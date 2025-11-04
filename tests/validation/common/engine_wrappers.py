@@ -103,8 +103,13 @@ class QEngineWrapper(EngineWrapper):
 
             def on_event(self, event):
                 """Route events to appropriate handlers."""
+                from qengine.core.event import FillEvent
+
                 if isinstance(event, MarketEvent):
                     self.on_market_event(event)
+                elif isinstance(event, FillEvent):
+                    # Let base class update internal position tracking
+                    super().on_fill_event(event)
 
             def on_market_event(self, event: MarketEvent):
                 from qengine.core.event import OrderEvent
@@ -114,13 +119,13 @@ class QEngineWrapper(EngineWrapper):
                 entry_signal = self.entries.iloc[self.bar_idx] if self.bar_idx < len(self.entries) else False
                 exit_signal = self.exits.iloc[self.bar_idx] if self.bar_idx < len(self.exits) else False
 
-                # Check current position via portfolio
-                position = self.portfolio.positions.get(event.asset_id)
-                current_qty = position.quantity if position is not None else 0.0
+                # Check current position via strategy's internal tracking (updated on FillEvent)
+                # NOTE: Do NOT use portfolio.positions - it's stale! Use self._positions which
+                # gets updated by the base Strategy.on_fill_event() handler
+                current_qty = self._positions.get(event.asset_id, 0.0)
 
-                # Exit logic: explicit exit OR exit on new entry
-                should_exit = exit_signal or (entry_signal and current_qty != 0)
-                if should_exit and current_qty != 0:
+                # Exit logic: exit if signal and have position
+                if exit_signal and current_qty != 0:
                     # Exit entire position
                     self._order_counter += 1
                     order_event = OrderEvent(
@@ -133,8 +138,8 @@ class QEngineWrapper(EngineWrapper):
                     )
                     self.event_bus.publish(order_event)
 
-                # Entry logic: enter when flat (after exit on same bar)
-                if entry_signal:
+                # Entry logic: enter only if flat
+                if entry_signal and current_qty == 0:
                     # Calculate position size (use all cash if size not specified)
                     if config.size is None:
                         # Use all available cash
@@ -220,7 +225,7 @@ class QEngineWrapper(EngineWrapper):
             asset_registry=registry,
             commission_model=commission_model,
             slippage_model=slippage_model,
-            execution_delay=True,  # Prevent lookahead bias
+            execution_delay=False,  # Disable for VectorBT comparison (VectorBT fills same-bar)
         )
 
         # Create strategy and data feed
