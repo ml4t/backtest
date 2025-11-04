@@ -1,0 +1,25 @@
+# Markdownlint configuration for validation framework documentation
+
+# Extend default configuration
+default: true
+
+# Line length - allow longer lines for code examples and tables
+MD013:
+  line_length: 120
+  heading_line_length: 80
+  code_block_line_length: 150
+  code_blocks: false
+  tables: false
+
+# Allow inline HTML for badges and formatting
+MD033: false
+
+# Allow duplicate headings (common in scenario documentation)
+MD024:
+  siblings_only: true
+
+# First line in file should be a top-level heading
+MD041: false
+
+# Allow bare URLs (useful for references)
+MD034: false

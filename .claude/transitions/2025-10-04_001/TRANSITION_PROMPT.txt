@@ -1,0 +1,24 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRANSITION PROMPT - Copy and paste this to start the next session
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+I'm continuing from the test coverage improvement work.
+
+Previous session completed:
+- Fixed all portfolio mypy type errors (commit 8747142)
+- Analyzed test coverage: 81% overall, 43 failing tests
+- Created work unit: 001_fix_broken_tests_and_expand_coverage
+- Exploration phase complete
+
+Current status:
+- 283 tests passing, 43 failing (broken by broker refactoring)
+- Critical modules undertested: Engine 19%, Broker 20%, Clock 21%
+- Ready to create detailed implementation plan
+
+Please read the handoff document at:
+.claude/transitions/latest/handoff.md
+
+Then run /plan to create the detailed task breakdown for fixing the 43 broken
+tests and expanding coverage to 90%+.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

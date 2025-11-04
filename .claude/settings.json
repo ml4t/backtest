@@ -1,0 +1,23 @@
+{
+  "project": "qengine",
+  "parent": "quantlab",
+  "framework_version": "2.0",
+  "workflow": {
+    "enabled": true,
+    "inherit_from_parent": true
+  },
+  "extraKnownMarketplaces": {
+    "local": {
+      "source": {
+        "source": "directory",
+        "path": "/home/stefan/agents/plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "system@local": true,
+    "workflow@local": true,
+    "memory@local": true,
+    "development@local": true
+  }
+}

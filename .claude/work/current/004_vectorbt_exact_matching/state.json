@@ -1,0 +1,980 @@
+{
+  "project": {
+    "name": "Phase 2: VectorBT Exact Matching",
+    "description": "Reverse engineer VectorBT Pro's TP/SL/TSL/fee/slippage logic and achieve exact trade-by-trade matching with qengine. Zero tolerance for approximation.",
+    "created_at": "2025-10-26T23:30:00Z",
+    "updated_at": "2025-10-27T15:00:00Z",
+    "phase": "Phase 2: VectorBT Exact Matching"
+  },
+  "status": "implementing",
+  "current_task": null,
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Set up VectorBT Pro investigation environment",
+      "description": "Create investigation environment with VectorBT Pro for empirical testing and analysis",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "VectorBT Pro installed and importable",
+        "Simple test backtest runs successfully",
+        "Can inspect Portfolio object attributes",
+        "Can access trade log and order records",
+        "Jupyter notebook set up for exploration"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/notebooks/",
+      "files_to_create": [
+        "notebooks/vectorbt_investigation.ipynb"
+      ],
+      "completed_at": "2025-10-27T00:25:43.169780+00:00"
+    },
+    {
+      "id": "TASK-002",
+      "title": "Analyze VectorBT source code for exit logic",
+      "description": "Read VectorBT Pro source code to understand TP/SL/TSL implementation details",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001"
+      ],
+      "acceptance_criteria": [
+        "Located relevant source code files",
+        "Documented TP/SL/TSL classes and methods",
+        "Identified key parameters and logic flow",
+        "Documented any proprietary algorithms",
+        "Created source code reference notes"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_source_analysis.md"
+      ],
+      "agent_recommendation": "architect - For understanding complex architectural decisions",
+      "completed_at": "2025-10-27T03:29:51.777492+00:00"
+    },
+    {
+      "id": "TASK-003",
+      "title": "Document entry price calculation mechanism",
+      "description": "Determine exactly how VectorBT calculates entry prices (timing, slippage, fees)",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "acceptance_criteria": [
+        "Entry price formula documented",
+        "Slippage application documented",
+        "Fee application documented",
+        "Verified with test cases (3+ examples)"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_entry_logic.md"
+      ]
+    },
+    {
+      "id": "TASK-004",
+      "title": "Document exit price calculation mechanism",
+      "description": "Determine exactly how VectorBT calculates exit prices (close, intra-bar, slippage, fees)",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "acceptance_criteria": [
+        "Exit price formula documented",
+        "Intra-bar behavior documented",
+        "Slippage application documented",
+        "Fee application documented",
+        "Verified with test cases (3+ examples)"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_exit_logic.md"
+      ]
+    },
+    {
+      "id": "TASK-005",
+      "title": "Document TP (take profit) triggering logic",
+      "description": "Document exactly when and how TP exits trigger in VectorBT",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-004"
+      ],
+      "acceptance_criteria": [
+        "TP trigger condition formula documented",
+        "TP price calculation documented",
+        "Timing of TP check documented",
+        "Verified with test cases showing TP exits"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_tp_logic.md"
+      ],
+      "completed_at": "2025-10-27T14:59:30.218018+00:00",
+      "actual_hours": 2.0
+    },
+    {
+      "id": "TASK-006",
+      "title": "Document SL (stop loss) triggering logic",
+      "description": "Document exactly when and how SL exits trigger in VectorBT",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-004"
+      ],
+      "acceptance_criteria": [
+        "SL trigger condition formula documented",
+        "SL price calculation documented",
+        "Timing of SL check documented",
+        "Verified with test cases showing SL exits"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_sl_logic.md"
+      ],
+      "completed_at": "2025-10-27T15:14:08.860731+00:00",
+      "actual_hours": 1.5
+    },
+    {
+      "id": "TASK-007",
+      "title": "Document TSL (trailing stop loss) tracking and triggering",
+      "description": "Document exactly how TSL is tracked (highest close vs high) and triggered",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-004"
+      ],
+      "acceptance_criteria": [
+        "TSL tracking mechanism documented",
+        "TSL trigger condition documented",
+        "TSL update frequency documented",
+        "Initial TSL calculation documented",
+        "Verified with test cases showing TSL exits"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_tsl_logic.md"
+      ],
+      "completed_at": "2025-10-27T16:02:19.031305+00:00",
+      "actual_hours": 2.5
+    },
+    {
+      "id": "TASK-008",
+      "title": "Document exit priority rules (same-bar conflicts)",
+      "description": "Determine what happens when multiple exit conditions trigger same bar",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-005",
+        "TASK-006",
+        "TASK-007"
+      ],
+      "acceptance_criteria": [
+        "Exit priority rules documented",
+        "Test cases for simultaneous triggers",
+        "Behavior verified empirically"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "medium",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_exit_priority.md"
+      ],
+      "completed_at": "2025-10-27T16:16:55.668206+00:00",
+      "actual_hours": 1.5
+    },
+    {
+      "id": "TASK-009",
+      "title": "Document fee calculation and application",
+      "description": "Document exactly how fees are calculated and when they are applied",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-003",
+        "TASK-004"
+      ],
+      "acceptance_criteria": [
+        "Fee formula documented",
+        "Fee application points documented",
+        "Impact on PnL calculation documented",
+        "Verified with test trades"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_fees.md"
+      ],
+      "completed_at": "2025-10-27T13:06:27.917381",
+      "actual_duration": "1.5h"
+    },
+    {
+      "id": "TASK-010",
+      "title": "Document slippage calculation and application",
+      "description": "Document exactly how slippage is calculated and applied (direction, timing)",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-003",
+        "TASK-004"
+      ],
+      "acceptance_criteria": [
+        "Slippage formula documented",
+        "Slippage application points documented",
+        "Direction (buy vs sell) documented",
+        "Verified with test trades"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_slippage.md"
+      ],
+      "completed_at": "2025-10-27T13:12:34.535868",
+      "actual_duration": "1.0h"
+    },
+    {
+      "id": "TASK-011",
+      "title": "Document position sizing with size=np.inf",
+      "description": "Understand how VectorBT handles size=np.inf (full capital allocation)",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-003",
+        "TASK-009",
+        "TASK-010"
+      ],
+      "acceptance_criteria": [
+        "Position sizing formula documented",
+        "Cash allocation rules documented",
+        "Fee/slippage impact on sizing documented",
+        "Quantity calculation documented",
+        "Verified with test trades"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/vectorbt_position_sizing.md"
+      ],
+      "completed_at": "2025-10-27T13:20:34.444668",
+      "actual_duration": "1.0h"
+    },
+    {
+      "id": "TASK-012",
+      "title": "Extract complete VectorBT trade log with all details",
+      "description": "Extract all trade details from VectorBT Portfolio object for comparison",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001"
+      ],
+      "acceptance_criteria": [
+        "Trade log includes: entry/exit time and price",
+        "Includes: fees, slippage, exit reason",
+        "Includes: position size, PnL, duration",
+        "Saved as structured data (CSV/Parquet)",
+        "All 352 trades from test period extracted"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/scripts/",
+      "files_to_create": [
+        "scripts/extract_vectorbt_trades.py",
+        "data/vectorbt_trades_q1_2024.parquet"
+      ],
+      "completed_at": "2025-10-27T17:58:30.000000",
+      "actual_duration": "0.78s",
+      "notes": "Extracted 482 trades (not 352) with comprehensive performance benchmarks. VectorBT Pro achieved 884K bars/second. Exit breakdown: 87.7% TSL, 12.3% TP."
+    },
+    {
+      "id": "TASK-013",
+      "title": "Create trade-by-trade comparison framework",
+      "description": "Build framework to compare VectorBT and qengine trades systematically",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-012"
+      ],
+      "acceptance_criteria": [
+        "Loads both VectorBT and qengine trade logs",
+        "Matches trades by index/timestamp",
+        "Compares all fields with clear reporting",
+        "Identifies missing/extra trades",
+        "Generates summary statistics"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "location": "projects/crypto_futures/scripts/",
+      "files_to_create": [
+        "scripts/compare_trades.py",
+        "tests/test_trade_matching.py"
+      ],
+      "completed_at": "2025-10-27T18:45:00.000000",
+      "actual_hours": 2.5,
+      "notes": "Created comprehensive comparison framework with classes for loading, matching, comparing, and reporting. Tested successfully with VectorBT self-comparison (100% match). Test suite created with pytest fixtures for various scenarios."
+    },
+    {
+      "id": "TASK-014",
+      "title": "Identify and document edge cases",
+      "description": "Identify edge cases in VectorBT trade log for comprehensive testing",
+      "type": "investigation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-012"
+      ],
+      "acceptance_criteria": [
+        "10+ edge cases identified",
+        "Edge case characteristics documented",
+        "Test data extracted for each case",
+        "Expected behavior documented"
+      ],
+      "estimated_hours": 2,
+      "priority": "medium",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/edge_cases.md"
+      ],
+      "completed_at": "2025-10-27T19:15:00.000000",
+      "actual_hours": 1.5,
+      "notes": "Identified 15 edge case categories from 482 trades. Extracted 12 specific examples to JSON. Documented characteristics, validation strategies, and priority recommendations. Edge cases cover duration extremes, PnL extremes, boundary conditions, and exit type distributions."
+    },
+    {
+      "id": "TASK-015",
+      "title": "Create verification test suite structure",
+      "description": "Set up pytest structure for verification tests",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-013",
+        "TASK-014"
+      ],
+      "acceptance_criteria": [
+        "pytest configuration in place",
+        "Test fixtures for VectorBT trades",
+        "Test fixtures for qengine setup",
+        "Parameterized tests for edge cases",
+        "Clear test organization"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "medium",
+      "location": "projects/crypto_futures/tests/",
+      "files_to_create": [
+        "tests/test_vectorbt_matching.py",
+        "tests/conftest.py"
+      ],
+      "completed_at": "2025-10-27T21:00:00.000000+00:00",
+      "actual_hours": 1.0,
+      "notes": "Created comprehensive test structure with 4 test classes covering data loading, edge cases, qengine matching (skipped), and comparison framework. Added VectorBT fixtures to conftest.py (lines 259-440) with session-scoped fixtures for trades/orders/edge cases, plus parameterized fixtures for testing all edge cases."
+    },
+    {
+      "id": "TASK-016",
+      "title": "Implement TP exit logic in qengine",
+      "description": "Implement TP exit logic exactly matching VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-005"
+      ],
+      "acceptance_criteria": [
+        "TP trigger condition matches VectorBT",
+        "TP price calculation matches VectorBT",
+        "TP timing matches VectorBT",
+        "Code documented with VectorBT reference",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/src/qengine/strategies/vectorbt_strategy.py",
+        "../../backtest/tests/test_tp_logic.py"
+      ],
+      "completed_at": "2025-10-27T22:00:00.000000+00:00",
+      "actual_hours": 2.0,
+      "notes": "Fixed critical bug: TP must be calculated from BASE PRICE (close before slippage), not fill_price. Updated bracket_manager.py with base_price extraction from metadata and fallback estimation. Created comprehensive 11-test suite (test_tp_vectorbt_matching.py) validating VectorBT exact matching. Updated existing test. Affects 59 TP exits (12.3%) in Q1 2024 data."
+    },
+    {
+      "id": "TASK-017",
+      "title": "Implement SL exit logic in qengine",
+      "description": "Implement SL exit logic exactly matching VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-006"
+      ],
+      "acceptance_criteria": [
+        "SL trigger condition matches VectorBT",
+        "SL price calculation matches VectorBT",
+        "SL timing matches VectorBT",
+        "Code documented",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_sl_logic.py"
+      ],
+      "completed_at": "2025-10-27T22:30:00.000000+00:00",
+      "actual_hours": 1.5,
+      "notes": "SL logic was already correctly implemented in qengine. Created comprehensive 10-test suite validating all behaviors. All tests passed. No code changes needed - verified existing implementation matches VectorBT exactly."
+    },
+    {
+      "id": "TASK-018",
+      "title": "Implement TSL tracking and exit logic in qengine",
+      "description": "Implement TSL tracking and exit logic exactly matching VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-007"
+      ],
+      "acceptance_criteria": [
+        "TSL tracking mechanism matches VectorBT",
+        "TSL trigger condition matches VectorBT",
+        "TSL update frequency matches VectorBT",
+        "Initial TSL calculation matches VectorBT",
+        "Code documented",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_tsl_logic.py"
+      ],
+      "completed_at": "2025-10-27T23:45:00.000000+00:00",
+      "actual_hours": 3.5,
+      "notes": "Implemented metadata-based peak tracking in broker.py (lines 519-569) and bracket_manager.py (lines 171-184). VectorBT 4-stage per-bar process implemented. TSL now trails from peak (max high), not current price. Created comprehensive test suite. Integration testing deferred to TASK-024. Affects 87.7% of exits (422/482 TSL trades in Q1 2024)."
+    },
+    {
+      "id": "TASK-019",
+      "title": "Implement exit priority handling in qengine",
+      "description": "Handle same-bar exit conflicts exactly like VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-008",
+        "TASK-016",
+        "TASK-017",
+        "TASK-018"
+      ],
+      "acceptance_criteria": [
+        "Exit priority rules match VectorBT",
+        "Simultaneous trigger handling verified",
+        "Code documented",
+        "Unit tests for conflict scenarios"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "medium",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_exit_priority.py"
+      ],
+      "actual_hours": 2.5,
+      "completed_at": "2025-10-27T23:59:00.000000+00:00",
+      "notes": "Implemented priority-based exit selection in broker.py. Added _get_exit_priority() and _collect_triggered_bracket_exits() methods. Modified order processing loops to skip bracket exits. Created new priority-based processing section. Unit tests passing (2/2). Integration tests deferred to TASK-024."
+    },
+    {
+      "id": "TASK-020",
+      "title": "Implement identical fee calculation in qengine",
+      "description": "Calculate fees exactly matching VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-009"
+      ],
+      "acceptance_criteria": [
+        "Fee formula matches VectorBT",
+        "Fee application points match VectorBT",
+        "PnL impact matches VectorBT",
+        "Code documented",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_fees.py"
+      ],
+      "completed_at": "2025-10-28T00:15:00.000000+00:00",
+      "actual_hours": 1.5,
+      "notes": "Created VectorBTCommission model implementing two-component fee system (percentage + fixed). Added to commission.py (lines 358-438, 80 lines). Verified with comprehensive test suite (4 test functions, all passing). No changes needed to broker or fill simulator - existing architecture already applies slippage before calculating fees, matching VectorBT exactly. Ready for integration testing in TASK-024."
+    },
+    {
+      "id": "TASK-021",
+      "title": "Implement identical slippage calculation in qengine",
+      "description": "Calculate slippage exactly matching VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-010"
+      ],
+      "acceptance_criteria": [
+        "Slippage formula matches VectorBT",
+        "Slippage application points match VectorBT",
+        "Direction handling matches VectorBT",
+        "Code documented",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_slippage.py"
+      ],
+      "actual_hours": 1.5,
+      "completion_date": "2025-10-27",
+      "notes": "Created VectorBTSlippage class with multiplicative formula. All 12 tests passing. Verified slippage applied before fees in FillSimulator."
+    },
+    {
+      "id": "TASK-022",
+      "title": "Implement identical position sizing in qengine",
+      "description": "Calculate position size exactly matching VectorBT's size=np.inf",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-011",
+        "TASK-020",
+        "TASK-021"
+      ],
+      "acceptance_criteria": [
+        "Position sizing formula matches VectorBT",
+        "Cash allocation matches VectorBT",
+        "Fee/slippage impact on sizing matches",
+        "Quantity calculation matches",
+        "Code documented",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_position_sizing.py"
+      ],
+      "completed_date": "2025-10-28",
+      "notes": "VectorBT size=np.inf position sizing implemented. Created position_sizer.py module with VectorBTInfiniteSizer class. Comprehensive test suite created. Ready for integration."
+    },
+    {
+      "id": "TASK-023",
+      "title": "Implement identical entry price logic in qengine",
+      "description": "Calculate entry prices exactly matching VectorBT",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-003"
+      ],
+      "acceptance_criteria": [
+        "Entry price formula matches VectorBT",
+        "Entry timing matches VectorBT",
+        "Slippage application matches",
+        "Fee application matches",
+        "Code documented",
+        "Unit tests pass"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "backtest/src/qengine/strategies/",
+      "files_to_create": [
+        "../../backtest/tests/test_entry_logic.py"
+      ],
+      "actual_hours": 1.5,
+      "completed_at": "2025-10-28T01:00:00.000000+00:00",
+      "notes": "VERIFIED - No implementation needed! qengine already implements VectorBT entry price logic correctly. FillSimulator applies: Slippage → Size → Fees (lines 177, 204, 211). VectorBTSlippage and VectorBTCommission from TASK-020/021 are correct. Test suite created (test_entry_price_vectorbt.py, 8 tests), integration testing deferred to TASK-024."
+    },
+    {
+      "id": "TASK-024",
+      "title": "Run initial qengine backtest with same signals",
+      "description": "Run qengine backtest with identical signals from Phase 1",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-016",
+        "TASK-017",
+        "TASK-018",
+        "TASK-019",
+        "TASK-020",
+        "TASK-021",
+        "TASK-022",
+        "TASK-023"
+      ],
+      "acceptance_criteria": [
+        "qengine backtest completes without errors",
+        "Trade log generated",
+        "Basic metrics calculated",
+        "Results saved for comparison"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/scripts/",
+      "files_to_create": [
+        "scripts/run_qengine_backtest.py",
+        "data/qengine_trades_q1_2024.parquet"
+      ]
+    },
+    {
+      "id": "TASK-025",
+      "title": "Compare aggregate metrics (trade count, total PnL)",
+      "description": "Compare high-level metrics between VectorBT and qengine",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-024",
+        "TASK-013"
+      ],
+      "acceptance_criteria": [
+        "Trade count comparison (target: exact match)",
+        "Total PnL comparison (target: <0.01% difference)",
+        "Win rate comparison",
+        "Average duration comparison",
+        "Report generated with differences"
+      ],
+      "estimated_hours": 1,
+      "priority": "high",
+      "location": "projects/crypto_futures/reports/",
+      "files_to_create": [
+        "reports/aggregate_comparison.md"
+      ]
+    },
+    {
+      "id": "TASK-026",
+      "title": "Implement trade-by-trade comparison script",
+      "description": "Run detailed trade-by-trade comparison and reporting",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-024",
+        "TASK-013"
+      ],
+      "acceptance_criteria": [
+        "Every trade compared individually",
+        "Differences highlighted with metrics",
+        "Clear reporting of mismatches",
+        "Summary statistics",
+        "Exportable comparison report"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/scripts/",
+      "files_to_create": [
+        "scripts/detailed_trade_comparison.py",
+        "reports/trade_by_trade_comparison.csv"
+      ]
+    },
+    {
+      "id": "TASK-027",
+      "title": "Debug first 10 trade discrepancies",
+      "description": "Investigate and fix first 10 trade differences",
+      "type": "debugging",
+      "status": "pending",
+      "dependencies": [
+        "TASK-026"
+      ],
+      "acceptance_criteria": [
+        "Root cause identified for each discrepancy",
+        "qengine code updated if needed",
+        "VectorBT behavior clarified if needed",
+        "First 10 trades match exactly",
+        "Fixes documented"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/debugging_notes.md"
+      ]
+    },
+    {
+      "id": "TASK-028",
+      "title": "Debug remaining trade discrepancies",
+      "description": "Iterate until all 352 trades match exactly",
+      "type": "debugging",
+      "status": "pending",
+      "dependencies": [
+        "TASK-027"
+      ],
+      "acceptance_criteria": [
+        "All 352 trades analyzed",
+        "All discrepancies resolved",
+        "100% matching achieved",
+        "Common error patterns documented"
+      ],
+      "estimated_hours": 4,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/"
+    },
+    {
+      "id": "TASK-029",
+      "title": "Verify 100% matching on test period",
+      "description": "Final verification of exact matching on Q1 2024 period",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-028"
+      ],
+      "acceptance_criteria": [
+        "Trade count: 352 = 352 ✅",
+        "Entry prices: 100% match ✅",
+        "Exit prices: 100% match ✅",
+        "Fees: 100% match ✅",
+        "PnL: 100% match (within rounding) ✅",
+        "Verification report generated"
+      ],
+      "estimated_hours": 1,
+      "priority": "high",
+      "location": "projects/crypto_futures/reports/",
+      "files_to_create": [
+        "reports/final_verification.md"
+      ]
+    },
+    {
+      "id": "TASK-030",
+      "title": "Test edge cases and boundary conditions",
+      "description": "Run edge case tests identified in TASK-014",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-029",
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "All edge cases tested",
+        "Behavior matches VectorBT for each case",
+        "Edge case test suite passes",
+        "Any surprises documented"
+      ],
+      "estimated_hours": 2,
+      "priority": "medium",
+      "location": "projects/crypto_futures/tests/",
+      "files_to_create": [
+        "tests/test_edge_cases.py",
+        "reports/edge_case_results.md"
+      ]
+    },
+    {
+      "id": "TASK-031",
+      "title": "Write VECTORBT_BEHAVIOR_SPEC.md",
+      "description": "Comprehensive VectorBT behavior specification document",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-002",
+        "TASK-003",
+        "TASK-004",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010",
+        "TASK-011",
+        "TASK-029"
+      ],
+      "acceptance_criteria": [
+        "All calculations documented with formulas",
+        "Examples provided for each behavior",
+        "Edge cases covered",
+        "Verified accurate by re-reading"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/VECTORBT_BEHAVIOR_SPEC.md"
+      ]
+    },
+    {
+      "id": "TASK-032",
+      "title": "Write QENGINE_IMPLEMENTATION_GUIDE.md",
+      "description": "Guide for implementing VectorBT behavior in qengine",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-016",
+        "TASK-017",
+        "TASK-018",
+        "TASK-019",
+        "TASK-020",
+        "TASK-021",
+        "TASK-022",
+        "TASK-023",
+        "TASK-029"
+      ],
+      "acceptance_criteria": [
+        "Clear step-by-step implementation guide",
+        "Code examples for each component",
+        "Pitfalls documented with solutions",
+        "Usable by someone not familiar with project"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/QENGINE_IMPLEMENTATION_GUIDE.md"
+      ],
+      "agent_recommendation": "code-reviewer - For implementation best practices review"
+    },
+    {
+      "id": "TASK-033",
+      "title": "Generate TRADE_COMPARISON_REPORT.md",
+      "description": "Final comparison report proving 100% matching",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-029",
+        "TASK-030"
+      ],
+      "acceptance_criteria": [
+        "Complete results documented",
+        "Clear proof of 100% matching",
+        "Edge cases covered",
+        "Exportable/shareable format"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "location": "projects/crypto_futures/docs/",
+      "files_to_create": [
+        "docs/TRADE_COMPARISON_REPORT.md"
+      ]
+    },
+    {
+      "id": "TASK-034",
+      "title": "Create verification test suite",
+      "description": "Package verification tests for reuse on new data periods",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015",
+        "TASK-029"
+      ],
+      "acceptance_criteria": [
+        "pytest suite runs end-to-end",
+        "Tests VectorBT vs qengine matching",
+        "Can be run on new data periods",
+        "Clear pass/fail reporting",
+        "Documented how to use"
+      ],
+      "estimated_hours": 2,
+      "priority": "medium",
+      "location": "projects/crypto_futures/tests/",
+      "files_to_create": [
+        "tests/test_vectorbt_qengine_matching.py",
+        "tests/README.md"
+      ],
+      "agent_recommendation": "test-engineer - For comprehensive test strategy"
+    },
+    {
+      "id": "TASK-035",
+      "title": "Final validation and sign-off",
+      "description": "Final review and sign-off for Phase 2 completion",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-031",
+        "TASK-032",
+        "TASK-033",
+        "TASK-034"
+      ],
+      "acceptance_criteria": [
+        "All 35 tasks completed",
+        "All documentation reviewed",
+        "All tests passing",
+        "100% matching verified",
+        "Ready for production use"
+      ],
+      "estimated_hours": 1,
+      "priority": "high",
+      "location": "projects/crypto_futures/"
+    }
+  ],
+  "completed_tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007",
+    "TASK-008",
+    "TASK-009",
+    "TASK-010",
+    "TASK-011",
+    "TASK-012",
+    "TASK-013",
+    "TASK-014",
+    "TASK-015",
+    "TASK-016",
+    "TASK-017",
+    "TASK-018",
+    "TASK-019",
+    "TASK-020",
+    "TASK-021",
+    "TASK-023"
+  ],
+  "next_available": [
+    "TASK-022"
+  ],
+  "metadata": {
+    "total_tasks": 35,
+    "total_estimated_hours": 55,
+    "test_period": "Q1 2024 (Jan 1 - Mar 31, 87 days)",
+    "baseline_trades": 352,
+    "baseline_pnl": 46140.15,
+    "exit_config": "TP=2.5%, TSL=1.0%",
+    "fees": 0.0002,
+    "slippage": 0.0002,
+    "target_matching": "100% (zero tolerance for approximation)",
+    "vectorbt_location": "VectorBT Pro (proprietary)",
+    "qengine_location": "/home/stefan/ml4t/software/backtest/src/qengine/"
+  },
+  "updated_at": "2025-10-28T01:00:00.000000+00:00",
+  "completed": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007",
+    "TASK-008",
+    "TASK-009",
+    "TASK-010",
+    "TASK-011",
+    "TASK-012",
+    "TASK-013",
+    "TASK-014",
+    "TASK-015",
+    "TASK-016",
+    "TASK-017",
+    "TASK-018",
+    "TASK-019",
+    "TASK-020",
+    "TASK-021",
+    "TASK-023"
+  ],
+  "progress": "23/35 (65.71%)"
+}

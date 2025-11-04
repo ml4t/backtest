@@ -1,0 +1,15 @@
+{
+    "id": "002",
+    "name": "002_comprehensive_qengine_validatio",
+    "created_at": "2025-10-04T20:00:00-05:00",
+    "requirement_type": "description",
+    "requirement_source": "Comprehensive QEngine validation against VectorBT Pro, Zipline-Reloaded, and Backtrader - testing correctness, performance, and ML integration across frequencies, assets, order types, and strategies. See .claude/planning/COMPREHENSIVE_VALIDATION_PLAN.md for detailed requirements.",
+    "phase": "planning_complete",
+    "status": "active",
+    "tasks_total": 38,
+    "tasks_completed": 0,
+    "estimated_hours": {
+        "min": 76,
+        "max": 152
+    }
+}

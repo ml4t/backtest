@@ -1,0 +1,59 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backtest Validation Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        .match { color: green; }
+        .diff { color: red; }
+        .summary { background-color: #f0f0f0; padding: 15px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Cross-Platform Backtest Validation</h1>
+
+    <div class="summary">
+        <h2>Summary</h2>
+        <pre>============================================================
+CROSS-PLATFORM VALIDATION SUMMARY
+============================================================
+
+Trade Counts:
+  qengine             :    2 trades
+  vectorbt_free       :    0 trades
+  Match: ✗ NO
+
+Total P&L:
+  qengine             : $2,588.44
+  vectorbt_free       : $0.00
+
+✓ No significant trade differences found
+
+============================================================</pre>
+    </div>
+
+    <h2>Trade Count Comparison</h2>
+    <table>
+        <tr><th>Platform</th><th>Trade Count</th></tr>
+        <tr><td>qengine</td><td>0</td></tr><tr><td>vectorbt_free</td><td>0</td></tr>
+    </table>
+
+    <h2>P&L Comparison</h2>
+    <table>
+        <tr><th>Platform</th><th>Total P&L</th></tr>
+        <tr><td>qengine</td><td>$2,588.44</td></tr><tr><td>vectorbt_free</td><td>$0.00</td></tr>
+    </table>
+
+    <h2>Trade-Level Differences</h2>
+    <table>
+        <tr><th>#</th><th>Field</th><th>Platform 1</th><th>Value 1</th><th>Platform 2</th><th>Value 2</th><th>Diff</th></tr>
+        
+    </table>
+
+</body>
+</html>
+        

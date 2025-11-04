@@ -1,0 +1,27 @@
+{
+  "platform": "qengine",
+  "trade_count": 2,
+  "total_pnl": 2588.4425788961807,
+  "win_rate": 50.0,
+  "metrics": {
+    "total_return": 3.9053087902391126,
+    "total_trades": 5,
+    "winning_trades": 2,
+    "losing_trades": 0,
+    "total_commission": 53.128179670562744,
+    "total_slippage": 5.312724914548994,
+    "final_equity": 103905.30879023911,
+    "cash_remaining": 90636.30854609849,
+    "avg_return": 0.03905308790239113,
+    "std_return": 0.0,
+    "sharpe_ratio": 0.0,
+    "max_drawdown": 0.0,
+    "win_rate": 40.0
+  },
+  "config": {
+    "initial_capital": 100000,
+    "commission": 0.001,
+    "slippage": 0.0
+  },
+  "execution_time": 0.007909536361694336
+}

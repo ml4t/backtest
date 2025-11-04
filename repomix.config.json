@@ -1,0 +1,38 @@
+{
+  "output": {
+    "filePath": "qengine-review.md",
+    "style": "xml",
+    "includeEmptyDirectories": false,
+    "topFilesLength": 12,
+    "showLineNumbers": false,
+    "removeComments": false,
+    "removeEmptyLines": false
+  },
+  "include": [
+    "README.md",
+    "src/qengine/__init__.py",
+    "src/qengine/engine.py",
+    "src/qengine/core/*.py",
+    "src/qengine/data/*.py",
+    "src/qengine/execution/*.py",
+    "src/qengine/portfolio/*.py",
+    "src/qengine/strategy/*.py",
+    "src/qengine/reporting/*.py"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      ".venv/**",
+      "docs/**",
+      "examples/**",
+      "tests/**",
+      "resources/**",
+      "htmlcov/**",
+      "__pycache__/**",
+      "*.pyc",
+      "benchmarks/**",
+      "config/**"
+    ]
+  }
+}

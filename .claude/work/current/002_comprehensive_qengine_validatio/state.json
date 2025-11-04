@@ -1,0 +1,729 @@
+{
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Install VectorBT Pro in isolated environment",
+      "description": "Set up .venv-vectorbt with VectorBT Pro installation. Use resources/vectorbt.pro-main/ source code. Verify installation with hello-world test.",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Virtual environment .venv-vectorbt created",
+        "VectorBT Pro installed and importable",
+        "Hello-world backtest runs successfully",
+        "Installation documented in setup guide"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 0: Infrastructure",
+      "type": "setup"
+    },
+    {
+      "id": "TASK-002",
+      "title": "Install Zipline-Reloaded in isolated environment",
+      "description": "Set up .venv-zipline with Zipline-Reloaded. Handle timezone and data bundle complexity. Verify with simple daily data test.",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Virtual environment .venv-zipline created",
+        "Zipline-Reloaded installed successfully",
+        "Data bundle configured for daily equities",
+        "Hello-world backtest runs successfully"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 0: Infrastructure",
+      "type": "setup"
+    },
+    {
+      "id": "TASK-003",
+      "title": "Install Backtrader in isolated environment",
+      "description": "Set up .venv-backtrader with Backtrader framework. Document known signal execution bugs as limitations.",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Virtual environment .venv-backtrader created",
+        "Backtrader installed and working",
+        "Hello-world backtest runs successfully",
+        "Known bugs documented"
+      ],
+      "estimated_hours": 2,
+      "phase": "Phase 0: Infrastructure",
+      "type": "setup"
+    },
+    {
+      "id": "TASK-004",
+      "title": "Implement VectorBT Pro adapter",
+      "description": "Create VectorBTProAdapter extending BaseFrameworkAdapter. Handle subprocess execution in isolated venv. Use quantgpt.chat for VectorBT Pro questions.",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001"
+      ],
+      "acceptance_criteria": [
+        "VectorBTProAdapter class implements BaseFrameworkAdapter",
+        "Subprocess execution working with .venv-vectorbt",
+        "Returns standardized ValidationResult",
+        "Unit tests passing"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 0: Infrastructure",
+      "type": "implementation"
+    },
+    {
+      "id": "TASK-005",
+      "title": "Implement Zipline-Reloaded adapter",
+      "description": "Create ZiplineAdapter extending BaseFrameworkAdapter. Handle data bundle format conversion and timezone issues.",
+      "status": "completed",
+      "dependencies": [
+        "TASK-002"
+      ],
+      "acceptance_criteria": [
+        "ZiplineAdapter class implements BaseFrameworkAdapter",
+        "Data bundle conversion working",
+        "Timezone handling correct",
+        "Unit tests passing"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 0: Infrastructure",
+      "type": "implementation",
+      "notes": "COMPLETED \u2705: Zipline adapter working with data.history() approach (no Pipeline). 11/11 tests passing. Generates trades and within 10% variance vs VectorBT. Simplified implementation using handle_data() directly."
+    },
+    {
+      "id": "TASK-006",
+      "title": "Implement Backtrader adapter",
+      "description": "Create BacktraderAdapter extending BaseFrameworkAdapter. Document known limitations and signal execution bugs.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-003"
+      ],
+      "acceptance_criteria": [
+        "BacktraderAdapter class implements BaseFrameworkAdapter",
+        "Feed format conversion working",
+        "Known bugs documented in limitations",
+        "Unit tests passing"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 0: Infrastructure",
+      "type": "implementation"
+    },
+    {
+      "id": "TASK-007",
+      "title": "Create universal data loader",
+      "description": "Build UniversalDataLoader supporting all data sources in ~/ml4t/projects/. Handle Parquet, CSV. Convert between Polars/Pandas and framework-specific formats.",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Loads daily equities, minute bars, crypto, tick data",
+        "Converts to framework-specific formats (VectorBT, Zipline, Backtrader, QEngine)",
+        "Handles Polars \u2194 Pandas conversion",
+        "Unit tests for all data sources"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 0: Infrastructure",
+      "type": "implementation"
+    },
+    {
+      "id": "TASK-008",
+      "title": "Create baseline verification test",
+      "description": "Implement hello-world test running identical simple strategy across all 4 frameworks. Verify infrastructure working end-to-end.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-004",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007"
+      ],
+      "acceptance_criteria": [
+        "Simple MA crossover runs on all 4 frameworks",
+        "Results returned in ValidationResult format",
+        "Basic agreement verified (within 10%)",
+        "Infrastructure proven functional"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 0: Infrastructure",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-009",
+      "title": "Document Phase 0 infrastructure setup",
+      "description": "Create comprehensive setup guide for framework installations, adapters, and data loaders. Include troubleshooting.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-008"
+      ],
+      "acceptance_criteria": [
+        "Installation guide complete for all 3 frameworks",
+        "Adapter implementation documented",
+        "Data loader usage examples provided",
+        "Troubleshooting section included"
+      ],
+      "estimated_hours": 2,
+      "phase": "Phase 0: Infrastructure",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-010",
+      "title": "Validate RSI Mean Reversion strategy",
+      "description": "Cross-framework validation of RSI mean reversion. Target 95%+ agreement on final value, \u00b15% on trade count.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-009"
+      ],
+      "acceptance_criteria": [
+        "Strategy runs on all 4 frameworks",
+        "Final portfolio value agreement \u226595%",
+        "Trade count agreement within \u00b15%",
+        "Trade timing verified",
+        "Results documented"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 1: Tier 1 Core Validation",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-011",
+      "title": "Validate Bollinger Band Breakout with stop-loss",
+      "description": "Test Bollinger breakout strategy with risk management. Verify stop-loss execution timing across frameworks.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-009"
+      ],
+      "acceptance_criteria": [
+        "Strategy runs on all 4 frameworks",
+        "Stop-loss triggers verified",
+        "Final value agreement \u226595%",
+        "Trade count and timing accurate",
+        "Risk management validated"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 1: Tier 1 Core Validation",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-012",
+      "title": "Validate multi-indicator MACD + RSI strategy",
+      "description": "Test combined technical indicators strategy. Verify signal generation logic across frameworks.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-009"
+      ],
+      "acceptance_criteria": [
+        "Strategy runs on all 4 frameworks",
+        "Signal combination logic verified",
+        "Final value agreement \u226595%",
+        "Indicator calculations match",
+        "Edge cases documented"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 1: Tier 1 Core Validation",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-013",
+      "title": "Validate multi-asset momentum ranking",
+      "description": "Test 30+ stock momentum ranking strategy. Verify portfolio rebalancing and position sizing across frameworks.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-009"
+      ],
+      "acceptance_criteria": [
+        "30+ stock portfolio runs on all frameworks",
+        "Ranking logic verified",
+        "Rebalancing timing accurate",
+        "Final value agreement \u226595%",
+        "Scalability proven"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 1: Tier 1 Core Validation",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-014",
+      "title": "Investigate any Tier 1 discrepancies",
+      "description": "Deep dive into any disagreements found in Tier 1 validation. Root cause analysis and resolution.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-010",
+        "TASK-011",
+        "TASK-012",
+        "TASK-013"
+      ],
+      "acceptance_criteria": [
+        "All discrepancies >5% investigated",
+        "Root causes identified and documented",
+        "QEngine bugs fixed or workarounds documented",
+        "Framework limitations documented"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 1: Tier 1 Core Validation",
+      "type": "investigation"
+    },
+    {
+      "id": "TASK-015",
+      "title": "Create Tier 1 validation report",
+      "description": "Comprehensive correctness report showing 95%+ agreement across all Tier 1 strategies. Proof of QEngine correctness.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-014"
+      ],
+      "acceptance_criteria": [
+        "All Tier 1 results documented",
+        "Agreement metrics calculated",
+        "Discrepancies explained",
+        "Correctness proof established",
+        "Report published"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 1: Tier 1 Core Validation",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-016",
+      "title": "Validate limit order execution",
+      "description": "Test limit order fill timing and price accuracy. Verify partial fills and order book simulation.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Limit orders execute at correct prices",
+        "Fill timing verified across frameworks",
+        "Partial fills handled correctly",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 2: Tier 2 Advanced Execution",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-017",
+      "title": "Validate stop-loss order triggering",
+      "description": "Test stop-loss trigger accuracy and slippage. Verify stop price execution across market conditions.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Stop-loss triggers at correct prices",
+        "Slippage modeling accurate",
+        "Gap handling verified",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 2: Tier 2 Advanced Execution",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-018",
+      "title": "Validate bracket orders",
+      "description": "Test bracket orders (entry + stop + target). Verify OCO (one-cancels-other) logic and multi-leg execution.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-016",
+        "TASK-017"
+      ],
+      "acceptance_criteria": [
+        "Bracket orders execute correctly",
+        "OCO logic verified",
+        "Exit timing accurate",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 2: Tier 2 Advanced Execution",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-019",
+      "title": "Validate trailing stop orders",
+      "description": "Test trailing stop dynamic adjustment. Verify trail amount calculation and trigger logic.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-017"
+      ],
+      "acceptance_criteria": [
+        "Trailing stops adjust correctly",
+        "Trail distance calculation accurate",
+        "Trigger timing verified",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 2: Tier 2 Advanced Execution",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-020",
+      "title": "Validate minute bar intraday strategies",
+      "description": "Test high-frequency strategies on NASDAQ100 minute bars. Verify intraday execution and EOD position handling.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Minute bar strategies run successfully",
+        "Intraday execution timing accurate",
+        "EOD positions handled correctly",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 2: Tier 2 Advanced Execution",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-021",
+      "title": "Create Tier 2 validation report",
+      "description": "Document advanced execution validation results. Prove order type implementation correctness.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-016",
+        "TASK-017",
+        "TASK-018",
+        "TASK-019",
+        "TASK-020"
+      ],
+      "acceptance_criteria": [
+        "All order types validated",
+        "Execution timing documented",
+        "Edge cases identified",
+        "Report published"
+      ],
+      "estimated_hours": 2,
+      "phase": "Phase 2: Tier 2 Advanced Execution",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-022",
+      "title": "Validate qfeatures technical indicator signals",
+      "description": "Test qfeatures library integration for signal generation. Verify indicator calculations and signal timing.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "qfeatures indicators compute correctly",
+        "Signals generated at correct times",
+        "Integration with QEngine proven",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 3: Tier 3 ML Integration",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-023",
+      "title": "Validate binary classification ML signals",
+      "description": "Test ML model binary signals (buy/sell). Verify qfeatures \u2192 qeval \u2192 qengine pipeline for classification models.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-022"
+      ],
+      "acceptance_criteria": [
+        "ML classification model trains successfully",
+        "Signals generated from model predictions",
+        "Pipeline integration proven",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 3: Tier 3 ML Integration",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-024",
+      "title": "Validate return forecasting for position sizing",
+      "description": "Test ML return prediction models for dynamic position sizing. Verify forecast-based allocation.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-023"
+      ],
+      "acceptance_criteria": [
+        "Return forecasting model working",
+        "Position sizing based on forecasts",
+        "Risk management integrated",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 3: Tier 3 ML Integration",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-025",
+      "title": "Validate multi-asset ML ranking",
+      "description": "Test ML-based asset ranking for portfolio construction. Verify ranking logic and rebalancing.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-024"
+      ],
+      "acceptance_criteria": [
+        "ML ranking model trains successfully",
+        "Asset selection based on rankings",
+        "Portfolio rebalancing working",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 3: Tier 3 ML Integration",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-026",
+      "title": "Validate SPY order flow microstructure signals",
+      "description": "Test order flow features (imbalance, toxicity, VPIN) from spy_features.parquet. Verify microstructure signal integration.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-022"
+      ],
+      "acceptance_criteria": [
+        "Order flow features load correctly",
+        "Microstructure signals generated",
+        "High-frequency logic verified",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 3: Tier 3 ML Integration",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-027",
+      "title": "Create Tier 3 ML pipeline report",
+      "description": "Document end-to-end ML integration validation. Prove qfeatures \u2192 qeval \u2192 qengine pipeline works correctly.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-023",
+        "TASK-024",
+        "TASK-025",
+        "TASK-026"
+      ],
+      "acceptance_criteria": [
+        "All ML strategies validated",
+        "Pipeline integration documented",
+        "Feature engineering proven",
+        "Report published"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 3: Tier 3 ML Integration",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-028",
+      "title": "Validate high-frequency tick data",
+      "description": "Test sub-second tick data strategies. Verify tick-level execution and performance.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Tick data loads and processes correctly",
+        "Sub-second execution verified",
+        "Performance benchmarked",
+        "Edge cases documented"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-029",
+      "title": "Validate irregular bars (volume/dollar)",
+      "description": "Test volume bars and dollar bars strategies. Verify non-time-based bar generation.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Volume/dollar bars generated correctly",
+        "Bar logic verified",
+        "Strategy execution accurate",
+        "Agreement \u226590% (more variance expected)"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-030",
+      "title": "Validate corporate actions handling",
+      "description": "Test dividend payments and stock splits. Verify position adjustment and cash flow accuracy.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Dividends credited correctly",
+        "Stock splits adjust positions",
+        "Cash flows verified",
+        "Agreement \u226595%"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-031",
+      "title": "Validate extreme market conditions",
+      "description": "Test strategies during market crashes and high volatility. Verify circuit breaker handling and gap execution.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "Crash scenarios tested",
+        "Gap handling verified",
+        "Risk limits enforced",
+        "Edge cases documented"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-032",
+      "title": "Validate 1000-asset portfolio scalability",
+      "description": "Test large-scale portfolio with 1000+ assets. Verify linear scaling and memory efficiency.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015"
+      ],
+      "acceptance_criteria": [
+        "1000-asset portfolio runs successfully",
+        "Linear scaling verified",
+        "Memory usage acceptable",
+        "Performance documented"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-033",
+      "title": "Create performance benchmarking suite",
+      "description": "Systematic performance comparison across frameworks. Measure speed, memory, scalability for all test scenarios.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-028",
+        "TASK-029",
+        "TASK-030",
+        "TASK-031",
+        "TASK-032"
+      ],
+      "acceptance_criteria": [
+        "All frameworks benchmarked",
+        "Metrics: events/sec, trades/sec, memory, CPU",
+        "Scaling curves documented (1-500 assets, 1mo-10yr)",
+        "Performance profiles created"
+      ],
+      "estimated_hours": 4,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "validation"
+    },
+    {
+      "id": "TASK-034",
+      "title": "Create Tier 4 performance report",
+      "description": "Document performance benchmarks and edge case handling. Establish when QEngine wins vs. alternatives.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-033"
+      ],
+      "acceptance_criteria": [
+        "Performance comparison complete",
+        "Edge cases documented",
+        "QEngine advantages identified",
+        "Report published"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 4: Tier 4 Performance",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-035",
+      "title": "Create validation summary report",
+      "description": "Comprehensive summary of all validation results across all tiers. High-level correctness and performance findings.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-015",
+        "TASK-021",
+        "TASK-027",
+        "TASK-034"
+      ],
+      "acceptance_criteria": [
+        "All tier results summarized",
+        "Key findings highlighted",
+        "Overall assessment provided",
+        "Executive summary included"
+      ],
+      "estimated_hours": 3,
+      "phase": "Phase 5: Documentation",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-036",
+      "title": "Create framework selection guide",
+      "description": "Decision matrix for choosing between frameworks. When to use QEngine vs. VectorBT vs. Zipline vs. Backtrader.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-035"
+      ],
+      "acceptance_criteria": [
+        "Decision matrix complete",
+        "Use cases for each framework",
+        "Pros/cons documented",
+        "Recommendations clear"
+      ],
+      "estimated_hours": 2,
+      "phase": "Phase 5: Documentation",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-037",
+      "title": "Create production readiness checklist",
+      "description": "Production deployment guide with validation checks. Operational readiness assessment.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-035"
+      ],
+      "acceptance_criteria": [
+        "Deployment checklist complete",
+        "Operational requirements documented",
+        "Monitoring recommendations included",
+        "Risk mitigation strategies provided"
+      ],
+      "estimated_hours": 2,
+      "phase": "Phase 5: Documentation",
+      "type": "documentation"
+    },
+    {
+      "id": "TASK-038",
+      "title": "Document known limitations and edge cases",
+      "description": "Comprehensive documentation of all known issues, workarounds, and edge cases discovered during validation.",
+      "status": "pending",
+      "dependencies": [
+        "TASK-035"
+      ],
+      "acceptance_criteria": [
+        "All known issues documented",
+        "Workarounds provided where possible",
+        "Edge cases catalogued",
+        "Future work identified"
+      ],
+      "estimated_hours": 2,
+      "phase": "Phase 5: Documentation",
+      "type": "documentation"
+    }
+  ],
+  "next_available": [
+    "TASK-006"
+  ],
+  "total_estimated_hours": {
+    "min": 76,
+    "max": 152
+  },
+  "critical_path": [
+    "Infrastructure Setup (Phase 0)",
+    "Tier 1 Core Validation (Phase 1)",
+    "Parallel: Tier 2-4 Validation",
+    "Documentation (Phase 5)"
+  ],
+  "parallelization_notes": "After TASK-015 completion, TASK-016 through TASK-032 can progress in parallel across different validation tiers. Only serialization required: Infrastructure \u2192 Tier 1 \u2192 Parallel validation \u2192 Documentation.",
+  "quality_gates": {
+    "phase_0": "All 3 frameworks installed and verified with hello-world test",
+    "phase_1": "95%+ agreement across all 5 Tier 1 strategies (correctness proof)",
+    "phase_2": "All order types executing correctly with accurate timing",
+    "phase_3": "End-to-end ML pipeline proven (qfeatures \u2192 qeval \u2192 qengine)",
+    "phase_4": "Performance profiles documented, edge cases handled",
+    "phase_5": "Comprehensive documentation ready for production"
+  }
+}

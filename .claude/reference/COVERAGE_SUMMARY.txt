@@ -1,0 +1,110 @@
+================================================================================
+                    QENGINE TEST COVERAGE SUMMARY
+================================================================================
+
+Overall Coverage: 81% (3027/3751 statements)
+Test Results: 283 passed, 43 failed (broken by broker refactoring)
+
+--------------------------------------------------------------------------------
+                          COVERAGE BY MODULE
+--------------------------------------------------------------------------------
+
+🟢 EXCELLENT (>80%)
+  [████████████████████████] 100% core/types.py
+  [██████████████████████  ]  95% portfolio/portfolio.py
+  [█████████████████████   ]  92% strategy/spy_order_flow_adapter.py
+  [█████████████████████   ]  92% core/constants.py
+  [████████████████████    ]  84% strategy/crypto_basis_adapter.py
+  [████████████████████    ]  81% portfolio/accounting.py
+
+🟡 MODERATE (50-80%)
+  [███████████             ]  53% reporting/base.py
+  [███████████             ]  51% strategy/base.py
+  [████████                ]  46% core/assets.py
+  [████████                ]  40% data/schemas.py
+  [████████                ]  39% execution/liquidity.py
+  [███████                 ]  36% execution/order.py
+  [███████                 ]  36% execution/position_tracker.py
+
+🔴 CRITICAL GAPS (<30%)
+  [████                    ]  19% engine.py                      ⚠️ CRITICAL
+  [████                    ]  20% execution/broker.py            ⚠️ CRITICAL
+  [████                    ]  21% core/clock.py                  ⚠️ CRITICAL
+  [█████                   ]  26% data/feed.py                   ⚠️ HIGH
+  [█████                   ]  26% portfolio/margin.py            ⚠️ HIGH
+  [████                    ]  24% execution/market_impact.py     ⚠️ HIGH
+  [█████                   ]  23% execution/commission.py        ⚠️ HIGH
+  [█████                   ]  23% portfolio/simple.py
+  [████                    ]  21% reporting/parquet.py
+  [████                    ]  19% execution/fill_simulator.py    ⚠️ HIGH
+
+⚫ NO COVERAGE
+  [                        ]   0% execution/corporate_actions.py
+
+--------------------------------------------------------------------------------
+                          TEST FAILURE BREAKDOWN
+--------------------------------------------------------------------------------
+
+Cash Constraints:          8 failures  ⚠️ Broker API changes
+Clock Multi-Feed:          7 failures  ⚠️ Clock refactoring needed
+Liquidity Integration:     6 failures  ⚠️ FillSimulator integration
+Market Impact:             6 failures  ⚠️ Broker refactoring
+Lookahead Prevention:      5 failures  ⚠️ Execution timing
+Commission Integration:    2 failures  ⚠️ Model integration
+Engine Integration:        2 failures  ⚠️ Core flow broken
+Other:                     7 failures  ⚠️ Various integration
+
+--------------------------------------------------------------------------------
+                          PRIORITY ACTION ITEMS
+--------------------------------------------------------------------------------
+
+🔴 IMMEDIATE (Next Session)
+   1. Fix 43 broken tests from broker refactoring
+   2. Engine coverage: 19% → 80%
+   3. Broker coverage: 20% → 80%
+
+🟡 HIGH PRIORITY (This Week)
+   4. Clock coverage: 21% → 80%
+   5. Fill simulator: 19% → 80%
+   6. Data feed: 26% → 80%
+
+🟢 MEDIUM PRIORITY (Next Week)
+   7. Strategy base: 51% → 80%
+   8. Order management: 36% → 80%
+   9. Commission/Slippage: 23-31% → 70%
+
+--------------------------------------------------------------------------------
+                          COVERAGE IMPROVEMENT ROADMAP
+--------------------------------------------------------------------------------
+
+Week 1 (Stabilization):     Fix broken tests        → 85% coverage
+Week 2 (Core Systems):      Core module tests       → 90% coverage
+Week 3 (Execution Models):  Execution model tests   → 92% coverage
+Week 4 (Advanced Features): Advanced feature tests  → 93% coverage
+
+Target: 90% coverage in 3-4 weeks with focused effort
+
+--------------------------------------------------------------------------------
+                          KEY FINDINGS
+--------------------------------------------------------------------------------
+
+✅ Strengths:
+   • Portfolio module excellent (95%)
+   • Type system perfect (100%)
+   • Strategy adapters very good (84-92%)
+
+⚠️ Weaknesses:
+   • Core engine critically low (19%)
+   • Broker critically low (20%)
+   • Clock critically low (21%)
+   • 43 tests broken by recent refactoring
+
+📊 Risk Assessment:
+   HIGH RISK:    Engine, Broker, Clock (<25%)
+   MEDIUM RISK:  Data, Fill Simulator, Margin (20-30%)
+   LOW RISK:     Portfolio, Types, Strategies (>80%)
+
+================================================================================
+                    Generated: 2025-10-04
+                    Full analysis: .claude/reference/COVERAGE_ANALYSIS.md
+================================================================================

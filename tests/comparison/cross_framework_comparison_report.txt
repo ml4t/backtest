@@ -1,0 +1,53 @@
+
+================================================================================
+CROSS-FRAMEWORK BACKTEST COMPARISON REPORT
+================================================================================
+Generated: 2025-08-08 12:14:14
+
+## RESULTS BY FRAMEWORK
+------------------------------------------------------------
+                Final Value  Total Return (%)  ...  Win Rate  Execution Time (s)
+QEngine         9195.878423         -8.041216  ...       0.5            1.252938
+Zipline-Style   9195.878423         -8.041216  ...       0.5            1.257529
+Backtrader     10018.960775          0.189608  ...       0.0            0.042015
+
+[3 rows x 7 columns]
+
+## DISCREPANCIES DETECTED
+------------------------------------------------------------
+  • Return discrepancy detected: std=3.88%
+  • Returns: QEngine=-8.04%, Zipline-Style=-8.04%, Backtrader=0.19%
+  • Trade count mismatch: QEngine=13, Zipline-Style=13, Backtrader=9
+
+## TRADE COMPARISON
+------------------------------------------------------------
+
+QEngine - First 3 trades:
+  1. 2015-03-16 00:00:00 BUY @ $124.95
+  2. 2015-04-16 00:00:00 SELL @ $126.17
+  3. 2015-04-28 00:00:00 BUY @ $130.56
+
+Zipline-Style - First 3 trades:
+  1. 2015-03-16 00:00:00 BUY @ $124.95
+  2. 2015-04-16 00:00:00 SELL @ $126.17
+  3. 2015-04-28 00:00:00 BUY @ $130.56
+
+Backtrader - First 3 trades:
+  1. 2024-01-15 10:52:00 BUY @ $449.17
+  2. 2024-01-15 11:11:00 SELL @ $448.78
+  3. 2024-01-15 11:37:00 BUY @ $449.16
+
+## RECOMMENDATIONS
+------------------------------------------------------------
+  ⚠ Investigate discrepancies in return calculations
+  ⚠ Trade generation logic differs between frameworks
+
+## FRAMEWORK ERRORS
+------------------------------------------------------------
+
+VectorBT:
+  • unsupported operand type(s) for *: 'method' and 'int'
+
+================================================================================
+END OF REPORT
+================================================================================

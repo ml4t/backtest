@@ -1,0 +1,241 @@
+name: QEngine Validation Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/validation/**'
+      - 'src/qengine/**'
+      - '.github/workflows/validation-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'tests/validation/**'
+      - 'src/qengine/**'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  validation-tests:
+    name: Run Validation Test Suite
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+      fail-fast: false  # Continue testing other versions if one fails
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        working-directory: tests/validation
+        run: |
+          # Install qengine and validation dependencies
+          cd ../..
+          uv sync --all-extras
+
+      - name: Verify installations
+        working-directory: tests/validation
+        run: |
+          uv run python -c "import qengine; print(f'qengine: {qengine.__version__}')"
+          uv run python -c "import vectorbtpro; print('VectorBT Pro: OK')" || echo "VectorBT Pro: Not available (license required)"
+          uv run python -c "import backtrader; print('Backtrader: OK')"
+          uv run python -c "import zipline; print('Zipline: OK')"
+
+      - name: Run infrastructure tests (fast)
+        working-directory: tests/validation
+        run: |
+          # Run fast tests (skip slow Zipline bundle tests)
+          uv run python -m pytest \
+            test_fixtures_market_data.py \
+            test_extractors.py \
+            test_matcher.py \
+            -v \
+            -m "not slow" \
+            --cov=fixtures \
+            --cov=extractors \
+            --cov=comparison \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      - name: Run scenario tests
+        working-directory: tests/validation
+        run: |
+          # Run all scenario tests
+          # Note: VectorBT Pro scenarios may be skipped if license not available
+          uv run python -m pytest \
+            test_scenario_001_simple_market_orders.py \
+            test_scenario_002_limit_orders.py \
+            test_scenario_003_stop_orders.py \
+            test_scenario_004_position_reentry.py \
+            test_scenario_005_multi_asset.py \
+            -v \
+            --cov=scenarios \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./tests/validation/coverage.xml
+          flags: validation-tests
+          name: validation-${{ matrix.python-version }}
+          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails
+
+      - name: Generate test report
+        if: always()
+        working-directory: tests/validation
+        run: |
+          # Generate human-readable test summary
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Python Version**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count test results
+          if [ -f .pytest_cache/v/cache/lastfailed ]; then
+            echo "**Status**: ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status**: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: |
+            tests/validation/coverage.xml
+            tests/validation/.pytest_cache/
+          retention-days: 30
+
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install ruff
+        run: uv tool install ruff
+
+      - name: Run ruff linter
+        working-directory: tests/validation
+        run: |
+          uvx ruff check . --output-format=github
+
+      - name: Run ruff formatter check
+        working-directory: tests/validation
+        run: |
+          uvx ruff format --check .
+
+  platform-compatibility:
+    name: Platform Compatibility Check
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.11']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run fast tests only
+        working-directory: tests/validation
+        run: |
+          cd ../..
+          uv sync
+          cd tests/validation
+          uv run python -m pytest test_matcher.py -v -m "not slow"
+
+  documentation-check:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check documentation exists
+        working-directory: tests/validation
+        run: |
+          # Verify all required documentation files exist
+          test -f README.md || exit 1
+          test -f STATUS.md || exit 1
+          test -f docs/PLATFORM_EXECUTION_MODELS.md || exit 1
+          test -f docs/TROUBLESHOOTING.md || exit 1
+          test -f docs/QUICK_REFERENCE.md || exit 1
+          test -f docs/CONTRIBUTING.md || exit 1
+          echo "✅ All documentation files present"
+
+      - name: Check documentation formatting
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: 'tests/validation/**/*.md'
+          config: tests/validation/.markdownlint.yaml
+
+  report-status:
+    name: Report Overall Status
+    runs-on: ubuntu-latest
+    needs: [validation-tests, lint-and-format, platform-compatibility, documentation-check]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.validation-tests.result }}" == "success" ] && \
+             [ "${{ needs.lint-and-format.result }}" == "success" ] && \
+             [ "${{ needs.platform-compatibility.result }}" == "success" ] && \
+             [ "${{ needs.documentation-check.result }}" == "success" ]; then
+            echo "✅ All checks passed!"
+            exit 0
+          else
+            echo "❌ Some checks failed"
+            echo "Validation Tests: ${{ needs.validation-tests.result }}"
+            echo "Lint & Format: ${{ needs.lint-and-format.result }}"
+            echo "Platform Compatibility: ${{ needs.platform-compatibility.result }}"
+            echo "Documentation: ${{ needs.documentation-check.result }}"
+            exit 1
+          fi

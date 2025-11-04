@@ -1,0 +1,26 @@
+# Markdownlint configuration
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+default: true
+
+# Line length
+MD013:
+  line_length: 120
+  code_blocks: false
+  tables: false
+
+# Allow inline HTML
+MD033: false
+
+# Allow bare URLs
+MD034: false
+
+# First line in file should be a top level heading
+MD041: false
+
+# Allow duplicate headings
+MD024:
+  siblings_only: true
+
+# Allow trailing punctuation in headings
+MD026: false
