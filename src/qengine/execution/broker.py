@@ -554,7 +554,6 @@ class SimulationBroker(Broker):
                 high=event.high,
                 low=event.low,
                 close=event.close,
-                open=event.open,
             )
             if fill_result:
                 # Check position before fill (for exit tracking)
@@ -736,7 +735,6 @@ class SimulationBroker(Broker):
                 high=event.high,
                 low=event.low,
                 close=event.close,
-                open=event.open,
             )
             if fill_result:
                 # Check position before fill (for exit tracking)

@@ -118,7 +118,6 @@ class FillSimulator:
         high: Price | None = None,
         low: Price | None = None,
         close: Price | None = None,
-        open: Price | None = None,
     ) -> FillResult | None:
         """Attempt to fill an order at the given market price or OHLC data.
 
@@ -141,8 +140,7 @@ class FillSimulator:
             timestamp: Event timestamp
             high: Bar's high price (for intrabar limit order detection)
             low: Bar's low price (for intrabar stop order detection)
-            close: Bar's close price (used as fallback and for exit fills)
-            open: Bar's open price (used for entry fills, VectorBT compatibility)
+            close: Bar's close price (used as fill price and fallback)
 
         Returns:
             FillResult if order was filled, None if order cannot be filled
@@ -154,33 +152,13 @@ class FillSimulator:
             - Updates liquidity model state
             - Increments internal fill counter
 
-            For VectorBT Pro compatibility:
-            - Entry fills use open price (when current_position is 0)
-            - Exit fills use close price (when reducing position)
-            - Bracket orders use intrabar execution with high/low
+            For VectorBT Pro compatibility, prefer passing high/low/close for intrabar
+            execution. If only market_price is provided, falls back to end-of-bar logic.
         """
-        # Determine if this is an entry or exit order
-        # Entry: position is 0, or order increases position
-        # Exit: order reduces or closes position
-        is_entry = False
-        if current_position == 0:
-            # Flat position -> entry
-            is_entry = True
-        elif (current_position > 0 and order.is_buy) or (current_position < 0 and order.is_sell):
-            # Adding to existing position -> entry
-            is_entry = True
-
         # Determine the price to use for checks and fills
-        # VectorBT Pro fill model:
-        # - Entry fills: use open price
-        # - Exit fills: use close price (bracket orders use high/low via intrabar)
-        if is_entry and open is not None:
-            check_price = open
-        elif close is not None:
-            check_price = close
-        elif market_price is not None:
-            check_price = market_price
-        else:
+        # Prefer close from OHLC, fallback to market_price for backward compatibility
+        check_price = close if close is not None else market_price
+        if check_price is None:
             logger.warning("No price data provided to try_fill_order")
             return None
 
