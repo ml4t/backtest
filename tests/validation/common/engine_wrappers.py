@@ -93,39 +93,66 @@ class QEngineWrapper(EngineWrapper):
                 self.entries = entries_ser
                 self.exits = exits_ser if exits_ser is not None else pd.Series([False] * len(entries_ser))
                 self.bar_idx = 0
+                self._order_counter = 0
+
+            def on_start(self, portfolio, event_bus):
+                super().on_start(portfolio, event_bus)
+                # Store references
+                self.portfolio = portfolio
+                self.event_bus = event_bus
+
+            def on_event(self, event):
+                """Route events to appropriate handlers."""
+                if isinstance(event, MarketEvent):
+                    self.on_market_event(event)
 
             def on_market_event(self, event: MarketEvent):
+                from qengine.core.event import OrderEvent
+                from qengine.core.types import OrderSide, OrderType
+
                 # Get signal for this bar
                 entry_signal = self.entries.iloc[self.bar_idx] if self.bar_idx < len(self.entries) else False
                 exit_signal = self.exits.iloc[self.bar_idx] if self.bar_idx < len(self.exits) else False
 
-                # Check current position
-                position = self.broker.get_position(event.asset_id)
+                # Check current position via portfolio
+                position = self.portfolio.positions.get(event.asset_id)
+                current_qty = position.quantity if position is not None else 0.0
 
-                # Exit logic
-                if exit_signal and position != 0:
+                # Exit logic: explicit exit OR exit on new entry
+                should_exit = exit_signal or (entry_signal and current_qty != 0)
+                if should_exit and current_qty != 0:
                     # Exit entire position
-                    self.broker.submit_market_order(
+                    self._order_counter += 1
+                    order_event = OrderEvent(
+                        timestamp=event.timestamp,
+                        order_id=f"EXIT_{self._order_counter:04d}",
                         asset_id=event.asset_id,
-                        quantity=abs(position),
-                        side='sell' if position > 0 else 'buy',
+                        order_type=OrderType.MARKET,
+                        side=OrderSide.SELL if current_qty > 0 else OrderSide.BUY,
+                        quantity=abs(current_qty),
                     )
+                    self.event_bus.publish(order_event)
 
-                # Entry logic
-                if entry_signal and position == 0:
+                # Entry logic: enter when flat (after exit on same bar)
+                if entry_signal:
                     # Calculate position size (use all cash if size not specified)
                     if config.size is None:
                         # Use all available cash
-                        cash = self.broker.get_cash()
+                        cash = self.portfolio.cash
                         size = cash / event.close  # Buy as much as possible
                     else:
                         size = config.size
 
-                    self.broker.submit_market_order(
+                    self._order_counter += 1
+                    order_event = OrderEvent(
+                        timestamp=event.timestamp,
+                        order_id=f"ENTRY_{self._order_counter:04d}",
                         asset_id=event.asset_id,
+                        order_type=OrderType.MARKET,
+                        side=OrderSide.BUY,
                         quantity=size,
-                        side='buy',
                     )
+                    self.event_bus.publish(order_event)
 
                 self.bar_idx += 1
 
@@ -135,17 +162,23 @@ class QEngineWrapper(EngineWrapper):
                 self.ohlcv = ohlcv_df.reset_index()
                 self.idx = 0
 
-            def __iter__(self):
-                return self
+            @property
+            def is_exhausted(self) -> bool:
+                """Check if all data has been consumed."""
+                return self.idx >= len(self.ohlcv)
 
-            def __next__(self):
-                if self.idx >= len(self.ohlcv):
-                    raise StopIteration
+            def get_next_event(self) -> MarketEvent:
+                """Get next market event."""
+                from qengine.core.types import MarketDataType
+
+                if self.is_exhausted:
+                    return None
 
                 row = self.ohlcv.iloc[self.idx]
                 event = MarketEvent(
                     timestamp=row['timestamp'],
                     asset_id="BTC",
+                    data_type=MarketDataType.BAR,
                     price=row['close'],
                     open=row['open'],
                     high=row['high'],
@@ -156,38 +189,86 @@ class QEngineWrapper(EngineWrapper):
                 self.idx += 1
                 return event
 
+            def peek_next_timestamp(self) -> datetime:
+                """Peek at timestamp of next event without consuming it."""
+                if self.is_exhausted:
+                    return None
+                return self.ohlcv.iloc[self.idx]['timestamp']
+
+            def reset(self):
+                """Reset to beginning."""
+                self.idx = 0
+
+            def seek(self, timestamp: datetime):
+                """Seek to specific timestamp."""
+                # Find first row with timestamp >= target
+                mask = self.ohlcv['timestamp'] >= timestamp
+                indices = mask[mask].index
+                if len(indices) > 0:
+                    self.idx = indices[0]
+                else:
+                    self.idx = len(self.ohlcv)
+
         # Create commission and slippage models
         commission_model = PercentageCommission(rate=config.fees) if config.fees > 0 else None
         slippage_model = PercentageSlippage(slippage=config.slippage) if config.slippage > 0 else None
 
-        # Run backtest
-        engine = BacktestEngine(
-            initial_capital=config.initial_cash,
+        # Create broker with commission/slippage models
+        from qengine.execution.broker import SimulationBroker
+        broker = SimulationBroker(
+            initial_cash=config.initial_cash,
             asset_registry=registry,
             commission_model=commission_model,
             slippage_model=slippage_model,
+            execution_delay=True,  # Prevent lookahead bias
         )
 
+        # Create strategy and data feed
         strategy = SignalStrategy(entries, exits)
         data_feed = SimpleDataFeed(ohlcv)
 
-        engine.run(strategy, data_feed)
+        # Run backtest
+        engine = BacktestEngine(
+            data_feed=data_feed,
+            strategy=strategy,
+            broker=broker,
+            initial_capital=config.initial_cash,
+        )
 
-        # Extract results
-        trades_df = engine.broker.trade_tracker.get_trades_dataframe()
+        results = engine.run()
 
-        # Calculate final values
-        final_cash = engine.broker.get_cash()
-        final_position = engine.broker.get_position("BTC")
+        # Get round-trip trades from trade_tracker, not broker.get_trades()
+        # broker.get_trades() returns individual orders/fills
+        # trade_tracker.get_trades_df() returns entry/exit paired trades
+        trades = engine.broker.trade_tracker.get_trades_df()
+        if hasattr(trades, 'to_pandas'):
+            # Convert Polars DataFrame to pandas
+            trades_df = trades.to_pandas()
+        else:
+            trades_df = trades
+
+        # Standardize column names to match expected format
+        # qengine uses: entry_dt, exit_dt, entry_quantity, exit_quantity
+        # expected: entry_time, exit_time, size, pnl, entry_price, exit_price
+        if len(trades_df) > 0:
+            trades_df = trades_df.rename(columns={
+                'entry_dt': 'entry_time',
+                'exit_dt': 'exit_time',
+                'entry_quantity': 'size',
+            })
+
+        # Get final values from results
+        final_value = results['final_value']
+        final_cash = engine.portfolio.cash
+        final_position = engine.broker.position_tracker.get_position("BTC")
         final_price = ohlcv['close'].iloc[-1]
-        final_value = final_cash + final_position * final_price
 
         return BacktestResult(
             trades=trades_df,
             final_value=final_value,
             final_cash=final_cash,
             final_position=final_position,
-            total_pnl=final_value - config.initial_cash,
+            total_pnl=results['total_return'] / 100 * config.initial_cash,  # Convert percentage to dollar PnL
             num_trades=len(trades_df),
             engine_name='qengine',
         )
