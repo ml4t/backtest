@@ -336,6 +336,9 @@ class SimulationBroker(Broker):
                     self._total_slippage += fill_result.slippage
                     self._fill_count += 1
 
+                    # Track trade (same as delayed execution path)
+                    self.trade_tracker.on_fill(fill_result.fill_event)
+
                     # Publish fill event immediately if order was filled
                     if hasattr(self, "event_bus") and self.event_bus:
                         self.event_bus.publish(fill_result.fill_event)
