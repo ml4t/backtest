@@ -4,7 +4,7 @@ Test 1.2: Entry + Exit Signal Pairs
 Objective: Verify all engines execute identical round-trip trades with explicit entry and exit signals.
 
 Configuration:
-- Asset: BTC (synthetic data, 1000 bars)
+- Asset: BTC (real CryptoCompare spot data, 1000 minute bars from 2021-01-01)
 - Signals: Fixed entry/exit pairs (entry every 50 bars, hold for 10 bars)
 - Order Type: Market orders
 - Fees: 0.0
@@ -30,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from common import (
-    generate_ohlcv,
+    load_real_crypto_data,
     generate_entry_exit_pairs,
     BacktestConfig,
     QEngineWrapper,
@@ -46,17 +46,13 @@ def test_1_2_entry_exit_pairs():
     print("TEST 1.2: Entry + Exit Signal Pairs")
     print("=" * 80)
 
-    # 1. Generate test data
-    print("\n1️⃣  Generating synthetic OHLCV data (1000 bars)...")
-    ohlcv = generate_ohlcv(
-        n_bars=1000,
+    # 1. Load real BTC data
+    print("\n1️⃣  Loading real BTC spot data (1000 bars)...")
+    ohlcv = load_real_crypto_data(
         symbol="BTC",
-        base_price=35000.0,
-        volatility=0.01,
-        seed=42,
+        data_type="spot",
+        n_bars=1000,
     )
-    print(f"   ✅ Generated {len(ohlcv)} bars")
-    print(f"   📊 Price range: ${ohlcv['close'].min():,.2f} - ${ohlcv['close'].max():,.2f}")
 
     # 2. Generate signals (entry/exit pairs)
     print("\n2️⃣  Generating entry/exit signal pairs...")

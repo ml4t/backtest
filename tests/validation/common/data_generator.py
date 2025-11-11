@@ -1,7 +1,8 @@
-"""Generate synthetic OHLCV data for validation tests."""
+"""Generate synthetic OHLCV data for validation tests and load real data."""
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from pathlib import Path
 
 
 def generate_ohlcv(
@@ -129,6 +130,74 @@ def validate_ohlcv(df: pd.DataFrame) -> bool:
             "Close of bar N must equal Open of bar N+1"
 
     return True
+
+
+def load_real_crypto_data(
+    symbol: str = "BTC",
+    data_type: str = "spot",
+    start_date: str | None = None,
+    end_date: str | None = None,
+    n_bars: int | None = None,
+) -> pd.DataFrame:
+    """
+    Load real cryptocurrency data from the projects directory.
+
+    Args:
+        symbol: Asset symbol (BTC, ETH, etc.)
+        data_type: 'spot' or 'futures'
+        start_date: Optional start date (YYYY-MM-DD)
+        end_date: Optional end date (YYYY-MM-DD)
+        n_bars: Optional number of bars to load (from start_date or beginning)
+
+    Returns:
+        DataFrame with columns: [timestamp, open, high, low, close, volume, symbol]
+        Index is timestamp (datetime)
+    """
+    # Find the data file
+    base_path = Path(__file__).parent.parent.parent.parent.parent
+    data_path = base_path / "projects" / "crypto_futures" / "data" / data_type / f"{symbol}_{data_type}.parquet"
+
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data file not found: {data_path}")
+
+    print(f"Loading real {symbol} {data_type} data from {data_path.name}...")
+
+    # Load with polars (fast) then convert to pandas
+    try:
+        import polars as pl
+        df_pl = pl.read_parquet(data_path)
+        df = df_pl.to_pandas()
+    except ImportError:
+        # Fallback to pandas if polars not available
+        df = pd.read_parquet(data_path)
+
+    # Standardize column names
+    df = df.rename(columns={'timestamp': 'timestamp'})
+
+    # Filter by date range if specified
+    if start_date is not None:
+        start = pd.Timestamp(start_date, tz='UTC')
+        df = df[df['timestamp'] >= start]
+
+    if end_date is not None:
+        end = pd.Timestamp(end_date, tz='UTC')
+        df = df[df['timestamp'] <= end]
+
+    # Limit to n_bars if specified
+    if n_bars is not None:
+        df = df.head(n_bars)
+
+    # Set timestamp as index
+    df = df.set_index('timestamp')
+
+    # Keep only OHLCV columns
+    df = df[['open', 'high', 'low', 'close', 'volume', 'symbol']]
+
+    print(f"   ✅ Loaded {len(df):,} bars")
+    print(f"   📅 Date range: {df.index.min()} to {df.index.max()}")
+    print(f"   💰 Price range: ${df['close'].min():.2f} - ${df['close'].max():.2f}")
+
+    return df
 
 
 if __name__ == "__main__":
