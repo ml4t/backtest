@@ -11,7 +11,7 @@ from typing import Optional
 class BacktestConfig:
     """Configuration for backtest runs (same across all engines)."""
     initial_cash: float = 100000.0
-    fees: float = 0.0
+    fees: float | dict = 0.0  # Float for percentage-only, or dict{"percentage": float, "fixed": float}
     slippage: float = 0.0
     order_type: str = 'market'  # 'market', 'limit', 'stop'
     size: Optional[float] = None  # None = use all cash (size=np.inf in VBT)
@@ -119,40 +119,53 @@ class QEngineWrapper(EngineWrapper):
                 entry_signal = self.entries.iloc[self.bar_idx] if self.bar_idx < len(self.entries) else False
                 exit_signal = self.exits.iloc[self.bar_idx] if self.bar_idx < len(self.exits) else False
 
-                # Check current position via strategy's internal tracking (updated on FillEvent)
-                # NOTE: For entry/exit checks, we use self._positions (strategy's view).
-                # But for EXIT orders, we must query broker's actual position to avoid
-                # leftover positions due to rounding/commission effects.
-                current_qty = self._positions.get(event.asset_id, 0.0)
+                # Check current position from portfolio (updated by FillEvents)
+                # CRITICAL: Use portfolio.get_position() instead of self._positions
+                # because portfolio is updated directly by FillEvents with actual filled quantities
+                position = self.portfolio.get_position(event.asset_id)
+                current_qty = position.quantity if position else 0.0
+
 
                 # Exit logic: exit if signal and have position
-                if exit_signal and current_qty != 0:
-                    # Exit entire position
-                    # Note: We request to exit current_qty, but the broker may reduce this
-                    # due to its own position tracking. To avoid leftover positions, we need
-                    # to check position again after exit and clean up if needed.
+                # Use larger threshold (1e-4) to handle fixed fee rounding errors
+                if exit_signal and abs(current_qty) > 1e-4:
+                    # Exit EXACTLY the quantity we actually hold in portfolio
+                    # This prevents position tracking mismatches with fixed fees/rounding
                     self._order_counter += 1
+                    exit_qty = abs(current_qty)
                     order_event = OrderEvent(
                         timestamp=event.timestamp,
                         order_id=f"EXIT_{self._order_counter:04d}",
                         asset_id=event.asset_id,
                         order_type=OrderType.MARKET,
                         side=OrderSide.SELL if current_qty > 0 else OrderSide.BUY,
-                        quantity=abs(current_qty),
+                        quantity=exit_qty,
                     )
                     self.event_bus.publish(order_event)
 
-                # Entry logic: enter only if flat
-                if entry_signal and current_qty == 0:
+                # Entry logic: enter only if flat (use portfolio position)
+                # Use larger threshold (1e-4) to handle fixed fee rounding errors
+                if entry_signal and abs(current_qty) < 1e-4:
                     # Calculate position size (use all cash if size not specified)
                     if config.size is None:
                         # Use all available cash, accounting for commission
                         cash = self.portfolio.cash
                         # Calculate size that fits within cash budget INCLUDING commission
-                        # For percentage commission: cash >= size * price * (1 + commission_rate)
-                        # Therefore: size <= cash / (price * (1 + commission_rate))
-                        commission_rate = config.fees if config.fees > 0 else 0.0
-                        size = cash / (event.close * (1 + commission_rate))
+                        # For combined fees: cash >= size * price * (1 + pct_rate) + fixed_fee
+                        # For percentage only: cash >= size * price * (1 + pct_rate)
+                        if isinstance(config.fees, dict):
+                            # Combined fees: solve for size in: cash = size * price * (1 + pct) + fixed
+                            pct_rate = config.fees.get('percentage', 0.0)
+                            fixed_fee = config.fees.get('fixed', 0.0)
+                            # size = (cash - fixed) / (price * (1 + pct))
+                            # Add small buffer (0.1%) to ensure exit can fully close position
+                            size = (cash - fixed_fee) / (event.close * (1 + pct_rate) * 1.001)
+                        elif config.fees > 0:
+                            # Percentage only
+                            size = cash / (event.close * (1 + config.fees))
+                        else:
+                            # No fees
+                            size = cash / event.close
                     else:
                         size = config.size
 
@@ -224,10 +237,23 @@ class QEngineWrapper(EngineWrapper):
 
         # Create commission and slippage models
         # IMPORTANT: Must pass NoCommission/NoSlippage instead of None to avoid FillSimulator defaults
-        from qengine.execution.commission import NoCommission
+        from qengine.execution.commission import NoCommission, VectorBTCommission
         from qengine.execution.slippage import NoSlippage
 
-        commission_model = PercentageCommission(rate=config.fees) if config.fees > 0 else NoCommission()
+        # Handle combined fees (percentage + fixed) or simple percentage
+        if isinstance(config.fees, dict):
+            # Combined fee model (percentage + fixed)
+            commission_model = VectorBTCommission(
+                fee_rate=config.fees.get('percentage', 0.0),
+                fixed_fee=config.fees.get('fixed', 0.0)
+            )
+        elif config.fees > 0:
+            # Simple percentage fee
+            commission_model = PercentageCommission(rate=config.fees)
+        else:
+            # No fees
+            commission_model = NoCommission()
+
         slippage_model = PercentageSlippage(slippage_pct=config.slippage) if config.slippage > 0 else NoSlippage()
 
         # Create broker with commission/slippage models
@@ -354,6 +380,16 @@ class VectorBTWrapper(EngineWrapper):
         # Run portfolio simulation
         size = np.inf if config.size is None else config.size
 
+        # Handle combined fees (percentage + fixed) or simple fees
+        if isinstance(config.fees, dict):
+            # Combined fees: VectorBT uses separate parameters
+            percentage_fees = config.fees.get('percentage', 0.0)
+            fixed_fees = config.fees.get('fixed', 0.0)
+        else:
+            # Simple percentage fees
+            percentage_fees = config.fees
+            fixed_fees = 0.0
+
         pf = vbt.Portfolio.from_signals(
             close=ohlcv['close'],
             open=ohlcv['open'],
@@ -363,7 +399,8 @@ class VectorBTWrapper(EngineWrapper):
             exits=exits_aligned,
             init_cash=config.initial_cash,
             size=size,
-            fees=config.fees,
+            fees=percentage_fees,
+            fixed_fees=fixed_fees,
             slippage=config.slippage,
             freq='1min',
         )
