@@ -86,14 +86,18 @@ class QEngineWrapper(EngineWrapper):
         registry = AssetRegistry()
         registry.register(asset_spec)
 
+        # Create PrecisionManager for consistent rounding
+        precision_mgr = asset_spec.get_precision_manager()
+
         # Create strategy that trades on signals
         class SignalStrategy(Strategy):
-            def __init__(self, entries_ser, exits_ser):
+            def __init__(self, entries_ser, exits_ser, precision_mgr):
                 super().__init__()
                 self.entries = entries_ser
                 self.exits = exits_ser if exits_ser is not None else pd.Series([False] * len(entries_ser))
                 self.bar_idx = 0
                 self._order_counter = 0
+                self.precision_mgr = precision_mgr  # Store for use in calculations
 
             def on_start(self, portfolio, event_bus):
                 super().on_start(portfolio, event_bus)
@@ -125,10 +129,9 @@ class QEngineWrapper(EngineWrapper):
                 position = self.portfolio.get_position(event.asset_id)
                 current_qty = position.quantity if position else 0.0
 
-
                 # Exit logic: exit if signal and have position
-                # Use larger threshold (1e-4) to handle fixed fee rounding errors
-                if exit_signal and abs(current_qty) > 1e-4:
+                # Use PrecisionManager to determine if position is effectively zero
+                if exit_signal and not self.precision_mgr.is_position_zero(current_qty):
                     # Exit EXACTLY the quantity we actually hold in portfolio
                     # This prevents position tracking mismatches with fixed fees/rounding
                     self._order_counter += 1
@@ -144,8 +147,8 @@ class QEngineWrapper(EngineWrapper):
                     self.event_bus.publish(order_event)
 
                 # Entry logic: enter only if flat (use portfolio position)
-                # Use larger threshold (1e-4) to handle fixed fee rounding errors
-                if entry_signal and abs(current_qty) < 1e-4:
+                # Use PrecisionManager to determine if position is effectively zero
+                if entry_signal and self.precision_mgr.is_position_zero(current_qty):
                     # Calculate position size (use all cash if size not specified)
                     if config.size is None:
                         # Use all available cash, accounting for commission
@@ -158,14 +161,22 @@ class QEngineWrapper(EngineWrapper):
                             pct_rate = config.fees.get('percentage', 0.0)
                             fixed_fee = config.fees.get('fixed', 0.0)
                             # size = (cash - fixed) / (price * (1 + pct))
-                            # Add small buffer (0.1%) to ensure exit can fully close position
-                            size = (cash - fixed_fee) / (event.close * (1 + pct_rate) * 1.001)
+                            # Use 99.99% of cash to leave tiny buffer for broker rounding
+                            size_raw = (cash * 0.9999 - fixed_fee) / (event.close * (1 + pct_rate))
+                            # Round DOWN to valid precision for this asset
+                            size = self.precision_mgr.round_quantity(size_raw)
                         elif config.fees > 0:
                             # Percentage only
-                            size = cash / (event.close * (1 + config.fees))
+                            # Use 99.99% of cash to leave tiny buffer for broker rounding
+                            size_raw = (cash * 0.9999) / (event.close * (1 + config.fees))
+                            # Round DOWN to valid precision for this asset
+                            size = self.precision_mgr.round_quantity(size_raw)
                         else:
                             # No fees
-                            size = cash / event.close
+                            # Use 99.99% of cash to leave tiny buffer for broker rounding
+                            size_raw = (cash * 0.9999) / event.close
+                            # Round DOWN to valid precision for this asset
+                            size = self.precision_mgr.round_quantity(size_raw)
                     else:
                         size = config.size
 
@@ -267,7 +278,7 @@ class QEngineWrapper(EngineWrapper):
         )
 
         # Create strategy and data feed
-        strategy = SignalStrategy(entries, exits)
+        strategy = SignalStrategy(entries, exits, precision_mgr)
         data_feed = SimpleDataFeed(ohlcv)
 
         # Run backtest
