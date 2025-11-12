@@ -119,7 +119,16 @@ class SimulationBroker(Broker):
         self.allow_immediate_reentry = allow_immediate_reentry
 
         # Initialize specialized components
-        self.position_tracker = PositionTracker(initial_cash)
+        # Note: PositionTracker doesn't get asset-specific PrecisionManager at init
+        # because broker handles multiple assets. Position rounding happens in FillSimulator.
+        # Cash rounding uses a default PrecisionManager (2 decimals for USD).
+        from qengine.core.precision import PrecisionManager
+        cash_precision_manager = PrecisionManager(
+            position_decimals=0,  # Not used for cash-only operations
+            price_decimals=2,
+            cash_decimals=2,
+        )
+        self.position_tracker = PositionTracker(initial_cash, cash_precision_manager)
         self.order_router = OrderRouter(execution_delay)
         self.bracket_manager = BracketOrderManager(self.submit_order)
 
@@ -240,6 +249,22 @@ class SimulationBroker(Broker):
 
         return self.trade_tracker.get_trades_df()
 
+    def _get_asset_precision_manager(self, asset_id: AssetId) -> "PrecisionManager | None":
+        """Get PrecisionManager for a specific asset.
+
+        Args:
+            asset_id: Asset identifier
+
+        Returns:
+            PrecisionManager for the asset, or None if asset not registered
+        """
+        from qengine.core.precision import PrecisionManager
+
+        asset_spec = self.asset_registry.get(asset_id)
+        if asset_spec:
+            return asset_spec.get_precision_manager()
+        return None
+
     def can_enter_position(self, asset_id: AssetId, current_time: datetime) -> bool:
         """
         Check if a new position can be entered for the given asset.
@@ -330,6 +355,7 @@ class SimulationBroker(Broker):
                         fill_result.fill_price,
                         fill_result.commission,
                         fill_result.slippage,
+                        asset_precision_manager=self._get_asset_precision_manager(order.asset_id),
                     )
                     # Update statistics
                     self._total_commission += fill_result.commission
@@ -570,6 +596,7 @@ class SimulationBroker(Broker):
                     fill_result.fill_price,
                     fill_result.commission,
                     fill_result.slippage,
+                    asset_precision_manager=self._get_asset_precision_manager(asset_id),
                 )
 
                 # Track exit timestamp if position went to zero (for allow_immediate_reentry=False)
@@ -751,6 +778,7 @@ class SimulationBroker(Broker):
                     fill_result.fill_price,
                     fill_result.commission,
                     fill_result.slippage,
+                    asset_precision_manager=self._get_asset_precision_manager(asset_id),
                 )
 
                 # Track exit timestamp if position went to zero (for allow_immediate_reentry=False)
