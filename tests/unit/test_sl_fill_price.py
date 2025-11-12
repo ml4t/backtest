@@ -8,10 +8,10 @@ import pytest
 from datetime import datetime
 
 from qengine.core.types import OrderSide, OrderType
-from qengine.data.asset_registry import AssetRegistry
+from qengine.data.asset_registry import AssetRegistry, AssetSpec
 from qengine.execution.fill_simulator import FillSimulator
 from qengine.execution.order import Order
-from qengine.execution.slippage import FixedSlippage
+from qengine.execution.slippage import PercentageSlippage
 
 
 class TestSLFillPrice:
@@ -21,13 +21,22 @@ class TestSLFillPrice:
     def asset_registry(self):
         """Create basic asset registry."""
         registry = AssetRegistry()
-        registry.register("BTC", "BTC/USD", "crypto")
+        registry.register(
+            spec=AssetSpec(
+                asset_id="BTC",
+                asset_type="crypto",
+                tick_size=0.01,
+                lot_size=1,
+                multiplier=1.0,
+                margin_requirement=1.0,
+            )
+        )
         return registry
 
     @pytest.fixture
     def fill_simulator(self, asset_registry):
-        """Create fill simulator with fixed slippage."""
-        slippage_model = FixedSlippage(slippage_bps=2.0)  # 0.02%
+        """Create fill simulator with percentage slippage."""
+        slippage_model = PercentageSlippage(slippage_pct=0.0002, min_slippage=0.0)  # 0.02%
         return FillSimulator(
             asset_registry=asset_registry,
             slippage_model=slippage_model,

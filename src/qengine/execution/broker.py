@@ -498,10 +498,9 @@ class SimulationBroker(Broker):
                     peak_price = event.open
                     order.metadata["peak_price"] = peak_price
 
-                # Stage 2: Check TSL trigger with current peak
+                # Stage 2: Calculate TSL level (but don't check trigger yet)
                 if order.trail_percent is not None:
                     trail_amount = peak_price * (order.trail_percent / 100.0)
-                    # BUG FIX: Logic was inverted!
                     # For SELL orders (exiting long): TSL = peak - trail_amount (stop BELOW)
                     # For BUY orders (exiting short): TSL = peak + trail_amount (stop ABOVE)
                     if order.is_buy:
@@ -512,22 +511,14 @@ class SimulationBroker(Broker):
                         tsl_level = peak_price - trail_amount
                     order.trailing_stop_price = tsl_level
 
-                    can_fill_result = order.can_fill(price=price, high=event.high, low=event.low)
-
-                    if can_fill_result:
-                        priority = self._get_exit_priority(bracket_type)
-                        triggered.append((priority, bracket_type, order))
-                        continue  # Don't do stages 3/4 if already triggered
-
                 # Stage 3: Update peak with high
                 if event.high > peak_price:
                     peak_price = event.high
                     order.metadata["peak_price"] = peak_price
 
-                # Stage 4: Re-check TSL with updated peak
+                # Stage 4: Recalculate TSL with updated peak and check trigger
                 if order.trail_percent is not None and not order.is_filled:
                     trail_amount = peak_price * (order.trail_percent / 100.0)
-                    # BUG FIX: Same fix as Stage 2
                     if order.is_buy:
                         # BUY order (exiting short): TSL above peak
                         tsl_level = peak_price + trail_amount
@@ -535,6 +526,12 @@ class SimulationBroker(Broker):
                         # SELL order (exiting long): TSL below peak
                         tsl_level = peak_price - trail_amount
                     order.trailing_stop_price = tsl_level
+
+                    # Now check if triggered (only in stage 4, after updating peak with high)
+                    can_fill_result = order.can_fill(price=price, high=event.high, low=event.low)
+                    if can_fill_result:
+                        priority = self._get_exit_priority(bracket_type)
+                        triggered.append((priority, bracket_type, order))
 
         # Sort by priority (lowest number = highest priority)
         triggered.sort(key=lambda x: x[0])
@@ -709,50 +706,43 @@ class SimulationBroker(Broker):
                 order.metadata["peak_price"] = order.metadata.get("base_price", price)
 
             # VectorBT 4-stage per-bar process:
-            # Stage 1: Update peak with open (before checking stop)
+            # Stage 1: Update peak with open
             peak_price = order.metadata["peak_price"]
             if event.open > peak_price:
                 peak_price = event.open
                 order.metadata["peak_price"] = peak_price
 
-            # Stage 2: Check TSL trigger with current peak (against low)
-            # Calculate TSL level from peak, not current price
+            # Stage 2: Calculate TSL level (but don't check trigger yet)
             if order.trail_percent is not None:
                 trail_amount = peak_price * (order.trail_percent / 100.0)
-                # BUG FIX: Logic was inverted (same as bracket code fix)
                 if order.is_buy:
                     # BUY order (exiting short): TSL above peak
                     tsl_level = peak_price + trail_amount
                 else:
                     # SELL order (exiting long): TSL below peak
                     tsl_level = peak_price - trail_amount
-
                 order.trailing_stop_price = tsl_level
 
-                # Check if triggered (for long exit: low <= tsl_level)
-                if order.can_fill(price=price, high=event.high, low=event.low):
-                    triggered_trailing.append(order)
-                    self._trailing_stops[asset_id].remove(order)
-                    continue  # Skip stage 3/4 if triggered
-
-            # Stage 3: Update peak with high (after checking stop)
+            # Stage 3: Update peak with high
             if event.high > peak_price:
                 peak_price = event.high
                 order.metadata["peak_price"] = peak_price
 
-            # Stage 4: Re-check TSL with updated peak (against close)
-            # Recalculate TSL level with potentially updated peak
+            # Stage 4: Recalculate TSL with updated peak and check trigger
             if order.trail_percent is not None and not order.is_filled:
                 trail_amount = peak_price * (order.trail_percent / 100.0)
-                # BUG FIX: Same as Stage 2
                 if order.is_buy:
                     # BUY order (exiting short): TSL above peak
                     tsl_level = peak_price + trail_amount
                 else:
                     # SELL order (exiting long): TSL below peak
                     tsl_level = peak_price - trail_amount
-
                 order.trailing_stop_price = tsl_level
+
+                # Now check if triggered (only in stage 4, after updating peak with high)
+                if order.can_fill(price=price, high=event.high, low=event.low):
+                    triggered_trailing.append(order)
+                    self._trailing_stops[asset_id].remove(order)
 
         # Process triggered trailing stops immediately (as market orders)
         for order in triggered_trailing:
