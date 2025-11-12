@@ -171,95 +171,39 @@ class BacktestEngine:
             data_start, data_end = self.data_feed.get_time_range()
             self.clock.advance_to(start_date or data_start)
 
-        # Main event loop
+        # Main event loop - Clock-driven (Phase 1 redesign complete)
+        # The Clock pulls events from all registered feeds (market data, signals, corporate actions)
+        # and returns them in strict chronological order, ensuring point-in-time correctness
         self.events_processed = 0
+        PROGRESS_LOG_INTERVAL = 10000
 
-        while not self.data_feed.is_exhausted:
+        while True:
             # Check max events limit
             if max_events and self.events_processed >= max_events:
                 logger.info(f"Reached max events limit: {max_events}")
                 break
 
-            # Get next market event from data feed
-            market_event = self.data_feed.get_next_event()
-            if market_event is None:
+            # Get next event from Clock's priority queue (across ALL feeds)
+            event = self.clock.get_next_event()
+            if event is None:
+                # All feeds exhausted
                 break
 
-            # Update clock
-            self.clock.advance_to(market_event.timestamp)
+            # Dispatch event to all registered subscribers
+            # Subscribers handle events based on event_type:
+            # - Strategy: receives MARKET and FILL events
+            # - Broker: receives ORDER and MARKET events
+            # - Portfolio: receives FILL events
+            # - Reporter: receives ALL events
+            self.clock.dispatch_event(event)
 
-            # Publish market event FIRST (this allows pending orders to be filled)
-            self.clock.publish(market_event)
-
-            # Dispatch event to all subscribers
-            self.clock.dispatch_event(market_event)
-
-            # TODO: TASK-1.4 will rewrite this loop to be Clock-driven
-            # For now, we still iterate over data_feed but use Clock for distribution
             self.events_processed += 1
 
-            # Process corporate actions AFTER fills (at start of each trading day)
-            # Check if we've moved to a new date
-            if hasattr(self, "_last_processed_date"):
-                current_date = market_event.timestamp.date()
-                if current_date != self._last_processed_date:
-                    # Process any pending corporate actions
-                    # Convert Position objects to quantities for corporate action processor
-                    current_positions = {
-                        asset_id: position.quantity
-                        for asset_id, position in self.portfolio.positions.items()
-                    }
-                    open_orders = self.broker.get_open_orders()  # Get all open orders
-                    cash = self.portfolio.cash
-
-                    # Process corporate actions
-                    updated_positions, updated_orders, updated_cash, notifications = (
-                        self.corporate_action_processor.process_actions(
-                            current_date, current_positions, open_orders, cash
-                        )
-                    )
-
-                    # Update portfolio and broker with adjustments
-                    if notifications:
-                        for notification in notifications:
-                            logger.info(f"Corporate Action: {notification}")
-
-                    # Apply position adjustments to Portfolio objects
-                    for asset_id, new_quantity in updated_positions.items():
-                        if asset_id in self.portfolio.positions:
-                            # Update existing position quantity
-                            self.portfolio.positions[asset_id].quantity = new_quantity
-                        elif new_quantity != 0:
-                            # Create new position if needed
-                            from qengine.portfolio.portfolio import Position
-
-                            self.portfolio.positions[asset_id] = Position(
-                                asset_id=asset_id, quantity=new_quantity
-                            )
-
-                    # Remove positions with zero quantity
-                    assets_to_remove = [
-                        asset_id
-                        for asset_id, position in self.portfolio.positions.items()
-                        if position.quantity == 0
-                    ]
-                    for asset_id in assets_to_remove:
-                        del self.portfolio.positions[asset_id]
-
-                    # Update cash
-                    self.portfolio.cash = updated_cash
-                    # Note: Orders are updated in place, so broker already has updated orders
-
-                    self._last_processed_date = current_date
-            else:
-                self._last_processed_date = market_event.timestamp.date()
-
-            # Update portfolio valuations
-            self.portfolio.update_market_value(market_event)
-
             # Log progress periodically
-            if self.events_processed % 10000 == 0:
-                logger.info(f"Processed {self.events_processed:,} events")
+            if self.events_processed % PROGRESS_LOG_INTERVAL == 0:
+                logger.info(
+                    f"Processed {self.events_processed:,} events at {event.timestamp}"
+                )
 
         # Finalize
         self.strategy.on_end()
