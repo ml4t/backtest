@@ -19,7 +19,6 @@ from qengine.core.constants import (
 )
 from qengine.core.event import (
     Event,
-    EventBus,
     FillEvent,
     MarketEvent,
     OrderEvent,
@@ -49,7 +48,6 @@ __all__ = [
     "decimal_to_bps",
     # Events
     "Event",
-    "EventBus",
     "FillEvent",
     "MarketEvent",
     "OrderEvent",

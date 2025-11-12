@@ -7,7 +7,7 @@ realistic market simulation.
 
 __version__ = "0.1.0"
 
-from qengine.core import Clock, Event, EventBus
+from qengine.core import Clock, Event
 from qengine.data import DataFeed
 from qengine.engine import BacktestEngine, BacktestResults
 from qengine.strategy import Strategy
@@ -18,6 +18,5 @@ __all__ = [
     "Clock",
     "DataFeed",
     "Event",
-    "EventBus",
     "Strategy",
 ]

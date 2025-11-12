@@ -7,7 +7,7 @@ from typing import Any
 import polars as pl
 
 from qengine.core.clock import Clock
-from qengine.core.event import EventBus, EventType
+from qengine.core.event import EventType
 from qengine.data.feed import DataFeed
 from qengine.execution.broker import Broker
 from qengine.portfolio.portfolio import Portfolio
@@ -71,7 +71,9 @@ class BacktestEngine:
         self.currency = currency
 
         # Create event bus for communication
-        self.event_bus = EventBus(use_priority_queue=use_priority_queue)
+        # TODO: TASK-1.2 - EventBus deprecated, functionality will move to Clock
+        # self.event_bus = EventBus(use_priority_queue=use_priority_queue)
+        self.event_bus = None  # Temporarily disabled pending Clock refactor
 
         # Create clock for time management
         self.clock = Clock()
