@@ -34,7 +34,7 @@
     {
       "id": "phase_2b",
       "name": "Code Quality & Architecture",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "critical",
       "description": "Clean up test contamination and complete PrecisionManager integration discovered during Phase 2",
       "tests_total": 0,
@@ -589,10 +589,11 @@
       "title": "Move VectorBT Models to Validation Tests",
       "description": "Move VectorBTCommission, VectorBTInfiniteSizer, and VectorBTSlippage from production code (src/qengine) to validation test fixtures (tests/validation/models/). Total 319 lines of test-specific code to relocate.",
       "type": "refactoring",
-      "status": "pending",
+      "status": "completed",
       "priority": "critical",
       "phase": "phase_2b",
       "dependencies": ["TASK-003"],
+      "completed_at": "2025-11-12T06:45:00Z",
       "test_file": null,
       "acceptance_criteria": [
         "VectorBTCommission moved to tests/validation/models/vectorbt_commission.py",
@@ -696,10 +697,10 @@
       "notes": "Final integration phase. TradeTracker is reporting layer, commission standardization ensures consistency. Buffer elimination would be ideal outcome but not required if root cause still exists."
     }
   ],
-  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003"],
-  "next_available": ["TASK-004", "TASK-016"],
+  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003", "TASK-016"],
+  "next_available": ["TASK-004", "TASK-017"],
   "total_tasks": 19,
-  "completed_count": 3,
-  "pending_count": 16,
-  "progress_percentage": 15.8
+  "completed_count": 4,
+  "pending_count": 15,
+  "progress_percentage": 21.1
 }
