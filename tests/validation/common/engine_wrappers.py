@@ -120,13 +120,17 @@ class QEngineWrapper(EngineWrapper):
                 exit_signal = self.exits.iloc[self.bar_idx] if self.bar_idx < len(self.exits) else False
 
                 # Check current position via strategy's internal tracking (updated on FillEvent)
-                # NOTE: Do NOT use portfolio.positions - it's stale! Use self._positions which
-                # gets updated by the base Strategy.on_fill_event() handler
+                # NOTE: For entry/exit checks, we use self._positions (strategy's view).
+                # But for EXIT orders, we must query broker's actual position to avoid
+                # leftover positions due to rounding/commission effects.
                 current_qty = self._positions.get(event.asset_id, 0.0)
 
                 # Exit logic: exit if signal and have position
                 if exit_signal and current_qty != 0:
                     # Exit entire position
+                    # Note: We request to exit current_qty, but the broker may reduce this
+                    # due to its own position tracking. To avoid leftover positions, we need
+                    # to check position again after exit and clean up if needed.
                     self._order_counter += 1
                     order_event = OrderEvent(
                         timestamp=event.timestamp,
@@ -142,9 +146,13 @@ class QEngineWrapper(EngineWrapper):
                 if entry_signal and current_qty == 0:
                     # Calculate position size (use all cash if size not specified)
                     if config.size is None:
-                        # Use all available cash
+                        # Use all available cash, accounting for commission
                         cash = self.portfolio.cash
-                        size = cash / event.close  # Buy as much as possible
+                        # Calculate size that fits within cash budget INCLUDING commission
+                        # For percentage commission: cash >= size * price * (1 + commission_rate)
+                        # Therefore: size <= cash / (price * (1 + commission_rate))
+                        commission_rate = config.fees if config.fees > 0 else 0.0
+                        size = cash / (event.close * (1 + commission_rate))
                     else:
                         size = config.size
 
@@ -215,8 +223,12 @@ class QEngineWrapper(EngineWrapper):
                     self.idx = len(self.ohlcv)
 
         # Create commission and slippage models
-        commission_model = PercentageCommission(rate=config.fees) if config.fees > 0 else None
-        slippage_model = PercentageSlippage(slippage=config.slippage) if config.slippage > 0 else None
+        # IMPORTANT: Must pass NoCommission/NoSlippage instead of None to avoid FillSimulator defaults
+        from qengine.execution.commission import NoCommission
+        from qengine.execution.slippage import NoSlippage
+
+        commission_model = PercentageCommission(rate=config.fees) if config.fees > 0 else NoCommission()
+        slippage_model = PercentageSlippage(slippage_pct=config.slippage) if config.slippage > 0 else NoSlippage()
 
         # Create broker with commission/slippage models
         from qengine.execution.broker import SimulationBroker
@@ -246,6 +258,37 @@ class QEngineWrapper(EngineWrapper):
         # broker.get_trades() returns individual orders/fills
         # trade_tracker.get_trades_df() returns entry/exit paired trades
         trades = engine.broker.trade_tracker.get_trades_df()
+
+        # Also get open positions as trades (for comparison with VectorBT which includes open positions)
+        if engine.broker.trade_tracker.get_open_position_count() > 0:
+            # Get final timestamp and price
+            final_timestamp = ohlcv.index[-1]
+            final_price = ohlcv['close'].iloc[-1]
+
+            # Convert open positions to trade records
+            open_position_trades = engine.broker.trade_tracker.get_open_positions_as_trades(
+                current_timestamp=final_timestamp,
+                current_price=final_price
+            )
+
+            # Convert to DataFrame and append
+            if open_position_trades:
+                import polars as pl
+                # Convert to pandas directly to avoid Polars schema issues
+                open_trades_dicts = [t.to_dict() for t in open_position_trades]
+                open_trades_pd = pd.DataFrame(open_trades_dicts)
+
+                # Concatenate with existing trades
+                if len(trades) > 0:
+                    # Convert both to pandas for concatenation
+                    if hasattr(trades, 'to_pandas'):
+                        trades_pd = trades.to_pandas()
+                    else:
+                        trades_pd = trades
+                    trades = pd.concat([trades_pd, open_trades_pd], ignore_index=True)
+                else:
+                    trades = open_trades_pd
+
         if hasattr(trades, 'to_pandas'):
             # Convert Polars DataFrame to pandas
             trades_df = trades.to_pandas()
