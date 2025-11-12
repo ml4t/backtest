@@ -70,10 +70,7 @@ class BacktestEngine:
         self.initial_capital = initial_capital
         self.currency = currency
 
-        # Create event bus for communication
-        # TODO: TASK-1.2 - EventBus deprecated, functionality will move to Clock
-        # self.event_bus = EventBus(use_priority_queue=use_priority_queue)
-        self.event_bus = None  # Temporarily disabled pending Clock refactor
+        # Event distribution now handled by Clock (subscribe/publish/dispatch)
 
         # Create clock for time management
         self.clock = Clock()
@@ -119,22 +116,22 @@ class BacktestEngine:
         self.end_time: datetime | None = None
 
     def _setup_event_handlers(self) -> None:
-        """Connect components via event subscriptions."""
+        """Connect components via Clock event subscriptions."""
         # Strategy subscribes to market and fill events
         # Note: Using on_event allows strategies to route events internally
-        self.event_bus.subscribe(EventType.MARKET, self.strategy.on_event)
-        self.event_bus.subscribe(EventType.FILL, self.strategy.on_event)
+        self.clock.subscribe(EventType.MARKET, self.strategy.on_event)
+        self.clock.subscribe(EventType.FILL, self.strategy.on_event)
 
         # Broker subscribes to order events AND market events (for fill checking)
-        self.event_bus.subscribe(EventType.ORDER, self.broker.on_order_event)
-        self.event_bus.subscribe(EventType.MARKET, self.broker.on_market_event)
+        self.clock.subscribe(EventType.ORDER, self.broker.on_order_event)
+        self.clock.subscribe(EventType.MARKET, self.broker.on_market_event)
 
         # Portfolio subscribes to fill events
-        self.event_bus.subscribe(EventType.FILL, self.portfolio.on_fill_event)
+        self.clock.subscribe(EventType.FILL, self.portfolio.on_fill_event)
 
         # Reporter subscribes to all events for logging
         for event_type in EventType:
-            self.event_bus.subscribe(event_type, self.reporter.on_event)
+            self.clock.subscribe(event_type, self.reporter.on_event)
 
     def run(
         self,
@@ -161,10 +158,13 @@ class BacktestEngine:
         self.start_time = datetime.now()  # Wall clock time for performance measurement
 
         # Initialize components
-        self.strategy.on_start(self.portfolio, self.event_bus)
-        self.broker.initialize(self.portfolio, self.event_bus)
+        self.strategy.on_start(self.portfolio, self.clock)
+        self.broker.initialize(self.portfolio, self.clock)
         self.portfolio.initialize()
         self.reporter.on_start()
+
+        # Add data feed to clock for event-driven processing
+        self.clock.add_data_feed(self.data_feed)
 
         # Initialize clock with data feed's time range
         if hasattr(self.data_feed, "get_time_range"):
@@ -189,11 +189,14 @@ class BacktestEngine:
             self.clock.advance_to(market_event.timestamp)
 
             # Publish market event FIRST (this allows pending orders to be filled)
-            self.event_bus.publish(market_event)
+            self.clock.publish(market_event)
 
-            # Process all events in queue (market -> signal -> order -> fill)
-            events_in_cycle = self.event_bus.process_all()
-            self.events_processed += events_in_cycle + 1  # +1 for market event
+            # Dispatch event to all subscribers
+            self.clock.dispatch_event(market_event)
+
+            # TODO: TASK-1.4 will rewrite this loop to be Clock-driven
+            # For now, we still iterate over data_feed but use Clock for distribution
+            self.events_processed += 1
 
             # Process corporate actions AFTER fills (at start of each trading day)
             # Check if we've moved to a new date
@@ -314,8 +317,8 @@ class BacktestEngine:
         """Reset the engine for another run."""
         logger.info("Resetting backtest engine")
 
-        # Clear event bus
-        self.event_bus.clear()
+        # Clear clock event queue and reset subscribers
+        self.clock.reset()
 
         # Reset components
         self.data_feed.reset()
