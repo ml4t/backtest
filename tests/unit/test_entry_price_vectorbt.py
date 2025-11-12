@@ -10,14 +10,20 @@ Reference: TASK-003 - VectorBT Entry Price Analysis
 """
 
 import pytest
+import sys
+from pathlib import Path
+
+# Add tests directory to path for validation models
+tests_path = Path(__file__).parent.parent
+if str(tests_path) not in sys.path:
+    sys.path.insert(0, str(tests_path))
 
 from qengine.core.event import MarketEvent
 from qengine.data.asset_registry import AssetRegistry, AssetSpec
 from qengine.execution.broker import SimulationBroker
-from qengine.execution.commission import VectorBTCommission
 from qengine.execution.fill_simulator import FillSimulator
 from qengine.execution.order import Order, OrderSide, OrderType
-from qengine.execution.slippage import VectorBTSlippage
+from validation.models import VectorBTCommission, VectorBTSlippage
 
 
 class TestVectorBTEntryPriceLogic:

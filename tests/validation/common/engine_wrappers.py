@@ -248,8 +248,15 @@ class QEngineWrapper(EngineWrapper):
 
         # Create commission and slippage models
         # IMPORTANT: Must pass NoCommission/NoSlippage instead of None to avoid FillSimulator defaults
-        from qengine.execution.commission import NoCommission, VectorBTCommission
+        from qengine.execution.commission import NoCommission
         from qengine.execution.slippage import NoSlippage
+        # Import validation-specific VectorBT models
+        import sys
+        from pathlib import Path
+        tests_path = Path(__file__).parent.parent.parent
+        if str(tests_path) not in sys.path:
+            sys.path.insert(0, str(tests_path))
+        from validation.models import VectorBTCommission
 
         # Handle combined fees (percentage + fixed) or simple percentage
         if isinstance(config.fees, dict):

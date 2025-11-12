@@ -1,6 +1,13 @@
 """Test VectorBT Commission Model (TASK-020)."""
 
-from qengine.execution.commission import VectorBTCommission
+import sys
+from pathlib import Path
+# Add tests directory to path for validation models
+tests_path = Path(__file__).parent.parent
+if str(tests_path) not in sys.path:
+    sys.path.insert(0, str(tests_path))
+
+from validation.models import VectorBTCommission
 from qengine.execution.order import Order
 from qengine.core.types import OrderType, OrderSide
 
