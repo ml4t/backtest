@@ -2,12 +2,15 @@
 
 import heapq
 import logging
+from collections import defaultdict
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
 
 import pandas_market_calendars as mcal
 
 from qengine.core.event import Event
+from qengine.core.types import EventType
 from qengine.data.feed import DataFeed, SignalSource
 
 
@@ -64,6 +67,9 @@ class Clock:
         self._event_queue: list[tuple[datetime, int, Event, object]] = []
         self._sequence_counter = 0  # Ensures FIFO when timestamps are identical
 
+        # Event subscribers (maps EventType to list of handlers)
+        self._subscribers: dict[EventType, list[Callable]] = defaultdict(list)
+
         # Market calendar
         if calendar:
             self.calendar = mcal.get_calendar(calendar)
@@ -101,6 +107,84 @@ class Clock:
         """
         self._signal_sources.append(source)
         self._prime_signal_source(source)
+
+    def subscribe(self, event_type: EventType, handler: Callable[[Event], None]) -> None:
+        """
+        Subscribe to events of a specific type.
+
+        This method allows components (Strategy, Broker, Portfolio, Reporter) to
+        register callbacks that will be invoked when events of the specified type
+        occur.
+
+        Args:
+            event_type: Type of events to subscribe to (MARKET, SIGNAL, ORDER, FILL, etc.)
+            handler: Callback function that takes an Event and returns None
+
+        Example:
+            >>> clock = Clock()
+            >>> def on_market_event(event: MarketEvent):
+            ...     print(f"Received market event at {event.timestamp}")
+            >>> clock.subscribe(EventType.MARKET, on_market_event)
+        """
+        if handler not in self._subscribers[event_type]:
+            self._subscribers[event_type].append(handler)
+            self.logger.debug(f"Subscribed {handler.__name__} to {event_type}")
+
+    def unsubscribe(self, event_type: EventType, handler: Callable[[Event], None]) -> None:
+        """
+        Unsubscribe from events of a specific type.
+
+        Args:
+            event_type: Type of events to unsubscribe from
+            handler: Handler function to remove
+        """
+        if handler in self._subscribers[event_type]:
+            self._subscribers[event_type].remove(handler)
+            self.logger.debug(f"Unsubscribed {handler.__name__} from {event_type}")
+
+    def publish(self, event: Event) -> None:
+        """
+        Publish an event to the priority queue.
+
+        This method allows components (primarily the Broker) to inject events
+        into the Clock's event stream. The event will be inserted at the correct
+        position based on its timestamp.
+
+        Args:
+            event: Event to publish
+
+        Example:
+            >>> fill_event = FillEvent(...)
+            >>> clock.publish(fill_event)  # Broker publishes fill after execution
+        """
+        heapq.heappush(
+            self._event_queue,
+            (event.timestamp, self._sequence_counter, event, None),
+        )
+        self._sequence_counter += 1
+        self.logger.debug(f"Published {event.__class__.__name__} at {event.timestamp}")
+
+    def dispatch_event(self, event: Event) -> None:
+        """
+        Dispatch an event to all registered subscribers.
+
+        This method is called by the main event loop to notify all subscribers
+        of an event. It catches and logs any exceptions raised by handlers to
+        prevent one failing handler from affecting others.
+
+        Args:
+            event: Event to dispatch to subscribers
+        """
+        handlers = self._subscribers.get(event.event_type, [])
+        for handler in handlers:
+            try:
+                handler(event)
+            except Exception as e:
+                self.logger.error(
+                    f"Error in event handler {handler.__name__} "
+                    f"for {event.__class__.__name__}: {e}",
+                    exc_info=True,
+                )
 
     def _prime_feed(self, feed: DataFeed) -> None:
         """
