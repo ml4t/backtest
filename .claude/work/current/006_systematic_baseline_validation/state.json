@@ -23,13 +23,24 @@
     {
       "id": "phase_2",
       "name": "Transaction Fees",
-      "status": "pending",
+      "status": "in_progress",
       "priority": "high",
       "description": "Validate commission calculation across different fee structures",
       "tests_total": 3,
-      "tests_passing": 0,
-      "tests_pending": 3,
+      "tests_passing": 2,
+      "tests_pending": 1,
       "tasks": ["TASK-002", "TASK-003", "TASK-004"]
+    },
+    {
+      "id": "phase_2b",
+      "name": "Code Quality & Architecture",
+      "status": "pending",
+      "priority": "critical",
+      "description": "Clean up test contamination and complete PrecisionManager integration discovered during Phase 2",
+      "tests_total": 0,
+      "tests_passing": 0,
+      "tests_pending": 0,
+      "tasks": ["TASK-016", "TASK-017", "TASK-018", "TASK-019"]
     },
     {
       "id": "phase_3",
@@ -114,10 +125,11 @@
       "title": "Test 2.1: Percentage Commission",
       "description": "Validate 0.1% percentage commission calculation. Gross PnL should match baseline, net PnL reduced by 0.2% per round trip.",
       "type": "test_implementation",
-      "status": "pending",
+      "status": "completed",
       "priority": "high",
       "phase": "phase_2",
       "dependencies": ["TASK-001"],
+      "completed_at": "2025-11-12T05:00:00Z",
       "test_file": "test_2_1_percentage_commission.py",
       "test_config": {
         "entries": 20,
@@ -145,10 +157,11 @@
       "title": "Test 2.2: Fixed + Percentage Fees",
       "description": "Validate combined fee structure (0.1% + $2 per trade). Total commission = (notional * 0.001) + $2.",
       "type": "test_implementation",
-      "status": "pending",
+      "status": "completed",
       "priority": "medium",
       "phase": "phase_2",
       "dependencies": ["TASK-002"],
+      "completed_at": "2025-11-12T10:30:00Z",
       "test_file": "test_2_2_combined_fees.py",
       "test_config": {
         "entries": 20,
@@ -570,12 +583,123 @@
       ],
       "estimated_hours": 2.0,
       "notes": "Requires special data generator with gaps, halts, and corporate actions. Most complex data generation."
+    },
+    {
+      "id": "TASK-016",
+      "title": "Move VectorBT Models to Validation Tests",
+      "description": "Move VectorBTCommission, VectorBTInfiniteSizer, and VectorBTSlippage from production code (src/qengine) to validation test fixtures (tests/validation/models/). Total 319 lines of test-specific code to relocate.",
+      "type": "refactoring",
+      "status": "pending",
+      "priority": "critical",
+      "phase": "phase_2b",
+      "dependencies": ["TASK-003"],
+      "test_file": null,
+      "acceptance_criteria": [
+        "VectorBTCommission moved to tests/validation/models/vectorbt_commission.py",
+        "VectorBTInfiniteSizer moved to tests/validation/models/vectorbt_sizer.py",
+        "VectorBTSlippage moved to tests/validation/models/vectorbt_slippage.py",
+        "All validation tests updated to import from new locations",
+        "grep 'VectorBT' src/qengine returns 0 results",
+        "All validation tests still pass (test_2_1, test_2_2, etc.)",
+        "Production code has clear separation from test infrastructure"
+      ],
+      "files": [
+        "src/qengine/execution/commission.py",
+        "src/qengine/execution/position_sizer.py",
+        "src/qengine/execution/slippage.py",
+        "tests/validation/models/__init__.py",
+        "tests/validation/models/vectorbt_commission.py",
+        "tests/validation/models/vectorbt_sizer.py",
+        "tests/validation/models/vectorbt_slippage.py",
+        "tests/validation/common/engine_wrappers.py"
+      ],
+      "estimated_hours": 2.5,
+      "notes": "Clean architectural separation. This is technical debt payoff - test-specific implementations should not live in production code."
+    },
+    {
+      "id": "TASK-017",
+      "title": "Integrate PrecisionManager into PositionTracker",
+      "description": "Add PrecisionManager to PositionTracker for rounding position quantities and cash updates (8 locations). This is the critical source-of-truth for all position state.",
+      "type": "feature",
+      "status": "pending",
+      "priority": "critical",
+      "phase": "phase_2b",
+      "dependencies": ["TASK-016"],
+      "test_file": null,
+      "acceptance_criteria": [
+        "PositionTracker.__init__() accepts precision_manager parameter",
+        "All position quantity updates rounded via precision_mgr.round_quantity()",
+        "All cash impact calculations rounded via precision_mgr.round_cash()",
+        "Zero checks use precision_mgr.is_position_zero() instead of < 1e-9",
+        "Broker creates and injects PrecisionManager from AssetSpec",
+        "Validation tests still pass with same or better accuracy",
+        "No float drift in position tracking"
+      ],
+      "files": [
+        "src/qengine/execution/position_tracker.py",
+        "src/qengine/execution/broker.py"
+      ],
+      "estimated_hours": 2.0,
+      "notes": "Most critical integration point. Position tracker is source of truth for all position state. Prevents float drift at the source."
+    },
+    {
+      "id": "TASK-018",
+      "title": "Integrate PrecisionManager into Portfolio and Order",
+      "description": "Add PrecisionManager to Portfolio (12 locations) for P&L accounting and Order (3 locations) for fill tracking. Prevents downstream float drift.",
+      "type": "feature",
+      "status": "pending",
+      "priority": "high",
+      "phase": "phase_2b",
+      "dependencies": ["TASK-017"],
+      "test_file": null,
+      "acceptance_criteria": [
+        "Portfolio.__init__() accepts precision_manager parameter",
+        "All position quantity, cost_basis, cash, and P&L updates rounded",
+        "Zero checks use precision_mgr.is_position_zero()",
+        "Order.update_fill() rounds filled_quantity and commission",
+        "Order gets PrecisionManager from AssetSpec",
+        "Validation tests accuracy improves or stays same",
+        "No P&L drift in portfolio accounting"
+      ],
+      "files": [
+        "src/qengine/portfolio/portfolio.py",
+        "src/qengine/execution/order.py"
+      ],
+      "estimated_hours": 2.5,
+      "notes": "Portfolio and Order are downstream from PositionTracker. This prevents float drift from propagating to P&L calculations and fill tracking."
+    },
+    {
+      "id": "TASK-019",
+      "title": "Complete PrecisionManager Integration and Test Buffer Elimination",
+      "description": "Integrate PrecisionManager into TradeTracker (10+ locations), standardize commission model rounding, and test eliminating 0.9999x buffer with comprehensive rounding in place.",
+      "type": "feature",
+      "status": "pending",
+      "priority": "medium",
+      "phase": "phase_2b",
+      "dependencies": ["TASK-018"],
+      "test_file": null,
+      "acceptance_criteria": [
+        "TradeTracker rounds all P&L calculations (gross_pnl, net_pnl, entry_costs, exit_costs)",
+        "All commission models use PrecisionManager.round_cash() consistently",
+        "Manual round(x, 2) calls replaced with precision_mgr.round_cash()",
+        "Test buffer elimination: change cash * 0.9999 → cash in test wrappers",
+        "If buffer removal works: validation tests pass without workaround",
+        "If buffer still needed: document root cause clearly",
+        "Final validation: test_2_1 and test_2_2 still passing"
+      ],
+      "files": [
+        "src/qengine/execution/trade_tracker.py",
+        "src/qengine/execution/commission.py",
+        "tests/validation/common/engine_wrappers.py"
+      ],
+      "estimated_hours": 3.0,
+      "notes": "Final integration phase. TradeTracker is reporting layer, commission standardization ensures consistency. Buffer elimination would be ideal outcome but not required if root cause still exists."
     }
   ],
-  "completed_tasks": ["TASK-001"],
-  "next_available": ["TASK-002"],
-  "total_tasks": 15,
-  "completed_count": 1,
-  "pending_count": 14,
-  "progress_percentage": 7
+  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003"],
+  "next_available": ["TASK-004", "TASK-016"],
+  "total_tasks": 19,
+  "completed_count": 3,
+  "pending_count": 16,
+  "progress_percentage": 15.8
 }
