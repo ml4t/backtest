@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 from qengine.core.types import (
     AssetId,
@@ -16,6 +16,7 @@ from qengine.core.types import (
     Quantity,
     TimeInForce,
 )
+from qengine.core.precision import PrecisionManager
 
 
 class OrderState(Enum):
@@ -92,6 +93,9 @@ class Order:
 
     # Metadata
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    # Precision management
+    precision_manager: Optional[PrecisionManager] = None
 
     def __post_init__(self):
         """Validate order on creation."""
@@ -334,11 +338,23 @@ class Order:
             total_value = (
                 self.filled_quantity * self.average_fill_price + fill_quantity * fill_price
             )
-            self.average_fill_price = total_value / (self.filled_quantity + fill_quantity)
+            new_filled_quantity = self.filled_quantity + fill_quantity
+            self.average_fill_price = total_value / new_filled_quantity
+            # Round average fill price to avoid float drift (Location 1/3)
+            if self.precision_manager:
+                self.average_fill_price = self.precision_manager.round_cash(self.average_fill_price)
 
         self.filled_quantity += fill_quantity
+        # Round filled quantity to avoid float drift (Location 2/3)
+        if self.precision_manager:
+            self.filled_quantity = self.precision_manager.round_quantity(self.filled_quantity)
+
         self.fill_count += 1
+
         self.commission += commission
+        # Round commission to avoid float drift (Location 3/3)
+        if self.precision_manager:
+            self.commission = self.precision_manager.round_cash(self.commission)
 
         # Update state
         if self.filled_quantity >= self.quantity:

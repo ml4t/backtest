@@ -983,7 +983,10 @@ class SimulationBroker(Broker):
         """
         from qengine.execution.order import Order
 
-        # Create Order object from OrderEvent
+        # Get asset-specific PrecisionManager for this order
+        asset_precision_manager = self._get_asset_precision_manager(event.asset_id)
+
+        # Create Order object from OrderEvent with PrecisionManager
         order = Order(
             order_id=event.order_id,
             asset_id=event.asset_id,
@@ -993,6 +996,7 @@ class SimulationBroker(Broker):
             limit_price=getattr(event, "limit_price", None),
             stop_price=getattr(event, "stop_price", None),
             time_in_force=getattr(event, "time_in_force", None),
+            precision_manager=asset_precision_manager,
         )
 
         # Submit the order
