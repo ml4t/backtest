@@ -6,11 +6,12 @@ Designed for high-performance backtesting with large numbers of trades.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 import polars as pl
 
 from qengine.core.event import FillEvent
+from qengine.core.precision import PrecisionManager
 from qengine.core.types import AssetId, OrderSide
 
 
@@ -100,8 +101,15 @@ class TradeTracker:
     - Lazy DataFrame construction (only when requested)
     """
 
-    def __init__(self):
-        """Initialize trade tracker."""
+    def __init__(self, precision_manager: Optional[PrecisionManager] = None):
+        """
+        Initialize trade tracker.
+
+        Args:
+            precision_manager: PrecisionManager for cash rounding (USD precision for P&L)
+        """
+        self.precision_manager = precision_manager
+
         # Open positions by asset (FIFO queue)
         self._open_positions: dict[AssetId, list[OpenPosition]] = {}
 
@@ -170,11 +178,19 @@ class TradeTracker:
                     position.quantity -= close_qty
                     remaining -= close_qty
 
-                    if position.quantity <= 1e-9:  # Fully closed
+                    # Check if fully closed using precision-aware check (Location 1/12)
+                    is_closed = position.quantity <= 1e-9
+                    if self.precision_manager:
+                        is_closed = self.precision_manager.is_position_zero(position.quantity)
+                    if is_closed:
                         position_queue.pop(0)
 
                 # If still have quantity left, opening new reverse position
-                if remaining > 1e-9:
+                # Use precision-aware check (Location 2/12)
+                has_remaining = remaining > 1e-9
+                if self.precision_manager:
+                    has_remaining = not self.precision_manager.is_position_zero(remaining)
+                if has_remaining:
                     # Create new fill event for remaining quantity
                     self._open_new_position(fill_event, remaining)
             else:
@@ -213,19 +229,44 @@ class TradeTracker:
         else:
             gross_pnl = close_quantity * (position.entry_price - exit_fill.fill_price)
 
+        # Round gross P&L to avoid float drift (Location 3/12)
+        if self.precision_manager:
+            gross_pnl = self.precision_manager.round_cash(gross_pnl)
+
         # Subtract costs (proportional to quantity closed)
         qty_fraction = close_quantity / position.quantity
         entry_costs = (position.entry_commission + position.entry_slippage) * qty_fraction
+        # Round entry costs (Location 4/12)
+        if self.precision_manager:
+            entry_costs = self.precision_manager.round_cash(entry_costs)
+
         exit_costs = exit_fill.commission + exit_fill.slippage
+        # Round exit costs (Location 5/12)
+        if self.precision_manager:
+            exit_costs = self.precision_manager.round_cash(exit_costs)
 
         net_pnl = gross_pnl - entry_costs - exit_costs
+        # Round net P&L to avoid float drift (Location 6/12)
+        if self.precision_manager:
+            net_pnl = self.precision_manager.round_cash(net_pnl)
 
         # Calculate return percentage
         capital_at_risk = close_quantity * position.entry_price
         return_pct = (net_pnl / capital_at_risk * 100) if capital_at_risk > 0 else 0.0
+        # Round return percentage (Location 7/12)
+        if self.precision_manager:
+            return_pct = self.precision_manager.round_cash(return_pct)
 
         # Duration
         duration_bars = self._current_bar_idx - position.entry_bar_idx
+
+        # Calculate proportional costs for trade record
+        proportional_entry_commission = position.entry_commission * qty_fraction
+        proportional_entry_slippage = position.entry_slippage * qty_fraction
+        # Round proportional costs (Locations 8-9/12)
+        if self.precision_manager:
+            proportional_entry_commission = self.precision_manager.round_cash(proportional_entry_commission)
+            proportional_entry_slippage = self.precision_manager.round_cash(proportional_entry_slippage)
 
         # Create trade record
         trade = TradeRecord(
@@ -234,8 +275,8 @@ class TradeTracker:
             entry_dt=position.entry_dt,
             entry_price=position.entry_price,
             entry_quantity=close_quantity,
-            entry_commission=(position.entry_commission * qty_fraction),
-            entry_slippage=(position.entry_slippage * qty_fraction),
+            entry_commission=proportional_entry_commission,
+            entry_slippage=proportional_entry_slippage,
             entry_order_id=position.entry_order_id,
             exit_dt=exit_fill.timestamp,
             exit_price=exit_fill.fill_price,
@@ -300,6 +341,76 @@ class TradeTracker:
     def get_open_position_count(self) -> int:
         """Get number of currently open positions."""
         return sum(len(positions) for positions in self._open_positions.values())
+
+    def get_open_positions_as_trades(self, current_timestamp: datetime, current_price: float) -> list[TradeRecord]:
+        """
+        Convert currently open positions to trade records (for end-of-backtest reporting).
+
+        This is useful for validation/comparison with other engines that report
+        open positions as "trades" with the exit being the end of the backtest.
+
+        Args:
+            current_timestamp: Current/final timestamp to use as exit_dt
+            current_price: Current/final price to use for exit_price
+
+        Returns:
+            List of trade records for open positions (exit = current timestamp/price)
+        """
+        open_trades = []
+
+        for asset_id, positions in self._open_positions.items():
+            for position in positions:
+                # Calculate theoretical P&L if closed at current price
+                if position.direction == "long":
+                    gross_pnl = position.quantity * (current_price - position.entry_price)
+                else:
+                    gross_pnl = position.quantity * (position.entry_price - current_price)
+
+                # Round gross P&L (Location 10/12)
+                if self.precision_manager:
+                    gross_pnl = self.precision_manager.round_cash(gross_pnl)
+
+                # No exit costs since not actually closed
+                net_pnl = gross_pnl - (position.entry_commission + position.entry_slippage)
+                # Round net P&L (Location 11/12)
+                if self.precision_manager:
+                    net_pnl = self.precision_manager.round_cash(net_pnl)
+
+                # Calculate return percentage
+                capital_at_risk = position.quantity * position.entry_price
+                return_pct = (net_pnl / capital_at_risk * 100) if capital_at_risk > 0 else 0.0
+                # Round return percentage (Location 12/12)
+                if self.precision_manager:
+                    return_pct = self.precision_manager.round_cash(return_pct)
+
+                # Duration
+                duration_bars = self._current_bar_idx - position.entry_bar_idx
+
+                # Create pseudo-trade record
+                trade = TradeRecord(
+                    trade_id=self._next_trade_id + len(open_trades),
+                    asset_id=asset_id,
+                    entry_dt=position.entry_dt,
+                    entry_price=position.entry_price,
+                    entry_quantity=position.quantity,
+                    entry_commission=position.entry_commission,
+                    entry_slippage=position.entry_slippage,
+                    entry_order_id=position.entry_order_id,
+                    exit_dt=current_timestamp,  # Current/final timestamp
+                    exit_price=current_price,  # Current/final price
+                    exit_quantity=position.quantity,
+                    exit_commission=0.0,  # No exit commission (not actually closed)
+                    exit_slippage=0.0,  # No exit slippage (not actually closed)
+                    exit_order_id="OPEN",  # Mark as open position
+                    pnl=net_pnl,
+                    return_pct=return_pct,
+                    duration_bars=duration_bars,
+                    direction=position.direction,
+                )
+
+                open_trades.append(trade)
+
+        return open_trades
 
     def get_stats(self) -> dict[str, Any]:
         """Get tracker statistics."""

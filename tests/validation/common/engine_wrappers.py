@@ -161,19 +161,22 @@ class QEngineWrapper(EngineWrapper):
                             pct_rate = config.fees.get('percentage', 0.0)
                             fixed_fee = config.fees.get('fixed', 0.0)
                             # size = (cash - fixed) / (price * (1 + pct))
-                            # Use 99.99% of cash to leave tiny buffer for broker rounding
+                            # TASK-019: Buffer (0.9999) still needed despite PrecisionManager integration
+                            # Root cause: Order sizing happens at signal generation (before fill),
+                            # but actual costs include additional rounding at execution time.
+                            # Buffer prevents "insufficient funds" errors from accumulated micro-differences.
                             size_raw = (cash * 0.9999 - fixed_fee) / (event.close * (1 + pct_rate))
                             # Round DOWN to valid precision for this asset
                             size = self.precision_mgr.round_quantity(size_raw)
                         elif config.fees > 0:
                             # Percentage only
-                            # Use 99.99% of cash to leave tiny buffer for broker rounding
+                            # TASK-019: Buffer still needed (see combined fees comment above)
                             size_raw = (cash * 0.9999) / (event.close * (1 + config.fees))
                             # Round DOWN to valid precision for this asset
                             size = self.precision_mgr.round_quantity(size_raw)
                         else:
                             # No fees
-                            # Use 99.99% of cash to leave tiny buffer for broker rounding
+                            # TASK-019: Buffer still needed (see combined fees comment above)
                             size_raw = (cash * 0.9999) / event.close
                             # Round DOWN to valid precision for this asset
                             size = self.precision_mgr.round_quantity(size_raw)

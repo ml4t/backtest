@@ -158,8 +158,8 @@ class SimulationBroker(Broker):
         # VectorBT compatibility: Track newly-created brackets to skip checking on creation bar
         self._newly_created_brackets: set[str] = set()
 
-        # Trade tracking (highly efficient)
-        self.trade_tracker = TradeTracker()
+        # Trade tracking (highly efficient) with cash precision manager
+        self.trade_tracker = TradeTracker(precision_manager=cash_precision_manager)
 
         # Statistics
         self._total_commission = 0.0
