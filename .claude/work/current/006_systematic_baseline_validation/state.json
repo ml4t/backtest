@@ -650,10 +650,12 @@
       "title": "Integrate PrecisionManager into Portfolio and Order",
       "description": "Add PrecisionManager to Portfolio (12 locations) for P&L accounting and Order (3 locations) for fill tracking. Prevents downstream float drift.",
       "type": "feature",
-      "status": "pending",
+      "status": "completed",
       "priority": "high",
       "phase": "phase_2b",
       "dependencies": ["TASK-017"],
+      "completed_at": "2025-11-12T12:00:00Z",
+      "actual_hours": 2.5,
       "test_file": null,
       "acceptance_criteria": [
         "Portfolio.__init__() accepts precision_manager parameter",
@@ -699,10 +701,10 @@
       "notes": "Final integration phase. TradeTracker is reporting layer, commission standardization ensures consistency. Buffer elimination would be ideal outcome but not required if root cause still exists."
     }
   ],
-  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003", "TASK-016", "TASK-017"],
-  "next_available": ["TASK-004", "TASK-018"],
+  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003", "TASK-016", "TASK-017", "TASK-018"],
+  "next_available": ["TASK-004", "TASK-019"],
   "total_tasks": 19,
-  "completed_count": 5,
-  "pending_count": 14,
-  "progress_percentage": 26.3
+  "completed_count": 6,
+  "pending_count": 13,
+  "progress_percentage": 31.6
 }
