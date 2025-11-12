@@ -173,12 +173,10 @@ def test_3_3_combined_costs():
             engines = list(results.keys())
             diff = abs(results[engines[0]].final_value - results[engines[1]].final_value)
             print(f"\n   💡 Final value difference: ${diff:,.2f}")
-            # NOTE: Combined costs show larger differences than individual costs
-            # This appears to be due to order-of-operations or cost calculation differences
-            # when both slippage and commission are applied together
-            # Using relaxed tolerance pending further investigation
-            tolerance = 2500.0  # Relaxed from $5 for combined costs
-            print(f"   ⚠️  Tolerance: ${tolerance:,.2f} (relaxed for combined costs investigation)")
+            # Fixed: Position sizing now correctly accounts for both slippage and commission
+            # See engine_wrappers.py for the fix (calculate effective_price with slippage first)
+            tolerance = 5.0  # Standard rounding tolerance
+            print(f"   ⚠️  Tolerance: ${tolerance:,.2f} (standard rounding tolerance)")
 
             if diff > tolerance:
                 print(f"   ❌ Difference exceeds tolerance!")

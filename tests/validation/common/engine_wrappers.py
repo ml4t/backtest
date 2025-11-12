@@ -151,33 +151,40 @@ class QEngineWrapper(EngineWrapper):
                 if entry_signal and self.precision_mgr.is_position_zero(current_qty):
                     # Calculate position size (use all cash if size not specified)
                     if config.size is None:
-                        # Use all available cash, accounting for commission
+                        # Use all available cash, accounting for BOTH slippage and commission
                         cash = self.portfolio.cash
-                        # Calculate size that fits within cash budget INCLUDING commission
-                        # For combined fees: cash >= size * price * (1 + pct_rate) + fixed_fee
-                        # For percentage only: cash >= size * price * (1 + pct_rate)
+                        # CRITICAL FIX: Must account for slippage in position sizing
+                        # Actual fill price = market_price * (1 + slippage) for BUYs
+                        # Commission = filled_notional * commission_rate
+                        # Total cost = size * fill_price * (1 + commission_rate)
+                        #            = size * market_price * (1 + slippage) * (1 + commission)
+
+                        # Calculate effective price including slippage
+                        slippage_multiplier = 1.0 + config.slippage if config.slippage > 0 else 1.0
+                        effective_price = event.close * slippage_multiplier
+
                         if isinstance(config.fees, dict):
-                            # Combined fees: solve for size in: cash = size * price * (1 + pct) + fixed
+                            # Combined fees: solve for size in: cash = size * effective_price * (1 + pct) + fixed
                             pct_rate = config.fees.get('percentage', 0.0)
                             fixed_fee = config.fees.get('fixed', 0.0)
-                            # size = (cash - fixed) / (price * (1 + pct))
+                            # size = (cash - fixed) / (effective_price * (1 + pct))
                             # TASK-019: Buffer (0.9999) still needed despite PrecisionManager integration
                             # Root cause: Order sizing happens at signal generation (before fill),
                             # but actual costs include additional rounding at execution time.
                             # Buffer prevents "insufficient funds" errors from accumulated micro-differences.
-                            size_raw = (cash * 0.9999 - fixed_fee) / (event.close * (1 + pct_rate))
+                            size_raw = (cash * 0.9999 - fixed_fee) / (effective_price * (1 + pct_rate))
                             # Round DOWN to valid precision for this asset
                             size = self.precision_mgr.round_quantity(size_raw)
                         elif config.fees > 0:
-                            # Percentage only
+                            # Percentage commission only
                             # TASK-019: Buffer still needed (see combined fees comment above)
-                            size_raw = (cash * 0.9999) / (event.close * (1 + config.fees))
+                            size_raw = (cash * 0.9999) / (effective_price * (1 + config.fees))
                             # Round DOWN to valid precision for this asset
                             size = self.precision_mgr.round_quantity(size_raw)
                         else:
-                            # No fees
+                            # No fees, but may have slippage
                             # TASK-019: Buffer still needed (see combined fees comment above)
-                            size_raw = (cash * 0.9999) / event.close
+                            size_raw = (cash * 0.9999) / effective_price
                             # Round DOWN to valid precision for this asset
                             size = self.precision_mgr.round_quantity(size_raw)
                     else:
@@ -259,7 +266,7 @@ class QEngineWrapper(EngineWrapper):
         tests_path = Path(__file__).parent.parent.parent
         if str(tests_path) not in sys.path:
             sys.path.insert(0, str(tests_path))
-        from validation.models import VectorBTCommission
+        from validation.models import VectorBTCommission, VectorBTSlippage
 
         # Handle combined fees (percentage + fixed) or simple percentage
         if isinstance(config.fees, dict):
@@ -275,7 +282,8 @@ class QEngineWrapper(EngineWrapper):
             # No fees
             commission_model = NoCommission()
 
-        slippage_model = PercentageSlippage(slippage_pct=config.slippage) if config.slippage > 0 else NoSlippage()
+        # Use VectorBTSlippage for validation (matches VectorBT's multiplicative formula)
+        slippage_model = VectorBTSlippage(slippage=config.slippage) if config.slippage > 0 else NoSlippage()
 
         # Create broker with commission/slippage models
         from qengine.execution.broker import SimulationBroker
