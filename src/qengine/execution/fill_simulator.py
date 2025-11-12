@@ -425,6 +425,13 @@ class FillSimulator:
                     if fill_quantity <= 0:
                         return None
 
+        # Round fill quantity to asset's precision (prevents float precision mismatches)
+        # For equities: truncates to whole shares
+        # For crypto: rounds to 8 decimals (satoshi precision)
+        if asset_spec:
+            precision_mgr = asset_spec.get_precision_manager()
+            fill_quantity = precision_mgr.round_quantity(fill_quantity)
+
         return fill_quantity
 
     def _get_market_price_with_impact(

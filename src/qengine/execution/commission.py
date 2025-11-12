@@ -26,8 +26,22 @@ class CommissionModel(ABC):
             fill_price: Price at which the order was filled
 
         Returns:
-            Commission amount in currency terms
+            Commission amount in currency terms (rounded to cents for USD)
         """
+
+    def _round_commission(self, commission: float) -> float:
+        """Round commission to cents (2 decimal places for USD).
+
+        This ensures commission values match real broker behavior where
+        commissions are always charged in whole cents.
+
+        Args:
+            commission: Raw commission amount
+
+        Returns:
+            Commission rounded to nearest cent
+        """
+        return round(commission, 2)
 
     def __repr__(self) -> str:
         """String representation."""
@@ -97,7 +111,8 @@ class PercentageCommission(CommissionModel):
     ) -> float:
         """Calculate percentage-based commission."""
         notional = fill_quantity * fill_price
-        return notional * self.rate
+        commission = notional * self.rate
+        return self._round_commission(commission)
 
     def __repr__(self) -> str:
         """String representation."""
@@ -430,7 +445,7 @@ class VectorBTCommission(CommissionModel):
         # Add fixed fees
         total_fees = percentage_fees + self.fixed_fee
 
-        return total_fees
+        return self._round_commission(total_fees)
 
     def __repr__(self) -> str:
         """String representation."""
