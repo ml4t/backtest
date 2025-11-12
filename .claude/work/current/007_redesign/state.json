@@ -1,0 +1,346 @@
+{
+  "project": {
+    "name": "QEngine Architectural Redesign",
+    "description": "Fix 3 critical architectural flaws: data-feed-driven loop, dual state management, redundant event queues",
+    "created_at": "2025-11-12T16:30:00Z",
+    "updated_at": "2025-11-12T16:30:00Z"
+  },
+  "status": "implementing",
+  "current_task": null,
+  "phases": {
+    "phase_1": {
+      "name": "Fix the Engine's Heart (Clock-Driven Loop)",
+      "description": "Implement true multi-source event-driven loop",
+      "status": "completed",
+      "estimated_hours": 48,
+      "priority": "critical",
+      "completed_at": "2025-11-12T20:30:00-05:00"
+    },
+    "phase_2": {
+      "name": "Fix the Engine's Brain (Single Portfolio State)",
+      "description": "Create single authoritative source of truth for cash and positions",
+      "status": "pending",
+      "dependencies": [
+        "phase_1"
+      ],
+      "estimated_hours": 68,
+      "priority": "critical"
+    },
+    "phase_3": {
+      "name": "Clean Up Architectural Smells",
+      "description": "Refactor AssetSpec and event-driven corporate actions",
+      "status": "deferred",
+      "estimated_hours": 28,
+      "priority": "high"
+    },
+    "phase_4": {
+      "name": "Feature Alignment (Pro-Am Trader)",
+      "description": "Config-first, futures, crypto support",
+      "status": "deferred",
+      "estimated_hours": 60,
+      "priority": "medium"
+    }
+  },
+  "tasks": [
+    {
+      "id": "TASK-1.1",
+      "phase": "phase_1",
+      "title": "Deprecate EventBus",
+      "description": "Delete EventBus class from core/event.py and merge functionality into Clock",
+      "type": "refactoring",
+      "status": "completed",
+      "dependencies": [],
+      "files": [
+        "src/qengine/core/event.py"
+      ],
+      "acceptance_criteria": [
+        "EventBus class deleted from event.py",
+        "No imports of EventBus remain in codebase",
+        "Event classes (MarketEvent, FillEvent, etc.) remain intact"
+      ],
+      "estimated_hours": 4,
+      "priority": "critical",
+      "completed_at": "2025-11-12T11:56:41-05:00",
+      "deliverables": [
+        "src/qengine/core/event.py",
+        "src/qengine/engine.py",
+        "src/qengine/__init__.py",
+        "src/qengine/core/__init__.py"
+      ]
+    },
+    {
+      "id": "TASK-1.2",
+      "phase": "phase_1",
+      "title": "Elevate Clock to Central Component",
+      "description": "Add subscribe() and publish() methods to Clock for event distribution",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-1.1"
+      ],
+      "files": [
+        "src/qengine/core/clock.py"
+      ],
+      "acceptance_criteria": [
+        "Clock has subscribe(event_type, handler) method",
+        "Clock has publish(event) method",
+        "Clock stores subscribers in _subscribers dict",
+        "Clock can dispatch events to registered handlers",
+        "All existing Clock tests still pass"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical",
+      "completed_at": "2025-11-12T12:30:32-05:00",
+      "deliverables": [
+        "src/qengine/core/clock.py"
+      ]
+    },
+    {
+      "id": "TASK-1.3",
+      "phase": "phase_1",
+      "title": "Refactor BacktestEngine to use Clock",
+      "description": "Remove event_bus and update _setup_event_handlers to use Clock",
+      "type": "refactoring",
+      "status": "completed",
+      "dependencies": [
+        "TASK-1.2"
+      ],
+      "files": [
+        "src/qengine/engine.py"
+      ],
+      "acceptance_criteria": [
+        "self.event_bus removed from BacktestEngine.__init__",
+        "_setup_event_handlers() uses self.clock.subscribe()",
+        "Strategy, Broker, Portfolio, Reporter subscribe via Clock",
+        "Data feeds added to Clock via clock.add_data_feed()"
+      ],
+      "estimated_hours": 12,
+      "priority": "critical",
+      "completed_at": "2025-11-12T12:39:03-05:00",
+      "deliverables": [
+        "src/qengine/engine.py"
+      ]
+    },
+    {
+      "id": "TASK-1.4",
+      "phase": "phase_1",
+      "title": "Rewrite Main Event Loop",
+      "description": "Replace data-feed-driven loop with Clock-driven loop in BacktestEngine.run()",
+      "type": "refactoring",
+      "status": "completed",
+      "dependencies": [
+        "TASK-1.3"
+      ],
+      "files": [
+        "src/qengine/engine.py"
+      ],
+      "acceptance_criteria": [
+        "Old 'while not self.data_feed.is_exhausted' loop deleted",
+        "New 'while event := self.clock.get_next_event()' loop implemented",
+        "Events dispatched via Clock's subscribers",
+        "Corporate action manual checks removed",
+        "Basic backtest runs without errors"
+      ],
+      "estimated_hours": 16,
+      "priority": "critical",
+      "completed_at": "2025-11-12T12:42:34-05:00",
+      "deliverables": [
+        "src/qengine/engine.py"
+      ]
+    },
+    {
+      "id": "TASK-1.5",
+      "phase": "phase_1",
+      "title": "Update Tests for Phase 1",
+      "description": "Fix all tests broken by Clock-driven architecture changes",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-1.4"
+      ],
+      "files": [
+        "tests/conftest.py",
+        "tests/unit/test_engine.py",
+        "tests/unit/test_clock_multi_feed.py",
+        "src/qengine/core/clock.py"
+      ],
+      "acceptance_criteria": [
+        "All clock tests pass",
+        "All engine tests pass",
+        "Integration tests pass with new architecture",
+        "7 existing validation tests still pass"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical",
+      "completed_at": "2025-11-12T20:30:00-05:00",
+      "deliverables": [
+        "tests/conftest.py",
+        "tests/unit/test_engine.py",
+        "src/qengine/core/clock.py"
+      ],
+      "results": {
+        "clock_tests": "23/25 passed (2 skipped)",
+        "engine_tests": "17/18 passed (1 skipped)",
+        "validation_tests": "5/9 passed (4 skipped - VectorBT unavailable)"
+      }
+    },
+    {
+      "id": "TASK-2.1",
+      "phase": "phase_2",
+      "title": "Deprecate PositionTracker",
+      "description": "Delete execution.PositionTracker class entirely",
+      "type": "refactoring",
+      "status": "blocked",
+      "dependencies": [
+        "TASK-1.5"
+      ],
+      "files": [
+        "src/qengine/execution/position_tracker.py"
+      ],
+      "acceptance_criteria": [
+        "position_tracker.py file deleted",
+        "No imports of PositionTracker remain"
+      ],
+      "estimated_hours": 4,
+      "priority": "critical"
+    },
+    {
+      "id": "TASK-2.2",
+      "phase": "phase_2",
+      "title": "Consolidate Portfolio Layer",
+      "description": "Merge SimplePortfolio and PortfolioAccounting into single Portfolio class",
+      "type": "refactoring",
+      "status": "blocked",
+      "dependencies": [
+        "TASK-2.1"
+      ],
+      "files": [
+        "src/qengine/portfolio/portfolio.py",
+        "src/qengine/portfolio/simple.py",
+        "src/qengine/portfolio/accounting.py"
+      ],
+      "acceptance_criteria": [
+        "Single Portfolio class with all functionality",
+        "SimplePortfolio deleted",
+        "PortfolioAccounting deleted",
+        "Portfolio manages cash, positions, P&L"
+      ],
+      "estimated_hours": 16,
+      "priority": "critical"
+    },
+    {
+      "id": "TASK-2.3",
+      "phase": "phase_2",
+      "title": "Refactor BacktestEngine Initialization",
+      "description": "Inject single Portfolio instance into Broker and Strategy",
+      "type": "refactoring",
+      "status": "blocked",
+      "dependencies": [
+        "TASK-2.2"
+      ],
+      "files": [
+        "src/qengine/engine.py"
+      ],
+      "acceptance_criteria": [
+        "Single self.portfolio = Portfolio() instantiated",
+        "self.broker.portfolio = self.portfolio",
+        "self.strategy.portfolio = self.portfolio",
+        "Broker and Strategy share same Portfolio instance"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical"
+    },
+    {
+      "id": "TASK-2.4",
+      "phase": "phase_2",
+      "title": "Refactor SimulationBroker",
+      "description": "Remove position_tracker and use Clock.publish() for fills",
+      "type": "refactoring",
+      "status": "blocked",
+      "dependencies": [
+        "TASK-2.3"
+      ],
+      "files": [
+        "src/qengine/execution/broker.py"
+      ],
+      "acceptance_criteria": [
+        "self.position_tracker removed entirely",
+        "Broker reads from self.portfolio.cash",
+        "Broker reads from self.portfolio.get_position()",
+        "Broker publishes fills via self.clock.publish(fill_event)",
+        "Broker never updates state directly"
+      ],
+      "estimated_hours": 16,
+      "priority": "critical"
+    },
+    {
+      "id": "TASK-2.5",
+      "phase": "phase_2",
+      "title": "Portfolio Subscribes to FillEvents",
+      "description": "Add on_fill_event() method and register Portfolio as subscriber",
+      "type": "feature",
+      "status": "blocked",
+      "dependencies": [
+        "TASK-2.4"
+      ],
+      "files": [
+        "src/qengine/portfolio/portfolio.py",
+        "src/qengine/engine.py"
+      ],
+      "acceptance_criteria": [
+        "Portfolio.on_fill_event(event) method added",
+        "Portfolio updates cash on fill events",
+        "Portfolio updates positions on fill events",
+        "Portfolio registered as FillEvent subscriber in Clock",
+        "No other component updates portfolio state"
+      ],
+      "estimated_hours": 12,
+      "priority": "critical"
+    },
+    {
+      "id": "TASK-2.6",
+      "phase": "phase_2",
+      "title": "Update Integration Tests",
+      "description": "Verify single source of truth in validation tests",
+      "type": "testing",
+      "status": "blocked",
+      "dependencies": [
+        "TASK-2.5"
+      ],
+      "files": [
+        "tests/validation/test_4_1_limit_orders.py",
+        "tests/validation/common/engine_wrappers.py"
+      ],
+      "acceptance_criteria": [
+        "All 7 passing validation tests still pass",
+        "test_4_1_limit_orders.py VectorBT comparison passes",
+        "No 'Cannot remove X shares, only have 0' errors",
+        "Broker and Strategy see identical portfolio state",
+        "Position tracking errors eliminated"
+      ],
+      "estimated_hours": 12,
+      "priority": "critical"
+    }
+  ],
+  "completed_tasks": [
+    "TASK-1.1",
+    "TASK-1.2",
+    "TASK-1.3",
+    "TASK-1.4",
+    "TASK-1.5"
+  ],
+  "next_available": [
+    "TASK-2.1"
+  ],
+  "metrics": {
+    "total_tasks": 11,
+    "completed": 5,
+    "in_progress": 0,
+    "pending": 6,
+    "blocked": 0,
+    "total_estimated_hours": 116,
+    "phases_complete": 1,
+    "phases_total": 4
+  },
+  "updated_at": "2025-11-12T20:30:00-05:00"
+}

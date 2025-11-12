@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 
 from qengine.core.clock import Clock, ClockMode
-from qengine.core.event import Event, EventBus, MarketEvent
+from qengine.core.event import Event, MarketEvent
 from qengine.core.types import AssetId, MarketDataType
 
 
@@ -56,10 +56,7 @@ def sample_signal_data(temp_dir: Path) -> Path:
     return path
 
 
-@pytest.fixture
-def event_bus() -> EventBus:
-    """Create an event bus for testing."""
-    return EventBus(use_priority_queue=True)
+# EventBus removed - use clock fixture for event distribution
 
 
 @pytest.fixture

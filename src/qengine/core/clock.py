@@ -128,7 +128,8 @@ class Clock:
         """
         if handler not in self._subscribers[event_type]:
             self._subscribers[event_type].append(handler)
-            self.logger.debug(f"Subscribed {handler.__name__} to {event_type}")
+            handler_name = getattr(handler, '__name__', repr(handler))
+            self.logger.debug(f"Subscribed {handler_name} to {event_type}")
 
     def unsubscribe(self, event_type: EventType, handler: Callable[[Event], None]) -> None:
         """
@@ -140,7 +141,8 @@ class Clock:
         """
         if handler in self._subscribers[event_type]:
             self._subscribers[event_type].remove(handler)
-            self.logger.debug(f"Unsubscribed {handler.__name__} from {event_type}")
+            handler_name = getattr(handler, '__name__', repr(handler))
+            self.logger.debug(f"Unsubscribed {handler_name} from {event_type}")
 
     def publish(self, event: Event) -> None:
         """
