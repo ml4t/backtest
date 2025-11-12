@@ -325,9 +325,13 @@ class Order:
         if fill_quantity <= 0:
             raise ValueError("Fill quantity must be positive")
 
-        if fill_quantity > self.remaining_quantity:
+        # Use precision manager for comparison to avoid float precision issues
+        rounded_fill = self.precision_manager.round_quantity(fill_quantity)
+        rounded_remaining = self.precision_manager.round_quantity(self.remaining_quantity)
+
+        if rounded_fill > rounded_remaining:
             raise ValueError(
-                f"Fill quantity {fill_quantity} exceeds remaining {self.remaining_quantity}",
+                f"Fill quantity {fill_quantity} (rounded: {rounded_fill}) exceeds remaining {self.remaining_quantity} (rounded: {rounded_remaining})",
             )
 
         # Update fill tracking
