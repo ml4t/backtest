@@ -130,8 +130,8 @@ class TestBrokerLiquidityIntegration:
         fill_result = broker.fill_simulator.try_fill_order(
             order,
             100.0,
-            broker.position_tracker.get_cash(),
-            broker.position_tracker.get_position("AAPL"),
+            broker.get_cash(),
+            broker.get_position("AAPL"),
             timestamp,
         )
 
@@ -164,8 +164,8 @@ class TestBrokerLiquidityIntegration:
         fill_result = broker.fill_simulator.try_fill_order(
             order,
             100.0,
-            broker.position_tracker.get_cash(),
-            broker.position_tracker.get_position("AAPL"),
+            broker.get_cash(),
+            broker.get_position("AAPL"),
             timestamp,
         )
 
@@ -196,8 +196,8 @@ class TestBrokerLiquidityIntegration:
         fill_result = broker.fill_simulator.try_fill_order(
             order,
             10.0,
-            broker.position_tracker.get_cash(),
-            broker.position_tracker.get_position("AAPL"),
+            broker.get_cash(),
+            broker.get_position("AAPL"),
             timestamp,
         )
 
@@ -227,8 +227,8 @@ class TestBrokerLiquidityIntegration:
         fill_result1 = broker.fill_simulator.try_fill_order(
             order1,
             100.0,
-            broker.position_tracker.get_cash(),
-            broker.position_tracker.get_position("AAPL"),
+            broker.get_cash(),
+            broker.get_position("AAPL"),
             timestamp,
         )
         assert fill_result1 is not None
@@ -283,8 +283,8 @@ class TestBrokerLiquidityIntegration:
         fill_result = broker.fill_simulator.try_fill_order(
             order,
             100.0,
-            broker.position_tracker.get_cash(),
-            broker.position_tracker.get_position("AAPL"),
+            broker.get_cash(),
+            broker.get_position("AAPL"),
             timestamp,
         )
         assert fill_result is None
@@ -314,8 +314,8 @@ class TestBrokerLiquidityIntegration:
         fill_result = broker.fill_simulator.try_fill_order(
             order,
             100.0,
-            broker.position_tracker.get_cash(),
-            broker.position_tracker.get_position("AAPL"),
+            broker.get_cash(),
+            broker.get_position("AAPL"),
             timestamp,
         )
 

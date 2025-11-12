@@ -21,6 +21,28 @@ class AssetSpec:
     # Trading hours (TODO: integrate with market calendars)
     tradeable_hours: Optional[tuple[int, int]] = None  # (start_hour, end_hour)
 
+    def get_precision_manager(self):
+        """Create PrecisionManager for this asset.
+
+        Returns:
+            PrecisionManager configured with this asset's precision rules
+        """
+        from qengine.core.precision import PrecisionManager
+
+        # Determine precision based on asset type
+        if self.asset_type == "crypto":
+            # Crypto: 8 decimals for quantity (satoshi), 2 for price
+            return PrecisionManager(position_decimals=8, price_decimals=2, cash_decimals=2)
+        elif self.asset_type in ("stock", "equity"):
+            # Equities: whole shares (0 decimals), 2 for price
+            return PrecisionManager(position_decimals=0, price_decimals=2, cash_decimals=2)
+        elif self.asset_type == "future":
+            # Futures: whole contracts (0 decimals), 2 for price
+            return PrecisionManager(position_decimals=0, price_decimals=2, cash_decimals=2)
+        else:
+            # Default: whole units, 2 decimal price
+            return PrecisionManager(position_decimals=0, price_decimals=2, cash_decimals=2)
+
 
 class AssetRegistry:
     """Registry of asset specifications."""

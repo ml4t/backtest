@@ -1,201 +1,230 @@
-"""Portfolio state management for QEngine."""
+"""Portfolio facade combining position tracking, analytics, and trade history.
 
-from dataclasses import dataclass, field
+This module provides the main Portfolio class - a facade that orchestrates:
+- PositionTracker (core position/cash management)
+- PerformanceAnalyzer (metrics and analytics, optional)
+- TradeJournal (trade history and persistence)
+
+The facade pattern provides:
+- Simple API for beginners (portfolio.on_fill_event())
+- Performance opt-out for HFT (track_analytics=False)
+- Easy extension for researchers (custom analyzer/journal classes)
+"""
+
+import logging
 from datetime import datetime
-from typing import Any, Optional, Union
+from typing import Any, Optional, Type
 
-from qengine.core.types import AssetId, Cash, Quantity
+from qengine.core.event import FillEvent
 from qengine.core.precision import PrecisionManager
+from qengine.core.types import AssetId, Cash, Quantity
+from qengine.portfolio.core import PositionTracker
+from qengine.portfolio.state import Position, PortfolioState
 
-
-@dataclass
-class Position:
-    """Represents a position in a single asset - current holdings only."""
-
-    asset_id: AssetId
-    quantity: Quantity = 0.0
-    cost_basis: float = 0.0
-    last_price: float = 0.0
-    unrealized_pnl: float = 0.0
-    precision_manager: Optional[PrecisionManager] = None
-
-    @property
-    def market_value(self) -> float:
-        """Current market value of the position."""
-        return self.quantity * self.last_price
-
-    def update_price(self, price: float) -> None:
-        """Update position with new market price."""
-        self.last_price = price
-        if self.quantity != 0:
-            avg_cost = self.cost_basis / self.quantity
-            self.unrealized_pnl = self.quantity * (price - avg_cost)
-            # Round unrealized P&L to avoid float drift (Location 1/12)
-            if self.precision_manager:
-                self.unrealized_pnl = self.precision_manager.round_cash(self.unrealized_pnl)
-
-    def add_shares(self, quantity: Quantity, price: float) -> None:
-        """Add shares to position."""
-        new_quantity = self.quantity + quantity
-
-        # Round new quantity to avoid float drift (Location 2/12)
-        if self.precision_manager:
-            new_quantity = self.precision_manager.round_quantity(new_quantity)
-
-        if new_quantity == 0 or (self.precision_manager and self.precision_manager.is_position_zero(new_quantity)):
-            # Closing position
-            self.unrealized_pnl = 0.0
-            self.cost_basis = 0.0
-            self.quantity = 0.0
-        else:
-            # Update cost basis
-            new_cost = quantity * price
-            self.cost_basis += new_cost
-            # Round cost basis to avoid float drift (Location 3/12)
-            if self.precision_manager:
-                self.cost_basis = self.precision_manager.round_cash(self.cost_basis)
-            self.quantity = new_quantity
-
-        self.update_price(price)
-
-    def remove_shares(self, quantity: Quantity, price: float) -> float:
-        """Remove shares from position, returns realized P&L for this transaction."""
-        # Use precision-aware tolerance if available (Location 4/12)
-        if self.precision_manager:
-            if quantity > self.quantity and not self.precision_manager.is_position_zero(quantity - self.quantity):
-                raise ValueError(f"Cannot remove {quantity} shares, only have {self.quantity}")
-        else:
-            # Fall back to fixed tolerance
-            TOLERANCE = 1e-9
-            if abs(quantity) > abs(self.quantity) + TOLERANCE:
-                raise ValueError(f"Cannot remove {quantity} shares, only have {self.quantity}")
-
-        # Calculate realized P&L for the shares being removed
-        avg_cost = self.cost_basis / self.quantity if self.quantity != 0 else 0
-        realized = quantity * (price - avg_cost)
-        # Round realized P&L to avoid float drift (Location 5/12)
-        if self.precision_manager:
-            realized = self.precision_manager.round_cash(realized)
-
-        # Update cost basis and quantity
-        self.cost_basis -= quantity * avg_cost
-        # Round cost basis to avoid float drift (Location 6/12)
-        if self.precision_manager:
-            self.cost_basis = self.precision_manager.round_cash(self.cost_basis)
-
-        self.quantity -= quantity
-        # Round quantity to avoid float drift (Location 7/12)
-        if self.precision_manager:
-            self.quantity = self.precision_manager.round_quantity(self.quantity)
-
-        self.update_price(price)
-        return realized
-
-
-@dataclass
-class PortfolioState:
-    """Complete portfolio state at a point in time."""
-
-    timestamp: datetime
-    cash: Cash
-    positions: dict[AssetId, Position] = field(default_factory=dict)
-    pending_orders: list[Any] = field(default_factory=list)
-    filled_orders: list[Any] = field(default_factory=list)
-
-    # Performance metrics
-    total_value: float = 0.0
-    total_realized_pnl: float = 0.0
-    total_unrealized_pnl: float = 0.0
-    total_commission: float = 0.0
-    total_slippage: float = 0.0
-
-    # Risk metrics
-    leverage: float = 1.0
-    max_position_value: float = 0.0
-    concentration: float = 0.0
-
-    @property
-    def equity(self) -> float:
-        """Total equity (cash + positions)."""
-        position_value = sum(p.market_value for p in self.positions.values())
-        return float(self.cash) + position_value
-
-    @property
-    def total_pnl(self) -> float:
-        """Total P&L across all positions."""
-        return self.total_realized_pnl + self.total_unrealized_pnl
-
-    def update_metrics(self) -> None:
-        """Update portfolio metrics."""
-        # Update position values
-        position_values = [p.market_value for p in self.positions.values()]
-
-        if position_values:
-            self.max_position_value = max(abs(v) for v in position_values)
-            total_position_value = sum(abs(v) for v in position_values)
-
-            # Update concentration (largest position as % of portfolio)
-            if self.equity > 0:
-                self.concentration = self.max_position_value / self.equity
-                self.leverage = total_position_value / self.equity
-            else:
-                self.concentration = 0.0
-                self.leverage = 0.0
-        else:
-            self.max_position_value = 0.0
-            self.concentration = 0.0
-            self.leverage = 0.0
-
-        # Update P&L (realized P&L is tracked at Portfolio level, not per Position)
-        self.total_unrealized_pnl = sum(p.unrealized_pnl for p in self.positions.values())
-        # total_realized_pnl is set from Portfolio.total_realized_pnl (passed in get_current_state)
-        self.total_value = self.equity
+logger = logging.getLogger(__name__)
 
 
 class Portfolio:
-    """Portfolio management with state tracking."""
+    """
+    Unified portfolio management facade - simple API with modular internals.
+
+    This is the main entry point for portfolio management in QEngine.
+    It combines three independent components:
+
+    1. PositionTracker - core position and cash tracking
+    2. PerformanceAnalyzer - performance metrics (optional, can disable for HFT)
+    3. TradeJournal - trade history and persistence
+
+    Example usage:
+
+        # Simple API (for beginners)
+        portfolio = Portfolio(initial_cash=100000)
+        portfolio.on_fill_event(fill)
+        metrics = portfolio.get_performance_metrics()
+
+        # Performance opt-out (for HFT)
+        portfolio = Portfolio(track_analytics=False)  # Zero overhead
+
+        # Easy extension (for researchers)
+        class MyAnalyzer(PerformanceAnalyzer):
+            def calculate_sortino_ratio(self): pass
+
+        portfolio = Portfolio(analyzer_class=MyAnalyzer)
+    """
 
     def __init__(
         self,
         initial_cash: Cash = 100000.0,
+        currency: str = "USD",
+        track_analytics: bool = True,
         precision_manager: Optional[PrecisionManager] = None,
+        analyzer_class: Optional[Type] = None,
+        journal_class: Optional[Type] = None,
     ):
-        """
-        Initialize portfolio with starting cash.
+        """Initialize portfolio with modular components.
 
         Args:
             initial_cash: Starting cash balance
-            precision_manager: PrecisionManager for cash rounding (USD precision)
+            currency: Base currency (default: USD)
+            track_analytics: Whether to enable analytics (disable for HFT, default: True)
+            precision_manager: PrecisionManager for cash rounding
+            analyzer_class: Custom analyzer class (default: PerformanceAnalyzer)
+            journal_class: Custom journal class (default: TradeJournal)
         """
-        self.initial_cash = float(initial_cash)
-        self.cash = float(initial_cash)
-        self.positions: dict[AssetId, Position] = {}
+        # Core tracking (always present)
+        self._tracker = PositionTracker(initial_cash, precision_manager)
+
+        # Optional analytics (can disable for performance)
+        if track_analytics:
+            from qengine.portfolio.analytics import PerformanceAnalyzer
+
+            AnalyzerClass = analyzer_class or PerformanceAnalyzer
+            self._analyzer: Optional[Any] = AnalyzerClass(self._tracker)
+        else:
+            self._analyzer = None
+
+        # Trade journal
+        from qengine.portfolio.analytics import TradeJournal
+
+        JournalClass = journal_class or TradeJournal
+        self._journal = JournalClass()
+
+        # Portfolio-level attributes
+        self.currency = currency
+        self.initial_cash = initial_cash
+        self.current_prices: dict[AssetId, float] = {}
         self.precision_manager = precision_manager
 
-        # Track cumulative costs and P&L
-        self.total_commission = 0.0
-        self.total_slippage = 0.0
-        self.total_realized_pnl = 0.0
-        self.asset_realized_pnl: dict[AssetId, float] = {}  # Per-asset P&L tracking
-
-        # History tracking
+        # State history (for backward compatibility)
         self.state_history: list[PortfolioState] = []
 
-    def get_position(self, asset_id: AssetId) -> Union[Position, None]:
-        """Get position for an asset."""
-        return self.positions.get(asset_id)
+    # ===== Event Handlers =====
+    def on_fill_event(self, event: FillEvent) -> None:
+        """Handle fill event from broker.
+
+        This is the main entry point for updating portfolio state.
+        Delegates to all three components:
+        1. TradeJournal - records the fill
+        2. PositionTracker - updates position and cash
+        3. PerformanceAnalyzer - updates metrics (if enabled)
+
+        Args:
+            event: FillEvent from broker
+        """
+        # Record in journal
+        self._journal.record_fill(event)
+
+        # Update position (convert Decimal to float for tracker)
+        quantity_change = (
+            float(event.fill_quantity) if event.side.value in ["buy", "BUY"] else -float(event.fill_quantity)
+        )
+        self._tracker.update_position(
+            asset_id=event.asset_id,
+            quantity_change=quantity_change,
+            price=float(event.fill_price),
+            commission=event.commission,
+            slippage=event.slippage,
+        )
+
+        # Update analytics (if enabled)
+        if self._analyzer:
+            self._analyzer.update(event.timestamp)
+
+        logger.info(
+            f"Fill: {event.side.value.upper()} {event.fill_quantity} {event.asset_id} "
+            f"@ ${float(event.fill_price):.2f}"
+        )
+
+    # ===== Delegate to PositionTracker =====
+    @property
+    def cash(self) -> float:
+        """Current cash balance."""
+        return self._tracker.cash
+
+    @cash.setter
+    def cash(self, value: float) -> None:
+        """Set cash balance (backward compatibility for tests).
+
+        Args:
+            value: New cash value
+        """
+        self._tracker.cash = value
+
+    @property
+    def equity(self) -> float:
+        """Total equity (cash + position market values)."""
+        return self._tracker.equity
+
+    @property
+    def returns(self) -> float:
+        """Simple returns from initial capital."""
+        return self._tracker.returns
+
+    @property
+    def unrealized_pnl(self) -> float:
+        """Total unrealized P&L across all positions."""
+        return self._tracker.unrealized_pnl
+
+    @property
+    def total_realized_pnl(self) -> float:
+        """Total realized P&L."""
+        return self._tracker.total_realized_pnl
+
+    @property
+    def total_commission(self) -> float:
+        """Total commission paid."""
+        return self._tracker.total_commission
+
+    @property
+    def total_slippage(self) -> float:
+        """Total slippage cost."""
+        return self._tracker.total_slippage
+
+    @property
+    def positions(self) -> dict[AssetId, Position]:
+        """Current positions (direct access for advanced users)."""
+        return self._tracker.positions
+
+    def get_position(self, asset_id: AssetId) -> Position | None:
+        """Get position for a specific asset.
+
+        Args:
+            asset_id: Asset identifier
+
+        Returns:
+            Position object or None if no position
+        """
+        return self._tracker.get_position(asset_id)
+
+    def get_all_positions(self) -> dict[AssetId, Quantity]:
+        """Get all current positions as dict of quantities.
+
+        Returns:
+            Dictionary mapping asset_id to quantity
+        """
+        return {asset_id: pos.quantity for asset_id, pos in self._tracker.positions.items()}
+
+    def update_prices(self, prices: dict[AssetId, float]) -> None:
+        """Update all positions with new market prices.
+
+        Args:
+            prices: Dictionary mapping asset_id to price
+        """
+        self._tracker.update_prices(prices)
+        self.current_prices.update(prices)
 
     def update_position(
         self,
         asset_id: AssetId,
-        quantity_change: Quantity,
+        quantity_change: float,
         price: float,
         commission: float = 0.0,
         slippage: float = 0.0,
-        asset_precision_manager: Optional[PrecisionManager] = None,
     ) -> None:
-        """
-        Update a position with a trade.
+        """Update position (backward compatibility).
+
+        This method is kept for backward compatibility with PortfolioAccounting.
+        New code should use on_fill_event() instead.
 
         Args:
             asset_id: Asset identifier
@@ -203,71 +232,86 @@ class Portfolio:
             price: Execution price
             commission: Commission paid
             slippage: Slippage cost
-            asset_precision_manager: PrecisionManager for asset-specific quantity precision
         """
-        # Get or create position with precision manager
-        if asset_id not in self.positions:
-            self.positions[asset_id] = Position(
-                asset_id=asset_id,
-                precision_manager=asset_precision_manager or self.precision_manager,
-            )
+        self._tracker.update_position(
+            asset_id=asset_id,
+            quantity_change=quantity_change,
+            price=price,
+            commission=commission,
+            slippage=slippage,
+        )
 
-        position = self.positions[asset_id]
+    # ===== Delegate to PerformanceAnalyzer =====
+    def get_performance_metrics(self) -> dict[str, Any]:
+        """Get performance metrics.
 
-        # Update position
-        if quantity_change > 0:
-            position.add_shares(quantity_change, price)
-            cash_change = quantity_change * price + commission
-            self.cash = float(self.cash) - cash_change
-            # Round cash after BUY (Location 8/12)
-            if self.precision_manager:
-                self.cash = self.precision_manager.round_cash(self.cash)
-        else:
-            realized_pnl = position.remove_shares(-quantity_change, price)
-            cash_change = (-quantity_change) * price - commission
-            self.cash = float(self.cash) + cash_change
-            # Round cash after SELL (Location 9/12)
-            if self.precision_manager:
-                self.cash = self.precision_manager.round_cash(self.cash)
+        Returns:
+            Dictionary with metrics like Sharpe ratio, max drawdown, etc.
 
-            # Track realized P&L (portfolio-level and per-asset)
-            self.total_realized_pnl += realized_pnl
-            # Round total realized P&L (Location 10/12)
-            if self.precision_manager:
-                self.total_realized_pnl = self.precision_manager.round_cash(self.total_realized_pnl)
+        Raises:
+            ValueError: If analytics is disabled (track_analytics=False)
+        """
+        if not self._analyzer:
+            raise ValueError("Analytics disabled. Set track_analytics=True to enable.")
+        return self._analyzer.get_metrics()
 
-            if asset_id not in self.asset_realized_pnl:
-                self.asset_realized_pnl[asset_id] = 0.0
-            self.asset_realized_pnl[asset_id] += realized_pnl
-            # Round asset realized P&L (Location 11/12)
-            if self.precision_manager:
-                self.asset_realized_pnl[asset_id] = self.precision_manager.round_cash(
-                    self.asset_realized_pnl[asset_id]
-                )
+    def calculate_sharpe_ratio(self) -> float | None:
+        """Calculate Sharpe ratio.
 
-        # Track costs
-        self.total_commission += commission
-        self.total_slippage += slippage
-        # Round cumulative costs (Locations 12-13/12)
-        if self.precision_manager:
-            self.total_commission = self.precision_manager.round_cash(self.total_commission)
-            self.total_slippage = self.precision_manager.round_cash(self.total_slippage)
+        Returns:
+            Sharpe ratio or None if analytics disabled or insufficient data
+        """
+        if not self._analyzer:
+            return None
+        return self._analyzer.calculate_sharpe_ratio()
 
-        # Remove empty positions (clean deletion rule with precision-aware check)
-        is_empty = position.quantity == 0
-        if asset_precision_manager:
-            is_empty = is_empty or asset_precision_manager.is_position_zero(position.quantity)
-        if is_empty:
-            del self.positions[asset_id]
+    # ===== Delegate to TradeJournal =====
+    def get_trades(self) -> Any:  # Returns pl.DataFrame but avoid import for type hint
+        """Get trade history as Polars DataFrame.
 
-    def update_prices(self, prices: dict[AssetId, float]) -> None:
-        """Update all positions with new market prices."""
-        for asset_id, price in prices.items():
-            if asset_id in self.positions:
-                self.positions[asset_id].update_price(price)
+        Returns:
+            Polars DataFrame with columns: timestamp, asset_id, side, quantity, price, etc.
+        """
+        return self._journal.get_trades()
 
+    # ===== For Advanced Users =====
+    @property
+    def tracker(self) -> PositionTracker:
+        """Access position tracker directly (advanced users).
+
+        Returns:
+            PositionTracker instance
+        """
+        return self._tracker
+
+    @property
+    def analyzer(self) -> Optional[Any]:
+        """Access performance analyzer directly (advanced users).
+
+        Returns:
+            PerformanceAnalyzer instance or None if analytics disabled
+        """
+        return self._analyzer
+
+    @property
+    def journal(self) -> Any:
+        """Access trade journal directly (advanced users).
+
+        Returns:
+            TradeJournal instance
+        """
+        return self._journal
+
+    # ===== Backward Compatibility =====
     def get_current_state(self, timestamp: datetime) -> PortfolioState:
-        """Get current portfolio state."""
+        """Get current portfolio state (backward compatibility).
+
+        Args:
+            timestamp: Current timestamp
+
+        Returns:
+            PortfolioState snapshot
+        """
         state = PortfolioState(
             timestamp=timestamp,
             cash=self.cash,
@@ -280,37 +324,38 @@ class Portfolio:
         return state
 
     def save_state(self, timestamp: datetime) -> None:
-        """Save current state to history."""
+        """Save current state to history (backward compatibility).
+
+        Args:
+            timestamp: Current timestamp
+        """
         self.state_history.append(self.get_current_state(timestamp))
 
-    @property
-    def equity(self) -> float:
-        """Total equity (cash + positions)."""
-        position_value = sum(p.market_value for p in self.positions.values())
-        return float(self.cash) + position_value
-
-    @property
-    def returns(self) -> float:
-        """Simple returns from initial capital."""
-        if self.initial_cash == 0:
-            return 0.0
-        return (self.equity - float(self.initial_cash)) / float(self.initial_cash)
-
-    @property
-    def unrealized_pnl(self) -> float:
-        """Total unrealized P&L."""
-        return sum(p.unrealized_pnl for p in self.positions.values())
-
     def get_position_summary(self) -> dict[str, Any]:
-        """Get summary of all positions."""
-        return {
-            "cash": self.cash,
-            "equity": self.equity,
-            "positions": len(self.positions),
-            "realized_pnl": self.total_realized_pnl,
-            "unrealized_pnl": self.unrealized_pnl,
-            "total_pnl": self.total_realized_pnl + self.unrealized_pnl,
-            "returns": self.returns,
-            "commission": self.total_commission,
-            "slippage": self.total_slippage,
-        }
+        """Get summary of all positions (backward compatibility).
+
+        Returns:
+            Dictionary with cash, equity, positions count, P&L, etc.
+        """
+        return self._tracker.get_summary()
+
+    def reset(self) -> None:
+        """Reset portfolio to initial state (backward compatibility).
+
+        This method is used by Broker during reset operations.
+        """
+        self._tracker.reset()
+        if self._analyzer:
+            # Reset analyzer state
+            self._analyzer.high_water_mark = self._tracker.initial_cash
+            self._analyzer.max_drawdown = 0.0
+            self._analyzer.daily_returns.clear()
+            self._analyzer.timestamps.clear()
+            self._analyzer.equity_curve.clear()
+            self._analyzer.max_leverage = 0.0
+            self._analyzer.max_concentration = 0.0
+        self._journal.reset()
+        self.state_history.clear()
+
+
+__all__ = ["Portfolio"]

@@ -104,11 +104,11 @@ class TestBacktestEngine:
 
         # Check types
         from qengine.execution.broker import SimulationBroker
-        from qengine.portfolio.simple import SimplePortfolio
+        from qengine.portfolio.portfolio import Portfolio
         from qengine.reporting.reporter import InMemoryReporter
 
         assert isinstance(engine.broker, SimulationBroker)
-        assert isinstance(engine.portfolio, SimplePortfolio)
+        assert isinstance(engine.portfolio, Portfolio)
         assert isinstance(engine.reporter, InMemoryReporter)
 
     def test_event_handler_setup(self, engine):

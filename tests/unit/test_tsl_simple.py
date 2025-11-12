@@ -9,7 +9,7 @@ from qengine.execution.order import Order
 
 def test_tsl_tracks_peak():
     """Verify TSL tracks peak price, not current price."""
-    broker = SimulationBroker(initial_cash=10000.0)
+    broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
     # Entry at 100
     entry_order = Order(

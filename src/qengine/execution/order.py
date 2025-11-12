@@ -122,6 +122,16 @@ class Order:
         if self.quantity <= 0:
             raise ValueError("Order quantity must be positive")
 
+        # Auto-create default PrecisionManager if not provided
+        if self.precision_manager is None:
+            from qengine.core.precision import PrecisionManager
+            # Use default precision: whole units for quantity, 2 decimals for price/cash
+            self.precision_manager = PrecisionManager(
+                position_decimals=0,
+                price_decimals=2,
+                cash_decimals=2
+            )
+
     @property
     def is_buy(self) -> bool:
         """Check if this is a buy order."""

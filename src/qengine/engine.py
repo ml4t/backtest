@@ -58,7 +58,7 @@ class BacktestEngine:
             data_feed: Source of market data events
             strategy: Trading strategy to execute
             broker: Order execution broker (default: SimulationBroker)
-            portfolio: Portfolio tracker (default: SimplePortfolio)
+            portfolio: Portfolio tracker (default: Portfolio)
             reporter: Results reporter (default: InMemoryReporter)
             initial_capital: Starting capital
             currency: Base currency for the portfolio
@@ -85,9 +85,9 @@ class BacktestEngine:
 
         # Initialize portfolio if not provided
         if portfolio is None:
-            from qengine.portfolio.simple import SimplePortfolio
+            from qengine.portfolio.portfolio import Portfolio
 
-            self.portfolio = SimplePortfolio(initial_capital=initial_capital, currency=currency)
+            self.portfolio = Portfolio(initial_cash=initial_capital, currency=currency)
         else:
             self.portfolio = portfolio
 
@@ -160,7 +160,7 @@ class BacktestEngine:
         # Initialize components
         self.strategy.on_start(self.portfolio, self.clock)
         self.broker.initialize(self.portfolio, self.clock)
-        self.portfolio.initialize()
+        # Portfolio initialization happens in __init__, no separate initialize() needed
         self.reporter.on_start()
 
         # Add data feed to clock for event-driven processing
@@ -208,7 +208,7 @@ class BacktestEngine:
         # Finalize
         self.strategy.on_end()
         self.broker.finalize()
-        self.portfolio.finalize()
+        # Portfolio has no finalize() method - state is already complete
         self.reporter.on_end()
 
         self.end_time = datetime.now()  # Wall clock time for performance measurement
@@ -231,9 +231,9 @@ class BacktestEngine:
         """
         # Get data from components
         trades = self.broker.get_trades()
-        positions = self.portfolio.get_positions()
-        returns = self.portfolio.get_returns()
-        metrics = self.portfolio.calculate_metrics()
+        positions = self.portfolio.get_all_positions()  # New API: dict[AssetId, Quantity]
+        returns = self.portfolio.returns  # New API: property instead of method
+        metrics = self.portfolio.get_performance_metrics()  # New API name
 
         # Add engine statistics
         duration = (self.end_time - self.start_time).total_seconds() if self.end_time else 0
@@ -247,8 +247,8 @@ class BacktestEngine:
             "duration_seconds": duration,
             "events_per_second": self.events_processed / duration if duration > 0 else 0,
             "initial_capital": self.initial_capital,
-            "final_value": self.portfolio.get_total_value(),
-            "total_return": (self.portfolio.get_total_value() / self.initial_capital - 1) * 100,
+            "final_value": self.portfolio.equity,  # New API: property
+            "total_return": (self.portfolio.equity / self.initial_capital - 1) * 100,
         }
 
         # Add reporter data if available

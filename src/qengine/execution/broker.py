@@ -10,6 +10,7 @@ from qengine.core.event import FillEvent, MarketEvent
 from qengine.core.types import (
     AssetId,
     OrderId,
+    OrderSide,
     OrderStatus,
     OrderType,
     Price,
@@ -19,9 +20,9 @@ from qengine.execution.bracket_manager import BracketOrderManager
 from qengine.execution.fill_simulator import FillSimulator
 from qengine.execution.order import Order, OrderState
 from qengine.execution.order_router import OrderRouter
-# from qengine.execution.position_tracker import PositionTracker  # Removed in TASK-2.1, refactored in TASK-2.4
 from qengine.execution.trade_tracker import TradeTracker
 from qengine.portfolio.margin import MarginAccount
+from qengine.portfolio.portfolio import Portfolio
 
 if TYPE_CHECKING:
     from qengine.execution.commission import CommissionModel
@@ -118,17 +119,21 @@ class SimulationBroker(Broker):
         self.max_leverage = max_leverage
         self.allow_immediate_reentry = allow_immediate_reentry
 
-        # Initialize specialized components
-        # Note: PositionTracker doesn't get asset-specific PrecisionManager at init
-        # because broker handles multiple assets. Position rounding happens in FillSimulator.
-        # Cash rounding uses a default PrecisionManager (2 decimals for USD).
+        # Initialize portfolio (replaces old PositionTracker)
+        # Note: Portfolio handles multiple assets with default precision
+        # Asset-specific precision is handled in FillSimulator
         from qengine.core.precision import PrecisionManager
         cash_precision_manager = PrecisionManager(
             position_decimals=0,  # Not used for cash-only operations
             price_decimals=2,
             cash_decimals=2,
         )
-        self.position_tracker = PositionTracker(initial_cash, cash_precision_manager)
+        # Internal portfolio for position tracking (replaces old PositionTracker)
+        self._internal_portfolio = Portfolio(
+            initial_cash=initial_cash,
+            precision_manager=cash_precision_manager,
+            track_analytics=False,  # Broker doesn't need performance analytics
+        )
         self.order_router = OrderRouter(execution_delay)
         self.bracket_manager = BracketOrderManager(self.submit_order)
 
@@ -175,18 +180,18 @@ class SimulationBroker(Broker):
     # Properties for backward compatibility
     @property
     def cash(self) -> float:
-        """Get current cash balance from PositionTracker."""
-        return self.position_tracker.get_cash()
+        """Get current cash balance from Portfolio."""
+        return self._internal_portfolio.cash
 
     @cash.setter
     def cash(self, value: float) -> None:
-        """Set cash balance in PositionTracker."""
-        self.position_tracker.cash = value
+        """Set cash balance in Portfolio."""
+        self._internal_portfolio.cash = value
 
     @property
     def _positions(self) -> dict[AssetId, Quantity]:
-        """Get positions from PositionTracker for backward compatibility."""
-        return self.position_tracker._positions
+        """Get positions from Portfolio for backward compatibility."""
+        return self._internal_portfolio.positions
 
     @property
     def _orders(self) -> dict[OrderId, Order]:
@@ -342,20 +347,19 @@ class SimulationBroker(Broker):
                 fill_result = self.fill_simulator.try_fill_order(
                     order,
                     market_price=self._last_prices[order.asset_id],
-                    current_cash=self.position_tracker.get_cash(),
-                    current_position=self.position_tracker.get_position(order.asset_id),
+                    current_cash=self._internal_portfolio.cash,
+                    current_position=self.get_position(order.asset_id),
                     timestamp=timestamp,
                 )
                 if fill_result:
-                    # Update position tracker
-                    self.position_tracker.update_position(
+                    # Update position tracker (convert side to quantity_change)
+                    quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
+                    self._internal_portfolio.update_position(
                         order.asset_id,
-                        fill_result.fill_quantity,
-                        order.side,
+                        quantity_change,
                         fill_result.fill_price,
                         fill_result.commission,
                         fill_result.slippage,
-                        asset_precision_manager=self._get_asset_precision_manager(order.asset_id),
                     )
                     # Update statistics
                     self._total_commission += fill_result.commission
@@ -577,8 +581,8 @@ class SimulationBroker(Broker):
             fill_result = self.fill_simulator.try_fill_order(
                 order,
                 market_price=price,
-                current_cash=self.position_tracker.get_cash(),
-                current_position=self.position_tracker.get_position(asset_id),
+                current_cash=self._internal_portfolio.cash,
+                current_position=self.get_position(asset_id),
                 timestamp=event.timestamp,
                 high=event.high,
                 low=event.low,
@@ -586,21 +590,20 @@ class SimulationBroker(Broker):
             )
             if fill_result:
                 # Check position before fill (for exit tracking)
-                position_before = self.position_tracker.get_position(asset_id)
+                position_before = self._internal_portfolio.get_position(asset_id)
 
-                # Update position tracker
-                self.position_tracker.update_position(
+                # Update position tracker (convert side to quantity_change)
+                quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
+                self._internal_portfolio.update_position(
                     asset_id,
-                    fill_result.fill_quantity,
-                    order.side,
+                    quantity_change,
                     fill_result.fill_price,
                     fill_result.commission,
                     fill_result.slippage,
-                    asset_precision_manager=self._get_asset_precision_manager(asset_id),
                 )
 
                 # Track exit timestamp if position went to zero (for allow_immediate_reentry=False)
-                position_after = self.position_tracker.get_position(asset_id)
+                position_after = self._internal_portfolio.get_position(asset_id)
                 if position_before != 0 and position_after == 0:
                     self._last_exit_time[asset_id] = event.timestamp
 
@@ -648,19 +651,19 @@ class SimulationBroker(Broker):
                 fill_result = self.fill_simulator.try_fill_order(
                     order,
                     market_price=price,
-                    current_cash=self.position_tracker.get_cash(),
-                    current_position=self.position_tracker.get_position(asset_id),
+                    current_cash=self._internal_portfolio.cash,
+                    current_position=self.get_position(asset_id),
                     timestamp=event.timestamp,
                     high=event.high,
                     low=event.low,
                     close=event.close,
                 )
                 if fill_result:
-                    # Update position tracker
-                    self.position_tracker.update_position(
+                    # Update position tracker (convert side to quantity_change)
+                    quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
+                    self._internal_portfolio.update_position(
                         asset_id,
-                        fill_result.fill_quantity,
-                        order.side,
+                        quantity_change,
                         fill_result.fill_price,
                         fill_result.commission,
                         fill_result.slippage,
@@ -759,8 +762,8 @@ class SimulationBroker(Broker):
             fill_result = self.fill_simulator.try_fill_order(
                 order,
                 market_price=price,
-                current_cash=self.position_tracker.get_cash(),
-                current_position=self.position_tracker.get_position(asset_id),
+                current_cash=self._internal_portfolio.cash,
+                current_position=self.get_position(asset_id),
                 timestamp=event.timestamp,
                 high=event.high,
                 low=event.low,
@@ -768,21 +771,20 @@ class SimulationBroker(Broker):
             )
             if fill_result:
                 # Check position before fill (for exit tracking)
-                position_before = self.position_tracker.get_position(asset_id)
+                position_before = self._internal_portfolio.get_position(asset_id)
 
-                # Update position tracker
-                self.position_tracker.update_position(
+                # Update position tracker (convert side to quantity_change)
+                quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
+                self._internal_portfolio.update_position(
                     asset_id,
-                    fill_result.fill_quantity,
-                    order.side,
+                    quantity_change,
                     fill_result.fill_price,
                     fill_result.commission,
                     fill_result.slippage,
-                    asset_precision_manager=self._get_asset_precision_manager(asset_id),
                 )
 
                 # Track exit timestamp if position went to zero (for allow_immediate_reentry=False)
-                position_after = self.position_tracker.get_position(asset_id)
+                position_after = self._internal_portfolio.get_position(asset_id)
                 if position_before != 0 and position_after == 0:
                     self._last_exit_time[asset_id] = event.timestamp
 
@@ -835,31 +837,30 @@ class SimulationBroker(Broker):
             fill_result = self.fill_simulator.try_fill_order(
                 winning_order,
                 market_price=price,
-                current_cash=self.position_tracker.get_cash(),
-                current_position=self.position_tracker.get_position(asset_id),
+                current_cash=self._internal_portfolio.cash,
+                current_position=self.get_position(asset_id),
                 timestamp=event.timestamp,
                 high=event.high,
                 low=event.low,
                 close=event.close,
-                open=event.open,
             )
 
             if fill_result:
                 # Check position before fill (for exit tracking)
-                position_before = self.position_tracker.get_position(asset_id)
+                position_before = self._internal_portfolio.get_position(asset_id)
 
-                # Update position tracker
-                self.position_tracker.update_position(
+                # Update position tracker (convert side to quantity_change)
+                quantity_change = fill_result.fill_quantity if winning_order.side == OrderSide.BUY else -fill_result.fill_quantity
+                self._internal_portfolio.update_position(
                     asset_id,
-                    fill_result.fill_quantity,
-                    winning_order.side,
+                    quantity_change,
                     fill_result.fill_price,
                     fill_result.commission,
                     fill_result.slippage,
                 )
 
                 # Track exit timestamp if position went to zero
-                position_after = self.position_tracker.get_position(asset_id)
+                position_after = self._internal_portfolio.get_position(asset_id)
                 if position_before != 0 and position_after == 0:
                     self._last_exit_time[asset_id] = event.timestamp
 
@@ -944,15 +945,16 @@ class SimulationBroker(Broker):
 
     def get_position(self, asset_id: AssetId) -> Quantity:
         """Get current position for an asset (delegates to PositionTracker)."""
-        return self.position_tracker.get_position(asset_id)
+        position = self._internal_portfolio.get_position(asset_id)
+        return position.quantity if position else 0.0
 
     def get_positions(self) -> dict[AssetId, Quantity]:
         """Get all current positions (delegates to PositionTracker)."""
-        return self.position_tracker.get_all_positions()
+        return self._internal_portfolio.get_all_positions()
 
     def get_cash(self) -> float:
         """Get current cash balance (delegates to PositionTracker)."""
-        return self.position_tracker.get_cash()
+        return self._internal_portfolio.cash
 
     def get_statistics(self) -> dict[str, Any]:
         """Get broker statistics."""
@@ -1059,7 +1061,7 @@ class SimulationBroker(Broker):
             )
 
         # Reset components
-        self.position_tracker.reset()
+        self._internal_portfolio.reset()
         self.order_router.reset()
         self.bracket_manager.reset()
         self.fill_simulator.reset()

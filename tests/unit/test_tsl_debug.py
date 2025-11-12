@@ -48,7 +48,7 @@ def test_tsl_debug():
     print(f"Filled quantity: {entry_order.filled_quantity}")
     print(f"Open orders: {len(broker._open_orders.get('BTC', []))}")
     print(f"Trailing stops: {len(broker._trailing_stops.get('BTC', []))}")
-    print(f"Position: {broker.position_tracker.get_position('BTC')}")
+    print(f"Position: {broker.get_position('BTC')}")
     
     if broker._trailing_stops.get("BTC"):
         for tsl in broker._trailing_stops["BTC"]:

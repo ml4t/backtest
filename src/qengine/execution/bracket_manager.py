@@ -182,6 +182,7 @@ class BracketOrderManager:
                 metadata={
                     "bracket_type": "trailing_stop",
                     "base_price": base_price,  # For VectorBT-compatible peak tracking (TASK-018)
+                    "peak_price": base_price,  # Initialize peak to entry price
                     "creation_timestamp": fill_event.timestamp,  # VectorBT: Skip entry bar checking
                 },
             )

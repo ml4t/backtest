@@ -20,12 +20,14 @@ Empirical Values from TASK-007 (BTC Q1 2024):
 """
 
 import pytest
+from datetime import datetime
 from decimal import Decimal
 
 from qengine.core.event import MarketEvent
-from qengine.core.types import OrderSide, OrderType
+from qengine.core.types import OrderSide, OrderType, MarketDataType
 from qengine.execution.broker import SimulationBroker
 from qengine.execution.order import Order
+
 
 
 class TestTSLPeakTracking:
@@ -44,7 +46,7 @@ class TestTSLPeakTracking:
         VectorBT: TSL locks at 103.95 (from peak 105)
         Incorrect: TSL would drop to 99.99 (from current 101)
         """
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # T0: Entry at 100
         entry_order = Order(
@@ -59,8 +61,9 @@ class TestTSLPeakTracking:
 
         # Fill entry
         event_t0 = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -76,8 +79,9 @@ class TestTSLPeakTracking:
 
         # T1: Price rises to 105 (new peak)
         event_t1 = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=104.0,
             high=105.0,  # Peak
             low=103.0,
@@ -94,8 +98,9 @@ class TestTSLPeakTracking:
 
         # T2: Price falls to 102 (below peak)
         event_t2 = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=103.0,
             high=103.5,
             low=101.5,
@@ -111,8 +116,9 @@ class TestTSLPeakTracking:
 
         # T3: Price continues falling to 101
         event_t3 = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=102.0,
             high=102.5,
             low=100.5,
@@ -133,7 +139,7 @@ class TestTSLPeakTracking:
         Peak should be 105 (high), not 101 (close)
         TSL should be 103.95 (105 * 0.99), not 99.99 (101 * 0.99)
         """
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # Entry
         entry_order = Order(
@@ -148,8 +154,9 @@ class TestTSLPeakTracking:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -163,8 +170,9 @@ class TestTSLPeakTracking:
 
         # Bar with high spike but lower close
         event = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.5,
             high=105.0,  # Peak at high
             low=99.0,
@@ -189,7 +197,7 @@ class TestTSLPeakTracking:
         Initial peak: $100
         Initial TSL: $99 (100 * 0.99)
         """
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # Entry
         base_price = 100.0
@@ -205,8 +213,9 @@ class TestTSLPeakTracking:
 
         # Fill entry
         event = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -256,8 +265,9 @@ class TestTSLExitPrice:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=43885.0,
             high=43900.0,
             low=43880.0,
@@ -271,8 +281,9 @@ class TestTSLExitPrice:
 
         # Price rises to peak
         event_peak = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=44600.0,
             high=44665.0,  # Peak from TASK-007
             low=44590.0,
@@ -287,8 +298,9 @@ class TestTSLExitPrice:
         # TSL retracement bar (triggers exit)
         # Low ($44,210) < TSL level ($44,218.35) → Trigger
         event_trigger = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=44290.0,
             high=44365.0,
             low=44210.0,  # Below TSL level, triggers exit
@@ -333,7 +345,7 @@ class TestTSLTriggerCondition:
         Bar: Low = $98.50 → Should trigger
         Bar: Low = $99.50 → Should NOT trigger
         """
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # Entry
         entry_order = Order(
@@ -348,8 +360,9 @@ class TestTSLTriggerCondition:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -364,8 +377,9 @@ class TestTSLTriggerCondition:
 
         # Bar with low exactly at TSL level
         event_trigger = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.0,  # Exactly at TSL
@@ -380,7 +394,7 @@ class TestTSLTriggerCondition:
 
     def test_tsl_does_not_trigger_above_level(self):
         """TSL should NOT trigger when low > tsl_level."""
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # Entry
         entry_order = Order(
@@ -395,8 +409,9 @@ class TestTSLTriggerCondition:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -407,8 +422,9 @@ class TestTSLTriggerCondition:
 
         # Bar with low above TSL level
         event = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=101.0,
             low=99.5,  # Above TSL (99.0)
@@ -432,7 +448,7 @@ class TestTSLStageProcessing:
         Bar opens at $105 → Peak updates to $105
         Then check: TSL = $103.95 (from new peak)
         """
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # Entry at 100
         entry_order = Order(
@@ -447,8 +463,9 @@ class TestTSLStageProcessing:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -462,8 +479,9 @@ class TestTSLStageProcessing:
 
         # Bar opens higher (gap up)
         event = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=105.0,  # Gap up on open
             high=106.0,
             low=104.0,
@@ -482,7 +500,7 @@ class TestTSLStageProcessing:
         Bar: Open=$102 (peak updates), High=$105 (peak updates), Low=$103.9 (triggers)
         Peak updates to 105 → TSL = 103.95 → Low (103.9) < TSL → Trigger!
         """
-        broker = SimulationBroker(initial_cash=10000.0)
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
 
         # Entry at 100
         entry_order = Order(
@@ -497,8 +515,9 @@ class TestTSLStageProcessing:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=100.0,
             high=100.5,
             low=99.5,
@@ -509,8 +528,9 @@ class TestTSLStageProcessing:
 
         # Bar where peak rises AND triggers in same bar
         event = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=102.0,  # Updates peak to 102
             high=105.0,  # Updates peak to 105 → TSL = 103.95
             low=103.9,  # 103.9 < 103.95 → Triggers!
@@ -550,8 +570,9 @@ class TestTSLExactValuesTask007:
 
         # Fill entry
         event_entry = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=43885.0,
             high=43900.0,
             low=43880.0,
@@ -564,8 +585,9 @@ class TestTSLExactValuesTask007:
 
         # Rise to peak
         event_peak = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=44600.0,
             high=44665.0,  # TASK-007 peak
             low=44590.0,
@@ -585,8 +607,9 @@ class TestTSLExactValuesTask007:
 
         # Trigger exit (TASK-007 bar)
         event_trigger = MarketEvent(
+            timestamp=datetime.now(),
             asset_id="BTC",
-            timestamp=None,
+            data_type=MarketDataType.BAR,
             open=44290.0,
             high=44365.0,
             low=44210.0,  # TASK-007 low
