@@ -83,6 +83,11 @@ class AssetSpec:
     short_enabled: bool = True
     leverage_available: float = 1.0  # Max leverage
 
+    # Precision overrides (optional - if None, uses asset class defaults)
+    position_decimals: int | None = None  # Override position rounding (None = use asset class default)
+    price_decimals: int | None = None  # Override price rounding (None = use asset class default)
+    cash_decimals: int | None = None  # Override cash/commission rounding (None = use asset class default)
+
     @property
     def is_derivative(self) -> bool:
         """Check if asset is a derivative."""
@@ -97,6 +102,17 @@ class AssetSpec:
     def has_expiry(self) -> bool:
         """Check if asset has expiry."""
         return self.expiry is not None
+
+    def get_precision_manager(self) -> "PrecisionManager":
+        """Create PrecisionManager for this asset.
+
+        Returns:
+            PrecisionManager configured with this asset's precision rules
+            (uses asset class defaults with optional per-asset overrides)
+        """
+        from qengine.core.precision import PrecisionManager
+
+        return PrecisionManager.from_asset_spec(self)
 
     def get_margin_requirement(self, quantity: float, price: Price) -> float:
         """
