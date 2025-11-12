@@ -27,6 +27,7 @@ from qengine.core.event import MarketEvent
 from qengine.core.types import OrderSide, OrderType, MarketDataType
 from qengine.execution.broker import SimulationBroker
 from qengine.execution.order import Order
+from qengine.execution.slippage import PercentageSlippage
 
 
 
@@ -250,7 +251,11 @@ class TestTSLExitPrice:
 
         Exit should be at TSL level ($44,218.35 - slippage), NOT at low ($44,210)
         """
-        broker = SimulationBroker(initial_cash=10000.0, slippage=0.0002)  # 0.02%
+        broker = SimulationBroker(
+            initial_cash=10000.0,
+            slippage_model=PercentageSlippage(slippage_pct=0.0002),
+            execution_delay=False,
+        )
 
         # Entry
         entry_order = Order(
@@ -555,7 +560,11 @@ class TestTSLExactValuesTask007:
         TSL level: $44,218.35 (= $44,665 * 0.99)
         Exit: $44,209.51 (= $44,218.35 * 0.9998 with slippage)
         """
-        broker = SimulationBroker(initial_cash=10000.0, slippage=0.0002)
+        broker = SimulationBroker(
+            initial_cash=10000.0,
+            slippage_model=PercentageSlippage(slippage_pct=0.0002),
+            execution_delay=False,
+        )
 
         # Entry (match TASK-007)
         entry_order = Order(

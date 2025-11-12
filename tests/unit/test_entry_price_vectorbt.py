@@ -19,6 +19,7 @@ if str(tests_path) not in sys.path:
     sys.path.insert(0, str(tests_path))
 
 from qengine.core.event import MarketEvent
+from qengine.core.types import MarketDataType
 from qengine.data.asset_registry import AssetRegistry, AssetSpec
 from qengine.execution.broker import SimulationBroker
 from qengine.execution.fill_simulator import FillSimulator
@@ -58,18 +59,19 @@ class TestVectorBTEntryPriceLogic:
         )
 
         # Create buy order
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_001",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=0.1,
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         # Market event with base price = $50,000
         market_event = MarketEvent(
             timestamp="2024-01-01T00:00:00Z",
             asset_id="BTC",
+            data_type=MarketDataType.BAR,
             open=50000.0,
             high=51000.0,
             low=49000.0,
@@ -81,10 +83,9 @@ class TestVectorBTEntryPriceLogic:
         fill_result = fill_simulator.try_fill_order(
             order=order,
             timestamp=market_event.timestamp,
-            market_price=market_event.close,  # $50,000 base price
+            market_price=market_event.open,  # $50,000 base price
             high=market_event.high,
             low=market_event.low,
-            volume=market_event.volume,
             current_cash=10000.0,
             current_position=0.0,
         )
@@ -111,12 +112,12 @@ class TestVectorBTEntryPriceLogic:
             slippage_model=slippage_model,
         )
 
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_002",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=0.1,
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         fill_result = fill_simulator.try_fill_order(
@@ -125,7 +126,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=50000.0,
             high=51000.0,
             low=49000.0,
-            volume=1000.0,
             current_cash=10000.0,
             current_position=0.0,
         )
@@ -154,12 +154,12 @@ class TestVectorBTEntryPriceLogic:
         )
 
         # Large order that will be constrained by cash
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_003",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=10.0,  # Request large quantity
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         cash_limit = 10000.0
@@ -170,7 +170,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=50000.0,
             high=51000.0,
             low=49000.0,
-            volume=1000.0,
             current_cash=cash_limit,
             current_position=0.0,
         )
@@ -203,12 +202,12 @@ class TestVectorBTEntryPriceLogic:
             slippage_model=slippage_model,
         )
 
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_004",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=10.0,
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         cash_limit = 10000.0
@@ -219,7 +218,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=50000.0,
             high=51000.0,
             low=49000.0,
-            volume=1000.0,
             current_cash=cash_limit,
             current_position=0.0,
         )
@@ -261,12 +259,12 @@ class TestVectorBTEntryPriceLogic:
             slippage_model=slippage_model,
         )
 
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_ex1",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=0.1,
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         fill_result = fill_simulator.try_fill_order(
@@ -275,7 +273,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=50000.0,
             high=51000.0,
             low=49000.0,
-            volume=1000.0,
             current_cash=10000.0,
             current_position=0.0,
         )
@@ -311,12 +308,12 @@ class TestVectorBTEntryPriceLogic:
             slippage_model=slippage_model,
         )
 
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_ex2",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=10.0,  # Large quantity (will be limited by cash)
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         fill_result = fill_simulator.try_fill_order(
@@ -325,7 +322,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=50000.0,
             high=51000.0,
             low=49000.0,
-            volume=1000.0,
             current_cash=10000.0,
             current_position=0.0,
         )
@@ -364,12 +360,12 @@ class TestVectorBTEntryPriceLogic:
             slippage_model=slippage_model,
         )
 
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_ex3",
             asset_id="BTC",
             side=OrderSide.BUY,
             quantity=10.0,
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         fill_result = fill_simulator.try_fill_order(
@@ -378,7 +374,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=50000.0,
             high=51000.0,
             low=49000.0,
-            volume=1000.0,
             current_cash=10000.0,
             current_position=0.0,
         )
@@ -390,9 +385,9 @@ class TestVectorBTEntryPriceLogic:
 
         assert abs(fill_result.fill_price - 50010.0) < 0.01
 
-        # Size should be less than Example 2 due to fixed fees
+        # Size should be close to expected (allow small floating point tolerance)
         expected_size = 0.19968
-        assert fill_result.fill_quantity <= expected_size
+        assert abs(fill_result.fill_quantity - expected_size) < 0.0001  # Within 0.01% tolerance
         assert fill_result.fill_quantity > expected_size * 0.99
 
         # Commission should include fixed fee
@@ -417,12 +412,12 @@ class TestVectorBTEntryPriceLogic:
         )
 
         # Sell order (exit)
-        order = Order.market_order(
+        order = Order(
+            order_type=OrderType.MARKET,
             order_id="test_sell",
             asset_id="BTC",
             side=OrderSide.SELL,
             quantity=0.1,
-            timestamp="2024-01-01T00:00:00Z",
         )
 
         fill_result = fill_simulator.try_fill_order(
@@ -431,7 +426,6 @@ class TestVectorBTEntryPriceLogic:
             market_price=51000.0,  # Exit at higher price
             high=51500.0,
             low=50500.0,
-            volume=1000.0,
             current_cash=10000.0,
             current_position=0.1,  # Have position to sell
         )
