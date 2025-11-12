@@ -23,12 +23,12 @@
     {
       "id": "phase_2",
       "name": "Transaction Fees",
-      "status": "in_progress",
+      "status": "completed",
       "priority": "high",
       "description": "Validate commission calculation across different fee structures",
       "tests_total": 3,
-      "tests_passing": 2,
-      "tests_pending": 1,
+      "tests_passing": 3,
+      "tests_pending": 0,
       "tasks": ["TASK-002", "TASK-003", "TASK-004"]
     },
     {
@@ -192,10 +192,12 @@
       "title": "Test 2.3: Asset-Specific Fees",
       "description": "Validate multi-asset test with different commission rates per asset (BTC: 0.1%, ETH: 0.05%).",
       "type": "test_implementation",
-      "status": "pending",
+      "status": "completed",
       "priority": "medium",
       "phase": "phase_2",
       "dependencies": ["TASK-003"],
+      "completed_at": "2025-11-12T14:00:00Z",
+      "actual_hours": 1.2,
       "test_file": "test_2_3_asset_specific_fees.py",
       "test_config": {
         "assets": ["BTC", "ETH"],
@@ -703,10 +705,10 @@
       "notes": "Final integration phase. TradeTracker is reporting layer, commission standardization ensures consistency. Buffer elimination would be ideal outcome but not required if root cause still exists."
     }
   ],
-  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003", "TASK-016", "TASK-017", "TASK-018", "TASK-019"],
-  "next_available": ["TASK-004"],
+  "completed_tasks": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-016", "TASK-017", "TASK-018", "TASK-019"],
+  "next_available": ["TASK-005"],
   "total_tasks": 19,
-  "completed_count": 7,
-  "pending_count": 12,
-  "progress_percentage": 36.8
+  "completed_count": 8,
+  "pending_count": 11,
+  "progress_percentage": 42.1
 }
