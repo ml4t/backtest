@@ -19,7 +19,7 @@ from qengine.execution.bracket_manager import BracketOrderManager
 from qengine.execution.fill_simulator import FillSimulator
 from qengine.execution.order import Order, OrderState
 from qengine.execution.order_router import OrderRouter
-from qengine.execution.position_tracker import PositionTracker
+# from qengine.execution.position_tracker import PositionTracker  # Removed in TASK-2.1, refactored in TASK-2.4
 from qengine.execution.trade_tracker import TradeTracker
 from qengine.portfolio.margin import MarginAccount
 
