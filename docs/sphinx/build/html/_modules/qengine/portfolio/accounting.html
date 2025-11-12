@@ -1,0 +1,477 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.portfolio.accounting &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.portfolio.accounting</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.portfolio.accounting</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Portfolio accounting and P&amp;L tracking for QEngine.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.event</span><span class="w"> </span><span class="kn">import</span> <span class="n">FillEvent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssetId</span><span class="p">,</span> <span class="n">Cash</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.portfolio.portfolio</span><span class="w"> </span><span class="kn">import</span> <span class="n">Portfolio</span>
+
+
+<div class="viewcode-block" id="PortfolioAccounting">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PortfolioAccounting</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handles portfolio accounting, P&amp;L calculation, and performance tracking.</span>
+
+<span class="sd">    This class integrates with the broker to track trades and calculate</span>
+<span class="sd">    real-time portfolio metrics including realized/unrealized P&amp;L,</span>
+<span class="sd">    returns, and risk metrics.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PortfolioAccounting.__init__">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">initial_cash</span><span class="p">:</span> <span class="n">Cash</span> <span class="o">=</span> <span class="mf">100000.0</span><span class="p">,</span> <span class="n">track_history</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize portfolio accounting.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            initial_cash: Starting cash balance</span>
+<span class="sd">            track_history: Whether to keep detailed history</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span> <span class="o">=</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">initial_cash</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">track_history</span> <span class="o">=</span> <span class="n">track_history</span>
+
+        <span class="c1"># Track all fills</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">FillEvent</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Performance tracking</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">initial_cash</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_drawdown</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">daily_returns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">timestamps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Risk tracking</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_leverage</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_concentration</span> <span class="o">=</span> <span class="mf">0.0</span></div>
+
+
+        <span class="c1"># Note: equity_curve and timestamps will be populated as events are processed</span>
+
+<div class="viewcode-block" id="PortfolioAccounting.process_fill">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.process_fill">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_event</span><span class="p">:</span> <span class="n">FillEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process a fill event and update portfolio.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            fill_event: Fill event from broker</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Record fill</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fill_event</span><span class="p">)</span>
+
+        <span class="c1"># Determine quantity change (positive for buy, negative for sell)</span>
+        <span class="n">quantity_change</span> <span class="o">=</span> <span class="n">fill_event</span><span class="o">.</span><span class="n">fill_quantity</span>
+        <span class="k">if</span> <span class="n">fill_event</span><span class="o">.</span><span class="n">side</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sell&quot;</span><span class="p">:</span>
+            <span class="n">quantity_change</span> <span class="o">=</span> <span class="o">-</span><span class="n">quantity_change</span>
+
+        <span class="c1"># Update portfolio position</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">update_position</span><span class="p">(</span>
+            <span class="n">asset_id</span><span class="o">=</span><span class="n">fill_event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span>
+            <span class="n">quantity_change</span><span class="o">=</span><span class="n">quantity_change</span><span class="p">,</span>
+            <span class="n">price</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">fill_event</span><span class="o">.</span><span class="n">fill_price</span><span class="p">),</span>
+            <span class="n">commission</span><span class="o">=</span><span class="n">fill_event</span><span class="o">.</span><span class="n">commission</span><span class="p">,</span>
+            <span class="n">slippage</span><span class="o">=</span><span class="n">fill_event</span><span class="o">.</span><span class="n">slippage</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Update performance metrics</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_metrics</span><span class="p">(</span><span class="n">fill_event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.update_prices">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.update_prices">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_prices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prices</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">AssetId</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update portfolio with new market prices.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            prices: Dictionary of asset prices</span>
+<span class="sd">            timestamp: Current timestamp</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">update_prices</span><span class="p">(</span><span class="n">prices</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_metrics</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_metrics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update performance and risk metrics.&quot;&quot;&quot;</span>
+        <span class="n">current_equity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">equity</span>
+
+        <span class="c1"># Update high water mark and drawdown</span>
+        <span class="k">if</span> <span class="n">current_equity</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span> <span class="o">=</span> <span class="n">current_equity</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">current_drawdown</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span> <span class="o">-</span> <span class="nb">float</span><span class="p">(</span><span class="n">current_equity</span><span class="p">))</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_drawdown</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_drawdown</span><span class="p">,</span> <span class="n">current_drawdown</span><span class="p">)</span>
+
+        <span class="c1"># Track equity curve</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">track_history</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">timestamps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current_equity</span><span class="p">)</span>
+
+            <span class="c1"># Calculate daily return if we have previous data</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">prev_equity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">prev_equity</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">daily_return</span> <span class="o">=</span> <span class="p">(</span><span class="n">current_equity</span> <span class="o">-</span> <span class="n">prev_equity</span><span class="p">)</span> <span class="o">/</span> <span class="n">prev_equity</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">daily_returns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">daily_return</span><span class="p">)</span>
+
+        <span class="c1"># Update risk metrics from current state</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">get_current_state</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_leverage</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_leverage</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">leverage</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_concentration</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_concentration</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">concentration</span><span class="p">)</span>
+
+        <span class="c1"># Save state if tracking history</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">track_history</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">save_state</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PortfolioAccounting.calculate_win_rate">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.calculate_win_rate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_win_rate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate win rate from trades (percentage of winning trades).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Group trades by asset to calculate P&amp;L</span>
+        <span class="n">winning_trades</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">total_trades</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># Track positions to determine win/loss</span>
+        <span class="n">position_pnl</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">fill</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="n">asset_id</span> <span class="o">=</span> <span class="n">fill</span><span class="o">.</span><span class="n">asset_id</span>
+
+            <span class="k">if</span> <span class="n">fill</span><span class="o">.</span><span class="n">side</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;buy&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">asset_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">position_pnl</span><span class="p">:</span>
+                    <span class="n">position_pnl</span><span class="p">[</span><span class="n">asset_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">position_pnl</span><span class="p">[</span><span class="n">asset_id</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">fill_quantity</span><span class="p">,</span> <span class="s2">&quot;price&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">fill_price</span><span class="p">)},</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">fill</span><span class="o">.</span><span class="n">side</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sell&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">position_pnl</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">asset_id</span><span class="p">):</span>
+                    <span class="c1"># Calculate P&amp;L for this trade</span>
+                    <span class="n">buy_info</span> <span class="o">=</span> <span class="n">position_pnl</span><span class="p">[</span><span class="n">asset_id</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                    <span class="n">pnl</span> <span class="o">=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">fill_price</span><span class="p">)</span> <span class="o">-</span> <span class="n">buy_info</span><span class="p">[</span><span class="s2">&quot;price&quot;</span><span class="p">])</span> <span class="o">*</span> <span class="nb">min</span><span class="p">(</span>
+                        <span class="n">fill</span><span class="o">.</span><span class="n">fill_quantity</span><span class="p">,</span>
+                        <span class="n">buy_info</span><span class="p">[</span><span class="s2">&quot;quantity&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+
+                    <span class="n">total_trades</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">if</span> <span class="n">pnl</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">winning_trades</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">winning_trades</span> <span class="o">/</span> <span class="n">total_trades</span> <span class="k">if</span> <span class="n">total_trades</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">0.0</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.calculate_profit_factor">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.calculate_profit_factor">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_profit_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate profit factor (gross profit / gross loss).&quot;&quot;&quot;</span>
+        <span class="n">gross_profit</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">gross_loss</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Track positions to determine profits and losses</span>
+        <span class="n">position_costs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">fill</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="n">asset_id</span> <span class="o">=</span> <span class="n">fill</span><span class="o">.</span><span class="n">asset_id</span>
+
+            <span class="k">if</span> <span class="n">fill</span><span class="o">.</span><span class="n">side</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;buy&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">asset_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">position_costs</span><span class="p">:</span>
+                    <span class="n">position_costs</span><span class="p">[</span><span class="n">asset_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">position_costs</span><span class="p">[</span><span class="n">asset_id</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">fill_quantity</span><span class="p">,</span> <span class="s2">&quot;price&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">fill_price</span><span class="p">)},</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">fill</span><span class="o">.</span><span class="n">side</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;sell&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">position_costs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">asset_id</span><span class="p">):</span>
+                    <span class="c1"># Calculate P&amp;L for this trade</span>
+                    <span class="n">buy_info</span> <span class="o">=</span> <span class="n">position_costs</span><span class="p">[</span><span class="n">asset_id</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                    <span class="n">pnl</span> <span class="o">=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">fill_price</span><span class="p">)</span> <span class="o">-</span> <span class="n">buy_info</span><span class="p">[</span><span class="s2">&quot;price&quot;</span><span class="p">])</span> <span class="o">*</span> <span class="nb">min</span><span class="p">(</span>
+                        <span class="n">fill</span><span class="o">.</span><span class="n">fill_quantity</span><span class="p">,</span>
+                        <span class="n">buy_info</span><span class="p">[</span><span class="s2">&quot;quantity&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">pnl</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">gross_profit</span> <span class="o">+=</span> <span class="n">pnl</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">gross_loss</span> <span class="o">+=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">pnl</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">gross_profit</span> <span class="o">/</span> <span class="n">gross_loss</span>
+            <span class="k">if</span> <span class="n">gross_loss</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">gross_profit</span> <span class="o">&gt;</span> <span class="mi">0</span>
+            <span class="k">else</span> <span class="mf">0.0</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.calculate_avg_commission">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.calculate_avg_commission">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_avg_commission</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate average commission per trade.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_commission</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.calculate_avg_slippage">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.calculate_avg_slippage">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_avg_slippage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate average slippage per trade.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_slippage</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.get_performance_metrics">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.get_performance_metrics">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_performance_metrics</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get comprehensive performance metrics.&quot;&quot;&quot;</span>
+        <span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;total_return&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">returns</span><span class="p">,</span>
+            <span class="s2">&quot;total_pnl&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_realized_pnl</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">unrealized_pnl</span><span class="p">,</span>
+            <span class="s2">&quot;realized_pnl&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_realized_pnl</span><span class="p">,</span>
+            <span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">unrealized_pnl</span><span class="p">,</span>
+            <span class="s2">&quot;max_drawdown&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_drawdown</span><span class="p">,</span>
+            <span class="s2">&quot;current_equity&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">equity</span><span class="p">,</span>
+            <span class="s2">&quot;current_cash&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">cash</span><span class="p">,</span>
+            <span class="s2">&quot;total_commission&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_commission</span><span class="p">,</span>
+            <span class="s2">&quot;total_slippage&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">total_slippage</span><span class="p">,</span>
+            <span class="s2">&quot;num_trades&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">),</span>
+            <span class="s2">&quot;max_leverage&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_leverage</span><span class="p">,</span>
+            <span class="s2">&quot;max_concentration&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_concentration</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Add Sharpe ratio if we have enough data</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">daily_returns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+            <span class="n">returns</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">daily_returns</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">returns</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c1"># Annualized Sharpe (assuming 252 trading days)</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">returns</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">/</span> <span class="n">returns</span><span class="o">.</span><span class="n">std</span><span class="p">())</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Add trading performance metrics</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;win_rate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_win_rate</span><span class="p">()</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;profit_factor&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_profit_factor</span><span class="p">()</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;avg_commission_per_trade&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_avg_commission</span><span class="p">()</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;avg_slippage_per_trade&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_avg_slippage</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">metrics</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.get_trades_df">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.get_trades_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_trades_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get all trades as a Polars DataFrame.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">trades_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">fill</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="p">:</span>
+            <span class="n">trades_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">timestamp</span><span class="p">,</span>
+                    <span class="s2">&quot;order_id&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">order_id</span><span class="p">,</span>
+                    <span class="s2">&quot;trade_id&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">trade_id</span><span class="p">,</span>
+                    <span class="s2">&quot;asset_id&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span>
+                    <span class="s2">&quot;side&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">side</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                    <span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">fill_quantity</span><span class="p">,</span>
+                    <span class="s2">&quot;price&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">fill_price</span><span class="p">,</span>
+                    <span class="s2">&quot;commission&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">commission</span><span class="p">,</span>
+                    <span class="s2">&quot;slippage&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">slippage</span><span class="p">,</span>
+                    <span class="s2">&quot;total_cost&quot;</span><span class="p">:</span> <span class="n">fill</span><span class="o">.</span><span class="n">total_cost</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">trades_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.get_equity_curve_df">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.get_equity_curve_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_equity_curve_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get equity curve as a Polars DataFrame.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">timestamps</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">timestamps</span><span class="p">,</span>
+                <span class="s2">&quot;equity&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="p">,</span>
+                <span class="s2">&quot;returns&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">daily_returns</span><span class="p">],</span>  <span class="c1"># Pad with 0 for first day</span>
+            <span class="p">},</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.get_positions_df">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.get_positions_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_positions_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current positions as a Polars DataFrame.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">positions_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">position</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">positions</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="c1"># Get realized P&amp;L from portfolio (tracked at portfolio level, not position level)</span>
+            <span class="n">realized_pnl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">asset_realized_pnl</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">position</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+            <span class="n">total_pnl</span> <span class="o">=</span> <span class="n">position</span><span class="o">.</span><span class="n">unrealized_pnl</span> <span class="o">+</span> <span class="n">realized_pnl</span>
+
+            <span class="n">positions_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;asset_id&quot;</span><span class="p">:</span> <span class="n">position</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span>
+                    <span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">position</span><span class="o">.</span><span class="n">quantity</span><span class="p">,</span>
+                    <span class="s2">&quot;cost_basis&quot;</span><span class="p">:</span> <span class="n">position</span><span class="o">.</span><span class="n">cost_basis</span><span class="p">,</span>
+                    <span class="s2">&quot;last_price&quot;</span><span class="p">:</span> <span class="n">position</span><span class="o">.</span><span class="n">last_price</span><span class="p">,</span>
+                    <span class="s2">&quot;market_value&quot;</span><span class="p">:</span> <span class="n">position</span><span class="o">.</span><span class="n">market_value</span><span class="p">,</span>
+                    <span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">:</span> <span class="n">position</span><span class="o">.</span><span class="n">unrealized_pnl</span><span class="p">,</span>
+                    <span class="s2">&quot;realized_pnl&quot;</span><span class="p">:</span> <span class="n">realized_pnl</span><span class="p">,</span>
+                    <span class="s2">&quot;total_pnl&quot;</span><span class="p">:</span> <span class="n">total_pnl</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">positions_data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.get_summary">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.get_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get portfolio summary.&quot;&quot;&quot;</span>
+        <span class="n">summary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">get_position_summary</span><span class="p">()</span>
+        <span class="n">summary</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_performance_metrics</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">summary</span></div>
+
+
+<div class="viewcode-block" id="PortfolioAccounting.reset">
+<a class="viewcode-back" href="../../../modules/portfolio.html#qengine.portfolio.accounting.PortfolioAccounting.reset">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reset portfolio to initial state.&quot;&quot;&quot;</span>
+        <span class="n">initial_cash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">initial_cash</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span> <span class="o">=</span> <span class="n">Portfolio</span><span class="p">(</span><span class="n">initial_cash</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fills</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">high_water_mark</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">initial_cash</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_drawdown</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">daily_returns</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">timestamps</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_leverage</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_concentration</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">track_history</span><span class="p">:</span>
+            <span class="c1"># Note: Initial timestamp will be set when first event is processed</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">equity_curve</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">initial_cash</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -23,7 +23,7 @@ from qengine.execution.commission import (
 )
 from qengine.execution.slippage import (
     NoSlippage,
-    FixedSlippageModel,
+    VectorBTSlippage,
 )
 from qengine.execution.order import Order
 from qengine.core.types import OrderType, OrderSide
@@ -96,7 +96,7 @@ class TestVectorBTInfiniteSizer:
         order = create_test_order()
 
         commission = PercentageCommission(rate=0.0002)
-        slippage = FixedSlippageModel(slippage_pct=0.0002)
+        slippage = VectorBTSlippage(slippage=0.0002)
 
         quantity = sizer.calculate_quantity(
             price=50000.0,
@@ -139,8 +139,8 @@ class TestVectorBTInfiniteSizer:
         sizer = VectorBTInfiniteSizer(granularity=0.001)
         order = create_test_order()
 
-        commission = VectorBTCommission(rate=0.0002, fixed_fee=10.0)
-        slippage = FixedSlippageModel(slippage_pct=0.0002)
+        commission = VectorBTCommission(fee_rate=0.0002, fixed_fee=10.0)
+        slippage = VectorBTSlippage(slippage=0.0002)
 
         quantity = sizer.calculate_quantity(
             price=50000.0,
@@ -173,7 +173,7 @@ class TestVectorBTInfiniteSizer:
         sizer = VectorBTInfiniteSizer(granularity=0.001)
         order = create_test_order()
 
-        commission = VectorBTCommission(rate=0.0002, fixed_fee=10.0)
+        commission = VectorBTCommission(fee_rate=0.0002, fixed_fee=10.0)
         slippage = NoSlippage()
 
         with pytest.raises(ValueError, match="Insufficient cash to cover fees"):
@@ -203,7 +203,7 @@ class TestVectorBTInfiniteSizer:
         order = create_test_order()
 
         commission = PercentageCommission(rate=0.0002)
-        slippage = FixedSlippageModel(slippage_pct=0.0002)
+        slippage = VectorBTSlippage(slippage=0.0002)
 
         quantity = sizer.calculate_quantity(
             price=50000.0,
@@ -305,7 +305,7 @@ class TestVectorBTInfiniteSizer:
 
         # With 1% slippage
         sizer_with_slip = VectorBTInfiniteSizer(granularity=0.001)
-        slippage = FixedSlippageModel(slippage_pct=0.01)
+        slippage = VectorBTSlippage(slippage=0.01)
         qty_with_slip = sizer_with_slip.calculate_quantity(
             price=50000.0,
             available_cash=10000.0,

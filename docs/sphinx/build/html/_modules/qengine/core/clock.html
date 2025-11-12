@@ -1,0 +1,504 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.core.clock &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.core.clock</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.core.clock</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Time management and synchronization for QEngine.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">heapq</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas_market_calendars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mcal</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.event</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.data.feed</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataFeed</span><span class="p">,</span> <span class="n">SignalSource</span>
+
+
+<div class="viewcode-block" id="ClockMode">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.ClockMode">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ClockMode</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Clock operation modes.&quot;&quot;&quot;</span>
+
+    <span class="n">BACKTEST</span> <span class="o">=</span> <span class="s2">&quot;backtest&quot;</span>  <span class="c1"># Historical simulation</span>
+    <span class="n">PAPER</span> <span class="o">=</span> <span class="s2">&quot;paper&quot;</span>  <span class="c1"># Paper trading with real-time data</span>
+    <span class="n">LIVE</span> <span class="o">=</span> <span class="s2">&quot;live&quot;</span>  <span class="c1"># Live trading</span></div>
+
+
+
+<div class="viewcode-block" id="Clock">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Clock</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Master time keeper for the simulation.</span>
+
+<span class="sd">    The Clock is responsible for:</span>
+<span class="sd">    - Advancing simulation time</span>
+<span class="sd">    - Coordinating multiple data sources</span>
+<span class="sd">    - Ensuring point-in-time correctness</span>
+<span class="sd">    - Managing trading calendar</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Clock.__init__">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="n">ClockMode</span> <span class="o">=</span> <span class="n">ClockMode</span><span class="o">.</span><span class="n">BACKTEST</span><span class="p">,</span>
+        <span class="n">calendar</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;NYSE&quot;</span><span class="p">,</span>
+        <span class="n">start_time</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">end_time</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the Clock.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mode: Operating mode (backtest, paper, live)</span>
+<span class="sd">            calendar: Market calendar name (e.g., &#39;NYSE&#39;, &#39;NASDAQ&#39;)</span>
+<span class="sd">            start_time: Simulation start time</span>
+<span class="sd">            end_time: Simulation end time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calendar_name</span> <span class="o">=</span> <span class="n">calendar</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span> <span class="o">=</span> <span class="n">start_time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span> <span class="o">=</span> <span class="n">end_time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+        <span class="c1"># Current simulation time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span> <span class="o">=</span> <span class="n">start_time</span>
+
+        <span class="c1"># Data sources</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data_feeds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">DataFeed</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">SignalSource</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Event queue (min heap by timestamp)</span>
+        <span class="c1"># Store tuples of (timestamp, sequence, event, source) for stable ordering</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">datetime</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Event</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Ensures FIFO when timestamps are identical</span>
+
+        <span class="c1"># Market calendar</span>
+        <span class="k">if</span> <span class="n">calendar</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">calendar</span> <span class="o">=</span> <span class="n">mcal</span><span class="o">.</span><span class="n">get_calendar</span><span class="p">(</span><span class="n">calendar</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">start_time</span> <span class="ow">and</span> <span class="n">end_time</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calendar</span><span class="o">.</span><span class="n">schedule</span><span class="p">(</span>
+                    <span class="n">start_date</span><span class="o">=</span><span class="n">start_time</span><span class="o">.</span><span class="n">date</span><span class="p">(),</span>
+                    <span class="n">end_date</span><span class="o">=</span><span class="n">end_time</span><span class="o">.</span><span class="n">date</span><span class="p">(),</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">calendar</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Statistics</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_events_processed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ticks_processed</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="Clock.add_data_feed">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.add_data_feed">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_data_feed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">feed</span><span class="p">:</span> <span class="n">DataFeed</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a data feed to the clock.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            feed: Data feed to add</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data_feeds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">feed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prime_feed</span><span class="p">(</span><span class="n">feed</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Clock.add_signal_source">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.add_signal_source">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_signal_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">SignalSource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a signal source to the clock.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            source: Signal source to add</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_sources</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prime_signal_source</span><span class="p">(</span><span class="n">source</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prime_feed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">feed</span><span class="p">:</span> <span class="n">DataFeed</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prime a data feed by adding its first event to the queue.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            feed: Data feed to prime</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">next_event</span> <span class="o">=</span> <span class="n">feed</span><span class="o">.</span><span class="n">get_next_event</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">next_event</span><span class="p">:</span>
+            <span class="c1"># Store tuple of (timestamp, sequence, event, source) for stable ordering</span>
+            <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">,</span> <span class="p">(</span><span class="n">next_event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span><span class="p">,</span> <span class="n">next_event</span><span class="p">,</span> <span class="n">feed</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prime_signal_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">SignalSource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prime a signal source.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            source: Signal source to prime</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">next_signal</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">get_next_signal</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">next_signal</span><span class="p">:</span>
+            <span class="c1"># Store tuple of (timestamp, sequence, event, source) for stable ordering</span>
+            <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">next_signal</span><span class="o">.</span><span class="n">timestamp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span><span class="p">,</span> <span class="n">next_signal</span><span class="p">,</span> <span class="n">source</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+<div class="viewcode-block" id="Clock.get_next_event">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.get_next_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_next_event</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Event</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the next event across all data sources.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Next event in chronological order or None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># Get event with earliest timestamp and its source</span>
+        <span class="c1"># Now unpacking 4 elements: timestamp, sequence, event, source</span>
+        <span class="n">timestamp</span><span class="p">,</span> <span class="n">sequence</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">source</span> <span class="o">=</span> <span class="n">heapq</span><span class="o">.</span><span class="n">heappop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">)</span>
+
+        <span class="c1"># Update current time (ensures PIT correctness)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span> <span class="o">=</span> <span class="n">timestamp</span>
+
+        <span class="c1"># Check if we&#39;re past end time</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span> <span class="ow">and</span> <span class="n">timestamp</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># Replenish queue from the source that provided this event</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_replenish_queue</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_events_processed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">event</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_replenish_queue</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">last_event</span><span class="p">:</span> <span class="n">Event</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add the next event from the source that provided the last event.</span>
+
+<span class="sd">        For correct multi-feed synchronization, only the feed that just provided</span>
+<span class="sd">        an event needs to be replenished. The heap maintains chronological order</span>
+<span class="sd">        across all feeds.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            last_event: The event that was just processed</span>
+<span class="sd">            source: The data feed or signal source that provided the last event</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qengine.data.feed</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataFeed</span><span class="p">,</span> <span class="n">SignalSource</span>
+
+        <span class="c1"># Only replenish from the source that provided the last event</span>
+        <span class="c1"># The heap ensures proper chronological ordering across all feeds</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">DataFeed</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span><span class="o">.</span><span class="n">is_exhausted</span><span class="p">:</span>
+                <span class="n">next_timestamp</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">peek_next_timestamp</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">next_timestamp</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span> <span class="ow">or</span> <span class="n">next_timestamp</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span><span class="p">):</span>
+                    <span class="n">next_event</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">get_next_event</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">next_event</span><span class="p">:</span>
+                        <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">,</span>
+                            <span class="p">(</span><span class="n">next_event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span><span class="p">,</span> <span class="n">next_event</span><span class="p">,</span> <span class="n">source</span><span class="p">),</span>
+                        <span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">SignalSource</span><span class="p">):</span>
+            <span class="n">next_timestamp</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">peek_next_timestamp</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">next_timestamp</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span> <span class="ow">or</span> <span class="n">next_timestamp</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_time</span><span class="p">):</span>
+                <span class="n">next_signal</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">get_next_signal</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">next_signal</span><span class="p">:</span>
+                    <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">,</span>
+                        <span class="p">(</span><span class="n">next_signal</span><span class="o">.</span><span class="n">timestamp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span><span class="p">,</span> <span class="n">next_signal</span><span class="p">,</span> <span class="n">source</span><span class="p">),</span>
+                    <span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_sequence_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">current_time</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the current simulation time.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_market_open</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if the market is currently open.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            True if market is open at current time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">calendar</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>  <span class="c1"># Assume always open if no calendar</span>
+
+        <span class="c1"># Check if current time is within a trading session</span>
+        <span class="n">current_date</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">current_date</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+            <span class="n">session</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">current_date</span><span class="p">]</span>
+            <span class="n">market_open</span> <span class="o">=</span> <span class="n">session</span><span class="p">[</span><span class="s2">&quot;market_open&quot;</span><span class="p">]</span>
+            <span class="n">market_close</span> <span class="o">=</span> <span class="n">session</span><span class="p">[</span><span class="s2">&quot;market_close&quot;</span><span class="p">]</span>
+
+            <span class="c1"># Convert to timezone-aware if needed</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="o">.</span><span class="n">tzinfo</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">market_open</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span> <span class="o">&lt;=</span> <span class="n">market_close</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">market_open</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+                <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span>
+                <span class="o">&lt;=</span> <span class="n">market_close</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_market_open</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the next market open time.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Next market open datetime or None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">calendar</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">current_date</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+        <span class="n">future_sessions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">index</span> <span class="o">&gt;=</span> <span class="n">current_date</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">_date</span><span class="p">,</span> <span class="n">session</span> <span class="ow">in</span> <span class="n">future_sessions</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">market_open</span> <span class="o">=</span> <span class="n">session</span><span class="p">[</span><span class="s2">&quot;market_open&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">market_open</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">market_open</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_market_close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the next market close time.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Next market close datetime or None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">calendar</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">current_date</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">current_date</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+            <span class="n">market_close</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">current_date</span><span class="p">][</span><span class="s2">&quot;market_close&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">market_close</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">market_close</span>
+
+        <span class="c1"># Look for next session</span>
+        <span class="n">future_sessions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">index</span> <span class="o">&gt;</span> <span class="n">current_date</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">future_sessions</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">future_sessions</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;market_close&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Clock.is_trading_day">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.is_trading_day">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_trading_day</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">date</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if a given date is a trading day.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            date: Date to check</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            True if date is a trading day</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="n">date</span><span class="o">.</span><span class="n">date</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">trading_sessions</span><span class="o">.</span><span class="n">index</span></div>
+
+
+<div class="viewcode-block" id="Clock.advance_to">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.advance_to">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">advance_to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">skip_events</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Advance the clock to a specific time.</span>
+
+<span class="sd">        Used for jumping forward in time during backtesting.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            timestamp: Target timestamp</span>
+<span class="sd">            skip_events: If False (default), raise error if events would be skipped</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Number of events skipped</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If skip_events=False and events would be skipped, or if trying to go back in time</span>
+<span class="sd">            RuntimeError: If not in backtest mode</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="n">ClockMode</span><span class="o">.</span><span class="n">BACKTEST</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Can only advance time in backtest mode&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">timestamp</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot go back in time&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Count events that would be skipped</span>
+        <span class="n">skipped_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">timestamp</span><span class="p">:</span>
+            <span class="n">skipped_count</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">skip_events</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Would skip </span><span class="si">{</span><span class="n">skipped_count</span><span class="si">}</span><span class="s2"> event(s) before </span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Set skip_events=True to allow.&quot;</span>
+                <span class="p">)</span>
+            <span class="n">heapq</span><span class="o">.</span><span class="n">heappop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span> <span class="o">=</span> <span class="n">timestamp</span>
+
+        <span class="k">if</span> <span class="n">skipped_count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Clock advanced to </span><span class="si">{</span><span class="n">timestamp</span><span class="si">}</span><span class="s2">, skipped </span><span class="si">{</span><span class="n">skipped_count</span><span class="si">}</span><span class="s2"> events&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">skipped_count</span></div>
+
+
+<div class="viewcode-block" id="Clock.reset">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.clock.Clock.reset">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reset the clock to initial state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_events_processed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ticks_processed</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># Reset all data feeds</span>
+        <span class="k">for</span> <span class="n">feed</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data_feeds</span><span class="p">:</span>
+            <span class="n">feed</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_prime_feed</span><span class="p">(</span><span class="n">feed</span><span class="p">)</span>
+
+        <span class="c1"># Reset all signal sources</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_signal_sources</span><span class="p">:</span>
+            <span class="n">source</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_prime_signal_source</span><span class="p">(</span><span class="n">source</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stats</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get clock statistics.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;current_time&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="p">,</span>
+            <span class="s2">&quot;events_processed&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_events_processed</span><span class="p">,</span>
+            <span class="s2">&quot;queue_size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="p">),</span>
+            <span class="s2">&quot;data_feeds&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_feeds</span><span class="p">),</span>
+            <span class="s2">&quot;signal_sources&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_sources</span><span class="p">),</span>
+            <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Clock(mode=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;time=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_current_time</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;events=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_events_processed</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

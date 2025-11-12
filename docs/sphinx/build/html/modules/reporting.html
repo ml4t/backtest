@@ -1,0 +1,579 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reporting Module &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Data Module" href="data.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">Data Module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Reporting Module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-qengine.reporting.base">Base Reporter</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qengine.reporting.base.ReportGenerator"><code class="docutils literal notranslate"><span class="pre">ReportGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.base.ReportGenerator.__init__"><code class="docutils literal notranslate"><span class="pre">ReportGenerator.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.base.ReportGenerator.generate"><code class="docutils literal notranslate"><span class="pre">ReportGenerator.generate()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-qengine.reporting.html">HTML Reporter</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qengine.reporting.html.HTMLReportGenerator"><code class="docutils literal notranslate"><span class="pre">HTMLReportGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.html.HTMLReportGenerator.generate"><code class="docutils literal notranslate"><span class="pre">HTMLReportGenerator.generate()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-qengine.reporting.parquet">Parquet Reporter</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qengine.reporting.parquet.ParquetReportGenerator"><code class="docutils literal notranslate"><span class="pre">ParquetReportGenerator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.parquet.ParquetReportGenerator.generate"><code class="docutils literal notranslate"><span class="pre">ParquetReportGenerator.generate()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.parquet.ParquetReportGenerator.load_report"><code class="docutils literal notranslate"><span class="pre">ParquetReportGenerator.load_report()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-qengine.reporting.reporter">Reporter</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter.__init__"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter.on_start"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter.on_start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter.on_event"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter.on_event()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter.on_end"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter.on_end()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter.reset"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter.reset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.ConsoleReporter.get_report"><code class="docutils literal notranslate"><span class="pre">ConsoleReporter.get_report()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter.__init__"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter.on_start"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter.on_start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter.on_event"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter.on_event()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter.on_end"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter.on_end()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter.get_report"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter.get_report()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.InMemoryReporter.reset"><code class="docutils literal notranslate"><span class="pre">InMemoryReporter.reset()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#qengine.reporting.reporter.Reporter"><code class="docutils literal notranslate"><span class="pre">Reporter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.Reporter.on_start"><code class="docutils literal notranslate"><span class="pre">Reporter.on_start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.Reporter.on_event"><code class="docutils literal notranslate"><span class="pre">Reporter.on_event()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.Reporter.on_end"><code class="docutils literal notranslate"><span class="pre">Reporter.on_end()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.Reporter.reset"><code class="docutils literal notranslate"><span class="pre">Reporter.reset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qengine.reporting.reporter.Reporter.get_report"><code class="docutils literal notranslate"><span class="pre">Reporter.get_report()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Reporting Module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/modules/reporting.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="reporting-module">
+<h1>Reporting Module<a class="headerlink" href="#reporting-module" title="Link to this heading"></a></h1>
+<p>The reporting module handles backtest results and report generation.</p>
+<section id="module-qengine.reporting.base">
+<span id="base-reporter"></span><h2>Base Reporter<a class="headerlink" href="#module-qengine.reporting.base" title="Link to this heading"></a></h2>
+<p>Base reporting functionality for QEngine.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qengine.reporting.base.ReportGenerator">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qengine.reporting.base.</span></span><span class="sig-name descname"><span class="pre">ReportGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/base.html#ReportGenerator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.base.ReportGenerator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Abstract base class for report generation.</p>
+<p>Different report formats (HTML, Parquet, JSON) should implement this interface.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_dir</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></li>
+<li><p><strong>report_name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.base.ReportGenerator.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/base.html#ReportGenerator.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.base.ReportGenerator.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize report generator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_dir</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Directory to save reports</p></li>
+<li><p><strong>report_name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Base name for report files</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.base.ReportGenerator.generate">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">generate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accounting</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="portfolio.html#qengine.portfolio.accounting.PortfolioAccounting" title="qengine.portfolio.accounting.PortfolioAccounting"><span class="pre">PortfolioAccounting</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">strategy_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backtest_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/base.html#ReportGenerator.generate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.base.ReportGenerator.generate" title="Link to this definition"></a></dt>
+<dd><p>Generate report from portfolio accounting data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accounting</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="portfolio.html#qengine.portfolio.accounting.PortfolioAccounting" title="qengine.portfolio.accounting.PortfolioAccounting"><code class="xref py py-class docutils literal notranslate"><span class="pre">PortfolioAccounting</span></code></a></span>) – Portfolio accounting with results</p></li>
+<li><p><strong>strategy_params</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Strategy configuration parameters</p></li>
+<li><p><strong>backtest_params</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Backtest configuration parameters</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path to generated report</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-qengine.reporting.html">
+<span id="html-reporter"></span><h2>HTML Reporter<a class="headerlink" href="#module-qengine.reporting.html" title="Link to this heading"></a></h2>
+<p>HTML report generation for QEngine backtests.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qengine.reporting.html.HTMLReportGenerator">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qengine.reporting.html.</span></span><span class="sig-name descname"><span class="pre">HTMLReportGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/html.html#HTMLReportGenerator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.html.HTMLReportGenerator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qengine.reporting.base.ReportGenerator" title="qengine.reporting.base.ReportGenerator"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReportGenerator</span></code></a></p>
+<p>Generates comprehensive HTML reports for backtest results.</p>
+<p>Creates interactive reports with:
+- Performance summary
+- Equity curve charts
+- Trade analysis
+- Risk metrics
+- Asset class breakdown</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_dir</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></li>
+<li><p><strong>report_name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.html.HTMLReportGenerator.generate">
+<span class="sig-name descname"><span class="pre">generate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accounting</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="portfolio.html#qengine.portfolio.accounting.PortfolioAccounting" title="qengine.portfolio.accounting.PortfolioAccounting"><span class="pre">PortfolioAccounting</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">strategy_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backtest_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/html.html#HTMLReportGenerator.generate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.html.HTMLReportGenerator.generate" title="Link to this definition"></a></dt>
+<dd><p>Generate HTML report from portfolio accounting data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accounting</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="portfolio.html#qengine.portfolio.accounting.PortfolioAccounting" title="qengine.portfolio.accounting.PortfolioAccounting"><code class="xref py py-class docutils literal notranslate"><span class="pre">PortfolioAccounting</span></code></a></span>) – Portfolio accounting with results</p></li>
+<li><p><strong>strategy_params</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Strategy configuration parameters</p></li>
+<li><p><strong>backtest_params</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Backtest configuration parameters</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path to generated HTML report</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-qengine.reporting.parquet">
+<span id="parquet-reporter"></span><h2>Parquet Reporter<a class="headerlink" href="#module-qengine.reporting.parquet" title="Link to this heading"></a></h2>
+<p>Parquet report generation for QEngine backtests.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qengine.reporting.parquet.ParquetReportGenerator">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qengine.reporting.parquet.</span></span><span class="sig-name descname"><span class="pre">ParquetReportGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">report_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/parquet.html#ParquetReportGenerator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.parquet.ParquetReportGenerator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qengine.reporting.base.ReportGenerator" title="qengine.reporting.base.ReportGenerator"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReportGenerator</span></code></a></p>
+<p>Generates Parquet-based reports for backtest results.</p>
+<p>Creates structured data files optimized for:
+- Data science workflows
+- Further analysis with Polars/Pandas
+- Integration with data pipelines
+- Long-term storage and archival</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_dir</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></li>
+<li><p><strong>report_name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.parquet.ParquetReportGenerator.generate">
+<span class="sig-name descname"><span class="pre">generate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">accounting</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="portfolio.html#qengine.portfolio.accounting.PortfolioAccounting" title="qengine.portfolio.accounting.PortfolioAccounting"><span class="pre">PortfolioAccounting</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">strategy_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backtest_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/parquet.html#ParquetReportGenerator.generate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.parquet.ParquetReportGenerator.generate" title="Link to this definition"></a></dt>
+<dd><p>Generate Parquet report from portfolio accounting data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>accounting</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="portfolio.html#qengine.portfolio.accounting.PortfolioAccounting" title="qengine.portfolio.accounting.PortfolioAccounting"><code class="xref py py-class docutils literal notranslate"><span class="pre">PortfolioAccounting</span></code></a></span>) – Portfolio accounting with results</p></li>
+<li><p><strong>strategy_params</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Strategy configuration parameters</p></li>
+<li><p><strong>backtest_params</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">None</span></code>) – Backtest configuration parameters</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path to generated report directory</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.parquet.ParquetReportGenerator.load_report">
+<span class="sig-name descname"><span class="pre">load_report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">report_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><span class="pre">Path</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/qengine/reporting/parquet.html#ParquetReportGenerator.load_report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.parquet.ParquetReportGenerator.load_report" title="Link to this definition"></a></dt>
+<dd><p>Load a previously generated Parquet report.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>report_dir</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></span>) – Directory containing the Parquet report</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary with loaded report data</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-qengine.reporting.reporter">
+<span id="reporter"></span><h2>Reporter<a class="headerlink" href="#module-qengine.reporting.reporter" title="Link to this heading"></a></h2>
+<p>Reporter implementations for capturing backtest events and results.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qengine.reporting.reporter.</span></span><span class="sig-name descname"><span class="pre">ConsoleReporter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">log_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'INFO'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_every_n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qengine.reporting.reporter.Reporter" title="qengine.reporting.reporter.Reporter"><code class="xref py py-class docutils literal notranslate"><span class="pre">Reporter</span></code></a></p>
+<p>Reporter that logs events to console.</p>
+<p>Useful for real-time monitoring of backtest progress.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>log_level</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">'INFO'</span></code>)</p></li>
+<li><p><strong>log_every_n</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">1000</span></code>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">log_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'INFO'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_every_n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize console reporter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>log_level</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">'INFO'</span></code>) – Logging level (DEBUG, INFO, WARNING, ERROR)</p></li>
+<li><p><strong>log_every_n</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">1000</span></code>) – Log summary every N events</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter.on_start">
+<span class="sig-name descname"><span class="pre">on_start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter.on_start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter.on_start" title="Link to this definition"></a></dt>
+<dd><p>Log backtest start.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter.on_event">
+<span class="sig-name descname"><span class="pre">on_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="core.html#qengine.core.event.Event" title="qengine.core.event.Event"><span class="pre">Event</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter.on_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter.on_event" title="Link to this definition"></a></dt>
+<dd><p>Log event if appropriate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>event</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="core.html#qengine.core.event.Event" title="qengine.core.event.Event"><code class="xref py py-class docutils literal notranslate"><span class="pre">Event</span></code></a></span>) – Event to potentially log</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter.on_end">
+<span class="sig-name descname"><span class="pre">on_end</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter.on_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter.on_end" title="Link to this definition"></a></dt>
+<dd><p>Log backtest completion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter.reset" title="Link to this definition"></a></dt>
+<dd><p>Reset reporter state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.ConsoleReporter.get_report">
+<span class="sig-name descname"><span class="pre">get_report</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#ConsoleReporter.get_report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.ConsoleReporter.get_report" title="Link to this definition"></a></dt>
+<dd><p>Get simple report for console reporter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Event count summary</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qengine.reporting.reporter.</span></span><span class="sig-name descname"><span class="pre">InMemoryReporter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capture_all_events</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qengine.reporting.reporter.Reporter" title="qengine.reporting.reporter.Reporter"><code class="xref py py-class docutils literal notranslate"><span class="pre">Reporter</span></code></a></p>
+<p>Reporter that stores all events and results in memory.</p>
+<p>This reporter captures:
+- All events processed during backtest
+- Timestamps and event counts
+- Summary statistics</p>
+<p>Useful for debugging and analysis of backtest execution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>capture_all_events</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">False</span></code>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">capture_all_events</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize in-memory reporter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>capture_all_events</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>, default: <code class="docutils literal notranslate"><span class="pre">False</span></code>) – If True, store all events (can use significant memory)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter.on_start">
+<span class="sig-name descname"><span class="pre">on_start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter.on_start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter.on_start" title="Link to this definition"></a></dt>
+<dd><p>Mark start of backtest.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter.on_event">
+<span class="sig-name descname"><span class="pre">on_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="core.html#qengine.core.event.Event" title="qengine.core.event.Event"><span class="pre">Event</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter.on_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter.on_event" title="Link to this definition"></a></dt>
+<dd><p>Capture event details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>event</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="core.html#qengine.core.event.Event" title="qengine.core.event.Event"><code class="xref py py-class docutils literal notranslate"><span class="pre">Event</span></code></a></span>) – Event to record</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter.on_end">
+<span class="sig-name descname"><span class="pre">on_end</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter.on_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter.on_end" title="Link to this definition"></a></dt>
+<dd><p>Mark end of backtest.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter.get_report">
+<span class="sig-name descname"><span class="pre">get_report</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter.get_report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter.get_report" title="Link to this definition"></a></dt>
+<dd><p>Get summary report of captured events.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary with event statistics and timing information</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.InMemoryReporter.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#InMemoryReporter.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.InMemoryReporter.reset" title="Link to this definition"></a></dt>
+<dd><p>Reset reporter to initial state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.Reporter">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qengine.reporting.reporter.</span></span><span class="sig-name descname"><span class="pre">Reporter</span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#Reporter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.Reporter" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Abstract base class for reporters.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.Reporter.on_start">
+<span class="sig-name descname"><span class="pre">on_start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#Reporter.on_start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.Reporter.on_start" title="Link to this definition"></a></dt>
+<dd><p>Called at start of backtest.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.Reporter.on_event">
+<span class="sig-name descname"><span class="pre">on_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="core.html#qengine.core.event.Event" title="qengine.core.event.Event"><span class="pre">Event</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#Reporter.on_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.Reporter.on_event" title="Link to this definition"></a></dt>
+<dd><p>Called for each event processed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>event</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="core.html#qengine.core.event.Event" title="qengine.core.event.Event"><code class="xref py py-class docutils literal notranslate"><span class="pre">Event</span></code></a></span>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.Reporter.on_end">
+<span class="sig-name descname"><span class="pre">on_end</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#Reporter.on_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.Reporter.on_end" title="Link to this definition"></a></dt>
+<dd><p>Called at end of backtest.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.Reporter.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#Reporter.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.Reporter.reset" title="Link to this definition"></a></dt>
+<dd><p>Reset reporter state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qengine.reporting.reporter.Reporter.get_report">
+<span class="sig-name descname"><span class="pre">get_report</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a></span></span><a class="reference internal" href="../_modules/qengine/reporting/reporter.html#Reporter.get_report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qengine.reporting.reporter.Reporter.get_report" title="Link to this definition"></a></dt>
+<dd><p>Get the generated report.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="data.html" class="btn btn-neutral float-left" title="Data Module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,664 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.execution.slippage &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.execution.slippage</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.execution.slippage</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Slippage models for QEngine.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Price</span><span class="p">,</span> <span class="n">Quantity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.execution.order</span><span class="w"> </span><span class="kn">import</span> <span class="n">Order</span>
+
+
+<div class="viewcode-block" id="SlippageModel">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SlippageModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SlippageModel</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for slippage models.</span>
+
+<span class="sd">    Slippage models determine the actual fill price based on order characteristics</span>
+<span class="sd">    and market conditions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SlippageModel.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SlippageModel.calculate_fill_price">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate the fill price with slippage.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            order: The order being filled</span>
+<span class="sd">            market_price: Current market price</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The fill price including slippage</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="SlippageModel.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SlippageModel.calculate_slippage_cost">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate the slippage cost in currency terms.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            order: The order being filled</span>
+<span class="sd">            fill_quantity: Quantity being filled</span>
+<span class="sd">            market_price: Current market price</span>
+<span class="sd">            fill_price: Actual fill price</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Slippage cost in currency terms</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="NoSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.NoSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NoSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;No slippage - all orders fill at market price.</span>
+
+<span class="sd">    Primarily used for testing or ideal conditions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="NoSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.NoSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fill at market price.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">market_price</span></div>
+
+
+<div class="viewcode-block" id="NoSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.NoSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;No slippage cost.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mf">0.0</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FixedSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.FixedSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FixedSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fixed spread slippage model.</span>
+
+<span class="sd">    Assumes a fixed spread for all orders.</span>
+<span class="sd">    Buy orders fill at ask (market + spread/2)</span>
+<span class="sd">    Sell orders fill at bid (market - spread/2)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        spread: Fixed spread amount (default 0.01)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="FixedSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.FixedSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spread</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with fixed spread.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">spread</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Spread must be non-negative&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spread</span> <span class="o">=</span> <span class="n">spread</span></div>
+
+
+<div class="viewcode-block" id="FixedSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.FixedSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price with fixed spread.&quot;&quot;&quot;</span>
+        <span class="n">half_spread</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spread</span> <span class="o">/</span> <span class="mi">2</span>
+
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="c1"># Buy at ask (worse price)</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">+</span> <span class="n">half_spread</span>
+        <span class="c1"># Sell at bid (worse price)</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">-</span> <span class="n">half_spread</span></div>
+
+
+<div class="viewcode-block" id="FixedSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.FixedSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost from spread.&quot;&quot;&quot;</span>
+        <span class="c1"># Cost is the absolute difference times quantity</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PercentageSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.PercentageSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PercentageSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Percentage-based slippage model.</span>
+
+<span class="sd">    Slippage is a percentage of the market price.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        slippage_pct: Slippage percentage (default 0.1%)</span>
+<span class="sd">        min_slippage: Minimum slippage amount (default 0.001)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PercentageSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.PercentageSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">slippage_pct</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">,</span> <span class="n">min_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with percentage parameters.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">slippage_pct</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Slippage percentage must be non-negative&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">min_slippage</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Minimum slippage must be non-negative&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">slippage_pct</span> <span class="o">=</span> <span class="n">slippage_pct</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_slippage</span> <span class="o">=</span> <span class="n">min_slippage</span></div>
+
+
+<div class="viewcode-block" id="PercentageSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.PercentageSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price with percentage slippage.&quot;&quot;&quot;</span>
+        <span class="c1"># Calculate slippage amount</span>
+        <span class="n">slippage_amount</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">market_price</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">slippage_pct</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_slippage</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="c1"># Buy at higher price</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">+</span> <span class="n">slippage_amount</span>
+        <span class="c1"># Sell at lower price</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">-</span> <span class="n">slippage_amount</span></div>
+
+
+<div class="viewcode-block" id="PercentageSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.PercentageSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="LinearImpactSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.LinearImpactSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LinearImpactSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Linear market impact slippage model.</span>
+
+<span class="sd">    Slippage increases linearly with order size.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        base_slippage: Base slippage for minimal orders (default 0.0001)</span>
+<span class="sd">        impact_coefficient: Impact per unit of order size (default 0.00001)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="LinearImpactSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.LinearImpactSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">base_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0001</span><span class="p">,</span>
+        <span class="n">impact_coefficient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.00001</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with impact parameters.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">base_slippage</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Base slippage must be non-negative&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">impact_coefficient</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Impact coefficient must be non-negative&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">base_slippage</span> <span class="o">=</span> <span class="n">base_slippage</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">impact_coefficient</span> <span class="o">=</span> <span class="n">impact_coefficient</span></div>
+
+
+<div class="viewcode-block" id="LinearImpactSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.LinearImpactSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price with linear impact.&quot;&quot;&quot;</span>
+        <span class="c1"># Linear impact based on order size</span>
+        <span class="n">impact</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_slippage</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">impact_coefficient</span> <span class="o">*</span> <span class="n">order</span><span class="o">.</span><span class="n">quantity</span>
+        <span class="n">slippage_amount</span> <span class="o">=</span> <span class="n">market_price</span> <span class="o">*</span> <span class="n">impact</span>
+
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">+</span> <span class="n">slippage_amount</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">-</span> <span class="n">slippage_amount</span></div>
+
+
+<div class="viewcode-block" id="LinearImpactSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.LinearImpactSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="SquareRootImpactSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SquareRootImpactSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SquareRootImpactSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Square root market impact model (Almgren-Chriss style).</span>
+
+<span class="sd">    Slippage increases with the square root of order size, modeling</span>
+<span class="sd">    non-linear market impact for large orders.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        temporary_impact: Temporary impact coefficient (default 0.1)</span>
+<span class="sd">        permanent_impact: Permanent impact coefficient (default 0.05)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SquareRootImpactSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SquareRootImpactSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">temporary_impact</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+        <span class="n">permanent_impact</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with impact parameters.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">temporary_impact</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Temporary impact must be non-negative&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">permanent_impact</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Permanent impact must be non-negative&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">temporary_impact</span> <span class="o">=</span> <span class="n">temporary_impact</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">permanent_impact</span> <span class="o">=</span> <span class="n">permanent_impact</span></div>
+
+
+<div class="viewcode-block" id="SquareRootImpactSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SquareRootImpactSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price with square root impact.&quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+        <span class="c1"># Square root impact model</span>
+        <span class="n">order_size_impact</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">order</span><span class="o">.</span><span class="n">quantity</span> <span class="o">/</span> <span class="mf">1000.0</span><span class="p">)</span>  <span class="c1"># Normalize by 1000 shares</span>
+
+        <span class="c1"># Combine temporary and permanent impact</span>
+        <span class="n">total_impact</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">temporary_impact</span> <span class="o">*</span> <span class="n">order_size_impact</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">permanent_impact</span> <span class="o">*</span> <span class="n">order_size_impact</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Convert to price impact</span>
+        <span class="n">slippage_amount</span> <span class="o">=</span> <span class="n">market_price</span> <span class="o">*</span> <span class="n">total_impact</span> <span class="o">*</span> <span class="mf">0.01</span>  <span class="c1"># Convert to percentage</span>
+
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">+</span> <span class="n">slippage_amount</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">-</span> <span class="n">slippage_amount</span></div>
+
+
+<div class="viewcode-block" id="SquareRootImpactSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.SquareRootImpactSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="VolumeShareSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VolumeShareSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VolumeShareSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Volume-based slippage model.</span>
+
+<span class="sd">    Slippage is based on the percentage of daily volume being traded.</span>
+<span class="sd">    Larger orders relative to volume have more impact.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        volume_limit: Maximum percentage of volume per bar (default 0.025 = 2.5%)</span>
+<span class="sd">        price_impact: Price impact coefficient (default 0.1)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="VolumeShareSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VolumeShareSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">volume_limit</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.025</span><span class="p">,</span>
+        <span class="n">price_impact</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with volume parameters.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">volume_limit</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Volume limit must be between 0 and 1&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">price_impact</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Price impact must be non-negative&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">volume_limit</span> <span class="o">=</span> <span class="n">volume_limit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">price_impact</span> <span class="o">=</span> <span class="n">price_impact</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_daily_volume</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="VolumeShareSlippage.set_daily_volume">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VolumeShareSlippage.set_daily_volume">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_daily_volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">volume</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the daily volume for impact calculation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            volume: Daily volume</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_daily_volume</span> <span class="o">=</span> <span class="n">volume</span></div>
+
+
+<div class="viewcode-block" id="VolumeShareSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VolumeShareSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price based on volume impact.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_daily_volume</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_daily_volume</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># No volume data, use minimal slippage</span>
+            <span class="n">slippage_amount</span> <span class="o">=</span> <span class="n">market_price</span> <span class="o">*</span> <span class="mf">0.0001</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Calculate volume share</span>
+            <span class="n">volume_share</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">order</span><span class="o">.</span><span class="n">quantity</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_daily_volume</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">volume_limit</span><span class="p">)</span>
+
+            <span class="c1"># Quadratic impact model (like Zipline)</span>
+            <span class="n">impact</span> <span class="o">=</span> <span class="n">volume_share</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">price_impact</span>
+            <span class="n">slippage_amount</span> <span class="o">=</span> <span class="n">market_price</span> <span class="o">*</span> <span class="n">impact</span>
+
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">+</span> <span class="n">slippage_amount</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">-</span> <span class="n">slippage_amount</span></div>
+
+
+<div class="viewcode-block" id="VolumeShareSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VolumeShareSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="AssetClassSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.AssetClassSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AssetClassSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Asset class specific slippage model.</span>
+
+<span class="sd">    Different slippage rates for different asset classes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        equity_slippage: Slippage for equities (default 0.01%)</span>
+<span class="sd">        future_slippage: Slippage for futures (default 0.02%)</span>
+<span class="sd">        option_slippage: Slippage for options (default 0.05%)</span>
+<span class="sd">        fx_slippage: Slippage for forex (default 0.005%)</span>
+<span class="sd">        crypto_slippage: Slippage for crypto (default 0.1%)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AssetClassSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.AssetClassSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">equity_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0001</span><span class="p">,</span>
+        <span class="n">future_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0002</span><span class="p">,</span>
+        <span class="n">option_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0005</span><span class="p">,</span>
+        <span class="n">fx_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.00005</span><span class="p">,</span>
+        <span class="n">crypto_slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with asset class specific rates.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">slippage_rates</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;equity&quot;</span><span class="p">:</span> <span class="n">equity_slippage</span><span class="p">,</span>
+            <span class="s2">&quot;future&quot;</span><span class="p">:</span> <span class="n">future_slippage</span><span class="p">,</span>
+            <span class="s2">&quot;option&quot;</span><span class="p">:</span> <span class="n">option_slippage</span><span class="p">,</span>
+            <span class="s2">&quot;forex&quot;</span><span class="p">:</span> <span class="n">fx_slippage</span><span class="p">,</span>
+            <span class="s2">&quot;fx&quot;</span><span class="p">:</span> <span class="n">fx_slippage</span><span class="p">,</span>  <span class="c1"># Alias</span>
+            <span class="s2">&quot;crypto&quot;</span><span class="p">:</span> <span class="n">crypto_slippage</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">default_slippage</span> <span class="o">=</span> <span class="n">equity_slippage</span></div>
+
+
+<div class="viewcode-block" id="AssetClassSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.AssetClassSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price based on asset class.&quot;&quot;&quot;</span>
+        <span class="c1"># Get asset class from order metadata or default</span>
+        <span class="n">asset_class</span> <span class="o">=</span> <span class="n">order</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;asset_class&quot;</span><span class="p">,</span> <span class="s2">&quot;equity&quot;</span><span class="p">)</span>
+        <span class="n">slippage_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slippage_rates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">asset_class</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_slippage</span><span class="p">)</span>
+
+        <span class="n">slippage_amount</span> <span class="o">=</span> <span class="n">market_price</span> <span class="o">*</span> <span class="n">slippage_rate</span>
+
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">+</span> <span class="n">slippage_amount</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">-</span> <span class="n">slippage_amount</span></div>
+
+
+<div class="viewcode-block" id="AssetClassSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.AssetClassSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="VectorBTSlippage">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VectorBTSlippage">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VectorBTSlippage</span><span class="p">(</span><span class="n">SlippageModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;VectorBT Pro compatible slippage model.</span>
+
+<span class="sd">    Implements VectorBT&#39;s multiplicative slippage formula exactly:</span>
+<span class="sd">    - Buy orders: adj_price = base_price * (1 + slippage)</span>
+<span class="sd">    - Sell orders: adj_price = base_price * (1 - slippage)</span>
+
+<span class="sd">    This differs from additive models where slippage is added/subtracted.</span>
+<span class="sd">    VectorBT&#39;s approach ensures slippage scales proportionally with price.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        slippage: Slippage as a decimal (e.g., 0.0002 = 0.02% = 2 basis points)</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; # 0.02% slippage on BTC at $50,000</span>
+<span class="sd">        &gt;&gt;&gt; slippage_model = VectorBTSlippage(slippage=0.0002)</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; # Buy order: pay 0.02% MORE</span>
+<span class="sd">        &gt;&gt;&gt; # adj_price = 50000 * (1 + 0.0002) = 50000 * 1.0002 = $50,010</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; # Sell order: receive 0.02% LESS</span>
+<span class="sd">        &gt;&gt;&gt; # adj_price = 50000 * (1 - 0.0002) = 50000 * 0.9998 = $49,990</span>
+
+<span class="sd">    References:</span>
+<span class="sd">        - TASK-010: VectorBT slippage documentation</span>
+<span class="sd">        - vectorbtpro/portfolio/nb/core.py: long_buy_nb() and long_sell_nb()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="VectorBTSlippage.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VectorBTSlippage.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">slippage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize with slippage rate.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            slippage: Slippage as a decimal (e.g., 0.0002 for 0.02%)</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If slippage is negative</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">slippage</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Slippage must be non-negative&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">slippage</span> <span class="o">=</span> <span class="n">slippage</span></div>
+
+
+<div class="viewcode-block" id="VectorBTSlippage.calculate_fill_price">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VectorBTSlippage.calculate_fill_price">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_fill_price</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span> <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Price</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate fill price using VectorBT&#39;s multiplicative formula.</span>
+
+<span class="sd">        Buy orders pay MORE (worse price for buyer):</span>
+<span class="sd">            adj_price = market_price * (1 + slippage)</span>
+
+<span class="sd">        Sell orders receive LESS (worse price for seller):</span>
+<span class="sd">            adj_price = market_price * (1 - slippage)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            order: The order being filled</span>
+<span class="sd">            market_price: Current market price (base price)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Adjusted fill price with slippage applied</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">order</span><span class="o">.</span><span class="n">is_buy</span><span class="p">:</span>
+            <span class="c1"># Buy at higher price (pay more) - multiplicative</span>
+            <span class="k">return</span> <span class="n">market_price</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">slippage</span><span class="p">)</span>
+        <span class="c1"># Sell at lower price (receive less) - multiplicative</span>
+        <span class="k">return</span> <span class="n">market_price</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">slippage</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="VectorBTSlippage.calculate_slippage_cost">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.slippage.VectorBTSlippage.calculate_slippage_cost">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_slippage_cost</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="n">Order</span><span class="p">,</span>
+        <span class="n">fill_quantity</span><span class="p">:</span> <span class="n">Quantity</span><span class="p">,</span>
+        <span class="n">market_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+        <span class="n">fill_price</span><span class="p">:</span> <span class="n">Price</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate slippage cost in currency terms.</span>
+
+<span class="sd">        Cost is the absolute difference between market and fill price,</span>
+<span class="sd">        multiplied by the quantity filled.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            order: The order being filled</span>
+<span class="sd">            fill_quantity: Quantity being filled</span>
+<span class="sd">            market_price: Market price before slippage</span>
+<span class="sd">            fill_price: Actual fill price after slippage</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Slippage cost in currency terms (always positive)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fill_price</span> <span class="o">-</span> <span class="n">market_price</span><span class="p">)</span> <span class="o">*</span> <span class="n">fill_quantity</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

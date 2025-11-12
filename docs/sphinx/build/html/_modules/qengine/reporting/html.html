@@ -1,0 +1,711 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.reporting.html &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.reporting.html</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.reporting.html</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;HTML report generation for QEngine backtests.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.portfolio.accounting</span><span class="w"> </span><span class="kn">import</span> <span class="n">PortfolioAccounting</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.reporting.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">ReportGenerator</span>
+
+
+<div class="viewcode-block" id="HTMLReportGenerator">
+<a class="viewcode-back" href="../../../modules/reporting.html#qengine.reporting.html.HTMLReportGenerator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HTMLReportGenerator</span><span class="p">(</span><span class="n">ReportGenerator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates comprehensive HTML reports for backtest results.</span>
+
+<span class="sd">    Creates interactive reports with:</span>
+<span class="sd">    - Performance summary</span>
+<span class="sd">    - Equity curve charts</span>
+<span class="sd">    - Trade analysis</span>
+<span class="sd">    - Risk metrics</span>
+<span class="sd">    - Asset class breakdown</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HTMLReportGenerator.generate">
+<a class="viewcode-back" href="../../../modules/reporting.html#qengine.reporting.html.HTMLReportGenerator.generate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">accounting</span><span class="p">:</span> <span class="n">PortfolioAccounting</span><span class="p">,</span>
+        <span class="n">strategy_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">backtest_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate HTML report from portfolio accounting data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            accounting: Portfolio accounting with results</span>
+<span class="sd">            strategy_params: Strategy configuration parameters</span>
+<span class="sd">            backtest_params: Backtest configuration parameters</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Path to generated HTML report</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Prepare report data</span>
+        <span class="n">report_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_report_data</span><span class="p">(</span><span class="n">accounting</span><span class="p">,</span> <span class="n">strategy_params</span><span class="p">,</span> <span class="n">backtest_params</span><span class="p">)</span>
+
+        <span class="c1"># Generate HTML content</span>
+        <span class="n">html_content</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_html_content</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span>
+
+        <span class="c1"># Save report</span>
+        <span class="n">report_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">report_name</span><span class="si">}</span><span class="s2">.html&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">report_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">html_content</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">report_path</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_html_content</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate the complete HTML report content.&quot;&quot;&quot;</span>
+        <span class="n">html</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">&lt;!DOCTYPE html&gt;</span>
+<span class="s2">&lt;html lang=&quot;en&quot;&gt;</span>
+<span class="s2">&lt;head&gt;</span>
+<span class="s2">    &lt;meta charset=&quot;UTF-8&quot;&gt;</span>
+<span class="s2">    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;</span>
+<span class="s2">    &lt;title&gt;QEngine Backtest Report - </span><span class="si">{</span><span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;report_name&quot;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/title&gt;</span>
+<span class="s2">    &lt;script src=&quot;https://cdn.plot.ly/plotly-latest.min.js&quot;&gt;&lt;/script&gt;</span>
+<span class="s2">    &lt;style&gt;</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_css_styles</span><span class="p">()</span><span class="si">}</span>
+<span class="s2">    &lt;/style&gt;</span>
+<span class="s2">&lt;/head&gt;</span>
+<span class="s2">&lt;body&gt;</span>
+<span class="s2">    &lt;div class=&quot;container&quot;&gt;</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_header</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_summary_section</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_performance_section</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_charts_section</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_trades_section</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_positions_section</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_risk_section</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_footer</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">    &lt;/div&gt;</span>
+
+<span class="s2">    &lt;script&gt;</span>
+<span class="s2">        </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_generate_javascript</span><span class="p">(</span><span class="n">report_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">    &lt;/script&gt;</span>
+<span class="s2">&lt;/body&gt;</span>
+<span class="s2">&lt;/html&gt;</span>
+<span class="s2">&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">html</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_css_styles</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get CSS styles for the report.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        * {</span>
+<span class="s2">            margin: 0;</span>
+<span class="s2">            padding: 0;</span>
+<span class="s2">            box-sizing: border-box;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        body {</span>
+<span class="s2">            font-family: &#39;Segoe UI&#39;, Tahoma, Geneva, Verdana, sans-serif;</span>
+<span class="s2">            background-color: #f5f5f5;</span>
+<span class="s2">            color: #333;</span>
+<span class="s2">            line-height: 1.6;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .container {</span>
+<span class="s2">            max-width: 1200px;</span>
+<span class="s2">            margin: 0 auto;</span>
+<span class="s2">            padding: 20px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .header {</span>
+<span class="s2">            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);</span>
+<span class="s2">            color: white;</span>
+<span class="s2">            padding: 30px;</span>
+<span class="s2">            border-radius: 10px;</span>
+<span class="s2">            margin-bottom: 30px;</span>
+<span class="s2">            text-align: center;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .header h1 {</span>
+<span class="s2">            font-size: 2.5em;</span>
+<span class="s2">            margin-bottom: 10px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .header .subtitle {</span>
+<span class="s2">            font-size: 1.2em;</span>
+<span class="s2">            opacity: 0.9;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .section {</span>
+<span class="s2">            background: white;</span>
+<span class="s2">            margin-bottom: 30px;</span>
+<span class="s2">            padding: 25px;</span>
+<span class="s2">            border-radius: 10px;</span>
+<span class="s2">            box-shadow: 0 4px 6px rgba(0,0,0,0.1);</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .section h2 {</span>
+<span class="s2">            color: #667eea;</span>
+<span class="s2">            font-size: 1.8em;</span>
+<span class="s2">            margin-bottom: 20px;</span>
+<span class="s2">            border-bottom: 3px solid #667eea;</span>
+<span class="s2">            padding-bottom: 10px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .metrics-grid {</span>
+<span class="s2">            display: grid;</span>
+<span class="s2">            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));</span>
+<span class="s2">            gap: 20px;</span>
+<span class="s2">            margin-bottom: 20px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .metric-card {</span>
+<span class="s2">            background: #f8f9ff;</span>
+<span class="s2">            padding: 20px;</span>
+<span class="s2">            border-radius: 8px;</span>
+<span class="s2">            border-left: 4px solid #667eea;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .metric-label {</span>
+<span class="s2">            font-size: 0.9em;</span>
+<span class="s2">            color: #666;</span>
+<span class="s2">            margin-bottom: 5px;</span>
+<span class="s2">            text-transform: uppercase;</span>
+<span class="s2">            letter-spacing: 0.5px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .metric-value {</span>
+<span class="s2">            font-size: 1.8em;</span>
+<span class="s2">            font-weight: bold;</span>
+<span class="s2">            color: #333;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .metric-value.positive {</span>
+<span class="s2">            color: #28a745;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .metric-value.negative {</span>
+<span class="s2">            color: #dc3545;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .chart-container {</span>
+<span class="s2">            margin: 20px 0;</span>
+<span class="s2">            min-height: 400px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .table-container {</span>
+<span class="s2">            overflow-x: auto;</span>
+<span class="s2">            margin-top: 20px;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        table {</span>
+<span class="s2">            width: 100%;</span>
+<span class="s2">            border-collapse: collapse;</span>
+<span class="s2">            background: white;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        th, td {</span>
+<span class="s2">            padding: 12px;</span>
+<span class="s2">            text-align: left;</span>
+<span class="s2">            border-bottom: 1px solid #ddd;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        th {</span>
+<span class="s2">            background-color: #f8f9ff;</span>
+<span class="s2">            font-weight: 600;</span>
+<span class="s2">            color: #667eea;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        tr:hover {</span>
+<span class="s2">            background-color: #f8f9ff;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .footer {</span>
+<span class="s2">            text-align: center;</span>
+<span class="s2">            color: #666;</span>
+<span class="s2">            font-size: 0.9em;</span>
+<span class="s2">            margin-top: 40px;</span>
+<span class="s2">            padding-top: 20px;</span>
+<span class="s2">            border-top: 1px solid #ddd;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .warning {</span>
+<span class="s2">            background-color: #fff3cd;</span>
+<span class="s2">            border: 1px solid #ffeaa7;</span>
+<span class="s2">            color: #856404;</span>
+<span class="s2">            padding: 15px;</span>
+<span class="s2">            border-radius: 5px;</span>
+<span class="s2">            margin: 15px 0;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        .info {</span>
+<span class="s2">            background-color: #d1ecf1;</span>
+<span class="s2">            border: 1px solid #bee5eb;</span>
+<span class="s2">            color: #0c5460;</span>
+<span class="s2">            padding: 15px;</span>
+<span class="s2">            border-radius: 5px;</span>
+<span class="s2">            margin: 15px 0;</span>
+<span class="s2">        }</span>
+
+<span class="s2">        @media (max-width: 768px) {</span>
+<span class="s2">            .metrics-grid {</span>
+<span class="s2">                grid-template-columns: 1fr;</span>
+<span class="s2">            }</span>
+
+<span class="s2">            .header h1 {</span>
+<span class="s2">                font-size: 2em;</span>
+<span class="s2">            }</span>
+<span class="s2">        }</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_header</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate the report header.&quot;&quot;&quot;</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;header&quot;&gt;</span>
+<span class="s2">            &lt;h1&gt;QEngine Backtest Report&lt;/h1&gt;</span>
+<span class="s2">            &lt;div class=&quot;subtitle&quot;&gt;</span>
+<span class="s2">                </span><span class="si">{</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;report_name&quot;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;br&gt;</span>
+<span class="s2">                Generated: </span><span class="si">{</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;generated_at&quot;</span><span class="p">][:</span><span class="mi">19</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_summary_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate the summary metrics section.&quot;&quot;&quot;</span>
+        <span class="n">perf</span> <span class="o">=</span> <span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;performance&quot;</span><span class="p">]</span>
+        <span class="n">portfolio</span> <span class="o">=</span> <span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;portfolio&quot;</span><span class="p">]</span>
+        <span class="n">costs</span> <span class="o">=</span> <span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;costs&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">            &lt;h2&gt;Performance Summary&lt;/h2&gt;</span>
+<span class="s2">            &lt;div class=&quot;metrics-grid&quot;&gt;</span>
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Total Return&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value </span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;total_return&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;total_return&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Total P&amp;L&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value </span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;total_pnl&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;</span>
+<span class="s2">                        $</span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;total_pnl&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Sharpe Ratio&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value </span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">perf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">perf</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;N/A&quot;</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Max Drawdown&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value negative&quot;&gt;</span>
+<span class="s2">                        -</span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;max_drawdown&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Win Rate&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;win_rate&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Total Trades&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;num_trades&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Final Equity&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        $</span><span class="si">{</span><span class="n">portfolio</span><span class="p">[</span><span class="s2">&quot;final_equity&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Total Commission&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value negative&quot;&gt;</span>
+<span class="s2">                        $</span><span class="si">{</span><span class="n">costs</span><span class="p">[</span><span class="s2">&quot;total_commission&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_performance_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate detailed performance metrics.&quot;&quot;&quot;</span>
+        <span class="n">perf</span> <span class="o">=</span> <span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;performance&quot;</span><span class="p">]</span>
+        <span class="n">costs</span> <span class="o">=</span> <span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;costs&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">            &lt;h2&gt;Detailed Performance&lt;/h2&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;metrics-grid&quot;&gt;</span>
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Realized P&amp;L&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value </span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;realized_pnl&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;</span>
+<span class="s2">                        $</span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;realized_pnl&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Unrealized P&amp;L&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value </span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;</span>
+<span class="s2">                        $</span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Profit Factor&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">perf</span><span class="p">[</span><span class="s2">&quot;profit_factor&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Avg Commission/Trade&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        $</span><span class="si">{</span><span class="n">costs</span><span class="p">[</span><span class="s2">&quot;avg_commission_per_trade&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_charts_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate charts section.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">            &lt;h2&gt;Charts&lt;/h2&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;chart-container&quot;&gt;</span>
+<span class="s2">                &lt;div id=&quot;equity-curve-chart&quot;&gt;&lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;chart-container&quot;&gt;</span>
+<span class="s2">                &lt;div id=&quot;returns-chart&quot;&gt;&lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_trades_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate trades analysis section.&quot;&quot;&quot;</span>
+        <span class="n">trades_df</span> <span class="o">=</span> <span class="n">report_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trades&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">trades_df</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">trades_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">                &lt;h2&gt;Trade Analysis&lt;/h2&gt;</span>
+<span class="s2">                &lt;div class=&quot;info&quot;&gt;No trades found in this backtest.&lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">            &quot;&quot;&quot;</span>
+
+        <span class="c1"># Get first few trades for display</span>
+        <span class="n">display_trades</span> <span class="o">=</span> <span class="n">trades_df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span><span class="o">.</span><span class="n">to_dicts</span><span class="p">()</span>
+
+        <span class="n">trades_html</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">trade</span> <span class="ow">in</span> <span class="n">display_trades</span><span class="p">:</span>
+            <span class="n">trades_html</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;tr&gt;</span>
+<span class="s2">                &lt;td&gt;</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;asset_id&quot;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;side&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;quantity&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;$</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;price&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;$</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;commission&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;$</span><span class="si">{</span><span class="n">trade</span><span class="p">[</span><span class="s2">&quot;total_cost&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">            &lt;/tr&gt;</span>
+<span class="s2">            &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">            &lt;h2&gt;Trade Analysis&lt;/h2&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;info&quot;&gt;</span>
+<span class="s2">                Showing first 20 trades out of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">trades_df</span><span class="p">)</span><span class="si">}</span><span class="s2"> total trades.</span>
+<span class="s2">            &lt;/div&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;table-container&quot;&gt;</span>
+<span class="s2">                &lt;table&gt;</span>
+<span class="s2">                    &lt;thead&gt;</span>
+<span class="s2">                        &lt;tr&gt;</span>
+<span class="s2">                            &lt;th&gt;Timestamp&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Asset&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Side&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Quantity&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Price&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Commission&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Total Cost&lt;/th&gt;</span>
+<span class="s2">                        &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/thead&gt;</span>
+<span class="s2">                    &lt;tbody&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">trades_html</span><span class="si">}</span>
+<span class="s2">                    &lt;/tbody&gt;</span>
+<span class="s2">                &lt;/table&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_positions_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate current positions section.&quot;&quot;&quot;</span>
+        <span class="n">positions_df</span> <span class="o">=</span> <span class="n">report_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;positions&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">positions_df</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">positions_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">                &lt;h2&gt;Current Positions&lt;/h2&gt;</span>
+<span class="s2">                &lt;div class=&quot;info&quot;&gt;No open positions at end of backtest.&lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">            &quot;&quot;&quot;</span>
+
+        <span class="n">positions_html</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">positions_df</span><span class="o">.</span><span class="n">to_dicts</span><span class="p">():</span>
+            <span class="n">positions_html</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            &lt;tr&gt;</span>
+<span class="s2">                &lt;td&gt;</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;asset_id&quot;</span><span class="p">]</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;quantity&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;$</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;cost_basis&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;$</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;last_price&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td&gt;$</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;market_value&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td class=&quot;</span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;$</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">                &lt;td class=&quot;</span><span class="si">{</span><span class="s2">&quot;positive&quot;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;total_pnl&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s2">&quot;negative&quot;</span><span class="si">}</span><span class="s2">&quot;&gt;$</span><span class="si">{</span><span class="n">pos</span><span class="p">[</span><span class="s2">&quot;total_pnl&quot;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&lt;/td&gt;</span>
+<span class="s2">            &lt;/tr&gt;</span>
+<span class="s2">            &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">            &lt;h2&gt;Current Positions&lt;/h2&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;table-container&quot;&gt;</span>
+<span class="s2">                &lt;table&gt;</span>
+<span class="s2">                    &lt;thead&gt;</span>
+<span class="s2">                        &lt;tr&gt;</span>
+<span class="s2">                            &lt;th&gt;Asset&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Quantity&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Cost Basis&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Last Price&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Market Value&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Unrealized P&amp;L&lt;/th&gt;</span>
+<span class="s2">                            &lt;th&gt;Total P&amp;L&lt;/th&gt;</span>
+<span class="s2">                        &lt;/tr&gt;</span>
+<span class="s2">                    &lt;/thead&gt;</span>
+<span class="s2">                    &lt;tbody&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">positions_html</span><span class="si">}</span>
+<span class="s2">                    &lt;/tbody&gt;</span>
+<span class="s2">                &lt;/table&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_risk_section</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate risk metrics section.&quot;&quot;&quot;</span>
+        <span class="n">risk</span> <span class="o">=</span> <span class="n">report_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;risk&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;section&quot;&gt;</span>
+<span class="s2">            &lt;h2&gt;Risk Metrics&lt;/h2&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;metrics-grid&quot;&gt;</span>
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Max Leverage&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">risk</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_leverage&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">x</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+
+<span class="s2">                &lt;div class=&quot;metric-card&quot;&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-label&quot;&gt;Max Concentration&lt;/div&gt;</span>
+<span class="s2">                    &lt;div class=&quot;metric-value&quot;&gt;</span>
+<span class="s2">                        </span><span class="si">{</span><span class="n">risk</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_concentration&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">)</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span>
+<span class="s2">                    &lt;/div&gt;</span>
+<span class="s2">                &lt;/div&gt;</span>
+<span class="s2">            &lt;/div&gt;</span>
+
+<span class="s2">            &lt;div class=&quot;warning&quot;&gt;</span>
+<span class="s2">                &lt;strong&gt;Risk Disclaimer:&lt;/strong&gt; Past performance does not guarantee future results.</span>
+<span class="s2">                All trading involves risk of loss.</span>
+<span class="s2">            &lt;/div&gt;</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_footer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate report footer.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;div class=&quot;footer&quot;&gt;</span>
+<span class="s2">            Report generated by QEngine Backtesting Framework&lt;br&gt;</span>
+<span class="s2">            Generated at: </span><span class="si">{</span><span class="n">report_data</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;generated_at&quot;</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">        &lt;/div&gt;</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_javascript</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">report_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate JavaScript for interactive charts.&quot;&quot;&quot;</span>
+        <span class="n">equity_df</span> <span class="o">=</span> <span class="n">report_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;equity_curve&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">equity_df</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">equity_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;// No data available for charts&quot;</span>
+
+        <span class="c1"># Convert DataFrame to JSON for JavaScript</span>
+        <span class="n">equity_data</span> <span class="o">=</span> <span class="n">equity_df</span><span class="o">.</span><span class="n">to_dicts</span><span class="p">()</span>
+
+        <span class="c1"># Convert datetime objects to strings for JSON serialization</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">equity_data</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;timestamp&quot;</span> <span class="ow">in</span> <span class="n">item</span><span class="p">:</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        // Equity curve chart</span>
+<span class="s2">        const equityData = </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">equity_data</span><span class="p">)</span><span class="si">}</span><span class="s2">;</span>
+
+<span class="s2">        const equityTrace = </span><span class="se">{{</span>
+<span class="s2">            x: equityData.map(d =&gt; d.timestamp),</span>
+<span class="s2">            y: equityData.map(d =&gt; d.equity),</span>
+<span class="s2">            type: &#39;scatter&#39;,</span>
+<span class="s2">            mode: &#39;lines&#39;,</span>
+<span class="s2">            name: &#39;Equity&#39;,</span>
+<span class="s2">            line: </span><span class="se">{{</span>
+<span class="s2">                color: &#39;#667eea&#39;,</span>
+<span class="s2">                width: 2</span>
+<span class="s2">            </span><span class="se">}}</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">;</span>
+
+<span class="s2">        const equityLayout = </span><span class="se">{{</span>
+<span class="s2">            title: &#39;Equity Curve&#39;,</span>
+<span class="s2">            xaxis: </span><span class="se">{{</span><span class="s2"> title: &#39;Date&#39; </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">            yaxis: </span><span class="se">{{</span><span class="s2"> title: &#39;Portfolio Value ($)&#39; </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">            margin: </span><span class="se">{{</span><span class="s2"> t: 50 </span><span class="se">}}</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">;</span>
+
+<span class="s2">        Plotly.newPlot(&#39;equity-curve-chart&#39;, [equityTrace], equityLayout);</span>
+
+<span class="s2">        // Returns chart</span>
+<span class="s2">        const returnsTrace = </span><span class="se">{{</span>
+<span class="s2">            x: equityData.map(d =&gt; d.timestamp).slice(1),</span>
+<span class="s2">            y: equityData.map(d =&gt; d.returns).slice(1),</span>
+<span class="s2">            type: &#39;scatter&#39;,</span>
+<span class="s2">            mode: &#39;markers&#39;,</span>
+<span class="s2">            name: &#39;Daily Returns&#39;,</span>
+<span class="s2">            marker: </span><span class="se">{{</span>
+<span class="s2">                color: equityData.map(d =&gt; d.returns &gt; 0 ? &#39;#28a745&#39; : &#39;#dc3545&#39;).slice(1),</span>
+<span class="s2">                size: 4</span>
+<span class="s2">            </span><span class="se">}}</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">;</span>
+
+<span class="s2">        const returnsLayout = </span><span class="se">{{</span>
+<span class="s2">            title: &#39;Daily Returns Distribution&#39;,</span>
+<span class="s2">            xaxis: </span><span class="se">{{</span><span class="s2"> title: &#39;Date&#39; </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">            yaxis: </span><span class="se">{{</span><span class="s2"> title: &#39;Daily Return&#39; </span><span class="se">}}</span><span class="s2">,</span>
+<span class="s2">            margin: </span><span class="se">{{</span><span class="s2"> t: 50 </span><span class="se">}}</span>
+<span class="s2">        </span><span class="se">}}</span><span class="s2">;</span>
+
+<span class="s2">        Plotly.newPlot(&#39;returns-chart&#39;, [returnsTrace], returnsLayout);</span>
+<span class="s2">        &quot;&quot;&quot;</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

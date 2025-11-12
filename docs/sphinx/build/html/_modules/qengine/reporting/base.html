@@ -1,0 +1,231 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.reporting.base &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.reporting.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.reporting.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Base reporting functionality for QEngine.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.portfolio.accounting</span><span class="w"> </span><span class="kn">import</span> <span class="n">PortfolioAccounting</span>
+
+
+<div class="viewcode-block" id="ReportGenerator">
+<a class="viewcode-back" href="../../../modules/reporting.html#qengine.reporting.base.ReportGenerator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ReportGenerator</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstract base class for report generation.</span>
+
+<span class="sd">    Different report formats (HTML, Parquet, JSON) should implement this interface.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ReportGenerator.__init__">
+<a class="viewcode-back" href="../../../modules/reporting.html#qengine.reporting.base.ReportGenerator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">report_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize report generator.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            output_dir: Directory to save reports</span>
+<span class="sd">            report_name: Base name for report files</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span> <span class="k">if</span> <span class="n">output_dir</span> <span class="k">else</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;reports&quot;</span>
+        <span class="c1"># Report name will use timestamp from first event if not provided</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">report_name</span> <span class="o">=</span> <span class="n">report_name</span> <span class="ow">or</span> <span class="s2">&quot;backtest_report&quot;</span>
+
+        <span class="c1"># Ensure output directory exists</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ReportGenerator.generate">
+<a class="viewcode-back" href="../../../modules/reporting.html#qengine.reporting.base.ReportGenerator.generate">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">accounting</span><span class="p">:</span> <span class="n">PortfolioAccounting</span><span class="p">,</span>
+        <span class="n">strategy_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">backtest_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate report from portfolio accounting data.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            accounting: Portfolio accounting with results</span>
+<span class="sd">            strategy_params: Strategy configuration parameters</span>
+<span class="sd">            backtest_params: Backtest configuration parameters</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Path to generated report</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prepare_report_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">accounting</span><span class="p">:</span> <span class="n">PortfolioAccounting</span><span class="p">,</span>
+        <span class="n">strategy_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">backtest_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare standardized report data from accounting.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            accounting: Portfolio accounting instance</span>
+<span class="sd">            strategy_params: Strategy parameters</span>
+<span class="sd">            backtest_params: Backtest parameters</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dictionary with report data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Get performance metrics</span>
+        <span class="n">metrics</span> <span class="o">=</span> <span class="n">accounting</span><span class="o">.</span><span class="n">get_performance_metrics</span><span class="p">()</span>
+
+        <span class="c1"># Get summary data</span>
+        <span class="n">summary</span> <span class="o">=</span> <span class="n">accounting</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span>
+
+        <span class="c1"># Prepare report data structure</span>
+        <span class="n">report_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;report_name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">report_name</span><span class="p">,</span>
+                <span class="s2">&quot;generated_at&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>  <span class="c1"># Wall clock time for report generation</span>
+                <span class="s2">&quot;strategy_params&quot;</span><span class="p">:</span> <span class="n">strategy_params</span> <span class="ow">or</span> <span class="p">{},</span>
+                <span class="s2">&quot;backtest_params&quot;</span><span class="p">:</span> <span class="n">backtest_params</span> <span class="ow">or</span> <span class="p">{},</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;performance&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;total_return&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;total_return&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;total_pnl&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;total_pnl&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;realized_pnl&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;realized_pnl&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unrealized_pnl&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;max_drawdown&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_drawdown&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sharpe_ratio&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;num_trades&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_trades&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                <span class="s2">&quot;win_rate&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">calculate_win_rate</span><span class="p">(),</span>
+                <span class="s2">&quot;profit_factor&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">calculate_profit_factor</span><span class="p">(),</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;costs&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;total_commission&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;total_commission&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;total_slippage&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;total_slippage&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;avg_commission_per_trade&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">calculate_avg_commission</span><span class="p">(),</span>
+                <span class="s2">&quot;avg_slippage_per_trade&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">calculate_avg_slippage</span><span class="p">(),</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;portfolio&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;initial_cash&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">portfolio</span><span class="o">.</span><span class="n">initial_cash</span><span class="p">,</span>
+                <span class="s2">&quot;final_equity&quot;</span><span class="p">:</span> <span class="n">summary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;equity&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;final_cash&quot;</span><span class="p">:</span> <span class="n">summary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cash&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="s2">&quot;num_positions&quot;</span><span class="p">:</span> <span class="n">summary</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;positions&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;risk&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;max_leverage&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_leverage&quot;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+                <span class="s2">&quot;max_concentration&quot;</span><span class="p">:</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_concentration&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;trades&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">get_trades_df</span><span class="p">(),</span>
+            <span class="s2">&quot;equity_curve&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">get_equity_curve_df</span><span class="p">(),</span>
+            <span class="s2">&quot;positions&quot;</span><span class="p">:</span> <span class="n">accounting</span><span class="o">.</span><span class="n">get_positions_df</span><span class="p">(),</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">report_data</span></div>
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

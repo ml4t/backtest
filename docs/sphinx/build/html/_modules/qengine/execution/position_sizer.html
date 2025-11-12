@@ -1,0 +1,442 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.execution.position_sizer &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.execution.position_sizer</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.execution.position_sizer</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Position sizing models for order quantity calculation.</span>
+
+<span class="sd">This module implements various position sizing strategies, including VectorBT&#39;s</span>
+<span class="sd">size=np.inf behavior which allocates maximum available capital.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Price</span><span class="p">,</span> <span class="n">Quantity</span><span class="p">,</span> <span class="n">Cash</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qengine.execution.order</span><span class="w"> </span><span class="kn">import</span> <span class="n">Order</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qengine.execution.commission</span><span class="w"> </span><span class="kn">import</span> <span class="n">CommissionModel</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qengine.execution.slippage</span><span class="w"> </span><span class="kn">import</span> <span class="n">SlippageModel</span>
+
+
+<div class="viewcode-block" id="PositionSizer">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PositionSizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PositionSizer</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for position sizing models.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PositionSizer.calculate_quantity">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PositionSizer.calculate_quantity">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_quantity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">price</span><span class="p">:</span> <span class="s2">&quot;Price&quot;</span><span class="p">,</span>
+        <span class="n">available_cash</span><span class="p">:</span> <span class="s2">&quot;Cash&quot;</span><span class="p">,</span>
+        <span class="n">commission_model</span><span class="p">:</span> <span class="s2">&quot;CommissionModel&quot;</span><span class="p">,</span>
+        <span class="n">slippage_model</span><span class="p">:</span> <span class="s2">&quot;SlippageModel&quot;</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="s2">&quot;Order&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Quantity&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate position size for an order.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            price: Current market price (base price before slippage)</span>
+<span class="sd">            available_cash: Available cash for the trade</span>
+<span class="sd">            commission_model: Commission model to estimate fees</span>
+<span class="sd">            slippage_model: Slippage model to estimate price adjustment</span>
+<span class="sd">            order: The order being sized (contains side, asset_id, etc.)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Quantity to trade (always positive, sign handled by order side)</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="PositionSizer.__repr__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PositionSizer.__repr__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;String representation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">()&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FixedQuantitySizer">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.FixedQuantitySizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FixedQuantitySizer</span><span class="p">(</span><span class="n">PositionSizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fixed quantity position sizer.</span>
+
+<span class="sd">    Always returns the same quantity regardless of cash or price.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="FixedQuantitySizer.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.FixedQuantitySizer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">quantity</span><span class="p">:</span> <span class="s2">&quot;Quantity&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize fixed quantity sizer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            quantity: Fixed quantity to trade</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">quantity</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Quantity must be positive&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">quantity</span> <span class="o">=</span> <span class="n">quantity</span></div>
+
+
+<div class="viewcode-block" id="FixedQuantitySizer.calculate_quantity">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.FixedQuantitySizer.calculate_quantity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_quantity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">price</span><span class="p">:</span> <span class="s2">&quot;Price&quot;</span><span class="p">,</span>
+        <span class="n">available_cash</span><span class="p">:</span> <span class="s2">&quot;Cash&quot;</span><span class="p">,</span>
+        <span class="n">commission_model</span><span class="p">:</span> <span class="s2">&quot;CommissionModel&quot;</span><span class="p">,</span>
+        <span class="n">slippage_model</span><span class="p">:</span> <span class="s2">&quot;SlippageModel&quot;</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="s2">&quot;Order&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Quantity&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return fixed quantity.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">quantity</span></div>
+
+
+<div class="viewcode-block" id="FixedQuantitySizer.__repr__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.FixedQuantitySizer.__repr__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;String representation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;FixedQuantitySizer(quantity=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">quantity</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="VectorBTInfiniteSizer">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.VectorBTInfiniteSizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">VectorBTInfiniteSizer</span><span class="p">(</span><span class="n">PositionSizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;VectorBT Pro size=np.inf position sizer.</span>
+
+<span class="sd">    Calculates maximum position size that can be purchased with available cash,</span>
+<span class="sd">    accounting for fees, slippage, and granularity constraints.</span>
+
+<span class="sd">    This replicates VectorBT Pro&#39;s size=np.inf behavior exactly:</span>
+<span class="sd">    1. Apply slippage to base price</span>
+<span class="sd">    2. Reserve cash for fixed fees</span>
+<span class="sd">    3. Calculate fee-adjusted cash</span>
+<span class="sd">    4. Calculate maximum size</span>
+<span class="sd">    5. Round down to granularity</span>
+<span class="sd">    6. Recalculate actual fees</span>
+
+<span class="sd">    Formula:</span>
+<span class="sd">        adj_price = base_price * (1 + slippage)</span>
+<span class="sd">        max_req_cash = (cash_limit - fixed_fees) / (1 + fee_rate)</span>
+<span class="sd">        max_size = max_req_cash / adj_price</span>
+<span class="sd">        final_size = floor(max_size / granularity) * granularity</span>
+
+<span class="sd">    Reference: TASK-011 completion document</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="VectorBTInfiniteSizer.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.VectorBTInfiniteSizer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">granularity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.001</span><span class="p">,</span>
+        <span class="n">allow_partial</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize VectorBT infinite sizer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            granularity: Minimum quantity increment (e.g., 0.001 BTC)</span>
+<span class="sd">            allow_partial: If False, reject orders that can&#39;t fill full granularity</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">granularity</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Granularity must be positive&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">granularity</span> <span class="o">=</span> <span class="n">granularity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">allow_partial</span> <span class="o">=</span> <span class="n">allow_partial</span></div>
+
+
+<div class="viewcode-block" id="VectorBTInfiniteSizer.calculate_quantity">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.VectorBTInfiniteSizer.calculate_quantity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_quantity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">price</span><span class="p">:</span> <span class="s2">&quot;Price&quot;</span><span class="p">,</span>
+        <span class="n">available_cash</span><span class="p">:</span> <span class="s2">&quot;Cash&quot;</span><span class="p">,</span>
+        <span class="n">commission_model</span><span class="p">:</span> <span class="s2">&quot;CommissionModel&quot;</span><span class="p">,</span>
+        <span class="n">slippage_model</span><span class="p">:</span> <span class="s2">&quot;SlippageModel&quot;</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="s2">&quot;Order&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Quantity&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate maximum quantity using VectorBT formula.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            price: Base market price (before slippage)</span>
+<span class="sd">            available_cash: Cash available for trade</span>
+<span class="sd">            commission_model: Commission model for fee estimation</span>
+<span class="sd">            slippage_model: Slippage model for price adjustment</span>
+<span class="sd">            order: Order being sized</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Maximum quantity that can be purchased, rounded to granularity</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If insufficient cash to cover fees or minimum quantity</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Step 1: Apply slippage to get adjusted price</span>
+        <span class="n">adj_price</span> <span class="o">=</span> <span class="n">slippage_model</span><span class="o">.</span><span class="n">calculate_fill_price</span><span class="p">(</span>
+            <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+            <span class="n">market_price</span><span class="o">=</span><span class="n">price</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">adj_price</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid adjusted price: </span><span class="si">{</span><span class="n">adj_price</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Step 2: Estimate fixed fees (if commission model supports it)</span>
+        <span class="c1"># For two-component models like VectorBTCommission, we need to get fixed_fee</span>
+        <span class="n">fixed_fees</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">fee_rate</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Try to extract fixed fee and rate from commission model</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">commission_model</span><span class="p">,</span> <span class="s1">&#39;fixed_fee&#39;</span><span class="p">):</span>
+            <span class="n">fixed_fees</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">fixed_fee</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">commission_model</span><span class="p">,</span> <span class="s1">&#39;fee_rate&#39;</span><span class="p">):</span>
+            <span class="n">fee_rate</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">fee_rate</span>
+        <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">commission_model</span><span class="p">,</span> <span class="s1">&#39;rate&#39;</span><span class="p">):</span>
+            <span class="n">fee_rate</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">rate</span>
+        <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">commission_model</span><span class="p">,</span> <span class="s1">&#39;commission&#39;</span><span class="p">):</span>
+            <span class="c1"># Flat commission models - treat as fixed fee</span>
+            <span class="n">fixed_fees</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">commission</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Fallback: estimate using a small quantity</span>
+            <span class="n">test_commission</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">calculate</span><span class="p">(</span>
+                <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+                <span class="n">fill_quantity</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
+                <span class="n">fill_price</span><span class="o">=</span><span class="n">adj_price</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># If commission is non-zero, treat as percentage</span>
+            <span class="k">if</span> <span class="n">test_commission</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">test_value</span> <span class="o">=</span> <span class="mf">0.001</span> <span class="o">*</span> <span class="n">adj_price</span>
+                <span class="n">fee_rate</span> <span class="o">=</span> <span class="n">test_commission</span> <span class="o">/</span> <span class="n">test_value</span>
+
+        <span class="c1"># Step 3: Calculate fee-adjusted cash</span>
+        <span class="n">max_req_cash</span> <span class="o">=</span> <span class="p">(</span><span class="n">available_cash</span> <span class="o">-</span> <span class="n">fixed_fees</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">fee_rate</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">max_req_cash</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Insufficient cash to cover fees: available=</span><span class="si">{</span><span class="n">available_cash</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;fixed_fees=</span><span class="si">{</span><span class="n">fixed_fees</span><span class="si">}</span><span class="s2">, fee_rate=</span><span class="si">{</span><span class="n">fee_rate</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Step 4: Calculate maximum size</span>
+        <span class="n">max_size</span> <span class="o">=</span> <span class="n">max_req_cash</span> <span class="o">/</span> <span class="n">adj_price</span>
+
+        <span class="k">if</span> <span class="n">max_size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid max_size: </span><span class="si">{</span><span class="n">max_size</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Step 5: Apply granularity (round down)</span>
+        <span class="n">final_size</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">max_size</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">granularity</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">granularity</span>
+
+        <span class="c1"># Check if we have at least one granularity unit</span>
+        <span class="k">if</span> <span class="n">final_size</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">granularity</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">allow_partial</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Insufficient cash for minimum quantity: &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;max_size=</span><span class="si">{</span><span class="n">max_size</span><span class="si">}</span><span class="s2">, granularity=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">granularity</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="c1"># Allow zero quantity (will be rejected by broker)</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Step 6: Verify total cost doesn&#39;t exceed available cash</span>
+        <span class="c1"># (This is a sanity check - formula should guarantee it)</span>
+        <span class="n">order_value</span> <span class="o">=</span> <span class="n">final_size</span> <span class="o">*</span> <span class="n">adj_price</span>
+        <span class="n">actual_commission</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">calculate</span><span class="p">(</span>
+            <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+            <span class="n">fill_quantity</span><span class="o">=</span><span class="n">final_size</span><span class="p">,</span>
+            <span class="n">fill_price</span><span class="o">=</span><span class="n">adj_price</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">total_cost</span> <span class="o">=</span> <span class="n">order_value</span> <span class="o">+</span> <span class="n">actual_commission</span>
+
+        <span class="k">if</span> <span class="n">total_cost</span> <span class="o">&gt;</span> <span class="n">available_cash</span><span class="p">:</span>
+            <span class="c1"># This should never happen if formula is correct, but be defensive</span>
+            <span class="c1"># Reduce size by one granularity unit</span>
+            <span class="n">final_size</span> <span class="o">=</span> <span class="n">final_size</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">granularity</span>
+            <span class="k">if</span> <span class="n">final_size</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">granularity</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Cannot reduce size further: cost=</span><span class="si">{</span><span class="n">total_cost</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;cash=</span><span class="si">{</span><span class="n">available_cash</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">final_size</span></div>
+
+
+<div class="viewcode-block" id="VectorBTInfiniteSizer.__repr__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.VectorBTInfiniteSizer.__repr__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;String representation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;VectorBTInfiniteSizer(granularity=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">granularity</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;allow_partial=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">allow_partial</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PercentageOfEquitySizer">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PercentageOfEquitySizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PercentageOfEquitySizer</span><span class="p">(</span><span class="n">PositionSizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Size positions as percentage of total equity.</span>
+
+<span class="sd">    Useful for Kelly criterion or risk-based position sizing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PercentageOfEquitySizer.__init__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PercentageOfEquitySizer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">percentage</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize percentage of equity sizer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            percentage: Fraction of equity to allocate (0.1 = 10%)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">percentage</span> <span class="o">&lt;=</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Percentage must be between 0 and 1&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">percentage</span> <span class="o">=</span> <span class="n">percentage</span></div>
+
+
+<div class="viewcode-block" id="PercentageOfEquitySizer.calculate_quantity">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PercentageOfEquitySizer.calculate_quantity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_quantity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">price</span><span class="p">:</span> <span class="s2">&quot;Price&quot;</span><span class="p">,</span>
+        <span class="n">available_cash</span><span class="p">:</span> <span class="s2">&quot;Cash&quot;</span><span class="p">,</span>
+        <span class="n">commission_model</span><span class="p">:</span> <span class="s2">&quot;CommissionModel&quot;</span><span class="p">,</span>
+        <span class="n">slippage_model</span><span class="p">:</span> <span class="s2">&quot;SlippageModel&quot;</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="s2">&quot;Order&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Quantity&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate quantity as percentage of equity.</span>
+
+<span class="sd">        Note: This uses available_cash as proxy for equity.</span>
+<span class="sd">        For accurate equity, pass (cash + position_value) as available_cash.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Apply slippage to get adjusted price</span>
+        <span class="n">adj_price</span> <span class="o">=</span> <span class="n">slippage_model</span><span class="o">.</span><span class="n">calculate_fill_price</span><span class="p">(</span>
+            <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+            <span class="n">market_price</span><span class="o">=</span><span class="n">price</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Calculate target value</span>
+        <span class="n">target_value</span> <span class="o">=</span> <span class="n">available_cash</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">percentage</span>
+
+        <span class="c1"># Estimate fees - check for both &#39;fee_rate&#39; (VectorBTCommission) and &#39;rate&#39; (PercentageCommission)</span>
+        <span class="n">fee_rate</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">commission_model</span><span class="p">,</span> <span class="s1">&#39;fee_rate&#39;</span><span class="p">):</span>
+            <span class="n">fee_rate</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">fee_rate</span>
+        <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">commission_model</span><span class="p">,</span> <span class="s1">&#39;rate&#39;</span><span class="p">):</span>
+            <span class="n">fee_rate</span> <span class="o">=</span> <span class="n">commission_model</span><span class="o">.</span><span class="n">rate</span>
+
+        <span class="c1"># Adjust for fees</span>
+        <span class="n">target_value_after_fees</span> <span class="o">=</span> <span class="n">target_value</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">fee_rate</span><span class="p">)</span>
+
+        <span class="c1"># Calculate quantity</span>
+        <span class="n">quantity</span> <span class="o">=</span> <span class="n">target_value_after_fees</span> <span class="o">/</span> <span class="n">adj_price</span>
+
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">quantity</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PercentageOfEquitySizer.__repr__">
+<a class="viewcode-back" href="../../../modules/execution.html#qengine.execution.position_sizer.PercentageOfEquitySizer.__repr__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;String representation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;PercentageOfEquitySizer(percentage=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">percentage</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

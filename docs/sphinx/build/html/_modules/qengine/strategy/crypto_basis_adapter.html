@@ -1,0 +1,625 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.strategy.crypto_basis_adapter &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.strategy.crypto_basis_adapter</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.strategy.crypto_basis_adapter</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Crypto Basis Strategy QEngine Adapter</span>
+<span class="sd">=====================================</span>
+
+<span class="sd">Adapter that integrates the CryptoBasisStrategy with QEngine&#39;s event-driven architecture.</span>
+<span class="sd">This allows the basis trading strategy to run within QEngine and benefit from</span>
+<span class="sd">advanced execution models, slippage simulation, and commission structures.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssetId</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.strategy.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DataFrameAdapter</span><span class="p">,</span>
+    <span class="n">ExternalStrategyInterface</span><span class="p">,</span>
+    <span class="n">PITData</span><span class="p">,</span>
+    <span class="n">StrategySignal</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="BasisState">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.BasisState">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BasisState</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;State tracking for basis calculations.&quot;&quot;&quot;</span>
+
+    <span class="n">spot_prices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">futures_prices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">timestamps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">basis_history</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="c1"># Rolling statistics</span>
+    <span class="n">basis_mean</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">basis_std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">current_z_score</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># Position tracking</span>
+    <span class="n">current_position</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">entry_basis</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">entry_timestamp</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="CryptoBasisExternalStrategy">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisExternalStrategy">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CryptoBasisExternalStrategy</span><span class="p">(</span><span class="n">ExternalStrategyInterface</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    External strategy implementation for crypto basis trading.</span>
+
+<span class="sd">    This wraps the original CryptoBasisStrategy logic in the interface</span>
+<span class="sd">    required for QEngine integration.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="CryptoBasisExternalStrategy.__init__">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisExternalStrategy.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">spot_asset_id</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">=</span> <span class="s2">&quot;BTC&quot;</span><span class="p">,</span>
+        <span class="n">futures_asset_id</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">=</span> <span class="s2">&quot;BTC_FUTURE&quot;</span><span class="p">,</span>
+        <span class="n">lookback_window</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">120</span><span class="p">,</span>
+        <span class="n">entry_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">exit_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">max_position</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span>
+        <span class="n">min_data_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize crypto basis strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            spot_asset_id: Asset ID for spot prices</span>
+<span class="sd">            futures_asset_id: Asset ID for futures prices</span>
+<span class="sd">            lookback_window: Number of periods for rolling statistics</span>
+<span class="sd">            entry_threshold: Z-score threshold for entry</span>
+<span class="sd">            exit_threshold: Z-score threshold for exit</span>
+<span class="sd">            max_position: Maximum position size</span>
+<span class="sd">            min_data_points: Minimum data points before generating signals</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span> <span class="o">=</span> <span class="n">spot_asset_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span> <span class="o">=</span> <span class="n">futures_asset_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lookback_window</span> <span class="o">=</span> <span class="n">lookback_window</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span> <span class="o">=</span> <span class="n">entry_threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">exit_threshold</span> <span class="o">=</span> <span class="n">exit_threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_position</span> <span class="o">=</span> <span class="n">max_position</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_data_points</span> <span class="o">=</span> <span class="n">min_data_points</span>
+
+        <span class="c1"># State</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">BasisState</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">volatility_lookback</span> <span class="o">=</span> <span class="mi">20</span></div>
+
+
+<div class="viewcode-block" id="CryptoBasisExternalStrategy.initialize">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisExternalStrategy.initialize">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize strategy state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">BasisState</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="CryptoBasisExternalStrategy.finalize">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisExternalStrategy.finalize">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">finalize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Cleanup strategy state.&quot;&quot;&quot;</span>
+        <span class="c1"># Log final statistics</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">:</span>
+            <span class="n">total_signals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">([</span><span class="n">b</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span> <span class="k">if</span> <span class="n">b</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">])</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[CryptoBasisStrategy] Generated </span><span class="si">{</span><span class="n">total_signals</span><span class="si">}</span><span class="s2"> signals&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[CryptoBasisStrategy] Final position: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CryptoBasisExternalStrategy.generate_signal">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisExternalStrategy.generate_signal">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_signal</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span>
+        <span class="n">pit_data</span><span class="p">:</span> <span class="n">PITData</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StrategySignal</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate trading signal based on basis analysis.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            timestamp: Current timestamp</span>
+<span class="sd">            pit_data: Point-in-time data snapshot</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Trading signal or None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Get current prices</span>
+        <span class="n">spot_price</span> <span class="o">=</span> <span class="n">pit_data</span><span class="o">.</span><span class="n">get_price</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span><span class="p">)</span>
+        <span class="n">futures_price</span> <span class="o">=</span> <span class="n">pit_data</span><span class="o">.</span><span class="n">get_price</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">spot_price</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">futures_price</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># Update state with new data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_state</span><span class="p">(</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">spot_price</span><span class="p">,</span> <span class="n">futures_price</span><span class="p">)</span>
+
+        <span class="c1"># Calculate current statistics if we have enough data</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_statistics</span><span class="p">()</span>
+
+        <span class="c1"># Need minimum data points for signal generation</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_data_points</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># Generate signal</span>
+        <span class="n">signal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_basis_signal</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">signal</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_state</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span>
+        <span class="n">spot_price</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">futures_price</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update internal state with new price data.&quot;&quot;&quot;</span>
+        <span class="c1"># Calculate basis</span>
+        <span class="n">basis</span> <span class="o">=</span> <span class="n">futures_price</span> <span class="o">-</span> <span class="n">spot_price</span>
+
+        <span class="c1"># Update history</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">timestamps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">spot_prices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spot_price</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">futures_prices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">futures_price</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span>
+
+        <span class="c1"># Maintain window size</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">lookback_window</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">timestamps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">timestamps</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">lookback_window</span> <span class="p">:]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">spot_prices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">spot_prices</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">lookback_window</span> <span class="p">:]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">futures_prices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">futures_prices</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">lookback_window</span> <span class="p">:]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">lookback_window</span> <span class="p">:]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_calculate_statistics</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate rolling statistics for basis.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">basis_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">)</span>
+
+        <span class="c1"># Rolling mean and std</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">basis_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">basis_array</span><span class="p">)</span>
+
+        <span class="c1"># Current z-score</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_std</span> <span class="o">&gt;</span> <span class="mf">1e-8</span><span class="p">:</span>  <span class="c1"># Avoid division by zero</span>
+            <span class="n">current_basis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_z_score</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">current_basis</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_mean</span>
+            <span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_std</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_z_score</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_basis_signal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StrategySignal</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate trading signal based on basis z-score.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_z_score</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">z_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_z_score</span>
+        <span class="n">current_basis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Calculate volatility for position sizing</span>
+        <span class="n">spot_returns</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">spot_prices</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">volatility_lookback</span> <span class="p">:]))</span>
+        <span class="n">volatility</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">spot_returns</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">spot_returns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mf">0.01</span>
+
+        <span class="n">position</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">confidence</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Entry logic</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-6</span><span class="p">:</span>  <span class="c1"># Flat position</span>
+            <span class="k">if</span> <span class="n">z_score</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">:</span>
+                <span class="c1"># Basis too high: short futures, long spot (negative position)</span>
+                <span class="n">position</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+                <span class="n">confidence</span> <span class="o">=</span> <span class="nb">min</span><span class="p">((</span><span class="n">z_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">entry_basis</span> <span class="o">=</span> <span class="n">current_basis</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">entry_timestamp</span> <span class="o">=</span> <span class="n">timestamp</span>
+
+            <span class="k">elif</span> <span class="n">z_score</span> <span class="o">&lt;</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">:</span>
+                <span class="c1"># Basis too low: long futures, short spot (positive position)</span>
+                <span class="n">position</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="n">confidence</span> <span class="o">=</span> <span class="nb">min</span><span class="p">((</span><span class="nb">abs</span><span class="p">(</span><span class="n">z_score</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">entry_basis</span> <span class="o">=</span> <span class="n">current_basis</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">entry_timestamp</span> <span class="o">=</span> <span class="n">timestamp</span>
+
+        <span class="c1"># Exit logic</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Long futures/short spot</span>
+                <span class="k">if</span> <span class="n">z_score</span> <span class="o">&gt;</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">exit_threshold</span><span class="p">:</span>  <span class="c1"># Basis normalized</span>
+                    <span class="n">position</span> <span class="o">=</span> <span class="mf">0.0</span>
+                    <span class="n">confidence</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="k">elif</span> <span class="n">z_score</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">:</span>  <span class="c1"># Reversal</span>
+                    <span class="n">position</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+                    <span class="n">confidence</span> <span class="o">=</span> <span class="nb">min</span><span class="p">((</span><span class="n">z_score</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">position</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span>  <span class="c1"># Hold</span>
+
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Short futures/long spot</span>
+                <span class="k">if</span> <span class="n">z_score</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">exit_threshold</span><span class="p">:</span>  <span class="c1"># Basis normalized</span>
+                    <span class="n">position</span> <span class="o">=</span> <span class="mf">0.0</span>
+                    <span class="n">confidence</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="k">elif</span> <span class="n">z_score</span> <span class="o">&lt;</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">:</span>  <span class="c1"># Reversal</span>
+                    <span class="n">position</span> <span class="o">=</span> <span class="mf">1.0</span>
+                    <span class="n">confidence</span> <span class="o">=</span> <span class="nb">min</span><span class="p">((</span><span class="nb">abs</span><span class="p">(</span><span class="n">z_score</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">entry_threshold</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">position</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span>  <span class="c1"># Hold</span>
+
+        <span class="c1"># Apply volatility adjustment and position limits</span>
+        <span class="k">if</span> <span class="n">position</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">volatility_scalar</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">volatility</span> <span class="o">*</span> <span class="mi">10</span><span class="p">)</span>  <span class="c1"># Reduce size in high vol</span>
+            <span class="n">position</span> <span class="o">=</span> <span class="n">position</span> <span class="o">*</span> <span class="nb">min</span><span class="p">(</span><span class="n">confidence</span> <span class="o">*</span> <span class="n">volatility_scalar</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_position</span><span class="p">)</span>
+
+        <span class="c1"># Update position state</span>
+        <span class="n">old_position</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span> <span class="o">=</span> <span class="n">position</span>
+
+        <span class="c1"># Only generate signal if position changed significantly</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">position</span> <span class="o">-</span> <span class="n">old_position</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.001</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">StrategySignal</span><span class="p">(</span>
+                <span class="n">timestamp</span><span class="o">=</span><span class="n">timestamp</span><span class="p">,</span>
+                <span class="n">asset_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span><span class="p">,</span>  <span class="c1"># Use spot as primary asset</span>
+                <span class="n">position</span><span class="o">=</span><span class="n">position</span><span class="p">,</span>
+                <span class="n">confidence</span><span class="o">=</span><span class="n">confidence</span><span class="p">,</span>
+                <span class="n">metadata</span><span class="o">=</span><span class="p">{</span>
+                    <span class="s2">&quot;basis&quot;</span><span class="p">:</span> <span class="n">current_basis</span><span class="p">,</span>
+                    <span class="s2">&quot;z_score&quot;</span><span class="p">:</span> <span class="n">z_score</span><span class="p">,</span>
+                    <span class="s2">&quot;volatility&quot;</span><span class="p">:</span> <span class="n">volatility</span><span class="p">,</span>
+                    <span class="s2">&quot;entry_basis&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">entry_basis</span><span class="p">,</span>
+                    <span class="s2">&quot;strategy_type&quot;</span><span class="p">:</span> <span class="s2">&quot;crypto_basis&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;spot_price&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">spot_prices</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="s2">&quot;futures_price&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">futures_prices</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                <span class="p">},</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="CryptoBasisExternalStrategy.get_current_statistics">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisExternalStrategy.get_current_statistics">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_current_statistics</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current basis statistics for monitoring.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;current_basis&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+            <span class="s2">&quot;basis_mean&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_mean</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;basis_std&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_std</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;z_score&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_z_score</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;current_position&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">current_position</span><span class="p">,</span>
+            <span class="s2">&quot;data_points&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">basis_history</span><span class="p">),</span>
+        <span class="p">}</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="CryptoBasisAdapter">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisAdapter">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CryptoBasisAdapter</span><span class="p">(</span><span class="n">DataFrameAdapter</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Complete adapter for crypto basis trading strategy.</span>
+
+<span class="sd">    This combines the external strategy with DataFrame support</span>
+<span class="sd">    and provides a complete QEngine integration.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="CryptoBasisAdapter.__init__">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisAdapter.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">spot_asset_id</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">=</span> <span class="s2">&quot;BTC&quot;</span><span class="p">,</span>
+        <span class="n">futures_asset_id</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">=</span> <span class="s2">&quot;BTC_FUTURE&quot;</span><span class="p">,</span>
+        <span class="n">lookback_window</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">120</span><span class="p">,</span>
+        <span class="n">entry_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">exit_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">max_position</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span>
+        <span class="n">position_scaling</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+        <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize crypto basis adapter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            spot_asset_id: Asset ID for spot prices</span>
+<span class="sd">            futures_asset_id: Asset ID for futures prices</span>
+<span class="sd">            lookback_window: Rolling window for statistics</span>
+<span class="sd">            entry_threshold: Z-score threshold for entries</span>
+<span class="sd">            exit_threshold: Z-score threshold for exits</span>
+<span class="sd">            max_position: Maximum position size</span>
+<span class="sd">            position_scaling: Scaling factor for position size</span>
+<span class="sd">            **kwargs: Additional arguments for DataFrameAdapter</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Create external strategy</span>
+        <span class="n">external_strategy</span> <span class="o">=</span> <span class="n">CryptoBasisExternalStrategy</span><span class="p">(</span>
+            <span class="n">spot_asset_id</span><span class="o">=</span><span class="n">spot_asset_id</span><span class="p">,</span>
+            <span class="n">futures_asset_id</span><span class="o">=</span><span class="n">futures_asset_id</span><span class="p">,</span>
+            <span class="n">lookback_window</span><span class="o">=</span><span class="n">lookback_window</span><span class="p">,</span>
+            <span class="n">entry_threshold</span><span class="o">=</span><span class="n">entry_threshold</span><span class="p">,</span>
+            <span class="n">exit_threshold</span><span class="o">=</span><span class="n">exit_threshold</span><span class="p">,</span>
+            <span class="n">max_position</span><span class="o">=</span><span class="n">max_position</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Create custom position sizer</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">basis_position_sizer</span><span class="p">(</span><span class="n">signal</span><span class="p">:</span> <span class="n">StrategySignal</span><span class="p">,</span> <span class="n">cash</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+            <span class="c1"># Scale position based on available cash and signal strength</span>
+            <span class="n">base_value</span> <span class="o">=</span> <span class="n">cash</span> <span class="o">*</span> <span class="n">position_scaling</span>  <span class="c1"># Use X% of cash</span>
+            <span class="n">position_value</span> <span class="o">=</span> <span class="n">base_value</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">position</span><span class="p">)</span> <span class="o">*</span> <span class="n">signal</span><span class="o">.</span><span class="n">confidence</span>
+
+            <span class="c1"># Return signed position value</span>
+            <span class="k">return</span> <span class="n">position_value</span> <span class="k">if</span> <span class="n">signal</span><span class="o">.</span><span class="n">position</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="o">-</span><span class="n">position_value</span>
+
+        <span class="c1"># Filter kwargs for parent constructor</span>
+        <span class="n">parent_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;position_sizer&quot;</span><span class="p">,</span> <span class="s2">&quot;risk_manager&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Initialize adapter</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">external_strategy</span><span class="o">=</span><span class="n">external_strategy</span><span class="p">,</span>
+            <span class="n">window_size</span><span class="o">=</span><span class="n">window_size</span><span class="p">,</span>
+            <span class="n">position_sizer</span><span class="o">=</span><span class="n">basis_position_sizer</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;CryptoBasisAdapter_</span><span class="si">{</span><span class="n">spot_asset_id</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">futures_asset_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">parent_kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Store configuration</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span> <span class="o">=</span> <span class="n">spot_asset_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span> <span class="o">=</span> <span class="n">futures_asset_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Event synchronization for multi-asset basis calculation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">datetime</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">AssetId</span><span class="p">,</span> <span class="n">MarketEvent</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_required_assets</span> <span class="o">=</span> <span class="p">{</span><span class="n">spot_asset_id</span><span class="p">,</span> <span class="n">futures_asset_id</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="CryptoBasisAdapter.on_start">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisAdapter.on_start">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_start</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Start strategy and subscribe to data feeds.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_start</span><span class="p">()</span>
+
+        <span class="c1"># Subscribe to both spot and futures data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">asset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span><span class="p">,</span> <span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;market&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">asset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span><span class="p">,</span> <span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;market&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subscribed to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span><span class="si">}</span><span class="s2"> (spot) and </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span><span class="si">}</span><span class="s2"> (futures)&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CryptoBasisAdapter.on_market_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisAdapter.on_market_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_market_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Process market events with synchronization for basis calculation.&quot;&quot;&quot;</span>
+        <span class="c1"># Buffer the event by timestamp and asset</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">timestamp</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">][</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">event</span>
+
+        <span class="c1"># Check if we have both required assets for this timestamp</span>
+        <span class="n">buffered_assets</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_required_assets</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">buffered_assets</span><span class="p">):</span>
+            <span class="c1"># We have both spot and futures data - process synchronously</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_process_synchronized_events</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">timestamp</span><span class="p">)</span>
+
+            <span class="c1"># Clean up old buffer entries (keep only last 10 timestamps)</span>
+            <span class="n">timestamps</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">timestamps</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">old_ts</span> <span class="ow">in</span> <span class="n">timestamps</span><span class="p">[:</span><span class="o">-</span><span class="mi">10</span><span class="p">]:</span>
+                    <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">[</span><span class="n">old_ts</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Still waiting for the other asset - update both DataFrame and parent&#39;s history</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_update_data_history</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_synchronized_events</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Process events when both spot and futures data are available.&quot;&quot;&quot;</span>
+        <span class="n">buffered_events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_buffer</span><span class="p">[</span><span class="n">timestamp</span><span class="p">]</span>
+
+        <span class="c1"># Process both events to update DataFrames AND internal history</span>
+        <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">buffered_events</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="c1"># Call parent&#39;s update which maintains _data_history dict</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_update_data_history</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+
+        <span class="c1"># Now create PITData - parent&#39;s _create_pit_data should have both prices now</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Create point-in-time data snapshot with both prices</span>
+            <span class="n">pit_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_pit_data</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+
+            <span class="c1"># Debug: check if PITData has both prices</span>
+            <span class="n">spot_price</span> <span class="o">=</span> <span class="n">pit_data</span><span class="o">.</span><span class="n">get_price</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span><span class="p">)</span>
+            <span class="n">futures_price</span> <span class="o">=</span> <span class="n">pit_data</span><span class="o">.</span><span class="n">get_price</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">spot_price</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">futures_price</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Missing prices in PITData: spot=</span><span class="si">{</span><span class="n">spot_price</span><span class="si">}</span><span class="s2">, futures=</span><span class="si">{</span><span class="n">futures_price</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">level</span><span class="o">=</span><span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span>
+
+            <span class="c1"># Generate signal from external strategy (now has both prices)</span>
+            <span class="n">signal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_strategy</span><span class="o">.</span><span class="n">generate_signal</span><span class="p">(</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">pit_data</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">signal</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Signal generated: pos=</span><span class="si">{</span><span class="n">signal</span><span class="o">.</span><span class="n">position</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, conf=</span><span class="si">{</span><span class="n">signal</span><span class="o">.</span><span class="n">confidence</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_process_signal</span><span class="p">(</span><span class="n">signal</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Check if we expected a signal but didn&#39;t get one</span>
+                <span class="n">stats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_strategy</span><span class="o">.</span><span class="n">get_current_statistics</span><span class="p">()</span>
+                <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;z_score&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mf">1.0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected signal but got None: z_score=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;z_score&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Update statistics for monitoring</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_strategy</span><span class="p">,</span> <span class="s2">&quot;get_current_statistics&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_strategy</span><span class="o">.</span><span class="n">get_current_statistics</span><span class="p">()</span>
+
+                <span class="c1"># Log all statistics for debugging</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Basis stats: z=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span><span class="p">[</span><span class="s1">&#39;z_score&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;mean=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;basis_mean&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;std=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;basis_std&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;current=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;current_basis&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;data_pts=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data_points&#39;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing synchronized events: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s2">&quot;ERROR&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CryptoBasisAdapter.get_strategy_diagnostics">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.CryptoBasisAdapter.get_strategy_diagnostics">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_strategy_diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get detailed diagnostics for strategy monitoring.&quot;&quot;&quot;</span>
+        <span class="n">base_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_strategy_state</span><span class="p">()</span>
+
+        <span class="c1"># Add basis-specific statistics</span>
+        <span class="n">base_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;basis_statistics&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_statistics</span><span class="p">,</span>
+                <span class="s2">&quot;spot_asset&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">spot_asset_id</span><span class="p">,</span>
+                <span class="s2">&quot;futures_asset&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">futures_asset_id</span><span class="p">,</span>
+                <span class="s2">&quot;dataframe_sizes&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="n">asset</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="k">for</span> <span class="n">asset</span><span class="p">,</span> <span class="n">df</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_all_dataframes</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="p">},</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">base_state</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="create_crypto_basis_strategy">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.crypto_basis_adapter.create_crypto_basis_strategy">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_crypto_basis_strategy</span><span class="p">(</span>
+    <span class="n">spot_asset_id</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">=</span> <span class="s2">&quot;BTC&quot;</span><span class="p">,</span>
+    <span class="n">futures_asset_id</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">=</span> <span class="s2">&quot;BTC_FUTURE&quot;</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">strategy_params</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CryptoBasisAdapter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Factory function to create a crypto basis strategy.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        spot_asset_id: Asset ID for spot prices</span>
+<span class="sd">        futures_asset_id: Asset ID for futures prices</span>
+<span class="sd">        **strategy_params: Strategy parameters</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Configured CryptoBasisAdapter</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">CryptoBasisAdapter</span><span class="p">(</span>
+        <span class="n">spot_asset_id</span><span class="o">=</span><span class="n">spot_asset_id</span><span class="p">,</span>
+        <span class="n">futures_asset_id</span><span class="o">=</span><span class="n">futures_asset_id</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">strategy_params</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

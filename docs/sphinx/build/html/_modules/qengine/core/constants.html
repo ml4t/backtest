@@ -1,0 +1,215 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.core.constants &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.core.constants</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.core.constants</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Configuration constants for QEngine.</span>
+
+<span class="sd">This module contains all magic numbers and configuration defaults used throughout</span>
+<span class="sd">the backtesting engine. Centralizing these values improves maintainability and</span>
+<span class="sd">makes it easier to adjust behavior without modifying core logic.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Capital and Portfolio Defaults</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="n">DEFAULT_INITIAL_CAPITAL</span> <span class="o">=</span> <span class="mf">100_000.0</span>
+<span class="sd">&quot;&quot;&quot;Default starting capital for backtests (USD).&quot;&quot;&quot;</span>
+
+<span class="n">DEFAULT_CURRENCY</span> <span class="o">=</span> <span class="s2">&quot;USD&quot;</span>
+<span class="sd">&quot;&quot;&quot;Default currency for portfolio accounting.&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Event Processing</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="n">PROGRESS_LOG_INTERVAL</span> <span class="o">=</span> <span class="mi">10_000</span>
+<span class="sd">&quot;&quot;&quot;Log progress message every N events during backtesting.&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Order Execution</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="n">MIN_FILL_SIZE</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="sd">&quot;&quot;&quot;Minimum meaningful fill quantity (shares/contracts).&quot;&quot;&quot;</span>
+
+<span class="n">MAX_COMMISSION_CALC_ITERATIONS</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="sd">&quot;&quot;&quot;Maximum iterations for binary search in commission calculations.&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Commission Defaults (basis points, where 1 bp = 0.01%)</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="n">DEFAULT_COMMISSION_RATE_BPS</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="sd">&quot;&quot;&quot;Default commission rate: 10 basis points = 0.1% = $0.001 per dollar.&quot;&quot;&quot;</span>
+
+<span class="n">DEFAULT_TAKER_FEE_BPS</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="sd">&quot;&quot;&quot;Default taker fee for maker-taker exchanges: 10 bps = 0.1%.&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Slippage Defaults (basis points)</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="n">SLIPPAGE_EQUITY_BPS</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="sd">&quot;&quot;&quot;Default slippage for equities: 1 basis point = 0.01%.&quot;&quot;&quot;</span>
+
+<span class="n">SLIPPAGE_FUTURES_BPS</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="sd">&quot;&quot;&quot;Default slippage for futures: 2 basis points = 0.02%.&quot;&quot;&quot;</span>
+
+<span class="n">SLIPPAGE_FX_BPS</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="sd">&quot;&quot;&quot;Default slippage for FX: 0.5 basis points = 0.005%.&quot;&quot;&quot;</span>
+
+<span class="n">SLIPPAGE_CRYPTO_BPS</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="sd">&quot;&quot;&quot;Default slippage for cryptocurrencies: 10 basis points = 0.1%.&quot;&quot;&quot;</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Helper Functions</span>
+<span class="c1"># =============================================================================</span>
+
+
+<div class="viewcode-block" id="bps_to_decimal">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.constants.bps_to_decimal">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">bps_to_decimal</span><span class="p">(</span><span class="n">bps</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert basis points to decimal representation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bps: Value in basis points (e.g., 10 for 0.1%)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Decimal representation (e.g., 0.001 for 10 bps)</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; bps_to_decimal(1)</span>
+<span class="sd">        0.0001</span>
+<span class="sd">        &gt;&gt;&gt; bps_to_decimal(10)</span>
+<span class="sd">        0.001</span>
+<span class="sd">        &gt;&gt;&gt; bps_to_decimal(100)</span>
+<span class="sd">        0.01</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">bps</span> <span class="o">/</span> <span class="mi">10_000</span></div>
+
+
+
+<div class="viewcode-block" id="decimal_to_bps">
+<a class="viewcode-back" href="../../../modules/core.html#qengine.core.constants.decimal_to_bps">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">decimal_to_bps</span><span class="p">(</span><span class="n">decimal</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert decimal to basis points.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        decimal: Decimal value (e.g., 0.001 for 10 bps)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Basis points (e.g., 10 for 0.001)</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; decimal_to_bps(0.0001)</span>
+<span class="sd">        1.0</span>
+<span class="sd">        &gt;&gt;&gt; decimal_to_bps(0.001)</span>
+<span class="sd">        10.0</span>
+<span class="sd">        &gt;&gt;&gt; decimal_to_bps(0.01)</span>
+<span class="sd">        100.0</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">decimal</span> <span class="o">*</span> <span class="mi">10_000</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "output": {
-    "filePath": "qengine-review.md",
+    "filePath": "repomix.xml",
     "style": "xml",
     "includeEmptyDirectories": false,
     "topFilesLength": 12,
@@ -17,7 +17,8 @@
     "src/qengine/execution/*.py",
     "src/qengine/portfolio/*.py",
     "src/qengine/strategy/*.py",
-    "src/qengine/reporting/*.py"
+    "src/qengine/reporting/*.py",
+    "src/*"
   ],
   "ignore": {
     "useGitignore": true,

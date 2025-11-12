@@ -14,6 +14,7 @@ class BacktestConfig:
     fees: float | dict = 0.0  # Float for percentage-only, or dict{"percentage": float, "fixed": float}
     slippage: float = 0.0
     order_type: str = 'market'  # 'market', 'limit', 'stop'
+    limit_offset: float = 0.02  # Offset from market price for limit orders (default 2%)
     size: Optional[float] = None  # None = use all cash (size=np.inf in VBT)
 
 
@@ -136,13 +137,28 @@ class QEngineWrapper(EngineWrapper):
                     # This prevents position tracking mismatches with fixed fees/rounding
                     self._order_counter += 1
                     exit_qty = abs(current_qty)
+
+                    # Determine order type and limit price for exits
+                    if config.order_type == 'limit':
+                        # SELL LIMIT: Set limit 2% ABOVE market (sell higher)
+                        # BUY LIMIT (to cover short): Set limit 2% BELOW market (buy cheaper)
+                        if current_qty > 0:  # Long position -> SELL LIMIT
+                            limit_price = event.close * (1 + config.limit_offset)
+                        else:  # Short position -> BUY LIMIT
+                            limit_price = event.close * (1 - config.limit_offset)
+                        order_type = OrderType.LIMIT
+                    else:
+                        limit_price = None
+                        order_type = OrderType.MARKET
+
                     order_event = OrderEvent(
                         timestamp=event.timestamp,
                         order_id=f"EXIT_{self._order_counter:04d}",
                         asset_id=event.asset_id,
-                        order_type=OrderType.MARKET,
+                        order_type=order_type,
                         side=OrderSide.SELL if current_qty > 0 else OrderSide.BUY,
                         quantity=exit_qty,
+                        limit_price=limit_price,
                     )
                     self.event_bus.publish(order_event)
 
@@ -191,13 +207,24 @@ class QEngineWrapper(EngineWrapper):
                         size = config.size
 
                     self._order_counter += 1
+
+                    # Determine order type and limit price for entries
+                    if config.order_type == 'limit':
+                        # BUY LIMIT: Set limit 2% BELOW market (buy cheaper)
+                        limit_price = event.close * (1 - config.limit_offset)
+                        order_type = OrderType.LIMIT
+                    else:
+                        limit_price = None
+                        order_type = OrderType.MARKET
+
                     order_event = OrderEvent(
                         timestamp=event.timestamp,
                         order_id=f"ENTRY_{self._order_counter:04d}",
                         asset_id=event.asset_id,
-                        order_type=OrderType.MARKET,
+                        order_type=order_type,
                         side=OrderSide.BUY,
                         quantity=size,
+                        limit_price=limit_price,
                     )
                     self.event_bus.publish(order_event)
 

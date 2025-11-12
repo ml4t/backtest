@@ -1,0 +1,514 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qengine.strategy.base &mdash; qengine 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qengine
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/execution.html">Execution Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/strategy.html">Strategy Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/data.html">Data Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/reporting.html">Reporting Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qengine</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qengine.strategy.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qengine.strategy.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Base strategy class and interfaces for QEngine.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.event</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">FillEvent</span><span class="p">,</span> <span class="n">MarketEvent</span><span class="p">,</span> <span class="n">SignalEvent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qengine.core.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssetId</span><span class="p">,</span> <span class="n">EventType</span><span class="p">,</span> <span class="n">OrderSide</span>
+
+
+<div class="viewcode-block" id="StrategyState">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.StrategyState">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StrategyState</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Strategy lifecycle states.&quot;&quot;&quot;</span>
+
+    <span class="n">INITIALIZED</span> <span class="o">=</span> <span class="s2">&quot;initialized&quot;</span>
+    <span class="n">STARTING</span> <span class="o">=</span> <span class="s2">&quot;starting&quot;</span>
+    <span class="n">RUNNING</span> <span class="o">=</span> <span class="s2">&quot;running&quot;</span>
+    <span class="n">STOPPING</span> <span class="o">=</span> <span class="s2">&quot;stopping&quot;</span>
+    <span class="n">STOPPED</span> <span class="o">=</span> <span class="s2">&quot;stopped&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="StrategyContext">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.StrategyContext">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">StrategyContext</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Context object containing strategy runtime information.&quot;&quot;&quot;</span>
+
+    <span class="n">start_time</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">end_time</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">initial_capital</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">commission_model</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">slippage_model</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">data_feeds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Strategy">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Strategy</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstract base class for all trading strategies.</span>
+
+<span class="sd">    This class defines the interface that all strategies must implement.</span>
+<span class="sd">    Strategies receive events through the on_event method and can submit</span>
+<span class="sd">    orders through the broker interface.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Strategy.__init__">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name: Optional name for the strategy</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">StrategyState</span><span class="o">.</span><span class="n">INITIALIZED</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">broker</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Will be injected by the engine</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># PIT data accessor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Strategy context</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subscriptions</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">AssetId</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_orders</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_trades</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span></div>
+
+
+<div class="viewcode-block" id="Strategy.on_start">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.on_start">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">portfolio</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">event_bus</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Called once when the strategy starts.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            portfolio: Portfolio instance for position tracking (optional)</span>
+<span class="sd">            event_bus: Event bus for publishing orders (optional)</span>
+
+<span class="sd">        Override this method to perform one-time initialization tasks like:</span>
+<span class="sd">        - Setting up indicators</span>
+<span class="sd">        - Subscribing to data feeds</span>
+<span class="sd">        - Initializing internal state</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Store references if provided</span>
+        <span class="k">if</span> <span class="n">portfolio</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">portfolio</span> <span class="o">=</span> <span class="n">portfolio</span>
+        <span class="k">if</span> <span class="n">event_bus</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">event_bus</span> <span class="o">=</span> <span class="n">event_bus</span></div>
+
+
+<div class="viewcode-block" id="Strategy.on_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.on_event">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process an event.</span>
+
+<span class="sd">        This is the main method where strategy logic is implemented.</span>
+<span class="sd">        It&#39;s called for every event the strategy is subscribed to.</span>
+
+<span class="sd">        Event routing is now properly fixed to ensure strategies receive</span>
+<span class="sd">        all relevant events including MarketEvent, FillEvent, etc.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            event: The event to process (MarketEvent, FillEvent, etc.)</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Strategy.on_market_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.on_market_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_market_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">MarketEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process a market data event.</span>
+
+<span class="sd">        Override this for specialized market data handling.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            event: Market data event</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Strategy.on_signal_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.on_signal_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_signal_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">SignalEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process an ML signal event.</span>
+
+<span class="sd">        Override this for signal-based strategies.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            event: Signal event from ML model</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Strategy.on_fill_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.on_fill_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_fill_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">FillEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process an order fill event.</span>
+
+<span class="sd">        Override this to track fills and update internal state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            event: Fill event</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Default implementation updates position tracking</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">side</span> <span class="ow">in</span> <span class="p">[</span><span class="n">OrderSide</span><span class="o">.</span><span class="n">BUY</span><span class="p">,</span> <span class="n">OrderSide</span><span class="o">.</span><span class="n">COVER</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">event</span><span class="o">.</span><span class="n">fill_quantity</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="n">event</span><span class="o">.</span><span class="n">fill_quantity</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Strategy.on_end">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.on_end">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_end</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Called once when the strategy stops.</span>
+
+<span class="sd">        Override this to perform cleanup tasks like:</span>
+<span class="sd">        - Closing positions</span>
+<span class="sd">        - Saving state</span>
+<span class="sd">        - Final analysis</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Strategy.before_trading_start">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.before_trading_start">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">before_trading_start</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Called before the start of each trading day.</span>
+
+<span class="sd">        Override this for daily preparation tasks like:</span>
+<span class="sd">        - Updating universe</span>
+<span class="sd">        - Recalculating signals</span>
+<span class="sd">        - Adjusting parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Strategy.after_trading_end">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.after_trading_end">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">after_trading_end</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Called after the end of each trading day.</span>
+
+<span class="sd">        Override this for end-of-day tasks like:</span>
+<span class="sd">        - Recording metrics</span>
+<span class="sd">        - Rebalancing</span>
+<span class="sd">        - Risk calculations</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Strategy.subscribe">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.subscribe">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">subscribe</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">asset</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">event_type</span><span class="p">:</span> <span class="n">EventType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Subscribe to specific events.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            asset: Asset to subscribe to (None for all)</span>
+<span class="sd">            event_type: Type of events to receive</span>
+<span class="sd">            **kwargs: Additional subscription parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">subscription</span> <span class="o">=</span> <span class="p">(</span><span class="n">asset</span><span class="p">,</span> <span class="n">event_type</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subscriptions</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">subscription</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Strategy.unsubscribe">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.unsubscribe">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">unsubscribe</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">asset</span><span class="p">:</span> <span class="n">AssetId</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">event_type</span><span class="p">:</span> <span class="n">EventType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Unsubscribe from specific events.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            asset: Asset to unsubscribe from</span>
+<span class="sd">            event_type: Type of events to stop receiving</span>
+<span class="sd">            **kwargs: Additional parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">subscription</span> <span class="o">=</span> <span class="p">(</span><span class="n">asset</span><span class="p">,</span> <span class="n">event_type</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subscriptions</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">subscription</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">current_positions</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">AssetId</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get current position quantities by asset.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_flat</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if strategy has no positions.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">qty</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">qty</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_positions</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+<div class="viewcode-block" id="Strategy.log">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.Strategy.log">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Log a message.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            message: Message to log</span>
+<span class="sd">            level: Log level (INFO, WARNING, ERROR, DEBUG)</span>
+<span class="sd">            timestamp: Simulation timestamp (if None, uses wall clock time for compatibility)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Use simulation time if provided, otherwise fall back to wall clock time</span>
+        <span class="k">if</span> <span class="n">timestamp</span><span class="p">:</span>
+            <span class="n">time_str</span> <span class="o">=</span> <span class="n">timestamp</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">time_str</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">time_str</span><span class="si">}</span><span class="s2">] [</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">] [</span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(name=&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;, state=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="SignalStrategy">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.SignalStrategy">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SignalStrategy</span><span class="p">(</span><span class="n">Strategy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for signal-based strategies.</span>
+
+<span class="sd">    This provides a simpler interface for strategies that primarily</span>
+<span class="sd">    react to ML signals rather than raw market data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SignalStrategy.__init__">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.SignalStrategy.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">signal_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize signal strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name: Strategy name</span>
+<span class="sd">            signal_threshold: Threshold for acting on signals</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">signal_threshold</span> <span class="o">=</span> <span class="n">signal_threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_history</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">AssetId</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="SignalStrategy.on_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.SignalStrategy.on_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Route events to appropriate handlers.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">SignalEvent</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">on_signal_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">MarketEvent</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">on_market_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">FillEvent</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">on_fill_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SignalStrategy.on_signal_event">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.SignalStrategy.on_signal_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_signal_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">SignalEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process signal and make trading decision.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            event: Signal event</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Track signal history</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">asset_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_signal_history</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_signal_history</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_history</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">signal_value</span><span class="p">)</span>
+
+        <span class="c1"># Make trading decision based on signal</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">process_signal</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">asset_id</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">signal_value</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">confidence</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SignalStrategy.process_signal">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.SignalStrategy.process_signal">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_signal</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">asset_id</span><span class="p">:</span> <span class="n">AssetId</span><span class="p">,</span>
+        <span class="n">signal_value</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">confidence</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Process a signal and decide on action.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            asset_id: Asset the signal is for</span>
+<span class="sd">            signal_value: Signal value (typically -1 to 1)</span>
+<span class="sd">            confidence: Optional confidence score</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IndicatorStrategy">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.IndicatorStrategy">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IndicatorStrategy</span><span class="p">(</span><span class="n">Strategy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for indicator-based strategies.</span>
+
+<span class="sd">    Provides utilities for managing technical indicators.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="IndicatorStrategy.__init__">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.IndicatorStrategy.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize indicator strategy.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_indicators</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="IndicatorStrategy.add_indicator">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.IndicatorStrategy.add_indicator">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_indicator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">indicator</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a technical indicator.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name: Name for the indicator</span>
+<span class="sd">            indicator: Indicator instance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_indicators</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">indicator</span></div>
+
+
+<div class="viewcode-block" id="IndicatorStrategy.get_indicator">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.IndicatorStrategy.get_indicator">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_indicator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get an indicator by name.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name: Indicator name</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Indicator instance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_indicators</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IndicatorStrategy.update_indicators">
+<a class="viewcode-back" href="../../../modules/strategy.html#qengine.strategy.base.IndicatorStrategy.update_indicators">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_indicators</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">price</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Update all indicators with new price.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            price: Latest price</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">indicator</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_indicators</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">indicator</span><span class="p">,</span> <span class="s2">&quot;update&quot;</span><span class="p">):</span>
+                <span class="n">indicator</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">price</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, ML4T.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

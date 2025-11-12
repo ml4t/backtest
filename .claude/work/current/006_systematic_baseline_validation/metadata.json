@@ -1,0 +1,13 @@
+{
+  "id": "006",
+  "name": "006_systematic_baseline_validation",
+  "created_at": "2025-11-04T23:00:00Z",
+  "requirement_type": "document",
+  "requirement_source": "tests/validation/VALIDATION_ROADMAP.md",
+  "phase": "planning_complete",
+  "status": "ready_for_implementation",
+  "tests_passing": 2,
+  "tests_total": 17,
+  "estimated_hours": 15.5,
+  "description": "Systematic validation of qengine vs VectorBT through 17 tests progressing from baseline to advanced features"
+}
