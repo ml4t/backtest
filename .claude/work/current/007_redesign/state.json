@@ -5,8 +5,8 @@
     "created_at": "2025-11-12T16:30:00Z",
     "updated_at": "2025-11-12T21:00:00Z"
   },
-  "status": "phase_2_complete",
-  "current_task": null,
+  "status": "phase_3_ready",
+  "current_task": "TASK-3.1",
   "phases": {
     "phase_1": {
       "name": "Fix the Engine's Heart (Clock-Driven Loop)",
@@ -30,11 +30,24 @@
       "completed_at": "2025-11-13T01:30:00-05:00"
     },
     "phase_3": {
-      "name": "Clean Up Architectural Smells",
-      "description": "Refactor AssetSpec and event-driven corporate actions",
-      "status": "deferred",
-      "estimated_hours": 28,
-      "priority": "high"
+      "name": "Post-Redesign Validation (Hybrid)",
+      "description": "Fix comparison tests + implement 4 validation tests (fees/slippage)",
+      "status": "ready",
+      "dependencies": [
+        "phase_1",
+        "phase_2"
+      ],
+      "estimated_hours": 6,
+      "priority": "critical",
+      "tasks": [
+        "TASK-3.1",
+        "TASK-3.2",
+        "TASK-3.3",
+        "TASK-3.4",
+        "TASK-3.5",
+        "TASK-3.6"
+      ],
+      "validation_target": "6/17 tests passing (35.3%)"
     },
     "phase_4": {
       "name": "Feature Alignment (Pro-Am Trader)",
@@ -486,6 +499,136 @@
         "migration_patterns": 15,
         "extension_examples": 8
       }
+    },
+    {
+      "id": "TASK-3.1",
+      "phase": "phase_3",
+      "title": "Fix Comparison/Integration Tests",
+      "description": "Create spy_order_flow_adapter stub, fix portfolio.simple imports",
+      "type": "bugfix",
+      "status": "ready",
+      "dependencies": [
+        "TASK-2.2.7"
+      ],
+      "files": [
+        "src/qengine/strategy/spy_order_flow_adapter.py",
+        "tests/comparison/test_backtester_validation.py",
+        "tests/comparison/test_baseline_evaluation.py",
+        "tests/integration/test_strategy_qengine_comparison.py"
+      ],
+      "acceptance_criteria": [
+        "No collection errors in tests/comparison/",
+        "No collection errors in tests/integration/",
+        "All comparison tests can import and run",
+        "Documented discrepancies with VectorBT"
+      ],
+      "estimated_hours": 2,
+      "priority": "critical"
+    },
+    {
+      "id": "TASK-3.2",
+      "phase": "phase_3",
+      "title": "Implement Test 1.3 (Multiple Round Trips)",
+      "description": "Validate 40 trades with 5-bar hold time, zero costs",
+      "type": "testing",
+      "status": "ready",
+      "dependencies": [
+        "TASK-3.1"
+      ],
+      "files": [
+        "tests/validation/test_1_3_multiple_round_trips.py"
+      ],
+      "acceptance_criteria": [
+        "Test passes (qengine matches VectorBT)",
+        "Trade count: 40 \u00b1 1",
+        "Final value: Within $10"
+      ],
+      "estimated_hours": 1,
+      "priority": "high"
+    },
+    {
+      "id": "TASK-3.3",
+      "phase": "phase_3",
+      "title": "Implement Test 2.1 (Percentage Commission)",
+      "description": "Validate 0.1% commission calculation",
+      "type": "testing",
+      "status": "ready",
+      "dependencies": [
+        "TASK-3.2"
+      ],
+      "files": [
+        "tests/validation/test_2_1_percentage_commission.py"
+      ],
+      "acceptance_criteria": [
+        "Test passes (commission matches VectorBT)",
+        "Total commission > 0",
+        "Commission match: Within $1"
+      ],
+      "estimated_hours": 1,
+      "priority": "high"
+    },
+    {
+      "id": "TASK-3.4",
+      "phase": "phase_3",
+      "title": "Implement Test 2.2 (Combined Fees)",
+      "description": "Validate 0.1% + $2 fixed fee calculation",
+      "type": "testing",
+      "status": "ready",
+      "dependencies": [
+        "TASK-3.3"
+      ],
+      "files": [
+        "tests/validation/test_2_2_combined_fees.py"
+      ],
+      "acceptance_criteria": [
+        "Test passes (fees match VectorBT)",
+        "Combined fee calculation correct"
+      ],
+      "estimated_hours": 1,
+      "priority": "high"
+    },
+    {
+      "id": "TASK-3.5",
+      "phase": "phase_3",
+      "title": "Implement Test 3.1 (Fixed Slippage)",
+      "description": "Validate $10 fixed slippage per trade",
+      "type": "testing",
+      "status": "ready",
+      "dependencies": [
+        "TASK-3.4"
+      ],
+      "files": [
+        "tests/validation/test_3_1_fixed_slippage.py"
+      ],
+      "acceptance_criteria": [
+        "Test passes (slippage matches VectorBT)",
+        "Slippage amount correct per trade"
+      ],
+      "estimated_hours": 1,
+      "priority": "high"
+    },
+    {
+      "id": "TASK-3.6",
+      "phase": "phase_3",
+      "title": "Documentation & Progress Report",
+      "description": "Update validation roadmap, document progress and remaining work",
+      "type": "documentation",
+      "status": "ready",
+      "dependencies": [
+        "TASK-3.5"
+      ],
+      "files": [
+        ".claude/work/current/006_systematic_baseline_validation/state.json",
+        "tests/validation/VALIDATION_ROADMAP.md",
+        ".claude/work/current/007_redesign/phase_3_results.md"
+      ],
+      "acceptance_criteria": [
+        "Progress tracked in state.json",
+        "VALIDATION_ROADMAP.md updated",
+        "Clear handoff for next session"
+      ],
+      "estimated_hours": 0.5,
+      "priority": "medium"
     }
   ],
   "completed_tasks": [
@@ -503,7 +646,9 @@
     "TASK-2.2.6",
     "TASK-2.2.7"
   ],
-  "next_available": [],
+  "next_available": [
+    "TASK-3.1"
+  ],
   "design_decisions": {
     "portfolio_architecture": {
       "decision": "Enhanced Facade + Composition",
@@ -515,16 +660,16 @@
     }
   },
   "metrics": {
-    "total_tasks": 13,
+    "total_tasks": 19,
     "completed": 13,
     "in_progress": 0,
-    "pending": 0,
+    "pending": 6,
     "blocked": 0,
     "total_estimated_hours": 128,
     "actual_hours_spent": 110,
     "hours_saved": 18,
     "phases_complete": 2,
-    "phases_total": 4,
+    "phases_total": 5,
     "portfolio_tests_total": 84,
     "portfolio_coverage": {
       "analytics": "100%",
@@ -536,5 +681,5 @@
     "legacy_code_removed": "~1,500 lines",
     "overall_project_coverage": "74%"
   },
-  "updated_at": "2025-11-13T01:30:00-05:00"
+  "updated_at": "2025-11-13T09:40:38"
 }

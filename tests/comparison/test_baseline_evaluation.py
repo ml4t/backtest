@@ -27,7 +27,7 @@ from qengine.core.event import MarketEvent
 from qengine.core.types import MarketDataType
 from qengine.engine import BacktestEngine
 from qengine.execution.broker import SimulationBroker
-from qengine.portfolio.simple import SimplePortfolio
+from qengine.portfolio import Portfolio
 from qengine.reporting.reporter import InMemoryReporter
 from qengine.strategy.spy_order_flow_adapter import create_spy_order_flow_strategy
 
@@ -192,7 +192,7 @@ class BaselineEvaluator:
 
             # Create engine components
             broker = SimulationBroker()
-            portfolio = SimplePortfolio(initial_capital=100000)
+            portfolio = Portfolio(initial_cash=100000)
             reporter = InMemoryReporter()
 
             # Create and configure engine
