@@ -352,8 +352,7 @@ class SimulationBroker(Broker):
                     timestamp=timestamp,
                 )
                 if fill_result:
-                    # Update order with fill information
-                    order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+                    # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
 
                     # Update position tracker (convert side to quantity_change)
                     quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
@@ -582,6 +581,10 @@ class SimulationBroker(Broker):
             if not order.is_active:
                 continue
 
+            # Skip already-filled orders (prevent double-fill attempts)
+            if order.remaining_quantity <= 0:
+                continue
+
             # Skip bracket exits (TP, SL, TSL) - they use priority-based processing
             if order.metadata.get("bracket_type") in ["take_profit", "stop_loss", "trailing_stop"]:
                 continue
@@ -597,8 +600,7 @@ class SimulationBroker(Broker):
                 close=event.close,
             )
             if fill_result:
-                # Update order with fill information
-                order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+                # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
 
                 # Check position before fill (for exit tracking)
                 position_before = self._internal_portfolio.get_position(asset_id)
@@ -654,6 +656,10 @@ class SimulationBroker(Broker):
 
         # Process triggered stops immediately
         for order in triggered_stops:
+            # Skip already-filled orders (prevent double-fill attempts)
+            if order.remaining_quantity <= 0:
+                continue
+
             if order.order_type == OrderType.STOP:
                 # Convert to market order and try to fill immediately
                 original_type = order.order_type
@@ -670,8 +676,7 @@ class SimulationBroker(Broker):
                     close=event.close,
                 )
                 if fill_result:
-                    # Update order with fill information
-                    order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+                    # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
 
                     # Update position tracker (convert side to quantity_change)
                     quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
@@ -763,6 +768,10 @@ class SimulationBroker(Broker):
 
         # Process triggered trailing stops immediately (as market orders)
         for order in triggered_trailing:
+            # Skip already-filled orders (prevent double-fill attempts)
+            if order.remaining_quantity <= 0:
+                continue
+
             original_type = order.order_type
             order.metadata["original_type"] = "TRAILING_STOP"
             order.order_type = OrderType.MARKET
@@ -777,8 +786,7 @@ class SimulationBroker(Broker):
                 close=event.close,
             )
             if fill_result:
-                # Update order with fill information
-                order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+                # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
 
                 # Check position before fill (for exit tracking)
                 position_before = self._internal_portfolio.get_position(asset_id)
@@ -837,73 +845,74 @@ class SimulationBroker(Broker):
                 if winning_order in self._trailing_stops[asset_id]:
                     self._trailing_stops[asset_id].remove(winning_order)
 
-            # Convert stop/trailing orders to MARKET for filling
-            original_type = winning_order.order_type
-            if bracket_type in ["stop_loss", "trailing_stop"]:
-                winning_order.metadata["original_type"] = original_type.value
-                winning_order.order_type = OrderType.MARKET
+            # Only fill if order has remaining quantity (prevent double-fill attempts)
+            if winning_order.remaining_quantity > 0:
+                # Convert stop/trailing orders to MARKET for filling
+                original_type = winning_order.order_type
+                if bracket_type in ["stop_loss", "trailing_stop"]:
+                    winning_order.metadata["original_type"] = original_type.value
+                    winning_order.order_type = OrderType.MARKET
 
-            # Fill the winning exit
-            fill_result = self.fill_simulator.try_fill_order(
-                winning_order,
-                market_price=price,
-                current_cash=self._internal_portfolio.cash,
-                current_position=self.get_position(asset_id),
-                timestamp=event.timestamp,
-                high=event.high,
-                low=event.low,
-                close=event.close,
-            )
-
-            if fill_result:
-                # Update order with fill information
-                winning_order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
-
-                # Check position before fill (for exit tracking)
-                position_before = self._internal_portfolio.get_position(asset_id)
-
-                # Update position tracker (convert side to quantity_change)
-                quantity_change = fill_result.fill_quantity if winning_order.side == OrderSide.BUY else -fill_result.fill_quantity
-                self._internal_portfolio.update_position(
-                    asset_id,
-                    quantity_change,
-                    fill_result.fill_price,
-                    fill_result.commission,
-                    fill_result.slippage,
+                # Fill the winning exit
+                fill_result = self.fill_simulator.try_fill_order(
+                    winning_order,
+                    market_price=price,
+                    current_cash=self._internal_portfolio.cash,
+                    current_position=self.get_position(asset_id),
+                    timestamp=event.timestamp,
+                    high=event.high,
+                    low=event.low,
+                    close=event.close,
                 )
 
-                # Track exit timestamp if position went to zero
-                position_after = self._internal_portfolio.get_position(asset_id)
-                if position_before != 0 and position_after == 0:
-                    self._last_exit_time[asset_id] = event.timestamp
+                if fill_result:
+                    # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
 
-                # Update statistics
-                self._total_commission += fill_result.commission
-                self._total_slippage += fill_result.slippage
-                self._fill_count += 1
+                    # Check position before fill (for exit tracking)
+                    position_before = self._internal_portfolio.get_position(asset_id)
 
-                # Track trade
-                self.trade_tracker.on_fill(fill_result.fill_event)
+                    # Update position tracker (convert side to quantity_change)
+                    quantity_change = fill_result.fill_quantity if winning_order.side == OrderSide.BUY else -fill_result.fill_quantity
+                    self._internal_portfolio.update_position(
+                        asset_id,
+                        quantity_change,
+                        fill_result.fill_price,
+                        fill_result.commission,
+                        fill_result.slippage,
+                    )
 
-                fills.append(fill_result.fill_event)
+                    # Track exit timestamp if position went to zero
+                    position_after = self._internal_portfolio.get_position(asset_id)
+                    if position_before != 0 and position_after == 0:
+                        self._last_exit_time[asset_id] = event.timestamp
 
-                # Handle OCO logic to cancel sibling bracket orders
-                if winning_order.is_filled and winning_order.child_order_ids and winning_order.metadata.get("bracket_type"):
-                    self.bracket_manager.handle_oco_fill(winning_order, self.cancel_order)
+                    # Update statistics
+                    self._total_commission += fill_result.commission
+                    self._total_slippage += fill_result.slippage
+                    self._fill_count += 1
 
-            else:
-                # If couldn't fill, restore order type and add back to queue
-                if bracket_type in ["stop_loss", "trailing_stop"]:
-                    winning_order.order_type = original_type
-                    if "original_type" in winning_order.metadata:
-                        del winning_order.metadata["original_type"]
+                    # Track trade
+                    self.trade_tracker.on_fill(fill_result.fill_event)
 
-                if bracket_type == "take_profit":
-                    self._open_orders[asset_id].append(winning_order)
-                elif bracket_type == "stop_loss":
-                    self._stop_orders[asset_id].append(winning_order)
-                elif bracket_type == "trailing_stop":
-                    self._trailing_stops[asset_id].append(winning_order)
+                    fills.append(fill_result.fill_event)
+
+                    # Handle OCO logic to cancel sibling bracket orders
+                    if winning_order.is_filled and winning_order.child_order_ids and winning_order.metadata.get("bracket_type"):
+                        self.bracket_manager.handle_oco_fill(winning_order, self.cancel_order)
+
+                else:
+                    # If couldn't fill, restore order type and add back to queue
+                    if bracket_type in ["stop_loss", "trailing_stop"]:
+                        winning_order.order_type = original_type
+                        if "original_type" in winning_order.metadata:
+                            del winning_order.metadata["original_type"]
+
+                    if bracket_type == "take_profit":
+                        self._open_orders[asset_id].append(winning_order)
+                    elif bracket_type == "stop_loss":
+                        self._stop_orders[asset_id].append(winning_order)
+                    elif bracket_type == "trailing_stop":
+                        self._trailing_stops[asset_id].append(winning_order)
 
         # CRITICAL FIX: Move pending orders to open AFTER processing current orders
         # This ensures orders cannot be filled on the same event that triggered them
