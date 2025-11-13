@@ -39,7 +39,25 @@ class TestStopOrders:
 
     def test_stop_order_triggering(self, broker):
         """Test stop order triggering mechanism."""
-        # Submit a sell stop order
+        # First establish a long position
+        buy_order = Order(
+            asset_id="AAPL",
+            order_type=OrderType.MARKET,
+            side=OrderSide.BUY,
+            quantity=100,
+        )
+        broker.submit_order(buy_order)
+
+        # Fill the buy order
+        buy_event = MarketEvent(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            asset_id="AAPL",
+            data_type=MarketDataType.BAR,
+            close=100.0,
+        )
+        broker.on_market_event(buy_event)
+
+        # Now submit a sell stop order
         order = Order(
             asset_id="AAPL",
             order_type=OrderType.STOP,
@@ -194,41 +212,61 @@ class TestTrailingStops:
 
     def test_trailing_stop_triggering(self, broker):
         """Test trailing stop triggering."""
+        # First establish a long position
+        buy_order = Order(
+            asset_id="AAPL",
+            order_type=OrderType.MARKET,
+            side=OrderSide.BUY,
+            quantity=100,
+        )
+        broker.submit_order(buy_order)
+
+        # Fill the buy order
+        buy_event = MarketEvent(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            asset_id="AAPL",
+            data_type=MarketDataType.BAR,
+            open=100.0,
+            high=100.5,
+            low=99.5,
+            close=100.0,
+        )
+        broker.on_market_event(buy_event)
+
+        # Now submit trailing stop (use percentage for VectorBT-style TSL)
         order = Order(
             asset_id="AAPL",
             order_type=OrderType.TRAILING_STOP,
             side=OrderSide.SELL,
             quantity=100,
-            trail_amount=2.0,
+            trail_percent=2.0,  # 2% trail
+            metadata={"base_price": 100.0},
         )
 
         broker.submit_order(order)
-
-        # Initialize at 100
-        market_event = MarketEvent(
-            timestamp=datetime(2024, 1, 1, 10, 0),
-            asset_id="AAPL",
-            data_type=MarketDataType.BAR,
-            close=100.0,
-        )
-        fills = broker.on_market_event(market_event)
-        assert len(fills) == 0  # Should not trigger yet
 
         # Price rises to 102, trail should update
         market_event = MarketEvent(
             timestamp=datetime(2024, 1, 1, 10, 1),
             asset_id="AAPL",
             data_type=MarketDataType.BAR,
+            open=102.0,
+            high=102.5,
+            low=101.5,
             close=102.0,
         )
         fills = broker.on_market_event(market_event)
         assert len(fills) == 0  # Still should not trigger
+        # After this bar: peak = 102.5, TSL = 102.5 * 0.98 = 100.45
 
-        # Price falls to 99.5, should trigger (below trail of 100.0)
+        # Price falls to 99.5, should trigger (below trail of ~100.45)
         market_event = MarketEvent(
             timestamp=datetime(2024, 1, 1, 10, 2),
             asset_id="AAPL",
             data_type=MarketDataType.BAR,
+            open=100.0,
+            high=100.5,
+            low=99.5,
             close=99.5,
         )
         fills = broker.on_market_event(market_event)
@@ -262,10 +300,10 @@ class TestBracketOrders:
         assert order.stop_loss == 95.0
 
     def test_bracket_order_missing_parameters(self):
-        """Test bracket order without required parameters fails."""
+        """Test bracket order without any exit parameters fails."""
         with pytest.raises(
             ValueError,
-            match="Bracket orders must have both profit_target and stop_loss",
+            match="Bracket orders must have exit parameters",
         ):
             Order(
                 asset_id="AAPL",
@@ -273,8 +311,7 @@ class TestBracketOrders:
                 side=OrderSide.BUY,
                 quantity=100,
                 limit_price=99.0,
-                profit_target=105.0,
-                # Missing stop_loss
+                # Missing ALL exit parameters (profit_target, stop_loss, tp_pct, sl_pct, tsl_pct)
             )
 
     def test_bracket_order_execution(self, broker):
@@ -422,7 +459,8 @@ class TestOrderIntegration:
             order_type=OrderType.TRAILING_STOP,
             side=OrderSide.SELL,
             quantity=25,
-            trail_amount=1.0,
+            trail_percent=1.0,  # Use percentage for TSL
+            metadata={"base_price": 100.0},  # Initialize peak
         )
 
         # Submit all orders
@@ -436,6 +474,9 @@ class TestOrderIntegration:
             timestamp=datetime(2024, 1, 1, 10, 0),
             asset_id="AAPL",
             data_type=MarketDataType.BAR,
+            open=100.0,
+            high=100.5,
+            low=99.5,
             close=100.0,
         )
         fills = broker.on_market_event(market_event)
@@ -449,6 +490,9 @@ class TestOrderIntegration:
             timestamp=datetime(2024, 1, 1, 10, 1),
             asset_id="AAPL",
             data_type=MarketDataType.BAR,
+            open=99.0,
+            high=99.5,
+            low=98.0,
             close=98.0,
         )
         fills = broker.on_market_event(market_event)
@@ -464,6 +508,9 @@ class TestOrderIntegration:
             timestamp=datetime(2024, 1, 1, 10, 2),
             asset_id="AAPL",
             data_type=MarketDataType.BAR,
+            open=98.0,
+            high=98.5,
+            low=97.0,
             close=97.0,
         )
         fills = broker.on_market_event(market_event)

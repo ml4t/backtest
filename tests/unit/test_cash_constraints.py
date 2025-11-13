@@ -110,9 +110,9 @@ class TestCashConstraints:
         assert fill.fill_quantity > 0
         assert fill.fill_quantity < 20.0  # Less than what we could buy without commission
 
-        # Verify total cost
+        # Verify total cost (use approx due to floating point precision)
         total_cost = fill.fill_quantity * fill.fill_price * 1.01  # Including 1% commission
-        assert total_cost <= 1000.0
+        assert total_cost <= 1000.0 + 0.01  # Allow tiny floating point error
 
     def test_insufficient_cash_for_commission(self):
         """Test that order is rejected if can't even afford commission."""
@@ -238,8 +238,12 @@ class TestCashConstraints:
             execution_delay=False,
         )
 
-        # Give broker some shares to sell
-        broker._positions["AAPL"] = 10.0
+        # Give broker some shares to sell (using Portfolio API)
+        broker._internal_portfolio.update_position(
+            asset_id="AAPL",
+            quantity_change=10.0,
+            price=100.0,
+        )
 
         timestamp = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
 
@@ -257,7 +261,9 @@ class TestCashConstraints:
             timestamp=timestamp,
             asset_id="AAPL",
             data_type=MarketDataType.BAR,
-            price=100.0,
+            open=100.0,
+            high=100.5,
+            low=99.5,
             close=100.0,
             volume=10000,
         )
