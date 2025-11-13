@@ -125,9 +125,9 @@ class Order:
         # Auto-create default PrecisionManager if not provided
         if self.precision_manager is None:
             from qengine.core.precision import PrecisionManager
-            # Use default precision: whole units for quantity, 2 decimals for price/cash
+            # Use default precision: 8 decimals for quantity (supports fractional shares/crypto), 2 decimals for price/cash
             self.precision_manager = PrecisionManager(
-                position_decimals=0,
+                position_decimals=8,  # Support fractional positions (crypto, fractional shares)
                 price_decimals=2,
                 cash_decimals=2
             )

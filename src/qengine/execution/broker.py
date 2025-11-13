@@ -352,6 +352,9 @@ class SimulationBroker(Broker):
                     timestamp=timestamp,
                 )
                 if fill_result:
+                    # Update order with fill information
+                    order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+
                     # Update position tracker (convert side to quantity_change)
                     quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
                     self._internal_portfolio.update_position(
@@ -372,6 +375,14 @@ class SimulationBroker(Broker):
                     # Publish fill event immediately if order was filled
                     if hasattr(self, "event_bus") and self.event_bus:
                         self.event_bus.publish(fill_result.fill_event)
+
+                    # Remove filled orders and handle bracket completions (same as delayed path)
+                    if order.is_filled:
+                        self.order_router.remove_order(order)
+
+                        # Handle bracket order completion
+                        if order.order_type == OrderType.BRACKET:
+                            self._handle_bracket_fill(order, fill_result.fill_event)
 
         logger.debug(f"Submitted order: {order}")
         return order.order_id
@@ -586,6 +597,9 @@ class SimulationBroker(Broker):
                 close=event.close,
             )
             if fill_result:
+                # Update order with fill information
+                order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+
                 # Check position before fill (for exit tracking)
                 position_before = self._internal_portfolio.get_position(asset_id)
 
@@ -656,6 +670,9 @@ class SimulationBroker(Broker):
                     close=event.close,
                 )
                 if fill_result:
+                    # Update order with fill information
+                    order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+
                     # Update position tracker (convert side to quantity_change)
                     quantity_change = fill_result.fill_quantity if order.side == OrderSide.BUY else -fill_result.fill_quantity
                     self._internal_portfolio.update_position(
@@ -760,6 +777,9 @@ class SimulationBroker(Broker):
                 close=event.close,
             )
             if fill_result:
+                # Update order with fill information
+                order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+
                 # Check position before fill (for exit tracking)
                 position_before = self._internal_portfolio.get_position(asset_id)
 
@@ -836,6 +856,9 @@ class SimulationBroker(Broker):
             )
 
             if fill_result:
+                # Update order with fill information
+                winning_order.update_fill(fill_result.fill_quantity, fill_result.fill_price)
+
                 # Check position before fill (for exit tracking)
                 position_before = self._internal_portfolio.get_position(asset_id)
 

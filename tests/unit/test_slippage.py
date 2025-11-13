@@ -487,8 +487,14 @@ class TestBrokerIntegration:
 
         broker.submit_order(order)
 
-        # Need to have some shares to sell
-        broker._positions["AAPL"] = 100
+        # Need to have some shares to sell - use Portfolio API to set up position
+        broker._internal_portfolio.update_position(
+            asset_id="AAPL",
+            quantity_change=100,
+            price=100.0,
+            commission=0.0,
+            slippage=0.0,
+        )
 
         market_event = MarketEvent(
             timestamp=datetime(2024, 1, 1, 10, 0),
