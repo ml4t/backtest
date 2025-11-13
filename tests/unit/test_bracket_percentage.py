@@ -85,7 +85,7 @@ class TestPercentageBracketOrders:
         assert tsl_order.order_type == OrderType.TRAILING_STOP
         assert tsl_order.side == OrderSide.SELL  # Exit side for long
         assert tsl_order.quantity == 1.0
-        assert tsl_order.trail_percent == 0.01  # 1%
+        assert tsl_order.trail_percent == 1.0  # 1% (stored as percentage, not decimal)
 
         # Verify OCO linking
         assert tsl_order.order_id in tp_order.child_order_ids
