@@ -254,8 +254,8 @@ class TestBrokerLiquidityIntegration:
         fill_result2 = broker2.fill_simulator.try_fill_order(
             order2,
             100.0,
-            broker2.position_tracker.get_cash(),
-            broker2.position_tracker.get_position("AAPL"),
+            broker2.get_cash(),
+            broker2.get_position("AAPL"),
             timestamp,
         )
         assert fill_result2 is not None

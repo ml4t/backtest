@@ -455,8 +455,8 @@ class FillSimulator:
 
     def _calculate_fill_price(self, order: Order, market_price: Price) -> Price:
         """Calculate the actual fill price including slippage."""
-        # For STOP orders, use stop_price as the base price (not market_price)
-        # This ensures stop orders fill at their trigger level, not at the bar's extreme
+        # For STOP orders (including SL), use stop_price as the base price (not market_price)
+        # This ensures stop orders fill at their stop level, not at the bar's extreme (low/high)
         if order.order_type == OrderType.STOP and order.stop_price is not None:
             base_price = order.stop_price
             if self.slippage_model:
@@ -467,6 +467,7 @@ class FillSimulator:
             return base_price * 0.9999  # Sell stops receive less
 
         # For TRAILING_STOP orders, use trailing_stop_price as base
+        # TSL level is the actual target exit price (not just a trigger)
         if order.order_type == OrderType.TRAILING_STOP and order.trailing_stop_price is not None:
             base_price = order.trailing_stop_price
             if self.slippage_model:

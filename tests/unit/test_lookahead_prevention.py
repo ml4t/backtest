@@ -162,6 +162,12 @@ class TestLookaheadPrevention:
         """Test that stop orders trigger immediately but fill on next event."""
         broker = SimulationBroker(initial_cash=10000.0)
 
+        # Establish position first (directly set position without affecting cash)
+        from qengine.portfolio.state import Position
+        position = Position(asset_id="AAPL")
+        position.add_shares(10.0, 150.0)
+        broker._internal_portfolio.tracker.positions["AAPL"] = position
+
         timestamp1 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
         timestamp2 = datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc)
         timestamp3 = datetime(2024, 1, 1, 9, 32, tzinfo=timezone.utc)
@@ -204,9 +210,10 @@ class TestLookaheadPrevention:
         fills2 = broker.on_market_event(market_event2)
         # Stop orders fill immediately when triggered (they already waited)
         assert len(fills2) == 1, "Stop order should fill immediately when triggered"
-        # Sell order gets slippage: 148.0 * 0.9999 = 147.9852
-        assert fills2[0].fill_price == pytest.approx(147.9852, rel=1e-4), (
-            "Should fill at trigger price with slippage"
+        # Sell STOP order fills at stop_price with slippage: 149.0 * 0.9999 = 148.9851
+        # NOT at market price (148.0) - stop_price is the fill level, not just trigger
+        assert fills2[0].fill_price == pytest.approx(148.9851, rel=1e-4), (
+            "Should fill at stop_price (149.0) with slippage, not at market price (148.0)"
         )
 
     def test_multiple_orders_proper_sequencing(self):

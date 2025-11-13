@@ -238,12 +238,11 @@ class TestCashConstraints:
             execution_delay=False,
         )
 
-        # Give broker some shares to sell (using Portfolio API)
-        broker._internal_portfolio.update_position(
-            asset_id="AAPL",
-            quantity_change=10.0,
-            price=100.0,
-        )
+        # Give broker some shares to sell (directly set position without affecting cash)
+        from qengine.portfolio.state import Position
+        position = Position(asset_id="AAPL")
+        position.add_shares(10.0, 100.0)
+        broker._internal_portfolio.tracker.positions["AAPL"] = position
 
         timestamp = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
 
