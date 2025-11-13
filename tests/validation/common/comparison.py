@@ -19,7 +19,16 @@ def compare_trades(results: Dict[str, BacktestResult], tolerance: float = 0.01) 
     comparison_data = []
 
     for engine_name, result in results.items():
-        final_pos_str = f"{result.final_position:.4f}" if result.final_position is not None else "None"
+        # Handle final_position: could be None, float, or Position object
+        if result.final_position is None:
+            final_pos_str = "None"
+        elif hasattr(result.final_position, 'quantity'):
+            # Position object - extract quantity
+            final_pos_str = f"{result.final_position.quantity:.4f}"
+        else:
+            # Assume it's a numeric value
+            final_pos_str = f"{result.final_position:.4f}"
+
         comparison_data.append({
             'Engine': engine_name,
             'Num Trades': result.num_trades,

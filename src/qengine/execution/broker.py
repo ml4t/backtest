@@ -1070,8 +1070,8 @@ class SimulationBroker(Broker):
             precision_manager=asset_precision_manager,
         )
 
-        # Submit the order
-        self.submit_order(order)
+        # Submit the order with the event's timestamp
+        self.submit_order(order, timestamp=event.timestamp)
 
     def finalize(self) -> None:
         """Finalize broker at end of backtest."""
