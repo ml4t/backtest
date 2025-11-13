@@ -159,6 +159,9 @@ class Clock:
             >>> fill_event = FillEvent(...)
             >>> clock.publish(fill_event)  # Broker publishes fill after execution
         """
+        if event.timestamp is None:
+            self.logger.warning(f"Attempted to publish event with None timestamp: {event.__class__.__name__}")
+            return
         heapq.heappush(
             self._event_queue,
             (event.timestamp, self._sequence_counter, event, None),
@@ -268,7 +271,7 @@ class Clock:
                 next_timestamp = source.peek_next_timestamp()
                 if next_timestamp and (not self.end_time or next_timestamp <= self.end_time):
                     next_event = source.get_next_event()
-                    if next_event:
+                    if next_event and next_event.timestamp is not None:
                         heapq.heappush(
                             self._event_queue,
                             (next_event.timestamp, self._sequence_counter, next_event, source),
@@ -278,7 +281,7 @@ class Clock:
             next_timestamp = source.peek_next_timestamp()
             if next_timestamp and (not self.end_time or next_timestamp <= self.end_time):
                 next_signal = source.get_next_signal()
-                if next_signal:
+                if next_signal and next_signal.timestamp is not None:
                     heapq.heappush(
                         self._event_queue,
                         (next_signal.timestamp, self._sequence_counter, next_signal, source),

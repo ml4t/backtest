@@ -19,13 +19,14 @@ def compare_trades(results: Dict[str, BacktestResult], tolerance: float = 0.01) 
     comparison_data = []
 
     for engine_name, result in results.items():
+        final_pos_str = f"{result.final_position:.4f}" if result.final_position is not None else "None"
         comparison_data.append({
             'Engine': engine_name,
             'Num Trades': result.num_trades,
             'Final Value': f"${result.final_value:,.2f}",
             'Total PnL': f"${result.total_pnl:,.2f}",
             'Final Cash': f"${result.final_cash:,.2f}",
-            'Final Position': f"{result.final_position:.4f}",
+            'Final Position': final_pos_str,
         })
 
     df = pd.DataFrame(comparison_data)

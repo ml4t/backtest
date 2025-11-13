@@ -390,7 +390,7 @@ class QEngineWrapper(EngineWrapper):
         # Get final values from results
         final_value = results['final_value']
         final_cash = engine.portfolio.cash
-        final_position = engine.broker.position_tracker.get_position("BTC")
+        final_position = engine.portfolio.get_position("BTC")
         final_price = ohlcv['close'].iloc[-1]
 
         return BacktestResult(
