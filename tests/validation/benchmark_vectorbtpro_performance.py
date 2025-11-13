@@ -7,20 +7,28 @@ import time
 from pathlib import Path
 
 import pandas as pd
+import pytest
 import vectorbtpro as vbt
 
-print("=" * 70)
-print("VECTORBT PRO PERFORMANCE TEST")
-print("=" * 70)
-print(f"VectorBT Pro Version: {vbt.__version__}")
-print()
-
-# Load Wiki data for realistic testing
-projects_dir = Path("~/ml4t/projects")
+# Check if data file exists at import time (for pytest collection)
+projects_dir = Path("~/ml4t/projects").expanduser()
 wiki_path = projects_dir / "daily_us_equities" / "wiki_prices.parquet"
+DATA_AVAILABLE = wiki_path.exists()
 
-print("Loading Wiki data...")
-df = pd.read_parquet(wiki_path)
+def load_test_data():
+    """Load Wiki data for testing (only called inside test)."""
+    print("=" * 70)
+    print("VECTORBT PRO PERFORMANCE TEST")
+    print("=" * 70)
+    print(f"VectorBT Pro Version: {vbt.__version__}")
+    print()
+
+    print("Loading Wiki data...")
+    df = pd.read_parquet(wiki_path)
+    return df
+
+# Skip all tests in this module if data not available
+pytestmark = pytest.mark.skipif(not DATA_AVAILABLE, reason="Wiki data not found at ~/ml4t/projects/daily_us_equities/wiki_prices.parquet")
 
 # Filter to 2013-2017 period and top 30 stocks by volume
 start_date = "2013-01-01"
