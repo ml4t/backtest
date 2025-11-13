@@ -50,14 +50,14 @@ class TestBacktestEngine:
     def mock_portfolio(self):
         """Create a mock portfolio."""
         portfolio = Mock()
-        portfolio.initialize = Mock()
-        portfolio.finalize = Mock()
+        # Portfolio no longer has initialize/finalize methods (handled in __init__)
         portfolio.on_fill_event = Mock()
         portfolio.update_market_value = Mock()
-        portfolio.get_positions = Mock(return_value=pl.DataFrame())
-        portfolio.get_returns = Mock(return_value=pl.Series())
-        portfolio.calculate_metrics = Mock(return_value={})
-        portfolio.get_total_value = Mock(return_value=100000.0)
+        # New API: properties and methods
+        portfolio.get_all_positions = Mock(return_value={})  # dict[AssetId, Quantity]
+        portfolio.returns = pl.Series("returns", [0.0])  # Property, not method
+        portfolio.get_performance_metrics = Mock(return_value={})  # New method name
+        portfolio.equity = 100000.0  # Property for total portfolio value
         portfolio.reset = Mock()
         return portfolio
 
@@ -150,15 +150,13 @@ class TestBacktestEngine:
         # Run engine (Clock-driven, no event_bus needed)
         results = engine.run()
 
-        # Verify initialization calls (DataFeed no longer has initialize method)
+        # Verify initialization calls (Portfolio no longer has initialize/finalize methods)
         mock_strategy.on_start.assert_called_once()
         mock_broker.initialize.assert_called_once()
-        mock_portfolio.initialize.assert_called_once()
 
         # Verify finalization calls
         mock_strategy.on_end.assert_called_once()
         mock_broker.finalize.assert_called_once()
-        mock_portfolio.finalize.assert_called_once()
 
         # Check results structure
         assert isinstance(results, dict)
@@ -256,12 +254,12 @@ class TestBacktestEngine:
 
     def test_compile_results(self, engine, mock_broker, mock_portfolio, mock_reporter):
         """Test results compilation."""
-        # Setup mock returns
+        # Setup mock returns with new API
         mock_broker.get_trades.return_value = pl.DataFrame({"trade_id": [1, 2]})
-        mock_portfolio.get_positions.return_value = pl.DataFrame({"asset_id": ["AAPL"]})
-        mock_portfolio.get_returns.return_value = pl.Series([0.01, 0.02])
-        mock_portfolio.calculate_metrics.return_value = {"sharpe_ratio": 1.5}
-        mock_portfolio.get_total_value.return_value = 110000.0
+        mock_portfolio.get_all_positions.return_value = {"AAPL": 100.0}  # New API: dict
+        mock_portfolio.returns = pl.Series("returns", [0.01, 0.02])  # New API: property
+        mock_portfolio.get_performance_metrics.return_value = {"sharpe_ratio": 1.5}  # New API
+        mock_portfolio.equity = 110000.0  # New API: property for total value
         mock_reporter.get_report.return_value = {"events": 100}
 
         engine.start_time = datetime.now()

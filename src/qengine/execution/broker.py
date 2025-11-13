@@ -661,10 +661,9 @@ class SimulationBroker(Broker):
                 continue
 
             if order.order_type == OrderType.STOP:
-                # Convert to market order and try to fill immediately
-                original_type = order.order_type
+                # Keep as STOP so FillSimulator uses correct fill price logic
+                # (FillSimulator._calculate_fill_price handles STOP specially)
                 order.metadata["original_type"] = "STOP"
-                order.order_type = OrderType.MARKET
                 fill_result = self.fill_simulator.try_fill_order(
                     order,
                     market_price=price,
@@ -766,15 +765,16 @@ class SimulationBroker(Broker):
                     triggered_trailing.append(order)
                     self._trailing_stops[asset_id].remove(order)
 
-        # Process triggered trailing stops immediately (as market orders)
+        # Process triggered trailing stops immediately
         for order in triggered_trailing:
             # Skip already-filled orders (prevent double-fill attempts)
             if order.remaining_quantity <= 0:
                 continue
 
-            original_type = order.order_type
+            # Keep as TRAILING_STOP so FillSimulator uses correct fill price logic
+            # (FillSimulator._calculate_fill_price handles TRAILING_STOP specially)
             order.metadata["original_type"] = "TRAILING_STOP"
-            order.order_type = OrderType.MARKET
+
             fill_result = self.fill_simulator.try_fill_order(
                 order,
                 market_price=price,
@@ -847,11 +847,10 @@ class SimulationBroker(Broker):
 
             # Only fill if order has remaining quantity (prevent double-fill attempts)
             if winning_order.remaining_quantity > 0:
-                # Convert stop/trailing orders to MARKET for filling
-                original_type = winning_order.order_type
+                # Keep original order type for stop/trailing stop to get correct fill price
+                # (FillSimulator._calculate_fill_price handles STOP and TRAILING_STOP specially)
                 if bracket_type in ["stop_loss", "trailing_stop"]:
-                    winning_order.metadata["original_type"] = original_type.value
-                    winning_order.order_type = OrderType.MARKET
+                    winning_order.metadata["original_type"] = winning_order.order_type.value
 
                 # Fill the winning exit
                 fill_result = self.fill_simulator.try_fill_order(

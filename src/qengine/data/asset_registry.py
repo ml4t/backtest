@@ -40,8 +40,9 @@ class AssetSpec:
             # Futures: whole contracts (0 decimals), 2 for price
             return PrecisionManager(position_decimals=0, price_decimals=2, cash_decimals=2)
         else:
-            # Default: whole units, 2 decimal price
-            return PrecisionManager(position_decimals=0, price_decimals=2, cash_decimals=2)
+            # Default: support fractional positions (8 decimals) for unknown assets
+            # This supports fractional shares, crypto, and modern trading
+            return PrecisionManager(position_decimals=8, price_decimals=2, cash_decimals=2)
 
 
 class AssetRegistry:
