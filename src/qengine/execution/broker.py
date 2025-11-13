@@ -124,7 +124,7 @@ class SimulationBroker(Broker):
         # Asset-specific precision is handled in FillSimulator
         from qengine.core.precision import PrecisionManager
         cash_precision_manager = PrecisionManager(
-            position_decimals=0,  # Not used for cash-only operations
+            position_decimals=8,  # Support fractional positions (crypto, fractional shares)
             price_decimals=2,
             cash_decimals=2,
         )
