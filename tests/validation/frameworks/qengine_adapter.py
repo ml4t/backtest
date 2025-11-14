@@ -1,22 +1,30 @@
 """
 QEngine Framework Adapter for Cross-Framework Validation
 
-Implements QEngine backtesting using the same manual approach as other frameworks
-for fair comparison.
+Now uses the REAL qengine library via QEngineWrapper for accurate validation.
 """
 
 import time
 import tracemalloc
 from typing import Any
+import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from .base import BaseFrameworkAdapter, TradeRecord, ValidationResult
+from .base import BaseFrameworkAdapter, TradeRecord, ValidationResult, MomentumStrategy
+
+# Add common module to path
+common_path = Path(__file__).parent.parent / "common"
+if str(common_path) not in sys.path:
+    sys.path.insert(0, str(common_path))
+
+from engine_wrappers import QEngineWrapper, BacktestConfig
 
 
 class QEngineAdapter(BaseFrameworkAdapter):
-    """Adapter for QEngine backtesting framework."""
+    """Adapter for QEngine backtesting framework using real qengine library."""
 
     def __init__(self):
         super().__init__("QEngine")
@@ -27,7 +35,7 @@ class QEngineAdapter(BaseFrameworkAdapter):
         strategy_params: dict[str, Any],
         initial_capital: float = 10000,
     ) -> ValidationResult:
-        """Run backtest using QEngine (manual implementation for comparison)."""
+        """Run backtest using real QEngine library via QEngineWrapper."""
 
         result = ValidationResult(
             framework=self.framework_name,
@@ -43,96 +51,111 @@ class QEngineAdapter(BaseFrameworkAdapter):
             short_window = strategy_params.get("short_window", 20)
             long_window = strategy_params.get("long_window", 50)
 
-            # Calculate moving averages
-            data_copy = data.copy()
-            data_copy["ma_short"] = (
-                data_copy["close"].rolling(window=short_window, min_periods=short_window).mean()
+            # Generate signals using MomentumStrategy
+            strategy = MomentumStrategy(short_window=short_window, long_window=long_window)
+            signals_df = strategy.generate_signals(data)
+
+            entries = signals_df['entries']
+            exits = signals_df['exits']
+
+            # Prepare OHLCV data for QEngineWrapper
+            # QEngineWrapper expects DatetimeIndex named 'timestamp', normalize column names
+            ohlcv = data.copy()
+
+            # Ensure we have the required OHLCV columns (lowercase)
+            required_cols = ['open', 'high', 'low', 'close', 'volume']
+            for col in required_cols:
+                if col not in ohlcv.columns:
+                    # Try uppercase version
+                    col_upper = col.upper()
+                    if col_upper in ohlcv.columns:
+                        ohlcv[col] = ohlcv[col_upper]
+
+            # Select only OHLCV columns
+            ohlcv = ohlcv[required_cols]
+
+            # Rename index to 'timestamp' (QEngineWrapper expects this)
+            ohlcv.index.name = 'timestamp'
+
+            # Create BacktestConfig (no fees/slippage for baseline test)
+            config = BacktestConfig(
+                initial_cash=initial_capital,
+                fees=0.0,
+                slippage=0.0,
+                order_type='market',
             )
-            data_copy["ma_long"] = (
-                data_copy["close"].rolling(window=long_window, min_periods=long_window).mean()
+
+            # Run backtest via QEngineWrapper
+            qengine = QEngineWrapper()
+            backtest_result = qengine.run_backtest(
+                ohlcv=ohlcv,
+                entries=entries,
+                exits=exits,
+                config=config,
             )
 
-            # Remove rows with NaN MAs
-            data_copy = data_copy.dropna()
+            # Convert BacktestResult to ValidationResult
+            result.final_value = backtest_result.final_value
+            result.total_return = (backtest_result.final_value / initial_capital - 1) * 100
+            result.num_trades = backtest_result.num_trades
 
-            print(f"QEngine processing {len(data_copy)} rows after MA calculation")
-
-            # Initialize portfolio
-            cash = initial_capital
-            shares = 0.0
-            position = 0  # 0 = flat, 1 = long
+            # Convert trades DataFrame to list of TradeRecord
             trades = []
-            equity_curve = []
-
-            prev_ma_short = None
-            prev_ma_long = None
-
-            for date, row in data_copy.iterrows():
-                current_ma_short = row["ma_short"]
-                current_ma_long = row["ma_long"]
-                current_price = row["close"]
-
-                # Track portfolio value
-                portfolio_value = cash + shares * current_price
-                equity_curve.append(portfolio_value)
-
-                # Generate signals based on MA crossover
-                signal = 0  # 0 = no change, 1 = go long, -1 = go flat
-
-                if prev_ma_short is not None and prev_ma_long is not None:
-                    # Check for golden cross (MA short crosses above MA long)
-                    if prev_ma_short <= prev_ma_long and current_ma_short > current_ma_long:
-                        signal = 1  # Go long
-                    # Check for death cross (MA short crosses below MA long)
-                    elif prev_ma_short > prev_ma_long and current_ma_short <= current_ma_long:
-                        signal = -1  # Go flat
-
-                # Execute trades
-                if signal == 1 and position == 0 and cash > 0:
-                    # Buy: use all cash
-                    shares = cash / current_price
-                    cash = 0.0
-                    position = 1
-                    trade = TradeRecord(
-                        timestamp=date,
+            if len(backtest_result.trades) > 0:
+                for _, trade_row in backtest_result.trades.iterrows():
+                    # Entry trade
+                    entry_trade = TradeRecord(
+                        timestamp=trade_row['entry_time'],
                         action="BUY",
-                        quantity=shares,
-                        price=current_price,
-                        value=shares * current_price,
+                        quantity=trade_row['size'],
+                        price=trade_row['entry_price'],
+                        value=trade_row['size'] * trade_row['entry_price'],
+                        commission=0.0,
                     )
-                    trades.append(trade)
+                    trades.append(entry_trade)
 
-                elif signal == -1 and position == 1 and shares > 0:
-                    # Sell: liquidate all shares
-                    cash = shares * current_price
-                    shares = 0.0
-                    position = 0
-                    trade = TradeRecord(
-                        timestamp=date,
+                    # Exit trade
+                    exit_trade = TradeRecord(
+                        timestamp=trade_row['exit_time'],
                         action="SELL",
-                        quantity=shares,
-                        price=current_price,
-                        value=cash,
+                        quantity=trade_row['size'],
+                        price=trade_row['exit_price'],
+                        value=trade_row['size'] * trade_row['exit_price'],
+                        commission=0.0,
                     )
-                    trades.append(trade)
+                    trades.append(exit_trade)
 
-                prev_ma_short = current_ma_short
-                prev_ma_long = current_ma_long
-
-            # Final portfolio value
-            final_value = cash + shares * data_copy["close"].iloc[-1]
-
-            # Set results
-            result.final_value = final_value
-            result.total_return = (final_value / initial_capital - 1) * 100
-            result.num_trades = len(trades)
             result.trades = trades
 
-            # Create equity curve series
-            result.equity_curve = pd.Series(equity_curve, index=data_copy.index)
+            # Calculate equity curve from portfolio values
+            # For simplicity, reconstruct from trades (real implementation would track bar-by-bar)
+            # Start with initial capital and update on each trade
+            equity = [initial_capital]
+            cash = initial_capital
+            shares = 0.0
+
+            # Sort trades by timestamp
+            sorted_trades = sorted(trades, key=lambda t: t.timestamp)
+
+            for trade in sorted_trades:
+                if trade.action == "BUY":
+                    shares = trade.quantity
+                    cash = 0.0
+                elif trade.action == "SELL":
+                    cash = trade.value
+                    shares = 0.0
+
+                # Portfolio value after trade
+                # If holding shares, value them at last known price (approximation)
+                if shares > 0:
+                    equity.append(shares * trade.price)
+                else:
+                    equity.append(cash)
+
+            result.equity_curve = pd.Series(equity)
 
             # Calculate performance metrics
-            if len(equity_curve) > 1:
+            if len(equity) > 1:
                 returns = result.equity_curve.pct_change().dropna()
                 result.daily_returns = returns
 
@@ -146,18 +169,9 @@ class QEngineAdapter(BaseFrameworkAdapter):
                     result.max_drawdown = drawdown.min() * 100
 
             # Calculate win rate from paired trades
-            if len(trades) >= 2:
-                trade_returns = []
-                for i in range(0, len(trades) - 1, 2):
-                    if i + 1 < len(trades):
-                        entry = trades[i]
-                        exit_trade = trades[i + 1]
-                        if entry.action == "BUY" and exit_trade.action == "SELL":
-                            ret = exit_trade.price / entry.price - 1
-                            trade_returns.append(ret)
-
-                if trade_returns:
-                    result.win_rate = sum(1 for r in trade_returns if r > 0) / len(trade_returns)
+            if len(backtest_result.trades) > 0 and 'pnl' in backtest_result.trades.columns:
+                winning_trades = (backtest_result.trades['pnl'] > 0).sum()
+                result.win_rate = winning_trades / len(backtest_result.trades)
 
             # Performance tracking
             current, peak = tracemalloc.get_traced_memory()
@@ -165,7 +179,7 @@ class QEngineAdapter(BaseFrameworkAdapter):
             result.execution_time = time.time() - start_time
             result.memory_usage = peak / 1024 / 1024
 
-            print("✓ QEngine backtest completed")
+            print("✓ QEngine backtest completed (using real qengine library)")
             print(f"  Final Value: ${result.final_value:,.2f}")
             print(f"  Total Return: {result.total_return:.2f}%")
             print(f"  Total Trades: {result.num_trades}")
@@ -176,6 +190,8 @@ class QEngineAdapter(BaseFrameworkAdapter):
         except Exception as e:
             error_msg = f"QEngine backtest failed: {e}"
             print(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
             result.errors.append(error_msg)
 
         return result
