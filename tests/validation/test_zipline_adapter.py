@@ -8,7 +8,7 @@ These tests verify basic functionality and document known issues.
 import pandas as pd
 import pytest
 
-from .data_loader import UniversalDataLoader
+from .fixtures import get_test_data
 from .frameworks.base import ValidationResult
 from .frameworks.zipline_adapter import ZiplineAdapter
 
@@ -17,19 +17,16 @@ class TestZiplineAdapter:
     """Test suite for Zipline-Reloaded adapter."""
 
     @pytest.fixture
-    def loader(self):
-        return UniversalDataLoader()
-
-    @pytest.fixture
     def adapter(self):
         return ZiplineAdapter()
 
     @pytest.fixture
-    def sample_data(self, loader):
+    def sample_data(self):
         """Load sample AAPL data for 2017."""
-        return loader.load_simple_equity_data(
-            ticker="AAPL", start_date="2017-01-03", end_date="2017-12-29", framework="zipline"
-        )
+        df = get_test_data(symbol="AAPL", start="2017-01-03", end="2017-12-29")
+        # Convert to Zipline format (DatetimeIndex)
+        df = df.set_index("timestamp")
+        return df
 
     def test_initialization(self, adapter):
         """Test adapter initialization."""
@@ -130,23 +127,5 @@ class TestZiplineIntegration:
         assert adapter.zipline_version is not None
         assert len(adapter.zipline_version) > 0
 
-    def test_data_loader_produces_zipline_compatible_data(self):
-        """Verify UniversalDataLoader produces Zipline-compatible data."""
-        loader = UniversalDataLoader()
-        data = loader.load_simple_equity_data(
-            ticker="AAPL", start_date="2017-01-03", end_date="2017-12-29", framework="zipline"
-        )
-
-        # Should be DataFrame with DatetimeIndex
-        assert isinstance(data, pd.DataFrame)
-        assert isinstance(data.index, pd.DatetimeIndex)
-
-        # Should have required columns
-        assert "close" in data.columns
-        assert "open" in data.columns
-        assert "high" in data.columns
-        assert "low" in data.columns
-        assert "volume" in data.columns
-
-        # Should have timezone (UTC)
-        assert data.index.tz is not None
+    # NOTE: Removed test_data_loader_produces_zipline_compatible_data
+    # UniversalDataLoader moved to projects/utils/ (development helper, not library code)

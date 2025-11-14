@@ -5,7 +5,7 @@ Unit tests for VectorBTProAdapter.
 import pandas as pd
 import pytest
 
-from .data_loader import UniversalDataLoader
+from .fixtures import get_test_data
 from .frameworks.base import ValidationResult
 from .frameworks.vectorbtpro_adapter import VectorBTProAdapter
 
@@ -14,21 +14,17 @@ class TestVectorBTProAdapter:
     """Test suite for VectorBTProAdapter."""
 
     @pytest.fixture
-    def loader(self):
-        """Create data loader instance."""
-        return UniversalDataLoader()
-
-    @pytest.fixture
     def adapter(self):
         """Create VectorBT Pro adapter instance."""
         return VectorBTProAdapter()
 
     @pytest.fixture
-    def sample_data(self, loader):
+    def sample_data(self):
         """Load sample AAPL data for testing."""
-        return loader.load_simple_equity_data(
-            ticker="AAPL", start_date="2017-01-01", end_date="2017-12-31", framework="vectorbt"
-        )
+        df = get_test_data(symbol="AAPL", start="2017-01-01", end="2017-12-31")
+        # Convert to VectorBT format (DatetimeIndex)
+        df = df.set_index("timestamp")
+        return df
 
     # ============================================================================
     # Initialization Tests

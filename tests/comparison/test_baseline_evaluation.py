@@ -671,9 +671,12 @@ class TestBaselineEvaluation:
             f"QEngine SPY test passed: {result.total_trades} trades in {result.execution_time:.2f}s",
         )
 
-    @pytest.mark.skip(reason="Requires crypto data files in projects/crypto_futures/data/")
+    @pytest.mark.skip(
+        reason="Development-only test - uses projects/ directory. "
+        "UniversalDataLoader moved to projects/utils/ (not part of library distribution)"
+    )
     def test_data_loading(self):
-        """Test that all data sources can be loaded."""
+        """Test that all data sources can be loaded from projects/ directory."""
         evaluator = BaselineEvaluator(verbose=False)
 
         # Test SPY data
