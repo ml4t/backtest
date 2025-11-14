@@ -361,7 +361,7 @@ class MultiAssetQEngineWrapper:
         # Get positions per asset
         positions = {}
         for asset_id in ohlcv_dict.keys():
-            positions[asset_id] = engine.broker.position_tracker.get_position(asset_id)
+            positions[asset_id] = engine.broker.get_position(asset_id)
 
         return {
             'trades': trades_df,
