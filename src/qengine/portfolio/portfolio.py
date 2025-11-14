@@ -15,7 +15,7 @@ import logging
 from datetime import datetime
 from typing import Any, Optional, Type
 
-from qengine.core.event import FillEvent
+from qengine.core.event import FillEvent, MarketEvent
 from qengine.core.precision import PrecisionManager
 from qengine.core.types import AssetId, Cash, Quantity
 from qengine.portfolio.core import PositionTracker
@@ -99,6 +99,18 @@ class Portfolio:
         self.state_history: list[PortfolioState] = []
 
     # ===== Event Handlers =====
+    def on_market_event(self, event: "MarketEvent") -> None:
+        """Handle market event to update position prices.
+
+        This ensures unrealized PnL reflects current market prices.
+
+        Args:
+            event: MarketEvent with current price
+        """
+        if event.close is not None:
+            # Update position prices with current market price
+            self._tracker.update_prices({event.asset_id: float(event.close)})
+
     def on_fill_event(self, event: FillEvent) -> None:
         """Handle fill event from broker.
 

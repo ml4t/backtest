@@ -25,7 +25,8 @@ class TradeRecord:
     commission: float = 0.0
 
     def __str__(self):
-        return f"{self.timestamp.strftime('%Y-%m-%d')} {self.action} {self.quantity:.2f} @ ${self.price:.2f}"
+        ts_str = self.timestamp.strftime('%Y-%m-%d') if self.timestamp else 'N/A'
+        return f"{ts_str} {self.action} {self.quantity:.2f} @ ${self.price:.2f}"
 
 
 @dataclass

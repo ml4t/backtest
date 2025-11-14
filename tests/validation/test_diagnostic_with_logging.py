@@ -210,19 +210,19 @@ def test_diagnostic_with_logging():
     results = engine.run()
 
     print(f"\n4️⃣  Results:")
-    print(f"   Final portfolio value: ${results.final_value:,.2f}")
+    print(f"   Final portfolio value: ${results['final_value']:,.2f}")
     print(f"   Entries published: {strategy.trade_count}")
     print(f"   Total orders: {strategy._order_counter}")
 
     # Get trades from broker
     trade_tracker = broker.trade_tracker
     if trade_tracker:
-        trades = trade_tracker.get_all_trades()
-        print(f"\n   Completed trades: {len(trades)}")
-        for i, trade in enumerate(trades[:5], 1):
-            print(f"     Trade {i}: entry ${trade.entry_price:,.2f} @ {trade.entry_time.strftime('%H:%M')}, "
-                  f"exit ${trade.exit_price:,.2f} @ {trade.exit_time.strftime('%H:%M')}, "
-                  f"pnl ${trade.pnl:,.2f}")
+        trades_df = trade_tracker.get_trades_df()
+        print(f"\n   Completed trades: {len(trades_df)}")
+        for i, row in enumerate(trades_df.head(5).iter_rows(named=True), 1):
+            print(f"     Trade {i}: entry ${row['entry_price']:,.2f} @ {row['entry_dt'].strftime('%H:%M')}, "
+                  f"exit ${row['exit_price']:,.2f} @ {row['exit_dt'].strftime('%H:%M')}, "
+                  f"pnl ${row['pnl']:,.2f}")
 
     print("\n" + "=" * 80)
     print("Expected: 3 entries at bars 10, 60, 110")

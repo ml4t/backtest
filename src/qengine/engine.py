@@ -126,7 +126,9 @@ class BacktestEngine:
         self.clock.subscribe(EventType.ORDER, self.broker.on_order_event)
         self.clock.subscribe(EventType.MARKET, self.broker.on_market_event)
 
-        # Portfolio subscribes to fill events
+        # Portfolio subscribes to fill and market events
+        # Market events update position prices for accurate unrealized PnL
+        self.clock.subscribe(EventType.MARKET, self.portfolio.on_market_event)
         self.clock.subscribe(EventType.FILL, self.portfolio.on_fill_event)
 
         # Reporter subscribes to all events for logging

@@ -13,8 +13,10 @@ import pytest
 
 # Add project paths
 qengine_src = Path(__file__).parent.parent.parent / "src"
+validation_dir = Path(__file__).parent
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
 sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(validation_dir))
 
 from frameworks import (
     BacktraderAdapter,
