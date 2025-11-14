@@ -166,9 +166,14 @@ class BaselineEvaluator:
         return events
 
     def run_qengine_spy_backtest(self, data: pd.DataFrame) -> EvaluationResult:
-        """Run SPY order flow strategy on QEngine."""
+        """Run SPY order flow strategy on QEngine using new DataFeed API."""
+        from qengine.data.feed import DataFeed
+        from qengine.core.assets import AssetSpec, AssetClass, AssetRegistry
+        from qengine.core.event import MarketEvent
+        from qengine.core.types import MarketDataType
+
         print("\n" + "=" * 60)
-        print("Running QEngine SPY Order Flow Backtest")
+        print("Running QEngine SPY Order Flow Backtest (New API)")
         print("=" * 60)
 
         # Start timing and memory tracking
@@ -176,8 +181,64 @@ class BaselineEvaluator:
         start_time = time.time()
 
         try:
-            # Convert data to events
-            events = self.prepare_qengine_data(data, "SPY")
+            # Prepare data (ensure required columns)
+            data_copy = data.copy()
+            if "timestamp" not in data_copy.columns and "date" in data_copy.columns:
+                data_copy = data_copy.rename(columns={"date": "timestamp"})
+
+            data_copy["timestamp"] = pd.to_datetime(data_copy["timestamp"])
+
+            # Create asset
+            asset_spec = AssetSpec(
+                asset_id="SPY",
+                asset_class=AssetClass.EQUITY,
+            )
+            registry = AssetRegistry()
+            registry.register(asset_spec)
+
+            # Create simple in-memory data feed
+            class SimpleDataFeed(DataFeed):
+                """Simple DataFrame-based data feed."""
+                def __init__(self, ohlcv_df, asset_id):
+                    self.ohlcv = ohlcv_df.reset_index(drop=True)
+                    self.asset_id = asset_id
+                    self.idx = 0
+
+                @property
+                def is_exhausted(self) -> bool:
+                    return self.idx >= len(self.ohlcv)
+
+                def get_next_event(self) -> MarketEvent | None:
+                    if self.is_exhausted:
+                        return None
+                    row = self.ohlcv.iloc[self.idx]
+                    event = MarketEvent(
+                        timestamp=row['timestamp'],
+                        asset_id=self.asset_id,
+                        data_type=MarketDataType.BAR,
+                        price=row['close'],
+                        open=row.get('open', row['close']),
+                        high=row.get('high', row['close']),
+                        low=row.get('low', row['close']),
+                        close=row['close'],
+                        volume=row.get('volume', 0),
+                    )
+                    self.idx += 1
+                    return event
+
+                def peek_next_timestamp(self):
+                    if self.is_exhausted:
+                        return None
+                    return self.ohlcv.iloc[self.idx]['timestamp']
+
+                def reset(self):
+                    self.idx = 0
+
+                def seek(self, timestamp):
+                    pass  # Not needed for this test
+
+            # Create data feed
+            data_feed = SimpleDataFeed(data_copy, "SPY")
 
             # Create strategy
             strategy = create_spy_order_flow_strategy(
@@ -190,65 +251,43 @@ class BaselineEvaluator:
                 position_scaling=0.2,
             )
 
-            # Create engine components
-            broker = SimulationBroker()
-            portfolio = Portfolio(initial_cash=100000)
-            reporter = InMemoryReporter()
-
-            # Create and configure engine
+            # Create engine with new API
             engine = BacktestEngine(
-                strategies=[strategy],
-                broker=broker,
-                portfolio=portfolio,
-                reporter=reporter,
+                data_feed=data_feed,
+                strategy=strategy,
+                initial_capital=100000,
             )
 
-            # Process events
+            # Run backtest (new API handles event loop)
+            results = engine.run()
+
+            # Get trades from trade_tracker
+            trades_df = engine.broker.trade_tracker.get_trades_df()
             trades = []
-            for event in events:
-                engine.process_event(event)
+            if not trades_df.empty:
+                for _, trade in trades_df.iterrows():
+                    trades.append({
+                        "timestamp": trade.get("entry_dt"),
+                        "asset": "SPY",
+                        "quantity": trade.get("quantity", 0),
+                        "price": trade.get("entry_price", 0),
+                        "type": "BUY" if trade.get("quantity", 0) > 0 else "SELL",
+                    })
 
-                # Track any trades
-                if hasattr(broker, "get_filled_orders"):
-                    filled = broker.get_filled_orders()
-                    for order in filled:
-                        trades.append(
-                            {
-                                "timestamp": order.timestamp,
-                                "asset": order.asset_id,
-                                "quantity": order.quantity,
-                                "price": order.fill_price,
-                                "type": "BUY" if order.quantity > 0 else "SELL",
-                            },
-                        )
-
-            # Calculate metrics
-            final_value = portfolio.get_total_value()
+            # Calculate metrics from results
+            final_value = results["final_value"]
             initial_value = 100000
             total_return = (final_value / initial_value - 1) * 100
 
-            # Simple annualized return (assuming 252 trading days)
-            days = (events[-1].timestamp - events[0].timestamp).days
+            # Simple annualized return
+            days = (data["timestamp"].iloc[-1] - data["timestamp"].iloc[0]).days
             annual_return = total_return * (252 / max(days, 1))
 
-            # Calculate win rate from trades
+            # Calculate win rate
             win_rate = 0.5  # Default
-            if trades:
-                # Group trades by position entry/exit
-                position_returns = []
-                for i in range(0, len(trades) - 1, 2):
-                    if i + 1 < len(trades):
-                        entry = trades[i]
-                        exit = trades[i + 1]
-                        ret = (
-                            (exit["price"] / entry["price"] - 1)
-                            if entry["type"] == "BUY"
-                            else (entry["price"] / exit["price"] - 1)
-                        )
-                        position_returns.append(ret)
-
-                if position_returns:
-                    win_rate = sum(1 for r in position_returns if r > 0) / len(position_returns)
+            if not trades_df.empty and "pnl" in trades_df.columns:
+                winning_trades = (trades_df["pnl"] > 0).sum()
+                win_rate = winning_trades / len(trades_df) if len(trades_df) > 0 else 0.5
 
             # Memory usage
             current, peak = tracemalloc.get_traced_memory()
@@ -261,7 +300,7 @@ class BaselineEvaluator:
             result = EvaluationResult(
                 framework="QEngine",
                 strategy="SPY Order Flow",
-                data_source="spy_features.parquet",
+                data_source="test_data",
                 total_return=total_return,
                 annual_return=annual_return,
                 sharpe_ratio=1.5,  # Placeholder - would need full equity curve
@@ -270,7 +309,7 @@ class BaselineEvaluator:
                 total_trades=len(trades),
                 execution_time=execution_time,
                 memory_usage=memory_mb,
-                data_points=len(events),
+                data_points=len(data),
                 trades=trades,
             )
 
@@ -600,16 +639,26 @@ class BaselineEvaluator:
 class TestBaselineEvaluation:
     """Test suite for baseline evaluation."""
 
-    @pytest.mark.skip(reason="Needs refactoring - uses old Engine API, BacktestEngine requires data_feed not event list")
+    @pytest.mark.skip(reason="SPY strategy adapter incompatible with current engine API - needs refactoring to match Strategy base class interface")
     def test_spy_order_flow_evaluation(self):
-        """Test SPY order flow strategy evaluation."""
+        """Test SPY order flow strategy evaluation with test data helper."""
+        # Add validation fixtures to path
+        sys.path.insert(0, str(Path(__file__).parent.parent / "validation"))
+        from fixtures import get_test_data
+
         evaluator = BaselineEvaluator(verbose=True)
 
-        # Load data
-        spy_data = evaluator.load_spy_order_flow_data()
+        # Get test data using smart fallback (qdata → yfinance → synthetic)
+        spy_data = get_test_data(
+            symbol="SPY",
+            start="2015-01-01",
+            end="2016-12-31",
+            frequency="daily",
+            verbose=True
+        )
         assert len(spy_data) > 0, "Should load SPY data"
 
-        # Run QEngine backtest
+        # Run QEngine backtest (uses new DataFeed API)
         result = evaluator.run_qengine_spy_backtest(spy_data.head(500))
 
         # Validate result
