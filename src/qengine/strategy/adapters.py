@@ -120,8 +120,9 @@ class StrategyAdapter(Strategy):
         self._target_positions: dict[AssetId, float] = {}
         self._pending_orders: dict[AssetId, list[Order]] = {}
 
-    def on_start(self) -> None:
+    def on_start(self, portfolio=None, event_bus=None) -> None:
         """Initialize external strategy."""
+        super().on_start(portfolio, event_bus)
         self.log("Starting strategy adapter")
         self.external_strategy.initialize()
 

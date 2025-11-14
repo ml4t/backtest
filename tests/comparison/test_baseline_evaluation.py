@@ -639,7 +639,10 @@ class BaselineEvaluator:
 class TestBaselineEvaluation:
     """Test suite for baseline evaluation."""
 
-    @pytest.mark.skip(reason="SPY strategy adapter incompatible with current engine API - needs refactoring to match Strategy base class interface")
+    @pytest.mark.skip(
+        reason="SPY strategy adapter has bugs - DataFrame.empty attribute error. "
+        "API signature fixed (on_start parameters) but strategy logic needs debugging."
+    )
     def test_spy_order_flow_evaluation(self):
         """Test SPY order flow strategy evaluation with test data helper."""
         # Add validation fixtures to path
