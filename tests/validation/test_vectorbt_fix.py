@@ -95,17 +95,16 @@ def test_vectorbt_implementation():
             for i, trade in enumerate(result.trades[:3]):
                 print(f"    {i + 1}. {trade}")
 
-    return result
+    # Assert the backtest succeeded
+    assert not result.has_errors, f"Backtest failed with errors: {result.errors}"
+    assert result.num_trades > 0, "No trades generated"
+    assert result.final_value > 0, "Final value must be positive"
 
 
 if __name__ == "__main__":
-    result = test_vectorbt_implementation()
-
-    if result.has_errors:
-        print("\n❌ VectorBT implementation still has issues")
-        sys.exit(1)
-    else:
+    try:
+        test_vectorbt_implementation()
         print("\n✅ VectorBT implementation fixed successfully!")
-        print(
-            f"Framework returned {result.num_trades} trades with {result.total_return:.2f}% return",
-        )
+    except AssertionError as e:
+        print(f"\n❌ VectorBT implementation still has issues: {e}")
+        sys.exit(1)
