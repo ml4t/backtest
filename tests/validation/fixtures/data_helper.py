@@ -177,9 +177,16 @@ class TestDataProvider:
             if df.empty:
                 return None
 
+            # Handle multi-level columns (Price/Close, Ticker/SPY)
+            if isinstance(df.columns, pd.MultiIndex):
+                # Flatten: take first level only (Price -> Close, High, Low, etc.)
+                df.columns = df.columns.get_level_values(0)
+
+            # Reset index to get date column
+            df = df.reset_index()
+
             # Standardize column names (yfinance uses capitalized)
             df.columns = df.columns.str.lower()
-            df = df.reset_index()
 
             # Rename date/datetime column to timestamp
             if "date" in df.columns:
@@ -189,8 +196,10 @@ class TestDataProvider:
 
             return df
 
-        except Exception:
+        except Exception as e:
             # yfinance failed - fall back
+            if self.verbose:
+                print(f"yfinance failed: {e}")
             return None
 
     def _generate_synthetic(
