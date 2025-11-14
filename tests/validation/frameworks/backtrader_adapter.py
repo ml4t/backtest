@@ -167,6 +167,10 @@ class BacktraderAdapter(BaseFrameworkAdapter):
             cerebro.broker.setcash(initial_capital)
             cerebro.broker.setcommission(commission=0.0)  # No commission for comparison
 
+            # CRITICAL: Enable cheat-on-close to execute at close of current bar (not next bar open)
+            # This matches QEngine/VectorBT behavior which execute on same bar as signal
+            cerebro.broker.set_coc(True)
+
             # Run backtest
             strategies = cerebro.run()
             strategy_instance = strategies[0]
@@ -192,7 +196,8 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                 )
                 result.trades.append(trade_record)
 
-            result.num_trades = len(result.trades)
+            # Count round-trip trades (pairs of buy/sell), not individual orders
+            result.num_trades = len(result.trades) // 2
 
             # Calculate win rate from paired trades
             if len(result.trades) >= 2:
