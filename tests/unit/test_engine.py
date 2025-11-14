@@ -179,9 +179,38 @@ class TestBacktestEngine:
 
         # DataFeed no longer has initialize method - date range is handled by engine
 
-    @pytest.mark.skip(reason="TODO: Mock datafeed needs update for Clock-driven architecture")
-    def test_run_with_max_events(self, engine, mock_data_feed):
+    def test_run_with_max_events(self, mock_strategy, mock_broker, mock_portfolio, mock_reporter):
         """Test run stops at max_events limit."""
+        from qengine.data.feed import DataFeed
+
+        # Create a simple mock data feed class that works with Clock
+        class SimpleMockDataFeed(DataFeed):
+            def __init__(self, events):
+                self.events = events
+                self.index = 0
+
+            def get_next_event(self):
+                if self.index >= len(self.events):
+                    return None
+                event = self.events[self.index]
+                self.index += 1
+                return event
+
+            def peek_next_timestamp(self):
+                if self.index >= len(self.events):
+                    return None
+                return self.events[self.index].timestamp
+
+            @property
+            def is_exhausted(self):
+                return self.index >= len(self.events)
+
+            def reset(self):
+                self.index = 0
+
+            def seek(self, timestamp):
+                pass
+
         # Create multiple market events
         events = [
             MarketEvent(
@@ -193,28 +222,16 @@ class TestBacktestEngine:
             for i in range(10)
         ]
 
-        # Setup mock datafeed to work with Clock-driven architecture
-        mock_data_feed._events = events
-        mock_data_feed._index = 0
-
-        def get_next_event_func():
-            if mock_data_feed._index < len(mock_data_feed._events):
-                event = mock_data_feed._events[mock_data_feed._index]
-                mock_data_feed._index += 1
-                return event
-            return None
-
-        def peek_next_timestamp_func():
-            if mock_data_feed._index < len(mock_data_feed._events):
-                return mock_data_feed._events[mock_data_feed._index].timestamp
-            return None
-
-        def is_exhausted_func():
-            return mock_data_feed._index >= len(mock_data_feed._events)
-
-        mock_data_feed.get_next_event = Mock(side_effect=get_next_event_func)
-        mock_data_feed.peek_next_timestamp = Mock(side_effect=peek_next_timestamp_func)
-        type(mock_data_feed).is_exhausted = property(lambda self: is_exhausted_func())
+        # Create engine with real mock datafeed
+        mock_data_feed = SimpleMockDataFeed(events)
+        engine = BacktestEngine(
+            data_feed=mock_data_feed,
+            strategy=mock_strategy,
+            broker=mock_broker,
+            portfolio=mock_portfolio,
+            reporter=mock_reporter,
+            initial_capital=100000.0,
+        )
 
         # Run engine with max_events limit (Clock-driven)
         results = engine.run(max_events=5)

@@ -6,9 +6,9 @@ from typing import List
 import pytest
 
 from qengine.core.clock import Clock, ClockMode
-from qengine.core.event import MarketEvent
+from qengine.core.event import MarketEvent, SignalEvent
 from qengine.core.types import MarketDataType
-from qengine.data.feed import DataFeed
+from qengine.data.feed import DataFeed, SignalSource
 
 
 class MockDataFeed(DataFeed):
@@ -50,6 +50,38 @@ class MockDataFeed(DataFeed):
         """Reset the feed to the beginning."""
         self.index = 0
         self._is_exhausted = False
+
+
+class MockSignalSource(SignalSource):
+    """Mock signal source for testing."""
+
+    def __init__(self, signals: List[SignalEvent]):
+        """Initialize with a list of signal events."""
+        self.signals = signals
+        self.index = 0
+
+    def get_next_signal(self) -> SignalEvent | None:
+        """Get the next signal."""
+        if self.index >= len(self.signals):
+            return None
+        signal = self.signals[self.index]
+        self.index += 1
+        return signal
+
+    def peek_next_timestamp(self) -> datetime | None:
+        """Peek at the next timestamp without consuming."""
+        if self.index >= len(self.signals):
+            return None
+        return self.signals[self.index].timestamp
+
+    @property
+    def is_exhausted(self) -> bool:
+        """Check if the source has no more signals."""
+        return self.index >= len(self.signals)
+
+    def reset(self) -> None:
+        """Reset the signal source to the beginning."""
+        self.index = 0
 
 
 class TestClockMultiFeed:
@@ -680,29 +712,27 @@ class TestClockResetAndStats:
 class TestClockSignalSources:
     """Test Clock signal source integration."""
 
-    @pytest.mark.skip(
-        reason="Need to create MockSignalSource - SignalSource uses get_next_signal()/SignalEvent, not get_next_event()/MarketEvent"
-    )
     def test_add_signal_source_increments_count(self):
         """Test that adding a signal source is tracked in stats."""
         clock = Clock(mode=ClockMode.BACKTEST)
 
-        # TODO: Create MockSignalSource implementing SignalSource interface
-        # SignalSource interface:
-        #   - get_next_signal() -> SignalEvent | None
-        #   - peek_next_timestamp() -> datetime | None
-        #   - reset() -> None
-        # (Different from DataFeed which returns MarketEvent)
+        # Create signal source
+        signals = [
+            SignalEvent(
+                timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc),
+                asset_id="AAPL",
+                signal_value=1.0,
+                model_id="test_model",
+            )
+        ]
+        signal_source = MockSignalSource(signals)
+        clock.add_signal_source(signal_source)
 
-        # signal_source = MockSignalSource(signals)
-        # clock.add_signal_source(signal_source)
-        # stats = clock.stats
-        # assert stats["signal_sources"] == 1
-        # assert stats["queue_size"] == 1
+        # Verify signal source is tracked
+        stats = clock.stats
+        assert stats["signal_sources"] == 1
+        assert stats["queue_size"] == 1
 
-    @pytest.mark.skip(
-        reason="Need to create MockSignalSource - SignalSource uses get_next_signal()/SignalEvent, not get_next_event()/MarketEvent"
-    )
     def test_mixed_feeds_and_signal_sources(self):
         """Test clock with both data feeds and signal sources."""
         clock = Clock(mode=ClockMode.BACKTEST)
@@ -722,17 +752,15 @@ class TestClockSignalSources:
         clock.add_data_feed(data_feed)
 
         # Add signal source
-        signal_events = [
-            MarketEvent(
+        signals = [
+            SignalEvent(
                 timestamp=datetime(2024, 1, 1, 9, 45, tzinfo=timezone.utc),
-                asset_id="SIGNAL",
-                data_type=MarketDataType.TICK,
-                price=1.0,
-                close=1.0,
-                volume=1,
+                asset_id="SIGNAL_MODEL",
+                signal_value=1.0,
+                model_id="test_model",
             )
         ]
-        signal_source = MockDataFeed(signal_events)
+        signal_source = MockSignalSource(signals)
         clock.add_signal_source(signal_source)
 
         # Verify both are tracked
@@ -743,7 +771,7 @@ class TestClockSignalSources:
 
         # Signal should come first (earlier timestamp)
         first_event = clock.get_next_event()
-        assert first_event.asset_id == "SIGNAL"
+        assert first_event.asset_id == "SIGNAL_MODEL"
 
         second_event = clock.get_next_event()
         assert second_event.asset_id == "AAPL"
