@@ -34,7 +34,11 @@ class VectorBTAdapter(BaseFrameworkAdapter):
         )
 
         try:
-            import vectorbt as vbt
+            # Try vectorbtpro first, fallback to vectorbt (open source)
+            try:
+                import vectorbtpro as vbt
+            except ImportError:
+                import vectorbt as vbt
 
             tracemalloc.start()
             start_time = time.time()
@@ -43,16 +47,12 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             short_window = strategy_params.get("short_window", 20)
             long_window = strategy_params.get("long_window", 50)
 
-            # Calculate moving averages using vectorbt
+            # Calculate moving averages
             close_prices = data["close"]
 
-            # Use vectorbt's MA indicator
-            ma_short = vbt.MA.run(close_prices, window=short_window)
-            ma_long = vbt.MA.run(close_prices, window=long_window)
-
-            # Extract the actual moving average values
-            ma_short_values = ma_short.ma
-            ma_long_values = ma_long.ma
+            # Use pandas rolling for consistency with other frameworks
+            ma_short_values = close_prices.rolling(window=short_window, min_periods=short_window).mean()
+            ma_long_values = close_prices.rolling(window=long_window, min_periods=long_window).mean()
 
             # Generate entry and exit signals
             # Entry: short MA crosses above long MA
@@ -83,31 +83,36 @@ class VectorBTAdapter(BaseFrameworkAdapter):
                 freq="D",  # Daily frequency
             )
 
-            # Extract results - use proper vectorbt 0.28.0 API
-            result.final_value = float(pf.final_value())
-            result.total_return = float(pf.total_return()) * 100
+            # Extract results - compatible with both vectorbt and vectorbtpro
+            result.final_value = float(pf.value.iloc[-1] if hasattr(pf.value, 'iloc') else pf.value())
+            result.total_return = float(pf.total_return * 100 if isinstance(pf.total_return, (int, float)) else pf.total_return() * 100)
 
-            # Get number of trades from orders
-            if hasattr(pf, "orders") and hasattr(pf.orders, "records"):
-                result.num_trades = len(pf.orders.records)
+            # Get number of trades (round trips, not individual orders)
+            if hasattr(pf, "trades") and hasattr(pf.trades, "records"):
+                result.num_trades = len(pf.trades.records)
+            elif hasattr(pf, "orders") and hasattr(pf.orders, "records"):
+                # Fallback: count orders and divide by 2 for round trips
+                result.num_trades = len(pf.orders.records) // 2
             else:
                 result.num_trades = 0
 
-            # Get performance metrics
+            # Get performance metrics - compatible with both APIs
             try:
-                result.sharpe_ratio = float(pf.sharpe_ratio())
+                sr = pf.sharpe_ratio
+                result.sharpe_ratio = float(sr if isinstance(sr, (int, float)) else sr())
             except:
                 result.sharpe_ratio = 0.0
 
             try:
-                result.max_drawdown = float(pf.max_drawdown()) * 100
+                md = pf.max_drawdown
+                result.max_drawdown = float(md if isinstance(md, (int, float)) else md()) * 100
             except:
                 result.max_drawdown = 0.0
 
             # Get equity curve and returns
             try:
-                result.equity_curve = pf.value()
-                result.daily_returns = pf.returns()
+                result.equity_curve = pf.value if hasattr(pf.value, 'index') else pf.value()
+                result.daily_returns = pf.returns if hasattr(pf.returns, 'index') else pf.returns()
             except:
                 result.equity_curve = pd.Series()
                 result.daily_returns = pd.Series()

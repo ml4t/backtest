@@ -62,9 +62,6 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                         period=self.params.long_window,
                     )
 
-                    # Create crossover signal
-                    self.crossover = bt.indicators.CrossOver(self.ma_short, self.ma_long)
-
                     # Track trades manually for debugging
                     self.trade_log = []
                     self.order = None  # Keep track of pending orders
@@ -77,9 +74,22 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                     current_date = self.data.datetime.date(0)
                     current_price = self.data.close[0]
 
+                    # Manual crossover detection to match QEngine/VectorBT logic
+                    # This uses asymmetric operators to prevent whipsaw
+                    current_short = self.ma_short[0]
+                    current_long = self.ma_long[0]
+                    prev_short = self.ma_short[-1]
+                    prev_long = self.ma_long[-1]
+
+                    # Golden cross: short MA crosses above long MA
+                    golden_cross = (prev_short <= prev_long) and (current_short > current_long)
+
+                    # Death cross: short MA crosses below long MA
+                    death_cross = (prev_short > prev_long) and (current_short <= current_long)
+
                     # Check for golden cross (go long)
                     if not self.position:
-                        if self.crossover > 0:  # MA short crosses above MA long
+                        if golden_cross:
                             # Calculate position size (use all available cash)
                             cash = self.broker.getcash()
                             size = cash / current_price
@@ -93,15 +103,14 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                                     "price": current_price,
                                     "size": size,
                                     "cash_before": cash,
-                                    "ma_short": self.ma_short[0],
-                                    "ma_long": self.ma_long[0],
-                                    "crossover": self.crossover[0],
+                                    "ma_short": current_short,
+                                    "ma_long": current_long,
                                 },
                             )
 
                     # Check for death cross (go flat)
                     else:
-                        if self.crossover < 0:  # MA short crosses below MA long
+                        if death_cross:
                             # Close position
                             self.order = self.close()
                             self.trade_log.append(
@@ -110,9 +119,8 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                                     "action": "SELL_SIGNAL",
                                     "price": current_price,
                                     "position_size": self.position.size,
-                                    "ma_short": self.ma_short[0],
-                                    "ma_long": self.ma_long[0],
-                                    "crossover": self.crossover[0],
+                                    "ma_short": current_short,
+                                    "ma_long": current_long,
                                 },
                             )
 
