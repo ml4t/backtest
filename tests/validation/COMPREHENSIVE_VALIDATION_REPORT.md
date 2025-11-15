@@ -1,8 +1,8 @@
-# QEngine Cross-Framework Validation Report
+# ml4t.backtest Cross-Framework Validation Report
 
 ## Executive Summary
 
-We have successfully validated QEngine against multiple established backtesting frameworks (Zipline-Reloaded, VectorBT, Backtrader) using both single-asset and multi-asset strategies. **QEngine demonstrates 100% agreement with VectorBT across all tests while being 9-265x faster.**
+We have successfully validated ml4t.backtest against multiple established backtesting frameworks (Zipline-Reloaded, VectorBT, Backtrader) using both single-asset and multi-asset strategies. **ml4t.backtest demonstrates 100% agreement with VectorBT across all tests while being 9-265x faster.**
 
 ## Test Results
 
@@ -13,12 +13,12 @@ We have successfully validated QEngine against multiple established backtesting 
 
 | Framework | Final Value | Return (%) | Trades | Time (s) | Status |
 |-----------|------------|------------|--------|----------|--------|
-| QEngine | $1,507.06 | -84.93% | 14 | 0.009 | ✅ Baseline |
+| ml4t.backtest | $1,507.06 | -84.93% | 14 | 0.009 | ✅ Baseline |
 | VectorBT | $1,507.06 | -84.93% | 14 | 2.412 | ✅ Perfect Match |
 | Zipline | $11,311.65 | +13.12% | 10 | 1.150 | ⚠️ Data Difference |
 | Backtrader | $9,799.17 | -2.01% | 9 | 0.053 | ❌ Known Bug |
 
-**Key Finding**: QEngine and VectorBT produce identical results down to the penny, validating correctness.
+**Key Finding**: ml4t.backtest and VectorBT produce identical results down to the penny, validating correctness.
 
 ### 2. Multi-Asset Portfolio (30 Stocks, 2013-2017)
 - **Data**: Top 30 liquid stocks from Wiki dataset
@@ -28,32 +28,32 @@ We have successfully validated QEngine against multiple established backtesting 
 
 | Framework | Final Value | Return (%) | Trades | Time (s) | Status |
 |-----------|------------|------------|--------|----------|--------|
-| QEngine | $95,481.01 | -4.52% | 4,960 | 0.580 | ✅ Baseline |
+| ml4t.backtest | $95,481.01 | -4.52% | 4,960 | 0.580 | ✅ Baseline |
 | VectorBT | $95,481.01 | -4.52% | 4,960 | 5.406 | ✅ Perfect Match |
 | Zipline | - | - | - | - | ❌ Asset availability issues |
 
-**Key Finding**: Perfect agreement with ~5,000 trades proves QEngine's reliability at scale.
+**Key Finding**: Perfect agreement with ~5,000 trades proves ml4t.backtest's reliability at scale.
 
 ## Performance Benchmarks
 
 ### Speed Comparison (Single Asset)
-- **QEngine**: 0.009s (baseline)
+- **ml4t.backtest**: 0.009s (baseline)
 - **Backtrader**: 0.053s (5.9x slower)
 - **Zipline**: 1.150s (126x slower)
 - **VectorBT**: 2.412s (265x slower)
 
 ### Speed Comparison (Multi-Asset, 5000 trades)
-- **QEngine**: 0.580s (baseline)
+- **ml4t.backtest**: 0.580s (baseline)
 - **VectorBT**: 5.406s (9.3x slower)
 
 ### Scalability
-- QEngine maintains sub-second performance even with 5,000 trades
+- ml4t.backtest maintains sub-second performance even with 5,000 trades
 - Linear scaling with number of assets and trades
 - Memory efficient with large datasets
 
 ## Framework Comparison
 
-### QEngine Advantages
+### ml4t.backtest Advantages
 ✅ **Fastest execution** - 9-265x faster than alternatives
 ✅ **Perfect accuracy** - 100% agreement with VectorBT
 ✅ **Clean API** - No metaclass magic or complex setup
@@ -75,7 +75,7 @@ We have successfully validated QEngine against multiple established backtesting 
 
 #### VectorBT
 - ✅ Accurate results
-- ⚠️ Slow performance (265x slower than QEngine)
+- ⚠️ Slow performance (265x slower than ml4t.backtest)
 - ⚠️ API changes between versions
 
 ## Validation Methodology
@@ -100,14 +100,14 @@ We have successfully validated QEngine against multiple established backtesting 
 
 ## Conclusions
 
-### 1. QEngine is Production-Ready
+### 1. ml4t.backtest is Production-Ready
 - **Correctness proven**: 100% agreement with VectorBT across all tests
 - **Performance validated**: 9-265x faster than alternatives
 - **Scale tested**: Handles 5,000+ trades efficiently
 
 ### 2. Use Case Recommendations
 
-#### Choose QEngine for:
+#### Choose ml4t.backtest for:
 - High-frequency strategies requiring speed
 - Large-scale portfolio backtesting
 - ML-driven strategies with many signals
@@ -129,7 +129,7 @@ We have successfully validated QEngine against multiple established backtesting 
 
 ### Test Environment
 - **Python**: 3.12.9
-- **QEngine**: Latest development version
+- **ml4t.backtest**: Latest development version
 - **VectorBT**: 0.28.0
 - **Zipline-Reloaded**: Latest with quandl bundle
 - **Backtrader**: 1.9.78.123
@@ -149,11 +149,11 @@ We have successfully validated QEngine against multiple established backtesting 
 4. `high_frequency_strategies.py` - Strategy implementations
 
 ### Reproducibility
-All test code is available in `/home/stefan/quantlab/qengine/tests/validation/`
+All test code is available in `/home/stefan/quantlab/ml4t.backtest/tests/validation/`
 Results are fully reproducible with the same data and random seeds.
 
 ---
 
 **Report Generated**: 2024-08-08
-**Author**: QEngine Development Team
+**Author**: ml4t.backtest Development Team
 **Status**: VALIDATION SUCCESSFUL ✅

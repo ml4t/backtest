@@ -1,7 +1,7 @@
-QEngine Documentation
+ml4t.backtest Documentation
 =====================
 
-QEngine is an event-driven backtesting engine with institutional-grade execution fidelity.
+ml4t.backtest is an event-driven backtesting engine with institutional-grade execution fidelity.
 
 **Core Mission**: Replicate real trading conditions with point-in-time correctness and realistic execution.
 
@@ -40,16 +40,16 @@ Installation
 
 .. code-block:: bash
 
-   pip install qengine
+   pip install ml4t.backtest
 
 Basic Example
 ^^^^^^^^^^^^^
 
 .. code-block:: python
 
-   from qengine.engine import BacktestEngine
-   from qengine.execution.broker import SimulationBroker
-   from qengine.strategy.base import Strategy
+   from ml4t.backtest.engine import BacktestEngine
+   from ml4t.backtest.execution.broker import SimulationBroker
+   from ml4t.backtest.strategy.base import Strategy
 
    # Create your strategy
    class MyStrategy(Strategy):

@@ -14,7 +14,7 @@ All acceptance criteria met:
 
 **Solution**: Copied complete `data` module from main `.venv` (Python 3.13) to `resources/vectorbt.pro-main/vectorbtpro/data/`.
 
-**Source of complete module**: The main QEngine venv (`.venv/lib/python3.13/site-packages/vectorbtpro/`) had a complete VectorBT Pro installation with the data module.
+**Source of complete module**: The main ml4t.backtest venv (`.venv/lib/python3.13/site-packages/vectorbtpro/`) had a complete VectorBT Pro installation with the data module.
 
 ## Verification Test Results
 

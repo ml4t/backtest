@@ -11,7 +11,7 @@ project_root = Path(__file__).parents[3]
 sys.path.insert(0, str(project_root / "src"))
 
 # -- Project information -----------------------------------------------------
-project = 'qengine'
+project = 'ml4t.backtest'
 copyright = '2024, ML4T'
 author = 'ML4T'
 release = '0.1.0'

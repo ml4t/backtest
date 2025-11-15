@@ -33,7 +33,7 @@ from common import (
     load_real_crypto_data,
     generate_entry_exit_pairs,
     BacktestConfig,
-    QEngineWrapper,
+    ml4t.backtestWrapper,
     VectorBTWrapper,
     print_validation_report,
 )
@@ -84,12 +84,12 @@ def test_1_2_entry_exit_pairs():
 
     print("\n4️⃣  Running backtests...")
 
-    # Run qengine
-    print("   🔧 Running qengine...")
+    # Run ml4t.backtest
+    print("   🔧 Running ml4t.backtest...")
     try:
-        qengine = QEngineWrapper()
-        results['qengine'] = qengine.run_backtest(ohlcv, entries, exits=exits, config=config)
-        print(f"      ✅ Complete: {results['qengine'].num_trades} trades")
+        ml4t.backtest = ml4t.backtestWrapper()
+        results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config)
+        print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
     except Exception as e:
         print(f"      ❌ Failed: {e}")
         import traceback

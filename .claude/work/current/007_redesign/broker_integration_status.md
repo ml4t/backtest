@@ -22,12 +22,12 @@ Broker integration partially working but reveals **pre-existing AssetSpec/Precis
 
 ### Issue 1: AssetSpec Missing Methods
 **Error**: `AttributeError: 'AssetSpec' object has no attribute 'get_precision_manager'`
-**Location**: `src/qengine/execution/fill_simulator.py:432`
+**Location**: `src/ml4t.backtest/execution/fill_simulator.py:432`
 **Affected tests**: Fill simulator tests, broker order processing tests
 
 ### Issue 2: Order PrecisionManager Initialization
 **Error**: `AttributeError: 'NoneType' object has no attribute 'round_quantity'`
-**Location**: `src/qengine/execution/order.py:329`
+**Location**: `src/ml4t.backtest/execution/order.py:329`
 **Cause**: Orders created without PrecisionManager instances
 
 ### Failing Tests (Pre-Existing)

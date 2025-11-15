@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-✅ **QEngine, VectorBT Pro, and Backtrader produce IDENTICAL results** when using:
+✅ **ml4t.backtest, VectorBT Pro, and Backtrader produce IDENTICAL results** when using:
 - Same data source
 - Same signal generation logic
 - Same execution timing (same-bar vs next-bar)
@@ -21,7 +21,7 @@
 
 | Framework | Return | Trades | Final Value | Execution Time | Status |
 |-----------|--------|--------|-------------|----------------|--------|
-| **QEngine** | -4.82% | 13 | $9,517.69 | 0.97s | ✅ Reference |
+| **ml4t.backtest** | -4.82% | 13 | $9,517.69 | 0.97s | ✅ Reference |
 | **VectorBT Pro** | -4.82% | 13 | $9,517.62 | 0.56s | ✅ Match |
 | **Backtrader** | -4.82% | 12* | $9,517.62 | 0.15s | ✅ Match |
 | **Zipline** | +5.99% | 27 | $10,599.25 | ? | ❌ Different data |
@@ -41,7 +41,7 @@ except ImportError:
     import vectorbt as vbt
 ```
 
-**Result**: VectorBT now works and matches QEngine perfectly.
+**Result**: VectorBT now works and matches ml4t.backtest perfectly.
 
 ---
 
@@ -55,31 +55,31 @@ except ImportError:
 ---
 
 ### 3. Backtrader - Next-Bar Execution ✅ FIXED
-**Problem**: Backtrader executed orders on bar N+1 (next-bar open), while QEngine/VectorBT execute on bar N (same-bar close).
+**Problem**: Backtrader executed orders on bar N+1 (next-bar open), while ml4t.backtest/VectorBT execute on bar N (same-bar close).
 
 **Evidence**:
 ```
-Signal Date | QEngine Entry | Backtrader Entry (before fix)
+Signal Date | ml4t.backtest Entry | Backtrader Entry (before fix)
 -----------+---------------+---------------------------
 2015-03-30 | BUY @ $126.37 | BUY on 2015-03-31 @ $126.09
 2015-04-01 | SELL@ $124.25 | SELL on 2015-04-02 @ $125.03
 ```
 
-**Impact**: 18% return discrepancy (QEngine: -4.82%, Backtrader: +13.27%)
+**Impact**: 18% return discrepancy (ml4t.backtest: -4.82%, Backtrader: +13.27%)
 
 **Solution**: Enable `cheat_on_close=True` in Backtrader broker:
 ```python
 cerebro.broker.set_coc(True)
 ```
 
-**Result**: Backtrader now executes on same bar, matches QEngine/VectorBT perfectly.
+**Result**: Backtrader now executes on same bar, matches ml4t.backtest/VectorBT perfectly.
 
 ---
 
 ### 4. Backtrader - Asymmetric Crossover Logic ✅ FIXED
-**Problem**: Used `bt.indicators.CrossOver()` which has different logic than QEngine/VectorBT.
+**Problem**: Used `bt.indicators.CrossOver()` which has different logic than ml4t.backtest/VectorBT.
 
-**Solution**: Replaced with manual detection matching QEngine logic:
+**Solution**: Replaced with manual detection matching ml4t.backtest logic:
 ```python
 golden_cross = (prev_short <= prev_long) and (current_short > current_long)
 death_cross = (prev_short > prev_long) and (current_short <= current_long)
@@ -102,7 +102,7 @@ death_cross = (prev_short > prev_long) and (current_short <= current_long)
 
 ## Framework Characteristics
 
-### QEngine (ml4t-backtest)
+### ml4t.backtest (mlquant-backtest)
 - **Execution Model**: Event-driven, same-bar close execution
 - **MA Calculation**: pandas rolling()
 - **Performance**: 0.97s for 504 bars
@@ -112,13 +112,13 @@ death_cross = (prev_short > prev_long) and (current_short <= current_long)
 - **Execution Model**: Vectorized, Portfolio.from_signals()
 - **MA Calculation**: pandas rolling()
 - **Performance**: 0.56s for 504 bars (fastest)
-- **Validation**: Matches QEngine exactly ✅
+- **Validation**: Matches ml4t.backtest exactly ✅
 
 ### Backtrader
 - **Execution Model**: Event-driven, configurable execution timing
 - **MA Calculation**: bt.indicators.SimpleMovingAverage()
 - **Performance**: 0.15s for 504 bars
-- **Validation**: Matches QEngine after enabling cheat-on-close ✅
+- **Validation**: Matches ml4t.backtest after enabling cheat-on-close ✅
 - **Note**: Requires `set_coc(True)` for same-bar execution
 
 ### Zipline-Reloaded 3.1.1
@@ -134,7 +134,7 @@ death_cross = (prev_short > prev_long) and (current_short <= current_long)
 
 First 5 trades (all frameworks now match):
 
-| Date | Signal | QEngine | VectorBT | Backtrader |
+| Date | Signal | ml4t.backtest | VectorBT | Backtrader |
 |------|--------|---------|----------|------------|
 | 2015-03-30 | ENTRY | BUY 79.12 @ $126.37 | BUY @ $126.37 | BUY 79.13 @ $126.37 |
 | 2015-04-01 | EXIT  | SELL 79.12 @ $124.25 | SELL @ $124.25 | SELL 79.13 @ $124.25 |
@@ -208,7 +208,7 @@ This prevents rapid oscillation when MAs are very close.
 ## Conclusions
 
 ### ✅ Validated
-**QEngine produces identical results to VectorBT Pro and Backtrader** when:
+**ml4t.backtest produces identical results to VectorBT Pro and Backtrader** when:
 1. Using the same input data
 2. Using the same crossover logic (asymmetric operators)
 3. Using the same execution timing (same-bar close)
@@ -216,7 +216,7 @@ This prevents rapid oscillation when MAs are very close.
 ### 📊 Performance
 - VectorBT Pro: Fastest (0.56s) due to vectorization
 - Backtrader: Fast (0.15s) with efficient indicators
-- QEngine: Moderate (0.97s) event-driven overhead
+- ml4t.backtest: Moderate (0.97s) event-driven overhead
 
 ### ⚠️ Limitations
 - Zipline requires significant rework to use custom data
@@ -224,7 +224,7 @@ This prevents rapid oscillation when MAs are very close.
 - All frameworks tested on single-asset, daily data only
 
 ### 🎯 Recommendations
-1. **For production**: Use QEngine with confidence - validated against industry standards
+1. **For production**: Use ml4t.backtest with confidence - validated against industry standards
 2. **For speed**: VectorBT Pro is fastest for vectorizable strategies
 3. **For Zipline**: Avoid unless you need Zipline-specific features (Pipeline API, etc.)
 4. **Execution timing**: Always verify same-bar vs next-bar execution in any framework
@@ -233,10 +233,10 @@ This prevents rapid oscillation when MAs are very close.
 
 ## Files Modified
 
-1. `tests/validation/frameworks/qengine_adapter.py` - Use real QEngineWrapper
+1. `tests/validation/frameworks/ml4t.backtest_adapter.py` - Use real ml4t.backtestWrapper
 2. `tests/validation/frameworks/vectorbt_adapter.py` - Import vectorbtpro, fix trade counting
 3. `tests/validation/frameworks/backtrader_adapter.py` - Enable cheat-on-close, manual crossover
-4. `tests/validation/test_pytest_integration.py` - Now validates real qengine library
+4. `tests/validation/test_pytest_integration.py` - Now validates real ml4t.backtest library
 
 ---
 
@@ -245,7 +245,7 @@ This prevents rapid oscillation when MAs are very close.
 **test_pytest_integration.py**: 7 passed, 1 skipped
 
 Passing tests:
-- ✅ test_qengine_performance
+- ✅ test_ml4t.backtest_performance
 - ✅ test_different_strategy_parameters (3 variants)
 - ✅ test_edge_cases
 - ✅ test_known_good_results
@@ -255,4 +255,4 @@ Skipped tests:
 
 ---
 
-**Validation Status: COMPLETE for QEngine, VectorBT Pro, and Backtrader** ✅
+**Validation Status: COMPLETE for ml4t.backtest, VectorBT Pro, and Backtrader** ✅

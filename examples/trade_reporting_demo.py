@@ -1,4 +1,4 @@
-"""Demo of trade reporting functionality in qengine.
+"""Demo of trade reporting functionality in ml4t.backtest.
 
 Shows how to access trades DataFrame after a backtest and compare with VectorBT format.
 """
@@ -6,18 +6,18 @@ Shows how to access trades DataFrame after a backtest and compare with VectorBT 
 import pandas as pd
 from datetime import datetime, timezone
 
-from qengine.core.assets import AssetRegistry, AssetSpec, AssetClass
-from qengine.core.event import MarketEvent
-from qengine.core.types import AssetId, OrderSide, OrderType, MarketDataType
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.order import Order
+from ml4t.backtest.core.assets import AssetRegistry, AssetSpec, AssetClass
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import AssetId, OrderSide, OrderType, MarketDataType
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.order import Order
 
 
 def demo_trade_reporting():
     """Demonstrate trade reporting with clean output format."""
 
     print("=" * 80)
-    print("QEngine Trade Reporting Demo")
+    print("ml4t.backtest Trade Reporting Demo")
     print("=" * 80)
     print()
 
@@ -143,7 +143,7 @@ def demo_trade_reporting():
     print()
 
     # Show comparison with VectorBT format
-    print("Column Name Comparison (qengine vs VectorBT):")
+    print("Column Name Comparison (ml4t.backtest vs VectorBT):")
     print("-" * 80)
     comparison = [
         ("trade_id", "Exit Trade Id"),
@@ -159,8 +159,8 @@ def demo_trade_reporting():
         ("direction", "Direction"),
     ]
 
-    for qengine_col, vbt_col in comparison:
-        print(f"  {qengine_col:20s} → {vbt_col}")
+    for ml4t.backtest_col, vbt_col in comparison:
+        print(f"  {ml4t.backtest_col:20s} → {vbt_col}")
 
     print()
     print("✓ Clean snake_case column names (no capitals or spaces!)")

@@ -6,7 +6,7 @@
 
 ## Objective
 
-Build production-quality validation infrastructure that tests qengine against VectorBT, Backtrader, and Zipline using real market data.
+Build production-quality validation infrastructure that tests ml4t.backtest against VectorBT, Backtrader, and Zipline using real market data.
 
 ## Success Criteria
 
@@ -66,12 +66,12 @@ We moved from synthetic data to real market data to:
 
 **Current Status**:
 - ✅ Backtrader: 2 trades extracted successfully
-- ❌ qengine: 0 trades (not executing signals)
+- ❌ ml4t.backtest: 0 trades (not executing signals)
 - ❌ VectorBT: 0 trades (not executing signals)
 - ⏸️ Zipline: Bundle ready, not tested yet
 
 **Issues to Resolve**:
-1. Why are qengine and VectorBT not executing trades?
+1. Why are ml4t.backtest and VectorBT not executing trades?
    - Signal dates are valid (confirmed in dataset)
    - Data is properly formatted
    - Likely signal processing or platform setup issue
@@ -98,7 +98,7 @@ Build 25-scenario test suite following TDD:
    - Timezone-aware timestamps (UTC)
 
 2. **Platform Integration**
-   - qengine: Event-driven execution
+   - ml4t.backtest: Event-driven execution
    - VectorBT: Vectorized backtesting
    - Backtrader: Strategy-based execution
    - Zipline: Algorithm API with bundles
@@ -129,7 +129,7 @@ Build 25-scenario test suite following TDD:
 ## Dependencies
 
 - Python 3.9+
-- qengine (local package)
+- ml4t.backtest (local package)
 - VectorBT (installed)
 - Backtrader (installed)
 - Zipline-reloaded (installed)

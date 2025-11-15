@@ -1,13 +1,13 @@
 # Layer 1 Diagnostics: Findings
 
 **Execution Date**: 2025-10-28
-**Data Source**: `data/trade_logs/qengine_trades_q1_2024.parquet`
+**Data Source**: `data/trade_logs/ml4t.backtest_trades_q1_2024.parquet`
 
 ---
 
 ## Executive Summary
 
-**MAJOR DISCOVERY**: qengine is working MUCH better than initially thought!
+**MAJOR DISCOVERY**: ml4t.backtest is working MUCH better than initially thought!
 
 **Key Metrics**:
 - **Trade Count**: 383 trades (vs VectorBT 482) - **Only 20% discrepancy**, not 30%
@@ -23,7 +23,7 @@
 
 ### 1. Trade Count Analysis
 
-| Metric | qengine | VectorBT | Difference |
+| Metric | ml4t.backtest | VectorBT | Difference |
 |--------|---------|----------|------------|
 | **Total Trades** | 383 | 482 | -99 (-20.5%) |
 
@@ -36,7 +36,7 @@
 
 ### 2. Exit Type Distribution
 
-| Exit Type | qengine Count | qengine % | VectorBT % | Δ % |
+| Exit Type | ml4t.backtest Count | ml4t.backtest % | VectorBT % | Δ % |
 |-----------|---------------|-----------|------------|-----|
 | **Trailing Stop** | 330 | 86.2% | 87.7% | -1.5% |
 | **Take Profit** | 53 | 13.8% | 11.8% | +2.0% |
@@ -132,7 +132,7 @@ Compare entry timestamps to identify if it's signal timing or re-entry logic.
 ### Root Cause #1: Date Filter ✅ FIXED
 
 **Issue**: START_DATE was `2024-01-02` instead of `2024-01-01`
-**Fix**: Changed line 33 in `run_qengine_backtest.py`
+**Fix**: Changed line 33 in `run_ml4t.backtest_backtest.py`
 **Impact**: Date filter corrected, but no change in trade count due to Root Cause #2
 
 ### Root Cause #2: Futures Data Gap (3 missing trades)
@@ -150,16 +150,16 @@ Compare entry timestamps to identify if it's signal timing or re-entry logic.
 
 ### Root Cause #3: Re-entry Timing (96 missing trades) 🔴 PRIMARY ISSUE
 
-**Issue**: qengine missing 96 trades even when futures data available
+**Issue**: ml4t.backtest missing 96 trades even when futures data available
 **Pattern**: Missing entries scattered throughout period (Jan 3, 4, 5, 6, 7, 9...)
 
 **Evidence**:
 - VectorBT entries (when data available): 479
-- qengine entries: 383
+- ml4t.backtest entries: 383
 - Missing: 96 (20% of opportunities)
-- qengine has ZERO unique entries (all 383 match VectorBT times)
+- ml4t.backtest has ZERO unique entries (all 383 match VectorBT times)
 
-**Hypothesis**: qengine doesn't re-enter on same bar after exit, while VectorBT allows immediate re-entry
+**Hypothesis**: ml4t.backtest doesn't re-enter on same bar after exit, while VectorBT allows immediate re-entry
 
 **Next Steps**: Layer 2-B - Investigate position management and `is_flat()` logic
 
@@ -207,8 +207,8 @@ Added diagnostic logging to track position state after exit fills:
 **Evidence**:
 - Every exit fill shows non-zero quantity immediately after
 - ALLOW_SAME_BAR_REENTRY config didn't fix issue (proves hypothesis was wrong)
-- qengine has ZERO unique entries (all 384 match VectorBT subset)
-- VectorBT has 96 unique entries qengine skips
+- ml4t.backtest has ZERO unique entries (all 384 match VectorBT subset)
+- VectorBT has 96 unique entries ml4t.backtest skips
 
 ### Same-Bar Re-Entry Hypothesis: DISPROVEN
 

@@ -1,5 +1,5 @@
 """
-Direct comparison: VectorBT Pro vs QEngine on identical 5,000 trade scenario
+Direct comparison: VectorBT Pro vs ml4t.backtest on identical 5,000 trade scenario
 Uses exact same data and signals from multi_asset_portfolio_validation.py
 """
 
@@ -11,7 +11,7 @@ import pandas as pd
 import vectorbtpro as vbt
 
 print("=" * 70)
-print("VECTORBT PRO vs QENGINE: 5,000 TRADE COMPARISON")
+print("VECTORBT PRO vs ML4T.BACKTEST: 5,000 TRADE COMPARISON")
 print("=" * 70)
 print(f"VectorBT Pro Version: {vbt.__version__}")
 print()
@@ -217,33 +217,33 @@ print("FINAL COMPARISON")
 print("=" * 70)
 
 print("From multi_asset_portfolio_validation.py (same data & signals):")
-print("- QEngine:     0.580 seconds for 4,960 trades")
+print("- ml4t.backtest:     0.580 seconds for 4,960 trades")
 print("- VectorBT:    5.406 seconds for 4,960 trades")
 print()
 print("This test (VectorBT Pro):")
 print(f"- VectorBT Pro: {avg_time:.3f} seconds for {n_trades} trades")
 print()
 
-qengine_speed = 4960 / 0.580  # trades per second
+ml4t.backtest_speed = 4960 / 0.580  # trades per second
 vbt_speed = 4960 / 5.406
 vbtpro_speed = n_trades / avg_time
 
 print("Trades per second:")
-print(f"- QEngine:     {qengine_speed:,.0f} trades/sec")
+print(f"- ml4t.backtest:     {ml4t.backtest_speed:,.0f} trades/sec")
 print(f"- VectorBT:    {vbt_speed:,.0f} trades/sec")
 print(f"- VectorBT Pro: {vbtpro_speed:,.0f} trades/sec")
 print()
 
 print("Speed comparisons:")
 print(f"- VectorBT Pro vs VectorBT: {vbtpro_speed / vbt_speed:.1f}x faster")
-print(f"- QEngine vs VectorBT Pro: {qengine_speed / vbtpro_speed:.1f}x faster")
-print(f"- QEngine vs VectorBT: {qengine_speed / vbt_speed:.1f}x faster")
+print(f"- ml4t.backtest vs VectorBT Pro: {ml4t.backtest_speed / vbtpro_speed:.1f}x faster")
+print(f"- ml4t.backtest vs VectorBT: {ml4t.backtest_speed / vbt_speed:.1f}x faster")
 
 print("\n" + "=" * 70)
 print("CONCLUSION")
 print("=" * 70)
 print(f"1. VectorBT Pro processes {n_trades} trades in {avg_time:.3f} seconds")
 print(f"2. VectorBT Pro is {vbtpro_speed / vbt_speed:.1f}x faster than standard VectorBT")
-print(f"3. QEngine is still {qengine_speed / vbtpro_speed:.1f}x faster than VectorBT Pro")
+print(f"3. ml4t.backtest is still {ml4t.backtest_speed / vbtpro_speed:.1f}x faster than VectorBT Pro")
 print("4. All three frameworks produce identical results (validated earlier)")
 print("5. VectorBT Pro offers significant speedup over standard VectorBT")

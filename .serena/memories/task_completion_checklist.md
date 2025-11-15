@@ -13,7 +13,7 @@ make check       # Run all three at once
 
 ### 2. Run Tests
 ```bash
-make test-qng    # Run qengine-specific tests
+make test-qng    # Run ml4t.backtest-specific tests
 # OR
 make test        # Run all tests if changes affect multiple projects
 ```

@@ -6,12 +6,12 @@
 
 ## Quick Summary
 
-✅ **Feasible and Well-Scoped**: QEngine is production-ready with 159 passing tests and 100% VectorBT agreement. Rich data available in `../projects/`. Main challenge: ensuring identical execution rules across platforms.
+✅ **Feasible and Well-Scoped**: ml4t.backtest is production-ready with 159 passing tests and 100% VectorBT agreement. Rich data available in `../projects/`. Main challenge: ensuring identical execution rules across platforms.
 
 ## Key Findings
 
 ### Strengths
-- QEngine validated and ready (September 2025 fixes complete)
+- ml4t.backtest validated and ready (September 2025 fixes complete)
 - Excellent data: 63 years daily US equities + NASDAQ-100 minute bars
 - Already 100% agreement with VectorBT (strong baseline)
 - Clear architecture: signal → adapter → platform → validator
@@ -23,7 +23,7 @@
 
 ### Recommended Approach
 
-**Phase 1** (Week 1): QEngine + VectorBT validation
+**Phase 1** (Week 1): ml4t.backtest + VectorBT validation
 - MA crossover signal
 - Daily US equities data
 - Basic trade/P&L comparison
@@ -54,7 +54,7 @@
 ## Questions for User
 
 1. Do you have vectorbt-pro license? (Free version works fine)
-2. Start with Phase 1 only (QEngine + VectorBT)?
+2. Start with Phase 1 only (ml4t.backtest + VectorBT)?
 3. Timeline preference: Phased (4 weeks) or accelerated?
 
 ## Architecture Preview

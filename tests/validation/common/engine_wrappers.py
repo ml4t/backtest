@@ -56,8 +56,8 @@ class EngineWrapper(ABC):
         pass
 
 
-class QEngineWrapper(EngineWrapper):
-    """Wrapper for qengine."""
+class ml4t.backtestWrapper(EngineWrapper):
+    """Wrapper for ml4t.backtest."""
 
     def run_backtest(
         self,
@@ -66,20 +66,20 @@ class QEngineWrapper(EngineWrapper):
         exits: Optional[pd.Series] = None,
         config: Optional[BacktestConfig] = None,
     ) -> BacktestResult:
-        """Run qengine backtest."""
-        from qengine.engine import BacktestEngine
-        from qengine.core.assets import AssetSpec, AssetRegistry
-        from qengine.data.feed import DataFeed
-        from qengine.strategy.base import Strategy
-        from qengine.core.event import MarketEvent
-        from qengine.execution.commission import PercentageCommission
-        from qengine.execution.slippage import PercentageSlippage
+        """Run ml4t.backtest backtest."""
+        from ml4t.backtest.engine import BacktestEngine
+        from ml4t.backtest.core.assets import AssetSpec, AssetRegistry
+        from ml4t.backtest.data.feed import DataFeed
+        from ml4t.backtest.strategy.base import Strategy
+        from ml4t.backtest.core.event import MarketEvent
+        from ml4t.backtest.execution.commission import PercentageCommission
+        from ml4t.backtest.execution.slippage import PercentageSlippage
 
         if config is None:
             config = BacktestConfig()
 
         # Create asset
-        from qengine.core.assets import AssetClass
+        from ml4t.backtest.core.assets import AssetClass
         asset_spec = AssetSpec(
             asset_id="BTC",
             asset_class=AssetClass.CRYPTO,
@@ -108,7 +108,7 @@ class QEngineWrapper(EngineWrapper):
 
             def on_event(self, event):
                 """Route events to appropriate handlers."""
-                from qengine.core.event import FillEvent
+                from ml4t.backtest.core.event import FillEvent
 
                 if isinstance(event, MarketEvent):
                     self.on_market_event(event)
@@ -117,8 +117,8 @@ class QEngineWrapper(EngineWrapper):
                     super().on_fill_event(event)
 
             def on_market_event(self, event: MarketEvent):
-                from qengine.core.event import OrderEvent
-                from qengine.core.types import OrderSide, OrderType
+                from ml4t.backtest.core.event import OrderEvent
+                from ml4t.backtest.core.types import OrderSide, OrderType
 
                 # Get signal for this bar
                 entry_signal = self.entries.iloc[self.bar_idx] if self.bar_idx < len(self.entries) else False
@@ -243,7 +243,7 @@ class QEngineWrapper(EngineWrapper):
 
             def get_next_event(self) -> MarketEvent:
                 """Get next market event."""
-                from qengine.core.types import MarketDataType
+                from ml4t.backtest.core.types import MarketDataType
 
                 if self.is_exhausted:
                     return None
@@ -285,8 +285,8 @@ class QEngineWrapper(EngineWrapper):
 
         # Create commission and slippage models
         # IMPORTANT: Must pass NoCommission/NoSlippage instead of None to avoid FillSimulator defaults
-        from qengine.execution.commission import NoCommission
-        from qengine.execution.slippage import NoSlippage
+        from ml4t.backtest.execution.commission import NoCommission
+        from ml4t.backtest.execution.slippage import NoSlippage
         # Import validation-specific VectorBT models
         import sys
         from pathlib import Path
@@ -313,7 +313,7 @@ class QEngineWrapper(EngineWrapper):
         slippage_model = VectorBTSlippage(slippage=config.slippage) if config.slippage > 0 else NoSlippage()
 
         # Create broker with commission/slippage models
-        from qengine.execution.broker import SimulationBroker
+        from ml4t.backtest.execution.broker import SimulationBroker
         broker = SimulationBroker(
             initial_cash=config.initial_cash,
             asset_registry=registry,
@@ -378,7 +378,7 @@ class QEngineWrapper(EngineWrapper):
             trades_df = trades
 
         # Standardize column names to match expected format
-        # qengine uses: entry_dt, exit_dt, entry_quantity, exit_quantity
+        # ml4t.backtest uses: entry_dt, exit_dt, entry_quantity, exit_quantity
         # expected: entry_time, exit_time, size, pnl, entry_price, exit_price
         if len(trades_df) > 0:
             trades_df = trades_df.rename(columns={
@@ -400,7 +400,7 @@ class QEngineWrapper(EngineWrapper):
             final_position=final_position,
             total_pnl=results['total_return'] / 100 * config.initial_cash,  # Convert percentage to dollar PnL
             num_trades=len(trades_df),
-            engine_name='qengine',
+            engine_name='ml4t.backtest',
         )
 
 

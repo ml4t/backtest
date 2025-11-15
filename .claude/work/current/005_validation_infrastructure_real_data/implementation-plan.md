@@ -47,7 +47,7 @@ For each task:
 
 ## Phase 1: Fix Current Platform Issues (PRIORITY 🔴)
 
-### TASK-001: Debug qengine Signal Processing
+### TASK-001: Debug ml4t.backtest Signal Processing
 
 **Status**: 🔴 BLOCKED (0 trades extracted)
 
@@ -55,10 +55,10 @@ For each task:
 
 #### 1. Write Diagnostic Test (RED)
 ```python
-# tests/validation/test_qengine_signal_processing.py
+# tests/validation/test_ml4t.backtest_signal_processing.py
 
-def test_qengine_executes_simple_buy_signal():
-    """qengine should execute a simple BUY market order"""
+def test_ml4t.backtest_executes_simple_buy_signal():
+    """ml4t.backtest should execute a simple BUY market order"""
     # Given: AAPL data and one BUY signal
     data = get_ticker_data('AAPL', '2017-02-01', '2017-02-28')
     signal = Signal(
@@ -68,9 +68,9 @@ def test_qengine_executes_simple_buy_signal():
         quantity=100,
     )
 
-    # When: Run qengine backtest
+    # When: Run ml4t.backtest backtest
     runner = PlatformRunner(Scenario001)
-    result = runner.run_qengine()
+    result = runner.run_ml4t.backtest()
 
     # Then: Should have 1 order placed
     assert len(result.raw_results['orders']) >= 1
@@ -89,7 +89,7 @@ def test_qengine_executes_simple_buy_signal():
 ```python
 # runner.py - Add verbose logging
 
-def run_qengine(self):
+def run_ml4t.backtest(self):
     print(f"📊 Signals to process: {len(signals)}")
     for sig in signals:
         print(f"  - {sig.timestamp}: {sig.action} {sig.quantity} {sig.asset}")
@@ -116,7 +116,7 @@ def run_qengine(self):
 - Document signal format requirements
 
 **Acceptance Criteria**:
-- ✅ Test passes (qengine executes signal)
+- ✅ Test passes (ml4t.backtest executes signal)
 - ✅ At least 1 order placed
 - ✅ Position correctly updated
 - ✅ Trade extracted successfully
@@ -251,7 +251,7 @@ def test_all_platforms_execute_scenario_001():
     """All 4 platforms should execute scenario 001 successfully"""
     # When: Run all platforms
     runner = PlatformRunner(Scenario001)
-    results = runner.run_all_platforms(['qengine', 'vectorbt', 'backtrader', 'zipline'])
+    results = runner.run_all_platforms(['ml4t.backtest', 'vectorbt', 'backtrader', 'zipline'])
 
     # Then: All should complete
     for platform, result in results.items():
@@ -407,9 +407,9 @@ def test_prepare_zipline_bundle_creates_hdf5():
 ```python
 # tests/validation/test_extractors.py
 
-def test_qengine_extractor_basic_trade():
-    """QEngine extractor should parse basic BUY→SELL trade"""
-    # Given: Mock qengine orders
+def test_ml4t.backtest_extractor_basic_trade():
+    """ml4t.backtest extractor should parse basic BUY→SELL trade"""
+    # Given: Mock ml4t.backtest orders
     orders = [
         MockOrder(
             order_id=1,
@@ -432,7 +432,7 @@ def test_qengine_extractor_basic_trade():
     ]
 
     # When: Extract trades
-    trades = extract_qengine_trades(orders, data)
+    trades = extract_ml4t.backtest_trades(orders, data)
 
     # Then: Should have 1 complete trade
     assert len(trades) == 1
@@ -516,7 +516,7 @@ def test_matcher_matches_identical_trades():
     """Matcher should match trades with same timestamp"""
     # Given: Two identical trades from different platforms
     trade1 = StandardTrade(
-        platform='qengine',
+        platform='ml4t.backtest',
         entry_timestamp=datetime(2017, 2, 7),
         entry_price=130.0,
         # ...
@@ -745,7 +745,7 @@ class Scenario002:
 
 ```
 Phase 1 (Critical Path):
-  TASK-001 (qengine fix) ─┐
+  TASK-001 (ml4t.backtest fix) ─┐
   TASK-002 (VectorBT fix) ├─→ TASK-004 (All platforms validated)
   TASK-003 (Zipline test) ─┘
 
@@ -802,7 +802,7 @@ Phase 4 (Final):
 2. ✅ Write requirements and exploration docs
 3. ✅ Create this implementation plan
 4. ⏳ Create state.json with task tracking
-5. ⏳ Start TASK-001 (Debug qengine)
+5. ⏳ Start TASK-001 (Debug ml4t.backtest)
 
 **Next Session**:
 1. Complete TASK-001, 002, 003

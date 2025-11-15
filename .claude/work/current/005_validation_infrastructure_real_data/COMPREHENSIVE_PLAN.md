@@ -1,4 +1,4 @@
-# Comprehensive TDD Implementation Plan: QEngine Feature Parity Validation
+# Comprehensive TDD Implementation Plan: ml4t.backtest Feature Parity Validation
 
 **Work Unit**: 005_validation_infrastructure_real_data
 **Version**: 2.0 (Approved 2025-11-04)
@@ -11,12 +11,12 @@
 
 ### Approach
 **Hybrid Validation Strategy**:
-- ✅ Validate 70% existing qengine features (primary focus)
+- ✅ Validate 70% existing ml4t.backtest features (primary focus)
 - 🔍 Document 30% missing features for future implementation
 
 ### Key Findings from Code Exploration
 
-**QEngine Implementation Status: 70-80% Complete**
+**ml4t.backtest Implementation Status: 70-80% Complete**
 
 | Category | Status | Details |
 |----------|--------|---------|
@@ -29,7 +29,7 @@
 | **Pipeline API** | ❌ 0% | Missing: Zipline-style factors (flag for future) |
 | **Performance** | ⚠️ 30% | Ad-hoc tests exist, needs systematization |
 
-**Critical Discovery**: QEngine has **excellent feature coverage** - most work is validation, not implementation!
+**Critical Discovery**: ml4t.backtest has **excellent feature coverage** - most work is validation, not implementation!
 
 ---
 
@@ -69,15 +69,15 @@ Total: 480 hours over 6 months
 
 ### Week 1-2: Platform Debugging (20 hours)
 
-#### TASK-001: Debug qengine Signal Processing (6h)
+#### TASK-001: Debug ml4t.backtest Signal Processing (6h)
 **Priority**: P0 (Critical)
 **Status**: 🔴 BLOCKED - 0 trades extracted
 
 **TDD Cycle**:
 ```python
 # RED
-def test_qengine_executes_market_order():
-    """qengine should execute BUY market order and fill at next bar"""
+def test_ml4t.backtest_executes_market_order():
+    """ml4t.backtest should execute BUY market order and fill at next bar"""
     assert len(orders_placed) >= 1
     assert orders_filled[0].status == OrderStatus.FILLED
     # Currently: ❌ Fails (0 orders)
@@ -97,10 +97,10 @@ def test_qengine_executes_market_order():
 
 **Files**:
 - `tests/validation/runner.py` (fix signal processing)
-- `tests/validation/test_qengine_integration.py` (NEW - diagnostic tests)
+- `tests/validation/test_ml4t.backtest_integration.py` (NEW - diagnostic tests)
 
 **Acceptance Criteria**:
-- ✅ qengine executes 4 signals from Scenario 001
+- ✅ ml4t.backtest executes 4 signals from Scenario 001
 - ✅ 2 complete trades extracted
 - ✅ Prices match expected OHLC data
 - ✅ No timezone errors
@@ -193,10 +193,10 @@ def test_zipline_executes_with_validation_bundle():
 # RED
 def test_all_platforms_scenario_001():
     """All 4 platforms should execute Scenario 001 successfully"""
-    for platform in ['qengine', 'vectorbt', 'backtrader', 'zipline']:
+    for platform in ['ml4t.backtest', 'vectorbt', 'backtrader', 'zipline']:
         assert len(trades[platform]) == 2
         assert trades[platform][0].entry_price > 0
-    # Currently: ❌ Fails (qengine, vectorbt have 0 trades)
+    # Currently: ❌ Fails (ml4t.backtest, vectorbt have 0 trades)
 
 # GREEN
 - Complete TASKS 001-003
@@ -549,7 +549,7 @@ def test_stop_limit_dual_trigger():
 
 **Scope**: 30 slippage scenarios across 8 models
 
-**Models to Validate** (from qengine):
+**Models to Validate** (from ml4t.backtest):
 1. NoSlippage
 2. FixedSlippage (absolute $)
 3. PercentageSlippage (% of price)
@@ -596,7 +596,7 @@ def test_slippage_models_apply_correctly():
 
 **Scope**: 25 commission scenarios across 9 models
 
-**Models to Validate** (from qengine):
+**Models to Validate** (from ml4t.backtest):
 1. NoCommission
 2. PerShareCommission (fixed per share)
 3. PerTradeCommission (flat fee)
@@ -656,14 +656,14 @@ def test_commission_models_calculate_correctly():
 ```python
 # RED
 def test_vectorbt_cost_compatibility():
-    """QEngine costs should exactly match VectorBT Pro when configured"""
+    """ml4t.backtest costs should exactly match VectorBT Pro when configured"""
     for scenario in vbt_scenarios:
-        qengine_trades = run_qengine_with_vbt_costs(scenario)
+        ml4t.backtest_trades = run_ml4t.backtest_with_vbt_costs(scenario)
         vbt_trades = run_vectorbt(scenario)
         # Exact match on net P&L
-        assert abs(qengine_trades['net_pnl'] - vbt_trades['net_pnl']) < 0.01
+        assert abs(ml4t.backtest_trades['net_pnl'] - vbt_trades['net_pnl']) < 0.01
         # Exact match on commission
-        assert abs(qengine_trades['commission'] - vbt_trades['commission']) < 0.01
+        assert abs(ml4t.backtest_trades['commission'] - vbt_trades['commission']) < 0.01
 ```
 
 **Acceptance Criteria**:
@@ -753,7 +753,7 @@ def test_position_sizing_calculates_correctly():
 - ✅ **<100MB memory** for 1000-asset universe
 
 ### Qualitative Targets
-- ✅ All documented qengine features validated
+- ✅ All documented ml4t.backtest features validated
 - ✅ Platform differences clearly explained
 - ✅ Migration guides complete
 - ✅ Performance characteristics benchmarked
@@ -802,7 +802,7 @@ def test_position_sizing_calculates_correctly():
 
 ### Immediate (This Week)
 1. ✅ **Plan Approved** - Ready to execute
-2. 🔄 **Start TASK-001** - Debug qengine signal processing
+2. 🔄 **Start TASK-001** - Debug ml4t.backtest signal processing
 3. 🔄 **Start TASK-002** - Debug VectorBT signal processing
 4. ⏳ **Prepare TASK-003** - Zipline integration test
 

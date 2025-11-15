@@ -1,6 +1,6 @@
-"""Demonstration of corporate actions handling in QEngine.
+"""Demonstration of corporate actions handling in ml4t.backtest.
 
-This example shows how QEngine handles various corporate actions:
+This example shows how ml4t.backtest handles various corporate actions:
 - Cash dividends
 - Stock splits
 - Mergers and acquisitions
@@ -15,7 +15,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from qengine.execution.corporate_actions import (
+from ml4t.backtest.execution.corporate_actions import (
     CashDividend,
     CorporateActionDataProvider,
     CorporateActionProcessor,
@@ -25,7 +25,7 @@ from qengine.execution.corporate_actions import (
     StockSplit,
     SymbolChange,
 )
-from qengine.execution.order import Order, OrderSide, OrderType
+from ml4t.backtest.execution.order import Order, OrderSide, OrderType
 
 
 def demo_basic_corporate_actions():
@@ -461,7 +461,7 @@ def demo_data_loading():
 
 def main():
     """Run all corporate actions demonstrations."""
-    print("CORPORATE ACTIONS HANDLING IN QENGINE")
+    print("CORPORATE ACTIONS HANDLING IN ML4T.BACKTEST")
     print("Advanced Backtesting Framework with Realistic Corporate Action Processing")
     print()
 
@@ -474,7 +474,7 @@ def main():
     print("\n\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
-    print("QEngine Corporate Actions Features:")
+    print("ml4t.backtest Corporate Actions Features:")
     print()
     print("📈 Supported Actions:")
     print("   • Cash Dividends - Automatic cash distribution")

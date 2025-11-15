@@ -15,8 +15,8 @@ import pandas as pd
 
 # Add paths
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-qengine_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(qengine_src))
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(ml4t.backtest_src))
 sys.path.insert(0, str(Path(__file__).parent))
 
 
@@ -74,8 +74,8 @@ def calculate_ma_signals(data: pd.DataFrame, fast: int = 20, slow: int = 50) -> 
     return signals
 
 
-def run_qengine_backtest(signals: pd.DataFrame, initial_capital: float = 10000) -> dict[str, Any]:
-    """Run backtest using QEngine approach."""
+def run_backtest_backtest(signals: pd.DataFrame, initial_capital: float = 10000) -> dict[str, Any]:
+    """Run backtest using ml4t.backtest approach."""
     start_time = time.time()
 
     cash = initial_capital
@@ -120,7 +120,7 @@ def run_qengine_backtest(signals: pd.DataFrame, initial_capital: float = 10000) 
     total_return = (final_value / initial_capital - 1) * 100
 
     return {
-        "framework": "QEngine",
+        "framework": "ml4t.backtest",
         "final_value": final_value,
         "total_return": total_return,
         "num_trades": len(trades),
@@ -277,9 +277,9 @@ def main():
     print("Running backtests...")
     print("-" * 40)
 
-    # QEngine
-    print("QEngine...")
-    qe_result = run_qengine_backtest(signals, initial_capital)
+    # ml4t.backtest
+    print("ml4t.backtest...")
+    qe_result = run_ml4t.backtest_backtest(signals, initial_capital)
     results.append(qe_result)
     if "error" not in qe_result:
         print(

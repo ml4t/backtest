@@ -5,7 +5,7 @@
 
 ## Executive Summary
 
-Successfully built production-quality validation infrastructure with custom Zipline bundle and real market data fixtures. **3 out of 4 platforms integrated**, with qengine and VectorBT requiring signal processing fixes.
+Successfully built production-quality validation infrastructure with custom Zipline bundle and real market data fixtures. **3 out of 4 platforms integrated**, with ml4t.backtest and VectorBT requiring signal processing fixes.
 
 ### Key Achievements This Session
 
@@ -27,7 +27,7 @@ Successfully built production-quality validation infrastructure with custom Zipl
 
 4. 🔄 **Multi-Platform Testing**
    - Backtrader: ✅ Working (2 trades extracted)
-   - qengine: ❌ Not executing (0 trades)
+   - ml4t.backtest: ❌ Not executing (0 trades)
    - VectorBT: ❌ Not executing (0 trades)
    - Zipline: ⏸️ Bundle ready, not tested
 
@@ -127,11 +127,11 @@ ingest('validation', show_progress=True)
 **Execution Model**:
 - **Timing**: Next-bar execution (signal T → fill T+1)
 - **Fill Price**: **Open** price of next bar
-- **Differences vs qengine**: 0.50-0.66% price variance (open vs close)
+- **Differences vs ml4t.backtest**: 0.50-0.66% price variance (open vs close)
 
-#### ❌ qengine (NOT EXECUTING)
+#### ❌ ml4t.backtest (NOT EXECUTING)
 
-**Extractor**: `extractors/qengine.py`
+**Extractor**: `extractors/ml4t.backtest.py`
 
 **Expected behavior**:
 - Extract orders from broker
@@ -143,7 +143,7 @@ ingest('validation', show_progress=True)
 **Hypothesis**: Signal processing or data format issue
 - Signals are valid (dates confirmed in dataset)
 - Data is properly loaded (249 rows)
-- Likely issue in runner.py's qengine execution logic
+- Likely issue in runner.py's ml4t.backtest execution logic
 
 #### ❌ VectorBT (NOT EXECUTING)
 
@@ -156,7 +156,7 @@ ingest('validation', show_progress=True)
 
 **Current issue**: 0 trades found
 
-**Hypothesis**: Same as qengine - signal processing issue
+**Hypothesis**: Same as ml4t.backtest - signal processing issue
 - VectorBT typically uses same-bar execution
 - May need different signal alignment
 
@@ -193,7 +193,7 @@ get_data() -> AAPL 2017 (249 days, real prices)
 
 **Why only Backtrader executed**:
 - Backtrader's strategy-based approach may be more forgiving
-- qengine and VectorBT may require specific signal format
+- ml4t.backtest and VectorBT may require specific signal format
 - Possible timezone mismatch in signal timestamps
 
 ## Diagnostic Findings
@@ -203,7 +203,7 @@ get_data() -> AAPL 2017 (249 days, real prices)
 ```
 Platform        Status    Trades    Issue
 --------------------------------------------
-qengine         ✅ OK      0        Not executing signals
+ml4t.backtest         ✅ OK      0        Not executing signals
 vectorbt        ✅ OK      0        Not executing signals
 backtrader      ✅ OK      2        ✅ Working correctly
 zipline         SKIP      -        Not tested yet
@@ -228,7 +228,7 @@ Trade 2:
 3. Uses **open** price for market orders
 4. Commission properly calculated
 
-### Root Cause Analysis: qengine & VectorBT
+### Root Cause Analysis: ml4t.backtest & VectorBT
 
 **Potential Issues**:
 
@@ -238,7 +238,7 @@ Trade 2:
    - May need timezone-aware signals
 
 2. **Data Feed Setup**
-   - qengine may need specific data feed format
+   - ml4t.backtest may need specific data feed format
    - VectorBT may require pandas DataFrame (not polars)
 
 3. **Runner Implementation**
@@ -246,7 +246,7 @@ Trade 2:
    - Date matching may fail due to timezone
 
 4. **Platform Configuration**
-   - qengine broker setup may be incomplete
+   - ml4t.backtest broker setup may be incomplete
    - VectorBT portfolio parameters may be wrong
 
 **Next Steps for Debugging**:
@@ -277,7 +277,7 @@ Trade 2:
 ### What Needs Improvement 🔧
 
 1. **Signal Processing**
-   - Current issue: qengine and VectorBT not executing
+   - Current issue: ml4t.backtest and VectorBT not executing
    - Need better error reporting
    - Need signal validation utilities
 
@@ -336,14 +336,14 @@ uv run python -c "
 
 # 3. Run validation
 cd tests/validation
-uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader
+uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt,backtrader
 ```
 
 ## Recommendations
 
 ### Immediate (Next Session)
 
-1. **Debug qengine signal processing**
+1. **Debug ml4t.backtest signal processing**
    - Add logging to SimpleDataFeed
    - Verify signals reach broker
    - Check order placement
@@ -389,7 +389,7 @@ uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader
 
 **Key Success**: Production-quality Zipline bundle built correctly on first try
 
-**Blocker**: Signal processing issue preventing qengine and VectorBT execution
+**Blocker**: Signal processing issue preventing ml4t.backtest and VectorBT execution
 
 **Confidence**: High - issue is likely simple configuration/format problem
 

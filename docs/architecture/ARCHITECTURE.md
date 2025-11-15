@@ -1,8 +1,8 @@
-# QEngine Architecture Documentation
+# ml4t.backtest Architecture Documentation
 
 ## Overview
 
-QEngine implements a modern event-driven architecture optimized for ML-driven trading strategies while maintaining the flexibility for traditional algorithmic trading. The system is built on three core principles:
+ml4t.backtest implements a modern event-driven architecture optimized for ML-driven trading strategies while maintaining the flexibility for traditional algorithmic trading. The system is built on three core principles:
 
 1. **Point-in-Time Correctness**: Architectural guarantees against data leakage
 2. **Performance First**: Columnar data with Polars, JIT compilation with Numba
@@ -12,7 +12,7 @@ QEngine implements a modern event-driven architecture optimized for ML-driven tr
 
 ### 1. Event System (`core/event.py`)
 
-The heart of QEngine is an event-driven architecture where all information flows through typed events:
+The heart of ml4t.backtest is an event-driven architecture where all information flows through typed events:
 
 ```python
 Event (base)
@@ -238,7 +238,7 @@ class CustomEvent(Event):
 
 ```python
 # Deterministic testing with fixed seeds
-engine = QEngine(seed=42)
+engine = ml4t.backtest(seed=42)
 
 # Golden scenario validation
 result = engine.run(scenario="split_dividend_test")
@@ -256,7 +256,7 @@ def test_million_events():
 
 ```python
 # Compatibility layer
-from qengine.compat import ZiplineAlgorithm
+from ml4t.backtest.compat import ZiplineAlgorithm
 
 class MyAlgo(ZiplineAlgorithm):
     def initialize(self, context):
@@ -268,7 +268,7 @@ class MyAlgo(ZiplineAlgorithm):
 
 ```python
 # Compatibility layer
-from qengine.compat import BacktraderStrategy
+from ml4t.backtest.compat import BacktraderStrategy
 
 class MyStrategy(BacktraderStrategy):
     def next(self):
@@ -304,4 +304,4 @@ class MyStrategy(BacktraderStrategy):
 
 ## Conclusion
 
-QEngine's architecture balances performance, correctness, and extensibility. By learning from existing solutions while leveraging modern Python tooling, QEngine provides a foundation for the next generation of algorithmic trading systems.
+ml4t.backtest's architecture balances performance, correctness, and extensibility. By learning from existing solutions while leveraging modern Python tooling, ml4t.backtest provides a foundation for the next generation of algorithmic trading systems.

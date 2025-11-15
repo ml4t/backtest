@@ -3,7 +3,7 @@
 
 import pytest
 
-from qengine.core.assets import AssetClass, AssetSpec
+from ml4t.backtest.core.assets import AssetClass, AssetSpec
 
 
 class TestEquityPnL:

@@ -50,9 +50,9 @@ portfolio = Portfolio(
 ### Basic Template
 
 ```python
-from qengine.portfolio.analytics import PerformanceAnalyzer
-from qengine.portfolio.core import PositionTracker
-from qengine.core.event import FillEvent
+from ml4t.backtest.portfolio.analytics import PerformanceAnalyzer
+from ml4t.backtest.portfolio.core import PositionTracker
+from ml4t.backtest.core.event import FillEvent
 
 class MyAnalyzer(PerformanceAnalyzer):
     """Custom analyzer with additional metrics."""
@@ -292,8 +292,8 @@ for alert in alerts:
 ### Basic Template
 
 ```python
-from qengine.portfolio.analytics import TradeJournal
-from qengine.core.event import FillEvent
+from ml4t.backtest.portfolio.analytics import TradeJournal
+from ml4t.backtest.core.event import FillEvent
 
 class MyJournal(TradeJournal):
     """Custom trade journal."""
@@ -683,8 +683,8 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from qengine.core.event import FillEvent, OrderSide
-from qengine.portfolio.core import PositionTracker
+from ml4t.backtest.core.event import FillEvent, OrderSide
+from ml4t.backtest.portfolio.core import PositionTracker
 from your_module import MyCustomAnalyzer
 
 def test_custom_analyzer():

@@ -1,7 +1,7 @@
-# QEngine Functionality Inventory
+# ml4t.backtest Functionality Inventory
 
 ## Overview
-QEngine is the event-driven backtesting engine in the QuantLab ecosystem, designed for state-of-the-art simulation with ML strategy support. **Production-ready** as of September 2025 with all critical issues resolved and comprehensive testing.
+ml4t.backtest is the event-driven backtesting engine in the QuantLab ecosystem, designed for state-of-the-art simulation with ML strategy support. **Production-ready** as of September 2025 with all critical issues resolved and comprehensive testing.
 
 ## Current Implementation Status
 
@@ -116,7 +116,7 @@ QEngine is the event-driven backtesting engine in the QuantLab ecosystem, design
 ## File Structure
 
 ```
-qengine/
+ml4t.backtest/
 ├── FUNCTIONALITY_INVENTORY.md  ✅ This file (updated)
 ├── CLAUDE.md                   ✅ Development guidelines
 ├── README.md                   ✅ User documentation
@@ -126,7 +126,7 @@ qengine/
 │   │   └── SIMULATION.md      ✅ Simulation model
 │   └── reviews/
 │       └── comparison_*.md    ✅ Platform comparisons
-├── src/qengine/
+├── src/ml4t.backtest/
 │   ├── __init__.py            ✅ Package initialization
 │   ├── core/
 │   │   ├── assets.py          ✅ Asset specifications
@@ -201,14 +201,14 @@ qengine/
 ## Working Example
 
 ```python
-from qengine import BacktestEngine
-from qengine.strategy.base import Strategy
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.slippage import PercentageSlippage
-from qengine.execution.commission import TieredCommission
-from qengine.portfolio.simple import SimplePortfolio
-from qengine.reporting.reporter import InMemoryReporter
-from qengine.data.feed import ParquetDataFeed
+from ml4t.backtest import BacktestEngine
+from ml4t.backtest.strategy.base import Strategy
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.slippage import PercentageSlippage
+from ml4t.backtest.execution.commission import TieredCommission
+from ml4t.backtest.portfolio.simple import SimplePortfolio
+from ml4t.backtest.reporting.reporter import InMemoryReporter
+from ml4t.backtest.data.feed import ParquetDataFeed
 
 # Create components
 data_feed = ParquetDataFeed("data.parquet")

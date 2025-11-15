@@ -158,7 +158,7 @@ Made exceptional progress fixing tests broken by FillSimulator refactoring. Comp
 The Engine implementation changed and no longer calls these initialization methods, or calls them differently. The tests use mocks and need updating to match current Engine API.
 
 **Investigation Approach**:
-1. Read `src/qengine/engine.py` to understand current initialization flow
+1. Read `src/ml4t.backtest/engine.py` to understand current initialization flow
 2. Check if `initialize()` was removed or renamed
 3. Update mock expectations to match actual implementation
 4. Consider whether tests should verify behavior differently
@@ -202,7 +202,7 @@ Based on TASK-002 pattern, these likely need the same fixes:
 uv run pytest tests/unit/test_engine.py::TestBacktestEngine::test_run_basic_flow -xvs --tb=short
 
 # Read Engine implementation
-cat src/qengine/engine.py | grep -A 20 "def run"
+cat src/ml4t.backtest/engine.py | grep -A 20 "def run"
 
 # Compare with what mocks expect
 grep -A 5 "mock_data_feed.initialize" tests/unit/test_engine.py
@@ -392,7 +392,7 @@ SimulationBroker (Orchestrator)
 **Python Environment**: uv-managed virtualenv
 **Test Framework**: pytest 8.4.2
 **Python Version**: 3.13.5
-**Serena**: Activated (qengine project)
+**Serena**: Activated (ml4t.backtest project)
 
 **Key Commands**:
 ```bash
@@ -450,9 +450,9 @@ See handoff document for full context and investigation approaches.
 - `.claude/reference/TESTING_GUIDE.md` - Testing standards
 
 ### Important Code Locations
-- `src/qengine/execution/fill_simulator.py` - Recently extracted component (93% coverage)
-- `src/qengine/execution/broker.py` - Broker orchestrator (46% coverage)
-- `src/qengine/core/clock.py` - Clock implementation (47% coverage, was 21%)
+- `src/ml4t.backtest/execution/fill_simulator.py` - Recently extracted component (93% coverage)
+- `src/ml4t.backtest/execution/broker.py` - Broker orchestrator (46% coverage)
+- `src/ml4t.backtest/core/clock.py` - Clock implementation (47% coverage, was 21%)
 - `tests/unit/test_broker.py` - Working broker test patterns (reference)
 
 ### Previous Sessions

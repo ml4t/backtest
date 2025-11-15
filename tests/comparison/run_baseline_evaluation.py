@@ -2,7 +2,7 @@
 Simple baseline evaluation runner using real data from projects/
 
 This script runs a simplified evaluation of strategies using real market data
-to verify QEngine's correctness and performance.
+to verify ml4t.backtest's correctness and performance.
 """
 
 import sys
@@ -15,19 +15,19 @@ import numpy as np
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 from unittest.mock import Mock
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType
-from qengine.strategy.adapters import PITData
-from qengine.strategy.crypto_basis_adapter import (
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType
+from ml4t.backtest.strategy.adapters import PITData
+from ml4t.backtest.strategy.crypto_basis_adapter import (
     CryptoBasisExternalStrategy,
 )
-from qengine.strategy.spy_order_flow_adapter import (
+from ml4t.backtest.strategy.spy_order_flow_adapter import (
     SPYOrderFlowExternalStrategy,
     create_spy_order_flow_strategy,
 )
@@ -258,10 +258,10 @@ def run_crypto_basis_test(spot_df: pd.DataFrame, futures_df: pd.DataFrame, max_r
     }
 
 
-def run_qengine_adapter_test(data: pd.DataFrame, max_rows: int = 500):
-    """Test QEngine adapter integration with real data."""
+def run_backtest_adapter_test(data: pd.DataFrame, max_rows: int = 500):
+    """Test ml4t.backtest adapter integration with real data."""
     print("\n" + "=" * 60)
-    print("QENGINE ADAPTER INTEGRATION TEST")
+    print("ML4T.BACKTEST ADAPTER INTEGRATION TEST")
     print("=" * 60)
 
     test_data = data.head(max_rows)
@@ -357,7 +357,7 @@ def main():
     spy_data = load_spy_data()
     if spy_data is not None:
         results["spy_standalone"] = run_spy_strategy_test(spy_data, max_rows=1000)
-        results["spy_adapter"] = run_qengine_adapter_test(spy_data, max_rows=1000)
+        results["spy_adapter"] = run_ml4t.backtest_adapter_test(spy_data, max_rows=1000)
 
     # Test 2: Crypto Basis Strategy
     spot_data, futures_data = load_crypto_data()
@@ -392,11 +392,11 @@ def main():
     print(f"  Average throughput: {total_points / total_time:.0f} points/sec")
 
     if total_time < 10 and total_memory < 500:
-        print("\n✓ QEngine demonstrates excellent performance!")
+        print("\n✓ ml4t.backtest demonstrates excellent performance!")
         print("  - Fast execution (<10s for all tests)")
         print("  - Low memory footprint (<500MB)")
     elif total_time < 30:
-        print("\n✓ QEngine shows good performance")
+        print("\n✓ ml4t.backtest shows good performance")
         print("  - Reasonable execution time")
         print("  - Consider optimization for better throughput")
     else:

@@ -2,13 +2,13 @@
 
 **Created**: 2025-11-04
 **Status**: ✅ Organized, 🔄 In Progress (Phase 1)
-**Current Task**: TASK-001 (Debug qengine signal processing)
+**Current Task**: TASK-001 (Debug ml4t.backtest signal processing)
 
 ---
 
 ## 🎯 Mission
 
-Build production-quality validation infrastructure that tests qengine execution against VectorBT, Backtrader, and Zipline using **real market data** with comprehensive test-driven development.
+Build production-quality validation infrastructure that tests ml4t.backtest execution against VectorBT, Backtrader, and Zipline using **real market data** with comprehensive test-driven development.
 
 ---
 
@@ -49,7 +49,7 @@ Updated scenario 001 from synthetic to real data:
 
 **Results**:
 - ✅ Backtrader: 2 trades extracted (WORKING!)
-- ❌ qengine: 0 trades (needs fix)
+- ❌ ml4t.backtest: 0 trades (needs fix)
 - ❌ VectorBT: 0 trades (needs fix)
 - ⏸️ Zipline: Bundle ready, not tested
 
@@ -63,12 +63,12 @@ Updated scenario 001 from synthetic to real data:
 
 | Task | Status | Priority | Time |
 |------|--------|----------|------|
-| TASK-001: Debug qengine | 🔄 In Progress | CRITICAL | 2.5h |
+| TASK-001: Debug ml4t.backtest | 🔄 In Progress | CRITICAL | 2.5h |
 | TASK-002: Debug VectorBT | ⏳ Pending | CRITICAL | 2.5h |
 | TASK-003: Test Zipline | ⏳ Pending | HIGH | 1.5h |
 | TASK-004: Validate All 4 | ⏳ Blocked | CRITICAL | 1h |
 
-**Blocker**: qengine and VectorBT not executing signals
+**Blocker**: ml4t.backtest and VectorBT not executing signals
 
 **Hypothesis**: Signal processing or timezone issue
 - Signal dates confirmed valid ✅
@@ -80,7 +80,7 @@ Updated scenario 001 from synthetic to real data:
 ## 📋 Full Task Breakdown (13 Tasks, 33.5 Hours)
 
 ### Phase 1: Platform Fixes (4 tasks, 7.5h) 🔴 CRITICAL
-- TASK-001: Debug qengine signal processing
+- TASK-001: Debug ml4t.backtest signal processing
 - TASK-002: Debug VectorBT signal processing
 - TASK-003: Test Zipline integration
 - TASK-004: Validate all 4 platforms
@@ -106,11 +106,11 @@ Updated scenario 001 from synthetic to real data:
 
 Every task follows **Red-Green-Refactor**:
 
-### Example: TASK-001 (Debug qengine)
+### Example: TASK-001 (Debug ml4t.backtest)
 
 **🔴 RED** - Write failing test:
 ```python
-def test_qengine_executes_simple_buy_signal():
+def test_ml4t.backtest_executes_simple_buy_signal():
     # Expect: 1 order placed
     assert len(orders) >= 1
     # Currently: 0 orders (test fails ❌)
@@ -152,7 +152,7 @@ def test_qengine_executes_simple_buy_signal():
 ## 🚀 Next Actions
 
 ### This Session (If Continuing)
-1. Start TASK-001: Debug qengine signal processing
+1. Start TASK-001: Debug ml4t.backtest signal processing
 2. Add verbose logging to runner.py
 3. Write diagnostic test
 4. Identify and fix signal issue
@@ -212,7 +212,7 @@ def test_qengine_executes_simple_buy_signal():
 
 3. **Platform Differences**:
    - Backtrader: Next-bar open execution ✅
-   - qengine: Configuration needed
+   - ml4t.backtest: Configuration needed
    - VectorBT: Same-bar close (expected)
    - Zipline: Bundle-based approach
 

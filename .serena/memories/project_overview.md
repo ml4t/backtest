@@ -1,7 +1,7 @@
-# QEngine Project Overview
+# ml4t.backtest Project Overview
 
 ## Purpose
-QEngine is a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. It's part of the QuantLab monorepo ecosystem.
+ml4t.backtest is a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. It's part of the QuantLab monorepo ecosystem.
 
 ## Tech Stack
 - **Language**: Python 3.12+
@@ -31,7 +31,7 @@ Part of QuantLab monorepo with:
 - **qfeatures**: Feature engineering (upstream)
 - **qeval**: Statistical validation (upstream)
 - **qdata**: Market data management
-- **qengine**: This project - backtesting engine
+- **ml4t.backtest**: This project - backtesting engine
 
 ## Key Design Principles
 1. Point-in-Time correctness (no data leakage)

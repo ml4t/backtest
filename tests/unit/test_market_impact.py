@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from qengine.execution.market_impact import (
+from ml4t.backtest.execution.market_impact import (
     AlmgrenChrissImpact,
     ImpactState,
     IntraDayMomentum,
@@ -14,7 +14,7 @@ from qengine.execution.market_impact import (
     ObizhaevWangImpact,
     PropagatorImpact,
 )
-from qengine.execution.order import Order, OrderSide, OrderType
+from ml4t.backtest.execution.order import Order, OrderSide, OrderType
 
 
 @pytest.fixture

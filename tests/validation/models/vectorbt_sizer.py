@@ -1,22 +1,22 @@
 """VectorBT Pro size=np.inf position sizer for validation testing.
 
-This module exists ONLY for validation purposes - to ensure qengine produces
+This module exists ONLY for validation purposes - to ensure ml4t.backtest produces
 identical position sizing to VectorBT Pro during comparative testing.
 
-DO NOT import this into production code (src/qengine). This is a test fixture.
+DO NOT import this into production code (src/ml4t.backtest). This is a test fixture.
 """
 
 import math
 from typing import TYPE_CHECKING
 
 # Import from production for base class
-from qengine.execution.position_sizer import PositionSizer
+from ml4t.backtest.execution.position_sizer import PositionSizer
 
 if TYPE_CHECKING:
-    from qengine.core.types import Price, Quantity, Cash
-    from qengine.execution.order import Order
-    from qengine.execution.commission import CommissionModel
-    from qengine.execution.slippage import SlippageModel
+    from ml4t.backtest.core.types import Price, Quantity, Cash
+    from ml4t.backtest.execution.order import Order
+    from ml4t.backtest.execution.commission import CommissionModel
+    from ml4t.backtest.execution.slippage import SlippageModel
 
 
 class VectorBTInfiniteSizer(PositionSizer):

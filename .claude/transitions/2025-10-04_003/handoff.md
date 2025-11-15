@@ -135,7 +135,7 @@ uv run pytest tests/unit/test_clock_multi_feed.py -xvs
 
 ### Key File Locations
 - **Tests**: `tests/unit/` (323 total, 41 failing)
-- **Source**: `src/qengine/` (80% coverage)
+- **Source**: `src/ml4t.backtest/` (80% coverage)
 - **Plan**: `.claude/work/test_fixes_plan.md`
 - **State**: `.claude/work/state.json`
 - **Exploration**: `.claude/work/exploration_test_fixes.md`
@@ -299,7 +299,7 @@ uv run ruff check src/ tests/
 uv run mypy src/
 
 # Coverage report
-uv run pytest tests/unit/ --cov=qengine --cov-report=term-missing
+uv run pytest tests/unit/ --cov=ml4t.backtest --cov-report=term-missing
 ```
 
 ### Success Criteria
@@ -416,7 +416,7 @@ uv run pytest tests/unit/ --tb=no -q | tail -1
 # Should show: 41 failed, 282 passed
 
 # Check coverage
-uv run pytest tests/unit/ --cov=qengine --cov-report=term | grep TOTAL
+uv run pytest tests/unit/ --cov=ml4t.backtest --cov-report=term | grep TOTAL
 # Should show: ~80% coverage
 ```
 

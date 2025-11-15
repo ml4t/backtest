@@ -1,7 +1,7 @@
 # Work Unit 001: Critical Fixes - COMPLETED
 
 ## Summary
-Successfully resolved all P0 and P1 critical issues identified in the QEngine backtesting framework code review.
+Successfully resolved all P0 and P1 critical issues identified in the ml4t.backtest backtesting framework code review.
 
 ## Work Delivered
 
@@ -20,10 +20,10 @@ Successfully resolved all P0 and P1 critical issues identified in the QEngine ba
 ## Technical Changes
 
 ### Core Files Modified
-- `src/qengine/engine.py` - Event subscription fixes
-- `src/qengine/execution/broker.py` - FillEvent publishing, execution delay, cash constraints
-- `src/qengine/core/clock.py` - Multi-feed synchronization
-- `src/qengine/core/assets.py` - P&L calculation enhancements
+- `src/ml4t.backtest/engine.py` - Event subscription fixes
+- `src/ml4t.backtest/execution/broker.py` - FillEvent publishing, execution delay, cash constraints
+- `src/ml4t.backtest/core/clock.py` - Multi-feed synchronization
+- `src/ml4t.backtest/core/assets.py` - P&L calculation enhancements
 
 ### Tests Added
 - 5 new test files with comprehensive coverage
@@ -36,18 +36,18 @@ Successfully resolved all P0 and P1 critical issues identified in the QEngine ba
 - Performance considerations documented
 
 ## Impact
-- QEngine backtesting framework is now production-ready
+- ml4t.backtest backtesting framework is now production-ready
 - All critical correctness issues resolved
 - Backward compatibility maintained
 - No breaking API changes
 
 ## Commit
 - SHA: d45e61f
-- Message: "fix: Complete all P0 and P1 critical fixes for QEngine backtesting framework"
+- Message: "fix: Complete all P0 and P1 critical fixes for ml4t.backtest backtesting framework"
 - Date: 2025-09-25
 
 ## Next Steps
-The QEngine framework is ready for:
+The ml4t.backtest framework is ready for:
 1. Production use in strategy development
 2. Integration testing with real strategies
 3. Performance benchmarking

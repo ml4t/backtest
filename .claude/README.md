@@ -1,6 +1,6 @@
 # .claude Directory Organization
 
-This directory contains Claude AI's workspace for the QEngine project. All planning, reference, and work-in-progress documents belong here, NOT in the project root.
+This directory contains Claude AI's workspace for the ml4t.backtest project. All planning, reference, and work-in-progress documents belong here, NOT in the project root.
 
 ## Directory Structure
 

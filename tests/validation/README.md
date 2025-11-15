@@ -1,11 +1,11 @@
-# QEngine Validation Framework
+# ml4t.backtest Validation Framework
 
 [![Validation Tests](https://github.com/YOUR_ORG/ml4t/actions/workflows/validation-tests.yml/badge.svg)](https://github.com/YOUR_ORG/ml4t/actions/workflows/validation-tests.yml)
 [![codecov](https://codecov.io/gh/YOUR_ORG/ml4t/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_ORG/ml4t)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Internal-green.svg)](LICENSE)
 
-**Production-quality validation infrastructure testing qengine against VectorBT Pro, Backtrader, and Zipline using real market data.**
+**Production-quality validation infrastructure testing ml4t.backtest against VectorBT Pro, Backtrader, and Zipline using real market data.**
 
 ## Status: ✅ All Phases Complete (100%)
 
@@ -28,7 +28,7 @@ uv run python -m pytest -v
 uv run python -m pytest test_scenario_002_limit_orders.py -v
 
 # Run scenario with all platforms
-uv run python runner.py --scenario 002 --platforms qengine,vectorbt,backtrader,zipline --report summary
+uv run python runner.py --scenario 002 --platforms ml4t.backtest,vectorbt,backtrader,zipline --report summary
 
 # Fast tests only (skip slow Zipline bundle tests)
 uv run python -m pytest test_fixtures_market_data.py -v -m "not slow"
@@ -47,7 +47,7 @@ tests/validation/
 │   ├── scenario_004_position_reentry.py
 │   └── scenario_005_multi_asset.py
 ├── extractors/                   # Platform-specific trade extraction
-│   ├── qengine.py
+│   ├── ml4t.backtest.py
 │   ├── vectorbt.py
 │   ├── backtrader.py
 │   └── zipline.py
@@ -74,7 +74,7 @@ All 4 platforms validated with real AAPL 2017 market data:
 
 | Platform   | Type          | Execution Model           | Status |
 |------------|---------------|---------------------------|--------|
-| qengine    | Event-driven  | Next-bar close            | ✅ OK  |
+| ml4t.backtest    | Event-driven  | Next-bar close            | ✅ OK  |
 | VectorBT   | Vectorized    | Same-bar close            | ✅ OK  |
 | Backtrader | Event-driven  | Next-bar open             | ✅ OK  |
 | Zipline    | Event-driven  | Next-bar close            | ✅ OK  |
@@ -171,7 +171,7 @@ Different platforms execute orders at different times relative to signals:
 - **Fastest** execution, most optimistic
 - Assumes you can act on today's close
 
-### QEngine & Zipline (Next-Bar Close)
+### ml4t.backtest & Zipline (Next-Bar Close)
 - Signal at T → Entry at T+1 close
 - **Realistic** execution timing
 - Cannot act until tomorrow
@@ -314,4 +314,4 @@ Part of ML4T software libraries. Internal use only.
 **Framework Version**: 1.0
 **Last Updated**: 2025-11-04
 **Status**: Production-ready for Tier 1 scenarios
-**Maintainer**: QEngine Validation Team
+**Maintainer**: ml4t.backtest Validation Team

@@ -1,4 +1,4 @@
-# QEngine Development Commands
+# ml4t.backtest Development Commands
 
 ## Essential Development Commands
 
@@ -14,7 +14,7 @@ make quality     # Format, lint, type-check all projects in monorepo
 ### Testing
 ```bash
 make test        # Run all tests
-make test-qng    # Test qengine project specifically
+make test-qng    # Test ml4t.backtest project specifically
 make test-unit   # Unit tests only
 make test-cov    # With coverage report
 pytest tests/unit/test_specific.py -v  # Run specific test file
@@ -54,5 +54,5 @@ python -m cProfile -o profile.stats examples/benchmark.py  # Profile code
 ## Important Notes
 - NEVER commit without running `make check` first
 - This is part of a monorepo - some commands should be run from parent directory
-- Use `make test-qng` for qengine-specific tests
+- Use `make test-qng` for ml4t.backtest-specific tests
 - Always follow TDD: write test first, then implementation

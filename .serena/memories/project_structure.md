@@ -1,9 +1,9 @@
-# QEngine Project Structure
+# ml4t.backtest Project Structure
 
 ## Directory Layout
 ```
-qengine/
-├── src/qengine/           # Source code
+ml4t.backtest/
+├── src/ml4t.backtest/           # Source code
 │   ├── core/              # Event system, clock, types
 │   │   ├── event.py       # Event definitions
 │   │   ├── event_bus.py   # Event bus implementation
@@ -48,9 +48,9 @@ qengine/
 ```
 
 ## Key Files
-- `src/qengine/engine.py` - Main BacktestEngine class
-- `src/qengine/core/event_bus.py` - Event-driven architecture core
-- `src/qengine/core/clock.py` - Time management for PIT correctness
+- `src/ml4t.backtest/engine.py` - Main BacktestEngine class
+- `src/ml4t.backtest/core/event_bus.py` - Event-driven architecture core
+- `src/ml4t.backtest/core/clock.py` - Time management for PIT correctness
 - `tests/conftest.py` - Shared test fixtures
 - `CLAUDE.md` - Development guidelines
 - `.claude/reference/ARCHITECTURE.md` - Architecture documentation

@@ -2,8 +2,8 @@
 
 TASK-018: TSL Tracking and Exit Logic
 
-This test suite validates that qengine TSL implementation exactly matches VectorBT Pro
-behavior as documented in TASK-007.
+This test suite validates that ml4t.backtest TSL implementation exactly matches VectorBT
+(open-source) behavior as documented in TASK-007.
 
 Key VectorBT TSL Behaviors:
 1. Peak-based tracking: TSL trails from PEAK (max high), not current price
@@ -23,11 +23,11 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import OrderSide, OrderType, MarketDataType
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.order import Order
-from qengine.execution.slippage import PercentageSlippage
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import OrderSide, OrderType, MarketDataType
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.execution.slippage import PercentageSlippage
 
 
 
@@ -645,7 +645,6 @@ class TestTSLExactValuesTask007:
             f"Exit should match TASK-007 value (44209.51), got {exit_price}"
 
 
-@pytest.mark.skip(reason="TSL threshold not implemented yet")
 class TestTSLWithThreshold:
     """Test TSL with threshold activation (optional feature)."""
 
@@ -658,7 +657,97 @@ class TestTSLWithThreshold:
         Peak reaches $102.5 → TSL activates
         TSL = $102.5 * 0.99 = $101.475
         """
-        pass  # To be implemented when threshold support is added
+        broker = SimulationBroker(initial_cash=10000.0, execution_delay=False)
+
+        # Entry at $100 with 2% threshold
+        entry_order = Order(
+            asset_id="BTC",
+            order_type=OrderType.BRACKET,
+            side=OrderSide.BUY,
+            quantity=1.0,
+            tsl_pct=0.01,  # 1% TSL (decimal format: 0.01 = 1%)
+            tsl_threshold_pct=0.02,  # 2% threshold (decimal format: 0.02 = 2%)
+            metadata={"base_price": 100.0},
+        )
+        broker.submit_order(entry_order)
+
+        # Fill entry
+        event_entry = MarketEvent(
+            timestamp=datetime.now(),
+            asset_id="BTC",
+            data_type=MarketDataType.BAR,
+            open=100.0,
+            high=100.5,
+            low=99.5,
+            close=100.0,
+            volume=1000.0,
+        )
+        broker.on_market_event(event_entry)
+
+        # Get TSL order
+        tsl_order = broker._trailing_stops["BTC"][0]
+
+        # Bar 1: Peak rises to $101.5 (below $102 threshold)
+        event_1 = MarketEvent(
+            timestamp=datetime.now(),
+            asset_id="BTC",
+            data_type=MarketDataType.BAR,
+            open=101.0,
+            high=101.5,  # Below threshold ($102)
+            low=100.5,
+            close=101.0,
+            volume=1000.0,
+        )
+        broker.on_market_event(event_1)
+
+        # TSL should NOT be activated yet
+        assert not tsl_order.metadata["tsl_activated"], \
+            "TSL should not activate - peak ($101.5) below threshold ($102)"
+        assert tsl_order.metadata["peak_price"] == 101.5, "Peak should track to $101.5"
+
+        # Bar 2: Peak rises to $102.5 (exceeds $102 threshold)
+        event_2 = MarketEvent(
+            timestamp=datetime.now(),
+            asset_id="BTC",
+            data_type=MarketDataType.BAR,
+            open=102.0,
+            high=102.5,  # Exceeds threshold ($102)
+            low=101.5,
+            close=102.0,
+            volume=1000.0,
+        )
+        broker.on_market_event(event_2)
+
+        # TSL should NOW be activated
+        assert tsl_order.metadata["tsl_activated"], \
+            "TSL should activate - peak ($102.5) exceeds threshold ($102)"
+        assert tsl_order.metadata["peak_price"] == 102.5, "Peak should update to $102.5"
+
+        # TSL level should be calculated from peak
+        expected_tsl = 102.5 * 0.99  # $101.475
+        assert abs(tsl_order.trailing_stop_price - expected_tsl) < 0.01, \
+            f"TSL should be {expected_tsl}, got {tsl_order.trailing_stop_price}"
+
+        # Bar 3: Price drops to $101.4 (below TSL, triggers exit)
+        event_3 = MarketEvent(
+            timestamp=datetime.now(),
+            asset_id="BTC",
+            data_type=MarketDataType.BAR,
+            open=102.0,
+            high=102.0,
+            low=101.4,  # Below TSL ($101.475)
+            close=101.5,
+            volume=1000.0,
+        )
+        broker.on_market_event(event_3)
+
+        # TSL should have triggered
+        assert len(broker._trailing_stops.get("BTC", [])) == 0, \
+            "TSL should trigger when low touches TSL level"
+
+        # Verify trade completed
+        trades_df = broker.trades
+        assert len(trades_df) == 1, "Should have 1 completed trade"
 
 
 if __name__ == "__main__":

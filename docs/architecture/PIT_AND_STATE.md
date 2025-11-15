@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document addresses the critical architectural concerns raised in the review regarding PIT (Point-in-Time) data access and state management in QEngine's hybrid architecture.
+This document addresses the critical architectural concerns raised in the review regarding PIT (Point-in-Time) data access and state management in ml4t.backtest's hybrid architecture.
 
 ## Point-in-Time Data Access
 
@@ -156,20 +156,20 @@ class MigrationHelper:
     """Utilities to help port strategies from other platforms."""
 
     @staticmethod
-    def zipline_order_to_qengine(
+    def zipline_order_to_ml4t.backtest(
         asset: Asset,
         amount: int,
         style: OrderStyle
     ) -> OrderEvent:
-        """Convert Zipline order to QEngine format."""
+        """Convert Zipline order to ml4t.backtest format."""
         # Simple mapping, not full compatibility
         pass
 
     @staticmethod
-    def backtrader_indicator_to_qengine(
+    def backtrader_indicator_to_ml4t.backtest(
         indicator_class: type
-    ) -> QEngineIndicator:
-        """Wrap Backtrader indicator for use in QEngine."""
+    ) -> ml4t.backtestIndicator:
+        """Wrap Backtrader indicator for use in ml4t.backtest."""
         # Basic wrapper, not full compatibility
         pass
 ```

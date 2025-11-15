@@ -6,9 +6,9 @@ from unittest.mock import Mock, patch
 import polars as pl
 import pytest
 
-from qengine.core.event import EventType, MarketEvent, OrderEvent
-from qengine.core.types import MarketDataType, OrderSide, OrderType
-from qengine.engine import BacktestEngine, BacktestResults
+from ml4t.backtest.core.event import EventType, MarketEvent, OrderEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide, OrderType
+from ml4t.backtest.engine import BacktestEngine, BacktestResults
 
 
 class TestBacktestEngine:
@@ -103,9 +103,9 @@ class TestBacktestEngine:
         assert engine.reporter is not None
 
         # Check types
-        from qengine.execution.broker import SimulationBroker
-        from qengine.portfolio.portfolio import Portfolio
-        from qengine.reporting.reporter import InMemoryReporter
+        from ml4t.backtest.execution.broker import SimulationBroker
+        from ml4t.backtest.portfolio.portfolio import Portfolio
+        from ml4t.backtest.reporting.reporter import InMemoryReporter
 
         assert isinstance(engine.broker, SimulationBroker)
         assert isinstance(engine.portfolio, Portfolio)
@@ -181,7 +181,7 @@ class TestBacktestEngine:
 
     def test_run_with_max_events(self, mock_strategy, mock_broker, mock_portfolio, mock_reporter):
         """Test run stops at max_events limit."""
-        from qengine.data.feed import DataFeed
+        from ml4t.backtest.data.feed import DataFeed
 
         # Create a simple mock data feed class that works with Clock
         class SimpleMockDataFeed(DataFeed):
@@ -383,8 +383,8 @@ class TestIntegrationScenarios:
 
     def test_simple_buy_and_hold_scenario(self):
         """Test a simple buy and hold strategy scenario."""
-        from qengine.data.feed import DataFeed
-        from qengine.strategy.base import Strategy
+        from ml4t.backtest.data.feed import DataFeed
+        from ml4t.backtest.strategy.base import Strategy
 
         # Create a simple data feed
         class SimpleDataFeed(DataFeed):

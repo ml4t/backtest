@@ -1,8 +1,8 @@
-# QEngine Simulation Reference
+# ml4t.backtest Simulation Reference
 
 ## Overview
 
-This document provides detailed specifications for QEngine's **institutional-grade market simulation** capabilities, including sophisticated execution models, comprehensive corporate actions handling, irregular timestamp processing, and multi-asset simulation workflows.
+This document provides detailed specifications for ml4t.backtest's **institutional-grade market simulation** capabilities, including sophisticated execution models, comprehensive corporate actions handling, irregular timestamp processing, and multi-asset simulation workflows.
 
 ## Recent Major Enhancements ✅
 
@@ -774,4 +774,4 @@ class BacktestSimulator:
         return self._generate_results()
 ```
 
-This completes the comprehensive simulation documentation for QEngine, covering market mechanics, execution models, and multi-asset support.
+This completes the comprehensive simulation documentation for ml4t.backtest, covering market mechanics, execution models, and multi-asset support.

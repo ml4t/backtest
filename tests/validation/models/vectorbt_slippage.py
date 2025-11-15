@@ -1,19 +1,19 @@
 """VectorBT Pro compatible slippage model for validation testing.
 
-This module exists ONLY for validation purposes - to ensure qengine produces
+This module exists ONLY for validation purposes - to ensure ml4t.backtest produces
 identical slippage calculations to VectorBT Pro during comparative testing.
 
-DO NOT import this into production code (src/qengine). This is a test fixture.
+DO NOT import this into production code (src/ml4t.backtest). This is a test fixture.
 """
 
 from typing import TYPE_CHECKING
 
 # Import from production for base class
-from qengine.execution.slippage import SlippageModel
+from ml4t.backtest.execution.slippage import SlippageModel
 
 if TYPE_CHECKING:
-    from qengine.core.types import Price, Quantity
-    from qengine.execution.order import Order
+    from ml4t.backtest.core.types import Price, Quantity
+    from ml4t.backtest.execution.order import Order
 
 
 class VectorBTSlippage(SlippageModel):

@@ -1,4 +1,4 @@
-# QEngine Testing Environment Exploration - Document Index
+# ml4t.backtest Testing Environment Exploration - Document Index
 
 **Completed**: November 4, 2025
 **Total Pages**: 2,100+ lines across 3 comprehensive documents
@@ -23,7 +23,7 @@
 **Best For**: Leadership decisions, project planning, quick reference
 
 **Key Takeaways**:
-- QEngine infrastructure is excellent, just needs scenarios
+- ml4t.backtest infrastructure is excellent, just needs scenarios
 - 20-25 scenarios planned across 5 tiers (basic → stress)
 - 6 weeks at 50% capacity for one developer
 - Low risk, high value, recommend proceeding
@@ -43,7 +43,7 @@
 - Scenario specification pattern with benefits
 - Runner architecture (5-step execution pipeline)
 
-**Part 2: QEngine Order Type Analysis (3 pages)**
+**Part 2: ml4t.backtest Order Type Analysis (3 pages)**
 - Supported order types (market, limit, stop, stop-limit, trailing, bracket, OCO)
 - Execution timing configuration (intrabar logic details)
 - Known issues (position sync - already fixed)
@@ -110,7 +110,7 @@
 - Table showing unit test + scenario coverage for 15 features
 - Status indicators: Ready, To Build, Partial, Needs Validation
 
-**Part 9: Required QEngine Enhancements (1 page)**
+**Part 9: Required ml4t.backtest Enhancements (1 page)**
 - Current gaps (minor: OCO validation, documentation)
 - Recommended enhancements (convenience methods, docs)
 - Note: All major features already implemented
@@ -119,7 +119,7 @@
 - VectorBT as baseline (same-bar execution)
 - Backtrader as reality check (next-bar standard)
 - Zipline for realism (multi-bar fills)
-- QEngine alignment approach
+- ml4t.backtest alignment approach
 
 **Part 11: Success Metrics (1 page)**
 - Quantitative: 20+ scenarios, 95%+ match rate, documentation
@@ -161,7 +161,7 @@
 5. Bracket order timing - Ensuring only one exit triggers
 
 **Execution Timing Deep Dive (2 pages)**
-- QEngine event loop diagram
+- ml4t.backtest event loop diagram
 - Option A: Same-bar execution (close)
 - Option B: Next-bar execution (open)
 - Option C: Intrabar execution (OHLC range)
@@ -273,7 +273,7 @@
 ## Document Cross-References
 
 ### From EXPLORATION_SUMMARY to detailed topics:
-- "QEngine Capabilities" → See EXPLORATION Part 2
+- "ml4t.backtest Capabilities" → See EXPLORATION Part 2
 - "Competitor Execution Models" → See EXPLORATION Part 3
 - "Scenario Roadmap" → See EXPLORATION Part 5
 - "Implementation Timeline" → See EXPLORATION Part 7
@@ -307,7 +307,7 @@
 - [ ] Create scenario_003 (accumulation)
 - [ ] Create scenario_004 (multi-asset)
 - [ ] Create scenario_005 (high-frequency)
-- [ ] All pass on qengine
+- [ ] All pass on ml4t.backtest
 - [ ] Cross-platform comparison works
 
 ### Phase 2-4: Continuing Development
@@ -323,7 +323,7 @@
 ### Strengths
 - StandardTrade format is excellent
 - Runner and extractor architecture works well
-- All order types already implemented in qengine
+- All order types already implemented in ml4t.backtest
 - Framework is event-driven and flexible
 
 ### Gaps

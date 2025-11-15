@@ -1,7 +1,7 @@
 # Handoff: 2025-10-04_009
 
 **Date**: 2025-10-04
-**Work Unit**: 002_comprehensive_qengine_validatio
+**Work Unit**: 002_comprehensive_ml4t.backtest_validatio
 **Phase**: Phase 0 - Infrastructure Setup (CRITICAL ISSUE DISCOVERED)
 
 ---
@@ -62,9 +62,9 @@
 - `tests/validation/test_data_loader.py` - 21/21 passing
 
 **Critical Documentation**:
-- `.claude/work/current/002_comprehensive_qengine_validatio/ZIPLINE_VECTORBT_RECONCILIATION.md` - **READ THIS** - detailed trade-by-trade analysis
-- `.claude/work/current/002_comprehensive_qengine_validatio/LEARNINGS.md` - Key insights from session
-- `.claude/work/current/002_comprehensive_qengine_validatio/state.json` - Task tracking
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/ZIPLINE_VECTORBT_RECONCILIATION.md` - **READ THIS** - detailed trade-by-trade analysis
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/LEARNINGS.md` - Key insights from session
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/state.json` - Task tracking
 
 ---
 
@@ -460,7 +460,7 @@ if data.current_dt.date() == datetime.date(2017, 4, 25):
 
 ### Validation Framework Quality Gates
 
-**MUST achieve before using for QEngine validation**:
+**MUST achieve before using for ml4t.backtest validation**:
 - Same entry/exit dates (±0 days) across frameworks
 - Return variance <0.5% on identical strategies
 - Trade count variance ±0 trades

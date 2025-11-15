@@ -257,10 +257,10 @@ Use TodoWrite to track:
 ## 🗂️ File Changes This Session
 
 ### Modified
-- `src/qengine/portfolio/portfolio.py` - Removed Position.realized_pnl
-- `src/qengine/portfolio/accounting.py` - Fixed type errors, equity curve
-- `src/qengine/portfolio/simple.py` - Fixed realized_pnl references
-- `src/qengine/portfolio/margin.py` - Fixed type errors
+- `src/ml4t.backtest/portfolio/portfolio.py` - Removed Position.realized_pnl
+- `src/ml4t.backtest/portfolio/accounting.py` - Fixed type errors, equity curve
+- `src/ml4t.backtest/portfolio/simple.py` - Fixed realized_pnl references
+- `src/ml4t.backtest/portfolio/margin.py` - Fixed type errors
 
 ### Created
 - `.claude/reference/COVERAGE_ANALYSIS.md` - Detailed coverage analysis
@@ -294,23 +294,23 @@ tests/
 ```toml
 # pyproject.toml
 [tool.pytest.ini_options]
-addopts = ["--cov=qengine", "--cov-report=term-missing", "--cov-report=html"]
+addopts = ["--cov=ml4t.backtest", "--cov-report=term-missing", "--cov-report=html"]
 
 [tool.coverage.run]
-source = ["src/qengine"]
+source = ["src/ml4t.backtest"]
 omit = ["*/tests/*", "*/__init__.py"]
 ```
 
 ### Running Tests
 ```bash
 # All tests with coverage
-pytest tests/unit tests/integration --cov=src/qengine --cov-report=term-missing --cov-report=html
+pytest tests/unit tests/integration --cov=src/ml4t.backtest --cov-report=term-missing --cov-report=html
 
 # Specific failing test
 pytest tests/unit/test_cash_constraints.py -v --tb=short
 
 # Coverage for specific module
-pytest tests/unit/test_broker.py --cov=src/qengine/execution/broker --cov-report=term-missing
+pytest tests/unit/test_broker.py --cov=src/ml4t.backtest/execution/broker --cov-report=term-missing
 ```
 
 ### Git Status

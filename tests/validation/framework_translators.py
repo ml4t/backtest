@@ -42,8 +42,8 @@ class BaseTranslator(ABC):
         """
 
 
-class QEngineTranslator(BaseTranslator):
-    """Translate strategy spec to QEngine implementation."""
+class ml4t.backtestTranslator(BaseTranslator):
+    """Translate strategy spec to ml4t.backtest implementation."""
 
     def translate_and_execute(
         self,
@@ -51,7 +51,7 @@ class QEngineTranslator(BaseTranslator):
         data: pd.DataFrame,
         initial_capital: float,
     ) -> dict[str, Any]:
-        """Execute strategy using QEngine's manual approach."""
+        """Execute strategy using ml4t.backtest's manual approach."""
         import time
 
         start_time = time.time()
@@ -127,7 +127,7 @@ class QEngineTranslator(BaseTranslator):
         total_return = (final_value / initial_capital - 1) * 100
 
         return {
-            "framework": "QEngine",
+            "framework": "ml4t.backtest",
             "final_value": final_value,
             "total_return": total_return,
             "num_trades": len(trades),

@@ -1,11 +1,11 @@
-# QEngine Testing Guide
+# ml4t.backtest Testing Guide
 
 ## Quick Start
 
 ### Run Tests with Coverage
 ```bash
 # All tests (unit + integration)
-pytest tests/unit tests/integration --cov=src/qengine --cov-report=term-missing --cov-report=html
+pytest tests/unit tests/integration --cov=src/ml4t.backtest --cov-report=term-missing --cov-report=html
 
 # Quick unit tests only
 pytest tests/unit -v
@@ -14,20 +14,20 @@ pytest tests/unit -v
 pytest tests/unit/test_portfolio.py -v
 
 # With coverage for specific module
-pytest tests/unit/test_portfolio.py --cov=src/qengine/portfolio --cov-report=term-missing
+pytest tests/unit/test_portfolio.py --cov=src/ml4t.backtest/portfolio --cov-report=term-missing
 ```
 
 ### View Coverage Reports
 ```bash
 # Terminal summary (always shown with --cov-report=term-missing)
-pytest tests/ --cov=src/qengine --cov-report=term-missing
+pytest tests/ --cov=src/ml4t.backtest --cov-report=term-missing
 
 # HTML report (detailed, interactive)
-pytest tests/ --cov=src/qengine --cov-report=html
+pytest tests/ --cov=src/ml4t.backtest --cov-report=html
 # Then open: htmlcov/index.html
 
 # JSON report (for CI/analysis)
-pytest tests/ --cov=src/qengine --cov-report=json
+pytest tests/ --cov=src/ml4t.backtest --cov-report=json
 ```
 
 ## Coverage Configuration
@@ -39,13 +39,13 @@ Coverage is configured in `pyproject.toml`:
 addopts = [
     "-ra",
     "--strict-markers",
-    "--cov=qengine",
+    "--cov=ml4t.backtest",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
 
 [tool.coverage.run]
-source = ["src/qengine"]
+source = ["src/ml4t.backtest"]
 omit = [
     "*/tests/*",
     "*/__init__.py",
@@ -160,7 +160,7 @@ def test_portfolio_insufficient_cash_for_order():
 ### 1. Terminal Report
 Shows missed lines directly in terminal:
 ```
-src/qengine/portfolio/portfolio.py    95%   142, 223
+src/ml4t.backtest/portfolio/portfolio.py    95%   142, 223
 ```
 
 ### 2. HTML Report
@@ -184,7 +184,7 @@ If coverage shows 0% for a module:
 echo $PYTHONPATH
 
 # Run with explicit path
-PYTHONPATH=src pytest tests/ --cov=src/qengine
+PYTHONPATH=src pytest tests/ --cov=src/ml4t.backtest
 ```
 
 ### Missing Tests
@@ -205,7 +205,7 @@ Tests that fail intermittently:
 ```yaml
 - name: Run tests with coverage
   run: |
-    pytest tests/ --cov=src/qengine --cov-report=term-missing --cov-report=xml
+    pytest tests/ --cov=src/ml4t.backtest --cov-report=term-missing --cov-report=xml
 
 - name: Upload coverage to Codecov
   uses: codecov/codecov-action@v3

@@ -1,17 +1,17 @@
-# QEngine Testing Environment - Comprehensive Exploration Report
+# ml4t.backtest Testing Environment - Comprehensive Exploration Report
 
 **Date**: November 4, 2025
-**Scope**: Design and architecture for an incremental test suite for qengine backtesting library
+**Scope**: Design and architecture for an incremental test suite for ml4t.backtest backtesting library
 **Status**: Complete analysis with actionable recommendations
 
 ---
 
 ## Executive Summary
 
-The qengine backtesting library has a solid foundation with:
+The ml4t.backtest backtesting library has a solid foundation with:
 - **34 existing unit tests** covering broker operations, execution logic, and edge cases
 - **1 validation scenario** (scenario_001: simple market orders) demonstrating cross-platform comparison
-- **Cross-platform framework** supporting qengine, VectorBT, Backtrader, and Zipline
+- **Cross-platform framework** supporting ml4t.backtest, VectorBT, Backtrader, and Zipline
 - **Rich order type support**: Market, Limit, Stop, Stop-Limit, Trailing Stop, Bracket (OCA)
 
 **Key Finding**: The existing testing infrastructure is well-designed and extensible. We need to leverage this foundation and build 10-20 additional validation scenarios that progress from simple to complex.
@@ -36,7 +36,7 @@ tests/
     ├── scenarios/                  # Test scenario specifications
     │   └── scenario_001_simple_market_orders.py  # Single scenario example
     ├── extractors/                 # Platform-specific trade extractors
-    │   ├── qengine.py              # Converts qengine broker results to StandardTrade
+    │   ├── ml4t.backtest.py              # Converts ml4t.backtest broker results to StandardTrade
     │   ├── vectorbt.py             # VectorBT Portfolio → StandardTrade
     │   ├── backtrader.py           # Backtrader trade records → StandardTrade
     │   └── zipline.py              # Zipline performance → StandardTrade
@@ -85,23 +85,23 @@ class Scenario:
 
 #### Runner Architecture (runner.py)
 1. **ScenarioRunner class**: Executes scenario on multiple platforms
-2. **Platform executors**: run_qengine(), run_vectorbt(), run_backtrader(), run_zipline()
+2. **Platform executors**: run_ml4t.backtest(), run_vectorbt(), run_backtrader(), run_zipline()
 3. **Trade extraction**: Platform-specific extractors convert native trade format
 4. **Trade matching**: match_trades() groups trades by entry timestamp
 5. **Reporting**: generate_summary_report() and generate_trade_report()
 
 **Current CLI**:
 ```bash
-python runner.py --scenario 001 --platforms qengine,vectorbt --report detailed
+python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt --report detailed
 ```
 
 ---
 
-## Part 2: QEngine Order Type Analysis
+## Part 2: ml4t.backtest Order Type Analysis
 
 ### 2.1 Supported Order Types
 
-From `/src/qengine/core/types.py` and `/src/qengine/execution/order.py`:
+From `/src/ml4t.backtest/core/types.py` and `/src/ml4t.backtest/execution/order.py`:
 
 | Order Type | Implementation | Status | Key Parameters |
 |---|---|---|---|
@@ -115,7 +115,7 @@ From `/src/qengine/core/types.py` and `/src/qengine/execution/order.py`:
 
 ### 2.2 Execution Timing Configuration
 
-From `/src/qengine/execution/order.py` (can_fill method):
+From `/src/ml4t.backtest/execution/order.py` (can_fill method):
 
 **Intrabar Execution Logic**:
 ```python
@@ -201,7 +201,7 @@ if order_type == STOP:
 | **VectorBT** | Same-bar possible | Same-bar if touched | OHLC range check | No (single bar) |
 | **Backtrader** | Next-bar open | Next-bar matched | Event-driven | Yes |
 | **Zipline** | Next-bar open | Volume-limited | Event-driven | Yes (default) |
-| **QEngine** | Flexible | OHLC range check | Event-driven | Can support |
+| **ml4t.backtest** | Flexible | OHLC range check | Event-driven | Can support |
 
 ---
 
@@ -273,11 +273,11 @@ expected = {
 - Validates basic execution and P&L
 
 **Scenario 002: Market Orders - Same-Bar Execution**
-- Test alternate execution timing (if qengine supports)
+- Test alternate execution timing (if ml4t.backtest supports)
 - Same 4 signals, expect same-bar close execution
 - **Key Insight**: Compare with Backtrader's cheat-on-close
 - **Complexity**: Low (2 trades)
-- **Platforms**: qengine (validate support), VectorBT (baseline)
+- **Platforms**: ml4t.backtest (validate support), VectorBT (baseline)
 
 **Scenario 003: Market Orders - No Position Changes**
 - 4 signals but all in same direction (4 BUYs in sequence)
@@ -333,14 +333,14 @@ expected = {
 - Bar sequence: Up 10%, down 3%, down 2%, down 5% (triggers)
 - **Expected**: Stop triggers on 4th bar
 - **Complexity**: High (peak tracking)
-- **Platforms**: qengine, VectorBT (Backtrader/Zipline may differ)
+- **Platforms**: ml4t.backtest, VectorBT (Backtrader/Zipline may differ)
 
 **Scenario 010: Mixed Order Types - Single Trade**
 - Entry: LIMIT at specific price
 - Exits: Take profit LIMIT + Stop loss STOP (OCO behavior)
 - **Expected**: Whichever fills first closes position
 - **Complexity**: High (multiple exit conditions)
-- **Platforms**: qengine (test bracket manager)
+- **Platforms**: ml4t.backtest (test bracket manager)
 
 ---
 
@@ -363,7 +363,7 @@ expected = {
 - Test `tp_pct`, `sl_pct`, `tsl_pct` parameters
 - Validate VectorBT compatibility (Pro feature)
 - **Complexity**: High (parameter handling)
-- **Platforms**: qengine, VectorBT Pro
+- **Platforms**: ml4t.backtest, VectorBT Pro
 
 **Scenario 014: Multiple Bracket Orders**
 - 3 entries with different bracket parameters
@@ -375,7 +375,7 @@ expected = {
 - IF/THEN logic: "Exit AAPL if GOOGL hits level X"
 - Tests cross-asset dependencies
 - **Complexity**: Very High
-- **Platforms**: qengine only (custom implementation)
+- **Platforms**: ml4t.backtest only (custom implementation)
 
 ---
 
@@ -385,7 +385,7 @@ expected = {
 - 1 BUY, then another BUY signal arrives before SELL
 - How do platforms handle doubling up?
 - **Expected**:
-  - qengine: Position increases (configurable)
+  - ml4t.backtest: Position increases (configurable)
   - VectorBT: May re-entry differently
   - Backtrader: Depends on strategy logic
 - **Complexity**: High (position accumulation)
@@ -433,7 +433,7 @@ expected = {
 **Scenario 023: Corporate Actions**
 - Stock split, dividend, reverse split
 - Position quantities and prices adjusted
-- **Note**: qengine has corporate_actions module
+- **Note**: ml4t.backtest has corporate_actions module
 
 **Scenario 024: Multi-Timeframe**
 - Signals on different timeframes (daily + 4H)
@@ -603,7 +603,7 @@ EXECUTION_MODELS = {
     'vectorbt_same_bar': ExecutionModel(...),
     'backtrader_next_bar': ExecutionModel(...),
     'zipline_volume_limited': ExecutionModel(...),
-    'qengine_flexible': ExecutionModel(...),
+    'ml4t.backtest_flexible': ExecutionModel(...),
 }
 ```
 
@@ -680,7 +680,7 @@ class EnhancedScenarioRunner:
 
 **Priority 1b: Basic Scenarios (001-005)**
 1. ✅ Scenario 001 already exists - validate it runs
-2. Create Scenario 002 (same-bar execution) - test qengine capability
+2. Create Scenario 002 (same-bar execution) - test ml4t.backtest capability
 3. Create Scenario 003 (position accumulation) - test no-exit case
 4. Create Scenario 004 (multi-asset) - test asset isolation
 5. Create Scenario 005 (high-frequency) - test queuing
@@ -751,7 +751,7 @@ class EnhancedScenarioRunner:
 
 ---
 
-## Part 9: Required QEngine Enhancements
+## Part 9: Required ml4t.backtest Enhancements
 
 ### 9.1 Current Gaps
 
@@ -817,9 +817,9 @@ Zipline should validate:
 - Volume-based execution
 - Realistic slippage modeling
 
-### 10.4 QEngine Alignment
+### 10.4 ml4t.backtest Alignment
 
-QEngine should match:
+ml4t.backtest should match:
 - All same-bar scenarios where VectorBT matches
 - All next-bar scenarios where Backtrader matches
 - More flexible than Zipline (instant fills, no volume limits by default)
@@ -864,7 +864,7 @@ QEngine should match:
 - [ ] Data generated or loaded successfully
 - [ ] Signals list is complete and correct
 - [ ] Expected results documented
-- [ ] Runner executes on qengine (primary test)
+- [ ] Runner executes on ml4t.backtest (primary test)
 - [ ] Trade extraction works
 - [ ] Trades pass basic validation (no look-ahead)
 
@@ -880,7 +880,7 @@ QEngine should match:
 
 ## Conclusion
 
-QEngine has solid testing foundations. The next phase should focus on:
+ml4t.backtest has solid testing foundations. The next phase should focus on:
 
 1. **Building** 20+ incremental validation scenarios
 2. **Leveraging** the existing StandardTrade infrastructure
@@ -894,5 +894,5 @@ The proposed architecture is:
 - **Maintainable**: Clear separation of concerns
 - **Comprehensive**: Covers basic to stress-test scenarios
 
-With 6 weeks of focused development, qengine can have a production-grade test suite that validates institutional-quality execution fidelity.
+With 6 weeks of focused development, ml4t.backtest can have a production-grade test suite that validates institutional-quality execution fidelity.
 

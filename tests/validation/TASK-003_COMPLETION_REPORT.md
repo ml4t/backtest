@@ -10,7 +10,7 @@ All acceptance criteria met. Zipline successfully integrated into validation fra
 
 Successfully integrated Zipline-reloaded into the validation infrastructure. Fixed timezone compatibility issues between Zipline's exchange_calendars library and Python's timezone handling, then resolved signal timestamp matching issues to enable trade execution and extraction.
 
-**Result**: All 4 platforms (qengine, VectorBT, Backtrader, Zipline) now execute successfully and extract 2 trades each for scenario 001.
+**Result**: All 4 platforms (ml4t.backtest, VectorBT, Backtrader, Zipline) now execute successfully and extract 2 trades each for scenario 001.
 
 ---
 
@@ -28,7 +28,7 @@ Successfully integrated Zipline-reloaded into the validation infrastructure. Fix
 
 ✅ **Results comparable to other platforms (next-bar execution)**
 - Entry timing matches Backtrader (both next-bar execution)
-- Exit timing matches qengine and Backtrader
+- Exit timing matches ml4t.backtest and Backtrader
 - Minor differences documented and expected (OHLC component, commission model)
 
 ✅ **Bundle data accessed correctly (no UnknownBundle errors)**
@@ -64,7 +64,7 @@ Successfully integrated Zipline-reloaded into the validation infrastructure. Fix
 ### Command Executed
 ```bash
 cd /home/stefan/ml4t/software/backtest/tests/validation
-uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader,zipline --report both
+uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt,backtrader,zipline --report both
 ```
 
 ### Results Summary
@@ -76,7 +76,7 @@ EXECUTION SUMMARY
 
 Platform        Time       Status
 --------------------------------------------------------------------------------
-qengine         0.296    s ✅ OK
+ml4t.backtest         0.296    s ✅ OK
 vectorbt        1.512    s ✅ OK
 backtrader      0.423    s ✅ OK
 zipline         0.835    s ✅ OK
@@ -85,7 +85,7 @@ zipline         0.835    s ✅ OK
 EXTRACTING TRADES
 ================================================================================
 
-  🔍 Extracting qengine trades...
+  🔍 Extracting ml4t.backtest trades...
      Found 2 trades
   🔍 Extracting vectorbt trades...
      Found 2 trades
@@ -217,7 +217,7 @@ total_commission = entry_comm + exit_comm
 
 **Execution Timing**:
 - Zipline & Backtrader: Next-bar open execution
-- qengine & VectorBT: Same-bar or next-bar close (configurable)
+- ml4t.backtest & VectorBT: Same-bar or next-bar close (configurable)
 
 **Expected Differences**:
 - Entry/exit timing: 1 day difference (same-bar vs next-bar)
@@ -259,12 +259,12 @@ All timezone and signal matching lessons documented in code comments:
 
 | Platform    | Time (seconds) | Relative |
 |-------------|----------------|----------|
-| qengine     | 0.296         | 1.0x     |
+| ml4t.backtest     | 0.296         | 1.0x     |
 | backtrader  | 0.423         | 1.4x     |
 | zipline     | 0.835         | 2.8x     |
 | vectorbt    | 1.512         | 5.1x     |
 
-**Zipline performance**: Moderate speed, faster than VectorBT but slower than qengine/Backtrader.
+**Zipline performance**: Moderate speed, faster than VectorBT but slower than ml4t.backtest/Backtrader.
 
 ---
 

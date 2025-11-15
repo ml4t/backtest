@@ -1,14 +1,14 @@
 # Handoff: 2025-10-04_008
 
 **Date**: 2025-10-04
-**Work Unit**: 002_comprehensive_qengine_validatio
+**Work Unit**: 002_comprehensive_ml4t.backtest_validatio
 **Phase**: Phase 0 - Infrastructure Setup
 
 ---
 
 ## Active Work
 
-Implementing comprehensive cross-framework validation for QEngine backtesting engine against VectorBT Pro, Zipline-Reloaded, and Backtrader to prove 95%+ correctness.
+Implementing comprehensive cross-framework validation for ml4t.backtest backtesting engine against VectorBT Pro, Zipline-Reloaded, and Backtrader to prove 95%+ correctness.
 
 **Current Sprint**: Building framework adapters and data loaders to enable end-to-end validation testing.
 
@@ -49,8 +49,8 @@ Implementing comprehensive cross-framework validation for QEngine backtesting en
 - `tests/validation/test_vectorbtpro_adapter.py` - 18/18 tests passing
 
 **Work Tracking**:
-- `.claude/work/current/002_comprehensive_qengine_validatio/state.json` - 38 tasks defined
-- `.claude/work/current/002_comprehensive_qengine_validatio/implementation-plan.md` - Full plan
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/state.json` - 38 tasks defined
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/implementation-plan.md` - Full plan
 
 ---
 
@@ -82,7 +82,7 @@ data = loader.load_simple_equity_data(ticker="AAPL", start_date="2017-01-01",
 - `to_vectorbt_format()` - DatetimeIndex, single-symbol OHLCV
 - `to_zipline_format()` - UTC timezone required
 - `to_backtrader_format()` - Lowercase column names
-- `to_qengine_format()` - Multi-asset with ticker column
+- `to_ml4t.backtest_format()` - Multi-asset with ticker column
 
 ### 3. Test Data Date Ranges (TASK-007)
 
@@ -325,10 +325,10 @@ EOF
 ### State Management
 ```bash
 # View work status
-cat .claude/work/current/002_comprehensive_qengine_validatio/state.json | jq '.next_available'
+cat .claude/work/current/002_comprehensive_ml4t.backtest_validatio/state.json | jq '.next_available'
 
 # Update task status
-cd .claude/work/current/002_comprehensive_qengine_validatio && python3 << 'EOF'
+cd .claude/work/current/002_comprehensive_ml4t.backtest_validatio && python3 << 'EOF'
 import json
 with open('state.json', 'r') as f:
     state = json.load(f)
@@ -377,7 +377,7 @@ source .venv/bin/activate && pytest tests/validation/ -v --tb=short
 
 # Check work state
 cat .claude/work/ACTIVE_WORK
-cat .claude/work/current/002_comprehensive_qengine_validatio/metadata.json
+cat .claude/work/current/002_comprehensive_ml4t.backtest_validatio/metadata.json
 ```
 
 ---

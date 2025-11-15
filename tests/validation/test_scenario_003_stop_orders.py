@@ -1,7 +1,7 @@
 """
 Integration test for all 4 platforms on scenario 003 (stop orders).
 
-This test validates that qengine, VectorBT, Backtrader, and Zipline all successfully
+This test validates that ml4t.backtest, VectorBT, Backtrader, and Zipline all successfully
 execute stop orders and trigger them at correct prices.
 
 Expected Results:
@@ -38,7 +38,7 @@ def test_all_platforms_scenario_003():
             "--scenario",
             "003",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "summary",
         ],
@@ -55,7 +55,7 @@ def test_all_platforms_scenario_003():
     output = result.stdout
 
     # All platforms should execute successfully
-    assert "qengine" in output and "✅ OK" in output, "qengine failed to execute"
+    assert "ml4t.backtest" in output and "✅ OK" in output, "ml4t.backtest failed to execute"
     assert "vectorbt" in output and "✅ OK" in output, "vectorbt failed to execute"
     assert "backtrader" in output and "✅ OK" in output, "backtrader failed to execute"
     assert "zipline" in output and "✅ OK" in output, "zipline failed to execute"
@@ -88,7 +88,7 @@ def test_stop_loss_validation():
             "--scenario",
             "003",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "detailed",
         ],
@@ -118,7 +118,7 @@ def test_stop_order_execution_timing():
 
     Platform differences:
     - VectorBT: May trigger same-bar if stop hit during bar
-    - qengine: Next-bar execution when stop is breached
+    - ml4t.backtest: Next-bar execution when stop is breached
     - Backtrader: Next-bar execution when stop is hit
     - Zipline: Next-bar execution when stop is breached
     """
@@ -128,7 +128,7 @@ def test_stop_order_execution_timing():
             "trigger": "when price <= stop_price (for stop-loss)",
             "notes": "Triggers when price touches stop during bar",
         },
-        "qengine": {
+        "ml4t.backtest": {
             "timing": "next-bar",
             "trigger": "when price <= stop_price (for stop-loss)",
             "notes": "Checks stop at next bar, exits if breached",

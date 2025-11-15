@@ -1,8 +1,8 @@
-# QEngine Advanced Simulation Models
+# ml4t.backtest Advanced Simulation Models
 
 ## Overview
 
-This document details the sophisticated execution models implemented in QEngine, providing institutional-grade backtesting realism through advanced slippage, commission, market impact, and corporate actions handling.
+This document details the sophisticated execution models implemented in ml4t.backtest, providing institutional-grade backtesting realism through advanced slippage, commission, market impact, and corporate actions handling.
 
 ## 1. Advanced Order Types ✅
 
@@ -720,7 +720,7 @@ class SimulationBroker:
 
 ## Summary
 
-QEngine now provides **institutional-grade execution modeling** with:
+ml4t.backtest now provides **institutional-grade execution modeling** with:
 
 - **22 distinct execution models** across slippage, commission, and market impact
 - **7 corporate action types** with automatic position adjustments

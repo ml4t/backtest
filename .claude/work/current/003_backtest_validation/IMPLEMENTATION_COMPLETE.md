@@ -7,7 +7,7 @@
 
 ## 🎯 Summary
 
-Built comprehensive cross-platform validation framework comparing QEngine against 4 reference platforms (VectorBT Pro/Free, Zipline-reloaded, Backtrader). Framework includes platform-independent signal generators, adapters for all 5 platforms, trade-level validators, and HTML reporting.
+Built comprehensive cross-platform validation framework comparing ml4t.backtest against 4 reference platforms (VectorBT Pro/Free, Zipline-reloaded, Backtrader). Framework includes platform-independent signal generators, adapters for all 5 platforms, trade-level validators, and HTML reporting.
 
 **Status**: All code written, documented, and ready for testing after dependency installation.
 
@@ -22,7 +22,7 @@ Built comprehensive cross-platform validation framework comparing QEngine agains
 
 ### 2. Platform Adapters (5 Platforms)
 
-- `adapters/qengine_adapter.py` - Full bracket order support
+- `adapters/ml4t.backtest_adapter.py` - Full bracket order support
 - `adapters/vectorbt_adapter.py` - Pro and Free versions
 - `adapters/zipline_adapter.py` - Zipline-reloaded integration
 - `adapters/backtrader_adapter.py` - Backtrader integration
@@ -59,7 +59,7 @@ Built comprehensive cross-platform validation framework comparing QEngine agains
 ```
 tests/validation/
 ├── signals/          # Platform-independent (MA, RSI, Random)
-├── adapters/         # Platform-specific (QEngine, VectorBT, Zipline, Backtrader)
+├── adapters/         # Platform-specific (ml4t.backtest, VectorBT, Zipline, Backtrader)
 ├── data/             # Data loading from ../projects/
 ├── validators/       # Trade comparison and reporting
 └── run_validation.py # Main entry point
@@ -78,8 +78,8 @@ cd tests/validation
 python3 quick_test.py
 
 # Run validation
-python3 run_validation.py --strategy ma_cross --platforms qengine
-python3 run_validation.py --strategy ma_cross --platforms qengine,vectorbt_free
+python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest
+python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest,vectorbt_free
 python3 run_validation.py --strategy all --platforms all
 
 # View results
@@ -91,7 +91,7 @@ open results/YYYY-MM-DD_HH-MM-SS/validation_report.html
 All 10 functional requirements from exploration completed:
 
 1. ✅ Platform-independent signals (zero coupling)
-2. ✅ 5 platform adapters (QEngine + 4 references)
+2. ✅ 5 platform adapters (ml4t.backtest + 4 references)
 3. ✅ 4 test strategies (MA, RSI, Random, variations)
 4. ✅ Trade-level validation with tolerance
 5. ✅ P&L and metrics comparison
@@ -123,7 +123,7 @@ All 4 levels implemented:
 
 - Dependency installation
 - First test run
-- QEngine API verification (minor fixes likely)
+- ml4t.backtest API verification (minor fixes likely)
 - Platform comparison runs
 
 ## 🎯 Next Steps
@@ -133,8 +133,8 @@ All 4 levels implemented:
 1. Install dependencies: `pip install polars pandas numpy vectorbt backtrader`
 2. Run component test: `python3 quick_test.py`
 3. Fix any import errors
-4. Run first backtest: `python3 run_validation.py --strategy ma_cross --platforms qengine`
-5. Fix any QEngine API mismatches
+4. Run first backtest: `python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest`
+5. Fix any ml4t.backtest API mismatches
 6. Add platforms incrementally
 
 ### This Week
@@ -169,7 +169,7 @@ From exploration phase - all met:
 
 ### Minor Fixes Likely Needed
 
-1. **QEngine API**: May need small adjustments to match actual API
+1. **ml4t.backtest API**: May need small adjustments to match actual API
 2. **VectorBT API**: Pro vs Free differences
 3. **Zipline Bundle**: May need custom configuration
 4. **Data Paths**: May need path adjustments

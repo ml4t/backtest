@@ -1,16 +1,25 @@
 """
 Base classes for cross-framework validation.
 
-Defines common interfaces and data structures for validating QEngine
+Defines common interfaces and data structures for validating ml4t.backtest
 against other backtesting frameworks.
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 import pandas as pd
+
+
+class Signal(TypedDict):
+    """Pre-computed trading signal."""
+
+    timestamp: datetime
+    asset_id: str
+    action: Literal["BUY", "SELL"]
+    quantity: float
 
 
 @dataclass
@@ -96,6 +105,38 @@ class BaseFrameworkAdapter(ABC):
         Returns:
             ValidationResult with performance metrics and trade records
         """
+
+    def run_with_signals(
+        self,
+        data: pd.DataFrame,
+        signals: list[Signal],
+        initial_capital: float = 10000,
+    ) -> ValidationResult:
+        """
+        Run backtest with pre-computed signals (eliminates calculation variance).
+
+        This method provides pure execution validation by accepting pre-computed
+        entry/exit signals. This eliminates variance from:
+        - Different indicator calculations (MA, RSI, etc.)
+        - Floating point rounding differences
+        - Data source differences
+
+        Args:
+            data: OHLCV data with DatetimeIndex (for price lookup)
+            signals: List of pre-computed trading signals with timestamps,
+                actions (BUY/SELL), and quantities
+            initial_capital: Starting capital for backtest
+
+        Returns:
+            ValidationResult with performance metrics and trade records
+
+        Raises:
+            NotImplementedError: If framework doesn't support signal-based execution
+        """
+        raise NotImplementedError(
+            f"{self.framework_name} adapter does not yet support signal-based execution. "
+            "Implement run_with_signals() to enable pure execution validation."
+        )
 
     def validate_data(self, data: pd.DataFrame) -> bool:
         """Validate input data format."""

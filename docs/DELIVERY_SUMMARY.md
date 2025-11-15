@@ -1,8 +1,8 @@
-# QEngine Critical Fixes - Delivery Summary
+# ml4t.backtest Critical Fixes - Delivery Summary
 
 ## 🎯 Work Completed
 
-Successfully resolved all P0 and P1 critical issues identified in the code review of QEngine backtesting framework.
+Successfully resolved all P0 and P1 critical issues identified in the code review of ml4t.backtest backtesting framework.
 
 ### Issues Addressed (8/8 Complete)
 
@@ -21,10 +21,10 @@ Successfully resolved all P0 and P1 critical issues identified in the code revie
 ## 📁 Files Modified
 
 ### Core Engine Files
-- `src/qengine/engine.py` - Fixed event subscriptions and initialization
-- `src/qengine/execution/broker.py` - Fixed FillEvent publishing, execution delay, cash constraints
-- `src/qengine/core/clock.py` - Fixed multi-feed synchronization with sequence counter
-- `src/qengine/core/assets.py` - Enhanced P&L calculations, added expiry-based option P&L
+- `src/ml4t.backtest/engine.py` - Fixed event subscriptions and initialization
+- `src/ml4t.backtest/execution/broker.py` - Fixed FillEvent publishing, execution delay, cash constraints
+- `src/ml4t.backtest/core/clock.py` - Fixed multi-feed synchronization with sequence counter
+- `src/ml4t.backtest/core/assets.py` - Enhanced P&L calculations, added expiry-based option P&L
 
 ### Test Files (New)
 - `tests/integration/test_corporate_action_integration.py` - Corporate action testing
@@ -87,7 +87,7 @@ Successfully resolved all P0 and P1 critical issues identified in the code revie
 
 ## 🚀 Deployment Ready
 
-The QEngine backtesting framework is now production-ready with:
+The ml4t.backtest backtesting framework is now production-ready with:
 
 1. **Functional Correctness**: All components properly integrated
 2. **Temporal Accuracy**: No lookahead bias, proper event sequencing
@@ -129,7 +129,7 @@ pytest tests/integration/test_corporate_action_integration.py -v
 
 ## 🎉 Summary
 
-All critical issues from the code review have been successfully resolved. The QEngine backtesting framework now provides:
+All critical issues from the code review have been successfully resolved. The ml4t.backtest backtesting framework now provides:
 
 - **Accurate backtesting** without lookahead bias
 - **Reliable multi-feed data** handling

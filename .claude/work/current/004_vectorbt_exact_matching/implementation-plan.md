@@ -2,14 +2,14 @@
 
 **Work Unit**: `20251026_002_vectorbt_exact_matching`
 **Created**: 2025-10-26
-**Objective**: Reverse engineer VectorBT Pro and achieve 100% exact matching with qengine
+**Objective**: Reverse engineer VectorBT Pro and achieve 100% exact matching with ml4t.backtest
 
 ---
 
 ## Project Overview
 
 ### Goal
-Achieve complete understanding of VectorBT Pro's backtesting calculations and replicate them exactly in qengine. No approximations - **100% exact matching required**.
+Achieve complete understanding of VectorBT Pro's backtesting calculations and replicate them exactly in ml4t.backtest. No approximations - **100% exact matching required**.
 
 ### Scope
 - ✅ **In Scope**: TP/SL/TSL logic, fee/slippage calculations, position sizing, entry/exit prices
@@ -54,7 +54,7 @@ Portfolio.from_signals(
 - Fee timing? (entry, exit, both?)
 - Position sizing? (how does size=np.inf work?)
 
-### qengine (ML4T - Target)
+### ml4t.backtest (ML4T - Target)
 ```
 Event-Driven Architecture:
 ├── Strategy (signal generation + exit logic)
@@ -376,11 +376,11 @@ Event-Driven Architecture:
 **Estimated**: 3 hours
 **Dependencies**: [TASK-012]
 
-**Description**: Build framework to compare VectorBT and qengine trades
+**Description**: Build framework to compare VectorBT and ml4t.backtest trades
 
 **Acceptance Criteria**:
 - Loads VectorBT trade log
-- Loads qengine trade log
+- Loads ml4t.backtest trade log
 - Matches trades by index/timestamp
 - Compares all fields (entry/exit prices, fees, PnL, etc.)
 - Reports differences with clear formatting
@@ -431,7 +431,7 @@ Event-Driven Architecture:
 **Acceptance Criteria**:
 - pytest configuration in place
 - Test fixtures for VectorBT trades
-- Test fixtures for qengine setup
+- Test fixtures for ml4t.backtest setup
 - Parameterized tests for edge cases
 - Clear test organization (unit vs integration)
 
@@ -441,9 +441,9 @@ Event-Driven Architecture:
 
 ---
 
-### Phase 3: qengine Implementation (Build)
+### Phase 3: ml4t.backtest Implementation (Build)
 
-#### TASK-016: Implement TP exit logic in qengine
+#### TASK-016: Implement TP exit logic in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 2 hours
@@ -459,12 +459,12 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_tp_logic.py`
 
 ---
 
-#### TASK-017: Implement SL exit logic in qengine
+#### TASK-017: Implement SL exit logic in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 1.5 hours
@@ -480,12 +480,12 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_sl_logic.py`
 
 ---
 
-#### TASK-018: Implement TSL tracking and exit logic in qengine
+#### TASK-018: Implement TSL tracking and exit logic in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 3 hours
@@ -502,12 +502,12 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_tsl_logic.py`
 
 ---
 
-#### TASK-019: Implement exit priority handling in qengine
+#### TASK-019: Implement exit priority handling in ml4t.backtest
 **Type**: feature
 **Priority**: medium
 **Estimated**: 1.5 hours
@@ -522,12 +522,12 @@ Event-Driven Architecture:
 - Unit tests for conflict scenarios
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_exit_priority.py`
 
 ---
 
-#### TASK-020: Implement identical fee calculation in qengine
+#### TASK-020: Implement identical fee calculation in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 1.5 hours
@@ -543,12 +543,12 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_fees.py`
 
 ---
 
-#### TASK-021: Implement identical slippage calculation in qengine
+#### TASK-021: Implement identical slippage calculation in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 1.5 hours
@@ -564,12 +564,12 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_slippage.py`
 
 ---
 
-#### TASK-022: Implement identical position sizing in qengine
+#### TASK-022: Implement identical position sizing in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 2 hours
@@ -586,12 +586,12 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_position_sizing.py`
 
 ---
 
-#### TASK-023: Implement identical entry price logic in qengine
+#### TASK-023: Implement identical entry price logic in ml4t.backtest
 **Type**: feature
 **Priority**: high
 **Estimated**: 1.5 hours
@@ -608,30 +608,30 @@ Event-Driven Architecture:
 - Unit tests pass
 
 **Files**:
-- `backtest/src/qengine/strategies/vectorbt_strategy.py`
+- `backtest/src/ml4t.backtest/strategies/vectorbt_strategy.py`
 - `backtest/tests/test_entry_logic.py`
 
 ---
 
 ### Phase 4: Validation and Debugging (Verify)
 
-#### TASK-024: Run initial qengine backtest with same signals
+#### TASK-024: Run initial ml4t.backtest backtest with same signals
 **Type**: testing
 **Priority**: high
 **Estimated**: 2 hours
 **Dependencies**: [TASK-16 through TASK-23]
 
-**Description**: Run qengine backtest with identical signals from Phase 1
+**Description**: Run ml4t.backtest backtest with identical signals from Phase 1
 
 **Acceptance Criteria**:
-- qengine backtest completes without errors
+- ml4t.backtest backtest completes without errors
 - Trade log generated
 - Basic metrics calculated (trade count, PnL, etc.)
 - Results saved for comparison
 
 **Files**:
-- `projects/crypto_futures/scripts/run_qengine_backtest.py`
-- `projects/crypto_futures/data/qengine_trades_q1_2024.parquet`
+- `projects/crypto_futures/scripts/run_ml4t.backtest_backtest.py`
+- `projects/crypto_futures/data/ml4t.backtest_trades_q1_2024.parquet`
 
 ---
 
@@ -641,7 +641,7 @@ Event-Driven Architecture:
 **Estimated**: 1 hour
 **Dependencies**: [TASK-024, TASK-013]
 
-**Description**: Compare high-level metrics between VectorBT and qengine
+**Description**: Compare high-level metrics between VectorBT and ml4t.backtest
 
 **Acceptance Criteria**:
 - Trade count comparison (target: exact match)
@@ -686,7 +686,7 @@ Event-Driven Architecture:
 
 **Acceptance Criteria**:
 - Root cause identified for each discrepancy
-- qengine code updated if needed
+- ml4t.backtest code updated if needed
 - VectorBT behavior clarified if needed
 - First 10 trades match exactly
 - Fixes documented
@@ -790,16 +790,16 @@ Event-Driven Architecture:
 
 ---
 
-#### TASK-032: Write QENGINE_IMPLEMENTATION_GUIDE.md
+#### TASK-032: Write ML4T_BACKTEST_IMPLEMENTATION_GUIDE.md
 **Type**: documentation
 **Priority**: high
 **Estimated**: 2 hours
 **Dependencies**: [TASK-016 through TASK-023, TASK-029]
 
-**Description**: Guide for implementing VectorBT behavior in qengine
+**Description**: Guide for implementing VectorBT behavior in ml4t.backtest
 
 **Contents**:
-- qengine architecture overview
+- ml4t.backtest architecture overview
 - Strategy implementation details
 - Code organization
 - How to replicate each VectorBT behavior
@@ -813,7 +813,7 @@ Event-Driven Architecture:
 - Usable by someone not familiar with project
 
 **Files**:
-- `projects/crypto_futures/docs/QENGINE_IMPLEMENTATION_GUIDE.md`
+- `projects/crypto_futures/docs/ML4T_BACKTEST_IMPLEMENTATION_GUIDE.md`
 
 ---
 
@@ -828,7 +828,7 @@ Event-Driven Architecture:
 **Contents**:
 - Test period and configuration
 - VectorBT baseline results
-- qengine results
+- ml4t.backtest results
 - Trade-by-trade comparison summary
 - Aggregate metrics comparison
 - Edge case test results
@@ -855,13 +855,13 @@ Event-Driven Architecture:
 
 **Acceptance Criteria**:
 - pytest suite runs end-to-end
-- Tests VectorBT vs qengine matching
+- Tests VectorBT vs ml4t.backtest matching
 - Can be run on new data periods
 - Clear pass/fail reporting
 - Documented how to use
 
 **Files**:
-- `projects/crypto_futures/tests/test_vectorbt_qengine_matching.py`
+- `projects/crypto_futures/tests/test_vectorbt_ml4t.backtest_matching.py`
 - `projects/crypto_futures/tests/README.md`
 
 ---
@@ -883,10 +883,10 @@ Event-Driven Architecture:
 
 **Deliverables**:
 - VECTORBT_BEHAVIOR_SPEC.md ✅
-- QENGINE_IMPLEMENTATION_GUIDE.md ✅
+- ML4T_BACKTEST_IMPLEMENTATION_GUIDE.md ✅
 - TRADE_COMPARISON_REPORT.md ✅
 - Verification test suite ✅
-- qengine VectorBT-matching implementation ✅
+- ml4t.backtest VectorBT-matching implementation ✅
 
 ---
 
@@ -899,8 +899,8 @@ Event-Driven Architecture:
 3. TASK-003 through TASK-011 (reverse engineering) →
 4. TASK-012 (extract VectorBT trades) →
 5. TASK-013 (comparison framework) →
-6. TASK-016 through TASK-023 (qengine implementation) →
-7. TASK-024 (run qengine) →
+6. TASK-016 through TASK-023 (ml4t.backtest implementation) →
+7. TASK-024 (run ml4t.backtest) →
 8. TASK-026 (detailed comparison) →
 9. TASK-027, TASK-028 (debugging) →
 10. TASK-029 (final verification) →
@@ -930,7 +930,7 @@ Event-Driven Architecture:
 
 ### Medium Risk Areas
 
-1. **qengine architecture differences** - Event-driven vs vectorized may cause issues
+1. **ml4t.backtest architecture differences** - Event-driven vs vectorized may cause issues
    - **Mitigation**: Careful implementation, extensive testing
 
 2. **Edge cases** - Unusual market conditions may reveal unexpected behavior
@@ -943,7 +943,7 @@ Event-Driven Architecture:
 ### TASK-002: VectorBT source code analysis
 **Recommended**: `/agent architect` - For understanding complex architectural decisions in VectorBT
 
-### TASK-016-023: qengine implementation
+### TASK-016-023: ml4t.backtest implementation
 **Recommended**: `/agent code-reviewer` - For security and correctness review of exit logic
 
 ### TASK-034: Verification test suite
@@ -957,7 +957,7 @@ Event-Driven Architecture:
 
 **Phase 1 (Investigation)**: ✅ when all VectorBT behaviors documented
 **Phase 2 (Test Setup)**: ✅ when comparison framework working
-**Phase 3 (Implementation)**: ✅ when qengine code matches VectorBT logic
+**Phase 3 (Implementation)**: ✅ when ml4t.backtest code matches VectorBT logic
 **Phase 4 (Validation)**: ✅ when 100% matching achieved
 **Phase 5 (Documentation)**: ✅ when all deliverables complete
 
@@ -969,7 +969,7 @@ Event-Driven Architecture:
 ✅ 100% fee calculation match
 ✅ 100% PnL match (within rounding)
 ✅ Complete VectorBT behavior specification
-✅ qengine implementation guide
+✅ ml4t.backtest implementation guide
 ✅ Trade comparison report
 ✅ Verification test suite
 

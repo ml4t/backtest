@@ -1,6 +1,6 @@
 # Validation Framework Implementation - Key Learnings
 
-**Project**: QEngine Cross-Framework Validation
+**Project**: ml4t.backtest Cross-Framework Validation
 **Phase**: Phase 0 - Infrastructure Setup
 **Date Range**: 2025-10-04
 **Progress**: 6/38 tasks complete (15.8%)

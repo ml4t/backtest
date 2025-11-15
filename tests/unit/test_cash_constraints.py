@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType, OrderSide, OrderType
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.commission import FlatCommission, PercentageCommission
-from qengine.execution.order import Order
-from qengine.execution.slippage import NoSlippage
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide, OrderType
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.commission import FlatCommission, PercentageCommission
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.execution.slippage import NoSlippage
 
 
 class TestCashConstraints:
@@ -239,7 +239,7 @@ class TestCashConstraints:
         )
 
         # Give broker some shares to sell (directly set position without affecting cash)
-        from qengine.portfolio.state import Position
+        from ml4t.backtest.portfolio.state import Position
         position = Position(asset_id="AAPL")
         position.add_shares(10.0, 100.0)
         broker._internal_portfolio.tracker.positions["AAPL"] = position

@@ -1,10 +1,10 @@
 """Simple TSL test to verify peak tracking."""
 
 from datetime import datetime
-from qengine.core.event import MarketEvent
-from qengine.core.types import OrderSide, OrderType, MarketDataType
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.order import Order
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import OrderSide, OrderType, MarketDataType
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.order import Order
 
 
 def test_tsl_tracks_peak():

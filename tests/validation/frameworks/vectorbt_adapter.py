@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from .base import BaseFrameworkAdapter, TradeRecord, ValidationResult
+from .base import BaseFrameworkAdapter, Signal, TradeRecord, ValidationResult
 
 
 class VectorBTAdapter(BaseFrameworkAdapter):
@@ -34,11 +34,9 @@ class VectorBTAdapter(BaseFrameworkAdapter):
         )
 
         try:
-            # Try vectorbtpro first, fallback to vectorbt (open source)
-            try:
-                import vectorbtpro as vbt
-            except ImportError:
-                import vectorbt as vbt
+            # Use open-source vectorbt for correctness validation
+            # (vectorbtpro should only be used for performance benchmarking)
+            import vectorbt as vbt
 
             tracemalloc.start()
             start_time = time.time()
@@ -84,8 +82,58 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             )
 
             # Extract results - compatible with both vectorbt and vectorbtpro
-            result.final_value = float(pf.value.iloc[-1] if hasattr(pf.value, 'iloc') else pf.value())
-            result.total_return = float(pf.total_return * 100 if isinstance(pf.total_return, (int, float)) else pf.total_return() * 100)
+            # Handle both Series (open-source) and callable (Pro) APIs
+            try:
+                value = pf.value
+                if callable(value):
+                    # Pro API - value is a method
+                    value_result = value()
+                    if hasattr(value_result, 'iloc'):
+                        result.final_value = float(value_result.iloc[-1])
+                    else:
+                        result.final_value = float(value_result)
+                elif hasattr(value, 'iloc'):
+                    # Series - get last value
+                    last_val = value.iloc[-1]
+                    # Handle case where iloc[-1] still returns a Series (multi-column)
+                    if hasattr(last_val, 'iloc'):
+                        result.final_value = float(last_val.iloc[0])
+                    else:
+                        result.final_value = float(last_val)
+                else:
+                    # Scalar
+                    result.final_value = float(value)
+            except Exception as e:
+                print(f"Warning: Could not extract final_value: {e}")
+                print(f"  Type: {type(pf.value)}")
+                if hasattr(pf.value, 'iloc'):
+                    print(f"  Last value type: {type(pf.value.iloc[-1])}")
+                result.final_value = 0.0
+
+            try:
+                total_return = pf.total_return
+                if callable(total_return):
+                    # Pro API - total_return is a method
+                    tr_result = total_return()
+                    if hasattr(tr_result, 'iloc'):
+                        last_tr = tr_result.iloc[-1]
+                        result.total_return = float(last_tr.iloc[0] if hasattr(last_tr, 'iloc') else last_tr) * 100
+                    else:
+                        result.total_return = float(tr_result) * 100
+                elif hasattr(total_return, 'iloc'):
+                    # Series - get last value
+                    last_tr = total_return.iloc[-1]
+                    # Handle case where iloc[-1] still returns a Series (multi-column)
+                    if hasattr(last_tr, 'iloc'):
+                        result.total_return = float(last_tr.iloc[0]) * 100
+                    else:
+                        result.total_return = float(last_tr) * 100
+                else:
+                    # Scalar
+                    result.total_return = float(total_return) * 100
+            except Exception as e:
+                print(f"Warning: Could not extract total_return: {e}")
+                result.total_return = 0.0
 
             # Get number of trades (round trips, not individual orders)
             if hasattr(pf, "trades") and hasattr(pf.trades, "records"):
@@ -99,14 +147,28 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             # Get performance metrics - compatible with both APIs
             try:
                 sr = pf.sharpe_ratio
-                result.sharpe_ratio = float(sr if isinstance(sr, (int, float)) else sr())
-            except:
+                if hasattr(sr, 'iloc'):
+                    # Series - get last/scalar value
+                    result.sharpe_ratio = float(sr.iloc[-1] if len(sr) > 1 else sr.iloc[0])
+                elif callable(sr):
+                    result.sharpe_ratio = float(sr())
+                else:
+                    result.sharpe_ratio = float(sr)
+            except Exception as e:
+                print(f"Warning: Could not extract sharpe_ratio: {e}")
                 result.sharpe_ratio = 0.0
 
             try:
                 md = pf.max_drawdown
-                result.max_drawdown = float(md if isinstance(md, (int, float)) else md()) * 100
-            except:
+                if hasattr(md, 'iloc'):
+                    # Series - get last/max value
+                    result.max_drawdown = float(md.iloc[-1] if len(md) > 1 else md.iloc[0]) * 100
+                elif callable(md):
+                    result.max_drawdown = float(md()) * 100
+                else:
+                    result.max_drawdown = float(md) * 100
+            except Exception as e:
+                print(f"Warning: Could not extract max_drawdown: {e}")
                 result.max_drawdown = 0.0
 
             # Get equity curve and returns
@@ -179,6 +241,150 @@ class VectorBTAdapter(BaseFrameworkAdapter):
         except Exception as e:
             error_msg = f"VectorBT backtest failed: {e}"
             print(f"✗ {error_msg}")
+            result.errors.append(error_msg)
+
+        return result
+
+    def run_with_signals(
+        self,
+        data: pd.DataFrame,
+        signals: list[Signal],
+        initial_capital: float = 10000,
+    ) -> ValidationResult:
+        """
+        Run backtest with pre-computed signals (pure execution validation).
+
+        This eliminates variance from indicator calculations by using
+        pre-computed entry/exit signals.
+
+        Args:
+            data: OHLCV data with DatetimeIndex
+            signals: Pre-computed trading signals
+            initial_capital: Starting capital
+
+        Returns:
+            ValidationResult with performance metrics
+        """
+        result = ValidationResult(
+            framework=self.framework_name,
+            strategy="SignalBased",
+            initial_capital=initial_capital,
+        )
+
+        try:
+            import vectorbt as vbt
+
+            tracemalloc.start()
+            start_time = time.time()
+
+            # Convert signal list to boolean entry/exit series
+            # Initialize with all False
+            entries = pd.Series(False, index=data.index)
+            exits = pd.Series(False, index=data.index)
+
+            # Process signals and set True at signal timestamps
+            for signal in signals:
+                timestamp = signal["timestamp"]
+                action = signal["action"]
+
+                # Find closest timestamp in data index (handles minor timing differences)
+                if timestamp in data.index:
+                    idx = timestamp
+                else:
+                    # Find nearest timestamp
+                    idx = data.index[data.index.get_indexer([timestamp], method='nearest')[0]]
+
+                if action == "BUY":
+                    entries.loc[idx] = True
+                elif action == "SELL":
+                    exits.loc[idx] = True
+
+            print(f"VectorBT signal-based: {entries.sum()} entries, {exits.sum()} exits")
+
+            # Create portfolio using from_signals
+            close_prices = data["close"]
+            pf = vbt.Portfolio.from_signals(
+                close_prices,
+                entries=entries,
+                exits=exits,
+                init_cash=initial_capital,
+                fees=0.0,  # No fees for signal validation
+                slippage=0.0,  # No slippage for signal validation
+                freq="D",
+            )
+
+            # Extract results using same robust API handling as run_backtest
+            try:
+                value = pf.value
+                if callable(value):
+                    value_result = value()
+                    if hasattr(value_result, 'iloc'):
+                        result.final_value = float(value_result.iloc[-1])
+                    else:
+                        result.final_value = float(value_result)
+                elif hasattr(value, 'iloc'):
+                    last_val = value.iloc[-1]
+                    if hasattr(last_val, 'iloc'):
+                        result.final_value = float(last_val.iloc[0])
+                    else:
+                        result.final_value = float(last_val)
+                else:
+                    result.final_value = float(value)
+            except Exception as e:
+                print(f"Warning: Could not extract final_value: {e}")
+                result.final_value = 0.0
+
+            try:
+                total_return = pf.total_return
+                if callable(total_return):
+                    tr_result = total_return()
+                    if hasattr(tr_result, 'iloc'):
+                        last_tr = tr_result.iloc[-1]
+                        result.total_return = float(last_tr.iloc[0] if hasattr(last_tr, 'iloc') else last_tr) * 100
+                    else:
+                        result.total_return = float(tr_result) * 100
+                elif hasattr(total_return, 'iloc'):
+                    last_tr = total_return.iloc[-1]
+                    if hasattr(last_tr, 'iloc'):
+                        result.total_return = float(last_tr.iloc[0]) * 100
+                    else:
+                        result.total_return = float(last_tr) * 100
+                else:
+                    result.total_return = float(total_return) * 100
+            except Exception as e:
+                print(f"Warning: Could not extract total_return: {e}")
+                result.total_return = 0.0
+
+            # Get number of trades
+            if hasattr(pf, "trades") and hasattr(pf.trades, "records"):
+                result.num_trades = len(pf.trades.records)
+            elif hasattr(pf, "orders") and hasattr(pf.orders, "records"):
+                result.num_trades = len(pf.orders.records) // 2
+            else:
+                result.num_trades = 0
+
+            # Performance tracking
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            result.execution_time = time.time() - start_time
+            result.memory_usage = peak / 1024 / 1024
+
+            print("✓ VectorBT signal-based backtest completed")
+            print(f"  Signals Processed: {len(signals)}")
+            print(f"  Final Value: ${result.final_value:,.2f}")
+            print(f"  Total Return: {result.total_return:.2f}%")
+            print(f"  Total Trades: {result.num_trades}")
+
+        except ImportError as e:
+            error_msg = f"VectorBT not available: {e}"
+            print(f"⚠ {error_msg}")
+            result.errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"VectorBT signal-based backtest failed: {e}"
+            print(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
             result.errors.append(error_msg)
 
         return result

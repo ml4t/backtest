@@ -2,13 +2,13 @@
 
 ## Summary
 
-Successfully implemented cross-platform validation framework comparing QEngine, VectorBT, Zipline, and Backtrader. Framework is operational with QEngine and VectorBT currently tested.
+Successfully implemented cross-platform validation framework comparing ml4t.backtest, VectorBT, Zipline, and Backtrader. Framework is operational with ml4t.backtest and VectorBT currently tested.
 
 ## Test Results (2020-01-01 to 2020-12-31, AAPL, MA Crossover Strategy)
 
 | Platform      | Trades | P&L      | Execution Time |
 |---------------|--------|----------|----------------|
-| QEngine       | 2      | $2,588.44| 0.00s          |
+| ml4t.backtest       | 2      | $2,588.44| 0.00s          |
 | VectorBT Free | 3      | $3,733.57| 0.14s          |
 
 ## Key Differences Identified
@@ -17,7 +17,7 @@ Successfully implemented cross-platform validation framework comparing QEngine, 
 
 **Root Cause**: Different execution models
 
-- **QEngine**: Next-bar execution
+- **ml4t.backtest**: Next-bar execution
   - Signal generated at timestamp T
   - Order executed at next market event (T+1)
   - Entry on 2020-04-15 signal → Fill on 2020-04-16
@@ -29,11 +29,11 @@ Successfully implemented cross-platform validation framework comparing QEngine, 
 
 **Impact**: 1-day timing offset on all entries/exits
 
-**Realistic Model**: QEngine's next-bar execution is more realistic. You cannot execute a trade based on today's close price at today's close (look-ahead bias).
+**Realistic Model**: ml4t.backtest's next-bar execution is more realistic. You cannot execute a trade based on today's close price at today's close (look-ahead bias).
 
 ### 2. Trade Count Mismatch
 
-**QEngine**: 2 complete + 1 open position
+**ml4t.backtest**: 2 complete + 1 open position
 - Trade 1: BUY 4/16 @ $71.68, SELL 9/17 @ $110.33
 - Trade 2: BUY 10/13 @ $121.11, SELL 11/2 @ $108.76
 - Open: BUY 11/17 @ $119.40 (not counted in completed trades)
@@ -43,7 +43,7 @@ Successfully implemented cross-platform validation framework comparing QEngine, 
 - Trade 2: BUY 10/12 @ $124.40, SELL 10/30 @ $108.86
 - Trade 3: BUY 11/16 @ $120.30, SELL (end of backtest)
 
-**Root Cause**: VectorBT closes all positions at end of backtest period, QEngine leaves them open.
+**Root Cause**: VectorBT closes all positions at end of backtest period, ml4t.backtest leaves them open.
 
 ### 3. Price Differences
 
@@ -66,19 +66,19 @@ Total P&L differs by $1,145.13 (44%) due to:
 1. **Standardize execution model**: Configure both platforms for same-bar OR next-bar execution
 2. **Handle open positions**: Either:
    - Force close at end (VectorBT behavior)
-   - Exclude open positions from both (QEngine behavior)
+   - Exclude open positions from both (ml4t.backtest behavior)
 3. **Commission alignment**: Verify both use identical commission models
 
 ### For Production Use
 
-1. **Prefer QEngine's model**: Next-bar execution avoids look-ahead bias
+1. **Prefer ml4t.backtest's model**: Next-bar execution avoids look-ahead bias
 2. **Document assumptions**: Clearly state execution timing in backtest reports
 3. **Add realism**: Consider slippage, market impact, partial fills
 
 ## Files Created
 
 - `tests/validation/signals/` - Platform-independent signal generators
-- `tests/validation/adapters/` - Platform adapters (QEngine, VectorBT, etc.)
+- `tests/validation/adapters/` - Platform adapters (ml4t.backtest, VectorBT, etc.)
 - `tests/validation/validators/` - Trade-level comparison validators
 - `tests/validation/data/` - Data loading utilities
 - `tests/validation/run_validation.py` - Main validation CLI
@@ -87,7 +87,7 @@ Total P&L differs by $1,145.13 (44%) due to:
 
 ## Next Steps
 
-1. ✅ QEngine adapter working
+1. ✅ ml4t.backtest adapter working
 2. ✅ VectorBT adapter working
 3. ⏳ Configure same-bar execution for fair comparison
 4. ⏳ Implement Zipline adapter
@@ -101,7 +101,7 @@ Total P&L differs by $1,145.13 (44%) due to:
 ## Status
 
 **Framework**: ✅ Operational
-**QEngine Integration**: ✅ Complete
+**ml4t.backtest Integration**: ✅ Complete
 **VectorBT Integration**: ✅ Complete
 **Differences Identified**: ✅ Root causes documented
 **Ready for**: Configuration tuning and additional platform testing

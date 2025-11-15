@@ -1,4 +1,4 @@
-# QEngine Code Style and Conventions
+# ml4t.backtest Code Style and Conventions
 
 ## Code Style
 - **Formatter**: ruff (auto-formats on `make format`)

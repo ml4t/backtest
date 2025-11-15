@@ -83,27 +83,27 @@ def generate_multi_asset_signals(n_bars: int, entries_per_asset: int = 10, hold_
     }
 
 
-class MultiAssetQEngineWrapper:
-    """Extended QEngine wrapper for multi-asset backtests."""
+class MultiAssetml4t.backtestWrapper:
+    """Extended ml4t.backtest wrapper for multi-asset backtests."""
 
     def run_backtest(self, ohlcv_dict, signals_dict, config):
         """
-        Run multi-asset backtest with qengine.
+        Run multi-asset backtest with ml4t.backtest.
 
         Args:
             ohlcv_dict: Dict of {asset_id: ohlcv_df}
             signals_dict: Dict of {asset_id: {'entries': Series, 'exits': Series}}
             config: BacktestConfig with asset-specific fees
         """
-        from qengine.engine import BacktestEngine
-        from qengine.core.assets import AssetSpec, AssetRegistry, AssetClass
-        from qengine.data.feed import DataFeed
-        from qengine.strategy.base import Strategy
-        from qengine.core.event import MarketEvent
-        from qengine.execution.commission import CommissionModel, PercentageCommission, NoCommission
-        from qengine.execution.slippage import NoSlippage
-        from qengine.execution.broker import SimulationBroker
-        from qengine.core.types import MarketDataType
+        from ml4t.backtest.engine import BacktestEngine
+        from ml4t.backtest.core.assets import AssetSpec, AssetRegistry, AssetClass
+        from ml4t.backtest.data.feed import DataFeed
+        from ml4t.backtest.strategy.base import Strategy
+        from ml4t.backtest.core.event import MarketEvent
+        from ml4t.backtest.execution.commission import CommissionModel, PercentageCommission, NoCommission
+        from ml4t.backtest.execution.slippage import NoSlippage
+        from ml4t.backtest.execution.broker import SimulationBroker
+        from ml4t.backtest.core.types import MarketDataType
         from datetime import datetime
 
         # Create asset registry
@@ -188,7 +188,7 @@ class MultiAssetQEngineWrapper:
                 self.event_bus = event_bus
 
             def on_event(self, event):
-                from qengine.core.event import FillEvent
+                from ml4t.backtest.core.event import FillEvent
 
                 if isinstance(event, MarketEvent):
                     self.on_market_event(event)
@@ -196,8 +196,8 @@ class MultiAssetQEngineWrapper:
                     super().on_fill_event(event)
 
             def on_market_event(self, event: MarketEvent):
-                from qengine.core.event import OrderEvent
-                from qengine.core.types import OrderSide, OrderType
+                from ml4t.backtest.core.event import OrderEvent
+                from ml4t.backtest.core.types import OrderSide, OrderType
 
                 asset_id = event.asset_id
                 bar_idx = self.bar_indices[asset_id]
@@ -370,7 +370,7 @@ class MultiAssetQEngineWrapper:
             'positions': positions,
             'total_pnl': results['total_return'] / 100 * config.initial_cash,
             'num_trades': len(trades_df),
-            'engine_name': 'qengine',
+            'engine_name': 'ml4t.backtest',
         }
 
 
@@ -383,7 +383,7 @@ class MultiAssetVectorBTWrapper:
 
         Since VectorBT Pro has broadcasting issues with asset-specific fees in multi-asset mode,
         we run each asset separately and aggregate results. This is valid because we're testing
-        qengine's asset-specific fee handling, not VectorBT's multi-asset capabilities.
+        ml4t.backtest's asset-specific fee handling, not VectorBT's multi-asset capabilities.
 
         Args:
             ohlcv_dict: Dict of {asset_id: ohlcv_df}
@@ -518,13 +518,13 @@ def test_2_3_asset_specific_fees():
 
     print("\n4️⃣  Running backtests...")
 
-    # Run qengine
-    print("   🔧 Running qengine...")
+    # Run ml4t.backtest
+    print("   🔧 Running ml4t.backtest...")
     try:
-        qengine = MultiAssetQEngineWrapper()
-        results['qengine'] = qengine.run_backtest(ohlcv_dict, signals_dict, config)
-        print(f"      ✅ Complete: {results['qengine']['num_trades']} trades")
-        print(f"      💰 Final value: ${results['qengine']['final_value']:,.2f}")
+        ml4t.backtest = MultiAssetml4t.backtestWrapper()
+        results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv_dict, signals_dict, config)
+        print(f"      ✅ Complete: {results['ml4t.backtest']['num_trades']} trades")
+        print(f"      💰 Final value: ${results['ml4t.backtest']['final_value']:,.2f}")
     except Exception as e:
         print(f"      ❌ Failed: {e}")
         import traceback
@@ -547,7 +547,7 @@ def test_2_3_asset_specific_fees():
     print("=" * 80)
 
     if len(results) == 2:
-        qe = results['qengine']
+        qe = results['ml4t.backtest']
         vbt = results['VectorBT']
 
         # Compare per-asset trades
@@ -555,11 +555,11 @@ def test_2_3_asset_specific_fees():
         for asset_id in ['BTC', 'ETH']:
             qe_asset_trades = len(qe['trades'][qe['trades']['asset_id'] == asset_id]) if 'asset_id' in qe['trades'].columns else 0
             vbt_asset_trades = len(vbt['trades'][vbt['trades']['asset_id'] == asset_id]) if 'asset_id' in vbt['trades'].columns else 0
-            print(f"   {asset_id}: qengine={qe_asset_trades}, VectorBT={vbt_asset_trades}")
+            print(f"   {asset_id}: ml4t.backtest={qe_asset_trades}, VectorBT={vbt_asset_trades}")
 
         # Compare final values
         print(f"\n💰 Final Values:")
-        print(f"   qengine:  ${qe['final_value']:,.2f}")
+        print(f"   ml4t.backtest:  ${qe['final_value']:,.2f}")
         print(f"   VectorBT: ${vbt['final_value']:,.2f}")
         value_diff = abs(qe['final_value'] - vbt['final_value'])
         print(f"   Difference: ${value_diff:.2f}")
@@ -573,7 +573,7 @@ def test_2_3_asset_specific_fees():
                     asset_commission = asset_trades['commission'].sum()
                     asset_notional = (asset_trades['entry_price'] * asset_trades['size']).sum()
                     effective_rate = (asset_commission / asset_notional * 100) if asset_notional > 0 else 0
-                    print(f"   {asset_id} (qengine): ${asset_commission:.2f} total, {effective_rate:.3f}% effective rate")
+                    print(f"   {asset_id} (ml4t.backtest): ${asset_commission:.2f} total, {effective_rate:.3f}% effective rate")
 
         if 'Fees' in vbt['trades'].columns and 'asset_id' in vbt['trades'].columns:
             for asset_id in ['BTC', 'ETH']:
@@ -590,7 +590,7 @@ def test_2_3_asset_specific_fees():
 
         # Total trades should match
         assert qe['num_trades'] == vbt['num_trades'], \
-            f"Trade count mismatch: qengine={qe['num_trades']}, VectorBT={vbt['num_trades']}"
+            f"Trade count mismatch: ml4t.backtest={qe['num_trades']}, VectorBT={vbt['num_trades']}"
         print(f"   ✅ Trade count matches: {qe['num_trades']}")
 
         # Final values should be within tolerance

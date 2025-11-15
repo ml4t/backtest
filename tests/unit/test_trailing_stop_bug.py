@@ -1,11 +1,11 @@
 """Test to demonstrate the trailing stop bug.
 
-This test shows that qengine's TSL implementation incorrectly calculates
+This test shows that ml4t.backtest's TSL implementation incorrectly calculates
 the trailing distance from the current price instead of from the peak price.
 """
 
-from qengine.core.types import OrderSide, OrderType
-from qengine.execution.order import Order
+from ml4t.backtest.core.types import OrderSide, OrderType
+from ml4t.backtest.execution.order import Order
 
 
 def test_trailing_stop_should_lock_profit():

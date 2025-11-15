@@ -1,8 +1,8 @@
-"""Demonstration of slippage models in QEngine."""
+"""Demonstration of slippage models in ml4t.backtest."""
 
 import sys
 
-sys.path.insert(0, "~/ml4t/qengine/src")
+sys.path.insert(0, "~/ml4t/ml4t.backtest/src")
 sys.path.insert(0, "~/ml4t/qfeatures/src")
 sys.path.insert(0, "~/ml4t/qeval/src")
 
@@ -10,11 +10,11 @@ from datetime import datetime
 
 import polars as pl
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType, OrderSide, OrderType
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.order import Order
-from qengine.execution.slippage import (
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide, OrderType
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.execution.slippage import (
     AssetClassSlippage,
     FixedSlippage,
     LinearImpactSlippage,

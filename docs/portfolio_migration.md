@@ -28,11 +28,11 @@ Upgrading from legacy Portfolio classes to the new unified Portfolio.
 
 ```python
 # Old code
-from qengine.portfolio.simple import SimplePortfolio
+from ml4t.backtest.portfolio.simple import SimplePortfolio
 portfolio = SimplePortfolio(initial_capital=100000)
 
 # New code
-from qengine.portfolio import Portfolio
+from ml4t.backtest.portfolio import Portfolio
 portfolio = Portfolio(initial_cash=100000)
 ```
 
@@ -44,11 +44,11 @@ portfolio = Portfolio(initial_cash=100000)
 
 ```python
 # Before
-from qengine.portfolio.simple import SimplePortfolio
-from qengine.portfolio.accounting import PortfolioAccounting
+from ml4t.backtest.portfolio.simple import SimplePortfolio
+from ml4t.backtest.portfolio.accounting import PortfolioAccounting
 
 # After
-from qengine.portfolio import Portfolio
+from ml4t.backtest.portfolio import Portfolio
 ```
 
 ### 2. Update Initialization
@@ -129,7 +129,7 @@ portfolio.update_prices({"BTC": 51000.0})
 #### Before: SimplePortfolio
 
 ```python
-from qengine.portfolio.simple import SimplePortfolio
+from ml4t.backtest.portfolio.simple import SimplePortfolio
 
 # Initialization
 portfolio = SimplePortfolio(initial_capital=100000, currency="USD")
@@ -153,7 +153,7 @@ portfolio.reset()
 #### After: Portfolio
 
 ```python
-from qengine.portfolio import Portfolio
+from ml4t.backtest.portfolio import Portfolio
 
 # Initialization
 portfolio = Portfolio(initial_cash=100000, currency="USD")
@@ -179,7 +179,7 @@ portfolio.reset()
 ```python
 def migrate_simpleportfolio_to_portfolio(old_portfolio):
     """Migrate SimplePortfolio instance to new Portfolio."""
-    from qengine.portfolio import Portfolio
+    from ml4t.backtest.portfolio import Portfolio
 
     # Create new portfolio with same initial state
     new_portfolio = Portfolio(
@@ -226,7 +226,7 @@ def migrate_simpleportfolio_to_portfolio(old_portfolio):
 #### Before: PortfolioAccounting
 
 ```python
-from qengine.portfolio.accounting import PortfolioAccounting
+from ml4t.backtest.portfolio.accounting import PortfolioAccounting
 
 # Initialization
 accounting = PortfolioAccounting(
@@ -261,7 +261,7 @@ accounting.reset()
 #### After: Portfolio
 
 ```python
-from qengine.portfolio import Portfolio
+from ml4t.backtest.portfolio import Portfolio
 
 # Initialization
 portfolio = Portfolio(
@@ -295,7 +295,7 @@ portfolio.reset()
 ```python
 def migrate_accounting_to_portfolio(old_accounting):
     """Migrate PortfolioAccounting instance to new Portfolio."""
-    from qengine.portfolio import Portfolio
+    from ml4t.backtest.portfolio import Portfolio
 
     # Create new portfolio with same settings
     new_portfolio = Portfolio(
@@ -481,7 +481,7 @@ positions = portfolio.positions
 
 ```python
 # Easy to customize
-from qengine.portfolio.analytics import PerformanceAnalyzer
+from ml4t.backtest.portfolio.analytics import PerformanceAnalyzer
 
 class MyAnalyzer(PerformanceAnalyzer):
     def calculate_custom_metric(self):
@@ -582,10 +582,10 @@ from pathlib import Path
 
 REPLACEMENTS = [
     # Imports
-    (r'from qengine\.portfolio\.simple import SimplePortfolio',
-     'from qengine.portfolio import Portfolio'),
-    (r'from qengine\.portfolio\.accounting import PortfolioAccounting',
-     'from qengine.portfolio import Portfolio'),
+    (r'from ml4t.backtest\.portfolio\.simple import SimplePortfolio',
+     'from ml4t.backtest.portfolio import Portfolio'),
+    (r'from ml4t.backtest\.portfolio\.accounting import PortfolioAccounting',
+     'from ml4t.backtest.portfolio import Portfolio'),
 
     # Class names
     (r'\bSimplePortfolio\b', 'Portfolio'),
@@ -684,7 +684,7 @@ find . -name "*.py" -exec python migrate_portfolio.py {} \;
 ```python
 def test_migration_equivalence():
     """Verify new Portfolio produces same results as old."""
-    from qengine.portfolio import Portfolio
+    from ml4t.backtest.portfolio import Portfolio
 
     # Setup
     portfolio = Portfolio(initial_cash=100000)

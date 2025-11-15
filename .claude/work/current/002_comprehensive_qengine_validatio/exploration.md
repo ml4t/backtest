@@ -1,4 +1,4 @@
-# Exploration Summary: QEngine Cross-Framework Validation
+# Exploration Summary: ml4t.backtest Cross-Framework Validation
 
 ## Codebase Analysis
 
@@ -25,7 +25,7 @@
    - MA crossover: $1,507.06 final value, 14 trades (exact match)
    - 30-stock portfolio: 5,000 trades, perfect agreement
 
-4. **QEngine Architecture**
+4. **ml4t.backtest Architecture**
    - Event-driven design with Clock, EventBus, Strategy, Broker, Portfolio
    - Polars-based for performance (10-100x faster than pandas)
    - Comprehensive execution models: 7 slippage, 9 commission, 6 market impact
@@ -92,7 +92,7 @@
 .venv-vectorbt     # VectorBT Pro environment
 .venv-zipline      # Zipline-Reloaded environment
 .venv-backtrader   # Backtrader environment
-.venv-qengine      # QEngine main environment
+.venv-ml4t.backtest      # ml4t.backtest main environment
 ```
 **Rationale**: Clean dependency management, no conflicts, easier debugging
 
@@ -115,7 +115,7 @@ Phase 1: Tier 1 Core Validation (95%+ agreement)
   ↓
 Phase 2: Tier 2 Advanced Execution (order types, sizing)
   ↓
-Phase 3: Tier 3 ML Integration (qfeatures → qengine)
+Phase 3: Tier 3 ML Integration (qfeatures → ml4t.backtest)
   ↓
 Phase 4: Tier 4 Performance & Edge Cases
   ↓
@@ -150,7 +150,7 @@ class UniversalDataLoader:
         # VectorBT: specific column names
         # Zipline: bundle format
         # Backtrader: feed format
-        # QEngine: Polars DataFrame
+        # ml4t.backtest: Polars DataFrame
 ```
 
 **Signal Generation Strategy:**
@@ -180,12 +180,12 @@ signals = model.predict(features)
 4. **Scalability**: Linear scaling 1→500 assets
 
 **Expected Performance Profiles:**
-- QEngine: 300-500 trades/sec (baseline)
+- ml4t.backtest: 300-500 trades/sec (baseline)
 - VectorBT Pro: 189K trades/sec (20-25x faster)
 - Backtrader: 50-100 trades/sec (0.1-0.2x)
 - Zipline: 2-5 trades/sec (0.01x)
 
-**When QEngine Wins:**
+**When ml4t.backtest Wins:**
 - Complex ML strategies (custom execution logic)
 - Realistic execution simulation (slippage, impact models)
 - Integration with qfeatures/qeval pipeline
@@ -231,7 +231,7 @@ This will create:
 ### Validation Strategy Summary
 - **Correctness First**: Establish 95%+ agreement baseline
 - **Performance Second**: Systematic benchmarking across scales
-- **ML Integration Third**: Prove qfeatures → qengine pipeline
+- **ML Integration Third**: Prove qfeatures → ml4t.backtest pipeline
 - **Edge Cases Last**: Stress test and production readiness
 
 ### Expected Deliverables

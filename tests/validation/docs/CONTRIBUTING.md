@@ -1,4 +1,4 @@
-# Contributing to QEngine Validation Framework
+# Contributing to ml4t.backtest Validation Framework
 
 Guide for adding new validation scenarios to the framework.
 
@@ -17,7 +17,7 @@ Guide for adding new validation scenarios to the framework.
 
 ## Overview
 
-The QEngine validation framework uses a **Test-Driven Development (TDD)** approach with the RED-GREEN-REFACTOR cycle. This proven methodology delivers:
+The ml4t.backtest validation framework uses a **Test-Driven Development (TDD)** approach with the RED-GREEN-REFACTOR cycle. This proven methodology delivers:
 
 - **71% time savings** vs estimates (scenarios complete in ~1h vs 3.5h)
 - **100% test coverage** for all scenarios
@@ -57,7 +57,7 @@ def test_all_platforms_scenario_00X():
     scenario = get_scenario()
 
     # Test each platform
-    for platform in ['qengine', 'vectorbt', 'backtrader', 'zipline']:
+    for platform in ['ml4t.backtest', 'vectorbt', 'backtrader', 'zipline']:
         results = run_backtest(
             scenario=scenario,
             platform=platform,
@@ -161,7 +161,7 @@ cd /home/stefan/ml4t/software/backtest/tests/validation
 uv run python -m pytest test_scenario_00X_description.py -v
 
 # Run with all platforms
-uv run python runner.py --scenario 00X --platforms qengine,vectorbt,backtrader,zipline --report summary
+uv run python runner.py --scenario 00X --platforms ml4t.backtest,vectorbt,backtrader,zipline --report summary
 
 # Expected: All 4 platforms execute successfully
 ```
@@ -218,7 +218,7 @@ from scenarios.scenario_00X_description import get_scenario
 def test_all_platforms_scenario_00X():
     """Test all 4 platforms execute scenario 00X"""
     scenario = get_scenario()
-    platforms = ['qengine', 'vectorbt', 'backtrader', 'zipline']
+    platforms = ['ml4t.backtest', 'vectorbt', 'backtrader', 'zipline']
     all_trades = {}
 
     # Run each platform
@@ -245,10 +245,10 @@ def test_specific_validation():
     """Verify [SPECIFIC BEHAVIOR]"""
     scenario = get_scenario()
 
-    # Run qengine (or whichever platform is most appropriate)
+    # Run ml4t.backtest (or whichever platform is most appropriate)
     results = run_backtest(
         scenario=scenario,
-        platform='qengine',
+        platform='ml4t.backtest',
         verbose=False
     )
 
@@ -262,7 +262,7 @@ def test_specific_validation():
 def test_execution_timing():
     """Document platform execution timing differences"""
     scenario = get_scenario()
-    platforms = ['qengine', 'vectorbt', 'backtrader', 'zipline']
+    platforms = ['ml4t.backtest', 'vectorbt', 'backtrader', 'zipline']
 
     for platform in platforms:
         results = run_backtest(
@@ -336,7 +336,7 @@ Different platforms execute at different times:
 | Platform | Execution | Signal T → Entry |
 |----------|-----------|------------------|
 | VectorBT | Same-bar close | T close |
-| QEngine | Next-bar close | T+1 close |
+| ml4t.backtest | Next-bar close | T+1 close |
 | Zipline | Next-bar close | T+1 close |
 | Backtrader | Next-bar open | T+1 open |
 
@@ -348,7 +348,7 @@ Different platforms execute at different times:
    - Same-bar execution (most optimistic)
    - `stop_loss` parameter exists but not uniformly supported across platforms
 
-2. **QEngine & Zipline**:
+2. **ml4t.backtest & Zipline**:
    - Next-bar close execution (realistic)
    - Zipline requires timezone-naive start/end dates (but signals must be UTC-aware!)
 
@@ -387,10 +387,10 @@ uv run python -m pytest test_scenario_00X_description.py -v
 uv run python -m pytest test_scenario_*.py -v
 
 # Run scenario with specific platform
-uv run python runner.py --scenario 00X --platforms qengine
+uv run python runner.py --scenario 00X --platforms ml4t.backtest
 
 # Run with all platforms and detailed report
-uv run python runner.py --scenario 00X --platforms qengine,vectorbt,backtrader,zipline --report detailed
+uv run python runner.py --scenario 00X --platforms ml4t.backtest,vectorbt,backtrader,zipline --report detailed
 ```
 
 ### Validation Checklist
@@ -552,7 +552,7 @@ assert all(s.timestamp.date() in df.index.date for s in signals)
 
 ## Questions?
 
-Contact the QEngine Validation Team or review existing scenarios for patterns.
+Contact the ml4t.backtest Validation Team or review existing scenarios for patterns.
 
 ---
 

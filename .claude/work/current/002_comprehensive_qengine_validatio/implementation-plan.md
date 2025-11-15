@@ -1,8 +1,8 @@
-# Implementation Plan: QEngine Cross-Framework Validation
+# Implementation Plan: ml4t.backtest Cross-Framework Validation
 
 ## Overview
 
-Comprehensive validation of QEngine backtesting framework against VectorBT Pro, Zipline-Reloaded, and Backtrader. Goal: Prove correctness (95%+ agreement), measure performance, validate ML integration, and establish framework selection guidance.
+Comprehensive validation of ml4t.backtest backtesting framework against VectorBT Pro, Zipline-Reloaded, and Backtrader. Goal: Prove correctness (95%+ agreement), measure performance, validate ML integration, and establish framework selection guidance.
 
 **Total Effort**: 76-152 hours across 38 tasks
 **Approach**: Quality-first, no artificial deadlines - tasks complete when correct
@@ -68,7 +68,7 @@ Comprehensive validation of QEngine backtesting framework against VectorBT Pro, 
 
 ### Phase 3: Tier 3 ML Integration (6 tasks, 12-24 hours)
 
-**Goal**: Prove end-to-end ML pipeline (qfeatures → qeval → qengine)
+**Goal**: Prove end-to-end ML pipeline (qfeatures → qeval → ml4t.backtest)
 
 **ML Strategies**:
 - TASK-022: qfeatures technical indicators - 3h
@@ -99,7 +99,7 @@ Comprehensive validation of QEngine backtesting framework against VectorBT Pro, 
 
 **Dependencies**: Requires TASK-015 complete. TASK-028 through TASK-032 can run in parallel. TASK-033 depends on all validation tasks. TASK-034 depends on TASK-033.
 
-**Success Criteria**: Performance profiles documented (events/sec, memory, scalability), edge cases handled, QEngine advantages identified.
+**Success Criteria**: Performance profiles documented (events/sec, memory, scalability), edge cases handled, ml4t.backtest advantages identified.
 
 ---
 
@@ -174,7 +174,7 @@ This allows 3 validation tiers to progress simultaneously, significantly reducin
 - [ ] Tier 2 report published
 
 ### Phase 3 Gate
-- [ ] qfeatures → qeval → qengine pipeline proven
+- [ ] qfeatures → qeval → ml4t.backtest pipeline proven
 - [ ] ML model signals execute correctly
 - [ ] Feature engineering working
 - [ ] 95%+ agreement maintained
@@ -184,7 +184,7 @@ This allows 3 validation tiers to progress simultaneously, significantly reducin
 - [ ] Performance profiles documented
 - [ ] Scalability verified (1-1000 assets)
 - [ ] Edge cases handled
-- [ ] QEngine advantages identified
+- [ ] ml4t.backtest advantages identified
 - [ ] Tier 4 report published
 
 ### Phase 5 Gate (FINAL)
@@ -201,7 +201,7 @@ This allows 3 validation tiers to progress simultaneously, significantly reducin
 .venv-vectorbt     # VectorBT Pro environment
 .venv-zipline      # Zipline-Reloaded environment
 .venv-backtrader   # Backtrader environment
-.venv-qengine      # QEngine main environment (current)
+.venv-ml4t.backtest      # ml4t.backtest main environment (current)
 ```
 **Rationale**: Clean dependency management, no conflicts, easier debugging
 
@@ -257,7 +257,7 @@ class UniversalDataLoader:
             # Zipline bundle format
         elif framework == "backtrader":
             # Backtrader feed format
-        elif framework == "qengine":
+        elif framework == "ml4t.backtest":
             # Already Polars, return as-is
         return formatted_df
 ```
@@ -289,12 +289,12 @@ signals = model.predict(features)
 4. **Scalability**: Linear scaling test (1→500 assets)
 
 ### Expected Performance Profiles
-- **QEngine**: 300-500 trades/sec (baseline)
+- **ml4t.backtest**: 300-500 trades/sec (baseline)
 - **VectorBT Pro**: 189K trades/sec (20-25x faster, vectorized)
 - **Backtrader**: 50-100 trades/sec (0.1-0.2x, event-driven overhead)
 - **Zipline**: 2-5 trades/sec (0.01x, data bundle overhead)
 
-### When QEngine Wins
+### When ml4t.backtest Wins
 - Complex ML strategies (custom execution logic)
 - Realistic execution simulation (7 slippage, 9 commission, 6 market impact models)
 - Integration with qfeatures/qeval pipeline
@@ -336,7 +336,7 @@ signals = model.predict(features)
 - ✅ Sub-second backtest for daily strategies (1 year, single asset)
 
 ### ML Integration (TERTIARY)
-- ✅ qfeatures → qeval → qengine pipeline proven
+- ✅ qfeatures → qeval → ml4t.backtest pipeline proven
 - ✅ Feature engineering working correctly
 - ✅ Model signals execute with same accuracy as deterministic
 

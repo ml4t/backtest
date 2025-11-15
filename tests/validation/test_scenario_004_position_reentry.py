@@ -1,7 +1,7 @@
 """
 Integration test for all 4 platforms on scenario 004 (position re-entry).
 
-This test validates that qengine, VectorBT, Backtrader, and Zipline all successfully
+This test validates that ml4t.backtest, VectorBT, Backtrader, and Zipline all successfully
 handle position accumulation and re-entry patterns.
 
 Expected Results:
@@ -41,7 +41,7 @@ def test_all_platforms_scenario_004():
             "--scenario",
             "004",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "summary",
         ],
@@ -58,7 +58,7 @@ def test_all_platforms_scenario_004():
     output = result.stdout
 
     # All platforms should execute successfully
-    assert "qengine" in output and "✅ OK" in output, "qengine failed to execute"
+    assert "ml4t.backtest" in output and "✅ OK" in output, "ml4t.backtest failed to execute"
     assert "vectorbt" in output and "✅ OK" in output, "vectorbt failed to execute"
     assert "backtrader" in output and "✅ OK" in output, "backtrader failed to execute"
     assert "zipline" in output and "✅ OK" in output, "zipline failed to execute"
@@ -92,7 +92,7 @@ def test_position_accumulation():
             "--scenario",
             "004",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "detailed",
         ],
@@ -111,7 +111,7 @@ def test_position_accumulation():
 
     # Should see evidence of accumulation in trades
     # (e.g., entry prices showing multiple buys)
-    assert "qengine" in output, "Missing qengine results"
+    assert "ml4t.backtest" in output, "Missing ml4t.backtest results"
     assert "vectorbt" in output, "Missing vectorbt results"
 
 
@@ -126,7 +126,7 @@ def test_reentry_patterns():
 
     Platform differences:
     - VectorBT: Same-bar execution possible
-    - qengine: Next-bar execution for market orders
+    - ml4t.backtest: Next-bar execution for market orders
     - Backtrader: Next-bar open execution
     - Zipline: Next-bar execution
 
@@ -144,7 +144,7 @@ def test_reentry_patterns():
             "reentry": "supported",
             "notes": "Vectorized execution, may execute same-bar",
         },
-        "qengine": {
+        "ml4t.backtest": {
             "timing": "next-bar",
             "price": "open (next bar)",
             "accumulation": "supported",
@@ -183,7 +183,7 @@ def test_reentry_patterns():
             "--scenario",
             "004",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "summary",
         ],

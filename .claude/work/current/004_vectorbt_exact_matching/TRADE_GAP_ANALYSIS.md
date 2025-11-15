@@ -1,4 +1,4 @@
-# Trade Gap Analysis: VectorBT vs qengine
+# Trade Gap Analysis: VectorBT vs ml4t.backtest
 
 **Date**: 2025-10-28
 **Status**: Root cause identified
@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-**CRITICAL FINDING**: qengine is missing the first ~3 VectorBT trades from January 1st, 2024.
+**CRITICAL FINDING**: ml4t.backtest is missing the first ~3 VectorBT trades from January 1st, 2024.
 
-The gap appears to be a **data timing/alignment issue** - VectorBT entries start at `2024-01-01 00:39 UTC` but qengine's futures data starts at `2024-01-01 23:00 UTC` (~23 hours later).
+The gap appears to be a **data timing/alignment issue** - VectorBT entries start at `2024-01-01 00:39 UTC` but ml4t.backtest's futures data starts at `2024-01-01 23:00 UTC` (~23 hours later).
 
-**Paradox**: Despite missing 32% of trades, qengine produces **10x higher PnL**:
+**Paradox**: Despite missing 32% of trades, ml4t.backtest produces **10x higher PnL**:
 - VectorBT: 482 trades → $2,247 PnL (37.76% win rate)
-- qengine: 328 trades → $21,979 PnL (38.11% win rate)
+- ml4t.backtest: 328 trades → $21,979 PnL (38.11% win rate)
 
 ---
 
@@ -25,17 +25,17 @@ The gap appears to be a **data timing/alignment issue** - VectorBT entries start
 1. 2024-01-01 00:39 UTC  ❌ MISSING
 2. 2024-01-01 04:13 UTC  ❌ MISSING
 3. 2024-01-01 20:35 UTC  ❌ MISSING
-4. 2024-01-02 02:04 UTC  ✅ MATCH (qengine #1)
-5. 2024-01-02 12:05 UTC  ✅ MATCH (qengine #2)
-6. 2024-01-02 15:37 UTC  ✅ MATCH (qengine #3)
-7. 2024-01-02 18:20 UTC  ✅ MATCH (qengine #4)
-8. 2024-01-02 21:14 UTC  ✅ MATCH (qengine #5)
+4. 2024-01-02 02:04 UTC  ✅ MATCH (ml4t.backtest #1)
+5. 2024-01-02 12:05 UTC  ✅ MATCH (ml4t.backtest #2)
+6. 2024-01-02 15:37 UTC  ✅ MATCH (ml4t.backtest #3)
+7. 2024-01-02 18:20 UTC  ✅ MATCH (ml4t.backtest #4)
+8. 2024-01-02 21:14 UTC  ✅ MATCH (ml4t.backtest #5)
 9. 2024-01-03 00:00 UTC  ❌ MISSING
 10. 2024-01-03 08:16 UTC  ❌ MISSING
 ```
 
 ### Pattern Identified:
-- **qengine starts trading ~25 hours after VectorBT**
+- **ml4t.backtest starts trading ~25 hours after VectorBT**
 - **After sync point, most entries align**
 - **Some trades still missing throughout period** (328 vs 482 = more than just initial offset)
 
@@ -43,7 +43,7 @@ The gap appears to be a **data timing/alignment issue** - VectorBT entries start
 
 ## Data Availability Issue
 
-From qengine backtest output:
+From ml4t.backtest backtest output:
 ```
 Futures: (60186, 13)
 Date range: 2024-01-01 23:00:00+00:00 to 2024-03-28 15:59:00+00:00
@@ -54,12 +54,12 @@ From VectorBT first entry:
 Entry: 2024-01-01 00:39:00 UTC
 ```
 
-**Problem**: VectorBT is entering trades ~23 hours BEFORE qengine's futures data starts!
+**Problem**: VectorBT is entering trades ~23 hours BEFORE ml4t.backtest's futures data starts!
 
 **Possible Causes**:
 1. **Data file starts at 23:00 on Jan 1st**, missing first 23 hours
 2. **Timezone mismatch** in data loading
-3. **Different data sources** between VectorBT and qengine runs
+3. **Different data sources** between VectorBT and ml4t.backtest runs
 
 ---
 
@@ -71,15 +71,15 @@ Entry: 2024-01-01 00:39:00 UTC
 - Avg PnL/trade: **$4.66**
 - Exit Distribution: 481 Closed, 1 Open
 
-### qengine (328 trades):
+### ml4t.backtest (328 trades):
 - Total PnL: **$21,979.24**
 - Win Rate: **38.11%**
 - Avg PnL/trade: **$67.01**
 - Exit Distribution: 284 TSL (86.6%), 44 TP (13.4%)
 
 ### Key Observations:
-1. **qengine avg PnL is 14x higher per trade** ($67 vs $4.66)
-2. **qengine win rate is slightly higher** (38.11% vs 37.76%)
+1. **ml4t.backtest avg PnL is 14x higher per trade** ($67 vs $4.66)
+2. **ml4t.backtest win rate is slightly higher** (38.11% vs 37.76%)
 3. **TSL fix is working correctly** (86.6% TSL, 13.4% TP)
 
 ---
@@ -89,10 +89,10 @@ Entry: 2024-01-01 00:39:00 UTC
 ### Primary Issue: Data Start Time
 The futures data file starts at `2024-01-01 23:00:00` but VectorBT baseline expects data from `2024-01-01 00:00:00`.
 
-This creates a **23-hour gap** where VectorBT can enter trades but qengine has no data.
+This creates a **23-hour gap** where VectorBT can enter trades but ml4t.backtest has no data.
 
 ### Secondary Issue: Ongoing Gap
-Even after the initial sync, qengine still has 328 trades vs VectorBT's 482 (after accounting for first 3 missing trades = ~479 expected).
+Even after the initial sync, ml4t.backtest still has 328 trades vs VectorBT's 482 (after accounting for first 3 missing trades = ~479 expected).
 
 **Remaining gap**: ~151 trades (31.4%) - suggests additional differences in:
 1. Re-entry logic after exits
@@ -103,16 +103,16 @@ Even after the initial sync, qengine still has 328 trades vs VectorBT's 482 (aft
 
 ## Performance Paradox Explained
 
-**Why is qengine 10x more profitable with fewer trades?**
+**Why is ml4t.backtest 10x more profitable with fewer trades?**
 
 ### Hypothesis 1: Position Sizing Difference
-qengine quantity: **~2.15 BTC per trade**
+ml4t.backtest quantity: **~2.15 BTC per trade**
 VectorBT size: **~0.23 BTC per trade**
 
-**Position sizing is ~9.4x larger in qengine!** This explains the 10x PnL difference.
+**Position sizing is ~9.4x larger in ml4t.backtest!** This explains the 10x PnL difference.
 
 ### Hypothesis 2: Better Risk Management
-qengine TSL working correctly (86.6% TSL, 13.4% TP) vs VectorBT's configuration may have different parameters.
+ml4t.backtest TSL working correctly (86.6% TSL, 13.4% TP) vs VectorBT's configuration may have different parameters.
 
 ### Hypothesis 3: Missing Losing Trades
 The missing January 1st trades might have been net losers. VectorBT shows some early losses:
@@ -135,7 +135,7 @@ Net for missing trades: ~+$454, so this doesn't fully explain the PnL difference
 2. **Investigate position sizing**:
    - Confirm VectorBT is using same $100k initial capital
    - Check if VectorBT wrapper has different sizing logic
-   - Verify qengine VectorBTInfiniteSizer matches VectorBT's actual behavior
+   - Verify ml4t.backtest VectorBTInfiniteSizer matches VectorBT's actual behavior
 
 3. **Analyze remaining 151-trade gap**:
    - Extract trade-by-trade timestamps for middle period (Jan 5-15)
@@ -184,7 +184,7 @@ Net for missing trades: ~+$454, so this doesn't fully explain the PnL difference
 
 2. **Why is position sizing 9.4x different?**
    - Both claim $100k initial capital
-   - VectorBT using 0.23 BTC, qengine using 2.15 BTC
+   - VectorBT using 0.23 BTC, ml4t.backtest using 2.15 BTC
    - Need to verify VectorBT's actual sizing logic
 
 3. **What explains the remaining 151-trade gap?**

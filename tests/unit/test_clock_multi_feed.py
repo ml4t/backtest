@@ -5,10 +5,10 @@ from typing import List
 
 import pytest
 
-from qengine.core.clock import Clock, ClockMode
-from qengine.core.event import MarketEvent, SignalEvent
-from qengine.core.types import MarketDataType
-from qengine.data.feed import DataFeed, SignalSource
+from ml4t.backtest.core.clock import Clock, ClockMode
+from ml4t.backtest.core.event import MarketEvent, SignalEvent
+from ml4t.backtest.core.types import MarketDataType
+from ml4t.backtest.data.feed import DataFeed, SignalSource
 
 
 class MockDataFeed(DataFeed):

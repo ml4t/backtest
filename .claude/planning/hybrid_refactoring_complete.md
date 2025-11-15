@@ -13,7 +13,7 @@ Successfully refactored the 862-line SimulationBroker class by extracting three 
 ### Components Created
 
 #### 1. PositionTracker (145 lines)
-**File**: `src/qengine/execution/position_tracker.py`
+**File**: `src/ml4t.backtest/execution/position_tracker.py`
 
 **Responsibilities**:
 - Track position quantities per asset
@@ -24,7 +24,7 @@ Successfully refactored the 862-line SimulationBroker class by extracting three 
 **Key Fix**: Resolved slippage double-counting bug - slippage is already included in fill_price, so it's only tracked for statistics, not subtracted from cash again.
 
 #### 2. OrderRouter (243 lines)
-**File**: `src/qengine/execution/order_router.py`
+**File**: `src/ml4t.backtest/execution/order_router.py`
 
 **Responsibilities**:
 - Route orders to appropriate queues (open, stop, trailing, bracket, pending)
@@ -33,7 +33,7 @@ Successfully refactored the 862-line SimulationBroker class by extracting three 
 - Remove orders from queues
 
 #### 3. BracketOrderManager (124 lines)
-**File**: `src/qengine/execution/bracket_manager.py`
+**File**: `src/ml4t.backtest/execution/bracket_manager.py`
 
 **Responsibilities**:
 - Create stop-loss and take-profit legs after parent fill
@@ -153,20 +153,20 @@ The following logic remains in SimulationBroker (to be extracted in future work)
 Fixed slippage accounting in `PositionTracker.update_position()`:
 - **Issue**: Slippage was subtracted from cash twice (once in fill_price, once explicitly)
 - **Fix**: Removed explicit subtraction - slippage parameter now used only for statistics
-- **Location**: `src/qengine/execution/position_tracker.py:76-86`
+- **Location**: `src/ml4t.backtest/execution/position_tracker.py:76-86`
 
 ---
 
 ## Files Modified
 
 1. **New Components**:
-   - `src/qengine/execution/position_tracker.py` (145 lines)
-   - `src/qengine/execution/order_router.py` (243 lines)
-   - `src/qengine/execution/bracket_manager.py` (124 lines)
+   - `src/ml4t.backtest/execution/position_tracker.py` (145 lines)
+   - `src/ml4t.backtest/execution/order_router.py` (243 lines)
+   - `src/ml4t.backtest/execution/bracket_manager.py` (124 lines)
 
 2. **Updated Modules**:
-   - `src/qengine/execution/broker.py` (refactored to use components)
-   - `src/qengine/execution/__init__.py` (added component exports)
+   - `src/ml4t.backtest/execution/broker.py` (refactored to use components)
+   - `src/ml4t.backtest/execution/__init__.py` (added component exports)
 
 3. **Total New Code**: 512 lines of focused, testable components
 
@@ -251,7 +251,7 @@ SimulationBroker (Orchestrator)
 ## References
 
 - Full refactoring plan: `.claude/planning/simulation_broker_refactoring_plan.md`
-- Component implementations: `src/qengine/execution/`
+- Component implementations: `src/ml4t.backtest/execution/`
 - Test suite: `tests/unit/test_broker.py`
 
 ---

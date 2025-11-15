@@ -6,7 +6,7 @@ The portfolio module manages portfolio state, positions, and accounting.
 Portfolio
 ---------
 
-.. automodule:: qengine.portfolio.portfolio
+.. automodule:: ml4t.backtest.portfolio.portfolio
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Portfolio
 Simple Portfolio
 ----------------
 
-.. automodule:: qengine.portfolio.simple
+.. automodule:: ml4t.backtest.portfolio.simple
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ Simple Portfolio
 Accounting
 ----------
 
-.. automodule:: qengine.portfolio.accounting
+.. automodule:: ml4t.backtest.portfolio.accounting
    :members:
    :undoc-members:
    :show-inheritance:
@@ -30,7 +30,7 @@ Accounting
 Margin
 ------
 
-.. automodule:: qengine.portfolio.margin
+.. automodule:: ml4t.backtest.portfolio.margin
    :members:
    :undoc-members:
    :show-inheritance:

@@ -8,7 +8,7 @@
 
 ## Overview
 
-Create a comprehensive validation framework to compare QEngine backtesting results against three established platforms (zipline-reloaded, vectorbt-pro, backtrader) using identical trading signals. The goal is to verify that the same signals produce the same trades and P&L across all platforms.
+Create a comprehensive validation framework to compare ml4t.backtest backtesting results against three established platforms (zipline-reloaded, vectorbt-pro, backtrader) using identical trading signals. The goal is to verify that the same signals produce the same trades and P&L across all platforms.
 
 ## Functional Requirements
 
@@ -23,7 +23,7 @@ Create a comprehensive validation framework to compare QEngine backtesting resul
   - Edge cases: Entry-only, exit-only, position sizing variations
 
 ### 2. Platform Adapters
-- **FR-2.1**: Implement adapter for QEngine
+- **FR-2.1**: Implement adapter for ml4t.backtest
 - **FR-2.2**: Implement adapter for zipline-reloaded
 - **FR-2.3**: Implement adapter for vectorbt-pro (or fallback to free vectorbt)
 - **FR-2.4**: Implement adapter for backtrader
@@ -73,7 +73,7 @@ Create a comprehensive validation framework to compare QEngine backtesting resul
 - **NFR-11**: Modular architecture (easy to add signals/platforms)
 - **NFR-12**: Comprehensive documentation
 - **NFR-13**: Type hints and docstrings throughout
-- **NFR-14**: Follow QEngine code standards (ruff, mypy)
+- **NFR-14**: Follow ml4t.backtest code standards (ruff, mypy)
 
 ## Acceptance Criteria
 
@@ -125,12 +125,12 @@ Available datasets in ../projects/:
    - Status: Open source, stable
    - Risk: LOW - Lightweight dependencies
 
-4. **QEngine**:
+4. **ml4t.backtest**:
    - Status: Under active development
    - Version: Production-ready (September 2025)
    - Features: Event-driven, execution delay, multi-feed sync
 
-### QEngine State
+### ml4t.backtest State
 - ✅ Event flow working (data → portfolio)
 - ✅ Temporal accuracy (execution delay)
 - ✅ Multi-feed synchronization
@@ -144,7 +144,7 @@ Available datasets in ../projects/:
 1. **Platform Installation** (HIGH): Zipline may have complex dependencies
 2. **Vectorbt-Pro License** (HIGH): Commercial license may not be available
 3. **Execution Model Differences** (HIGH): Platforms may have inherent differences
-4. **QEngine Maturity** (MEDIUM): May discover missing features during testing
+4. **ml4t.backtest Maturity** (MEDIUM): May discover missing features during testing
 
 ### Process Risks
 5. **Scope Creep** (MEDIUM): Too many test cases initially

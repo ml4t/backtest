@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Crypto Basis Strategy QEngine Integration Demo
+Crypto Basis Strategy ml4t.backtest Integration Demo
 ==============================================
 
 This example demonstrates how to integrate an external crypto basis trading strategy
-with QEngine's event-driven backtesting framework. It shows:
+with ml4t.backtest's event-driven backtesting framework. It shows:
 
-1. How to use the Strategy-QEngine Integration Bridge
-2. Running a sophisticated strategy in QEngine
-3. Leveraging QEngine's advanced execution models
-4. Comparing standalone vs QEngine results
+1. How to use the Strategy-ml4t.backtest Integration Bridge
+2. Running a sophisticated strategy in ml4t.backtest
+3. Leveraging ml4t.backtest's advanced execution models
+4. Comparing standalone vs ml4t.backtest results
 
-Run with: PYTHONPATH=~/ml4t/qengine/src python examples/crypto_basis_integration_demo.py
+Run with: PYTHONPATH=~/ml4t/ml4t.backtest/src python examples/crypto_basis_integration_demo.py
 """
 
 from datetime import datetime, timedelta
@@ -21,14 +21,14 @@ import numpy as np
 import polars as pl
 from ml4t_backtest import BacktestEngine
 
-from qengine.data.feed import DataFrameFeed
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.commission import MakerTakerCommission, PercentageCommission
-from qengine.execution.market_impact import LinearMarketImpact
-from qengine.execution.slippage import LinearImpactSlippage, PercentageSlippage
-from qengine.portfolio.simple import SimplePortfolio
-from qengine.reporting.reporter import InMemoryReporter
-from qengine.strategy import create_crypto_basis_strategy
+from ml4t.backtest.data.feed import DataFrameFeed
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.commission import MakerTakerCommission, PercentageCommission
+from ml4t.backtest.execution.market_impact import LinearMarketImpact
+from ml4t.backtest.execution.slippage import LinearImpactSlippage, PercentageSlippage
+from ml4t.backtest.portfolio.simple import SimplePortfolio
+from ml4t.backtest.reporting.reporter import InMemoryReporter
+from ml4t.backtest.strategy import create_crypto_basis_strategy
 
 
 def generate_synthetic_crypto_data(
@@ -133,11 +133,11 @@ def run_standalone_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
     return results
 
 
-def run_qengine_basic_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
-    """Run strategy in QEngine with basic execution models."""
-    print("\n=== Running QEngine Basic Strategy ===")
+def run_backtest_basic_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
+    """Run strategy in ml4t.backtest with basic execution models."""
+    print("\n=== Running ml4t.backtest Basic Strategy ===")
 
-    # Combine data for QEngine
+    # Combine data for ml4t.backtest
     combined_df = pl.concat([data["spot"], data["futures"]])
     combined_df = combined_df.sort("timestamp")
 
@@ -169,14 +169,14 @@ def run_qengine_basic_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
     )
 
     # Run backtest
-    print("Running QEngine backtest...")
+    print("Running ml4t.backtest backtest...")
     results = engine.run()
 
     # Extract metrics
     portfolio_value = results.get("final_portfolio_value", 100000)
     total_return = (portfolio_value - 100000) / 100000
 
-    print("QEngine Basic Results:")
+    print("ml4t.backtest Basic Results:")
     print(f"  Final Portfolio Value: ${portfolio_value:,.2f}")
     print(f"  Total Return: {total_return:.2%}")
     print(f"  Number of Trades: {len(results.get('trades', []))}")
@@ -184,11 +184,11 @@ def run_qengine_basic_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
     return results
 
 
-def run_qengine_advanced_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
-    """Run strategy in QEngine with advanced execution models."""
-    print("\n=== Running QEngine Advanced Strategy ===")
+def run_backtest_advanced_strategy(data: dict[str, pl.DataFrame]) -> dict[str, Any]:
+    """Run strategy in ml4t.backtest with advanced execution models."""
+    print("\n=== Running ml4t.backtest Advanced Strategy ===")
 
-    # Combine data for QEngine
+    # Combine data for ml4t.backtest
     combined_df = pl.concat([data["spot"], data["futures"]])
     combined_df = combined_df.sort("timestamp")
 
@@ -228,14 +228,14 @@ def run_qengine_advanced_strategy(data: dict[str, pl.DataFrame]) -> dict[str, An
     )
 
     # Run backtest
-    print("Running QEngine advanced backtest...")
+    print("Running ml4t.backtest advanced backtest...")
     results = engine.run()
 
     # Extract metrics
     portfolio_value = results.get("final_portfolio_value", 100000)
     total_return = (portfolio_value - 100000) / 100000
 
-    print("QEngine Advanced Results:")
+    print("ml4t.backtest Advanced Results:")
     print(f"  Final Portfolio Value: ${portfolio_value:,.2f}")
     print(f"  Total Return: {total_return:.2%}")
     print(f"  Number of Trades: {len(results.get('trades', []))}")
@@ -269,33 +269,33 @@ def compare_results(standalone: dict, basic: dict, advanced: dict) -> None:
 
     print("Strategy Performance:")
     print(f"  Standalone:      {standalone_return:8.2%}")
-    print(f"  QEngine Basic:   {basic_return:8.2%}")
-    print(f"  QEngine Advanced:{advanced_return:8.2%}")
+    print(f"  ml4t.backtest Basic:   {basic_return:8.2%}")
+    print(f"  ml4t.backtest Advanced:{advanced_return:8.2%}")
 
     print("\nTrade Counts:")
     print(f"  Standalone:      {standalone['metrics']['num_trades']:8}")
-    print(f"  QEngine Basic:   {len(basic.get('trades', [])):8}")
-    print(f"  QEngine Advanced:{len(advanced.get('trades', [])):8}")
+    print(f"  ml4t.backtest Basic:   {len(basic.get('trades', [])):8}")
+    print(f"  ml4t.backtest Advanced:{len(advanced.get('trades', [])):8}")
 
     # Analysis
     print("\nAnalysis:")
     if basic_return < standalone_return:
         diff = abs(basic_return - standalone_return)
         print(
-            f"  • QEngine Basic shows {diff:.2%} lower return due to more realistic execution costs",
+            f"  • ml4t.backtest Basic shows {diff:.2%} lower return due to more realistic execution costs",
         )
 
     if advanced_return < basic_return:
         diff = abs(advanced_return - basic_return)
-        print(f"  • QEngine Advanced shows {diff:.2%} lower return due to market impact modeling")
+        print(f"  • ml4t.backtest Advanced shows {diff:.2%} lower return due to market impact modeling")
 
-    print("  • The integration bridge successfully connects external strategies to QEngine")
-    print("  • QEngine provides more realistic cost modeling than standalone implementations")
+    print("  • The integration bridge successfully connects external strategies to ml4t.backtest")
+    print("  • ml4t.backtest provides more realistic cost modeling than standalone implementations")
 
 
 def main():
     """Run the complete integration demo."""
-    print("Crypto Basis Strategy QEngine Integration Demo")
+    print("Crypto Basis Strategy ml4t.backtest Integration Demo")
     print("=" * 50)
 
     try:
@@ -304,14 +304,14 @@ def main():
 
         # Run all three implementations
         standalone_results = run_standalone_strategy(data)
-        basic_results = run_qengine_basic_strategy(data)
-        advanced_results = run_qengine_advanced_strategy(data)
+        basic_results = run_ml4t.backtest_basic_strategy(data)
+        advanced_results = run_ml4t.backtest_advanced_strategy(data)
 
         # Compare results
         compare_results(standalone_results, basic_results, advanced_results)
 
         print("\n=== Integration Bridge Success! ===")
-        print("✅ External strategy successfully integrated with QEngine")
+        print("✅ External strategy successfully integrated with ml4t.backtest")
         print("✅ Multiple execution models tested")
         print("✅ Results show realistic cost impact")
         print("✅ Framework ready for production strategies")

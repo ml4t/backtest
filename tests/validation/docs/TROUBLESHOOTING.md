@@ -21,7 +21,7 @@
 
 ### Symptom
 ```
-Extracting qengine trades...
+Extracting ml4t.backtest trades...
    Found 0 trades
 ```
 
@@ -103,7 +103,7 @@ def validate_signal_dates(signals, data):
                 print(f"   Nearest: {nearest['timestamp'][0]}")
 ```
 
-#### 3. Broker Not Linked to Strategy (qengine)
+#### 3. Broker Not Linked to Strategy (ml4t.backtest)
 
 **Problem**: Strategy has no `broker` attribute
 
@@ -297,9 +297,9 @@ sys.path.insert(0, str(Path(__file__).parent / 'scenarios'))
 ```python
 # In extractors/__init__.py
 try:
-    from .qengine import extract_qengine_trades
+    from .ml4t.backtest import extract_ml4t.backtest_trades
 except ImportError:
-    from qengine import extract_qengine_trades
+    from ml4t.backtest import extract_ml4t.backtest_trades
 ```
 
 ---
@@ -394,7 +394,7 @@ import os
 os.environ['NUMBA_CACHE_DIR'] = '/tmp/numba_cache'
 ```
 
-### Symptom: qengine Slow Event Processing
+### Symptom: ml4t.backtest Slow Event Processing
 ```
 Processed 10,000 events (taking >1 minute)
 ```
@@ -411,7 +411,7 @@ results = engine.run(max_events=1000)
 
 # 2. Disable verbose logging
 import logging
-logging.getLogger('qengine').setLevel(logging.WARNING)
+logging.getLogger('ml4t.backtest').setLevel(logging.WARNING)
 
 # 3. Use priority queue
 engine = BacktestEngine(
@@ -551,7 +551,7 @@ def diagnose():
 
     # 5. Check platforms
     print("\n5. Checking platform imports...")
-    platforms = ['qengine', 'vectorbtpro', 'backtrader', 'zipline']
+    platforms = ['ml4t.backtest', 'vectorbtpro', 'backtrader', 'zipline']
     for platform in platforms:
         try:
             __import__(platform)

@@ -8,7 +8,7 @@
 
 ```
 VectorBT:   Same-bar @ CLOSE  (signal T → entry T close)
-qengine:    Next-bar @ CLOSE  (signal T → entry T+1 close)
+ml4t.backtest:    Next-bar @ CLOSE  (signal T → entry T+1 close)
 Backtrader: Next-bar @ OPEN   (signal T → entry T+1 open)
 Zipline:    Next-bar @ OPEN*  (signal T → entry T+1 open, *configurable)
 ```
@@ -49,7 +49,7 @@ print(f"Match: {signal.timestamp in data['timestamp'].to_list()}")  # Should be 
 
 ## Platform-Specific Patterns
 
-### qengine
+### ml4t.backtest
 ```python
 # Signal creation
 Signal(timestamp=datetime(2017, 2, 6, tzinfo=pytz.UTC), asset='AAPL', action='BUY', quantity=100)
@@ -130,16 +130,16 @@ price_tolerance_pct = 0.1            # ±0.1%
 
 ```bash
 # Single platform
-uv run python runner.py --scenario 001 --platforms qengine
+uv run python runner.py --scenario 001 --platforms ml4t.backtest
 
 # Multiple platforms
-uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader
+uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt,backtrader
 
 # All platforms with detailed report
-uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader,zipline --report both
+uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt,backtrader,zipline --report both
 
 # Diagnostic test
-uv run python test_qengine_signal_processing.py
+uv run python test_ml4t.backtest_signal_processing.py
 ```
 
 ---
@@ -167,7 +167,7 @@ For signal at 2017-02-06:
 | Platform   | Entry Date | Entry Price | P&L Estimate |
 |------------|-----------|-------------|--------------|
 | VectorBT   | 2017-02-06 | $130.29 (C) | ~$8,600     |
-| qengine    | 2017-02-07 | $131.54 (C) | ~$900       |
+| ml4t.backtest    | 2017-02-07 | $131.54 (C) | ~$900       |
 | Backtrader | 2017-02-07 | $130.54 (O) | ~$1,000     |
 
 **These differences are EXPECTED and CORRECT!**
@@ -187,7 +187,7 @@ tests/validation/
 ├── fixtures/
 │   └── market_data.py                  # Data loading
 ├── extractors/
-│   ├── qengine.py                      # Trade extraction
+│   ├── ml4t.backtest.py                      # Trade extraction
 │   ├── vectorbt.py
 │   ├── backtrader.py
 │   └── zipline.py

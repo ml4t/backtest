@@ -192,8 +192,8 @@ This plan prioritizes fixing the critical architectural flaws first, then aligni
 ### Phase 3: Clean Up Architectural Smells
 
 1. **Refactor `AssetSpec`:**
-    * Move `get_margin_requirement()` logic into `qengine.portfolio.Margin`.
-    * Move `calculate_pnl()` logic into `qengine.portfolio.Portfolio`.
+    * Move `get_margin_requirement()` logic into `ml4t.backtest.portfolio.Margin`.
+    * Move `calculate_pnl()` logic into `ml4t.backtest.portfolio.Portfolio`.
     * `AssetSpec` should only hold data: `contract_size`, `tick_size`, `initial_margin`, `taker_fee`, etc.
 2. **Event-Drive Corporate Actions:**
     * Create a `CorporateActionFeed(DataFeed)` that reads from a file and generates `CorporateActionEvent`s.

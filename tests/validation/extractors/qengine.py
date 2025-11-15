@@ -1,8 +1,8 @@
-"""QEngine trade extractor.
+"""ml4t.backtest trade extractor.
 
-Converts qengine broker results to StandardTrade format.
+Converts ml4t.backtest broker results to StandardTrade format.
 
-Challenge: qengine returns individual orders (BUY/SELL),
+Challenge: ml4t.backtest returns individual orders (BUY/SELL),
 must match into complete trades (entry + exit).
 """
 
@@ -20,9 +20,9 @@ except ImportError:
     from core.trade import StandardTrade, get_bar_at_timestamp, infer_price_component
 
 
-def extract_qengine_trades(results: dict[str, Any], data: pl.DataFrame) -> List[StandardTrade]:
+def extract_ml4t.backtest_trades(results: dict[str, Any], data: pl.DataFrame) -> List[StandardTrade]:
     """
-    Extract trades from qengine broker results.
+    Extract trades from ml4t.backtest broker results.
 
     Args:
         results: Dict from BacktestEngine.run() with 'trades' key
@@ -33,7 +33,7 @@ def extract_qengine_trades(results: dict[str, Any], data: pl.DataFrame) -> List[
 
     Example:
         >>> results = engine.run()
-        >>> trades = extract_qengine_trades(results, data)
+        >>> trades = extract_ml4t.backtest_trades(results, data)
         >>> for trade in trades:
         ...     print(f"{trade.entry_timestamp} -> {trade.exit_timestamp}: ${trade.net_pnl:.2f}")
     """
@@ -83,7 +83,7 @@ def extract_qengine_trades(results: dict[str, Any], data: pl.DataFrame) -> List[
 
             standard_trades.append(StandardTrade(
                 trade_id=len(standard_trades),
-                platform='qengine',
+                platform='ml4t.backtest',
                 entry_timestamp=position['entry_timestamp'],
                 entry_price=position['entry_price'],
                 entry_price_component=position['entry_component'],

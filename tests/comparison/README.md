@@ -1,6 +1,6 @@
 # Backtester Comparison Tests
 
-This directory contains comparison tests between qengine and established backtesting frameworks.
+This directory contains comparison tests between ml4t.backtest and established backtesting frameworks.
 
 ## Structure
 
@@ -14,7 +14,7 @@ comparison/
 ├── adapters/            # Wrappers for each backtester
 │   ├── __init__.py
 │   ├── base.py          # Common adapter interface
-│   ├── qengine.py       # Our engine adapter
+│   ├── ml4t.backtest.py       # Our engine adapter
 │   ├── vectorbt.py      # VectorBT/Pro adapter
 │   ├── zipline.py       # Zipline adapter
 │   └── backtrader.py    # Backtrader adapter
@@ -27,7 +27,7 @@ comparison/
 
 ## Available Backtesters
 
-1. **qengine** - Our implementation
+1. **ml4t.backtest** - Our implementation
 2. **VectorBT Pro** - GPU-accelerated vectorized backtesting
 3. **VectorBT** - Open-source vectorized backtesting
 4. **Zipline-Reloaded** - Quantopian's legacy, event-driven
@@ -40,10 +40,10 @@ comparison/
 make test-comparison
 
 # Or directly
-pytest qengine/tests/comparison/ -v
+pytest ml4t.backtest/tests/comparison/ -v
 
 # Run specific comparison
-pytest qengine/tests/comparison/test_comparison.py::test_ml_strategy_comparison -v
+pytest ml4t.backtest/tests/comparison/test_comparison.py::test_ml_strategy_comparison -v
 ```
 
 ## Key Comparisons

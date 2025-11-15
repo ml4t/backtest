@@ -2,13 +2,13 @@
 
 ## Executive Summary
 
-Comprehensive validation framework is feasible with structured phased approach. QEngine is production-ready (September 2025) with 159 passing tests and 100% agreement with VectorBT on basic scenarios. Rich data available in `../projects/`. Main risks: vectorbt-pro license availability and platform execution model differences.
+Comprehensive validation framework is feasible with structured phased approach. ml4t.backtest is production-ready (September 2025) with 159 passing tests and 100% agreement with VectorBT on basic scenarios. Rich data available in `../projects/`. Main risks: vectorbt-pro license availability and platform execution model differences.
 
 ## Codebase Analysis
 
-### QEngine Current State (Production-Ready)
+### ml4t.backtest Current State (Production-Ready)
 
-**Core Components** (from `src/qengine/`):
+**Core Components** (from `src/ml4t.backtest/`):
 - `engine.py`: BacktestEngine, BacktestResults - Main entry point
 - `core/`: Event bus, Clock (time control), base abstractions
 - `data/`: Data feed abstractions (ParquetDataFeed confirmed)
@@ -56,12 +56,12 @@ Comprehensive validation framework is feasible with structured phased approach. 
 
 | Platform | Type | Fill Model | Data Format | Complexity | Status |
 |----------|------|------------|-------------|------------|--------|
-| **QEngine** | Event-driven | Realistic broker sim | Polars/Parquet | Medium | ✅ Production-ready |
+| **ml4t.backtest** | Event-driven | Realistic broker sim | Polars/Parquet | Medium | ✅ Production-ready |
 | **Zipline** | Event-driven | Bar-based fills | Pandas DataFrame | High | ⚠️ Complex deps |
 | **VectorBT** | Vectorized | Configurable fills | Pandas/NumPy | Low | ✅ Free version OK |
 | **Backtrader** | Event-driven | Flexible broker | Custom feeds | Medium | ✅ Stable |
 
-**Key Insight**: VectorBT should be primary reference (already 100% validated with QEngine).
+**Key Insight**: VectorBT should be primary reference (already 100% validated with ml4t.backtest).
 
 ## Implementation Architecture
 
@@ -86,7 +86,7 @@ tests/validation/
 │
 ├── adapters/                          # Platform-specific adapters
 │   ├── base.py                        # Adapter interface
-│   ├── qengine_adapter.py             # QEngine integration
+│   ├── ml4t.backtest_adapter.py             # ml4t.backtest integration
 │   ├── zipline_adapter.py             # Zipline integration
 │   ├── vectorbt_adapter.py            # VectorBT integration
 │   ├── backtrader_adapter.py          # Backtrader integration
@@ -109,7 +109,7 @@ tests/validation/
 │
 ├── results/                           # Test outputs (gitignored)
 │   └── YYYY-MM-DD_HH-MM-SS/          # Timestamped runs
-│       ├── qengine_results.json
+│       ├── ml4t.backtest_results.json
 │       ├── zipline_results.json
 │       ├── vectorbt_results.json
 │       ├── backtrader_results.json
@@ -202,12 +202,12 @@ class TradeValidator:
 1. Set up directory structure
 2. Implement signal generator interface + MA crossover
 3. Load data from `../projects/daily_us_equities/`
-4. Implement QEngine adapter (easiest, already understood)
+4. Implement ml4t.backtest adapter (easiest, already understood)
 5. Implement VectorBT adapter (reference platform, 100% validated)
 6. Create buy-and-hold test case
 7. Build basic validator (trade count, P&L)
 
-**Deliverable**: QEngine vs VectorBT working on 1 signal, 1 dataset
+**Deliverable**: ml4t.backtest vs VectorBT working on 1 signal, 1 dataset
 
 **Risk Mitigation**:
 - Start with platforms we know work
@@ -272,7 +272,7 @@ To ensure fair comparison, configure ALL platforms with:
 ### 2. Data Format Strategy
 
 Each platform expects different data formats:
-- QEngine: Polars DataFrame
+- ml4t.backtest: Polars DataFrame
 - Zipline: Pandas with DatetimeIndex, specific columns
 - VectorBT: Pandas or NumPy arrays
 - Backtrader: Feed objects or Pandas
@@ -336,9 +336,9 @@ Differences beyond tolerance → Investigation required.
    - Mitigation: Start with simplest execution rules, document diffs
    - Status: Expected, manageable
 
-3. **QEngine Missing Features**
+3. **ml4t.backtest Missing Features**
    - Impact: May discover unimplemented features during testing
-   - Mitigation: QEngine is production-ready, most features done
+   - Mitigation: ml4t.backtest is production-ready, most features done
    - Status: Low probability given recent fixes
 
 ### MEDIUM Priority Risks
@@ -389,7 +389,7 @@ Differences beyond tolerance → Investigation required.
 ## Success Indicators
 
 - ✅ Requirements captured and documented
-- ✅ QEngine codebase understood (production-ready)
+- ✅ ml4t.backtest codebase understood (production-ready)
 - ✅ Data availability confirmed (rich datasets in ../projects/)
 - ✅ Architecture designed (modular, extensible)
 - ✅ Risks identified and mitigated
@@ -400,7 +400,7 @@ Differences beyond tolerance → Investigation required.
 
 This is a **well-scoped, achievable validation project** with:
 - Clear objective (cross-platform validation)
-- Strong foundation (QEngine production-ready, 100% VectorBT agreement)
+- Strong foundation (ml4t.backtest production-ready, 100% VectorBT agreement)
 - Good data (multiple datasets available)
 - Manageable risks (mitigated with phased approach)
 

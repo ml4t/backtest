@@ -7,11 +7,11 @@ This test validates the fill_simulator integration.
 import pytest
 from datetime import datetime
 
-from qengine.core.types import OrderSide, OrderType
-from qengine.data.asset_registry import AssetRegistry, AssetSpec
-from qengine.execution.fill_simulator import FillSimulator
-from qengine.execution.order import Order
-from qengine.execution.slippage import PercentageSlippage
+from ml4t.backtest.core.types import OrderSide, OrderType
+from ml4t.backtest.data.asset_registry import AssetRegistry, AssetSpec
+from ml4t.backtest.execution.fill_simulator import FillSimulator
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.execution.slippage import PercentageSlippage
 
 
 class TestSLFillPrice:

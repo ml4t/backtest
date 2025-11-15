@@ -11,7 +11,7 @@
 
 This document captures the verified behavior of VectorBT Pro's backtesting engine based on source code analysis (TASK-002) and empirical testing (TASK-005, TASK-006, TASK-007).
 
-**Critical Note**: This documents VectorBT's implementation as a **baseline**. The future qengine implementation must be **configurable** - these behaviors represent reasonable defaults, not the only options. Users should be able to configure:
+**Critical Note**: This documents VectorBT's implementation as a **baseline**. The future ml4t.backtest implementation must be **configurable** - these behaviors represent reasonable defaults, not the only options. Users should be able to configure:
 - Exit price models (stop level vs actual OHLC vs market impact)
 - Execution timing (intra-bar vs open/close only)
 - Slippage models (fixed vs volume-based vs liquidity-based)
@@ -307,7 +307,7 @@ sl_level = base_price * (1 - sl_stop)
 - Assumes exits can occur at any point during the bar when condition met
 - Exit prices are stop levels (not extreme prices), simulating limit/stop orders
 
-**Future Configurability** (qengine):
+**Future Configurability** (ml4t.backtest):
 - **Default**: VectorBT-style (intra-bar with stop level fills)
 - **Conservative**: Only check at open or close
 - **Aggressive**: Assume fills at actual high/low
@@ -332,7 +332,7 @@ This creates a **consistent fill model** that is:
 
 ---
 
-## Implementation Roadmap for qengine
+## Implementation Roadmap for ml4t.backtest
 
 ### Phase 2 Remaining Tasks
 
@@ -354,7 +354,7 @@ This creates a **consistent fill model** that is:
 
 ### Configurability Requirements (Future)
 
-Based on findings, qengine should make these aspects configurable:
+Based on findings, ml4t.backtest should make these aspects configurable:
 
 1. **Exit Price Model**:
    - Option A: Stop level (VectorBT default) ✅

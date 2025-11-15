@@ -1,7 +1,7 @@
 """
 Integration test for all 4 platforms on scenario 001 (simple market orders).
 
-This test validates that qengine, VectorBT, Backtrader, and Zipline all successfully
+This test validates that ml4t.backtest, VectorBT, Backtrader, and Zipline all successfully
 execute the scenario and produce comparable results with expected differences.
 
 Expected Results:
@@ -35,7 +35,7 @@ def test_all_platforms_scenario_001():
             "--scenario",
             "001",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "summary",
         ],
@@ -52,7 +52,7 @@ def test_all_platforms_scenario_001():
     output = result.stdout
 
     # All platforms should execute successfully
-    assert "qengine" in output and "✅ OK" in output
+    assert "ml4t.backtest" in output and "✅ OK" in output
     assert "vectorbt" in output and "✅ OK" in output
     assert "backtrader" in output and "✅ OK" in output
     assert "zipline" in output and "✅ OK" in output
@@ -82,7 +82,7 @@ def test_platform_execution_models():
 
     Platform execution models (for signal at 2017-02-06):
     - VectorBT:   Entry 2017-02-06 @ $130.29 (same-bar close)
-    - qengine:    Entry 2017-02-07 @ $131.54 (next-bar close)
+    - ml4t.backtest:    Entry 2017-02-07 @ $131.54 (next-bar close)
     - Backtrader: Entry 2017-02-07 @ $130.54 (next-bar open)
     - Zipline:    Entry 2017-02-07 @ $131.60 (next-bar close)
 
@@ -98,7 +98,7 @@ def test_platform_execution_models():
             "entry_date": "2017-02-06",
             "entry_price": 130.29,
         },
-        "qengine": {
+        "ml4t.backtest": {
             "timing": "next-bar",
             "price": "close",
             "entry_date": "2017-02-07",

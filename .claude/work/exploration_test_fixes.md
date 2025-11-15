@@ -148,7 +148,7 @@ FlatCommission(commission=10.0)
 
 #### Step 2.1: Margin Module Coverage (29% → 70%+)
 **Target**: Add margin account tests
-**Files**: `src/qengine/portfolio/margin.py`
+**Files**: `src/ml4t.backtest/portfolio/margin.py`
 **Test File**: Create `tests/unit/test_margin.py`
 
 **Test Coverage Needed**:
@@ -162,7 +162,7 @@ FlatCommission(commission=10.0)
 
 #### Step 2.2: Clock Module Coverage (36% → 70%+)
 **Target**: Add multi-feed clock tests
-**Files**: `src/qengine/core/clock.py`
+**Files**: `src/ml4t.backtest/core/clock.py`
 **Test File**: Fix `tests/unit/test_clock_multi_feed.py` (currently failing)
 
 **Test Coverage Needed**:
@@ -175,7 +175,7 @@ FlatCommission(commission=10.0)
 
 #### Step 2.3: SimplePortfolio Coverage (77% → 90%+)
 **Target**: Improve portfolio test coverage
-**Files**: `src/qengine/portfolio/simple.py`
+**Files**: `src/ml4t.backtest/portfolio/simple.py`
 **Test File**: Expand `tests/unit/test_portfolio_get_position.py`
 
 **Additional Tests Needed**:
@@ -196,7 +196,7 @@ uv run pytest tests/unit/ -v
 
 #### Step 3.2: Coverage Report
 ```bash
-uv run pytest tests/unit/ --cov=qengine --cov-report=term-missing
+uv run pytest tests/unit/ --cov=ml4t.backtest --cov-report=term-missing
 ```
 **Target**: 85%+ overall coverage
 

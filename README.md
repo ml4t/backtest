@@ -1,4 +1,4 @@
-# QEngine
+# ml4t.backtest
 
 **Production-ready** event-driven backtesting engine for ML-driven trading strategies with architectural guarantees against data leakage. All critical issues resolved (September 2025).
 
@@ -7,7 +7,7 @@
 ```bash
 # Development setup (from monorepo root)
 make setup
-make test-qng  # Test qengine
+make test-backtest
 
 # Or standalone
 pip install -e .
@@ -16,19 +16,19 @@ pip install -e .
 ## Quick Start
 
 ```python
-import qengine as qe
-from qengine.data import ParquetDataFeed
-from qengine.strategy import Strategy
+from ml4t.backtest import BacktestEngine, Strategy
+from ml4t.backtest.data import ParquetDataFeed
+from ml4t.backtest.execution import MarketOrder
 
 # Create strategy
 class MomentumStrategy(Strategy):
     def on_market_event(self, event, context):
         # Access point-in-time safe data
         if context.signals['momentum'] > 0.02:
-            self.submit_order(qe.MarketOrder("AAPL", 100, "BUY"))
+            self.submit_order(MarketOrder("AAPL", 100, "BUY"))
 
 # Run backtest
-engine = qe.BacktestEngine(
+engine = BacktestEngine(
     data_feed=ParquetDataFeed("data.parquet"),
     strategy=MomentumStrategy(),
     initial_capital=100_000
@@ -98,12 +98,12 @@ from qeval import PurgedWalkForwardCV
 # Feature engineering → Model validation → Backtesting
 features = Pipeline().fit_transform(data)
 validated_model = qeval.validate(model, features)
-results = qengine.backtest(validated_model, features)
+results = ml4t.backtest.backtest(validated_model, features)
 ```
 
 ## Recent Updates (September 2025)
 
-**All Critical Issues Resolved** - QEngine is now production-ready:
+**All Critical Issues Resolved** - ml4t.backtest is now production-ready:
 
 - ✅ **Event Flow Fixed**: Complete event routing from market data to portfolio
 - ✅ **Temporal Accuracy**: Execution delay prevents lookahead bias

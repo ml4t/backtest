@@ -33,7 +33,7 @@ for i, sig in enumerate(signals):
     else:
         print(f"   ⚠️  No matching data row found!")
 
-    # Find next bar (for QEngine-style next-bar execution)
+    # Find next bar (for ml4t.backtest-style next-bar execution)
     next_rows = data.filter(pl.col('timestamp') > sig.timestamp).sort('timestamp').head(1)
     if len(next_rows) > 0:
         next_row = next_rows[0]
@@ -43,6 +43,6 @@ for i, sig in enumerate(signals):
 
 print("\nExpected execution patterns:")
 print("-" * 80)
-print("QEngine: Executes at next market event after signal")
+print("ml4t.backtest: Executes at next market event after signal")
 print("VectorBT: Executes on the signal bar (same-bar execution)")
 print("\nThis explains the 1-day difference in entry times.")

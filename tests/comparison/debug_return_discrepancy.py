@@ -1,5 +1,5 @@
 """
-Debug return discrepancy between QEngine and Backtrader
+Debug return discrepancy between ml4t.backtest and Backtrader
 
 Investigate why identical trades produce different returns.
 """
@@ -10,9 +10,9 @@ from pathlib import Path
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 
 def load_spy_data():
@@ -26,10 +26,10 @@ def load_spy_data():
     return df.head(390)
 
 
-def debug_qengine_calculation():
-    """Debug QEngine calculation step by step."""
+def debug_backtest_calculation():
+    """Debug ml4t.backtest calculation step by step."""
     print("\n" + "=" * 60)
-    print("DEBUGGING QENGINE CALCULATION")
+    print("DEBUGGING ML4T.BACKTEST CALCULATION")
     print("=" * 60)
 
     data = load_spy_data()
@@ -103,7 +103,7 @@ def debug_qengine_calculation():
     final_value = cash + shares * data["close"].iloc[-1]
     total_return = (final_value / initial_capital - 1) * 100
 
-    print("\nQEngine Summary:")
+    print("\nml4t.backtest Summary:")
     print(f"  Initial capital: ${initial_capital:,.2f}")
     print(f"  Final cash: ${cash:.2f}")
     print(f"  Final shares: {shares:.4f}")
@@ -226,14 +226,14 @@ def compare_trade_by_trade():
     print("TRADE-BY-TRADE COMPARISON")
     print("=" * 80)
 
-    qengine_trades, qengine_final, qengine_return = debug_qengine_calculation()
+    ml4t.backtest_trades, ml4t.backtest_final, ml4t.backtest_return = debug_ml4t.backtest_calculation()
     bt_trades, bt_final, bt_return = debug_backtrader_calculation()
 
-    print(f"\n{'Trade':<6} {'QEngine Price':<15} {'Backtrader Price':<18} {'Difference':<12}")
+    print(f"\n{'Trade':<6} {'ml4t.backtest Price':<15} {'Backtrader Price':<18} {'Difference':<12}")
     print("-" * 60)
 
-    for i in range(min(len(qengine_trades), len(bt_trades))):
-        qe_trade = qengine_trades[i]
+    for i in range(min(len(ml4t.backtest_trades), len(bt_trades))):
+        qe_trade = ml4t.backtest_trades[i]
         bt_trade = bt_trades[i]
 
         price_diff = abs(qe_trade["price"] - bt_trade["price"])
@@ -242,18 +242,18 @@ def compare_trade_by_trade():
         )
 
     print("\nFINAL COMPARISON:")
-    print(f"  QEngine final value:  ${qengine_final:.6f}")
+    print(f"  ml4t.backtest final value:  ${ml4t.backtest_final:.6f}")
     print(f"  Backtrader final value: ${bt_final:.6f}")
-    print(f"  Difference: ${abs(qengine_final - bt_final):.6f}")
-    print(f"  QEngine return:  {qengine_return:.6f}%")
+    print(f"  Difference: ${abs(ml4t.backtest_final - bt_final):.6f}")
+    print(f"  ml4t.backtest return:  {ml4t.backtest_return:.6f}%")
     print(f"  Backtrader return: {bt_return:.6f}%")
-    print(f"  Return difference: {abs(qengine_return - bt_return):.6f}%")
+    print(f"  Return difference: {abs(ml4t.backtest_return - bt_return):.6f}%")
 
     # Investigate potential causes
     print("\nPOTENTIAL CAUSES:")
-    if abs(qengine_final - bt_final) > 1:
+    if abs(ml4t.backtest_final - bt_final) > 1:
         print("  • Significant value difference suggests different position sizing")
-    if len(qengine_trades) != len(bt_trades):
+    if len(ml4t.backtest_trades) != len(bt_trades):
         print("  • Different number of trades")
     else:
         print("  • Same number of trades - likely rounding or calculation differences")

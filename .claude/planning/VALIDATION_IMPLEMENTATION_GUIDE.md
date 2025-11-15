@@ -1,4 +1,4 @@
-# QEngine Validation - Implementation Guide
+# ml4t.backtest Validation - Implementation Guide
 
 **Status**: Ready to Begin
 **Approach**: Systematic, quality-first validation (no artificial deadlines)
@@ -35,9 +35,9 @@ source .venv-backtrader/bin/activate
 pip install backtrader
 deactivate
 
-# QEngine environment (main development)
-python -m venv .venv-qengine
-source .venv-qengine/bin/activate
+# ml4t.backtest environment (main development)
+python -m venv .venv-ml4t.backtest
+source .venv-ml4t.backtest/bin/activate
 pip install -e .
 # Install test dependencies
 pip install pytest pandas polars numpy
@@ -56,7 +56,7 @@ frameworks = [
     ('.venv-vectorbt', 'vectorbtpro'),
     ('.venv-zipline', 'zipline'),
     ('.venv-backtrader', 'backtrader'),
-    ('.venv-qengine', 'qengine'),
+    ('.venv-ml4t.backtest', 'ml4t.backtest'),
 ]
 
 for venv, package in frameworks:
@@ -229,8 +229,8 @@ class UniversalDataLoader:
         elif framework == 'backtrader':
             # Backtrader format
             return df
-        elif framework == 'qengine':
-            # QEngine uses Polars
+        elif framework == 'ml4t.backtest':
+            # ml4t.backtest uses Polars
             return pl.from_pandas(df)
 ```
 
@@ -249,7 +249,7 @@ class UniversalDataLoader:
 # tests/validation/test_00_baseline.py
 
 import pytest
-from validation.frameworks import QEngineAdapter, VectorBTProAdapter, ZiplineAdapter, BacktraderAdapter
+from validation.frameworks import ml4t.backtestAdapter, VectorBTProAdapter, ZiplineAdapter, BacktraderAdapter
 from validation.data_loader import UniversalDataLoader
 
 def test_baseline_all_frameworks():
@@ -271,7 +271,7 @@ def test_baseline_all_frameworks():
 
     # Run on all frameworks
     adapters = [
-        QEngineAdapter(),
+        ml4t.backtestAdapter(),
         VectorBTProAdapter(),
         ZiplineAdapter(),
         BacktraderAdapter()
@@ -288,19 +288,19 @@ def test_baseline_all_frameworks():
         print(f"{adapter.framework_name}: ${result.final_value:,.2f} ({result.num_trades} trades)")
 
     # Compare results
-    qengine_value = results['QEngine'].final_value
+    ml4t.backtest_value = results['ml4t.backtest'].final_value
     vbt_value = results['VectorBT Pro'].final_value
 
     # Allow 5% difference for baseline
-    agreement = abs(qengine_value - vbt_value) / qengine_value * 100
-    print(f"\nQEngine vs VectorBT Pro agreement: {100-agreement:.2f}%")
+    agreement = abs(ml4t.backtest_value - vbt_value) / ml4t.backtest_value * 100
+    print(f"\nml4t.backtest vs VectorBT Pro agreement: {100-agreement:.2f}%")
 
     assert agreement < 5.0, f"Baseline test shows {agreement:.1f}% difference"
 ```
 
 **Acceptance**:
 - Test runs successfully on all 4 frameworks
-- QEngine vs VectorBT Pro within 5% (for initial setup)
+- ml4t.backtest vs VectorBT Pro within 5% (for initial setup)
 - All adapters return valid `ValidationResult` objects
 
 ---
@@ -346,7 +346,7 @@ def test_rsi_mean_reversion():
 ```
 
 **Acceptance**:
-- 95%+ agreement between QEngine and VectorBT Pro
+- 95%+ agreement between ml4t.backtest and VectorBT Pro
 - Trade counts within ±5%
 - Execution timing correct (no lookahead)
 
@@ -496,7 +496,7 @@ def test_minute_bar_execution():
 
 ## Phase 3: Tier 3 - ML Integration
 
-**Goal**: Validate qfeatures → qeval → qengine pipeline
+**Goal**: Validate qfeatures → qeval → ml4t.backtest pipeline
 
 ### Task 3.1: qfeatures Technical Signals
 

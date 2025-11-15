@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Diagnostic test for qengine signal processing (TASK-001 RED phase).
+Diagnostic test for ml4t.backtest signal processing (TASK-001 RED phase).
 
-This test verifies that qengine correctly:
+This test verifies that ml4t.backtest correctly:
 1. Receives signals from the signal-driven strategy
 2. Converts signals to orders
 3. Submits orders to the broker
@@ -28,9 +28,9 @@ from market_data import get_ticker_data
 from scenario_001_simple_market_orders import Signal
 
 
-def test_qengine_executes_market_orders():
+def test_ml4t.backtest_executes_market_orders():
     """
-    RED: Test that qengine executes BUY/SELL market orders and generates trades.
+    RED: Test that ml4t.backtest executes BUY/SELL market orders and generates trades.
 
     EXPECTED RESULT (currently failing):
     - 4 signals → 4 orders submitted → 4 fills → 2 complete trades
@@ -40,15 +40,15 @@ def test_qengine_executes_market_orders():
 
     This is the TDD RED phase for TASK-001.
     """
-    # Import qengine components
-    from qengine.engine import BacktestEngine
-    from qengine.strategy.base import Strategy
-    from qengine.execution.broker import SimulationBroker
-    from qengine.execution.commission import PercentageCommission
-    from qengine.execution.order import Order
-    from qengine.core.types import OrderType, OrderSide, EventType, MarketDataType
-    from qengine.core.event import MarketEvent
-    from qengine.data.feed import DataFeed
+    # Import ml4t.backtest components
+    from ml4t.backtest.engine import BacktestEngine
+    from ml4t.backtest.strategy.base import Strategy
+    from ml4t.backtest.execution.broker import SimulationBroker
+    from ml4t.backtest.execution.commission import PercentageCommission
+    from ml4t.backtest.execution.order import Order
+    from ml4t.backtest.core.types import OrderType, OrderSide, EventType, MarketDataType
+    from ml4t.backtest.core.event import MarketEvent
+    from ml4t.backtest.data.feed import DataFeed
 
     # Get real AAPL 2017 data
     data = get_ticker_data(
@@ -273,4 +273,4 @@ def test_qengine_executes_market_orders():
 
 if __name__ == "__main__":
     # Run test directly for debugging
-    test_qengine_executes_market_orders()
+    test_ml4t.backtest_executes_market_orders()

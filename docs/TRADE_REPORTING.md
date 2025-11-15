@@ -1,8 +1,8 @@
-# Trade Reporting in QEngine
+# Trade Reporting in ml4t.backtest
 
 ## Overview
 
-QEngine provides highly efficient trade tracking and reporting built into the `SimulationBroker`. Trades are automatically tracked as fills occur, with minimal performance overhead.
+ml4t.backtest provides highly efficient trade tracking and reporting built into the `SimulationBroker`. Trades are automatically tracked as fills occur, with minimal performance overhead.
 
 ## Features
 
@@ -16,7 +16,7 @@ QEngine provides highly efficient trade tracking and reporting built into the `S
 ## Quick Start
 
 ```python
-from qengine.execution.broker import SimulationBroker
+from ml4t.backtest.execution.broker import SimulationBroker
 
 # Create broker
 broker = SimulationBroker(initial_cash=100000.0)
@@ -55,11 +55,11 @@ print(f"Win rate: {(trades_df['pnl'] > 0).sum() / len(trades_df) * 100:.1f}%")
 | `duration_bars` | Int64 | Trade duration in bars |
 | `direction` | String | "long" or "short" |
 
-## Column Name Comparison: QEngine vs VectorBT
+## Column Name Comparison: ml4t.backtest vs VectorBT
 
-**QEngine uses clean `snake_case` naming** (no capitals, no spaces):
+**ml4t.backtest uses clean `snake_case` naming** (no capitals, no spaces):
 
-| QEngine | VectorBT Pro |
+| ml4t.backtest | VectorBT Pro |
 |---------|--------------|
 | `trade_id` | `Exit Trade Id` |
 | `asset_id` | `Column` |
@@ -317,7 +317,7 @@ fig.show()
 
 ## Comparison with VectorBT
 
-| Feature | QEngine | VectorBT Pro |
+| Feature | ml4t.backtest | VectorBT Pro |
 |---------|---------|--------------|
 | Column names | `snake_case` | `Title Case With Spaces` |
 | DataFrame library | Polars (Arrow) | Pandas |
@@ -338,7 +338,7 @@ Potential additions in future versions:
 
 ## Summary
 
-QEngine's trade reporting provides:
+ml4t.backtest's trade reporting provides:
 
 1. **Zero-config simplicity** - Just access `broker.trades`
 2. **Clean API** - Pythonic naming, type-safe

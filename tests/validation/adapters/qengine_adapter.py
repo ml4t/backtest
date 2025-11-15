@@ -1,16 +1,16 @@
-"""QEngine adapter for cross-platform validation."""
+"""ml4t.backtest adapter for cross-platform validation."""
 import time
 from datetime import datetime
 from typing import Any
 
 import polars as pl
 
-from qengine import BacktestEngine
-from qengine.core.event import EventType, MarketEvent, OrderEvent
-from qengine.core.types import AssetId, MarketDataType, OrderSide, OrderType
-from qengine.data.feed import DataFeed
-from qengine.execution.order import Order
-from qengine.strategy.base import Strategy
+from ml4t.backtest import BacktestEngine
+from ml4t.backtest.core.event import EventType, MarketEvent, OrderEvent
+from ml4t.backtest.core.types import AssetId, MarketDataType, OrderSide, OrderType
+from ml4t.backtest.data.feed import DataFeed
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.strategy.base import Strategy
 
 from .base import BacktestResult, PlatformAdapter, Trade
 
@@ -132,7 +132,7 @@ class SignalDrivenStrategy(Strategy):
             self.executed_signals.add(key)
 
     def _execute_signal(self, signal, market_event):
-        """Translate signal to QEngine order."""
+        """Translate signal to ml4t.backtest order."""
         # Determine order side
         if signal.action == 'BUY':
             side = OrderSide.BUY
@@ -193,11 +193,11 @@ class SignalDrivenStrategy(Strategy):
             self.broker.submit_order(order)
 
 
-class QEngineAdapter(PlatformAdapter):
-    """Adapter for QEngine backtesting platform."""
+class ml4t.backtestAdapter(PlatformAdapter):
+    """Adapter for ml4t.backtest backtesting platform."""
 
     def __init__(self):
-        super().__init__("qengine")
+        super().__init__("ml4t.backtest")
 
     def run_backtest(
         self,
@@ -208,7 +208,7 @@ class QEngineAdapter(PlatformAdapter):
         slippage: float = 0.0,
         **kwargs
     ) -> BacktestResult:
-        """Run backtest using QEngine."""
+        """Run backtest using ml4t.backtest."""
         start_time = time.time()
 
         # Create data feed
@@ -218,9 +218,9 @@ class QEngineAdapter(PlatformAdapter):
         strategy = SignalDrivenStrategy(signals)
 
         # Create broker with commission/slippage
-        from qengine.execution.broker import SimulationBroker
-        from qengine.execution.commission import PercentageCommission
-        from qengine.execution.slippage import FixedSlippage
+        from ml4t.backtest.execution.broker import SimulationBroker
+        from ml4t.backtest.execution.commission import PercentageCommission
+        from ml4t.backtest.execution.slippage import FixedSlippage
 
         broker = SimulationBroker(
             commission_model=PercentageCommission(commission),
@@ -265,9 +265,9 @@ class QEngineAdapter(PlatformAdapter):
         )
 
     def _convert_trades(self, trades_df: pl.DataFrame) -> list[Trade]:
-        """Convert QEngine orders to standardized trades format.
+        """Convert ml4t.backtest orders to standardized trades format.
 
-        QEngine returns individual fills, not matched entry/exit pairs.
+        ml4t.backtest returns individual fills, not matched entry/exit pairs.
         We need to match BUY and SELL orders to create complete trades.
         """
         if trades_df.is_empty():
@@ -375,13 +375,13 @@ class QEngineAdapter(PlatformAdapter):
         })
 
     def supports_stop_loss(self) -> bool:
-        """QEngine supports stop loss via bracket orders."""
+        """ml4t.backtest supports stop loss via bracket orders."""
         return True
 
     def supports_take_profit(self) -> bool:
-        """QEngine supports take profit via bracket orders."""
+        """ml4t.backtest supports take profit via bracket orders."""
         return True
 
     def supports_trailing_stop(self) -> bool:
-        """QEngine supports trailing stop orders."""
+        """ml4t.backtest supports trailing stop orders."""
         return True

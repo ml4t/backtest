@@ -3,7 +3,7 @@
 SPY Order Flow Strategy Demo
 
 Demonstrates the integration of the SPY Order Flow momentum strategy
-with QEngine's event-driven backtesting framework.
+with ml4t.backtest's event-driven backtesting framework.
 """
 
 import sys
@@ -12,14 +12,14 @@ from pathlib import Path
 
 import numpy as np
 
-# Add QEngine to path
+# Add ml4t.backtest to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from unittest.mock import Mock
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType
-from qengine.strategy.spy_order_flow_adapter import create_spy_order_flow_strategy
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType
+from ml4t.backtest.strategy.spy_order_flow_adapter import create_spy_order_flow_strategy
 
 
 def generate_spy_order_flow_data(n_events: int = 100):

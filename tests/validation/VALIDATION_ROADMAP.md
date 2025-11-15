@@ -1,6 +1,6 @@
-# QEngine Validation Roadmap
+# ml4t.backtest Validation Roadmap
 
-**Purpose**: Systematic validation of qengine execution against VectorBT Pro
+**Purpose**: Systematic validation of ml4t.backtest execution against VectorBT Pro
 **Approach**: Test one variable at a time, increasing complexity incrementally
 **Status**: Phase 1 (Baseline) in progress
 **Last Updated**: 2025-11-04
@@ -25,7 +25,7 @@
 
 ## Phase 1: Baseline Execution (No Fees, No Slippage)
 
-**Goal**: Verify qengine execution matches VectorBT with zero transaction costs
+**Goal**: Verify ml4t.backtest execution matches VectorBT with zero transaction costs
 
 ### Test 1.1: Entry Signals Only ✅ PASSING
 **File**: `test_1_1_baseline_entries.py`
@@ -39,13 +39,13 @@
 - Initial cash: $100,000
 
 **Expected Behavior**:
-- qengine: Reports 1 trade (open position with exit = final bar)
+- ml4t.backtest: Reports 1 trade (open position with exit = final bar)
 - VectorBT: Reports 1 trade (open position)
 - Both should have identical final value and PnL
 
 **Current Result**: ✅ Both engines match ($111,140.65 final value)
 
-**Known Issue**: qengine entry_time shows "None" (timestamp recording cosmetic issue)
+**Known Issue**: ml4t.backtest entry_time shows "None" (timestamp recording cosmetic issue)
 
 ---
 
@@ -487,11 +487,11 @@ def test_X_Y_description():
     )
 
     # 4. Run backtests
-    qengine_result = QEngineWrapper().run_backtest(ohlcv, entries, exits, config)
+    ml4t.backtest_result = ml4t.backtestWrapper().run_backtest(ohlcv, entries, exits, config)
     vbt_result = VectorBTWrapper().run_backtest(ohlcv, entries, exits, config)
 
     # 5. Compare results
-    success, report = compare_results(qengine_result, vbt_result, tolerance=...)
+    success, report = compare_results(ml4t.backtest_result, vbt_result, tolerance=...)
 
     # 6. Print report
     print(report)
@@ -503,7 +503,7 @@ def test_X_Y_description():
 ### Success Criteria
 
 For each test to pass:
-1. **Trade Count**: qengine matches VectorBT (± 1 trade tolerance)
+1. **Trade Count**: ml4t.backtest matches VectorBT (± 1 trade tolerance)
 2. **Final Value**: Within $10 (0.01% of $100K)
 3. **PnL**: Within $10
 4. **Prices**: Within 1 cent per trade
@@ -537,7 +537,7 @@ For each test to pass:
 **Status**: ✅ Fixed
 
 ### Issue 3: Timestamp Recording (Cosmetic)
-**Problem**: qengine open position trades show entry_time=None
+**Problem**: ml4t.backtest open position trades show entry_time=None
 **Root Cause**: FillEvent.timestamp not properly passed in some scenarios
 **Impact**: Low (tests pass, only affects display)
 **Status**: ⏳ Deferred (cosmetic issue)

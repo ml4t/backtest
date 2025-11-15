@@ -41,7 +41,7 @@ from common import (
     load_real_crypto_data,
     generate_entry_exit_pairs,
     BacktestConfig,
-    QEngineWrapper,
+    ml4t.backtestWrapper,
     VectorBTWrapper,
     print_validation_report,
 )
@@ -105,13 +105,13 @@ def test_3_1_fixed_slippage():
 
     print("\n4️⃣  Running backtests...")
 
-    # Run qengine
-    print("   🔧 Running qengine...")
+    # Run ml4t.backtest
+    print("   🔧 Running ml4t.backtest...")
     try:
-        qengine = QEngineWrapper()
-        results['qengine'] = qengine.run_backtest(ohlcv, entries, exits=exits, config=config)
-        print(f"      ✅ Complete: {results['qengine'].num_trades} trades")
-        print(f"      💰 Final value: ${results['qengine'].final_value:,.2f}")
+        ml4t.backtest = ml4t.backtestWrapper()
+        results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config)
+        print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
+        print(f"      💰 Final value: ${results['ml4t.backtest'].final_value:,.2f}")
     except Exception as e:
         print(f"      ❌ Failed: {e}")
         import traceback
@@ -175,7 +175,7 @@ def test_3_1_fixed_slippage():
             print(f"   ⚠️  Tolerance: $10.00 (due to price variation in fixed slippage)")
 
             # For fixed slippage, we expect slight differences due to price variation
-            # VectorBT uses percentage at each bar, qengine may use different approach
+            # VectorBT uses percentage at each bar, ml4t.backtest may use different approach
             # Allow $10 tolerance
             if diff > 10.0:
                 print(f"   ❌ Difference exceeds tolerance!")

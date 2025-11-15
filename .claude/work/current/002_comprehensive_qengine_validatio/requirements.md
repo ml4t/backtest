@@ -1,14 +1,14 @@
-# Requirements: QEngine Cross-Framework Validation
+# Requirements: ml4t.backtest Cross-Framework Validation
 
 ## Source
 - Type: description
-- Reference: Comprehensive QEngine validation plan
+- Reference: Comprehensive ml4t.backtest validation plan
 - Date: 2025-10-04T19:59:00-05:00
 - Detailed Plan: `.claude/planning/COMPREHENSIVE_VALIDATION_PLAN.md`
 
 ## Overview
 
-Comprehensive validation of QEngine backtesting framework against three major industry frameworks:
+Comprehensive validation of ml4t.backtest backtesting framework against three major industry frameworks:
 - **VectorBT Pro** (commercial, vectorized, 20-25x faster)
 - **Zipline-Reloaded** (Quantopian legacy, event-driven)
 - **Backtrader** (popular, event-driven)
@@ -60,7 +60,7 @@ Goals: Prove correctness, measure performance, validate ML integration, establis
 ## Non-Functional Requirements
 
 ### Performance
-- QEngine within 2x of VectorBT Pro for simple strategies
+- ml4t.backtest within 2x of VectorBT Pro for simple strategies
 - Linear scaling with asset count (validated up to 500 assets)
 - Sub-second backtest for daily strategies (1 year, single asset)
 
@@ -72,7 +72,7 @@ Goals: Prove correctness, measure performance, validate ML integration, establis
 ### Compatibility
 - Support daily, minute, tick, and irregular bar frequencies
 - Handle equities, crypto futures/spot, multi-asset portfolios
-- Work with qfeatures → qeval → qengine ML pipeline
+- Work with qfeatures → qeval → ml4t.backtest ML pipeline
 
 ### Documentation
 - Comprehensive validation reports for each tier
@@ -115,7 +115,7 @@ Goals: Prove correctness, measure performance, validate ML integration, establis
 
 ### Existing Infrastructure
 - `tests/validation/frameworks/base.py` - BaseFrameworkAdapter
-- `tests/validation/frameworks/qengine_adapter.py` - QEngine implementation
+- `tests/validation/frameworks/ml4t.backtest_adapter.py` - ml4t.backtest implementation
 - `tests/validation/strategy_specifications.py` - Generic strategy specs
 - Previous validation results (MA crossover, multi-asset portfolio)
 

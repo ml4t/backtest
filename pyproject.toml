@@ -1,4 +1,4 @@
-# QEngine - Event-driven backtesting with institutional-grade correctness guarantees
+# ml4t.backtest - Event-driven backtesting with institutional-grade correctness guarantees
 # Independent package configuration for standalone distribution
 
 [build-system]
@@ -6,10 +6,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/qengine/__init__.py"
+path = "src/ml4t/backtest/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/qengine"]
+packages = ["src/ml4t"]
+namespaces = true
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -71,19 +72,16 @@ dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "pyarrow>=14.0.0",
-
     # Event system
-    "sortedcontainers>=2.4.0",  # Efficient priority queue
-
+    "sortedcontainers>=2.4.0", # Efficient priority queue
     # Performance optimization
     "numba>=0.57.0",
-
     # Utilities
     "structlog>=23.0.0",
     "python-dateutil>=2.8.0",
-
     # Market calendars (needed for clock module)
     "pandas-market-calendars>=4.0.0",
+    "pytest>=8.4.2",
 ]
 
 [project.optional-dependencies]
@@ -134,7 +132,7 @@ docs = [
 
 # All optional dependencies
 all = [
-    "qengine[viz,advanced,dev,docs]",
+    "ml4t-backtest[viz,advanced,dev,docs]",
 ]
 
 [project.urls]
@@ -152,7 +150,7 @@ python_functions = ["test_*"]
 addopts = [
     "-ra",
     "--strict-markers",
-    "--cov=qengine",
+    "--cov=ml4t.backtest",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -165,6 +163,10 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
+    "ignore::UserWarning:vectorbt",  # VectorBT accessor registration warnings
+    "ignore::tables.NaturalNameWarning",  # PyTables naming warnings
+    "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
+    "ignore::pytest.PytestReturnNotNoneWarning",  # Some tests return values for direct execution
 ]
 
 [tool.ruff]
@@ -204,7 +206,7 @@ warn_redundant_casts = true
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["src/qengine"]
+source = ["src/ml4t/backtest"]
 omit = [
     "*/tests/*",
     "*/__init__.py",

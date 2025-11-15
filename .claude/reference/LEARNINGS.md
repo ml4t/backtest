@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-ML4T-Backtest (formerly QEngine) represents our most ambitious undertaking: an institutional-grade event-driven backtesting engine. While boasting exceptional component design (modular architecture, comprehensive execution models, multi-asset support), code review revealed **critical P0 integration flaws** that rendered the engine non-functional. These integration issues taught us invaluable lessons about system design and testing.
+ML4T-Backtest (formerly ml4t.backtest) represents our most ambitious undertaking: an institutional-grade event-driven backtesting engine. While boasting exceptional component design (modular architecture, comprehensive execution models, multi-asset support), code review revealed **critical P0 integration flaws** that rendered the engine non-functional. These integration issues taught us invaluable lessons about system design and testing.
 
 ## Core Mission & Philosophy
 

@@ -1,6 +1,6 @@
 """
 Complete Cross-Framework Validation
-Comparing QEngine, Zipline-Reloaded, VectorBT, and Backtrader
+Comparing ml4t.backtest, Zipline-Reloaded, VectorBT, and Backtrader
 
 This script runs identical MA crossover strategies on all frameworks
 using the same data to validate correctness.
@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 
 # Add paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(qengine_src))
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(ml4t.backtest_src))
 
 
 def run_zipline_backtest(
@@ -168,13 +168,13 @@ def run_zipline_backtest(
     }
 
 
-def run_qengine_backtest(
+def run_backtest_backtest(
     data: pd.DataFrame,
     fast_period: int = 20,
     slow_period: int = 50,
     initial_capital: float = 10000,
 ) -> dict[str, Any]:
-    """Run MA crossover on QEngine."""
+    """Run MA crossover on ml4t.backtest."""
     start_time = time.time()
 
     # Initialize portfolio
@@ -256,7 +256,7 @@ def run_qengine_backtest(
     max_dd = drawdown.min() * 100 if len(drawdown) > 0 else 0
 
     return {
-        "framework": "QEngine",
+        "framework": "ml4t.backtest",
         "final_value": final_value,
         "total_return": total_return,
         "num_trades": len(trades),
@@ -532,18 +532,18 @@ def main():
         print(f"   ✗ Error loading data: {e}")
         return
 
-    # 3. Run QEngine
-    print("\n3. Running QEngine...")
+    # 3. Run ml4t.backtest
+    print("\n3. Running ml4t.backtest...")
     try:
-        qengine_result = run_qengine_backtest(
+        ml4t.backtest_result = run_ml4t.backtest_backtest(
             data,
             fast_period=fast_period,
             slow_period=slow_period,
             initial_capital=initial_capital,
         )
-        results.append(qengine_result)
+        results.append(ml4t.backtest_result)
         print(
-            f"   ✓ Final: ${qengine_result['final_value']:,.2f} | Return: {qengine_result['total_return']:.2f}% | Trades: {qengine_result['num_trades']}",
+            f"   ✓ Final: ${ml4t.backtest_result['final_value']:,.2f} | Return: {ml4t.backtest_result['total_return']:.2f}% | Trades: {ml4t.backtest_result['num_trades']}",
         )
     except Exception as e:
         print(f"   ✗ Error: {e}")

@@ -1,12 +1,12 @@
 # Systematic Backtesting Engine Validation Plan
 
-**Goal**: Validate qengine against 3 reference implementations by testing isolated functionality incrementally
+**Goal**: Validate ml4t.backtest against 3 reference implementations by testing isolated functionality incrementally
 
 **Engines to Compare**:
 1. VectorBT Pro (reference #1)
 2. Zipline (reference #2)
 3. Backtrader (reference #3)
-4. qengine (implementation under test)
+4. ml4t.backtest (implementation under test)
 
 **Validation Principle**: Start simple, add one variable at a time, document differences
 
@@ -45,7 +45,7 @@ Engine         Trades  Entry_1_Price  Entry_1_Time           Final_Value
 VectorBT       20      $35,000.00     2021-01-04 00:50:00   $105,234.56
 Zipline        20      $35,000.00     2021-01-04 00:50:00   $105,234.56
 Backtrader     20      $35,000.00     2021-01-04 00:50:00   $105,234.56
-qengine        20      $35,000.00     2021-01-04 00:50:00   $105,234.56
+ml4t.backtest        20      $35,000.00     2021-01-04 00:50:00   $105,234.56
 Status: ✅ PASS - All engines identical
 ```
 
@@ -104,7 +104,7 @@ Status: ✅ PASS - All engines identical
 
 **Validation Script**: `tests/validation/test_2_2_slippage_only.py`
 
-**Key Question**: Does qengine's SlippageModel actually get applied?
+**Key Question**: Does ml4t.backtest's SlippageModel actually get applied?
 
 ### Test 2.3: Fees + Slippage Combined
 
@@ -352,7 +352,7 @@ class EngineWrapper(ABC):
 class VectorBTWrapper(EngineWrapper): ...
 class ZiplineWrapper(EngineWrapper): ...
 class BacktraderWrapper(EngineWrapper): ...
-class QEngineWrapper(EngineWrapper): ...
+class ml4t.backtestWrapper(EngineWrapper): ...
 ```
 
 **2. Signal Generator** (`signal_generator.py`):
@@ -366,7 +366,7 @@ def generate_entry_exit_pairs(n_bars, hold_bars=10):
 
 **3. Comparison Tool** (`comparison.py`):
 ```python
-def compare_trades(vbt_trades, zipline_trades, bt_trades, qengine_trades):
+def compare_trades(vbt_trades, zipline_trades, bt_trades, ml4t.backtest_trades):
     """Compare trades across all engines and report differences."""
     
 def assert_identical(results_dict, tolerance=0.01):
@@ -379,7 +379,7 @@ def assert_identical(results_dict, tolerance=0.01):
 """Test 1.1: Baseline - Entry Signals Only"""
 import pytest
 from tests.validation.common import (
-    VectorBTWrapper, ZiplineWrapper, BacktraderWrapper, QEngineWrapper,
+    VectorBTWrapper, ZiplineWrapper, BacktraderWrapper, ml4t.backtestWrapper,
     generate_fixed_entries, generate_ohlcv, compare_trades
 )
 
@@ -406,15 +406,15 @@ def test_baseline_entries():
     bt = BacktraderWrapper()
     bt_result = bt.run_backtest(ohlcv, signals, config)
     
-    qengine = QEngineWrapper()
-    qengine_result = qengine.run_backtest(ohlcv, signals, config)
+    ml4t.backtest = ml4t.backtestWrapper()
+    ml4t.backtest_result = ml4t.backtest.run_backtest(ohlcv, signals, config)
     
     # 4. Compare results
     results = {
         'VectorBT': vbt_result,
         'Zipline': zipline_result,
         'Backtrader': bt_result,
-        'qengine': qengine_result,
+        'ml4t.backtest': ml4t.backtest_result,
     }
     
     # 5. Assert identical
@@ -482,9 +482,9 @@ For each test:
 
 1. **Create infrastructure** (engine wrappers, data generators)
 2. **Run Test 1.1** (simplest baseline)
-3. **Fix any qengine issues** found in Test 1.1
+3. **Fix any ml4t.backtest issues** found in Test 1.1
 4. **Proceed incrementally** through each test
 5. **Document all differences** in a master comparison table
 
-**Success Metric**: All 17 tests pass for qengine (identical to reference engines)
+**Success Metric**: All 17 tests pass for ml4t.backtest (identical to reference engines)
 

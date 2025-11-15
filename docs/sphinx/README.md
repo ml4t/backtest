@@ -1,6 +1,6 @@
-# QEngine Sphinx Documentation
+# ml4t.backtest Sphinx Documentation
 
-This directory contains the Sphinx-generated API documentation for qengine.
+This directory contains the Sphinx-generated API documentation for ml4t.backtest.
 
 ## Building the Documentation
 
@@ -75,7 +75,7 @@ The documentation is automatically generated from docstrings in the source code,
 
 ## Docstring Style
 
-QEngine uses Google-style docstrings. Example:
+ml4t.backtest uses Google-style docstrings. Example:
 
 ```python
 def calculate_quantity(

@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures for QEngine tests."""
+"""Pytest configuration and fixtures for ml4t.backtest tests."""
 
 import tempfile
 from collections.abc import Generator
@@ -8,9 +8,9 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from qengine.core.clock import Clock, ClockMode
-from qengine.core.event import Event, MarketEvent
-from qengine.core.types import AssetId, MarketDataType
+from ml4t.backtest.core.clock import Clock, ClockMode
+from ml4t.backtest.core.event import Event, MarketEvent
+from ml4t.backtest.core.types import AssetId, MarketDataType
 
 
 @pytest.fixture

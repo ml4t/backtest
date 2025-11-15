@@ -2,9 +2,9 @@
 
 ## Primary Objective
 
-**Reverse engineer VectorBT Pro's backtesting logic and achieve 100% exact matching with qengine**
+**Reverse engineer VectorBT Pro's backtesting logic and achieve 100% exact matching with ml4t.backtest**
 
-This is NOT about approximation. We need **complete transparency and exact matching** to validate qengine.
+This is NOT about approximation. We need **complete transparency and exact matching** to validate ml4t.backtest.
 
 ## Core Requirements
 
@@ -27,7 +27,7 @@ This is NOT about approximation. We need **complete transparency and exact match
 - Empirical testing with known edge cases
 - Trade-by-trade inspection
 
-### 2. Exact qengine Implementation
+### 2. Exact ml4t.backtest Implementation
 
 **Must match VectorBT 100%**:
 - Same entry prices
@@ -44,7 +44,7 @@ This is NOT about approximation. We need **complete transparency and exact match
 
 **Success criteria**:
 - Extract complete VectorBT trade log (entry/exit prices, timestamps, fees, PnL)
-- Run qengine with identical entry signals
+- Run ml4t.backtest with identical entry signals
 - Compare every single trade
 - Achieve 100% match on test period (Q1 2024, 87 days, ~352 trades)
 - Zero tolerance for differences
@@ -53,7 +53,7 @@ This is NOT about approximation. We need **complete transparency and exact match
 
 **Must produce**:
 - Complete VectorBT behavior documentation
-- Implementation notes for qengine
+- Implementation notes for ml4t.backtest
 - Trade-by-trade comparison report
 - Edge case handling guide
 - Verification test suite
@@ -104,22 +104,22 @@ This is NOT about approximation. We need **complete transparency and exact match
 - Built-in TP/SL/TSL support
 - Black-box exit logic
 
-### qengine (ML4T)
+### ml4t.backtest (ML4T)
 - Event-driven architecture
 - Requires manual exit implementation
 - Must replicate VectorBT behavior exactly
-- Located at: `/home/stefan/ml4t/software/backtest/src/qengine/`
+- Located at: `/home/stefan/ml4t/software/backtest/src/ml4t.backtest/`
 
 ## Dependencies
 
 ### Required Files
 - Phase 1 indicators: `projects/crypto_futures/data/indicators/BTC_indicators.parquet`
-- VectorBT comparison script: `projects/crypto_futures/scripts/compare_vectorbt_vs_qengine.py`
-- qengine library: `backtest/src/qengine/`
+- VectorBT comparison script: `projects/crypto_futures/scripts/compare_vectorbt_vs_ml4t.backtest.py`
+- ml4t.backtest library: `backtest/src/ml4t.backtest/`
 
 ### Required Knowledge
 - VectorBT Pro API and behavior
-- qengine architecture (Strategy, DataFeed, Broker, Portfolio)
+- ml4t.backtest architecture (Strategy, DataFeed, Broker, Portfolio)
 - Event-driven backtesting patterns
 - Point-in-time correctness
 
@@ -127,11 +127,11 @@ This is NOT about approximation. We need **complete transparency and exact match
 
 ### 1. Documentation
 - `VECTORBT_BEHAVIOR_SPEC.md` - Complete VectorBT behavior specification
-- `QENGINE_IMPLEMENTATION_GUIDE.md` - How to replicate VectorBT in qengine
+- `ML4T_BACKTEST_IMPLEMENTATION_GUIDE.md` - How to replicate VectorBT in ml4t.backtest
 - `TRADE_COMPARISON_REPORT.md` - Trade-by-trade validation results
 
 ### 2. Code
-- qengine strategy with exact VectorBT matching
+- ml4t.backtest strategy with exact VectorBT matching
 - Trade extraction and comparison scripts
 - Verification test suite
 
@@ -142,15 +142,15 @@ This is NOT about approximation. We need **complete transparency and exact match
 
 ## Why This Matters
 
-**We cannot validate qengine without understanding the reference implementation**
+**We cannot validate ml4t.backtest without understanding the reference implementation**
 
 - If we don't know how VectorBT calculates exits, we can't verify correctness
 - Approximate matching hides bugs and implementation differences
 - Need complete transparency to:
-  - Trust qengine for production use
+  - Trust ml4t.backtest for production use
   - Implement strategies correctly
   - Debug issues when they arise
-  - Extend qengine with confidence
+  - Extend ml4t.backtest with confidence
 
 **This is foundational validation work. Must be done right.**
 
@@ -159,7 +159,7 @@ This is NOT about approximation. We need **complete transparency and exact match
 Phase 2 is complete when:
 
 1. ✅ VectorBT behavior fully documented (every calculation)
-2. ✅ qengine implements identical logic (verified by code review)
+2. ✅ ml4t.backtest implements identical logic (verified by code review)
 3. ✅ 100% trade-by-trade matching on test period
 4. ✅ Edge cases identified and tested
 5. ✅ Complete implementation guide exists

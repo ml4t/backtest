@@ -1,4 +1,4 @@
-# TASK-001 Completion Report: Debug qengine Signal Processing
+# TASK-001 Completion Report: Debug ml4t.backtest Signal Processing
 
 **Task ID**: TASK-001
 **Status**: ✅ **COMPLETED**
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-Successfully diagnosed and fixed critical **timezone mismatch issue** that prevented qengine (and all platforms) from executing signals. All three platforms (qengine, VectorBT, Backtrader) now successfully execute scenario 001 with 2 complete trades each.
+Successfully diagnosed and fixed critical **timezone mismatch issue** that prevented ml4t.backtest (and all platforms) from executing signals. All three platforms (ml4t.backtest, VectorBT, Backtrader) now successfully execute scenario 001 with 2 complete trades each.
 
 ---
 
@@ -18,7 +18,7 @@ Successfully diagnosed and fixed critical **timezone mismatch issue** that preve
 
 **Initial State** (from handoff document):
 - ✅ Backtrader: 2 trades extracted
-- ❌ qengine: 0 trades extracted
+- ❌ ml4t.backtest: 0 trades extracted
 - ❌ VectorBT: 0 trades extracted
 - ⏸️ Zipline: Not tested
 
@@ -30,7 +30,7 @@ Successfully diagnosed and fixed critical **timezone mismatch issue** that preve
 
 ### TDD RED Phase: Diagnostic Test
 
-Created comprehensive diagnostic test (`test_qengine_signal_processing.py`) with verbose logging to trace signal execution flow.
+Created comprehensive diagnostic test (`test_ml4t.backtest_signal_processing.py`) with verbose logging to trace signal execution flow.
 
 **Initial Discovery**:
 ```python
@@ -125,19 +125,19 @@ if exit_ts and not exit_ts.tzinfo:
 ### Test Execution: All Platforms
 
 ```bash
-uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader
+uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt,backtrader
 ```
 
 **Results**:
 ```
 Platform        Time       Status
 --------------------------------------------------------------------------------
-qengine         0.349s     ✅ OK
+ml4t.backtest         0.349s     ✅ OK
 vectorbt        1.697s     ✅ OK
 backtrader      0.499s     ✅ OK
 
 EXTRACTING TRADES
-  qengine     : 2 trades ✅
+  ml4t.backtest     : 2 trades ✅
   vectorbt    : 2 trades ✅
   backtrader  : 2 trades ✅
 
@@ -150,7 +150,7 @@ MATCHING TRADES
 | Platform   | Timing Model | Entry Bar  | Entry Price | Example Entry              |
 |------------|-------------|------------|-------------|----------------------------|
 | **VectorBT**   | Same-bar    | Signal bar | Close       | 2017-02-06 @ $130.29      |
-| **qengine**    | Next-bar    | Signal+1   | Close       | 2017-02-07 @ $131.54      |
+| **ml4t.backtest**    | Next-bar    | Signal+1   | Close       | 2017-02-07 @ $131.54      |
 | **Backtrader** | Next-bar    | Signal+1   | Open        | 2017-02-07 @ $130.54      |
 
 **Trade Groups Identified**:
@@ -159,8 +159,8 @@ MATCHING TRADES
 - VectorBT: Entry 2017-02-06 close ($130.29) → Exit 2017-04-17 close ($141.83)
 - Net P&L: $8,639.67
 
-**Group 2**: Entry 2017-02-07 (qengine + Backtrader next-bar)
-- qengine: Entry 2017-02-07 close ($131.54) → Exit 2017-04-18 close ($141.19)
+**Group 2**: Entry 2017-02-07 (ml4t.backtest + Backtrader next-bar)
+- ml4t.backtest: Entry 2017-02-07 close ($131.54) → Exit 2017-04-18 close ($141.19)
   Net P&L: $937.00
 - Backtrader: Entry 2017-02-07 open ($130.54) → Exit 2017-04-18 open
   Net P&L: $1,032.61
@@ -170,8 +170,8 @@ MATCHING TRADES
 - VectorBT: Entry 2017-07-17 close ($149.56) → Exit 2017-12-18 close ($176.42)
 - Net P&L: $19,254.93
 
-**Group 4**: Entry 2017-07-18 (qengine + Backtrader next-bar)
-- qengine: Entry 2017-07-18 close ($150.10) → Exit 2017-12-19 close ($174.52)
+**Group 4**: Entry 2017-07-18 (ml4t.backtest + Backtrader next-bar)
+- ml4t.backtest: Entry 2017-07-18 close ($150.10) → Exit 2017-12-19 close ($174.52)
   Net P&L: $2,410.29
 - Backtrader: Entry 2017-07-18 open ($149.20) → Exit 2017-12-19 open
   Net P&L: $2,518.15
@@ -179,7 +179,7 @@ MATCHING TRADES
 
 **Validation Summary**:
 - ✅ Perfect matches: 2 (VectorBT-only trades)
-- ⚠️ Minor differences: 2 (qengine vs Backtrader open/close variance)
+- ⚠️ Minor differences: 2 (ml4t.backtest vs Backtrader open/close variance)
 - ❌ Critical differences: 0
 
 ---
@@ -204,7 +204,7 @@ signal_time = datetime(2017, 2, 6)  # Naive
 ### 2. Platform-Specific Quirks
 
 - **Backtrader**: Returns timezone-naive datetimes from `datetime.datetime(0)` and `bt.num2date()`
-- **qengine**: Expects timezone-aware timestamps
+- **ml4t.backtest**: Expects timezone-aware timestamps
 - **VectorBT**: Handles both but prefers pandas DatetimeIndex with UTC
 
 **Solution**: Build adapters that normalize timestamps at integration boundaries.
@@ -220,7 +220,7 @@ signal_time = datetime(2017, 2, 6)  # Naive
 ## Files Modified
 
 ### New Files
-1. `tests/validation/test_qengine_signal_processing.py` (273 lines)
+1. `tests/validation/test_ml4t.backtest_signal_processing.py` (273 lines)
    - Comprehensive diagnostic test with verbose logging
    - Red-Green-Refactor TDD cycle demonstration
    - Asserts 4 orders → 4 fills → 2 trades
@@ -246,7 +246,7 @@ signal_time = datetime(2017, 2, 6)  # Naive
 
 ✅ **All criteria met**:
 
-- [x] Test passes - qengine executes signals
+- [x] Test passes - ml4t.backtest executes signals
 - [x] At least 1 order placed for BUY signal (4 orders placed)
 - [x] Position correctly updated to 100 shares
 - [x] Trade extracted successfully (2 complete trades)

@@ -5,11 +5,11 @@ from datetime import date, datetime
 import polars as pl
 import pytest
 
-from qengine.core.event import MarketEvent
-from qengine.data.feed import CSVDataFeed
-from qengine.engine import BacktestEngine
-from qengine.execution.corporate_actions import CashDividend, StockSplit
-from qengine.strategy.base import Strategy
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.data.feed import CSVDataFeed
+from ml4t.backtest.engine import BacktestEngine
+from ml4t.backtest.execution.corporate_actions import CashDividend, StockSplit
+from ml4t.backtest.strategy.base import Strategy
 
 
 class BuyAndHoldStrategy(Strategy):
@@ -26,8 +26,8 @@ class BuyAndHoldStrategy(Strategy):
     def on_event(self, event):
         if isinstance(event, MarketEvent) and not self.has_bought:
             # Buy 100 shares
-            from qengine.core.event import OrderEvent
-            from qengine.core.types import OrderSide, OrderType
+            from ml4t.backtest.core.event import OrderEvent
+            from ml4t.backtest.core.types import OrderSide, OrderType
 
             order_event = OrderEvent(
                 timestamp=event.timestamp,
@@ -79,7 +79,6 @@ def corporate_actions():
     ]
 
 
-@pytest.mark.skip(reason="Corporate action processing not implemented in engine event loop")
 def test_stock_split_integration(tmp_path, sample_market_data, corporate_actions):
     """Test that stock splits are properly processed during backtest."""
 
@@ -124,7 +123,6 @@ def test_stock_split_integration(tmp_path, sample_market_data, corporate_actions
     assert dividend_action.dividend_per_share == 0.50
 
 
-@pytest.mark.skip(reason="Corporate action processing not implemented in engine event loop")
 def test_position_adjustment_after_split(tmp_path, sample_market_data, corporate_actions):
     """Test that positions are correctly adjusted after stock split."""
 

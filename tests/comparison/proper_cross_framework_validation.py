@@ -1,8 +1,8 @@
 """
-Proper Cross-Framework Validation: QEngine vs Zipline vs Backtrader vs VectorBT
+Proper Cross-Framework Validation: ml4t.backtest vs Zipline vs Backtrader vs VectorBT
 
 This implements IDENTICAL momentum strategies using IDENTICAL data across all frameworks
-to validate QEngine's correctness through direct comparison.
+to validate ml4t.backtest's correctness through direct comparison.
 
 Strategy: Simple Moving Average Crossover
 - 20-day MA crosses above 50-day MA: Go Long (100% allocation)
@@ -27,9 +27,9 @@ import numpy as np
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 
 @dataclass
@@ -77,13 +77,13 @@ def load_identical_test_data() -> pd.DataFrame:
     return test_data
 
 
-def validate_qengine(data: pd.DataFrame) -> ValidationResult:
-    """Validate QEngine with identical strategy and data."""
+def validate_backtest(data: pd.DataFrame) -> ValidationResult:
+    """Validate ml4t.backtest with identical strategy and data."""
     print("\n" + "=" * 60)
-    print("QENGINE VALIDATION")
+    print("ML4T.BACKTEST VALIDATION")
     print("=" * 60)
 
-    result = ValidationResult(framework="QEngine", data_source="AAPL 2015-2016")
+    result = ValidationResult(framework="ml4t.backtest", data_source="AAPL 2015-2016")
 
     try:
         tracemalloc.start()
@@ -176,14 +176,14 @@ def validate_qengine(data: pd.DataFrame) -> ValidationResult:
         result.execution_time_sec = time.time() - start_time
         result.memory_usage_mb = peak / 1024 / 1024
 
-        print("✓ QEngine completed successfully")
+        print("✓ ml4t.backtest completed successfully")
         print(f"  Final Value: ${final_value:,.2f}")
         print(f"  Total Return: {result.total_return_pct:.2f}%")
         print(f"  Total Trades: {len(trades)}")
         print(f"  Execution Time: {result.execution_time_sec:.3f}s")
 
     except Exception as e:
-        print(f"✗ QEngine failed: {e}")
+        print(f"✗ ml4t.backtest failed: {e}")
         result.error_msg = str(e)
 
     return result
@@ -524,7 +524,7 @@ def main():
     """Run proper cross-framework validation."""
     print("\n" + "#" * 80)
     print("# PROPER CROSS-FRAMEWORK VALIDATION")
-    print("# QEngine vs Zipline-Reloaded vs Backtrader vs VectorBT")
+    print("# ml4t.backtest vs Zipline-Reloaded vs Backtrader vs VectorBT")
     print("# Strategy: Moving Average Crossover (20/50)")
     print("# Data: AAPL Daily 2015-2016")
     print("# Capital: $10,000")
@@ -539,8 +539,8 @@ def main():
 
         print(f"\nRunning validations with {len(test_data)} data points...")
 
-        # QEngine validation
-        results.append(validate_qengine(test_data))
+        # ml4t.backtest validation
+        results.append(validate_ml4t.backtest(test_data))
 
         # Backtrader validation
         results.append(validate_backtrader(test_data))

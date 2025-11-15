@@ -6,7 +6,7 @@ The execution module handles order execution, position sizing, commission, and s
 Broker
 ------
 
-.. automodule:: qengine.execution.broker
+.. automodule:: ml4t.backtest.execution.broker
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Broker
 Orders
 ------
 
-.. automodule:: qengine.execution.order
+.. automodule:: ml4t.backtest.execution.order
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ Orders
 Position Sizing
 ---------------
 
-.. automodule:: qengine.execution.position_sizer
+.. automodule:: ml4t.backtest.execution.position_sizer
    :members:
    :undoc-members:
    :show-inheritance:
@@ -30,7 +30,7 @@ Position Sizing
 Commission Models
 -----------------
 
-.. automodule:: qengine.execution.commission
+.. automodule:: ml4t.backtest.execution.commission
    :members:
    :undoc-members:
    :show-inheritance:
@@ -38,7 +38,7 @@ Commission Models
 Slippage Models
 ---------------
 
-.. automodule:: qengine.execution.slippage
+.. automodule:: ml4t.backtest.execution.slippage
    :members:
    :undoc-members:
    :show-inheritance:
@@ -46,7 +46,7 @@ Slippage Models
 Fill Simulator
 --------------
 
-.. automodule:: qengine.execution.fill_simulator
+.. automodule:: ml4t.backtest.execution.fill_simulator
    :members:
    :undoc-members:
    :show-inheritance:
@@ -54,7 +54,7 @@ Fill Simulator
 Trade Tracker
 -------------
 
-.. automodule:: qengine.execution.trade_tracker
+.. automodule:: ml4t.backtest.execution.trade_tracker
    :members:
    :undoc-members:
    :show-inheritance:
@@ -62,7 +62,7 @@ Trade Tracker
 Position Tracker
 ----------------
 
-.. automodule:: qengine.execution.position_tracker
+.. automodule:: ml4t.backtest.execution.position_tracker
    :members:
    :undoc-members:
    :show-inheritance:
@@ -70,7 +70,7 @@ Position Tracker
 Bracket Manager
 ---------------
 
-.. automodule:: qengine.execution.bracket_manager
+.. automodule:: ml4t.backtest.execution.bracket_manager
    :members:
    :undoc-members:
    :show-inheritance:

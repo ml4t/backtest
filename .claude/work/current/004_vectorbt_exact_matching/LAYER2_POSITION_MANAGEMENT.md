@@ -5,14 +5,14 @@
 
 ## Executive Summary
 
-After adjusting test periods, identified the actual root cause: **qengine requires a flat position (`is_flat=True`) to enter, while VectorBT allows entries with existing positions.**
+After adjusting test periods, identified the actual root cause: **ml4t.backtest requires a flat position (`is_flat=True`) to enter, while VectorBT allows entries with existing positions.**
 
 ## Evidence
 
 ### 1. Signal Utilization (2024-01-02 onwards)
 - **Total TRUE signals**: 479
 - **VectorBT trades**: 479 (100% utilization)
-- **qengine trades**: 328 (68.5% utilization)
+- **ml4t.backtest trades**: 328 (68.5% utilization)
 - **Missing**: 151 signals (31.5%)
 
 ### 2. Entry Timestamps Match Perfectly
@@ -23,30 +23,30 @@ First 5 entries are IDENTICAL:
 - Both: 2024-01-02 18:20
 - Both: 2024-01-02 21:14
 
-**Conclusion**: When qengine does enter, it enters at the same time as VectorBT.
+**Conclusion**: When ml4t.backtest does enter, it enters at the same time as VectorBT.
 
 ### 3. Exit Distribution Matches (1.3pp difference)
-- qengine: 13.4% TP, 86.6% TSL
+- ml4t.backtest: 13.4% TP, 86.6% TSL
 - VectorBT: 12.1% TP, 87.9% TSL
 
 **Conclusion**: Exit logic is working correctly.
 
 ### 4. Code Evidence
 
-**File**: `projects/crypto_futures/scripts/run_qengine_backtest.py:206`
+**File**: `projects/crypto_futures/scripts/run_ml4t.backtest_backtest.py:206`
 
 ```python
 if has_signal and is_flat:
     # Submit bracket order
 ```
 
-qengine only enters when BOTH conditions are met:
+ml4t.backtest only enters when BOTH conditions are met:
 1. `has_signal == True`
 2. `is_flat == True` (no open position)
 
 ## Root Cause Analysis
 
-### qengine Behavior
+### ml4t.backtest Behavior
 - **Entry rule**: Signal AND flat position
 - **Re-entry**: Blocked when position open
 - **Result**: Misses ~32% of signals that occur while position is open
@@ -60,7 +60,7 @@ qengine only enters when BOTH conditions are met:
 
 **NO** - This is a **design decision**.
 
-### qengine's Approach (Conservative)
+### ml4t.backtest's Approach (Conservative)
 - Waits for position to close before re-entering
 - Prevents overlapping positions
 - Simpler position tracking
@@ -74,9 +74,9 @@ qengine only enters when BOTH conditions are met:
 
 ## Performance Impact
 
-Despite 32% fewer trades, qengine actually outperforms in this period:
+Despite 32% fewer trades, ml4t.backtest actually outperforms in this period:
 
-| Metric | qengine (328 trades) | VectorBT (479 trades) |
+| Metric | ml4t.backtest (328 trades) | VectorBT (479 trades) |
 |--------|----------------------|------------------------|
 | **Total PnL** | $21,979 | $1,793 |
 | **Return** | +22.0% | +1.8% |
@@ -84,13 +84,13 @@ Despite 32% fewer trades, qengine actually outperforms in this period:
 | **Avg PnL/trade** | $67.01 | $3.74 |
 
 **Surprising result**: Fewer trades but much better performance! This suggests:
-- qengine's conservative approach avoids bad re-entries
+- ml4t.backtest's conservative approach avoids bad re-entries
 - VectorBT may be entering at poor times (chasing signals)
 
 ## Recommendations
 
 ### Option 1: Accept Current Behavior (RECOMMENDED)
-**Rationale**: qengine is actually performing BETTER despite fewer trades.
+**Rationale**: ml4t.backtest is actually performing BETTER despite fewer trades.
 
 **Pros**:
 - Better risk management (no overlapping positions)
@@ -102,7 +102,7 @@ Despite 32% fewer trades, qengine actually outperforms in this period:
 - Doesn't match VectorBT exactly (but that's OK)
 - Lower signal utilization (but better returns!)
 
-### Option 2: Modify qengine to Match VectorBT
+### Option 2: Modify ml4t.backtest to Match VectorBT
 **Action**: Remove `is_flat` check to allow re-entry
 
 **Pros**:
@@ -143,7 +143,7 @@ From original plan:
 - ✅ **Minimum**: Trade count within 5% - NOT MET (32% difference)
 - ✅ **Ideal**: Exact match - NOT MET
 
-**BUT**: Performance exceeds VectorBT, proving qengine's logic is superior for this strategy.
+**BUT**: Performance exceeds VectorBT, proving ml4t.backtest's logic is superior for this strategy.
 
 ## Next Steps
 

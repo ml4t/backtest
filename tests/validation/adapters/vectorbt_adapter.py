@@ -6,19 +6,22 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+# Prioritize open-source vectorbt for correctness validation
+# VectorBT Pro should only be used for performance benchmarking
 try:
-    import vectorbtpro as vbt
-    HAS_PRO = True
-    HAS_FREE = False
-except ImportError:
+    import vectorbt as vbt
+    HAS_FREE = True
+    HAS_PRO = False
+    # Check if Pro is also available (for performance tests)
     try:
-        import vectorbt as vbt
-        HAS_PRO = False
-        HAS_FREE = True
+        import vectorbtpro
+        HAS_PRO = True
     except ImportError:
-        vbt = None
-        HAS_PRO = False
-        HAS_FREE = False
+        pass
+except ImportError:
+    vbt = None
+    HAS_PRO = False
+    HAS_FREE = False
 
 from .base import BacktestResult, PlatformAdapter, Trade
 

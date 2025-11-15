@@ -1,18 +1,18 @@
 # Critical Issues Discovered from ml-strategies Integration
 
 **Date**: 2025-10-03
-**Source**: ml-strategies backtest validation (qengine vs vectorbt comparison)
+**Source**: ml-strategies backtest validation (ml4t.backtest vs vectorbt comparison)
 **Status**: 🔴 CRITICAL - Production-blocking issues
 
 ---
 
 ## Overview
 
-During validation of qengine against vectorbt on a real ML trading strategy, we discovered critical issues that make qengine unsafe for production use. While **signal generation is perfectly aligned**, the **position sizing and risk management** allows unlimited leverage, causing 57x worse returns than vectorbt on identical signals.
+During validation of ml4t.backtest against vectorbt on a real ML trading strategy, we discovered critical issues that make ml4t.backtest unsafe for production use. While **signal generation is perfectly aligned**, the **position sizing and risk management** allows unlimited leverage, causing 57x worse returns than vectorbt on identical signals.
 
 **Test Summary**:
 - Both engines: Same features, same signals (20% LONG, 20% SHORT, 60% FLAT)
-- qengine: -1,207% return (-$1.2M on $100K capital)
+- ml4t.backtest: -1,207% return (-$1.2M on $100K capital)
 - vectorbt: -21% return (-$21K on $100K capital)
 - Difference: **57x worse** due to unlimited leverage
 
@@ -32,7 +32,7 @@ The execution layer accepts orders without checking if there's sufficient capita
 
 Test case: ML strategy trading BTC futures with $100K initial capital.
 
-**qengine behavior**:
+**ml4t.backtest behavior**:
 ```python
 # Strategy submits: OrderEvent(side=BUY, quantity=1.0)
 # Broker executes: 1.0 BTC @ $115,000 = $115,000 notional
@@ -106,7 +106,7 @@ def process_order(self, order: OrderEvent):
 
 ### Proposed Fix
 
-**Location**: `src/qengine/execution/simulation_broker.py`
+**Location**: `src/ml4t.backtest/execution/simulation_broker.py`
 
 **Changes needed**:
 1. Add `max_leverage` parameter to broker config (default: 1.0, no leverage)
@@ -133,9 +133,9 @@ broker_config = SimulationBrokerConfig(
 
 ### Related Files
 
-- `src/qengine/execution/simulation_broker.py` - Order execution
-- `src/qengine/portfolio/portfolio.py` - Capital tracking
-- `src/qengine/core/config.py` - Configuration
+- `src/ml4t.backtest/execution/simulation_broker.py` - Order execution
+- `src/ml4t.backtest/portfolio/portfolio.py` - Capital tracking
+- `src/ml4t.backtest/core/config.py` - Configuration
 
 ---
 
@@ -486,8 +486,8 @@ def test_vectorbt_alignment():
 ### Validation Tests
 ```python
 # test_validation.py
-def test_qengine_vs_vectorbt_identical_signals():
-    """Given same signals, qengine and vectorbt produce similar results."""
+def test_ml4t.backtest_vs_vectorbt_identical_signals():
+    """Given same signals, ml4t.backtest and vectorbt produce similar results."""
     # Tolerance: Within 10% PnL difference
 ```
 
@@ -514,7 +514,7 @@ Before marking these issues as resolved:
 - ✅ Fill events contain actual quantities
 
 ### Validation Tests
-- ✅ qengine vs vectorbt alignment test passes
+- ✅ ml4t.backtest vs vectorbt alignment test passes
 - ✅ PnL difference < 10% on same signals
 - ✅ No unlimited leverage scenarios
 
@@ -528,9 +528,9 @@ Before marking these issues as resolved:
 ## References
 
 - **Source repository**: `/home/stefan/clients/wyden/long-short/development/ml-strategies`
-- **Validation script**: `scripts/validate_qengine_final.py`
-- **Alignment docs**: `.claude/memory/qengine_vectorbt_alignment.md`
-- **Summary**: `.claude/memory/qengine_alignment_summary.md`
+- **Validation script**: `scripts/validate_ml4t.backtest_final.py`
+- **Alignment docs**: `.claude/memory/ml4t.backtest_vectorbt_alignment.md`
+- **Summary**: `.claude/memory/ml4t.backtest_alignment_summary.md`
 
 ---
 

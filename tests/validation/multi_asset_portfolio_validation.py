@@ -14,8 +14,8 @@ import numpy as np
 import pandas as pd
 
 # Add paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(qengine_src))
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(ml4t.backtest_src))
 
 
 def load_wiki_universe(
@@ -180,7 +180,7 @@ def momentum_ranking_strategy(
     return signals, entries, exits
 
 
-def run_multi_asset_qengine(
+def run_multi_asset_ml4t.backtest(
     data: pd.DataFrame,
     signals: pd.DataFrame,
     entries: pd.DataFrame,
@@ -188,7 +188,7 @@ def run_multi_asset_qengine(
     tickers: list[str],
     initial_capital: float = 100000,
 ) -> dict[str, Any]:
-    """Run multi-asset backtest using QEngine approach."""
+    """Run multi-asset backtest using ml4t.backtest approach."""
     start_time = time.time()
 
     # Initialize portfolio
@@ -263,7 +263,7 @@ def run_multi_asset_qengine(
     max_dd = drawdown.min() * 100 if len(drawdown) > 0 else 0
 
     return {
-        "framework": "QEngine",
+        "framework": "ml4t.backtest",
         "final_value": final_value,
         "total_return": total_return,
         "num_trades": len(trades),
@@ -586,10 +586,10 @@ def main():
     except Exception as e:
         print(f"   ✗ Error: {e}")
 
-    # 2. Run QEngine
-    print("\n2. Running QEngine...")
+    # 2. Run ml4t.backtest
+    print("\n2. Running ml4t.backtest...")
     try:
-        qengine_result = run_multi_asset_qengine(
+        ml4t.backtest_result = run_multi_asset_ml4t.backtest(
             data,
             signals,
             entries,
@@ -597,11 +597,11 @@ def main():
             tickers,
             initial_capital,
         )
-        results.append(qengine_result)
+        results.append(ml4t.backtest_result)
         print(
-            f"   ✓ Final: ${qengine_result['final_value']:,.2f} | "
-            f"Return: {qengine_result['total_return']:.2f}% | "
-            f"Trades: {qengine_result['num_trades']}",
+            f"   ✓ Final: ${ml4t.backtest_result['final_value']:,.2f} | "
+            f"Return: {ml4t.backtest_result['total_return']:.2f}% | "
+            f"Trades: {ml4t.backtest_result['num_trades']}",
         )
     except Exception as e:
         print(f"   ✗ Error: {e}")

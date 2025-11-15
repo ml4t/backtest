@@ -1,6 +1,6 @@
 """Unit tests for VectorBT-compatible entry price logic.
 
-Tests verify that qengine's entry price calculation matches VectorBT Pro exactly:
+Tests verify that ml4t.backtest's entry price calculation matches VectorBT Pro exactly:
 1. Slippage applied FIRST to base price
 2. Size calculated using slippage-adjusted price
 3. Fees calculated on slippage-adjusted order value
@@ -18,12 +18,12 @@ tests_path = Path(__file__).parent.parent
 if str(tests_path) not in sys.path:
     sys.path.insert(0, str(tests_path))
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType
-from qengine.data.asset_registry import AssetRegistry, AssetSpec
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.fill_simulator import FillSimulator
-from qengine.execution.order import Order, OrderSide, OrderType
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType
+from ml4t.backtest.data.asset_registry import AssetRegistry, AssetSpec
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.fill_simulator import FillSimulator
+from ml4t.backtest.execution.order import Order, OrderSide, OrderType
 from validation.models import VectorBTCommission, VectorBTSlippage
 
 

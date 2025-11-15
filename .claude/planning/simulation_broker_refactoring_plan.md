@@ -77,7 +77,7 @@ SimulationBroker (Facade/Orchestrator)
 
 ### 1. PositionTracker ✅ COMPLETED
 
-**File**: `src/qengine/execution/position_tracker.py` (145 lines)
+**File**: `src/ml4t.backtest/execution/position_tracker.py` (145 lines)
 
 **Responsibilities**:
 - Track position quantities per asset
@@ -107,7 +107,7 @@ class PositionTracker:
 
 ### 2. OrderRouter ✅ COMPLETED
 
-**File**: `src/qengine/execution/order_router.py` (243 lines)
+**File**: `src/ml4t.backtest/execution/order_router.py` (243 lines)
 
 **Responsibilities**:
 - Route orders to appropriate queues (open, stop, trailing, bracket, pending)
@@ -142,7 +142,7 @@ class OrderRouter:
 
 ### 3. BracketOrderManager ✅ COMPLETED
 
-**File**: `src/qengine/execution/bracket_manager.py` (124 lines)
+**File**: `src/ml4t.backtest/execution/bracket_manager.py` (124 lines)
 
 **Responsibilities**:
 - Create stop-loss and take-profit legs after parent fill
@@ -168,7 +168,7 @@ class BracketOrderManager:
 
 ### 4. FillSimulator ❌ NOT YET CREATED - REQUIRES DETAILED DESIGN
 
-**File**: `src/qengine/execution/fill_simulator.py` (estimated 300-400 lines)
+**File**: `src/ml4t.backtest/execution/fill_simulator.py` (estimated 300-400 lines)
 
 **Responsibilities**:
 - Determine if order can fill at market price
@@ -510,9 +510,9 @@ Given the complexity of FillSimulator (195-line method with 9 responsibilities, 
 
 ## Files Created
 
-1. `src/qengine/execution/position_tracker.py` (145 lines)
-2. `src/qengine/execution/order_router.py` (243 lines)
-3. `src/qengine/execution/bracket_manager.py` (124 lines)
+1. `src/ml4t.backtest/execution/position_tracker.py` (145 lines)
+2. `src/ml4t.backtest/execution/order_router.py` (243 lines)
+3. `src/ml4t.backtest/execution/bracket_manager.py` (124 lines)
 4. `.claude/planning/simulation_broker_refactoring_plan.md` (this document)
 
 **Total New Code**: 512 lines across 3 focused components

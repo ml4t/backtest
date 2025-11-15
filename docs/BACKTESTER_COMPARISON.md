@@ -3,7 +3,7 @@
 ## Overview
 
 QuantLab includes integration with multiple established backtesting frameworks to:
-1. Validate our qengine implementation against industry standards
+1. Validate our ml4t.backtest implementation against industry standards
 2. Compare performance and results across different approaches
 3. Enable migration paths from existing systems
 4. Benchmark ML strategy performance
@@ -65,7 +65,7 @@ integration_tests/
 │   │   ├── mean_reversion.py      # Simple benchmark
 │   │   └── trend_following.py     # Classic momentum
 │   ├── adapters/
-│   │   ├── qengine_adapter.py     # Our engine
+│   │   ├── ml4t.backtest_adapter.py     # Our engine
 │   │   ├── vectorbt_adapter.py    # VectorBT wrapper
 │   │   ├── zipline_adapter.py     # Zipline wrapper
 │   │   └── backtrader_adapter.py  # Backtrader wrapper
@@ -90,7 +90,7 @@ strategy = MLStrategy(
 results = run_comparison(
     strategy=strategy,
     data=historical_data,
-    engines=['qengine', 'vectorbt', 'zipline', 'backtrader']
+    engines=['ml4t.backtest', 'vectorbt', 'zipline', 'backtrader']
 )
 
 # Compare results

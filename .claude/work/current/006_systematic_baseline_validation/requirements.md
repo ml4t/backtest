@@ -8,7 +8,7 @@
 
 ## Overview
 
-Implement a systematic 17-test validation suite comparing qengine execution against VectorBT Pro. Tests progress incrementally from baseline (no fees/slippage) through fees, slippage, order types, advanced features, and stress testing.
+Implement a systematic 17-test validation suite comparing ml4t.backtest execution against VectorBT Pro. Tests progress incrementally from baseline (no fees/slippage) through fees, slippage, order types, advanced features, and stress testing.
 
 **Current Status**: 2/17 tests passing (Tests 1.1 and 1.2)
 **Remaining**: 15 tests to implement
@@ -25,7 +25,7 @@ Implement a systematic 17-test validation suite comparing qengine execution agai
 ## Test Structure (6 Phases, 17 Tests)
 
 ### Phase 1: Baseline Execution (No Fees, No Slippage)
-**Goal**: Verify qengine matches VectorBT with zero transaction costs
+**Goal**: Verify ml4t.backtest matches VectorBT with zero transaction costs
 
 - ✅ **Test 1.1**: Entry signals only (PASSING)
 - ✅ **Test 1.2**: Entry/exit pairs (PASSING)
@@ -68,7 +68,7 @@ Implement a systematic 17-test validation suite comparing qengine execution agai
 ## Success Criteria
 
 For each test to pass:
-1. **Trade Count**: qengine matches VectorBT (± 1 trade tolerance)
+1. **Trade Count**: ml4t.backtest matches VectorBT (± 1 trade tolerance)
 2. **Final Value**: Within $10 (0.01% of $100K)
 3. **PnL**: Within $10
 4. **Prices**: Within 1 cent per trade
@@ -109,11 +109,11 @@ def test_X_Y_description():
     )
 
     # 4. Run backtests
-    qengine_result = QEngineWrapper().run_backtest(ohlcv, entries, exits, config)
+    ml4t.backtest_result = ml4t.backtestWrapper().run_backtest(ohlcv, entries, exits, config)
     vbt_result = VectorBTWrapper().run_backtest(ohlcv, entries, exits, config)
 
     # 5. Compare results
-    success = print_validation_report({'qengine': qengine_result, 'VectorBT': vbt_result})
+    success = print_validation_report({'ml4t.backtest': ml4t.backtest_result, 'VectorBT': vbt_result})
 
     # 6. Assert
     assert success, "Engines produced different results"
@@ -132,7 +132,7 @@ def test_X_Y_description():
 - **Status**: ✅ Fixed - Test 1.1 now passes
 
 ### Issue 3: Timestamp Recording (Cosmetic)
-- **Problem**: qengine open position trades show entry_time=None
+- **Problem**: ml4t.backtest open position trades show entry_time=None
 - **Impact**: Low (tests pass, only affects display)
 - **Status**: ⏳ Deferred (cosmetic issue)
 
@@ -147,7 +147,7 @@ def test_X_Y_description():
 - `tests/validation/common/` - Test infrastructure
   - `data_generator.py` - Synthetic OHLCV generation
   - `signal_generator.py` - Signal generation utilities
-  - `engine_wrappers.py` - QEngine and VectorBT wrappers
+  - `engine_wrappers.py` - ml4t.backtest and VectorBT wrappers
   - `comparison.py` - Result comparison tools
 
 ## Out of Scope

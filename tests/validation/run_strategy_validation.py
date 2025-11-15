@@ -18,9 +18,9 @@ from typing import Any
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from strategies.base_strategy import (
@@ -65,18 +65,18 @@ def load_test_data() -> pd.DataFrame:
     raise FileNotFoundError(f"Wiki data not found at {wiki_path}")
 
 
-def execute_with_qengine(
+def execute_with_ml4t.backtest(
     data: pd.DataFrame,
     signals: pd.DataFrame,
     initial_capital: float,
 ) -> BacktestResult:
-    """Execute signals using QEngine (manual implementation)."""
+    """Execute signals using ml4t.backtest (manual implementation)."""
     import time
 
     start_time = time.time()
 
     result = BacktestResult(
-        framework="QEngine",
+        framework="ml4t.backtest",
         strategy="PreCalculated",
         initial_capital=initial_capital,
         final_value=initial_capital,
@@ -439,9 +439,9 @@ def validate_strategy(
 
     results = []
 
-    # QEngine
-    print("   Running QEngine...")
-    qe_result = execute_with_qengine(data, signals, initial_capital)
+    # ml4t.backtest
+    print("   Running ml4t.backtest...")
+    qe_result = execute_with_ml4t.backtest(data, signals, initial_capital)
     results.append(qe_result)
     print(f"      Final value: ${qe_result.final_value:,.2f} | Trades: {qe_result.num_trades}")
 

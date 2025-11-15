@@ -1,8 +1,8 @@
-# Migration Guide to QEngine
+# Migration Guide to ml4t.backtest
 
 ## Philosophy
 
-QEngine does **not** provide drop-in compatibility with other frameworks. Instead, we offer:
+ml4t.backtest does **not** provide drop-in compatibility with other frameworks. Instead, we offer:
 - Clear migration patterns
 - Helper utilities for common tasks
 - Excellent documentation
@@ -10,7 +10,7 @@ QEngine does **not** provide drop-in compatibility with other frameworks. Instea
 
 ## Quick Comparison
 
-| Feature | Zipline | Backtrader | QEngine |
+| Feature | Zipline | Backtrader | ml4t.backtest |
 |---------|---------|------------|---------|
 | Strategy Method | `handle_data()` | `next()` | `on_event()` |
 | Data Access | `data.current()` | `self.data[0]` | `pit_data.get_latest()` |
@@ -46,7 +46,7 @@ def handle_data(context, data):
         order_target_percent(context.asset, 0.0)
 ```
 
-**QEngine:**
+**ml4t.backtest:**
 ```python
 class MovingAverageCrossover(Strategy):
     def on_start(self):
@@ -101,7 +101,7 @@ class SmaCross(bt.Strategy):
             self.close()
 ```
 
-**QEngine:**
+**ml4t.backtest:**
 ```python
 class SmaCross(Strategy):
     def __init__(self, period1: int = 50, period2: int = 200):
@@ -156,7 +156,7 @@ history = data.history(asset, 'close', 100, '1d')
 price = self.data.close[0]
 history = self.data.close.get(size=100)
 
-# QEngine
+# ml4t.backtest
 price = pit_data.get_latest_price(asset)
 history = pit_data.get_history(asset, 'close', 100, '1d')
 ```
@@ -172,7 +172,7 @@ order_target_value(asset, 10000)
 self.order_target_percent(target=0.5)
 self.order_target_value(target=10000)
 
-# QEngine
+# ml4t.backtest
 self.broker.target_position(asset, 0.5)
 self.broker.target_value(asset, 10000)
 ```
@@ -188,17 +188,17 @@ cash = context.portfolio.cash
 positions = self.broker.positions
 cash = self.broker.cash
 
-# QEngine
+# ml4t.backtest
 positions = self.broker.get_positions()
 cash = self.broker.get_cash()
 ```
 
 ## Migration Helpers
 
-QEngine provides utilities to ease migration:
+ml4t.backtest provides utilities to ease migration:
 
 ```python
-from qengine.migration import MigrationHelper
+from ml4t.backtest.migration import MigrationHelper
 
 # Convert common patterns
 helper = MigrationHelper()
@@ -221,7 +221,7 @@ sma = helper.wrap_backtrader_indicator(bt.indicators.SMA, period=50)
 - Document indicator dependencies
 - Note any custom logic
 
-### 2. Set Up QEngine Structure
+### 2. Set Up ml4t.backtest Structure
 ```python
 class YourStrategy(Strategy):
     def __init__(self, **params):
@@ -237,14 +237,14 @@ class YourStrategy(Strategy):
 ```
 
 ### 3. Port Indicators
-- Use built-in QEngine indicators where available
+- Use built-in ml4t.backtest indicators where available
 - Wrap existing indicators with helpers
 - Implement custom indicators as needed
 
 ### 4. Convert Order Logic
-- Map order types to QEngine equivalents
+- Map order types to ml4t.backtest equivalents
 - Update position sizing logic
-- Adjust for QEngine's broker interface
+- Adjust for ml4t.backtest's broker interface
 
 ### 5. Test Thoroughly
 - Start with simple test cases
@@ -280,7 +280,7 @@ class YourStrategy(Strategy):
 ### Resources
 - [API Documentation](../api/)
 - [Example Strategies](../../examples/)
-- [GitHub Discussions](https://github.com/quantlab/qengine/discussions)
+- [GitHub Discussions](https://github.com/quantlab/ml4t.backtest/discussions)
 - [Discord Community](#)
 
 ### Common Issues
@@ -302,10 +302,10 @@ class YourStrategy(Strategy):
 
 ## Conclusion
 
-Migration to QEngine requires some effort, but the benefits are substantial:
+Migration to ml4t.backtest requires some effort, but the benefits are substantial:
 - Better performance
 - Stronger correctness guarantees
 - Modern development experience
 - Active community and support
 
-Start with a simple strategy, get comfortable with the patterns, then migrate your complex strategies. The QEngine team and community are here to help!
+Start with a simple strategy, get comfortable with the patterns, then migrate your complex strategies. The ml4t.backtest team and community are here to help!

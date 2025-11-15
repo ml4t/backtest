@@ -31,10 +31,10 @@ exits.iloc[8] = True  # Sell both on day 8
 initial_capital = 10000
 
 print("=" * 60)
-print("QEngine Approach (Equal Dollar Allocation)")
+print("ml4t.backtest Approach (Equal Dollar Allocation)")
 print("=" * 60)
 
-# QEngine: Allocate $5000 to each stock
+# ml4t.backtest: Allocate $5000 to each stock
 cash = initial_capital
 positions = {}
 
@@ -59,7 +59,7 @@ for col in prices.columns:
 print(f"Final value: ${final_value:.2f}")
 print(f"Return: {(final_value / initial_capital - 1) * 100:.2f}%")
 
-qengine_final = final_value
+ml4t.backtest_final = final_value
 
 print("\n" + "=" * 60)
 print("VectorBT Approach 1: With Fixed Dollar Size")
@@ -145,16 +145,16 @@ print("\n" + "=" * 60)
 print("THE TRUTH")
 print("=" * 60)
 
-print(f"QEngine result: ${qengine_final:.2f}")
+print(f"ml4t.backtest result: ${ml4t.backtest_final:.2f}")
 print(f"VectorBT (correct sizing): ${vbt_final_1:.2f}")
 print(f"VectorBT (no sizing): ${vbt_final_2:.2f}")
 print(f"VectorBT (wrong sizing): ${vbt_final_3:.2f}")
 
 print("\n🔍 Analysis:")
-if abs(qengine_final - vbt_final_1) < 0.01:
-    print("✅ VectorBT with correct sizing matches QEngine")
+if abs(ml4t.backtest_final - vbt_final_1) < 0.01:
+    print("✅ VectorBT with correct sizing matches ml4t.backtest")
 else:
-    print(f"❌ Even with 'correct' sizing, differs by ${abs(qengine_final - vbt_final_1):.2f}")
+    print(f"❌ Even with 'correct' sizing, differs by ${abs(ml4t.backtest_final - vbt_final_1):.2f}")
 
 if vbt_final_2 != vbt_final_1:
     print("⚠️ Default VectorBT (no sizing) gives different results!")

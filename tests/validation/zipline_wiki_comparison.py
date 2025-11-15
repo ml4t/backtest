@@ -15,8 +15,8 @@ import pandas as pd
 
 # Add paths
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-qengine_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(qengine_src))
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(ml4t.backtest_src))
 sys.path.insert(0, str(Path(__file__).parent))
 
 
@@ -275,14 +275,14 @@ def extract_wiki_data_from_zipline(
     return df
 
 
-def run_qengine_on_wiki_data(
+def run_backtest_on_wiki_data(
     data: pd.DataFrame,
     fast_period: int = 20,
     slow_period: int = 50,
     initial_capital: float = 10000,
 ) -> dict[str, Any]:
     """
-    Run MA crossover on QEngine using Wiki data.
+    Run MA crossover on ml4t.backtest using Wiki data.
     """
     import time
 
@@ -347,7 +347,7 @@ def run_qengine_on_wiki_data(
     total_return = (final_value / initial_capital - 1) * 100
 
     return {
-        "framework": "QEngine",
+        "framework": "ml4t.backtest",
         "strategy": "MA_Crossover",
         "final_value": final_value,
         "total_return": total_return,
@@ -475,19 +475,19 @@ def compare_frameworks_on_wiki_data():
         print(f"   ✗ Error extracting data: {e}")
         return None
 
-    # 3. Run on QEngine
-    print("\n3. Running on QEngine (using extracted Wiki data)...")
+    # 3. Run on ml4t.backtest
+    print("\n3. Running on ml4t.backtest (using extracted Wiki data)...")
     try:
-        qengine_result = run_qengine_on_wiki_data(
+        ml4t.backtest_result = run_ml4t.backtest_on_wiki_data(
             wiki_data,
             fast_period=fast_period,
             slow_period=slow_period,
             initial_capital=initial_capital,
         )
-        results.append(qengine_result)
-        print(f"   ✓ Final Value: ${qengine_result['final_value']:,.2f}")
-        print(f"   ✓ Return: {qengine_result['total_return']:.2f}%")
-        print(f"   ✓ Trades: {qengine_result['num_trades']}")
+        results.append(ml4t.backtest_result)
+        print(f"   ✓ Final Value: ${ml4t.backtest_result['final_value']:,.2f}")
+        print(f"   ✓ Return: {ml4t.backtest_result['total_return']:.2f}%")
+        print(f"   ✓ Trades: {ml4t.backtest_result['num_trades']}")
     except Exception as e:
         print(f"   ✗ Error: {e}")
 

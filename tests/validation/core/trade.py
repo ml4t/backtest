@@ -17,13 +17,13 @@ class StandardTrade:
     """
     Platform-independent trade representation.
 
-    Every platform (qengine, VectorBT, Backtrader, Zipline) must
+    Every platform (ml4t.backtest, VectorBT, Backtrader, Zipline) must
     convert its native trade format to this standard for comparison.
     """
 
     # Identity
     trade_id: int                     # Sequential ID within platform
-    platform: str                     # 'qengine', 'vectorbt', 'backtrader', 'zipline'
+    platform: str                     # 'ml4t.backtest', 'vectorbt', 'backtrader', 'zipline'
 
     # Entry
     entry_timestamp: datetime         # When did we enter?

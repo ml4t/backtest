@@ -54,7 +54,7 @@ Made substantial progress on fixing tests broken by FillSimulator refactoring. S
 **Blocker Discovered**:
 Clock class not properly advancing through multi-feed events
 - Symptom: Only returns first event from each feed, then stops
-- Root cause: Logic bug in `src/qengine/core/clock.py` multi-feed event merging
+- Root cause: Logic bug in `src/ml4t.backtest/core/clock.py` multi-feed event merging
 - Impact: 6/7 tests blocked by this implementation bug
 - Estimated fix time: 1-1.5 hours of Clock.py debugging
 
@@ -222,7 +222,7 @@ Comparing with working `test_broker.py`:
 - Whether it's a heap queue issue, exhaustion check, or something else
 
 **Next Steps for Clock Debugging**:
-1. Read `src/qengine/core/clock.py` to understand multi-feed logic
+1. Read `src/ml4t.backtest/core/clock.py` to understand multi-feed logic
 2. Add debug logging to Clock.get_next_event()
 3. Run `test_single_feed` with verbose output
 4. Fix event advancement logic
@@ -261,7 +261,7 @@ uv run pytest tests/unit/test_slippage.py tests/unit/test_commission.py tests/un
 ```bash
 # Resume TASK-003 debugging
 # 1. Understand Clock implementation
-cat src/qengine/core/clock.py | grep -A 20 "def get_next_event"
+cat src/ml4t.backtest/core/clock.py | grep -A 20 "def get_next_event"
 
 # 2. Run failing test with debug output
 uv run pytest tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_single_feed -xvs
@@ -385,7 +385,7 @@ tests/unit/test_clock_multi_feed.py - MarketEvent + MockDataFeed fixes
 uv run pytest tests/unit/test_<filename>.py -v
 
 # Run with coverage
-uv run pytest tests/unit/ --cov=qengine --cov-report=term-missing
+uv run pytest tests/unit/ --cov=ml4t.backtest --cov-report=term-missing
 
 # Run single test with debug output
 uv run pytest tests/unit/<file>::<TestClass>::<test_name> -xvs
@@ -414,7 +414,7 @@ Option A (Recommended): Run /next to start TASK-002 (Broker Integration Tests)
 
 Option B (Alternative): Debug Clock.py multi-feed event merging
   - Investigate why Clock only returns first event from each feed
-  - Fix event advancement logic in src/qengine/core/clock.py
+  - Fix event advancement logic in src/ml4t.backtest/core/clock.py
   - Complete TASK-003 (6/7 tests still failing)
 
 Recommendation: Start with TASK-002 for immediate progress, tackle Clock debugging in separate focused session.
@@ -434,9 +434,9 @@ See handoff document for full context and investigation approaches.
 - `.claude/reference/TESTING_GUIDE.md` - Testing standards
 
 ### Important Code Locations
-- `src/qengine/execution/fill_simulator.py` - Recently extracted component
-- `src/qengine/execution/broker.py` - Broker orchestrator
-- `src/qengine/core/clock.py` - Clock implementation (needs debugging)
+- `src/ml4t.backtest/execution/fill_simulator.py` - Recently extracted component
+- `src/ml4t.backtest/execution/broker.py` - Broker orchestrator
+- `src/ml4t.backtest/core/clock.py` - Clock implementation (needs debugging)
 - `tests/unit/test_broker.py` - Working broker test patterns (reference)
 
 ### Previous Sessions

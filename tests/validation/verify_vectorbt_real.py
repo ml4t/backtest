@@ -96,9 +96,9 @@ print(f"Final value: ${float(final_value2):.2f}")
 print(f"Total return: {float(pf2.total_return()) * 100:.2f}%")
 print(f"Number of trades: {len(pf2.orders.records)}")
 
-# Test 3: The way QEngine does it (manual calculation)
+# Test 3: The way ml4t.backtest does it (manual calculation)
 print("\n" + "=" * 60)
-print("TEST 3: QEngine-style Manual Calculation")
+print("TEST 3: ml4t.backtest-style Manual Calculation")
 print("=" * 60)
 
 cash = 10000
@@ -126,13 +126,13 @@ for date in prices.index:
                 trades.append(("BUY", col, shares, current_prices[col]))
 
 # Final portfolio value
-final_value_qengine = cash
+final_value_ml4t.backtest = cash
 for col, shares in positions.items():
     if shares > 0:
-        final_value_qengine += shares * prices.iloc[-1][col]
+        final_value_ml4t.backtest += shares * prices.iloc[-1][col]
 
-print(f"Final value: ${final_value_qengine:.2f}")
-print(f"Return: {(final_value_qengine / 10000 - 1) * 100:.2f}%")
+print(f"Final value: ${final_value_ml4t.backtest:.2f}")
+print(f"Return: {(final_value_ml4t.backtest / 10000 - 1) * 100:.2f}%")
 print(f"Number of trades: {len(trades)}")
 
 # Compare results
@@ -142,10 +142,10 @@ print("=" * 60)
 
 print(f"Default VectorBT (wrong): ${final_values.mean():.2f} (mean of separate portfolios)")
 print(f"Grouped VectorBT (correct): ${float(final_value2):.2f}")
-print(f"QEngine-style manual: ${final_value_qengine:.2f}")
+print(f"ml4t.backtest-style manual: ${final_value_ml4t.backtest:.2f}")
 
-diff = abs(float(final_value2) - final_value_qengine)
-print(f"\nDifference between grouped VectorBT and QEngine: ${diff:.2f}")
+diff = abs(float(final_value2) - final_value_ml4t.backtest)
+print(f"\nDifference between grouped VectorBT and ml4t.backtest: ${diff:.2f}")
 
 if diff < 0.01:
     print("✅ Results match! VectorBT grouped mode works correctly.")

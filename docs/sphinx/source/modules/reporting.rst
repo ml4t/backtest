@@ -6,7 +6,7 @@ The reporting module handles backtest results and report generation.
 Base Reporter
 -------------
 
-.. automodule:: qengine.reporting.base
+.. automodule:: ml4t.backtest.reporting.base
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Base Reporter
 HTML Reporter
 -------------
 
-.. automodule:: qengine.reporting.html
+.. automodule:: ml4t.backtest.reporting.html
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ HTML Reporter
 Parquet Reporter
 ----------------
 
-.. automodule:: qengine.reporting.parquet
+.. automodule:: ml4t.backtest.reporting.parquet
    :members:
    :undoc-members:
    :show-inheritance:
@@ -30,7 +30,7 @@ Parquet Reporter
 Reporter
 --------
 
-.. automodule:: qengine.reporting.reporter
+.. automodule:: ml4t.backtest.reporting.reporter
    :members:
    :undoc-members:
    :show-inheritance:

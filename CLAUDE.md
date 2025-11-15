@@ -1,11 +1,14 @@
-# CLAUDE.md - QEngine Development Guidelines
+# CLAUDE.md - ml4t.backtest Development Guidelines
+
+## Project Understanding
+@.claude/PROJECT_MAP.md
 
 ## Context & Location
 
-**You are in**: `/home/stefan/ml4t/software/backtest/` (qengine library)
+**You are in**: `/home/stefan/ml4t/software/backtest/` (ml4t.backtest library)
 **Parent directory**: `/home/stefan/ml4t/software/` (multi-library coordination)
 **Sibling libraries**: `../data/`, `../features/`, `../evaluation/`
-**Integration projects**: `../projects/` (use qengine in workflows)
+**Integration projects**: `../projects/` (use ml4t.backtest in workflows)
 
 **Division of Labor**: See `../.claude/memory/division_of_labor.md` for when to work here vs parent directory.
 
@@ -14,17 +17,17 @@
 - Order types and execution logic
 - Position tracking and portfolio management
 - Broker simulation and fill models
-- Unit tests for qengine functionality
+- Unit tests for ml4t.backtest functionality
 - API improvements and documentation
 
 **Work in PARENT directory for**:
-- Multi-library workflows using qengine + others
+- Multi-library workflows using ml4t.backtest + others
 - Integration testing in `../projects/`
 - Validation studies (e.g., VectorBT exact matching)
 
 ## Vision & Goals
 
-QEngine provides an event-driven backtesting engine with institutional-grade execution fidelity.
+ml4t.backtest provides an event-driven backtesting engine with institutional-grade execution fidelity.
 
 **Core Mission**: Replicate real trading conditions with point-in-time correctness and realistic execution.
 
@@ -58,13 +61,13 @@ See `../projects/crypto_futures/` for validation work.
 
 ## Projects Awareness
 
-`../projects/` uses qengine for:
+`../projects/` uses ml4t.backtest for:
 - Strategy backtesting
 - VectorBT replication and validation
 - Execution fidelity testing
 - Performance benchmarking
 
-**Integration Work**: The VectorBT exact matching study (`../projects/crypto_futures/`) validates qengine produces identical results to VectorBT Pro.
+**Integration Work**: The VectorBT exact matching study (`../projects/crypto_futures/`) validates ml4t.backtest produces identical results to VectorBT Pro.
 
 Coordinate breaking changes through parent `.claude/`.
 

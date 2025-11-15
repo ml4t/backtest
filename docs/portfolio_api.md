@@ -1,6 +1,6 @@
 # Portfolio API Reference
 
-Complete reference for the QEngine Portfolio module.
+Complete reference for the ml4t.backtest Portfolio module.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Complete reference for the QEngine Portfolio module.
 ### Basic Usage
 
 ```python
-from qengine.portfolio import Portfolio
+from ml4t.backtest.portfolio import Portfolio
 
 # Create portfolio
 portfolio = Portfolio(initial_cash=100000.0, currency="USD")

@@ -1,4 +1,4 @@
-# Test Coverage Analysis - QEngine Backtest
+# Test Coverage Analysis - ml4t.backtest Backtest
 
 **Generated**: 2025-10-04
 **Overall Coverage**: **81%** (3751/724 statements)
@@ -248,7 +248,7 @@ Total:             ~343 tests
 ### Coverage Configuration
 ```toml
 [tool.coverage.run]
-source = ["src/qengine"]
+source = ["src/ml4t.backtest"]
 omit = [
     "*/tests/*",
     "*/__init__.py",

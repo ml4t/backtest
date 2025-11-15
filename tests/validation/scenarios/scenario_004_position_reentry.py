@@ -269,7 +269,7 @@ class Scenario004:
 
         # Must trade counts match?
         # Note: Different platforms may group trades differently
-        # qengine/backtrader/zipline: 3 trades (accumulation counts as 1 trade)
+        # ml4t.backtest/backtrader/zipline: 3 trades (accumulation counts as 1 trade)
         # VectorBT: May show 4-5 trades (each entry/exit separate)
         'trade_count_exact': False,  # Allow some variation
     }

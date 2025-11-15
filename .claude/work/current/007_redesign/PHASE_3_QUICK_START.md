@@ -30,7 +30,7 @@ Integration Tests:    0/2   passing (BROKEN) ❌ ← Fix first
 **Steps**:
 ```bash
 # 1. Create stub adapter
-touch src/qengine/strategy/spy_order_flow_adapter.py
+touch src/ml4t.backtest/strategy/spy_order_flow_adapter.py
 
 # 2. Copy template from crypto_basis_adapter.py
 # 3. Update comparison tests to use new Portfolio API
@@ -41,10 +41,10 @@ uv run python -m pytest tests/comparison/ tests/integration/ -v
 ```
 
 **Files to Create/Modify**:
-- `src/qengine/strategy/spy_order_flow_adapter.py` (NEW - stub)
+- `src/ml4t.backtest/strategy/spy_order_flow_adapter.py` (NEW - stub)
 - `tests/comparison/test_backtester_validation.py` (FIX imports)
 - `tests/comparison/test_baseline_evaluation.py` (FIX imports)
-- `tests/integration/test_strategy_qengine_comparison.py` (FIX imports)
+- `tests/integration/test_strategy_ml4t.backtest_comparison.py` (FIX imports)
 
 **Success**: No collection errors, tests can run
 
@@ -158,7 +158,7 @@ Integration Tests:    2/2   runnable      ✅ ← Fixed!
 ```
 
 ### Documented:
-- ✅ Comparison results (qengine vs VectorBT)
+- ✅ Comparison results (ml4t.backtest vs VectorBT)
 - ✅ 4 new validation tests passing
 - ✅ Clear plan for remaining 11 tests
 - ✅ Updated VALIDATION_ROADMAP.md
@@ -178,13 +178,13 @@ def test_X_Y_...():
 ### If Tests Fail Due to Tolerance
 ```python
 # Adjust tolerance in assertions
-assert abs(qengine_result.final_value - vbt_result.final_value) <= 20.0  # Looser
+assert abs(ml4t.backtest_result.final_value - vbt_result.final_value) <= 20.0  # Looser
 ```
 
 ### If Comparison Tests Still Break
 ```python
 # Document expected behavior in test docstring
-# Run qengine alone, document results
+# Run ml4t.backtest alone, document results
 # Mark as "TODO: Compare with VectorBT when available"
 ```
 

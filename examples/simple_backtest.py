@@ -1,4 +1,4 @@
-"""Simple backtest example demonstrating QEngine's basic functionality."""
+"""Simple backtest example demonstrating ml4t.backtest's basic functionality."""
 
 import logging
 from datetime import datetime
@@ -7,8 +7,8 @@ from pathlib import Path
 import polars as pl
 from ml4t_backtest import BacktestEngine
 
-from qengine.data.feed import ParquetDataFeed
-from qengine.strategy.base import Strategy
+from ml4t.backtest.data.feed import ParquetDataFeed
+from ml4t.backtest.strategy.base import Strategy
 
 # Configure logging
 logging.basicConfig(
@@ -35,7 +35,7 @@ class BuyAndHoldStrategy(Strategy):
 
     def on_event(self, event):
         """Handle events (uses fixed event routing)."""
-        from qengine.core.event import EventType
+        from ml4t.backtest.core.event import EventType
 
         # Only handle market events for our asset
         if event.event_type != EventType.MARKET or event.asset_id != self.asset_id:
@@ -50,8 +50,8 @@ class BuyAndHoldStrategy(Strategy):
 
             if shares > 0:
                 # Create market order
-                from qengine.core.event import OrderEvent
-                from qengine.core.types import OrderSide, OrderType
+                from ml4t.backtest.core.event import OrderEvent
+                from ml4t.backtest.core.types import OrderSide, OrderType
 
                 order = OrderEvent(
                     timestamp=event.timestamp,

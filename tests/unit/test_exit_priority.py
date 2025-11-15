@@ -1,6 +1,6 @@
 """Unit tests for VectorBT-compatible exit priority handling.
 
-Tests verify that qengine's Broker implements VectorBT's exit priority rule:
+Tests verify that ml4t.backtest's Broker implements VectorBT's exit priority rule:
     SL (Stop Loss) > TSL (Trailing Stop Loss) > TP (Take Profit)
 
 When multiple bracket exits trigger in the same bar, only the highest priority
@@ -9,8 +9,8 @@ exit should fill, and the others should be cancelled via OCO logic.
 
 import pytest
 
-from qengine.data.asset_registry import AssetRegistry
-from qengine.execution.broker import SimulationBroker
+from ml4t.backtest.data.asset_registry import AssetRegistry
+from ml4t.backtest.execution.broker import SimulationBroker
 
 
 class TestExitPriority:

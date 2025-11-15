@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 
 import pytest
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType, OrderSide, OrderType
-from qengine.execution.broker import SimulationBroker
-from qengine.execution.order import Order
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide, OrderType
+from ml4t.backtest.execution.broker import SimulationBroker
+from ml4t.backtest.execution.order import Order
 
 
 class TestLookaheadPrevention:
@@ -163,7 +163,7 @@ class TestLookaheadPrevention:
         broker = SimulationBroker(initial_cash=10000.0)
 
         # Establish position first (directly set position without affecting cash)
-        from qengine.portfolio.state import Position
+        from ml4t.backtest.portfolio.state import Position
         position = Position(asset_id="AAPL")
         position.add_shares(10.0, 150.0)
         broker._internal_portfolio.tracker.positions["AAPL"] = position

@@ -1,7 +1,7 @@
 """
 Debug Framework Discrepancy
 
-Investigate why QEngine and Backtrader produce different results
+Investigate why ml4t.backtest and Backtrader produce different results
 with identical data and strategy logic.
 """
 
@@ -11,9 +11,9 @@ from pathlib import Path
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 
 def load_test_data():
@@ -29,10 +29,10 @@ def load_test_data():
     return test_data
 
 
-def debug_qengine_signals(data):
-    """Debug QEngine signal generation step by step."""
+def debug_backtest_signals(data):
+    """Debug ml4t.backtest signal generation step by step."""
     print("=" * 60)
-    print("DEBUGGING QENGINE SIGNALS")
+    print("DEBUGGING ML4T.BACKTEST SIGNALS")
     print("=" * 60)
 
     data_copy = data.copy()
@@ -117,7 +117,7 @@ def debug_qengine_signals(data):
 
     final_value = cash + shares * data_copy["close"].iloc[-1]
 
-    print("\nQEngine Results:")
+    print("\nml4t.backtest Results:")
     print(f"  Signals detected: {len(signals_found)}")
     print(f"  Trades executed: {len(trades)}")
     print(f"  Final value: ${final_value:,.2f}")
@@ -257,7 +257,7 @@ def compare_signals(qe_signals, bt_signals):
     print("SIGNAL COMPARISON")
     print("=" * 60)
 
-    print(f"QEngine signals: {len(qe_signals)}")
+    print(f"ml4t.backtest signals: {len(qe_signals)}")
     print(f"Backtrader signals: {len(bt_signals)}")
 
     # Compare first few signals
@@ -307,7 +307,7 @@ def main():
     print(f"\nLoaded {len(data)} rows of AAPL data")
 
     # Debug both frameworks
-    qe_signals, qe_trades, qe_final = debug_qengine_signals(data)
+    qe_signals, qe_trades, qe_final = debug_ml4t.backtest_signals(data)
     bt_signals, bt_trades, bt_final = debug_backtrader_signals(data)
 
     # Compare results
@@ -316,10 +316,10 @@ def main():
     print("\n" + "=" * 60)
     print("FINAL COMPARISON")
     print("=" * 60)
-    print(f"QEngine final value: ${qe_final:,.2f}")
+    print(f"ml4t.backtest final value: ${qe_final:,.2f}")
     print(f"Backtrader final value: ${bt_final:,.2f}")
     print(f"Difference: ${abs(qe_final - bt_final):.2f}")
-    print(f"QEngine trades: {len(qe_trades)}")
+    print(f"ml4t.backtest trades: {len(qe_trades)}")
     print(f"Backtrader trades: {len(bt_trades)}")
 
 

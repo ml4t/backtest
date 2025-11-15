@@ -9,19 +9,19 @@ from pathlib import Path
 
 # Handle imports when run as script vs module
 try:
-    from .qengine import extract_qengine_trades
+    from .ml4t.backtest import extract_ml4t.backtest_trades
     from .vectorbt import extract_vectorbt_trades
     from .backtrader import extract_backtrader_trades
     from .zipline import extract_zipline_trades
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
-    from qengine import extract_qengine_trades
+    from ml4t.backtest import extract_ml4t.backtest_trades
     from vectorbt import extract_vectorbt_trades
     from backtrader import extract_backtrader_trades
     from zipline import extract_zipline_trades
 
 __all__ = [
-    'extract_qengine_trades',
+    'extract_ml4t.backtest_trades',
     'extract_vectorbt_trades',
     'extract_backtrader_trades',
     'extract_zipline_trades',

@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .base import BaseFrameworkAdapter, TradeRecord, ValidationResult
+from .base import BaseFrameworkAdapter, Signal, TradeRecord, ValidationResult
 
 
 class ZiplineAdapter(BaseFrameworkAdapter):
@@ -227,5 +227,149 @@ class ZiplineAdapter(BaseFrameworkAdapter):
             import traceback
             result.errors.append(error_msg)
             result.errors.append(traceback.format_exc())
+
+        return result
+
+    def run_with_signals(
+        self,
+        data: pd.DataFrame,
+        signals: list[Signal],
+        initial_capital: float = 10000,
+    ) -> ValidationResult:
+        """
+        Run backtest with pre-computed signals (pure execution validation).
+
+        Args:
+            data: OHLCV data with DatetimeIndex
+            signals: Pre-computed trading signals
+            initial_capital: Starting capital
+
+        Returns:
+            ValidationResult with performance metrics
+        """
+        result = ValidationResult(
+            framework=self.framework_name,
+            strategy="SignalBased",
+            initial_capital=initial_capital,
+        )
+
+        try:
+            from zipline import run_algorithm
+            from zipline.api import order_target_percent, record, set_commission, set_slippage, symbol
+            from zipline.finance import commission, slippage
+
+            tracemalloc.start()
+            start_time = time.time()
+
+            # Convert signals to date-indexed series for quick lookup
+            signal_dict = {}
+            for signal in signals:
+                date = signal["timestamp"].date()
+                if date not in signal_dict:
+                    signal_dict[date] = []
+                signal_dict[date].append(signal)
+
+            trades_list = []
+
+            def initialize(context):
+                context.asset = symbol('AAPL')
+                context.trades = []
+                context.signal_dict = signal_dict
+                context.target_position = 0.0  # Track intended position to handle async orders
+
+                # No fees/slippage for signal validation
+                set_commission(commission.PerShare(cost=0.0))
+                set_slippage(slippage.FixedSlippage(spread=0.0))
+
+            def handle_data(context, data):
+                current_date = data.current_dt.date()
+                current_price = data.current(context.asset, 'close')
+
+                # Check if we have signals for today
+                if current_date in context.signal_dict:
+                    for signal in context.signal_dict[current_date]:
+                        action = signal["action"]
+                        print(f"  [Zipline] {current_date}: Signal={action}, TargetPos={context.target_position}")
+
+                        if action == "BUY" and context.target_position == 0.0:
+                            # Enter long position
+                            order_target_percent(context.asset, 1.0)
+                            context.target_position = 1.0  # Mark that we intend to be long
+                            context.trades.append({
+                                'date': data.current_dt,
+                                'action': 'BUY',
+                                'price': current_price
+                            })
+                            print(f"    → BUY order placed")
+                        elif action == "SELL" and context.target_position > 0.0:
+                            # Exit position
+                            order_target_percent(context.asset, 0.0)
+                            context.target_position = 0.0  # Mark that we intend to be flat
+                            context.trades.append({
+                                'date': data.current_dt,
+                                'action': 'SELL',
+                                'price': current_price
+                            })
+                            print(f"    → SELL order placed")
+                        else:
+                            print(f"    → SKIPPED (wrong state)")
+
+                record(price=current_price)
+
+            def analyze(context, perf):
+                nonlocal trades_list
+                trades_list = context.trades
+
+                # Debug: Print actual fills
+                print(f"  [Zipline Debug] Trades executed: {len(trades_list)}")
+                for i, trade in enumerate(trades_list):
+                    print(f"    {i+1}. {trade['date'].date()} {trade['action']} @ ${trade['price']:.2f}")
+
+            # Determine date range
+            start_date = data.index[0].tz_localize(None) if data.index.tz else data.index[0]
+            end_date = data.index[-1].tz_localize(None) if data.index.tz else data.index[-1]
+
+            print(f"Zipline signal-based: {len(signals)} signals from {start_date} to {end_date}")
+
+            # Run algorithm
+            perf = run_algorithm(
+                start=start_date,
+                end=end_date,
+                initialize=initialize,
+                handle_data=handle_data,
+                analyze=analyze,
+                capital_base=initial_capital,
+                bundle='quandl'
+            )
+
+            # Extract results
+            result.final_value = perf['portfolio_value'].iloc[-1]
+            result.total_return = (result.final_value / initial_capital - 1) * 100
+            # Count round trips (pairs of buy/sell), not individual orders
+            result.num_trades = len(trades_list) // 2
+
+            # Performance tracking
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            result.execution_time = time.time() - start_time
+            result.memory_usage = peak / 1024 / 1024
+
+            print("✓ Zipline signal-based backtest completed")
+            print(f"  Signals Processed: {len(signals)}")
+            print(f"  Final Value: ${result.final_value:,.2f}")
+            print(f"  Total Return: {result.total_return:.2f}%")
+            print(f"  Total Trades: {result.num_trades}")
+
+        except ImportError as e:
+            error_msg = f"Zipline not available: {e}"
+            print(f"⚠ {error_msg}")
+            result.errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"Zipline signal-based backtest failed: {e}"
+            print(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            result.errors.append(error_msg)
 
         return result

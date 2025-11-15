@@ -2,7 +2,7 @@
 Zipline Implementation with Wiki Prices Data
 
 This creates a custom Zipline bundle using the Wiki Prices data from projects/daily_us_equities/
-to enable proper comparison with QEngine and Backtrader.
+to enable proper comparison with ml4t.backtest and Backtrader.
 """
 
 import os
@@ -16,9 +16,9 @@ from pathlib import Path
 import pandas as pd
 
 # Project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 # Try importing Zipline
 try:

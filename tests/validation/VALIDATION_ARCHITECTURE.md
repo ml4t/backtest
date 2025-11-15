@@ -2,7 +2,7 @@
 
 ## Goal
 
-Validate that qengine can replicate backtesting results from VectorBT Pro, Backtrader, and Zipline through controlled, transparent scenarios.
+Validate that ml4t.backtest can replicate backtesting results from VectorBT Pro, Backtrader, and Zipline through controlled, transparent scenarios.
 
 **Focus**: Trading mechanics, NOT strategy logic
 - Order execution (market, limit, stop)
@@ -58,7 +58,7 @@ tests/validation/
 │       └── ...
 │
 ├── platforms/              # Platform adapters
-│   ├── qengine_adapter.py
+│   ├── ml4t.backtest_adapter.py
 │   ├── vectorbt_adapter.py
 │   ├── backtrader_adapter.py
 │   └── zipline_adapter.py
@@ -244,14 +244,14 @@ class ScenarioComparison:
 
 Test each scenario with different platform configurations:
 
-| Config | VectorBT | Backtrader | Zipline | qengine |
+| Config | VectorBT | Backtrader | Zipline | ml4t.backtest |
 |--------|----------|------------|---------|---------|
 | Exec timing | same_bar | next_bar | next_bar | configurable |
 | Price used | close | open | open | configurable |
 | Slippage model | fixed_pct | fixed_pct | volume-based | configurable |
 | Partial fills | no | yes | yes | yes |
 
-**Goal**: Document configuration that makes qengine match each platform.
+**Goal**: Document configuration that makes ml4t.backtest match each platform.
 
 ## Output Format
 
@@ -270,7 +270,7 @@ Results:
 ┌────────────┬────────┬───────────────┬──────────┬────────────┐
 │ Platform   │ Trades │ Total PnL     │ Timing   │ Price Used │
 ├────────────┼────────┼───────────────┼──────────┼────────────┤
-│ qengine    │ 2      │ $1,234.56     │ next_bar │ open       │
+│ ml4t.backtest    │ 2      │ $1,234.56     │ next_bar │ open       │
 │ VectorBT   │ 2      │ $1,235.10     │ same_bar │ close      │
 │ Backtrader │ 2      │ $1,234.50     │ next_bar │ open       │
 │ Zipline    │ 2      │ $1,234.60     │ next_bar │ open       │
@@ -279,13 +279,13 @@ Results:
 Match Analysis:
 ✅ Trade count: All platforms agree (2 trades)
 ⚠️  PnL difference: $0.54 (0.04%) - Within tolerance
-✅ Execution timing: qengine matches Backtrader and Zipline
+✅ Execution timing: ml4t.backtest matches Backtrader and Zipline
 ❌ VectorBT uses different timing (same-bar execution)
 
 Recommendation:
-- qengine behavior validated against Backtrader/Zipline
+- ml4t.backtest behavior validated against Backtrader/Zipline
 - VectorBT difference explained: same-bar vs next-bar execution
-- Configure qengine with same_bar_execution=True to match VectorBT
+- Configure ml4t.backtest with same_bar_execution=True to match VectorBT
 ```
 
 ### Trade-by-Trade Comparison
@@ -294,19 +294,19 @@ Trade 1: Entry 2020-02-03, Exit 2020-04-15
 ──────────────────────────────────────────
 
 Entry:
-  qengine    : 2020-02-04 open  $73.50
+  ml4t.backtest    : 2020-02-04 open  $73.50
   VectorBT   : 2020-02-03 close $73.85  [diff: $0.35]
   Backtrader : 2020-02-04 open  $73.50  [MATCH]
   Zipline    : 2020-02-04 open  $73.50  [MATCH]
 
 Exit:
-  qengine    : 2020-04-16 open  $71.10
+  ml4t.backtest    : 2020-04-16 open  $71.10
   VectorBT   : 2020-04-15 close $71.35  [diff: $0.25]
   Backtrader : 2020-04-16 open  $71.10  [MATCH]
   Zipline    : 2020-04-16 open  $71.10  [MATCH]
 
 PnL:
-  qengine    : -$240.00
+  ml4t.backtest    : -$240.00
   VectorBT   : -$250.00  [diff: $10.00]
   Backtrader : -$240.00  [MATCH]
   Zipline    : -$242.00  [diff: $2.00, commission calculation]
@@ -336,11 +336,11 @@ For every difference found:
 
 Example:
 ```
-DIFFERENCE: qengine vs VectorBT entry timing
+DIFFERENCE: ml4t.backtest vs VectorBT entry timing
 
-What: qengine enters at next bar open, VectorBT at signal bar close
+What: ml4t.backtest enters at next bar open, VectorBT at signal bar close
 Why: Event-driven vs vectorized execution model
-How: Set qengine.config.execution_timing = 'same_bar'
+How: Set ml4t.backtest.config.execution_timing = 'same_bar'
 Decision: Offer both modes, default to 'next_bar' (more realistic)
 ```
 
@@ -349,12 +349,12 @@ Decision: Offer both modes, default to 'next_bar' (more realistic)
 **Week 1**: Foundation
 - Clean up existing test/validation/ structure
 - Implement Scenario 001-003 (market, limit, stop)
-- Get qengine, VectorBT, Backtrader working in parallel
+- Get ml4t.backtest, VectorBT, Backtrader working in parallel
 
 **Week 2**: Order types
 - Implement Scenario 004-005 (brackets, trailing stops)
 - Document execution differences
-- Add configuration options to qengine
+- Add configuration options to ml4t.backtest
 
 **Week 3**: Edge cases & multi-asset
 - Implement Scenario 006-013
@@ -368,4 +368,4 @@ Decision: Offer both modes, default to 'next_bar' (more realistic)
 
 ---
 
-**Philosophy**: We're not trying to match VectorBT exactly. We're validating that qengine's trading mechanics are correct and transparent, with clear documentation of design choices.
+**Philosophy**: We're not trying to match VectorBT exactly. We're validating that ml4t.backtest's trading mechanics are correct and transparent, with clear documentation of design choices.

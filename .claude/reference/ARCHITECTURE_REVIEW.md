@@ -9,7 +9,7 @@ principles.
 
 **Verdict: A+**. This is a state-of-the-art design that correctly identifies and solves the core challenges of modern,
 ML-driven backtesting. The "Polars-first" architecture, combined with a rigorous event-driven core and a clear focus on
-point-in-time correctness, positions QEngine to be a best-in-class solution. The implementation plan is ambitious but
+point-in-time correctness, positions ml4t.backtest to be a best-in-class solution. The implementation plan is ambitious but
 well-structured and pragmatic.
 
 This review will highlight the key strengths and identify a few areas where further clarification would strengthen the
@@ -121,5 +121,5 @@ technology choices are superb, and the implementation roadmap is pragmatic.
 
 **My recommendation is to proceed with this plan with high confidence.** The key will be to remain disciplined in
 executing the phased rollout and to pay special attention to the implementation details of the PIT enforcement and state
-management systems. If executed well, QEngine has the potential to become the new standard for Python-based quantitative
+management systems. If executed well, ml4t.backtest has the potential to become the new standard for Python-based quantitative
 backtesting.

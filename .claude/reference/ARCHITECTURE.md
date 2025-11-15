@@ -1,14 +1,14 @@
-# QEngine Architecture
+# ml4t.backtest Architecture
 
 ## Overview
 
-QEngine is a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. This document describes the internal architecture, design patterns, and implementation details specific to QEngine's simulation capabilities.
+ml4t.backtest is a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. This document describes the internal architecture, design patterns, and implementation details specific to ml4t.backtest's simulation capabilities.
 
 ## Core Architecture
 
 ### Event-Driven Design
 
-QEngine follows a pure event-driven architecture for realistic market simulation:
+ml4t.backtest follows a pure event-driven architecture for realistic market simulation:
 
 ```mermaid
 graph LR
@@ -24,7 +24,7 @@ graph LR
 ### Module Organization
 
 ```
-qengine/
+ml4t.backtest/
 ├── core/               # Core infrastructure
 │   ├── clock.py        # Master time controller
 │   ├── event_bus.py    # Event routing system
@@ -157,7 +157,7 @@ class Clock:
 
 ### Irregular Timestamps Support
 
-QEngine's event-driven architecture natively supports irregular timestamps, enabling backtesting on:
+ml4t.backtest's event-driven architecture natively supports irregular timestamps, enabling backtesting on:
 
 - **Volume Bars**: Events triggered by share volume thresholds
 - **Dollar Bars**: Events triggered by dollar volume thresholds
@@ -318,7 +318,7 @@ class MLStrategy(Strategy):
 
 ### Advanced Order Types
 
-QEngine supports sophisticated order types for realistic simulation:
+ml4t.backtest supports sophisticated order types for realistic simulation:
 
 ```python
 class OrderType(Enum):

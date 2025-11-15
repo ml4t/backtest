@@ -195,12 +195,12 @@ def generate_summary_report(matches: List[TradeMatch]) -> str:
 
     # Platform coverage
     lines.append("Platform Coverage:")
-    platforms = ['qengine', 'vectorbt', 'backtrader', 'zipline']
+    platforms = ['ml4t.backtest', 'vectorbt', 'backtrader', 'zipline']
     platform_counts = {p: 0 for p in platforms}
 
     for match in matches:
-        if match.qengine_trade:
-            platform_counts['qengine'] += 1
+        if match.ml4t.backtest_trade:
+            platform_counts['ml4t.backtest'] += 1
         if match.vectorbt_trade:
             platform_counts['vectorbt'] += 1
         if match.backtrader_trade:

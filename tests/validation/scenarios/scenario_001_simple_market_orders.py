@@ -198,7 +198,7 @@ class Scenario001:
         """
         Calculate expected PnL if using next bar open prices.
 
-        This is what we expect qengine to produce.
+        This is what we expect ml4t.backtest to produce.
         """
         df = Scenario001.get_data()
 

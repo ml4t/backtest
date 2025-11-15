@@ -52,8 +52,8 @@ def test_diagnostic_with_logging():
         if bar < len(entries):
             print(f"     Bar {bar}: entry={entries.iloc[bar]}, exit={exits.iloc[bar]}")
 
-    # 3. Run qengine WITH FEES and logging
-    print("\n3️⃣  Running qengine with detailed logging...")
+    # 3. Run ml4t.backtest WITH FEES and logging
+    print("\n3️⃣  Running ml4t.backtest with detailed logging...")
     config = BacktestConfig(
         initial_cash=100000.0,
         fees=0.001,  # 0.1%
@@ -61,14 +61,14 @@ def test_diagnostic_with_logging():
         order_type='market',
     )
 
-    # Import qengine components
-    from qengine.engine import BacktestEngine
-    from qengine.core.event import MarketEvent
-    from qengine.execution.broker import SimulationBroker
-    from qengine.execution.commission import PercentageCommission
-    from qengine.data.feed import DataFeed
-    from qengine.strategy.base import Strategy
-    from qengine.core.types import MarketDataType
+    # Import ml4t.backtest components
+    from ml4t.backtest.engine import BacktestEngine
+    from ml4t.backtest.core.event import MarketEvent
+    from ml4t.backtest.execution.broker import SimulationBroker
+    from ml4t.backtest.execution.commission import PercentageCommission
+    from ml4t.backtest.data.feed import DataFeed
+    from ml4t.backtest.strategy.base import Strategy
+    from ml4t.backtest.core.types import MarketDataType
 
     # Create custom strategy with logging
     class LoggingSignalStrategy(Strategy):
@@ -87,7 +87,7 @@ def test_diagnostic_with_logging():
             self.event_bus = event_bus
 
         def on_event(self, event):
-            from qengine.core.event import FillEvent
+            from ml4t.backtest.core.event import FillEvent
 
             if isinstance(event, MarketEvent):
                 self.on_market_event(event)
@@ -95,8 +95,8 @@ def test_diagnostic_with_logging():
                 super().on_fill_event(event)
 
         def on_market_event(self, event: MarketEvent):
-            from qengine.core.event import OrderEvent
-            from qengine.core.types import OrderSide, OrderType
+            from ml4t.backtest.core.event import OrderEvent
+            from ml4t.backtest.core.types import OrderSide, OrderType
 
             # Get signal for this bar
             entry_signal = self.entries.iloc[self.bar_idx] if self.bar_idx < len(self.entries) else False

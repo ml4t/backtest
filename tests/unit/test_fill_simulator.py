@@ -4,12 +4,12 @@ from datetime import datetime
 
 import pytest
 
-from qengine.core.constants import MIN_FILL_SIZE
-from qengine.core.types import OrderSide, OrderType
-from qengine.data.asset_registry import AssetRegistry
-from qengine.execution.commission import PercentageCommission
-from qengine.execution.fill_simulator import FillResult, FillSimulator
-from qengine.execution.order import Order, OrderState
+from ml4t.backtest.core.constants import MIN_FILL_SIZE
+from ml4t.backtest.core.types import OrderSide, OrderType
+from ml4t.backtest.data.asset_registry import AssetRegistry
+from ml4t.backtest.execution.commission import PercentageCommission
+from ml4t.backtest.execution.fill_simulator import FillResult, FillSimulator
+from ml4t.backtest.execution.order import Order, OrderState
 
 
 class TestFillSimulator:
@@ -749,7 +749,7 @@ class TestFillSimulator:
         margin_account.check_margin_requirement.return_value = (True, 1000.0)
 
         # Create asset spec that requires margin
-        from qengine.core.assets import AssetClass, AssetSpec, ContractType
+        from ml4t.backtest.core.assets import AssetClass, AssetSpec, ContractType
 
         future_spec = AssetSpec(
             asset_id="ES",
@@ -792,7 +792,7 @@ class TestFillSimulator:
         margin_account.available_margin = 0.0
 
         # Create asset spec that requires margin
-        from qengine.core.assets import AssetClass, AssetSpec, ContractType
+        from ml4t.backtest.core.assets import AssetClass, AssetSpec, ContractType
 
         future_spec = AssetSpec(
             asset_id="ES",

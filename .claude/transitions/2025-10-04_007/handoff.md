@@ -8,7 +8,7 @@ Successfully completed comprehensive test suite fixes - resolved all originally 
 
 **Status**: ✅ COMPLETED - All test fixes complete, no active work unit
 
-The session focused on systematic test failure resolution across the qengine backtest framework:
+The session focused on systematic test failure resolution across the ml4t.backtest backtest framework:
 - Fixed Clock implementation bugs (3 bugs)
 - Resolved corporate action timing issue
 - Fixed data loading column mismatches
@@ -30,8 +30,8 @@ The session focused on systematic test failure resolution across the qengine bac
 - **Branch**: main (clean, no conflicts)
 
 ### Key Files Modified
-1. `src/qengine/core/clock.py` - Fixed logger, calendar checks, trading_sessions
-2. `src/qengine/engine.py` - Moved corporate action processing after fills
+1. `src/ml4t.backtest/core/clock.py` - Fixed logger, calendar checks, trading_sessions
+2. `src/ml4t.backtest/engine.py` - Moved corporate action processing after fills
 3. `tests/unit/test_clock_multi_feed.py` - Enabled tests, updated assertions
 4. `tests/comparison/test_baseline_evaluation.py` - Fixed SPY data columns
 5. `tests/validation/test_pytest_integration.py` - Fixed edge cases
@@ -119,7 +119,7 @@ uv run pytest tests/unit/test_clock_multi_feed.py -v
 uv run pytest tests/integration/test_corporate_action_integration.py -v
 
 # With coverage
-uv run pytest tests/ --cov=src/qengine --cov-report=term-missing
+uv run pytest tests/ --cov=src/ml4t.backtest --cov-report=term-missing
 ```
 
 ### Debug Findings
@@ -136,8 +136,8 @@ uv run pytest tests/ --cov=src/qengine --cov-report=term-missing
 ## Files to Review
 
 ### Core Changes
-- `src/qengine/core/clock.py:53-54, 291-293, 70-79, 333` - Bug fixes
-- `src/qengine/engine.py:186-251` - Corporate action reordering
+- `src/ml4t.backtest/core/clock.py:53-54, 291-293, 70-79, 333` - Bug fixes
+- `src/ml4t.backtest/engine.py:186-251` - Corporate action reordering
 
 ### Test Updates
 - `tests/unit/test_clock_multi_feed.py:48-55, 84-91` - Assertions and skips
@@ -147,7 +147,7 @@ uv run pytest tests/ --cov=src/qengine --cov-report=term-missing
 
 ## Environment
 
-- **Project**: ml4t/backtest (QEngine)
+- **Project**: ml4t/backtest (ml4t.backtest)
 - **Python**: 3.13 (via uv)
 - **Test framework**: pytest with coverage plugin
 - **Framework**: Claude Code v3.1

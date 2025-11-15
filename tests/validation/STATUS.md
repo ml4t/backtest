@@ -9,7 +9,7 @@
 ## 🎉 Major Milestones
 
 ### ✅ Phase 1 Complete: All Platforms Working (100%)
-- All 4 platforms (qengine, VectorBT, Backtrader, Zipline) validated
+- All 4 platforms (ml4t.backtest, VectorBT, Backtrader, Zipline) validated
 - Comprehensive documentation created (6,000+ lines)
 - Execution models documented and tested
 
@@ -78,7 +78,7 @@ All 4 platforms validated with real AAPL 2017 market data:
 
 | Platform   | Type          | Execution Model   | Status | Test Time |
 |------------|---------------|-------------------|--------|-----------|
-| qengine    | Event-driven  | Next-bar close    | ✅ OK   | ~0.3s     |
+| ml4t.backtest    | Event-driven  | Next-bar close    | ✅ OK   | ~0.3s     |
 | VectorBT   | Vectorized    | Same-bar close    | ✅ OK   | ~1.6s     |
 | Backtrader | Event-driven  | Next-bar open     | ✅ OK   | ~0.5s     |
 | Zipline    | Event-driven  | Next-bar close    | ✅ OK   | ~0.9s     |
@@ -131,7 +131,7 @@ Comprehensive documentation ensures you never need to re-research:
 
 ### 2. Execution Model Validation
 - **VectorBT**: Same-bar close (signal T → entry T close)
-- **QEngine**: Next-bar close (signal T → entry T+1 close)
+- **ml4t.backtest**: Next-bar close (signal T → entry T+1 close)
 - **Backtrader**: Next-bar open (signal T → entry T+1 open)
 - **Zipline**: Next-bar close (signal T → entry T+1 close, configurable)
 
@@ -161,7 +161,7 @@ All execution timing differences documented and validated!
 
 ### Platform-Specific Quirks
 - **VectorBT**: Same-bar execution (most optimistic), `stop_loss` parameter exists but not uniformly supported
-- **QEngine**: Next-bar close execution (realistic)
+- **ml4t.backtest**: Next-bar close execution (realistic)
 - **Backtrader**: Next-bar open execution (most realistic for market orders), dual timezone dict lookups needed
 - **Zipline**: Next-bar close execution, per-share commissions (not percentage)
 
@@ -272,7 +272,7 @@ uv run python -m pytest -v
 uv run python -m pytest test_scenario_005_multi_asset.py -v
 
 # Run scenario with all platforms
-uv run python runner.py --scenario 005 --platforms qengine,vectorbt,backtrader,zipline --report summary
+uv run python runner.py --scenario 005 --platforms ml4t.backtest,vectorbt,backtrader,zipline --report summary
 
 # Fast tests only (skip slow Zipline bundle tests)
 uv run python -m pytest test_fixtures_market_data.py -v -m "not slow"
@@ -326,7 +326,7 @@ uv run python -m pytest test_fixtures_market_data.py -v -m "not slow"
 **Major accomplishment**: Production-ready validation framework with 5 scenarios across 4 platforms!
 
 **What works**:
-- ✅ All 4 platforms validated (qengine, VectorBT, Backtrader, Zipline)
+- ✅ All 4 platforms validated (ml4t.backtest, VectorBT, Backtrader, Zipline)
 - ✅ Trade-by-trade comparison (never compare just aggregates)
 - ✅ 5 Tier 1 scenarios (market, limit, stop, position re-entry, multi-asset)
 - ✅ 70 tests (100% passing)
@@ -350,4 +350,4 @@ uv run python -m pytest test_fixtures_market_data.py -v -m "not slow"
 **Framework Version**: 1.0
 **Last Updated**: 2025-11-04 23:30 UTC
 **Status**: Production-Ready (85% complete, Phase 3 ✅)
-**Maintainer**: QEngine Validation Team
+**Maintainer**: ml4t.backtest Validation Team

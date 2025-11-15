@@ -1,6 +1,6 @@
 """
-Test VectorBT Pro vs QEngine with multi-asset portfolio
-Validates that VectorBT Pro produces same results as standard VectorBT and QEngine
+Test VectorBT Pro vs ml4t.backtest with multi-asset portfolio
+Validates that VectorBT Pro produces same results as standard VectorBT and ml4t.backtest
 """
 
 import sys
@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 import vectorbtpro as vbt
 
-# Add QEngine to path
-qengine_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(qengine_src))
+# Add ml4t.backtest to path
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(ml4t.backtest_src))
 
 print("=" * 70)
 print("VECTORBT PRO VALIDATION")
@@ -64,9 +64,9 @@ print()
 initial_capital = 100000
 position_size = initial_capital / 5  # Max 5 positions
 
-# METHOD 1: QEngine Manual
+# METHOD 1: ml4t.backtest Manual
 print("=" * 50)
-print("METHOD 1: QEngine Manual Calculation")
+print("METHOD 1: ml4t.backtest Manual Calculation")
 print("=" * 50)
 
 cash = initial_capital
@@ -92,13 +92,13 @@ for date in dates:
             trades += 1
 
 # Final value
-qengine_final = cash
+ml4t.backtest_final = cash
 for col, shares in positions.items():
     if shares > 0:
-        qengine_final += shares * prices.iloc[-1][col]
+        ml4t.backtest_final += shares * prices.iloc[-1][col]
 
-print(f"Final value: ${qengine_final:,.2f}")
-print(f"Return: {(qengine_final / initial_capital - 1) * 100:.2f}%")
+print(f"Final value: ${ml4t.backtest_final:,.2f}")
+print(f"Return: {(ml4t.backtest_final / initial_capital - 1) * 100:.2f}%")
 print(f"Trades: {trades}")
 
 # METHOD 2: VectorBT Pro
@@ -212,15 +212,15 @@ print("\n" + "=" * 70)
 print("FINAL COMPARISON")
 print("=" * 70)
 
-diff = abs(qengine_final - vbt_final)
-diff_pct = diff / qengine_final * 100 if qengine_final > 0 else 0
+diff = abs(ml4t.backtest_final - vbt_final)
+diff_pct = diff / ml4t.backtest_final * 100 if ml4t.backtest_final > 0 else 0
 
-print(f"QEngine Manual:   ${qengine_final:,.2f}")
+print(f"ml4t.backtest Manual:   ${ml4t.backtest_final:,.2f}")
 print(f"VectorBT Pro:     ${vbt_final:,.2f}")
 print(f"Difference:       ${diff:.2f} ({diff_pct:.4f}%)")
 
 if diff < 0.01:
-    print("\n✅ PERFECT MATCH! VectorBT Pro matches QEngine exactly!")
+    print("\n✅ PERFECT MATCH! VectorBT Pro matches ml4t.backtest exactly!")
 elif diff < 1.0:
     print("\n✅ NEAR-PERFECT MATCH! Tiny rounding differences only.")
 elif diff < 100:

@@ -1,11 +1,11 @@
-# QEngine Project Guidelines
+# ml4t.backtest Project Guidelines
 
 ## Repository Organization
 
 ### Directory Structure
 
 ```
-qengine/
+ml4t.backtest/
 ├── .claude/              # Claude AI planning and reference docs
 │   ├── planning/         # Implementation plans, roadmaps
 │   ├── reference/        # Design reviews, decisions
@@ -15,7 +15,7 @@ qengine/
 │   ├── guides/          # How-to guides
 │   └── api/             # API reference
 ├── src/                 # Source code
-│   └── qengine/
+│   └── ml4t.backtest/
 ├── tests/               # Test suite
 ├── examples/            # Example strategies
 ├── benchmarks/          # Performance benchmarks
@@ -122,7 +122,7 @@ import numpy as np
 import polars as pl
 
 # Local
-from qengine.core import Event
+from ml4t.backtest.core import Event
 ```
 
 ## Development Workflow
@@ -327,4 +327,4 @@ Remember:
 4. **Document clearly** - Both code and decisions
 5. **Profile first** - Measure before optimizing
 
-These guidelines ensure QEngine remains maintainable, performant, and professional.
+These guidelines ensure ml4t.backtest remains maintainable, performant, and professional.

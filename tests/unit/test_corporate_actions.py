@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from qengine.execution.corporate_actions import (
+from ml4t.backtest.execution.corporate_actions import (
     CashDividend,
     CorporateAction,
     CorporateActionDataProvider,
@@ -16,7 +16,7 @@ from qengine.execution.corporate_actions import (
     StockSplit,
     SymbolChange,
 )
-from qengine.execution.order import Order, OrderSide, OrderType
+from ml4t.backtest.execution.order import Order, OrderSide, OrderType
 
 
 @pytest.fixture

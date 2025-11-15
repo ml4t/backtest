@@ -1,4 +1,4 @@
-# QEngine Testing Exploration - Quick Start Guide
+# ml4t.backtest Testing Exploration - Quick Start Guide
 
 **TL;DR**: 2,100+ lines of analysis ready. Start with EXPLORATION_SUMMARY.md (20 min read).
 
@@ -43,7 +43,7 @@
 
 | Question | Answer |
 |---|---|
-| **What are we testing?** | Event-driven order execution in qengine backtesting library |
+| **What are we testing?** | Event-driven order execution in ml4t.backtest backtesting library |
 | **How many scenarios?** | 25+ across 5 tiers (basic → stress) |
 | **How long?** | 6 weeks at 50% capacity (1 developer) |
 | **Complexity?** | Low - infrastructure exists, just need scenarios |
@@ -82,15 +82,15 @@
 ### Current State
 - 34 unit tests ✅
 - 1 validation scenario (needs 20+ more)
-- 7 qengine order types (all implemented)
-- 4-platform support (qengine, VectorBT, Backtrader, Zipline)
+- 7 ml4t.backtest order types (all implemented)
+- 4-platform support (ml4t.backtest, VectorBT, Backtrader, Zipline)
 
 ### Competitors
 - VectorBT: Same-bar execution
 - Backtrader: Next-bar open (default)
 - Zipline: Volume-limited fills
 
-### QEngine
+### ml4t.backtest
 - All order types ready (market, limit, stop, trailing, bracket, OCO)
 - Event-driven architecture with intrabar checking
 - Position tracking (known sync issue fixed)
@@ -107,7 +107,7 @@
 
 ### Phase 1b: Basic (2-3 days)
 - Scenarios 001-005 (market orders)
-- All pass on qengine
+- All pass on ml4t.backtest
 
 ### Phase 2: Order Types (5-7 days)
 - Scenarios 006-010 (limit/stop orders)
@@ -142,7 +142,7 @@ Minimal. Expected platform discrepancies are documentable.
 ## Success Criteria (One Checklist)
 
 - [ ] 34 unit tests pass
-- [ ] Scenarios 001-005 pass on qengine
+- [ ] Scenarios 001-005 pass on ml4t.backtest
 - [ ] Cross-platform comparison works
 - [ ] No look-ahead bias
 - [ ] Documentation complete
@@ -174,7 +174,7 @@ A: Yes. Edge cases like re-entry and bracket order timing often reveal issues.
 A: Yes. Scenarios are independent. 2 devs at 25% each = 6 week timeline.
 
 **Q: Do we need all frameworks?**
-A: Start with qengine only. VectorBT/Backtrader for cross-platform validation later.
+A: Start with ml4t.backtest only. VectorBT/Backtrader for cross-platform validation later.
 
 **Q: How maintainable?**
 A: Scenarios are data-driven (signals + expectations). Code changes unlikely to break them.

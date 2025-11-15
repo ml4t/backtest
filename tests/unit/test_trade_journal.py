@@ -4,8 +4,8 @@ from datetime import datetime
 
 import pytest
 
-from qengine.core.event import FillEvent, OrderSide
-from qengine.portfolio.analytics import TradeJournal
+from ml4t.backtest.core.event import FillEvent, OrderSide
+from ml4t.backtest.portfolio.analytics import TradeJournal
 
 
 class TestTradeJournalInitialization:

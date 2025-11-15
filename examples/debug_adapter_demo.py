@@ -4,16 +4,16 @@ Debug Strategy Adapter Demo
 ===========================
 
 This simplified demo isolates and tests individual components to verify
-the Strategy-QEngine Integration Bridge is working correctly.
+the Strategy-ml4t.backtest Integration Bridge is working correctly.
 """
 
 from datetime import datetime, timedelta
 from unittest.mock import Mock
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType
-from qengine.strategy.adapters import PITData
-from qengine.strategy.crypto_basis_adapter import CryptoBasisExternalStrategy
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType
+from ml4t.backtest.strategy.adapters import PITData
+from ml4t.backtest.strategy.crypto_basis_adapter import CryptoBasisExternalStrategy
 
 
 def test_external_strategy_directly():
@@ -80,7 +80,7 @@ def test_adapter_integration():
     """Test the full adapter integration."""
     print("🧪 Testing full adapter integration...")
 
-    from qengine.strategy import create_crypto_basis_strategy
+    from ml4t.backtest.strategy import create_crypto_basis_strategy
 
     # Create strategy with same parameters as direct test
     strategy = create_crypto_basis_strategy(
@@ -178,7 +178,7 @@ def test_adapter_integration():
 
 def main():
     """Run debug tests."""
-    print("🔍 Strategy-QEngine Integration Bridge Debug")
+    print("🔍 Strategy-ml4t.backtest Integration Bridge Debug")
     print("=" * 50)
 
     success = True

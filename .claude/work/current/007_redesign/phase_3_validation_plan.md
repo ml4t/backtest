@@ -43,7 +43,7 @@ Integration Tests:    0/2   passing (BROKEN) ❌
 
 #### Subtasks:
 1. **Create stub `spy_order_flow_adapter.py`** (30 min)
-   - Location: `src/qengine/strategy/spy_order_flow_adapter.py`
+   - Location: `src/ml4t.backtest/strategy/spy_order_flow_adapter.py`
    - Reference: `crypto_basis_adapter.py` as template
    - Minimal implementation for tests to import
 
@@ -58,7 +58,7 @@ Integration Tests:    0/2   passing (BROKEN) ❌
    - Fix any remaining import errors
 
 4. **Document comparison results** (30 min)
-   - Record qengine vs VectorBT discrepancies
+   - Record ml4t.backtest vs VectorBT discrepancies
    - Document any failing comparisons
    - Create baseline for future validation
 
@@ -69,14 +69,14 @@ Integration Tests:    0/2   passing (BROKEN) ❌
 - ✅ Documented any discrepancies found
 
 #### Deliverables:
-- `src/qengine/strategy/spy_order_flow_adapter.py` (stub)
+- `src/ml4t.backtest/strategy/spy_order_flow_adapter.py` (stub)
 - Updated comparison test files
 - Comparison results report
 
 ---
 
 ### TASK-3.2: Implement Test 1.3 (Multiple Round Trips)
-**Goal**: Validate qengine handles multiple entry/exit cycles correctly
+**Goal**: Validate ml4t.backtest handles multiple entry/exit cycles correctly
 **Estimated Time**: 1 hour
 **Priority**: High
 
@@ -86,7 +86,7 @@ def test_1_3_multiple_round_trips():
     """
     Test 1.3: Multiple Round Trips (40 trades, 5-bar hold)
 
-    Goal: Verify qengine correctly handles multiple entry/exit cycles
+    Goal: Verify ml4t.backtest correctly handles multiple entry/exit cycles
     Expected: 40 trades, exact PnL match with VectorBT
     """
     # 1. Generate 1000-bar OHLCV data
@@ -107,23 +107,23 @@ def test_1_3_multiple_round_trips():
     )
 
     # 4. Run backtests
-    qengine_result = QEngineWrapper().run_backtest(ohlcv, entries, exits, config)
+    ml4t.backtest_result = ml4t.backtestWrapper().run_backtest(ohlcv, entries, exits, config)
     vbt_result = VectorBTWrapper().run_backtest(ohlcv, entries, exits, config)
 
     # 5. Compare results
     report = print_validation_report({
-        'qengine': qengine_result,
+        'ml4t.backtest': ml4t.backtest_result,
         'VectorBT': vbt_result
     })
 
     # 6. Assertions
-    assert abs(qengine_result.num_trades - vbt_result.num_trades) <= 1
-    assert abs(qengine_result.final_value - vbt_result.final_value) <= 10.0
+    assert abs(ml4t.backtest_result.num_trades - vbt_result.num_trades) <= 1
+    assert abs(ml4t.backtest_result.final_value - vbt_result.final_value) <= 10.0
 ```
 
 #### Acceptance Criteria:
 - ✅ Test file created: `tests/validation/test_1_3_multiple_round_trips.py`
-- ✅ Test passes (qengine matches VectorBT)
+- ✅ Test passes (ml4t.backtest matches VectorBT)
 - ✅ Trade count: 40 ± 1
 - ✅ Final value: Within $10
 
@@ -151,8 +151,8 @@ def test_2_1_percentage_commission():
     )
 
     # Assertions include commission checks:
-    assert qengine_result.total_commission > 0
-    assert abs(qengine_result.total_commission - vbt_result.total_commission) <= 1.0
+    assert ml4t.backtest_result.total_commission > 0
+    assert abs(ml4t.backtest_result.total_commission - vbt_result.total_commission) <= 1.0
 ```
 
 #### Acceptance Criteria:
@@ -215,7 +215,7 @@ def test_3_1_fixed_slippage():
     )
 
     # Verify fill prices differ from market by $10
-    for trade in qengine_result.trades:
+    for trade in ml4t.backtest_result.trades:
         assert abs(trade.slippage) >= 9.0  # Allow 10% tolerance
 ```
 
@@ -315,7 +315,7 @@ def test_3_1_fixed_slippage():
 
 ### Internal:
 - `tests/validation/common/` infrastructure
-- `src/qengine/` (post-redesign)
+- `src/ml4t.backtest/` (post-redesign)
 - New Portfolio API
 
 ---
@@ -327,7 +327,7 @@ def test_3_1_fixed_slippage():
 **Mitigation**: Document expected behavior, skip tests with clear TODO
 
 ### Risk 2: VectorBT API Differences
-**Impact**: Tests may fail even if qengine is correct
+**Impact**: Tests may fail even if ml4t.backtest is correct
 **Mitigation**: Document discrepancies, consider acceptable tolerances
 
 ### Risk 3: Slippage/Commission Models Don't Match

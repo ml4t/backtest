@@ -1,7 +1,7 @@
 # FINAL Handoff Before Project Move to ~/ml4t/software/
 
 **Date**: 2025-10-05
-**Work Unit**: 002_comprehensive_qengine_validatio
+**Work Unit**: 002_comprehensive_ml4t.backtest_validatio
 **Phase**: Phase 0 - Infrastructure Setup
 **Status**: CRITICAL BUG FIXED ✅
 
@@ -76,8 +76,8 @@ ma_long = history[-context.long_window:].mean()  # Only last 30 days
 - `verify_alignment.py` - Full cross-framework validation
 
 **Documentation**:
-- `.claude/work/current/002_comprehensive_qengine_validatio/LEARNINGS.md` - Comprehensive learnings including bug fix
-- `.claude/work/current/002_comprehensive_qengine_validatio/ZIPLINE_VECTORBT_RECONCILIATION.md` - Original investigation (pre-fix)
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/LEARNINGS.md` - Comprehensive learnings including bug fix
+- `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/ZIPLINE_VECTORBT_RECONCILIATION.md` - Original investigation (pre-fix)
 
 ---
 
@@ -225,7 +225,7 @@ def run_backtest_with_signals(
 ```
 Unit Tests → Integration Tests → Cross-Framework Tests → Production Use
      ↓              ↓                      ↓                     ↓
-   Passes        Passes             MUST MATCH           Ready for QEngine
+   Passes        Passes             MUST MATCH           Ready for ml4t.backtest
 ```
 
 ### Test Coverage Targets
@@ -294,10 +294,10 @@ pytest tests/validation/test_zipline_adapter.py -v
 ### 3. Review Documentation
 ```bash
 # Comprehensive learnings
-cat .claude/work/current/002_comprehensive_qengine_validatio/LEARNINGS.md
+cat .claude/work/current/002_comprehensive_ml4t.backtest_validatio/LEARNINGS.md
 
 # Bug fix details (search for "2025-10-05")
-cat .claude/work/current/002_comprehensive_qengine_validatio/LEARNINGS.md | grep -A 30 "2025-10-05"
+cat .claude/work/current/002_comprehensive_ml4t.backtest_validatio/LEARNINGS.md | grep -A 30 "2025-10-05"
 ```
 
 ### 4. Continue Work
@@ -310,9 +310,9 @@ cat .claude/work/current/002_comprehensive_qengine_validatio/LEARNINGS.md | grep
 
 ## Most Important Takeaway
 
-**The validation framework's purpose is to validate QEngine correctness.**
+**The validation framework's purpose is to validate ml4t.backtest correctness.**
 
-**To validate QEngine, the validation framework itself must be correct.**
+**To validate ml4t.backtest, the validation framework itself must be correct.**
 
 **To ensure the validation framework is correct, we must cross-validate between established frameworks (VectorBT, Zipline, Backtrader).**
 
@@ -332,7 +332,7 @@ cat .claude/work/current/002_comprehensive_qengine_validatio/LEARNINGS.md | grep
 
 **Backtrader**: Next to implement, research simple API first
 
-**QEngine**: The system being validated (not yet integrated with validation framework)
+**ml4t.backtest**: The system being validated (not yet integrated with validation framework)
 
 ---
 

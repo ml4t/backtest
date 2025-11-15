@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document analyzes three leading backtesting frameworks (Backtrader, Zipline-Reloaded, and VectorBT Pro) to extract best practices, architectural patterns, and lessons learned for QEngine development.
+This document analyzes three leading backtesting frameworks (Backtrader, Zipline-Reloaded, and VectorBT Pro) to extract best practices, architectural patterns, and lessons learned for ml4t.backtest development.
 
 ## 1. Backtrader Analysis
 
@@ -24,7 +24,7 @@ This document analyzes three leading backtesting frameworks (Backtrader, Zipline
 3. **Memory Inefficient**: Keeps entire history in memory
 4. **Complex API**: Steep learning curve with metaclass magic
 
-### Lessons for QEngine
+### Lessons for ml4t.backtest
 - ✅ Keep the strategy API simple and intuitive
 - ✅ Make everything pluggable but with clear interfaces
 - ❌ Avoid complex metaclass patterns
@@ -61,7 +61,7 @@ class Strategy:
 3. **Maintenance Burden**: Large codebase, technical debt
 4. **Learning Curve**: Complex API with many abstractions
 
-### Lessons for QEngine
+### Lessons for ml4t.backtest
 - ✅ Implement robust PIT data handling from the start
 - ✅ Design for corporate actions and calendar awareness
 - ✅ Separate data ingestion from strategy logic
@@ -103,7 +103,7 @@ def handle_data(context, data):
 3. **Signal-Based**: Not true order simulation
 4. **Learning Curve**: Different mental model from traditional backtesting
 
-### Lessons for QEngine
+### Lessons for ml4t.backtest
 - ✅ Use columnar data structures (Polars/Arrow)
 - ✅ Implement Numba JIT for hot paths
 - ✅ Provide rich performance analytics
@@ -189,9 +189,9 @@ Common lifecycle hooks:
 - ❌ Limited support for stateful strategies
 - ❌ Signal-only execution model
 
-## 7. Recommended Architecture for QEngine
+## 7. Recommended Architecture for ml4t.backtest
 
-Based on this analysis, QEngine should:
+Based on this analysis, ml4t.backtest should:
 
 ### Core Design Principles
 1. **Event-Driven Core**: For realism and flexibility
@@ -255,7 +255,7 @@ class Strategy(ABC):
 
 Based on incumbent analysis:
 
-| Metric | Backtrader | Zipline | VectorBT | QEngine Target |
+| Metric | Backtrader | Zipline | VectorBT | ml4t.backtest Target |
 |--------|------------|---------|----------|----------------|
 | 1M Daily Bars | ~60s | ~30s | <1s | <5s |
 | 10M Tick Events | >10min | ~5min | N/A | <30s |
@@ -290,11 +290,11 @@ Based on this analysis, prioritize:
 
 ## Conclusion
 
-The analysis reveals that while each framework has strengths, none fully addresses the needs of modern ML-driven quantitative trading. QEngine can succeed by:
+The analysis reveals that while each framework has strengths, none fully addresses the needs of modern ML-driven quantitative trading. ml4t.backtest can succeed by:
 
 1. Combining Backtrader's flexibility with VectorBT's performance
 2. Matching Zipline's data integrity without its complexity
 3. Adding first-class ML support that none currently provide
 4. Using modern Python tooling (Polars, Numba, optional Rust)
 
-This positions QEngine to become the definitive backtesting framework for the next generation of algorithmic traders.
+This positions ml4t.backtest to become the definitive backtesting framework for the next generation of algorithmic traders.

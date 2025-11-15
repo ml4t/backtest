@@ -37,9 +37,9 @@ exits.iloc[9, 2] = True  # Sell C on day 9
 
 print("Total expected trades:", entries.sum().sum() + exits.sum().sum())
 
-# Method 1: QEngine style (manual)
+# Method 1: ml4t.backtest style (manual)
 print("\n" + "=" * 50)
-print("Method 1: QEngine Manual")
+print("Method 1: ml4t.backtest Manual")
 print("=" * 50)
 
 cash = 10000
@@ -66,13 +66,13 @@ for i, date in enumerate(dates):
                 print(f"Day {i}: BUY {col} - {shares:.2f} shares @ ${prices.loc[date, col]:.2f}")
 
 # Final value
-final_qengine = cash
+final_ml4t.backtest = cash
 for col, shares in positions.items():
     if shares > 0:
-        final_qengine += shares * prices.iloc[-1][col]
+        final_ml4t.backtest += shares * prices.iloc[-1][col]
 
 print(f"\nFinal cash: ${cash:.2f}")
-print(f"Final portfolio value: ${final_qengine:.2f}")
+print(f"Final portfolio value: ${final_ml4t.backtest:.2f}")
 
 # Method 2: VectorBT WITHOUT grouping
 print("\n" + "=" * 50)
@@ -150,17 +150,17 @@ print("\n" + "=" * 50)
 print("RESULTS COMPARISON")
 print("=" * 50)
 
-print(f"QEngine manual: ${final_qengine:.2f}")
+print(f"ml4t.backtest manual: ${final_ml4t.backtest:.2f}")
 print(f"VectorBT separate (WRONG): ${final_separate.mean():.2f}")
 print(f"VectorBT grouped: ${final_grouped:.2f}")
 print(f"VectorBT sized: ${final_sized:.2f}")
 
 print("\n🚨 THE ISSUE:")
-if abs(final_qengine - final_grouped) > 0.01:
-    print(f"Grouped VectorBT differs from QEngine by ${abs(final_qengine - final_grouped):.2f}")
+if abs(final_ml4t.backtest - final_grouped) > 0.01:
+    print(f"Grouped VectorBT differs from ml4t.backtest by ${abs(final_ml4t.backtest - final_grouped):.2f}")
     print("This suggests VectorBT's cash_sharing might work differently than expected!")
 
-if abs(final_qengine - final_sized) < 0.01:
-    print("✅ VectorBT with explicit sizing matches QEngine")
+if abs(final_ml4t.backtest - final_sized) < 0.01:
+    print("✅ VectorBT with explicit sizing matches ml4t.backtest")
 else:
-    print(f"❌ Even with sizing, VectorBT differs by ${abs(final_qengine - final_sized):.2f}")
+    print(f"❌ Even with sizing, VectorBT differs by ${abs(final_ml4t.backtest - final_sized):.2f}")

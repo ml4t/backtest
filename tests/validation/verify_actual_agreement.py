@@ -1,5 +1,5 @@
 """
-Verify that QEngine and VectorBT actually agree - this is NOT fake!
+Verify that ml4t.backtest and VectorBT actually agree - this is NOT fake!
 """
 
 import sys
@@ -8,11 +8,11 @@ from pathlib import Path
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
-from frameworks import QEngineAdapter, VectorBTAdapter
+from frameworks import ml4t.backtestAdapter, VectorBTAdapter
 
 
 def load_real_data():
@@ -29,8 +29,8 @@ def load_real_data():
 
 
 def verify_real_agreement():
-    """Verify QEngine and VectorBT actually produce identical results."""
-    print("VERIFYING REAL QEngine vs VectorBT AGREEMENT")
+    """Verify ml4t.backtest and VectorBT actually produce identical results."""
+    print("VERIFYING REAL ml4t.backtest vs VectorBT AGREEMENT")
     print("=" * 60)
     print("This uses REAL VectorBT 0.28.0 from pip, not fake implementation!")
     print()
@@ -50,10 +50,10 @@ def verify_real_agreement():
     print(f"Capital: ${initial_capital:,}")
 
     # Create adapters
-    qe_adapter = QEngineAdapter()
+    qe_adapter = ml4t.backtestAdapter()
     vbt_adapter = VectorBTAdapter()
 
-    print("\nRunning QEngine backtest...")
+    print("\nRunning ml4t.backtest backtest...")
     qe_result = qe_adapter.run_backtest(data, strategy_params, initial_capital)
 
     print("\nRunning VectorBT backtest (REAL vectorbt 0.28.0)...")
@@ -65,7 +65,7 @@ def verify_real_agreement():
 
     # Check for errors
     if qe_result.has_errors:
-        print(f"❌ QEngine failed: {qe_result.errors}")
+        print(f"❌ ml4t.backtest failed: {qe_result.errors}")
         return False
 
     if vbt_result.has_errors:
@@ -73,7 +73,7 @@ def verify_real_agreement():
         return False
 
     # Compare results
-    print(f"{'Metric':<20} {'QEngine':<15} {'VectorBT':<15} {'Match':<10}")
+    print(f"{'Metric':<20} {'ml4t.backtest':<15} {'VectorBT':<15} {'Match':<10}")
     print("-" * 70)
 
     # Final value
@@ -104,8 +104,8 @@ def verify_real_agreement():
 
     print(f"\n{'=' * 60}")
     if overall_match:
-        print("✅ PERFECT AGREEMENT! QEngine and VectorBT produce IDENTICAL results")
-        print("   This validates QEngine's correctness using real VectorBT 0.28.0")
+        print("✅ PERFECT AGREEMENT! ml4t.backtest and VectorBT produce IDENTICAL results")
+        print("   This validates ml4t.backtest's correctness using real VectorBT 0.28.0")
     else:
         print("❌ DISCREPANCY DETECTED!")
         print(f"   Value match: {value_match}")
@@ -115,7 +115,7 @@ def verify_real_agreement():
     # Show trade details if available
     if qe_result.trades and vbt_result.trades:
         print("\nFirst 3 trades comparison:")
-        print(f"{'QEngine':<50} {'VectorBT':<50}")
+        print(f"{'ml4t.backtest':<50} {'VectorBT':<50}")
         print("-" * 100)
 
         max_trades = min(3, len(qe_result.trades), len(vbt_result.trades))
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         success = verify_real_agreement()
         if success:
             print("\n🎉 VERIFICATION SUCCESSFUL!")
-            print("QEngine has been validated against REAL VectorBT implementation!")
+            print("ml4t.backtest has been validated against REAL VectorBT implementation!")
         else:
             print("\n🔍 VERIFICATION SHOWS DISCREPANCY")
             print("Need to investigate differences between frameworks")

@@ -8,7 +8,7 @@ using trade-by-trade comparison.
 Usage:
     python runner.py --scenario 001                    # Run specific scenario
     python runner.py --all                             # Run all scenarios
-    python runner.py --platforms qengine,vectorbt      # Specific platforms only
+    python runner.py --platforms ml4t.backtest,vectorbt      # Specific platforms only
     python runner.py --scenario 001 --report detailed  # Generate detailed report
 """
 
@@ -22,7 +22,7 @@ import polars as pl
 
 # Import extractors, matcher, and reporter
 from extractors import (
-    extract_qengine_trades,
+    extract_ml4t.backtest_trades,
     extract_vectorbt_trades,
     extract_backtrader_trades,
     extract_zipline_trades,
@@ -60,21 +60,21 @@ class ScenarioRunner:
             raise ValueError(f"No Scenario class found in module {scenario_module}")
         self.scenario_class = scenario_classes[0]
 
-    def run_qengine(self) -> PlatformResult:
-        """Run scenario on qengine."""
-        print(f"  🔧 Running qengine...")
+    def run_ml4t.backtest(self) -> PlatformResult:
+        """Run scenario on ml4t.backtest."""
+        print(f"  🔧 Running ml4t.backtest...")
         start = datetime.now()
 
         try:
-            # Import qengine components
-            from qengine.engine import BacktestEngine
-            from qengine.strategy.base import Strategy
-            from qengine.execution.broker import SimulationBroker
-            from qengine.execution.commission import PercentageCommission
-            from qengine.execution.order import Order
-            from qengine.core.types import OrderType, OrderSide, EventType, MarketDataType
-            from qengine.core.event import MarketEvent
-            from qengine.data.feed import DataFeed
+            # Import ml4t.backtest components
+            from ml4t.backtest.engine import BacktestEngine
+            from ml4t.backtest.strategy.base import Strategy
+            from ml4t.backtest.execution.broker import SimulationBroker
+            from ml4t.backtest.execution.commission import PercentageCommission
+            from ml4t.backtest.execution.order import Order
+            from ml4t.backtest.core.types import OrderType, OrderSide, EventType, MarketDataType
+            from ml4t.backtest.core.event import MarketEvent
+            from ml4t.backtest.data.feed import DataFeed
 
             # Get data and signals
             data = self.scenario_class.get_data()
@@ -201,7 +201,7 @@ class ScenarioRunner:
             scenario_name = self.scenario_class.name if hasattr(self.scenario_class, 'name') else self.scenario.__name__
 
             return PlatformResult(
-                platform='qengine',
+                platform='ml4t.backtest',
                 scenario=scenario_name,
                 data=data,
                 raw_results=results,
@@ -213,7 +213,7 @@ class ScenarioRunner:
             import traceback
             scenario_name = self.scenario_class.name if hasattr(self.scenario_class, 'name') else self.scenario.__name__
             return PlatformResult(
-                platform='qengine',
+                platform='ml4t.backtest',
                 scenario=scenario_name,
                 data=self.scenario_class.get_data(),
                 raw_results=None,
@@ -542,7 +542,7 @@ class ScenarioRunner:
         Run scenario on specified platforms.
 
         Args:
-            platforms: List of platform names ('qengine', 'vectorbt', etc.)
+            platforms: List of platform names ('ml4t.backtest', 'vectorbt', etc.)
 
         Returns:
             Dictionary mapping platform name to result
@@ -550,8 +550,8 @@ class ScenarioRunner:
         results = {}
 
         for platform in platforms:
-            if platform == 'qengine':
-                results[platform] = self.run_qengine()
+            if platform == 'ml4t.backtest':
+                results[platform] = self.run_ml4t.backtest()
             elif platform == 'vectorbt':
                 results[platform] = self.run_vectorbt()
             elif platform == 'backtrader':
@@ -593,8 +593,8 @@ def main():
     parser.add_argument(
         '--platforms',
         type=str,
-        default='qengine,vectorbt',
-        help='Comma-separated list of platforms (default: qengine,vectorbt)'
+        default='ml4t.backtest,vectorbt',
+        help='Comma-separated list of platforms (default: ml4t.backtest,vectorbt)'
     )
     parser.add_argument(
         '--report',
@@ -649,8 +649,8 @@ def main():
 
             print(f"  🔍 Extracting {platform} trades...")
 
-            if platform == 'qengine':
-                trades = extract_qengine_trades(result.raw_results, result.data)
+            if platform == 'ml4t.backtest':
+                trades = extract_ml4t.backtest_trades(result.raw_results, result.data)
                 trades_by_platform[platform] = trades
                 print(f"     Found {len(trades)} trades")
 

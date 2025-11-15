@@ -5,9 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from qengine.portfolio.analytics import PerformanceAnalyzer
-from qengine.portfolio.core import PositionTracker
-from qengine.portfolio.state import Position
+from ml4t.backtest.portfolio.analytics import PerformanceAnalyzer
+from ml4t.backtest.portfolio.core import PositionTracker
+from ml4t.backtest.portfolio.state import Position
 
 
 class TestPerformanceAnalyzerInitialization:

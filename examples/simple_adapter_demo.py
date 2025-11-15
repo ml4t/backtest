@@ -3,24 +3,24 @@
 Simple Strategy Adapter Demo
 ============================
 
-This demonstrates the core Strategy-QEngine Integration Bridge functionality
-without requiring full QEngine integration. It shows:
+This demonstrates the core Strategy-ml4t.backtest Integration Bridge functionality
+without requiring full ml4t.backtest integration. It shows:
 
-1. How external strategies integrate with QEngine adapters
+1. How external strategies integrate with ml4t.backtest adapters
 2. Event processing and signal generation
 3. Order submission through the broker interface
 
-Run with: PYTHONPATH=~/ml4t/qengine/src python examples/simple_adapter_demo.py
+Run with: PYTHONPATH=~/ml4t/ml4t.backtest/src python examples/simple_adapter_demo.py
 """
 
 from datetime import datetime, timedelta
 
 import numpy as np
 
-from qengine.core.event import MarketEvent
-from qengine.core.types import MarketDataType, OrderSide
-from qengine.execution.order import Order
-from qengine.strategy import create_crypto_basis_strategy
+from ml4t.backtest.core.event import MarketEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.strategy import create_crypto_basis_strategy
 
 
 class MockBroker:
@@ -92,7 +92,7 @@ def generate_market_events(n_events: int = 50) -> list[MarketEvent]:
 
 def run_adapter_demo():
     """Run the strategy adapter demonstration."""
-    print("🚀 Strategy-QEngine Integration Bridge Demo")
+    print("🚀 Strategy-ml4t.backtest Integration Bridge Demo")
     print("=" * 50)
 
     # Create the integrated strategy
@@ -194,10 +194,10 @@ def run_adapter_demo():
     strategy.on_end()
 
     print("\n✅ Integration Bridge Demo Complete!")
-    print("   🔗 External strategy successfully integrated with QEngine")
+    print("   🔗 External strategy successfully integrated with ml4t.backtest")
     print("   📊 Event-driven processing working correctly")
     print("   🎯 Signal generation and order submission functional")
-    print("   🚀 Ready for full backtesting with QEngine!")
+    print("   🚀 Ready for full backtesting with ml4t.backtest!")
 
     return {
         "events_processed": len(events),

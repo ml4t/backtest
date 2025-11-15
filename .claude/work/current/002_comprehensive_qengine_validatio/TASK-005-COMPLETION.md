@@ -133,7 +133,7 @@ end_date = data.index[-1].tz_localize(None) if data.index.tz else data.index[-1]
 
 1. `tests/validation/frameworks/zipline_adapter.py` - Simplified from 322 to 204 lines
 2. `tests/validation/test_zipline_adapter.py` - Removed xfail, now 11/11 passing
-3. `.claude/work/current/002_comprehensive_qengine_validatio/state.json` - Updated notes
+3. `.claude/work/current/002_comprehensive_ml4t.backtest_validatio/state.json` - Updated notes
 
 ## Next Steps
 

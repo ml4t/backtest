@@ -6,7 +6,7 @@ The strategy module provides base classes and adapters for implementing trading 
 Base Strategy
 -------------
 
-.. automodule:: qengine.strategy.base
+.. automodule:: ml4t.backtest.strategy.base
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Base Strategy
 Strategy Adapters
 -----------------
 
-.. automodule:: qengine.strategy.adapters
+.. automodule:: ml4t.backtest.strategy.adapters
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ Strategy Adapters
 Crypto Basis Adapter
 --------------------
 
-.. automodule:: qengine.strategy.crypto_basis_adapter
+.. automodule:: ml4t.backtest.strategy.crypto_basis_adapter
    :members:
    :undoc-members:
    :show-inheritance:

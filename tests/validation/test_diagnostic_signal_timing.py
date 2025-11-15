@@ -1,7 +1,7 @@
 """
 Diagnostic Test: Signal Timing Investigation
 
-Objective: Isolate the signal timing discrepancy between qengine and VectorBT.
+Objective: Isolate the signal timing discrepancy between ml4t.backtest and VectorBT.
 
 This test uses a minimal signal set to verify engines execute at identical times.
 """
@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import (
     load_real_crypto_data,
     BacktestConfig,
-    QEngineWrapper,
+    ml4t.backtestWrapper,
     VectorBTWrapper,
 )
 import pandas as pd
@@ -61,14 +61,14 @@ def test_diagnostic_signal_timing():
         order_type='market',
     )
 
-    qengine = QEngineWrapper()
-    result_qe_no_fees = qengine.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
+    ml4t.backtest = ml4t.backtestWrapper()
+    result_qe_no_fees = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
 
     vbt = VectorBTWrapper()
     result_vbt_no_fees = vbt.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
 
     print(f"\n   Results (NO FEES):")
-    print(f"   qengine: {result_qe_no_fees.num_trades} trades, final: ${result_qe_no_fees.final_value:,.2f}")
+    print(f"   ml4t.backtest: {result_qe_no_fees.num_trades} trades, final: ${result_qe_no_fees.final_value:,.2f}")
     print(f"   VectorBT: {result_vbt_no_fees.num_trades} trades, final: ${result_vbt_no_fees.final_value:,.2f}")
 
     # Check entry prices
@@ -78,7 +78,7 @@ def test_diagnostic_signal_timing():
         result_vbt_no_fees.trades['entry_price'].head(3)
     ), 1):
         match = "✅" if abs(qe_price - vbt_price) < 0.01 else "❌"
-        print(f"     Trade {i}: qengine ${qe_price:,.2f} vs VectorBT ${vbt_price:,.2f} {match}")
+        print(f"     Trade {i}: ml4t.backtest ${qe_price:,.2f} vs VectorBT ${vbt_price:,.2f} {match}")
 
     # 4. Test WITH fees (where discrepancy occurs)
     print("\n4️⃣  Test B: WITH FEES (0.1%)")
@@ -89,11 +89,11 @@ def test_diagnostic_signal_timing():
         order_type='market',
     )
 
-    result_qe_fees = qengine.run_backtest(ohlcv, entries, exits=exits, config=config_with_fees)
+    result_qe_fees = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config_with_fees)
     result_vbt_fees = vbt.run_backtest(ohlcv, entries, exits=exits, config=config_with_fees)
 
     print(f"\n   Results (WITH FEES):")
-    print(f"   qengine: {result_qe_fees.num_trades} trades, final: ${result_qe_fees.final_value:,.2f}")
+    print(f"   ml4t.backtest: {result_qe_fees.num_trades} trades, final: ${result_qe_fees.final_value:,.2f}")
     print(f"   VectorBT: {result_vbt_fees.num_trades} trades, final: ${result_vbt_fees.final_value:,.2f}")
 
     # Check entry prices
@@ -103,18 +103,18 @@ def test_diagnostic_signal_timing():
         result_vbt_fees.trades['entry_price'].head(3)
     ), 1):
         match = "✅" if abs(qe_price - vbt_price) < 0.01 else "❌"
-        print(f"     Trade {i}: qengine ${qe_price:,.2f} vs VectorBT ${vbt_price:,.2f} {match}")
+        print(f"     Trade {i}: ml4t.backtest ${qe_price:,.2f} vs VectorBT ${vbt_price:,.2f} {match}")
 
     # Check if number of trades differs
     if result_qe_fees.num_trades != result_vbt_fees.num_trades:
         print(f"\n   ⚠️  TRADE COUNT MISMATCH!")
-        print(f"   qengine has {result_qe_fees.num_trades} trades")
+        print(f"   ml4t.backtest has {result_qe_fees.num_trades} trades")
         print(f"   VectorBT has {result_vbt_fees.num_trades} trades")
         print(f"\n   This suggests phantom trades being generated!")
 
     # 5. Detailed trade comparison
     print("\n5️⃣  Detailed Trade Comparison (WITH FEES):")
-    print(f"\n   qengine trades:")
+    print(f"\n   ml4t.backtest trades:")
     for i, row in result_qe_fees.trades.head(5).iterrows():
         print(f"     Trade {i+1}: entry ${row['entry_price']:,.2f}, exit ${row['exit_price']:,.2f}, pnl ${row['pnl']:,.2f}")
 

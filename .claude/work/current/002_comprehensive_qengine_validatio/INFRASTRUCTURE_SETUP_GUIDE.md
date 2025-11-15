@@ -1,7 +1,7 @@
 # Infrastructure Setup Guide - Phase 0
 
 ## Overview
-This guide documents the installation and configuration of isolated virtual environments for cross-framework validation of QEngine against VectorBT Pro, Zipline-Reloaded, and Backtrader.
+This guide documents the installation and configuration of isolated virtual environments for cross-framework validation of ml4t.backtest against VectorBT Pro, Zipline-Reloaded, and Backtrader.
 
 ## Virtual Environment Strategy
 Each framework is installed in an isolated virtual environment to prevent dependency conflicts:
@@ -10,7 +10,7 @@ Each framework is installed in an isolated virtual environment to prevent depend
 .venv-vectorbt     # VectorBT Pro (Python 3.12.3)
 .venv-zipline      # Zipline-Reloaded (TBD)
 .venv-backtrader   # Backtrader (TBD)
-.venv              # QEngine (existing, Polars-based)
+.venv              # ml4t.backtest (existing, Polars-based)
 ```
 
 **Rationale**: Clean dependency management, easier debugging, framework-specific Python versions if needed.
@@ -209,7 +209,7 @@ print(f"Final portfolio value: {perf['portfolio_value'].iloc[-1]}")
 **Known Issues to Address:**
 - Timezone complexity (always use UTC)
 - Data bundle format (custom loader needed for Polars data)
-- Slow performance (126x slower than QEngine)
+- Slow performance (126x slower than ml4t.backtest)
 
 ---
 
@@ -263,7 +263,7 @@ print(f'Final Portfolio Value: {cerebro.broker.getvalue():.2f}')
 
 **Known Issues to Address:**
 - Signal execution bugs (document as limitations)
-- 6x slower than QEngine
+- 6x slower than ml4t.backtest
 - Feed format conversion needed
 
 ---
@@ -322,8 +322,8 @@ class UniversalDataLoader:
         })
 
     @staticmethod
-    def to_qengine_format(df: pl.DataFrame) -> pl.DataFrame:
-        """QEngine uses Polars directly"""
+    def to_ml4t.backtest_format(df: pl.DataFrame) -> pl.DataFrame:
+        """ml4t.backtest uses Polars directly"""
         return df
 ```
 

@@ -1,8 +1,8 @@
-# Irregular Timestamps - QEngine's Key Differentiator
+# Irregular Timestamps - ml4t.backtest's Key Differentiator
 
 ## Overview
 
-QEngine's **native support for irregular timestamps** is a fundamental architectural advantage that sets it apart from other backtesting frameworks. This capability enables realistic simulation using volume bars, dollar bars, information bars, and any other event-driven aggregation method.
+ml4t.backtest's **native support for irregular timestamps** is a fundamental architectural advantage that sets it apart from other backtesting frameworks. This capability enables realistic simulation using volume bars, dollar bars, information bars, and any other event-driven aggregation method.
 
 ## Key Value Proposition
 
@@ -12,7 +12,7 @@ QEngine's **native support for irregular timestamps** is a fundamental architect
 - **Information loss**: Miss market microstructure effects
 - **Overfitting risk**: Strategies overfit to artificial timing patterns
 
-### What QEngine Does Right
+### What ml4t.backtest Does Right
 - **Event-driven timing**: Strategies react at natural market events
 - **Information preservation**: Capture market microstructure dynamics
 - **Realistic execution**: Orders execute at natural market timing
@@ -22,7 +22,7 @@ QEngine's **native support for irregular timestamps** is a fundamental architect
 
 ### Architecture Foundation
 ```python
-# QEngine's core event loop handles any timestamp sequence
+# ml4t.backtest's core event loop handles any timestamp sequence
 class EventProcessor:
     def process_events(self, events):
         # Sort by timestamp - handles completely irregular sequences
@@ -43,9 +43,9 @@ class EventProcessor:
 volume_bars = VolumeBars(threshold=50000)  # From qfeatures
 irregular_df = volume_bars.fit_transform(tick_data)
 
-# QEngine processes directly - no time grid alignment needed
+# ml4t.backtest processes directly - no time grid alignment needed
 feed = PolarsDataFeed(irregular_df)
-engine = QEngine()
+engine = ml4t.backtest()
 engine.add_data_feed(feed)  # Just works!
 ```
 
@@ -73,12 +73,12 @@ engine.add_data_feed(feed)  # Just works!
 
 ## Integration with QFeatures
 
-QEngine seamlessly consumes irregular data from qfeatures:
+ml4t.backtest seamlessly consumes irregular data from qfeatures:
 
 ```python
 from qfeatures.bars.volume import VolumeBars
 from qfeatures.bars.dollar import DollarBars
-from qengine import QEngine
+from ml4t.backtest import ml4t.backtest
 
 # 1. Create irregular bars with qfeatures
 volume_bars = VolumeBars(threshold=100000)
@@ -87,8 +87,8 @@ dollar_bars = DollarBars(threshold=1000000)
 irregular_volume_data = volume_bars.fit_transform(tick_data)
 irregular_dollar_data = dollar_bars.fit_transform(tick_data)
 
-# 2. QEngine processes both seamlessly
-engine = QEngine()
+# 2. ml4t.backtest processes both seamlessly
+engine = ml4t.backtest()
 engine.add_data_feed(PolarsDataFeed(irregular_volume_data))
 engine.add_data_feed(PolarsDataFeed(irregular_dollar_data))
 
@@ -106,7 +106,7 @@ class IrregularStrategy(Strategy):
 ### Framework Comparison
 | Framework | Volume Bars | Dollar Bars | Info Bars | Native Support |
 |-----------|-------------|-------------|-----------|----------------|
-| **QEngine** | ✅ | ✅ | ✅ | **Native** |
+| **ml4t.backtest** | ✅ | ✅ | ✅ | **Native** |
 | Backtrader | ❌ | ❌ | ❌ | None |
 | Zipline | Limited | ❌ | ❌ | Preprocessing |
 | VectorBT | Manual | Manual | ❌ | Workarounds |
@@ -137,7 +137,7 @@ class IrregularStrategy(Strategy):
 tick_bars = TickBars(threshold=1000)  # 1000 transactions per bar
 hf_data = tick_bars.fit_transform(level1_data)
 
-# QEngine processes at natural execution timing
+# ml4t.backtest processes at natural execution timing
 class HighFrequencyStrategy(Strategy):
     def on_market_event(self, event, pit_data):
         # React to market microstructure events
@@ -164,7 +164,7 @@ class FlowStrategy(Strategy):
 spy_volume_bars = volume_bars.transform(spy_ticks)    # High activity
 bond_dollar_bars = dollar_bars.transform(bond_ticks)  # Lower activity
 
-# QEngine synchronizes naturally without forcing alignment
+# ml4t.backtest synchronizes naturally without forcing alignment
 engine.add_data_feed(PolarsDataFeed(spy_volume_bars))
 engine.add_data_feed(PolarsDataFeed(bond_dollar_bars))
 ```
@@ -172,13 +172,13 @@ engine.add_data_feed(PolarsDataFeed(bond_dollar_bars))
 ## Marketing Messages
 
 ### For Quantitative Researchers
-"Stop forcing your strategies into artificial time grids. QEngine's native irregular timestamp support lets you backtest on volume bars, dollar bars, and information bars - capturing the market microstructure effects that drive real alpha."
+"Stop forcing your strategies into artificial time grids. ml4t.backtest's native irregular timestamp support lets you backtest on volume bars, dollar bars, and information bars - capturing the market microstructure effects that drive real alpha."
 
 ### For Portfolio Managers
-"Get more realistic backtests with QEngine's event-driven timing. No more overfitted strategies that fail in live trading because they relied on artificial time patterns."
+"Get more realistic backtests with ml4t.backtest's event-driven timing. No more overfitted strategies that fail in live trading because they relied on artificial time patterns."
 
 ### For Developers
-"QEngine is the only framework that handles irregular timestamps natively. Volume bars, dollar bars, tick bars - they all just work, no preprocessing required."
+"ml4t.backtest is the only framework that handles irregular timestamps natively. Volume bars, dollar bars, tick bars - they all just work, no preprocessing required."
 
 ## Future Extensions
 
@@ -208,10 +208,10 @@ live_volume_stream = VolumeBarStream(threshold=50000)
 
 ## Key Takeaways
 
-1. **Unique Capability**: QEngine is uniquely positioned with native irregular timestamp support
+1. **Unique Capability**: ml4t.backtest is uniquely positioned with native irregular timestamp support
 2. **Architectural Advantage**: Event-driven design enables natural market timing
 3. **Quality Improvement**: Better backtests through realistic market timing
 4. **Competitive Moat**: Difficult for competitors to retrofit this capability
 5. **Marketing Asset**: Strong differentiator for positioning against other frameworks
 
-This capability should be prominently featured in all QEngine marketing materials and technical documentation.
+This capability should be prominently featured in all ml4t.backtest marketing materials and technical documentation.

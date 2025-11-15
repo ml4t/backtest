@@ -1,8 +1,8 @@
 """Tests for PrecisionManager - numerical rounding for asset classes."""
 
 import pytest
-from qengine.core.assets import AssetSpec, AssetClass
-from qengine.core.precision import PrecisionManager, PRECISION_DEFAULTS
+from ml4t.backtest.core.assets import AssetSpec, AssetClass
+from ml4t.backtest.core.precision import PrecisionManager, PRECISION_DEFAULTS
 
 
 class TestPrecisionManager:

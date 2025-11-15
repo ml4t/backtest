@@ -54,7 +54,7 @@ class BacktestResult:
     """Standardized backtest results across all platforms.
 
     Attributes:
-        platform: Platform name (qengine, vectorbt_pro, zipline, etc.)
+        platform: Platform name (ml4t.backtest, vectorbt_pro, zipline, etc.)
         trades: List of all trades (open and closed)
         equity_curve: Time series of portfolio value
         metrics: Performance metrics dictionary

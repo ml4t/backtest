@@ -165,10 +165,10 @@ assert fill.fill_price == pytest.approx(151.0151, rel=1e-4)  # 151.0 * 1.0001
 
 ### Code Quality Metrics
 ```
-src/qengine/execution/fill_simulator.py    175 statements,   9 missed (95% coverage)
-src/qengine/execution/broker.py            256 statements,  52 missed (80% coverage)
-src/qengine/execution/market_impact.py     163 statements,   7 missed (96% coverage)
-src/qengine/execution/liquidity.py          80 statements,   2 missed (98% coverage)
+src/ml4t.backtest/execution/fill_simulator.py    175 statements,   9 missed (95% coverage)
+src/ml4t.backtest/execution/broker.py            256 statements,  52 missed (80% coverage)
+src/ml4t.backtest/execution/market_impact.py     163 statements,   7 missed (96% coverage)
+src/ml4t.backtest/execution/liquidity.py          80 statements,   2 missed (98% coverage)
 ```
 
 FillSimulator and its integrations are well-tested.
@@ -210,7 +210,7 @@ FillSimulator and its integrations are well-tested.
 2. **Document FillSimulator API** (if not already done)
    - Add comprehensive docstring examples showing stateless usage
    - Document market impact timing model (orders don't self-impact)
-   - Location: `src/qengine/execution/fill_simulator.py`
+   - Location: `src/ml4t.backtest/execution/fill_simulator.py`
 
 3. **Consider Test Refactoring** (low priority)
    - Many tests now have duplicated "two event" pattern
@@ -308,7 +308,7 @@ Focus: [Choose one]
 ## Transition Prompt for Next Agent
 
 ```
-I'm continuing work on the QEngine backtesting framework. The previous session successfully fixed 18 test failures after extracting FillSimulator from SimulationBroker.
+I'm continuing work on the ml4t.backtest backtesting framework. The previous session successfully fixed 18 test failures after extracting FillSimulator from SimulationBroker.
 
 Current state:
 - 325/325 tests passing (one pre-existing flaky test excluded)

@@ -188,16 +188,16 @@ for n_days, n_stocks in test_sizes:
         f"{n_days:<10} {n_stocks:<10} {n_signals:<10} {n_trades:<10} {exec_time:<12.3f} {trades_per_sec:<12.1f}",
     )
 
-# Compare with QEngine performance (from previous tests)
+# Compare with ml4t.backtest performance (from previous tests)
 print("\n" + "=" * 70)
 print("PERFORMANCE COMPARISON")
 print("=" * 70)
 print("From previous multi-asset validation (5,000 trades):")
-print("- QEngine:     0.580 seconds (8,621 trades/sec)")
+print("- ml4t.backtest:     0.580 seconds (8,621 trades/sec)")
 print("- VectorBT:    5.406 seconds (918 trades/sec)")
 print(f"- VectorBT Pro: {pro_time:.3f} seconds ({n_trades / pro_time:.0f} trades/sec)")
 print()
-print(f"QEngine vs VectorBT Pro speedup: {pro_time / 0.580:.1f}x")
+print(f"ml4t.backtest vs VectorBT Pro speedup: {pro_time / 0.580:.1f}x")
 
 # Test advanced VectorBT Pro features
 print("\n" + "=" * 70)
@@ -267,4 +267,4 @@ print(
     f"3. Parameter optimization: {len(lookback_periods) * len(top_n_stocks)} combinations in {opt_time:.2f}s",
 )
 print("4. Advanced metrics and features working correctly")
-print(f"5. QEngine still faster by {pro_time / 0.580:.1f}x on this workload")
+print(f"5. ml4t.backtest still faster by {pro_time / 0.580:.1f}x on this workload")

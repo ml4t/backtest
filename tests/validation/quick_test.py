@@ -30,7 +30,7 @@ except Exception as e:
 print("\n3. Testing adapter imports...")
 try:
     from adapters import (
-        QEngineAdapter,
+        ml4t.backtestAdapter,
         VectorBTProAdapter,
         VectorBTFreeAdapter,
         BacktraderAdapter,
@@ -80,16 +80,16 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 
-# Test 6: Test QEngine adapter initialization
-print("\n6. Testing QEngine adapter...")
+# Test 6: Test ml4t.backtest adapter initialization
+print("\n6. Testing ml4t.backtest adapter...")
 try:
-    adapter = QEngineAdapter()
-    print(f"   ✓ QEngine adapter created: {adapter.name}")
+    adapter = ml4t.backtestAdapter()
+    print(f"   ✓ ml4t.backtest adapter created: {adapter.name}")
     print(f"   Stop Loss: {adapter.supports_stop_loss()}")
     print(f"   Take Profit: {adapter.supports_take_profit()}")
     print(f"   Trailing Stop: {adapter.supports_trailing_stop()}")
 except Exception as e:
-    print(f"   ✗ Error creating QEngine adapter: {e}")
+    print(f"   ✗ Error creating ml4t.backtest adapter: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
@@ -118,5 +118,5 @@ print("✅ All component tests passed!")
 print("=" * 60)
 print("\nNext steps:")
 print("1. Run: python tests/validation/run_validation.py --help")
-print("2. Try: python tests/validation/run_validation.py --strategy ma_cross --platforms qengine")
-print("3. Compare: python tests/validation/run_validation.py --strategy ma_cross --platforms qengine,vectorbt_free")
+print("2. Try: python tests/validation/run_validation.py --strategy ma_cross --platforms ml4t.backtest")
+print("3. Compare: python tests/validation/run_validation.py --strategy ma_cross --platforms ml4t.backtest,vectorbt_free")

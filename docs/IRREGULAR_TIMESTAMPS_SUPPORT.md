@@ -1,8 +1,8 @@
-# Irregular Timestamps Support in QEngine
+# Irregular Timestamps Support in ml4t.backtest
 
 ## Overview
 
-QEngine's event-driven architecture provides **native support for irregular timestamps**, allowing backtesting on any type of bar aggregation including volume bars, dollar bars, information bars, and other non-time-based sampling methods. This capability is a key differentiator that sets QEngine apart from many other backtesting frameworks.
+ml4t.backtest's event-driven architecture provides **native support for irregular timestamps**, allowing backtesting on any type of bar aggregation including volume bars, dollar bars, information bars, and other non-time-based sampling methods. This capability is a key differentiator that sets ml4t.backtest apart from many other backtesting frameworks.
 
 ## Why Irregular Timestamps Matter
 
@@ -18,13 +18,13 @@ Using time-based bars can introduce significant biases:
 - Structural breaks at market open/close
 - Information leakage across regular intervals
 
-## QEngine's Event-Driven Solution
+## ml4t.backtest's Event-Driven Solution
 
-QEngine's core architecture is built around **events**, not time intervals:
+ml4t.backtest's core architecture is built around **events**, not time intervals:
 
 ```python
-from qengine.core.event import Event, MarketEvent
-from qengine.core.types import MarketDataType
+from ml4t.backtest.core.event import Event, MarketEvent
+from ml4t.backtest.core.types import MarketDataType
 from datetime import datetime
 
 # Volume bar event - triggers when 10,000 shares traded
@@ -56,7 +56,7 @@ dollar_bar_event = MarketEvent(
 
 ## Supported Bar Types
 
-QEngine can handle any bar aggregation method supported by qfeatures:
+ml4t.backtest can handle any bar aggregation method supported by qfeatures:
 
 ### 1. Volume Bars
 ```python
@@ -66,7 +66,7 @@ from qfeatures.bars.volume import VolumeBars
 volume_bars = VolumeBars(threshold=10000)
 irregular_data = volume_bars.transform(tick_data)
 
-# QEngine processes these irregular timestamps naturally
+# ml4t.backtest processes these irregular timestamps naturally
 for row in irregular_data.iter_rows(named=True):
     event = MarketEvent(
         timestamp=row["timestamp"],
@@ -85,14 +85,14 @@ for row in irregular_data.iter_rows(named=True):
 ```python
 # Dollar volume bars from qfeatures
 dollar_data = dollar_bars.transform(tick_data)
-# QEngine processes seamlessly - timestamps are completely irregular
+# ml4t.backtest processes seamlessly - timestamps are completely irregular
 ```
 
 ### 3. Information Bars
 ```python
 # Information-driven bars (e.g., based on VPIN, order flow imbalance)
 info_data = info_bars.transform(tick_data)
-# QEngine handles complex conditional logic for bar formation
+# ml4t.backtest handles complex conditional logic for bar formation
 ```
 
 ### 4. Tick Bars
@@ -106,9 +106,9 @@ tick_data = tick_bars.transform(raw_ticks)
 
 ### Event-Driven Clock
 ```python
-from qengine.core.clock import SimulationClock
+from ml4t.backtest.core.clock import SimulationClock
 
-# QEngine's clock is event-driven, not time-driven
+# ml4t.backtest's clock is event-driven, not time-driven
 clock = SimulationClock()
 
 # Advances based on event timestamps, regardless of irregularity
@@ -151,21 +151,21 @@ def on_market_event(self, event: MarketEvent, pit_data):
 
 ## Integration with QFeatures
 
-QEngine is designed to seamlessly consume irregular data from qfeatures:
+ml4t.backtest is designed to seamlessly consume irregular data from qfeatures:
 
 ```python
 import polars as pl
 from qfeatures.bars.volume import VolumeBars
-from qengine import QEngine
-from qengine.data.feed import PolarsDataFeed
+from ml4t.backtest import ml4t.backtest
+from ml4t.backtest.data.feed import PolarsDataFeed
 
 # 1. Create irregular bars with qfeatures
 volume_bars = VolumeBars(threshold=50000)  # 50k share bars
 irregular_df = volume_bars.fit_transform(tick_data)
 
-# 2. Feed directly into QEngine
+# 2. Feed directly into ml4t.backtest
 feed = PolarsDataFeed(irregular_df)
-engine = QEngine()
+engine = ml4t.backtest()
 engine.add_data_feed(feed)
 
 # 3. Strategy processes irregular timestamps naturally
@@ -189,8 +189,8 @@ This captures market microstructure effects that time bars miss
 
 import polars as pl
 from qfeatures.bars.volume import VolumeBars
-from qengine import QEngine
-from qengine.strategy import Strategy
+from ml4t.backtest import ml4t.backtest
+from ml4t.backtest.strategy import Strategy
 
 class VolumeMomentumStrategy(Strategy):
     def __init__(self):
@@ -233,7 +233,7 @@ for row in volume_df.head(10).iter_rows(named=True):
     print(f"{row['timestamp']} - Volume: {row['volume']:,}")
 
 # Backtest on irregular timestamps
-engine = QEngine()
+engine = ml4t.backtest()
 engine.add_strategy(VolumeMomentumStrategy())
 engine.add_data_feed(PolarsDataFeed(volume_df))
 
@@ -243,7 +243,7 @@ print(f"\nBacktest completed with {len(volume_df)} irregular events")
 
 ## Performance Benefits
 
-Using irregular timestamps with QEngine provides several advantages:
+Using irregular timestamps with ml4t.backtest provides several advantages:
 
 ### 1. Information Content
 - **Higher signal-to-noise ratio**: Bars form based on market activity, not time
@@ -264,7 +264,7 @@ Using irregular timestamps with QEngine provides several advantages:
 
 | Framework | Time Bars | Volume Bars | Dollar Bars | Info Bars | Irregular Support |
 |-----------|-----------|-------------|-------------|-----------|-------------------|
-| **QEngine** | ✅ | ✅ | ✅ | ✅ | **Native** |
+| **ml4t.backtest** | ✅ | ✅ | ✅ | ✅ | **Native** |
 | Backtrader | ✅ | ❌ | ❌ | ❌ | Workarounds only |
 | Zipline | ✅ | ❌ | ❌ | ❌ | Custom pipeline |
 | VectorBT | ✅ | Limited | Limited | ❌ | Manual preprocessing |
@@ -274,8 +274,8 @@ Using irregular timestamps with QEngine provides several advantages:
 
 ### Event Processing
 ```python
-# QEngine's core event loop handles any timestamp sequence
-class QEngine:
+# ml4t.backtest's core event loop handles any timestamp sequence
+class ml4t.backtest:
     def process_events(self, events):
         # Sort events by timestamp (handles irregular sequences)
         sorted_events = sorted(events, key=lambda e: e.timestamp)
@@ -355,7 +355,7 @@ def on_market_event(self, event, pit_data):
 
 ## Future Enhancements
 
-QEngine's irregular timestamp support enables future innovations:
+ml4t.backtest's irregular timestamp support enables future innovations:
 
 ### 1. Multi-Asset Synchronization
 ```python
@@ -363,7 +363,7 @@ QEngine's irregular timestamp support enables future innovations:
 aapl_volume_bars = volume_bars.transform(aapl_ticks)    # Irregular timing A
 tsla_dollar_bars = dollar_bars.transform(tsla_ticks)    # Irregular timing B
 
-# QEngine synchronizes naturally without forcing artificial alignment
+# ml4t.backtest synchronizes naturally without forcing artificial alignment
 ```
 
 ### 2. Alternative Data Integration
@@ -384,13 +384,13 @@ live_volume_bars = VolumeBarStream(threshold=50000)
 
 ## Conclusion
 
-QEngine's **native support for irregular timestamps** is a fundamental architectural advantage that enables:
+ml4t.backtest's **native support for irregular timestamps** is a fundamental architectural advantage that enables:
 
 - **More realistic backtesting** through natural market timing
 - **Better strategy development** using information-driven bars
 - **Seamless integration** with qfeatures' advanced bar aggregation
 - **Future-proof architecture** for alternative data and real-time trading
 
-This capability, combined with QEngine's event-driven design, point-in-time correctness, and high-performance implementation, creates a uniquely powerful backtesting framework for modern quantitative strategies.
+This capability, combined with ml4t.backtest's event-driven design, point-in-time correctness, and high-performance implementation, creates a uniquely powerful backtesting framework for modern quantitative strategies.
 
-The ability to handle volume bars, dollar bars, information bars, and any other irregular aggregation method out-of-the-box is indeed a significant differentiator that should be prominently featured in QEngine's marketing and documentation.
+The ability to handle volume bars, dollar bars, information bars, and any other irregular aggregation method out-of-the-box is indeed a significant differentiator that should be prominently featured in ml4t.backtest's marketing and documentation.

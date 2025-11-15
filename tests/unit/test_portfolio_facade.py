@@ -17,10 +17,10 @@ import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from qengine.core.event import FillEvent, OrderSide
-from qengine.core.precision import PrecisionManager
-from qengine.portfolio.portfolio import Portfolio
-from qengine.portfolio.analytics import PerformanceAnalyzer, TradeJournal
+from ml4t.backtest.core.event import FillEvent, OrderSide
+from ml4t.backtest.core.precision import PrecisionManager
+from ml4t.backtest.portfolio.portfolio import Portfolio
+from ml4t.backtest.portfolio.analytics import PerformanceAnalyzer, TradeJournal
 
 
 # ===== Test Fixtures =====

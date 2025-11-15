@@ -26,7 +26,7 @@
    - `validate_signals()`: Ensures signal consistency
 
 3. **Engine Wrappers** (`engine_wrappers.py`):
-   - `QEngineWrapper`: Wraps qengine with standardized interface
+   - `ml4t.backtestWrapper`: Wraps ml4t.backtest with standardized interface
    - `VectorBTWrapper`: Wraps VectorBT Pro with matching interface
    - `BacktestConfig`: Configuration dataclass
    - `BacktestResult`: Standardized result format
@@ -126,7 +126,7 @@ def test_X_Y_description():
     config = BacktestConfig(...)
 
     # 4. Run backtests
-    qengine_result = QEngineWrapper().run_backtest(ohlcv, entries, exits, config)
+    ml4t.backtest_result = ml4t.backtestWrapper().run_backtest(ohlcv, entries, exits, config)
     vbt_result = VectorBTWrapper().run_backtest(ohlcv, entries, exits, config)
 
     # 5. Compare and assert
@@ -149,7 +149,7 @@ def test_X_Y_description():
 - **pandas**: Data manipulation
 - **numpy**: Numerical operations
 - **VectorBT Pro**: Reference engine
-- **qengine**: Engine under test
+- **ml4t.backtest**: Engine under test
 
 ### Development Workflow
 
@@ -181,7 +181,7 @@ def test_X_Y_description():
 ### Files to NOT Modify
 
 - `tests/validation/common/*.py` - Infrastructure is stable
-- `src/qengine/` - No core engine changes expected
+- `src/ml4t.backtest/` - No core engine changes expected
 - `tests/validation/test_1_1*.py` and `test_1_2*.py` - Already passing
 
 ---
@@ -197,13 +197,13 @@ def test_X_Y_description():
 ### Medium Risk (Phase 4)
 - Tests 4.1-4.3 (Order types)
 - More complex execution logic
-- May require debugging VectorBT vs qengine order type differences
+- May require debugging VectorBT vs ml4t.backtest order type differences
 - May exceed estimated time
 
 ### High Risk (Phases 5-6)
 - Tests 5.1-5.3, 6.1-6.2
 - Complex features (margin, multi-asset, edge cases)
-- May expose qengine limitations or bugs
+- May expose ml4t.backtest limitations or bugs
 - May require infrastructure enhancements
 - Time estimates uncertain
 
@@ -211,7 +211,7 @@ def test_X_Y_description():
 
 1. **Start Simple**: Complete Phases 1-3 before tackling complex tests
 2. **Early Warning**: If a test fails unexpectedly, pause and investigate
-3. **Document Differences**: If qengine and VectorBT differ, document why
+3. **Document Differences**: If ml4t.backtest and VectorBT differ, document why
 4. **Flexible Timeline**: Phase 5-6 may take longer than estimated
 5. **Skip if Blocked**: If a test is blocked, skip and revisit later
 

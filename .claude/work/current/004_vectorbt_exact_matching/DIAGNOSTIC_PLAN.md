@@ -1,11 +1,11 @@
-# Root Cause Analysis Plan: qengine vs VectorBT Discrepancies
+# Root Cause Analysis Plan: ml4t.backtest vs VectorBT Discrepancies
 
 ## Executive Summary
 
 **Observed Discrepancies:**
-- **Trade Count**: qengine 337 vs VectorBT 482 (30% fewer trades)
-- **Exit Types**: qengine 100% TSL vs VectorBT 87.7% TSL + 11.8% TP + 0.6% SL
-- **Performance**: qengine -24.89% vs VectorBT baseline (unknown)
+- **Trade Count**: ml4t.backtest 337 vs VectorBT 482 (30% fewer trades)
+- **Exit Types**: ml4t.backtest 100% TSL vs VectorBT 87.7% TSL + 11.8% TP + 0.6% SL
+- **Performance**: ml4t.backtest -24.89% vs VectorBT baseline (unknown)
 
 **Investigation Strategy:** 4-layer diagnostic approach from quick data inspection to isolated component testing, following evidence chain to avoid trial-and-error.
 
@@ -20,7 +20,7 @@
 - Different signal interpretation (close > upper vs different comparison)
 - Signal timing differences (bar close vs bar open)
 - Data alignment issues (timestamp mismatches)
-- Crossover vs level detection (VectorBT might use transitions, qengine uses absolute values)
+- Crossover vs level detection (VectorBT might use transitions, ml4t.backtest uses absolute values)
 
 ### Category 2: Position Management Differences
 **Hypothesis**: Re-entry logic prevents consecutive positions that VectorBT allows.
@@ -76,7 +76,7 @@
 
 **Steps:**
 1. **Compare First 10 Trades**
-   - Load qengine trades: `data/trade_logs/qengine_trades_q1_2024.parquet`
+   - Load ml4t.backtest trades: `data/trade_logs/ml4t.backtest_trades_q1_2024.parquet`
    - Load VectorBT trades: `data/trade_logs/vectorbt_trades_q1_2024.parquet` (if exists)
    - Compare entry timestamps
    - **Decision Point**: If timestamps match → signal OK, investigate exits (go to step 3)
@@ -85,17 +85,17 @@
 2. **Count Consecutive Signal Utilization**
    - For first 50 signals, count how many result in trades
    - Calculate utilization rate for both engines
-   - **Decision Point**: If qengine skips signals VectorBT doesn't → re-entry blocking (go to Layer 2-B)
+   - **Decision Point**: If ml4t.backtest skips signals VectorBT doesn't → re-entry blocking (go to Layer 2-B)
 
 3. **Compare Exit Types and Timing**
    - For trades with matching entry timestamps, compare exit types
    - Calculate time-in-trade statistics
-   - **Decision Point**: If qengine exits earlier systematically → TSL too aggressive (go to Layer 2-C)
+   - **Decision Point**: If ml4t.backtest exits earlier systematically → TSL too aggressive (go to Layer 2-C)
 
 4. **Analyze Trade Duration Distribution**
    - Plot histogram of trade durations for both engines
    - Calculate mean, median, std dev
-   - **Expected**: If TSL is too aggressive, qengine trades will be systematically shorter
+   - **Expected**: If TSL is too aggressive, ml4t.backtest trades will be systematically shorter
 
 **Expected Outcomes:**
 - Clear identification of which category (1-6) is primary root cause
@@ -108,7 +108,7 @@
 
 #### Layer 2-A: Signal Generation (if Layer 1 Step 1 failed)
 **Files to Read:**
-- `projects/crypto_futures/scripts/run_qengine_backtest.py` (signal generation logic)
+- `projects/crypto_futures/scripts/run_ml4t.backtest_backtest.py` (signal generation logic)
 - Check: Line ~100-110 where signal is created from donchian_120min_upper
 
 **Questions to Answer:**
@@ -118,8 +118,8 @@
 
 #### Layer 2-B: Re-entry Logic (if Layer 1 Step 2 failed)
 **Files to Read:**
-- `projects/crypto_futures/scripts/run_qengine_backtest.py` (on_market_event method)
-- `backtest/src/qengine/portfolio/portfolio.py` (position state tracking)
+- `projects/crypto_futures/scripts/run_ml4t.backtest_backtest.py` (on_market_event method)
+- `backtest/src/ml4t.backtest/portfolio/portfolio.py` (position state tracking)
 
 **Questions to Answer:**
 - How is `is_flat` determined?
@@ -128,7 +128,7 @@
 
 #### Layer 2-C: TSL Triggering Logic (if Layer 1 Step 3 failed)
 **Files to Read:**
-- `backtest/src/qengine/execution/bracket_manager.py` (on_market_event method)
+- `backtest/src/ml4t.backtest/execution/bracket_manager.py` (on_market_event method)
 - Focus on TSL update logic and trigger conditions
 
 **Questions to Answer:**
@@ -243,7 +243,7 @@ def test_immediate_reentry():
 3. Compare with VectorBT baseline
 4. Iterate if needed
 
-**Deliverable**: qengine matching VectorBT behavior
+**Deliverable**: ml4t.backtest matching VectorBT behavior
 
 ---
 
@@ -251,7 +251,7 @@ def test_immediate_reentry():
 
 ### Minimum Success (Phase 2 Completion)
 - ✅ Identified all root causes of discrepancies
-- ✅ qengine trade count within 5% of VectorBT (459-505 trades)
+- ✅ ml4t.backtest trade count within 5% of VectorBT (459-505 trades)
 - ✅ Exit type distribution matches VectorBT within 10%
 - ✅ First 100 trades match VectorBT exactly on entry timing
 
@@ -287,9 +287,9 @@ def test_immediate_reentry():
 3. `tests/validation/test_bracket_tsl_update.py` - Layer 4 isolated tests
 
 ### Existing Resources
-- `data/trade_logs/qengine_trades_q1_2024.parquet` - qengine results
+- `data/trade_logs/ml4t.backtest_trades_q1_2024.parquet` - ml4t.backtest results
 - `data/trade_logs/vectorbt_trades_q1_2024.parquet` - VectorBT baseline (if exists)
-- `backtest/src/qengine/execution/bracket_manager.py` - TSL/TP implementation
+- `backtest/src/ml4t.backtest/execution/bracket_manager.py` - TSL/TP implementation
 - Previous investigation docs in `projects/crypto_futures/docs/TASK-*_COMPLETION.md`
 
 ---

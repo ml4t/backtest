@@ -8,8 +8,8 @@ if str(tests_path) not in sys.path:
     sys.path.insert(0, str(tests_path))
 
 from validation.models import VectorBTCommission
-from qengine.execution.order import Order
-from qengine.core.types import OrderType, OrderSide
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.core.types import OrderType, OrderSide
 
 
 def test_vectorbt_commission_percentage_only():

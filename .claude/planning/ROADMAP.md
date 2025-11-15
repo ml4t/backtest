@@ -1,4 +1,4 @@
-# QEngine Development Roadmap
+# ml4t.backtest Development Roadmap
 
 ## Current Status: Pre-Alpha (v0.1.0)
 
@@ -236,6 +236,6 @@
 
 ## Contact
 
-- GitHub: https://github.com/quantlab/qengine
-- Email: qengine@example.com
-- Documentation: https://qengine.readthedocs.io
+- GitHub: https://github.com/quantlab/ml4t.backtest
+- Email: ml4t.backtest@example.com
+- Documentation: https://ml4t.backtest.readthedocs.io

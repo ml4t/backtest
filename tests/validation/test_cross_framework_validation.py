@@ -1,7 +1,7 @@
 """
 Comprehensive Cross-Framework Validation Test
 
-Tests QEngine against VectorBT and Backtrader using identical data and strategies.
+Tests ml4t.backtest against VectorBT and Backtrader using identical data and strategies.
 This becomes part of our pytest suite for continuous validation.
 """
 
@@ -13,14 +13,14 @@ import numpy as np
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 from frameworks import (
     BacktraderAdapter,
     MomentumStrategy,
-    QEngineAdapter,
+    ml4t.backtestAdapter,
     ValidationResult,
     VectorBTAdapter,
 )
@@ -198,9 +198,9 @@ def test_cross_framework_validation():
     adapters = []
 
     try:
-        adapters.append(QEngineAdapter())
+        adapters.append(ml4t.backtestAdapter())
     except Exception as e:
-        print(f"QEngine adapter failed to create: {e}")
+        print(f"ml4t.backtest adapter failed to create: {e}")
 
     try:
         adapters.append(VectorBTAdapter())

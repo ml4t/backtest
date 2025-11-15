@@ -2,7 +2,7 @@
 Test data helper with intelligent fallback.
 
 Provides reproducible test data with multiple fallback strategies:
-1. qdata integration (if available) - tests qengine + qdata together
+1. qdata integration (if available) - tests ml4t.backtest + qdata together
 2. yfinance directly - standalone mode
 3. Cached fixtures - offline mode
 4. Synthetic GBM - pure unit tests
@@ -115,7 +115,7 @@ class TestDataProvider:
             if qdata_path.exists():
                 sys.path.insert(0, str(qdata_path))
 
-            from qdata.providers.yahoo import YahooFinanceProvider
+            from ml4t.data.providers.yahoo import YahooFinanceProvider
 
             provider = YahooFinanceProvider(enable_progress=False)
             df_polars = provider.fetch_ohlcv(

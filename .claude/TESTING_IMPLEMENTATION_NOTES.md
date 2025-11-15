@@ -1,4 +1,4 @@
-# QEngine Testing Implementation - Technical Notes
+# ml4t.backtest Testing Implementation - Technical Notes
 
 **Document**: Supplementary technical guidance for building validation scenarios
 **Audience**: Developers implementing the test scenarios roadmap
@@ -92,7 +92,7 @@ config = {
 }
 
 platform_notes = {
-    'qengine': 'Executes at next bar open (default)',
+    'ml4t.backtest': 'Executes at next bar open (default)',
     'vectorbt': 'May execute same bar if price touched',
     'backtrader': 'Next bar open for market orders',
 }
@@ -154,7 +154,7 @@ Signal(..., order_type='LIMIT', limit_price=80.0),
 
 ## Execution Timing Deep Dive
 
-### QEngine Event Loop
+### ml4t.backtest Event Loop
 
 ```
 FOR each bar in data:
@@ -251,9 +251,9 @@ import importlib
 module = importlib.import_module(f'scenarios.scenario_001_...')
 runner = ScenarioRunner(module)
 
-# Run qengine only
-results = runner.run(['qengine'])
-result = results['qengine']
+# Run ml4t.backtest only
+results = runner.run(['ml4t.backtest'])
+result = results['ml4t.backtest']
 
 # Check for errors
 if result.errors:
@@ -265,9 +265,9 @@ else:
 ### Step 4: Extract and Inspect Trades
 
 ```python
-from extractors import extract_qengine_trades
+from extractors import extract_ml4t.backtest_trades
 
-trades = extract_qengine_trades(result.raw_results, result.data)
+trades = extract_ml4t.backtest_trades(result.raw_results, result.data)
 for trade in trades:
     print(f"Entry: {trade.entry_timestamp} @ {trade.entry_price}")
     print(f"Exit:  {trade.exit_timestamp} @ {trade.exit_price if trade.exit_price else 'OPEN'}")
@@ -290,12 +290,12 @@ print(f"Entry price ${trade.entry_price} matches {component}")
 
 ```python
 # Run all platforms
-results = runner.run(['qengine', 'vectorbt', 'backtrader'])
+results = runner.run(['ml4t.backtest', 'vectorbt', 'backtrader'])
 
 # Extract trades from each
-from extractors import extract_qengine_trades, extract_vectorbt_trades, extract_backtrader_trades
+from extractors import extract_ml4t.backtest_trades, extract_vectorbt_trades, extract_backtrader_trades
 
-trades_qengine = extract_qengine_trades(results['qengine'].raw_results, results['qengine'].data)
+trades_ml4t.backtest = extract_ml4t.backtest_trades(results['ml4t.backtest'].raw_results, results['ml4t.backtest'].data)
 trades_vbt = extract_vectorbt_trades(results['vectorbt'].raw_results['portfolio'], results['vectorbt'].raw_results['data'])
 trades_bt = extract_backtrader_trades(results['backtrader'].raw_results['trades'], results['backtrader'].raw_results['data'])
 
@@ -303,7 +303,7 @@ trades_bt = extract_backtrader_trades(results['backtrader'].raw_results['trades'
 from comparison import match_trades
 
 matches = match_trades({
-    'qengine': trades_qengine,
+    'ml4t.backtest': trades_ml4t.backtest,
     'vectorbt': trades_vbt,
     'backtrader': trades_bt,
 })
@@ -521,7 +521,7 @@ IDEA → DRAFT → IMPLEMENTATION → VALIDATION → ACCEPTANCE → MAINTENANCE
 
 **Draft**: Document what you want to test, why, and expected results
 **Implementation**: Code the scenario following template
-**Validation**: Run on qengine, verify results make sense
+**Validation**: Run on ml4t.backtest, verify results make sense
 **Cross-platform**: Run on VectorBT/Backtrader, document differences
 **Acceptance**: All platforms pass within tolerance OR document expected differences
 **Maintenance**: Keep up-to-date with code changes
@@ -556,7 +556,7 @@ When implementing the roadmap, you'll create/modify:
 1. **Review this document** with the team
 2. **Create fixtures framework** (3-4 hours)
 3. **Implement scenarios 002-005** (2-3 days)
-4. **Validate on qengine** (1 day)
+4. **Validate on ml4t.backtest** (1 day)
 5. **Run cross-platform comparison** (1 day)
 6. **Iterate** on remaining scenarios
 

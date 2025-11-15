@@ -1,8 +1,8 @@
-# QEngine Testing Environment Exploration - Executive Summary
+# ml4t.backtest Testing Environment Exploration - Executive Summary
 
 **Completed**: November 4, 2025
 **Status**: Ready for implementation
-**Scope**: Comprehensive analysis of testing requirements for qengine backtesting library
+**Scope**: Comprehensive analysis of testing requirements for ml4t.backtest backtesting library
 
 ---
 
@@ -11,12 +11,12 @@
 ### 1. Current Testing Infrastructure
 - **34 unit tests** in `tests/unit/` covering broker, execution, and order logic
 - **1 validation scenario** demonstrating cross-platform comparison framework
-- **4-platform support**: qengine, VectorBT, Backtrader, Zipline
+- **4-platform support**: ml4t.backtest, VectorBT, Backtrader, Zipline
 - **StandardTrade format** for platform-independent trade comparison
 
 **Finding**: Infrastructure is well-designed; we need to leverage it for 20+ scenarios.
 
-### 2. QEngine Capabilities
+### 2. ml4t.backtest Capabilities
 **Supported Order Types**:
 - ✅ Market orders (complete)
 - ✅ Limit orders (complete, intrabar matching)
@@ -34,9 +34,9 @@
 | **VectorBT** | Same-bar (conditional) | OHLC range check | No |
 | **Backtrader** | Next-bar open | Event-driven | Yes |
 | **Zipline** | Next-bar open | Volume-limited | Yes |
-| **QEngine** | Flexible | OHLC range check | Configurable |
+| **ml4t.backtest** | Flexible | OHLC range check | Configurable |
 
-**Key Insight**: QEngine has the most flexible execution model; can match any platform's behavior.
+**Key Insight**: ml4t.backtest has the most flexible execution model; can match any platform's behavior.
 
 ### 4. Scenario Roadmap
 
@@ -48,7 +48,7 @@
 4. **COMPLEX (016-020)**: Re-entry, partial fills, time-in-force - 5 scenarios
 5. **STRESS (021+)**: Margin, corporate actions, large portfolios - 5+ scenarios
 
-**Coverage**: 15+ order types/features, 90%+ of qengine functionality
+**Coverage**: 15+ order types/features, 90%+ of ml4t.backtest functionality
 
 ---
 
@@ -58,7 +58,7 @@
 **Length**: 1,000+ lines
 **Contents**:
 - Complete codebase analysis (Part 1)
-- QEngine order type details (Part 2)
+- ml4t.backtest order type details (Part 2)
 - Competitor execution model research (Part 3)
 - Detailed 25-scenario roadmap (Part 5)
 - Testing architecture proposal (Part 6)
@@ -107,10 +107,10 @@
 
 ### Opportunity: Execution Timing Clarity
 - Different platforms behave differently
-- qEngines implementation supports multiple timing models
+- ml4t.backtest's implementation supports multiple timing models
 - No clear documentation of timing semantics
 
-**Action**: Create execution timing guide, add qengine configuration options.
+**Action**: Create execution timing guide, add ml4t.backtest configuration options.
 
 ### Risk: Platform Discrepancies
 - VectorBT same-bar vs Backtrader next-bar
@@ -174,7 +174,7 @@
 
 ### Must-Have
 - [ ] All 34 unit tests pass
-- [ ] Scenarios 001-005 pass on qengine
+- [ ] Scenarios 001-005 pass on ml4t.backtest
 - [ ] Cross-platform comparison works for basic scenarios
 - [ ] No look-ahead bias in any scenario
 - [ ] Documentation complete and clear
@@ -219,7 +219,7 @@
 ### Infrastructure
 - Test data: Synthetic (no cost)
 - VectorBT/Backtrader/Zipline: Already available
-- qengine: Source code available
+- ml4t.backtest: Source code available
 
 ### Time Budget
 - **Week 1**: Foundation + basic scenarios (40 hours)
@@ -235,7 +235,7 @@
 ### Hard Dependencies
 - Python 3.9+
 - Polars (data handling)
-- qengine source code
+- ml4t.backtest source code
 - VectorBT Pro (for cross-platform validation)
 - Backtrader (optional, for comparison)
 - Zipline (optional, for volume-limited fill testing)
@@ -257,13 +257,13 @@
 4. **Good timing**: No competing priorities, team has capacity
 
 **Start with**: Phase 1a (infrastructure) + Phase 1b (basic scenarios)
-**Then assess**: Need for cross-platform validation vs qengine-only
+**Then assess**: Need for cross-platform validation vs ml4t.backtest-only
 
 ---
 
 ## Questions Answered
 
-**Q: Is qengine ready for validation scenarios?**
+**Q: Is ml4t.backtest ready for validation scenarios?**
 A: Yes. All major order types implemented, infrastructure in place, just need scenarios.
 
 **Q: How much work is this?**
@@ -276,9 +276,9 @@ A: Yes. Edge cases like re-entry, partial fills, and bracket order timing often 
 A: Partially. Scenarios 001-005 can be created with minimal infrastructure.
 
 **Q: What about VectorBT/Backtrader alignment?**
-A: Scenarios will document where platforms differ. qEngines flexible architecture can match any.
+A: Scenarios will document where platforms differ. ml4t.backtest's flexible architecture can match any.
 
-**Q: How do we maintain scenarios as qengine evolves?**
+**Q: How do we maintain scenarios as ml4t.backtest evolves?**
 A: Scenarios are data-driven (signals + expectations). Code changes shouldn't break them.
 
 ---
@@ -309,12 +309,12 @@ A: Scenarios are data-driven (signals + expectations). Code changes shouldn't br
 
 ## Conclusion
 
-QEngine has excellent foundations for validation testing. The infrastructure (StandardTrade, extractors, runner, comparison framework) is well-designed and extensible. 
+ml4t.backtest has excellent foundations for validation testing. The infrastructure (StandardTrade, extractors, runner, comparison framework) is well-designed and extensible. 
 
 The next phase is straightforward: create 20+ scenarios that progress from basic market orders through complex bracket order scenarios. Each scenario is self-contained, follows a clear pattern, and validates specific order types and execution semantics.
 
 With focused effort over 6 weeks, we can build a comprehensive test suite that:
-- Validates all qengine order types
+- Validates all ml4t.backtest order types
 - Documents execution timing semantics
 - Provides reference implementations for each scenario
 - Enables reliable cross-platform comparison

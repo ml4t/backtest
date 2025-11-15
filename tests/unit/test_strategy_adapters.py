@@ -5,16 +5,16 @@ from unittest.mock import Mock
 
 import numpy as np
 
-from qengine.core.event import FillEvent, MarketEvent
-from qengine.core.types import MarketDataType, OrderSide
-from qengine.strategy.adapters import (
+from ml4t.backtest.core.event import FillEvent, MarketEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide
+from ml4t.backtest.strategy.adapters import (
     DataFrameAdapter,
     ExternalStrategyInterface,
     PITData,
     StrategyAdapter,
     StrategySignal,
 )
-from qengine.strategy.crypto_basis_adapter import (
+from ml4t.backtest.strategy.crypto_basis_adapter import (
     CryptoBasisAdapter,
     CryptoBasisExternalStrategy,
     create_crypto_basis_strategy,
@@ -290,7 +290,7 @@ class TestCryptoBasisStrategy:
                 break
 
     def test_basis_adapter_integration(self):
-        """Test full basis adapter with QEngine integration."""
+        """Test full basis adapter with ml4t.backtest integration."""
         adapter = CryptoBasisAdapter(
             spot_asset_id="BTC",
             futures_asset_id="BTC_FUTURE",

@@ -1,10 +1,10 @@
-"""Demonstration of market impact models in QEngine."""
+"""Demonstration of market impact models in ml4t.backtest."""
 
 from datetime import datetime, timedelta
 
 import numpy as np
 
-from qengine.execution.market_impact import (
+from ml4t.backtest.execution.market_impact import (
     AlmgrenChrissImpact,
     IntraDayMomentum,
     LinearMarketImpact,
@@ -12,7 +12,7 @@ from qengine.execution.market_impact import (
     ObizhaevWangImpact,
     PropagatorImpact,
 )
-from qengine.execution.order import Order, OrderSide, OrderType
+from ml4t.backtest.execution.order import Order, OrderSide, OrderType
 
 
 def create_order(side: OrderSide, quantity: float, asset_id: str = "AAPL") -> Order:
@@ -310,7 +310,7 @@ def demo_volume_impact_comparison():
 def main():
     """Run all market impact demonstrations."""
     print("MARKET IMPACT MODELS DEMONSTRATION")
-    print("QEngine - Advanced Backtesting Framework")
+    print("ml4t.backtest - Advanced Backtesting Framework")
     print()
 
     demo_basic_impact_models()

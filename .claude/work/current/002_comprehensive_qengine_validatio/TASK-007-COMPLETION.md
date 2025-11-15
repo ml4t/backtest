@@ -42,7 +42,7 @@ Created `UniversalDataLoader` class that loads data from ~/ml4t/projects/ and co
    - **Lowercase** column names (backtrader requirement)
    - Single-symbol OHLCV
 
-4. **`to_qengine_format()`**:
+4. **`to_ml4t.backtest_format()`**:
    - DatetimeIndex
    - Multi-asset support: keeps ticker column
    - Native Polars-compatible format
@@ -83,7 +83,7 @@ Test categories:
 ## Acceptance Criteria Status
 
 ✅ Loads daily equities, minute bars, crypto, tick data
-✅ Converts to framework-specific formats (VectorBT, Zipline, Backtrader, QEngine)
+✅ Converts to framework-specific formats (VectorBT, Zipline, Backtrader, ml4t.backtest)
 ✅ Handles Polars ↔ Pandas conversion
 ✅ Unit tests for all data sources (21/21 passing)
 

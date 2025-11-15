@@ -454,14 +454,14 @@ class Portfolio:
 
         # Optional analytics (can disable for performance)
         if track_analytics:
-            from qengine.portfolio.analytics import PerformanceAnalyzer
+            from ml4t.backtest.portfolio.analytics import PerformanceAnalyzer
             AnalyzerClass = analyzer_class or PerformanceAnalyzer
             self._analyzer = AnalyzerClass(self._tracker)
         else:
             self._analyzer = None
 
         # Trade journal
-        from qengine.portfolio.analytics import TradeJournal
+        from ml4t.backtest.portfolio.analytics import TradeJournal
         JournalClass = journal_class or TradeJournal
         self._journal = JournalClass()
 

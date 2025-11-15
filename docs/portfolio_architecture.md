@@ -93,7 +93,7 @@ class Portfolio:
 
 ### 1. PositionTracker (Core)
 
-**Location**: `src/qengine/portfolio/core.py`
+**Location**: `src/ml4t.backtest/portfolio/core.py`
 
 **Responsibility**: Pure domain logic for position and cash tracking.
 
@@ -122,7 +122,7 @@ class PositionTracker:
 
 ### 2. PerformanceAnalyzer (Metrics)
 
-**Location**: `src/qengine/portfolio/analytics.py`
+**Location**: `src/ml4t.backtest/portfolio/analytics.py`
 
 **Responsibility**: Calculate performance metrics and risk analytics.
 
@@ -152,7 +152,7 @@ class PerformanceAnalyzer:
 
 ### 3. TradeJournal (History)
 
-**Location**: `src/qengine/portfolio/analytics.py`
+**Location**: `src/ml4t.backtest/portfolio/analytics.py`
 
 **Responsibility**: Record fills and calculate trade-based metrics.
 
@@ -177,7 +177,7 @@ class TradeJournal:
 
 ### 4. Position & PortfolioState (Data)
 
-**Location**: `src/qengine/portfolio/state.py`
+**Location**: `src/ml4t.backtest/portfolio/state.py`
 
 **Responsibility**: Data structures for position and state snapshots.
 

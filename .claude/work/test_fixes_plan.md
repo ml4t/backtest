@@ -264,7 +264,7 @@ class TestMarginAccount:
 
 **Testing**:
 ```bash
-uv run pytest tests/unit/test_margin.py --cov=qengine.portfolio.margin --cov-report=term-missing
+uv run pytest tests/unit/test_margin.py --cov=ml4t.backtest.portfolio.margin --cov-report=term-missing
 ```
 
 ---
@@ -304,7 +304,7 @@ Expand clock module test coverage from 36% to 70%+ by adding missing test cases 
 
 **Testing**:
 ```bash
-uv run pytest tests/unit/test_clock*.py --cov=qengine.core.clock --cov-report=term-missing
+uv run pytest tests/unit/test_clock*.py --cov=ml4t.backtest.core.clock --cov-report=term-missing
 ```
 
 ---
@@ -344,7 +344,7 @@ Expand SimplePortfolio test coverage from 77% to 90%+ by adding missing test cas
 
 **Testing**:
 ```bash
-uv run pytest tests/unit/test_portfolio*.py --cov=qengine.portfolio.simple --cov-report=term-missing
+uv run pytest tests/unit/test_portfolio*.py --cov=ml4t.backtest.portfolio.simple --cov-report=term-missing
 ```
 
 ---
@@ -372,7 +372,7 @@ Run complete test suite to verify all fixes and ensure no regressions.
 uv run pytest tests/unit/ -v
 
 # Coverage report
-uv run pytest tests/unit/ --cov=qengine --cov-report=term-missing --cov-report=html
+uv run pytest tests/unit/ --cov=ml4t.backtest --cov-report=term-missing --cov-report=html
 
 # Quality checks
 uv run ruff check src/ tests/

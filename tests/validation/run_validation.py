@@ -3,7 +3,7 @@
 Main validation runner for cross-platform backtest validation.
 
 Usage:
-    python run_validation.py --strategy ma_cross --platforms qengine,vectorbt_pro
+    python run_validation.py --strategy ma_cross --platforms ml4t.backtest,vectorbt_pro
     python run_validation.py --strategy all --platforms all
 """
 import argparse
@@ -12,7 +12,7 @@ from pathlib import Path
 
 from adapters import (
     BacktraderAdapter,
-    QEngineAdapter,
+    ml4t.backtestAdapter,
     VectorBTFreeAdapter,
     VectorBTProAdapter,
     ZiplineAdapter,
@@ -25,7 +25,7 @@ from validators import TradeValidator
 def get_available_platforms():
     """Get list of available platform adapters."""
     return {
-        'qengine': QEngineAdapter,
+        'ml4t.backtest': ml4t.backtestAdapter,
         'vectorbt_pro': VectorBTProAdapter,
         'vectorbt_free': VectorBTFreeAdapter,
         'zipline': ZiplineAdapter,
@@ -113,7 +113,7 @@ def run_validation(
             adapter = adapter_class()
 
             # Prepare data in platform-specific format
-            if platform_name == 'qengine':
+            if platform_name == 'ml4t.backtest':
                 platform_data = data
             else:
                 # Most platforms need pandas
@@ -196,7 +196,7 @@ def main():
 
     parser.add_argument(
         '--platforms',
-        default='qengine,vectorbt_pro',
+        default='ml4t.backtest,vectorbt_pro',
         help='Comma-separated list of platforms (or "all")'
     )
 

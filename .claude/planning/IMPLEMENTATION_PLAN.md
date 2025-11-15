@@ -1,8 +1,8 @@
-# QEngine Implementation Plan
+# ml4t.backtest Implementation Plan
 
 ## Executive Summary
 
-This document outlines a comprehensive implementation plan for **QEngine**, a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. Based on the detailed design specification, this plan provides a roadmap for building a high-performance, Python-native backtesting framework that addresses critical gaps in the current ecosystem.
+This document outlines a comprehensive implementation plan for **ml4t.backtest**, a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. Based on the detailed design specification, this plan provides a roadmap for building a high-performance, Python-native backtesting framework that addresses critical gaps in the current ecosystem.
 
 ## Project Goals
 
@@ -163,10 +163,10 @@ This document outlines a comprehensive implementation plan for **QEngine**, a st
 ### Core Components
 
 ```
-qengine/
+ml4t.backtest/
 ├── pyproject.toml              # Modern Python packaging
 ├── src/
-│   └── qengine/
+│   └── ml4t.backtest/
 │       ├── __init__.py
 │       ├── core/
 │       │   ├── __init__.py
@@ -282,7 +282,7 @@ tests/
 
 ### From Zipline
 1. Create `ZiplineCompatStrategy` base class
-2. Map Zipline API methods to QEngine equivalents
+2. Map Zipline API methods to ml4t.backtest equivalents
 3. Provide data bundle conversion utilities
 4. Document API differences and improvements
 
@@ -400,6 +400,6 @@ tests/
 
 ## Conclusion
 
-QEngine represents a significant opportunity to create the definitive backtesting framework for the modern Python quantitative finance ecosystem. By combining the best practices from existing solutions with modern technologies and a focus on ML workflows, QEngine will fill a critical gap in the market and serve as the foundation for the next generation of algorithmic trading systems.
+ml4t.backtest represents a significant opportunity to create the definitive backtesting framework for the modern Python quantitative finance ecosystem. By combining the best practices from existing solutions with modern technologies and a focus on ML workflows, ml4t.backtest will fill a critical gap in the market and serve as the foundation for the next generation of algorithmic trading systems.
 
-The phased approach ensures we can deliver value quickly while building toward a comprehensive solution. The emphasis on performance, correctness, and usability will make QEngine the natural choice for both researchers and practitioners in the quantitative finance space.
+The phased approach ensures we can deliver value quickly while building toward a comprehensive solution. The emphasis on performance, correctness, and usability will make ml4t.backtest the natural choice for both researchers and practitioners in the quantitative finance space.

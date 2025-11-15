@@ -8,7 +8,7 @@ from .engine_wrappers import (
     VectorBTWrapper,
     ZiplineWrapper,
     BacktraderWrapper,
-    QEngineWrapper,
+    ml4t.backtestWrapper,
 )
 from .comparison import compare_trades, assert_identical, print_validation_report
 
@@ -23,7 +23,7 @@ __all__ = [
     'VectorBTWrapper',
     'ZiplineWrapper',
     'BacktraderWrapper',
-    'QEngineWrapper',
+    'ml4t.backtestWrapper',
     'compare_trades',
     'assert_identical',
     'print_validation_report',

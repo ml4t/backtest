@@ -1,4 +1,4 @@
-# QEngine Comprehensive Validation Plan
+# ml4t.backtest Comprehensive Validation Plan
 ## Cross-Framework Validation Strategy
 
 **Version**: 1.0
@@ -10,14 +10,14 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive validation strategy for QEngine against three major backtesting frameworks: **VectorBT Pro**, **Zipline-Reloaded**, and **Backtrader**. The goal is to thoroughly validate QEngine's correctness, identify performance characteristics, and establish clear guidance on framework selection for different use cases.
+This document outlines a comprehensive validation strategy for ml4t.backtest against three major backtesting frameworks: **VectorBT Pro**, **Zipline-Reloaded**, and **Backtrader**. The goal is to thoroughly validate ml4t.backtest's correctness, identify performance characteristics, and establish clear guidance on framework selection for different use cases.
 
 ### Key Objectives
 
 1. **Correctness Validation**: Achieve 95%+ agreement with VectorBT Pro across diverse scenarios
 2. **Performance Benchmarking**: Systematic comparison of speed, memory, and scalability
 3. **Feature Coverage**: Test broad range of frequencies, assets, order types, and strategies
-4. **ML Pipeline Integration**: Validate qfeatures → qeval → qengine workflow
+4. **ML Pipeline Integration**: Validate qfeatures → qeval → ml4t.backtest workflow
 5. **Production Readiness**: Document edge cases, limitations, and deployment guidance
 
 ### Current Status
@@ -25,7 +25,7 @@ This document outlines a comprehensive validation strategy for QEngine against t
 ✅ **Already Validated:**
 - Daily equities + MA crossover: 100% agreement with VectorBT (1,507.06 final value)
 - Multi-asset portfolio: 100% agreement with 5,000 trades
-- QEngine 9-265x faster than alternatives for event-driven execution
+- ml4t.backtest 9-265x faster than alternatives for event-driven execution
 
 ⚠️ **Known Issues:**
 - Backtrader: Missing trades bug (executes 9 instead of 14)
@@ -65,7 +65,7 @@ This document outlines a comprehensive validation strategy for QEngine against t
 
 | Framework | Type | Speed | Strengths | Limitations | Best For |
 |-----------|------|-------|-----------|-------------|----------|
-| **QEngine** | Event-driven | Baseline | ML integration, realistic execution, clean API | Newer, less mature | Complex ML strategies, custom execution |
+| **ml4t.backtest** | Event-driven | Baseline | ML integration, realistic execution, clean API | Newer, less mature | Complex ML strategies, custom execution |
 | **VectorBT Pro** | Vectorized | 20-25x faster | Speed, Numba JIT, mature | Proprietary, vectorized only | Parameter optimization, rapid prototyping |
 | **Zipline** | Event-driven | 126x slower | Industry standard, Quantopian legacy | Complex setup, slow | Legacy compatibility, standard backtests |
 | **Backtrader** | Event-driven | 6x slower | Popular, extensive docs | Bugs in signal execution | Community support, simple strategies |
@@ -74,7 +74,7 @@ This document outlines a comprehensive validation strategy for QEngine against t
 
 **Validation Framework** (`tests/validation/frameworks/`):
 - `base.py`: BaseFrameworkAdapter, ValidationResult, TradeRecord
-- `qengine_adapter.py`: QEngine implementation
+- `ml4t.backtest_adapter.py`: ml4t.backtest implementation
 - `vectorbt_adapter.py`: VectorBT/Pro implementation
 - `zipline_adapter.py`: Zipline implementation
 - `backtrader_adapter.py`: Backtrader implementation
@@ -99,10 +99,10 @@ The validation matrix spans 5 key dimensions:
 | Frequency | Data Source | Test Priority | Frameworks |
 |-----------|-------------|---------------|------------|
 | Daily bars | Wiki prices, equity_prices | **Tier 1** | All |
-| Minute bars | NASDAQ100 | **Tier 2** | QEngine, VectorBT Pro |
-| Tick data | tick_data/ | **Tier 4** | QEngine, VectorBT Pro |
-| Irregular bars | Generated from tick | **Tier 4** | QEngine, VectorBT Pro |
-| Multi-timeframe | Combined | **Tier 3** | QEngine, VectorBT Pro |
+| Minute bars | NASDAQ100 | **Tier 2** | ml4t.backtest, VectorBT Pro |
+| Tick data | tick_data/ | **Tier 4** | ml4t.backtest, VectorBT Pro |
+| Irregular bars | Generated from tick | **Tier 4** | ml4t.backtest, VectorBT Pro |
+| Multi-timeframe | Combined | **Tier 3** | ml4t.backtest, VectorBT Pro |
 
 #### **Dimension 2: Asset Classes**
 
@@ -126,7 +126,7 @@ The validation matrix spans 5 key dimensions:
 
 #### **Dimension 4: Order Types & Execution**
 
-| Order Type | Realism | QEngine Support | VectorBT Pro | Backtrader | Zipline |
+| Order Type | Realism | ml4t.backtest Support | VectorBT Pro | Backtrader | Zipline |
 |------------|---------|-----------------|--------------|------------|---------|
 | Market | Low | ✅ | ✅ | ✅ | ✅ |
 | Limit | Medium | ✅ | ✅ | ✅ | ✅ |
@@ -176,7 +176,7 @@ The validation matrix spans 5 key dimensions:
 **Deliverable**: `TIER2_EXECUTION_VALIDATION.md` - Order execution accuracy
 
 #### **Tier 3: ML Integration (High Value)**
-*Objective: Validate qfeatures → qeval → qengine pipeline*
+*Objective: Validate qfeatures → qeval → ml4t.backtest pipeline*
 
 | Test ID | ML Model | Features Source | Strategy | Data | Validation |
 |---------|----------|-----------------|----------|------|------------|
@@ -243,7 +243,7 @@ Based on existing benchmarks and framework architecture:
 
 | Framework | Events/sec | Trades/sec | Relative Speed | Use Case Sweet Spot |
 |-----------|-----------|------------|----------------|---------------------|
-| QEngine | 300-500 | 300-500 | 1x (baseline) | ML strategies, 10-100 assets, realistic execution |
+| ml4t.backtest | 300-500 | 300-500 | 1x (baseline) | ML strategies, 10-100 assets, realistic execution |
 | VectorBT Pro | N/A | 189,000 | 20-25x | Simple strategies, parameter optimization, 100+ assets |
 | Backtrader | 50-100 | 50-100 | 0.1-0.2x | Simple strategies, < 20 assets, learning |
 | Zipline | 2-5 | 2-5 | 0.01x | Legacy workflows, research, < 50 assets |
@@ -329,7 +329,7 @@ signals = features.compute([
 ```
 
 **Advantages**:
-- Tests qfeatures → qengine pipeline
+- Tests qfeatures → ml4t.backtest pipeline
 - Still deterministic (same params → same output)
 - Validates feature engineering integration
 
@@ -354,7 +354,7 @@ validator = ModelValidator(features, target='returns')
 model = validator.train_model('xgboost', params)
 signals = model.predict(features)
 
-# Execute in qengine
+# Execute in ml4t.backtest
 strategy = MLStrategy(model, features)
 engine = BacktestEngine(data, strategy)
 results = engine.run()
@@ -363,7 +363,7 @@ results = engine.run()
 **Advantages**:
 - Real-world ML workflow
 - Tests full QuantLab pipeline
-- Validates qfeatures → qeval → qengine integration
+- Validates qfeatures → qeval → ml4t.backtest integration
 
 **Use Cases**: Tier 3 ML validation
 
@@ -450,7 +450,7 @@ For ML-generated signals, validate:
 
 **Success Criteria**:
 - ✅ 95%+ agreement with VectorBT Pro (final value within 5%)
-- ✅ All Tier 1 tests passing with QEngine
+- ✅ All Tier 1 tests passing with ml4t.backtest
 - ✅ Discrepancies explained and documented
 
 ---
@@ -478,14 +478,14 @@ For ML-generated signals, validate:
 - 🔍 Framework execution model comparison
 
 **Success Criteria**:
-- ✅ All order types execute correctly in QEngine
+- ✅ All order types execute correctly in ml4t.backtest
 - ✅ Documented differences in execution assumptions
 - ✅ Minute-bar strategies validated
 
 ---
 
 ### Phase 3: ML Integration - Tier 3 (Week 6-7)
-**Goal**: Validate qfeatures → qeval → qengine pipeline
+**Goal**: Validate qfeatures → qeval → ml4t.backtest pipeline
 
 **Tasks**:
 - [ ] T3.1: Binary classification signals (buy/sell)
@@ -495,7 +495,7 @@ For ML-generated signals, validate:
 - [ ] T3.5: Order flow microstructure signals
 - [ ] Validate feature computation consistency
 - [ ] Test ML model integration patterns
-- [ ] Document qfeatures → qengine workflow
+- [ ] Document qfeatures → ml4t.backtest workflow
 
 **Test Matrix**:
 ```
@@ -509,7 +509,7 @@ For ML-generated signals, validate:
 - 🔗 Pipeline architecture documentation
 
 **Success Criteria**:
-- ✅ qfeatures signals execute correctly in QEngine
+- ✅ qfeatures signals execute correctly in ml4t.backtest
 - ✅ No lookahead bias in ML pipeline
 - ✅ Model predictions consistent and reproducible
 - ✅ ML strategies outperform simple baselines (as expected)
@@ -543,7 +543,7 @@ For ML-generated signals, validate:
 
 **Success Criteria**:
 - ✅ Performance profiles documented for all frameworks
-- ✅ QEngine scalability validated (500+ assets)
+- ✅ ml4t.backtest scalability validated (500+ assets)
 - ✅ Bottlenecks identified and optimization plan created
 - ✅ Clear guidance on framework selection by use case
 
@@ -593,7 +593,7 @@ signals.to_parquet('test_signals.parquet')
 #### **Step 2: Framework Execution**
 ```python
 # Execute same signals on each framework
-frameworks = ['qengine', 'vectorbtpro', 'zipline', 'backtrader']
+frameworks = ['ml4t.backtest', 'vectorbtpro', 'zipline', 'backtrader']
 
 results = {}
 for framework in frameworks:
@@ -654,8 +654,8 @@ if not comparison.all_agree():
 - No lookahead bias: Verified by timeline
 
 **Tier 4 (Performance)**:
-- QEngine speed: Within 2x of VectorBT Pro for simple strategies
-- QEngine advantages: Proven for complex ML strategies
+- ml4t.backtest speed: Within 2x of VectorBT Pro for simple strategies
+- ml4t.backtest advantages: Proven for complex ML strategies
 - Scalability: 500+ assets without degradation
 - Memory: Linear scaling with assets
 
@@ -729,8 +729,8 @@ Each validation test must document:
 - 100% reproducibility of ML pipeline results
 
 ✅ **Performance**:
-- QEngine within 2x of VectorBT Pro for simple strategies
-- QEngine advantages proven for complex ML strategies (faster than event-driven alternatives)
+- ml4t.backtest within 2x of VectorBT Pro for simple strategies
+- ml4t.backtest advantages proven for complex ML strategies (faster than event-driven alternatives)
 - Scalability validated up to 500 assets
 
 ✅ **Coverage**:
@@ -768,7 +768,7 @@ Each validation test must document:
 
 ### 8.3 Qualitative Success Indicators
 
-✅ **Confidence**: Team has high confidence in QEngine correctness
+✅ **Confidence**: Team has high confidence in ml4t.backtest correctness
 ✅ **Clarity**: Clear guidance on framework selection for different use cases
 ✅ **Completeness**: All major backtesting scenarios validated
 ✅ **Usability**: Documentation enables easy adoption by new users
@@ -780,7 +780,7 @@ Each validation test must document:
 
 Based on existing analysis and planned validation:
 
-### Choose **QEngine** for:
+### Choose **ml4t.backtest** for:
 - ✅ ML-driven strategies with complex feature engineering
 - ✅ Realistic execution simulation with multiple cost models
 - ✅ Custom strategy logic and execution rules
@@ -808,7 +808,7 @@ Based on existing analysis and planned validation:
 - ⚠️ Not recommended for production
 
 ### Use **Multiple Frameworks** for:
-- ✅ Critical strategy validation (QEngine + VectorBT Pro)
+- ✅ Critical strategy validation (ml4t.backtest + VectorBT Pro)
 - ✅ Research requiring different perspectives
 - ✅ Teaching and comparing approaches
 

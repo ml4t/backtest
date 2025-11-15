@@ -1,34 +1,34 @@
-# QEngine Cross-Framework Validation Report
+# ml4t.backtest Cross-Framework Validation Report
 
 ## Executive Summary
 
-**✅ QEngine has been successfully validated against established backtesting frameworks.**
+**✅ ml4t.backtest has been successfully validated against established backtesting frameworks.**
 
 - **Perfect Agreement with VectorBT**: 100% identical results (final value, returns, trade count)
-- **Performance Advantage**: QEngine is 178x faster than VectorBT on identical strategies
+- **Performance Advantage**: ml4t.backtest is 178x faster than VectorBT on identical strategies
 - **Real Framework Testing**: Validated against actual VectorBT 0.28.0, not simulated implementations
 - **Comprehensive Test Suite**: Pytest integration for continuous validation in CI/CD
 
 ## Validation Results
 
-### QEngine vs VectorBT 0.28.0
+### ml4t.backtest vs VectorBT 0.28.0
 **Strategy**: Moving Average Crossover (MA20 vs MA50)
 **Data**: AAPL Daily Data (2015-2016, 504 trading days)
 **Capital**: $10,000
 
-| Metric | QEngine | VectorBT | Agreement |
+| Metric | ml4t.backtest | VectorBT | Agreement |
 |--------|---------|----------|-----------|
 | Final Value | $9,106.96 | $9,106.96 | ✅ Identical |
 | Total Return | -8.93% | -8.93% | ✅ Identical |
 | Trade Count | 11 | 11 | ✅ Identical |
-| Execution Time | 0.031s | 5.532s | ⚡ QEngine 178x faster |
+| Execution Time | 0.031s | 5.532s | ⚡ ml4t.backtest 178x faster |
 
-### QEngine vs Backtrader
+### ml4t.backtest vs Backtrader
 **Status**: ⚠️ Known discrepancy in Backtrader implementation
-- QEngine/VectorBT: 11 trades, -8.93% return
+- ml4t.backtest/VectorBT: 11 trades, -8.93% return
 - Backtrader: 9 trades, +0.63% return
 - **Root Cause**: Backtrader implementation missing 2 trades due to position tracking bug
-- **Conclusion**: QEngine is correct (validated by VectorBT agreement)
+- **Conclusion**: ml4t.backtest is correct (validated by VectorBT agreement)
 
 ## Technical Validation
 
@@ -43,19 +43,19 @@
 - **Consistent Processing**: Moving averages calculated identically
 
 ### Signal Generation
-- **QEngine**: Manual MA crossover calculation and position tracking
+- **ml4t.backtest**: Manual MA crossover calculation and position tracking
 - **VectorBT**: Native `vbt.MA` indicators with `Portfolio.from_signals()`
 - **Perfect Match**: Both detect identical 6 entry signals and 6 exit signals
 
 ## Performance Analysis
 
 ### Execution Speed
-- **QEngine**: 0.031 seconds
+- **ml4t.backtest**: 0.031 seconds
 - **VectorBT**: 5.532 seconds
 - **Speedup**: 178.4x faster
 
 ### Memory Usage
-- **QEngine**: ~0.5MB peak memory
+- **ml4t.backtest**: ~0.5MB peak memory
 - **VectorBT**: ~37.8MB peak memory
 - **Efficiency**: 75x more memory efficient
 
@@ -70,14 +70,14 @@
 ```
 tests/validation/frameworks/
 ├── base.py                   # Common interfaces
-├── qengine_adapter.py       # QEngine implementation
+├── ml4t.backtest_adapter.py       # ml4t.backtest implementation
 ├── vectorbt_adapter.py      # VectorBT adapter
 ├── backtrader_adapter.py    # Backtrader adapter
 └── zipline_adapter.py       # Zipline adapter (TODO)
 ```
 
 ### Test Scenarios
-1. **Basic Agreement**: QEngine vs VectorBT identical results
+1. **Basic Agreement**: ml4t.backtest vs VectorBT identical results
 2. **Performance**: Speed and memory benchmarks
 3. **Edge Cases**: Minimal capital, short data, no signals
 4. **Parameter Variations**: Different MA window combinations
@@ -88,12 +88,12 @@ tests/validation/frameworks/
 ### Strengths Assessment
 | Framework | Speed | Accuracy | Features | Ease of Use |
 |-----------|-------|----------|----------|-------------|
-| **QEngine** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **ml4t.backtest** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | VectorBT | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
 | Backtrader | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
 | Zipline | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
 
-### QEngine Advantages
+### ml4t.backtest Advantages
 1. **Speed**: Significantly faster execution
 2. **Memory Efficiency**: Lower memory footprint
 3. **Correctness**: Validated accuracy against established frameworks
@@ -131,11 +131,11 @@ tests/validation/frameworks/
 
 ## Conclusion
 
-**QEngine has been successfully validated as a reliable, high-performance backtesting engine.** The perfect agreement with VectorBT, combined with significant performance advantages, demonstrates that QEngine provides both accuracy and efficiency for quantitative trading research.
+**ml4t.backtest has been successfully validated as a reliable, high-performance backtesting engine.** The perfect agreement with VectorBT, combined with significant performance advantages, demonstrates that ml4t.backtest provides both accuracy and efficiency for quantitative trading research.
 
-The comprehensive test suite ensures ongoing validation and prevents regressions, giving users confidence in QEngine's correctness and reliability.
+The comprehensive test suite ensures ongoing validation and prevents regressions, giving users confidence in ml4t.backtest's correctness and reliability.
 
 ---
 *Report generated: 2025-01-08*
-*Validation framework: QEngine Cross-Framework Testing Suite*
+*Validation framework: ml4t.backtest Cross-Framework Testing Suite*
 *VectorBT version: 0.28.0*

@@ -27,7 +27,7 @@ class TestExtractorsIntegration:
         That test validates:
         - All 4 extractors produce StandardTrade objects
         - Trades are extracted correctly from real platform outputs
-        - FIFO matching works (qengine, Zipline)
+        - FIFO matching works (ml4t.backtest, Zipline)
         - Timezone handling works (Backtrader)
         - Commission split works (Backtrader)
         - Open vs closed trades (all platforms)
@@ -40,27 +40,27 @@ class TestExtractorsIntegration:
 class TestExtractorEdgeCases:
     """Test edge cases for each extractor using minimal mocks."""
 
-    def test_qengine_empty_results(self):
-        """Test qengine extractor handles empty results."""
-        from extractors.qengine import extract_qengine_trades
+    def test_ml4t.backtest_empty_results(self):
+        """Test ml4t.backtest extractor handles empty results."""
+        from extractors.ml4t.backtest import extract_ml4t.backtest_trades
         import polars as pl
 
         # Empty results
         results = {'trades': pl.DataFrame()}
         data = pl.DataFrame({'timestamp': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []})
 
-        trades = extract_qengine_trades(results, data)
+        trades = extract_ml4t.backtest_trades(results, data)
         assert len(trades) == 0
 
-    def test_qengine_missing_trades_key(self):
-        """Test qengine extractor handles missing 'trades' key."""
-        from extractors.qengine import extract_qengine_trades
+    def test_ml4t.backtest_missing_trades_key(self):
+        """Test ml4t.backtest extractor handles missing 'trades' key."""
+        from extractors.ml4t.backtest import extract_ml4t.backtest_trades
         import polars as pl
 
         results = {}  # No 'trades' key
         data = pl.DataFrame({'timestamp': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []})
 
-        trades = extract_qengine_trades(results, data)
+        trades = extract_ml4t.backtest_trades(results, data)
         assert len(trades) == 0
 
     def test_vectorbt_empty_portfolio(self):
@@ -119,9 +119,9 @@ class TestExtractorEdgeCases:
 class TestExtractorDocumentation:
     """Document extractor implementation details for future reference."""
 
-    def test_qengine_expects_filled_time_column(self):
+    def test_ml4t.backtest_expects_filled_time_column(self):
         """
-        QEngine extractor expects DataFrame with columns:
+        ml4t.backtest extractor expects DataFrame with columns:
         - filled_time (datetime with timezone)
         - asset_id (str)
         - side (str: 'buy' or 'sell', lowercase)
@@ -220,7 +220,7 @@ This approach avoids complex mocking of platform-specific data structures
 while still providing comprehensive test coverage.
 
 **Expected Coverage**:
-- extractors/qengine.py: 60-70% (main paths covered by integration tests)
+- extractors/ml4t.backtest.py: 60-70% (main paths covered by integration tests)
 - extractors/vectorbt.py: 60-70%
 - extractors/backtrader.py: 70-80% (timezone handling is critical path)
 - extractors/zipline.py: 60-70%

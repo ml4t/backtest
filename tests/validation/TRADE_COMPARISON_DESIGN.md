@@ -20,7 +20,7 @@ class StandardTrade:
 
     # Identity
     trade_id: int                    # Sequential ID within platform
-    platform: str                    # 'qengine', 'vectorbt', 'backtrader', 'zipline'
+    platform: str                    # 'ml4t.backtest', 'vectorbt', 'backtrader', 'zipline'
 
     # Entry
     entry_timestamp: datetime        # When did we enter?
@@ -56,14 +56,14 @@ class StandardTrade:
 
 Each platform needs an extractor that produces `List[StandardTrade]`:
 
-### QEngine Extractor
+### ml4t.backtest Extractor
 
 ```python
-def extract_qengine_trades(results: dict, data: pl.DataFrame) -> List[StandardTrade]:
+def extract_ml4t.backtest_trades(results: dict, data: pl.DataFrame) -> List[StandardTrade]:
     """
-    Extract trades from qengine results.
+    Extract trades from ml4t.backtest results.
 
-    qengine returns individual orders, so we must:
+    ml4t.backtest returns individual orders, so we must:
     1. Match BUY orders with SELL orders to form complete trades
     2. Look up OHLC at entry/exit timestamps from data
     3. Infer which price component was used (likely close for market orders)
@@ -97,7 +97,7 @@ def extract_qengine_trades(results: dict, data: pl.DataFrame) -> List[StandardTr
 
             standard_trades.append(StandardTrade(
                 trade_id=len(standard_trades),
-                platform='qengine',
+                platform='ml4t.backtest',
                 entry_timestamp=entry['entry_timestamp'],
                 entry_price=entry['entry_price'],
                 entry_price_component=entry_component,
@@ -221,7 +221,7 @@ class TradeMatch:
     """Result of matching a trade across platforms."""
 
     # Matched trades (one per platform)
-    qengine_trade: StandardTrade | None
+    ml4t.backtest_trade: StandardTrade | None
     vectorbt_trade: StandardTrade | None
     backtrader_trade: StandardTrade | None
     zipline_trade: StandardTrade | None
@@ -273,37 +273,37 @@ def generate_comparison_report(matches: List[TradeMatch]) -> str:
     =====================================
 
     Entry Timing:
-      qengine   : 2020-02-04 09:30:00 ✅
+      ml4t.backtest   : 2020-02-04 09:30:00 ✅
       vectorbt  : 2020-02-04 09:30:00 ✅
       backtrader: 2020-02-04 09:31:00 ❌ (+60s)
       zipline   : 2020-02-04 09:30:00 ✅
 
     Entry Prices:
-      qengine   : $73.50 (open)  ✅
+      ml4t.backtest   : $73.50 (open)  ✅
       vectorbt  : $73.85 (close) ⚠️  +0.48% (+$0.35)
       backtrader: $73.50 (open)  ✅
       zipline   : $73.50 (open)  ✅
 
     Exit Timing:
-      qengine   : 2020-04-16 16:00:00 ✅
+      ml4t.backtest   : 2020-04-16 16:00:00 ✅
       vectorbt  : 2020-04-15 16:00:00 ❌ (-1 day)
       backtrader: 2020-04-16 16:00:00 ✅
       zipline   : 2020-04-16 16:00:00 ✅
 
     Exit Prices:
-      qengine   : $84.88 (open)  ✅
+      ml4t.backtest   : $84.88 (open)  ✅
       vectorbt  : $84.25 (close) ⚠️  -0.74% (-$0.63)
       backtrader: $84.88 (open)  ✅
       zipline   : $84.88 (open)  ✅
 
     P&L Comparison:
-      qengine   : $970.31 (net) ✅
+      ml4t.backtest   : $970.31 (net) ✅
       vectorbt  : $896.50 (net) ⚠️  -7.6% (-$73.81)
       backtrader: $970.31 (net) ✅
       zipline   : $968.12 (net) ✅ (rounding)
 
     VERDICT:
-    • qengine, backtrader, zipline: MATCH ✅
+    • ml4t.backtest, backtrader, zipline: MATCH ✅
     • vectorbt: Different execution model (same-bar vs next-bar) ⚠️
 
     =====================================
@@ -325,7 +325,7 @@ def generate_comparison_report(matches: List[TradeMatch]) -> str:
 
 1. ✅ StandardTrade dataclass
 2. ✅ Helper functions (get_bar_at_timestamp, infer_price_component)
-3. ✅ QEngine extractor
+3. ✅ ml4t.backtest extractor
 4. ✅ VectorBT extractor
 5. ⏳ Backtrader extractor
 6. ⏳ Zipline extractor

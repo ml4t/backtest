@@ -1,5 +1,5 @@
 """
-Cross-Framework Comparison: Same Strategy on QEngine, Zipline, Backtrader, VectorBT
+Cross-Framework Comparison: Same Strategy on ml4t.backtest, Zipline, Backtrader, VectorBT
 
 This module implements identical trading logic across all frameworks to validate:
 1. Trade generation consistency
@@ -18,9 +18,9 @@ import numpy as np
 import pandas as pd
 
 # Add project paths
-qengine_src = Path(__file__).parent.parent.parent / "src"
+ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(qengine_src))
+sys.path.insert(0, str(ml4t.backtest_src))
 
 
 @dataclass
@@ -109,19 +109,19 @@ def load_test_data() -> pd.DataFrame:
     raise FileNotFoundError("No suitable test data found")
 
 
-def run_qengine_backtest(
+def run_backtest_backtest(
     data: pd.DataFrame,
     strategy: SimpleMomentumStrategy,
     use_daily_data: bool = False,
 ) -> BacktestResult:
-    """Run backtest using QEngine."""
+    """Run backtest using ml4t.backtest."""
     print("\n" + "=" * 60)
-    print("Running QEngine Backtest")
+    print("Running ml4t.backtest Backtest")
     print("=" * 60)
 
     initial_capital = 10000.0
     result = BacktestResult(
-        framework="QEngine",
+        framework="ml4t.backtest",
         initial_capital=initial_capital,
         final_value=initial_capital,
         total_return=0.0,
@@ -245,14 +245,14 @@ def run_qengine_backtest(
                             trade_returns,
                         )
 
-        print("✓ QEngine backtest completed")
+        print("✓ ml4t.backtest backtest completed")
         print(f"  Final value: ${final_value:,.2f}")
         print(f"  Return: {result.total_return:.2f}%")
         print(f"  Trades: {result.num_trades}")
         print(f"  Sharpe: {result.sharpe_ratio:.2f}")
 
     except Exception as e:
-        print(f"✗ QEngine backtest failed: {e}")
+        print(f"✗ ml4t.backtest backtest failed: {e}")
         result.errors.append(str(e))
 
     return result
@@ -785,8 +785,8 @@ def main():
     # Run backtests with daily data for consistency
     results = []
 
-    # QEngine (using daily data)
-    results.append(run_qengine_backtest(test_data, strategy, use_daily_data=True))
+    # ml4t.backtest (using daily data)
+    results.append(run_ml4t.backtest_backtest(test_data, strategy, use_daily_data=True))
 
     # Zipline-style (uses daily data)
     results.append(run_zipline_backtest(test_data, strategy))

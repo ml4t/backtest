@@ -70,7 +70,7 @@
 3. Run a test:
    ```bash
    cd tests/validation
-   uv run python runner.py --scenario 001 --platforms qengine,vectorbt
+   uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt
    ```
 4. If it fails, use [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
@@ -107,13 +107,13 @@
 cd /home/stefan/ml4t/software/backtest/tests/validation
 
 # Single platform test
-uv run python runner.py --scenario 001 --platforms qengine
+uv run python runner.py --scenario 001 --platforms ml4t.backtest
 
 # Multi-platform comparison
-uv run python runner.py --scenario 001 --platforms qengine,vectorbt,backtrader --report both
+uv run python runner.py --scenario 001 --platforms ml4t.backtest,vectorbt,backtrader --report both
 
 # Diagnostic test (if zero trades)
-uv run python test_qengine_signal_processing.py
+uv run python test_ml4t.backtest_signal_processing.py
 
 # Run troubleshooting diagnostic
 uv run python docs/diagnose.py  # (see TROUBLESHOOTING.md for script)
@@ -124,7 +124,7 @@ uv run python docs/diagnose.py  # (see TROUBLESHOOTING.md for script)
 # Verify all platforms available
 uv run python -c "
 import sys
-for pkg in ['qengine', 'vectorbtpro', 'backtrader', 'zipline']:
+for pkg in ['ml4t.backtest', 'vectorbtpro', 'backtrader', 'zipline']:
     try:
         __import__(pkg)
         print(f'✅ {pkg}')
@@ -195,13 +195,13 @@ print(f"3. In data: {signal.timestamp in data['timestamp'].to_list()}")  # Shoul
 
 **A**: Depends on comparison type. See [Trade Matching Guidelines](PLATFORM_EXECUTION_MODELS.md#trade-matching-guidelines).
 
-**Comparing different execution models** (VectorBT vs qengine):
+**Comparing different execution models** (VectorBT vs ml4t.backtest):
 ```python
 timestamp_tolerance_seconds = 86400  # ±1 day
 price_tolerance_pct = 2.0            # ±2%
 ```
 
-**Comparing same execution model** (qengine vs qengine):
+**Comparing same execution model** (ml4t.backtest vs ml4t.backtest):
 ```python
 timestamp_tolerance_seconds = 60     # ±1 minute
 price_tolerance_pct = 0.1            # ±0.1%
@@ -212,7 +212,7 @@ price_tolerance_pct = 0.1            # ±0.1%
 **A**: Check these files:
 
 1. `../scenarios/scenario_001_simple_market_orders.py` - Complete scenario
-2. `../test_qengine_signal_processing.py` - Diagnostic test
+2. `../test_ml4t.backtest_signal_processing.py` - Diagnostic test
 3. `../runner.py` - Integration patterns
 4. `../TASK-001_COMPLETION_REPORT.md` - Case study
 
@@ -279,7 +279,7 @@ See [PLATFORM_EXECUTION_MODELS.md - Scenario Creation Checklist](PLATFORM_EXECUT
 - [VectorBT Pro Docs](https://vectorbt.pro/)
 - [Backtrader Documentation](https://www.backtrader.com/docu/)
 - [Zipline-Reloaded Docs](https://zipline.ml4trading.io/)
-- qengine: See `../../../src/qengine/` source code
+- ml4t.backtest: See `../../../src/ml4t.backtest/` source code
 
 ### Framework Standards
 - TDD Methodology: Red-Green-Refactor cycle

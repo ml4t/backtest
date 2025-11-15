@@ -29,7 +29,7 @@ The content is organized as follows:
 ## Notes
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Only files matching these patterns are included: README.md, CLAUDE.md, src/qengine/__init__.py, src/qengine/engine.py, src/qengine/core/*.py, src/qengine/data/*.py, src/qengine/execution/*.py, src/qengine/portfolio/*.py, src/qengine/strategy/*.py, src/qengine/reporting/*.py
+- Only files matching these patterns are included: README.md, CLAUDE.md, src/ml4t.backtest/__init__.py, src/ml4t.backtest/engine.py, src/ml4t.backtest/core/*.py, src/ml4t.backtest/data/*.py, src/ml4t.backtest/execution/*.py, src/ml4t.backtest/portfolio/*.py, src/ml4t.backtest/strategy/*.py, src/ml4t.backtest/reporting/*.py
 - Files matching these patterns are excluded: .venv/**, docs/**, examples/**, tests/**, resources/**, htmlcov/**, __pycache__/**, *.pyc, benchmarks/**, config/**, src/**/*.py
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
@@ -46,11 +46,11 @@ README.md
 
 ## File: CLAUDE.md
 ````markdown
-  1: # CLAUDE.md - QEngine Development Guidelines
+  1: # CLAUDE.md - ml4t.backtest Development Guidelines
   2: 
   3: ## Project Overview
   4: 
-  5: QEngine is a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. Built on modern Python tooling (Polars, Arrow, Numba), it provides institutional-grade simulation capabilities while preventing data leakage through architectural guarantees.
+  5: ml4t.backtest is a state-of-the-art event-driven backtesting engine designed for machine learning-driven trading strategies. Built on modern Python tooling (Polars, Arrow, Numba), it provides institutional-grade simulation capabilities while preventing data leakage through architectural guarantees.
   6: 
   7: ## Key Documentation
   8: 
@@ -75,11 +75,11 @@ README.md
  27: 
  28: ## Monorepo Context
  29: 
- 30: QEngine is part of the **QuantLab monorepo**, a comprehensive quantitative finance ecosystem:
+ 30: ml4t.backtest is part of the **QuantLab monorepo**, a comprehensive quantitative finance ecosystem:
  31: 
  32: - **qfeatures**: Feature engineering and labeling (upstream)
  33: - **qeval**: Statistical validation (upstream)
- 34: - **qengine** (this project): Event-driven backtesting engine
+ 34: - **ml4t.backtest** (this project): Event-driven backtesting engine
  35: 
  36: ### Development Setup
  37: 
@@ -88,7 +88,7 @@ README.md
  40: ```bash
  41: # From monorepo root
  42: make setup       # One-time setup
- 43: make test-qng    # Test qengine specifically
+ 43: make test-qng    # Test ml4t.backtest specifically
  44: make quality     # Format, lint, type-check all projects
  45: ```
  46: 
@@ -100,7 +100,7 @@ README.md
  52: 
  53: ### Integration Points
  54: 
- 55: QEngine consumes:
+ 55: ml4t.backtest consumes:
  56: 1. **Features from qfeatures**: Standardized DataFrames with features and labels
  57: 2. **Models from qeval**: Validated ML models ready for backtesting
  58: 
@@ -117,7 +117,7 @@ README.md
  69: ## Project Structure
  70: 
  71: ```
- 72: qengine/
+ 72: ml4t.backtest/
  73: ├── CLAUDE.md               # This file - project guidelines
  74: ├── README.md               # User-facing project overview
  75: ├── LICENSE                 # Apache 2.0 license
@@ -140,7 +140,7 @@ README.md
  92: │   │   └── PIT_AND_STATE.md
  93: │   └── guides/            # How-to guides
  94: │       └── MIGRATION_GUIDE.md
- 95: ├── src/qengine/           # Source code
+ 95: ├── src/ml4t.backtest/           # Source code
  96: │   ├── core/              # Event system, clock, types
  97: │   ├── data/              # Data feeds and schemas
  98: │   ├── strategy/          # Strategy framework
@@ -451,7 +451,7 @@ README.md
 403: 
 404: ## Notes
 405: 
-406: - This document supersedes generic templates for QEngine
+406: - This document supersedes generic templates for ml4t.backtest
 407: - Always prioritize correctness over performance
 408: - Keep migration simple - good UX beats compatibility
 409: - Reference DESIGN.md for any architectural questions
@@ -460,16 +460,16 @@ README.md
 
 ## File: README.md
 ````markdown
-  1: # QEngine
+  1: # ml4t.backtest
   2: 
-  3: QEngine is a state-of-the-art event-driven backtesting engine designed for high-performance backtesting of machine learning-driven trading strategies. It provides realistic market simulation with architectural guarantees against data leakage.
+  3: ml4t.backtest is a state-of-the-art event-driven backtesting engine designed for high-performance backtesting of machine learning-driven trading strategies. It provides realistic market simulation with architectural guarantees against data leakage.
   4: 
   5: ## Installation
   6: 
   7: ```bash
   8: # From source (recommended)
   9: git clone <repository-url>
- 10: cd qengine
+ 10: cd ml4t.backtest
  11: pip install -e .
  12: ```
  13: 
@@ -477,7 +477,7 @@ README.md
  15: 
  16: ```python
  17: import polars as pl
- 18: import qengine as qe
+ 18: import ml4t.backtest as qe
  19: 
  20: # Load market data
  21: data_feed = qe.DataFeed.from_parquet("market_data.parquet")
@@ -530,24 +530,24 @@ README.md
  68: 
  69: ## Architecture
  70: 
- 71: QEngine follows a clean event-driven architecture:
+ 71: ml4t.backtest follows a clean event-driven architecture:
  72: 
  73: ### Core Components
  74: ```python
  75: # Event system
- 76: from qengine.core import Event, EventBus, Clock
+ 76: from ml4t.backtest.core import Event, EventBus, Clock
  77: 
  78: # Data pipeline
- 79: from qengine.data import DataFeed
+ 79: from ml4t.backtest.data import DataFeed
  80: 
  81: # Strategy framework
- 82: from qengine.strategy import Strategy
+ 82: from ml4t.backtest.strategy import Strategy
  83: 
  84: # Portfolio management
- 85: from qengine.portfolio import Portfolio
+ 85: from ml4t.backtest.portfolio import Portfolio
  86: 
  87: # Order execution
- 88: from qengine.execution import Broker, Order
+ 88: from ml4t.backtest.execution import Broker, Order
  89: ```
  90: 
  91: ### Execution Pipeline
@@ -560,7 +560,7 @@ README.md
  98: 
  99: ## Order Types
 100: 
-101: QEngine supports sophisticated order types:
+101: ml4t.backtest supports sophisticated order types:
 102: 
 103: ```python
 104: # Market orders
@@ -594,7 +594,7 @@ README.md
 132: 
 133: ### Slippage Models
 134: ```python
-135: from qengine.execution.slippage import LinearImpactSlippage, VolumeShareSlippage
+135: from ml4t.backtest.execution.slippage import LinearImpactSlippage, VolumeShareSlippage
 136: 
 137: # Linear market impact
 138: slippage = LinearImpactSlippage(impact_coefficient=0.1)
@@ -605,7 +605,7 @@ README.md
 143: 
 144: ### Commission Models
 145: ```python
-146: from qengine.execution.commission import PercentageCommission, TieredCommission
+146: from ml4t.backtest.execution.commission import PercentageCommission, TieredCommission
 147: 
 148: # Simple percentage
 149: commission = PercentageCommission(rate=0.001)  # 10 basis points
@@ -640,7 +640,7 @@ README.md
 178: 
 179: ### ML Strategy Integration
 180: ```python
-181: from qengine.strategy.adapters import MLStrategyAdapter
+181: from ml4t.backtest.strategy.adapters import MLStrategyAdapter
 182: 
 183: class MLMomentumStrategy(MLStrategyAdapter):
 184:     def predict(self, features):
@@ -656,7 +656,7 @@ README.md
 194: 
 195: ## Performance Analysis
 196: 
-197: QEngine provides comprehensive performance analytics:
+197: ml4t.backtest provides comprehensive performance analytics:
 198: 
 199: ```python
 200: results = engine.run()
@@ -677,12 +677,12 @@ README.md
 215: 
 216: ## Integration with QuantLab
 217: 
-218: QEngine integrates seamlessly with other QuantLab libraries:
+218: ml4t.backtest integrates seamlessly with other QuantLab libraries:
 219: 
 220: ```python
 221: import qfeatures as qf
 222: import qeval as qe
-223: import qengine as qng
+223: import ml4t.backtest as qng
 224: 
 225: # Feature engineering with QFeatures
 226: features = qf.Pipeline([
@@ -695,14 +695,14 @@ README.md
 233: cv = qe.PurgedWalkForwardCV(n_splits=5)
 234: model_results = qe.Evaluator(cv).evaluate(model, features)
 235: 
-236: # Strategy backtesting with QEngine
+236: # Strategy backtesting with ml4t.backtest
 237: strategy = qng.MLStrategyAdapter(model)
 238: backtest_results = qng.BacktestEngine(strategy=strategy).run()
 239: ```
 240: 
 241: ## Validation & Testing
 242: 
-243: QEngine has been extensively validated:
+243: ml4t.backtest has been extensively validated:
 244: 
 245: - **154 unit tests** with comprehensive coverage
 246: - **Cross-framework validation**: 100% agreement with VectorBT
@@ -712,7 +712,7 @@ README.md
 250: ## Contributing
 251: 
 252: 1. Install development dependencies: `pip install -e ".[dev]"`
-253: 2. Run code quality checks: `ruff format . && ruff check . --fix && mypy src/qengine`
+253: 2. Run code quality checks: `ruff format . && ruff check . --fix && mypy src/ml4t.backtest`
 254: 3. Run tests: `pytest tests/`
 255: 4. Follow event-driven patterns and maintain type safety
 256: 

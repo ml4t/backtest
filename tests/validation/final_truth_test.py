@@ -1,5 +1,5 @@
 """
-FINAL TRUTH TEST: Are QEngine and VectorBT results actually identical?
+FINAL TRUTH TEST: Are ml4t.backtest and VectorBT results actually identical?
 Let's test with a scenario where any discrepancy MUST show up.
 """
 
@@ -8,7 +8,7 @@ import pandas as pd
 import vectorbt as vbt
 
 print("=" * 70)
-print("FINAL VALIDATION: QEngine vs VectorBT Multi-Asset Portfolio")
+print("FINAL VALIDATION: ml4t.backtest vs VectorBT Multi-Asset Portfolio")
 print("=" * 70)
 print()
 
@@ -58,9 +58,9 @@ for i in range(20, len(dates), 20):
 total_signals = entries.sum().sum() + exits.sum().sum()
 print(f"Total trading signals: {total_signals}")
 
-# METHOD 1: QEngine-style manual calculation
+# METHOD 1: ml4t.backtest-style manual calculation
 print("\n" + "=" * 50)
-print("METHOD 1: QEngine Manual Calculation")
+print("METHOD 1: ml4t.backtest Manual Calculation")
 print("=" * 50)
 
 initial_capital = 100000
@@ -88,13 +88,13 @@ for date in dates:
             trades += 1
 
 # Final value
-qengine_final = cash
+ml4t.backtest_final = cash
 for col, shares in positions.items():
     if shares > 0:
-        qengine_final += shares * prices.iloc[-1][col]
+        ml4t.backtest_final += shares * prices.iloc[-1][col]
 
-print(f"Final value: ${qengine_final:,.2f}")
-print(f"Return: {(qengine_final / initial_capital - 1) * 100:.2f}%")
+print(f"Final value: ${ml4t.backtest_final:,.2f}")
+print(f"Return: {(ml4t.backtest_final / initial_capital - 1) * 100:.2f}%")
 print(f"Trades executed: {trades}")
 
 # METHOD 2: VectorBT with proper configuration
@@ -155,17 +155,17 @@ print("\n" + "=" * 70)
 print("RESULTS COMPARISON")
 print("=" * 70)
 
-diff = abs(qengine_final - vbt_final)
-diff_pct = diff / qengine_final * 100
+diff = abs(ml4t.backtest_final - vbt_final)
+diff_pct = diff / ml4t.backtest_final * 100
 
-print(f"QEngine manual:        ${qengine_final:,.2f}")
+print(f"ml4t.backtest manual:        ${ml4t.backtest_final:,.2f}")
 print(f"VectorBT with sizing:  ${vbt_final:,.2f}")
 print(f"VectorBT without size: ${wrong_final:,.2f} (WRONG!)")
 print()
-print(f"Difference (QEngine vs VectorBT with sizing): ${diff:.2f} ({diff_pct:.4f}%)")
+print(f"Difference (ml4t.backtest vs VectorBT with sizing): ${diff:.2f} ({diff_pct:.4f}%)")
 
 if diff < 0.01:
-    print("\n✅ PERFECT MATCH! QEngine and VectorBT produce identical results!")
+    print("\n✅ PERFECT MATCH! ml4t.backtest and VectorBT produce identical results!")
     print("   The implementation is CORRECT.")
 elif diff < 1.0:
     print("\n✅ NEAR-PERFECT MATCH! Tiny rounding differences only.")
@@ -178,7 +178,7 @@ else:
 print("\n" + "=" * 70)
 print("CONCLUSION")
 print("=" * 70)
-print("1. VectorBT WITH proper sizing matches QEngine exactly")
+print("1. VectorBT WITH proper sizing matches ml4t.backtest exactly")
 print("2. VectorBT WITHOUT sizing gives completely wrong results")
 print("3. Our implementation correctly uses sizing, so results are valid")
 print("4. The 'perfect agreement' is real, not cheating!")

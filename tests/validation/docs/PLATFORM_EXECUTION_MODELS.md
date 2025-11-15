@@ -9,7 +9,7 @@
 ## Table of Contents
 
 1. [Execution Model Comparison](#execution-model-comparison)
-2. [qengine (ML4T Custom Engine)](#qengine)
+2. [ml4t.backtest (ML4T Custom Engine)](#ml4t.backtest)
 3. [VectorBT Pro](#vectorbt-pro)
 4. [Backtrader](#backtrader)
 5. [Zipline-Reloaded](#zipline-reloaded)
@@ -24,7 +24,7 @@
 
 | Platform   | Timing Model | Entry Bar  | Entry Price | Exit Bar   | Exit Price | Commission Timing |
 |------------|-------------|------------|-------------|------------|------------|-------------------|
-| **qengine**    | Next-bar    | Signal+1   | Close       | Signal+1   | Close      | Per-trade         |
+| **ml4t.backtest**    | Next-bar    | Signal+1   | Close       | Signal+1   | Close      | Per-trade         |
 | **VectorBT**   | Same-bar    | Signal     | Close       | Signal     | Close      | Per-trade         |
 | **Backtrader** | Next-bar    | Signal+1   | Open        | Signal+1   | Open       | Per-trade         |
 | **Zipline**    | Next-bar    | Signal+1   | Open*       | Signal+1   | Close*     | Per-share         |
@@ -41,7 +41,7 @@ Signal at 2017-02-06:
 └─ Use case: Backtesting only, not realistic for intraday
 ```
 
-**Next-Bar Execution** (qengine, Backtrader, Zipline):
+**Next-Bar Execution** (ml4t.backtest, Backtrader, Zipline):
 ```
 Signal at 2017-02-06:
 ├─ Entry: 2017-02-07 open/close
@@ -56,7 +56,7 @@ For scenario 001 with signal at 2017-02-06:
 | Platform   | Entry Date | Entry Price | Difference from VBT |
 |------------|-----------|-------------|---------------------|
 | VectorBT   | 2017-02-06 | $130.29     | Reference           |
-| qengine    | 2017-02-07 | $131.54     | +1 day, +$1.25      |
+| ml4t.backtest    | 2017-02-07 | $131.54     | +1 day, +$1.25      |
 | Backtrader | 2017-02-07 | $130.54     | +1 day, +$0.25      |
 | Zipline    | 2017-02-07 | $130.54*    | +1 day, +$0.25      |
 
@@ -64,7 +64,7 @@ For scenario 001 with signal at 2017-02-06:
 
 ---
 
-## qengine
+## ml4t.backtest
 
 ### Overview
 
@@ -139,8 +139,8 @@ Signal(
 
 **Order Submission**:
 ```python
-from qengine.execution.order import Order
-from qengine.core.types import OrderType, OrderSide
+from ml4t.backtest.execution.order import Order
+from ml4t.backtest.core.types import OrderType, OrderSide
 
 order = Order(
     asset_id='AAPL',
@@ -170,13 +170,13 @@ Columns:
 
 **Extraction Pattern**:
 ```python
-def extract_qengine_trades(results: dict, data: pl.DataFrame) -> List[StandardTrade]:
+def extract_ml4t.backtest_trades(results: dict, data: pl.DataFrame) -> List[StandardTrade]:
     trades_df = results.get('trades')
     if trades_df is None or trades_df.is_empty():
         return []
 
     # Match BUY → SELL pairs using FIFO
-    # qengine returns individual orders, not complete trades
+    # ml4t.backtest returns individual orders, not complete trades
 ```
 
 ### Known Quirks
@@ -476,7 +476,7 @@ def extract_backtrader_trades(trades_list: List[dict], data: pd.DataFrame):
    - Try naive lookup first, fall back to aware
 
 3. **Fills at OPEN price by default**
-   - Different from qengine (close) and VectorBT (close)
+   - Different from ml4t.backtest (close) and VectorBT (close)
    - More realistic for market orders
    - Causes price variance in comparisons (0.5-1%)
 
@@ -628,7 +628,7 @@ def extract_zipline_trades(perf: pd.DataFrame, data: pd.DataFrame):
 ### Known Quirks
 
 1. **Bundle-based data only**
-   - Can't use ad-hoc DataFrames like qengine/VectorBT
+   - Can't use ad-hoc DataFrames like ml4t.backtest/VectorBT
    - Must create custom bundle
    - Bundle ingestion can be tricky
 
@@ -654,7 +654,7 @@ def extract_zipline_trades(perf: pd.DataFrame, data: pd.DataFrame):
 4. **Returns transactions, not trades**
    - Transaction = individual fill
    - Trade = entry + exit pair
-   - Must match manually like qengine
+   - Must match manually like ml4t.backtest
 
 5. **Requires ZIPLINE_ROOT environment variable**
    ```python
@@ -731,7 +731,7 @@ data.index = data.index.tz_localize(None)
 
 | Platform   | Entry  | Exit   |
 |------------|--------|--------|
-| qengine    | Close  | Close  |
+| ml4t.backtest    | Close  | Close  |
 | VectorBT   | Close  | Close  |
 | Backtrader | Open   | Open   |
 | Zipline    | Open*  | Close* |
@@ -749,7 +749,7 @@ data.index = data.index.tz_localize(None)
 
 | Platform   | Commission Type | Example            |
 |------------|----------------|-------------------|
-| qengine    | Percentage     | 0.1% of trade value |
+| ml4t.backtest    | Percentage     | 0.1% of trade value |
 | VectorBT   | Percentage     | 0.1% of trade value |
 | Backtrader | Percentage     | 0.1% of trade value |
 | Zipline    | Per-share      | $0.01 per share     |
@@ -808,7 +808,7 @@ comparison = {
 ```python
 # Trade Group: Entry 2017-02-07
 trades = {
-    'qengine': {
+    'ml4t.backtest': {
         'entry_date': '2017-02-07',
         'entry_price': 131.54,
         'exit_date': '2017-04-18',
@@ -841,7 +841,7 @@ pnl_diff = abs(937.00 - 1032.61)  # $95.61
 When creating a new scenario:
 
 - [ ] Signals use UTC-aware timestamps: `datetime(..., tzinfo=pytz.UTC)`
-- [ ] Data has UTC-aware timestamps for qengine/VectorBT
+- [ ] Data has UTC-aware timestamps for ml4t.backtest/VectorBT
 - [ ] Expected results document execution model differences
 - [ ] Tolerance configuration accounts for platform variance
 - [ ] Test data includes splits/dividends if testing adjustments

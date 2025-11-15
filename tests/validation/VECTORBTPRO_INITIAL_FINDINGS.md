@@ -7,7 +7,7 @@ VectorBT Pro is a closed-source, commercial backtesting framework (version 2025.
 - **Code Size**: 320,775 lines of Python
 - **Files**: 271 Python files
 - **Performance**: 188,869 trades/second (after JIT warm-up)
-- **Speed**: 206x faster than standard VectorBT, 22x faster than QEngine
+- **Speed**: 206x faster than standard VectorBT, 22x faster than ml4t.backtest
 - **License**: Commercial, proprietary (no redistribution allowed)
 
 ## Package Structure
@@ -104,7 +104,7 @@ vectorbtpro/
    - Walk-forward analysis
    - Monte Carlo simulations
 
-## Comparison with QEngine
+## Comparison with ml4t.backtest
 
 ### VectorBT Pro Advantages:
 1. **Speed**: 22x faster for vectorized strategies
@@ -113,7 +113,7 @@ vectorbtpro/
 4. **Visualization**: Rich Plotly-based visualizations
 5. **Documentation**: Comprehensive (though proprietary)
 
-### QEngine Advantages:
+### ml4t.backtest Advantages:
 1. **Event-Driven**: More realistic order execution
 2. **ML Integration**: Native support for ML strategies
 3. **Open Source**: Full transparency and customization
@@ -122,7 +122,7 @@ vectorbtpro/
 
 ### Different Use Cases:
 - **VectorBT Pro**: Best for vectorized strategies, parameter optimization, rapid prototyping
-- **QEngine**: Best for complex ML strategies, realistic simulation, custom execution logic
+- **ml4t.backtest**: Best for complex ML strategies, realistic simulation, custom execution logic
 
 ## Technical Insights
 
@@ -156,7 +156,7 @@ VectorBT Pro is a highly optimized, commercial-grade backtesting framework that 
 - Efficient memory layout
 - Extensive caching
 
-While it excels at speed for vectorized strategies, it operates in a different paradigm than event-driven simulators like QEngine. The two serve complementary purposes in a quant's toolkit.
+While it excels at speed for vectorized strategies, it operates in a different paradigm than event-driven simulators like ml4t.backtest. The two serve complementary purposes in a quant's toolkit.
 
 ## Files to Examine in Detail
 

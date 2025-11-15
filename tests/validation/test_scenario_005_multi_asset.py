@@ -1,7 +1,7 @@
 """
 Integration test for all 4 platforms on scenario 005 (multi-asset).
 
-This test validates that qengine, VectorBT, Backtrader, and Zipline all successfully
+This test validates that ml4t.backtest, VectorBT, Backtrader, and Zipline all successfully
 execute trades across multiple assets simultaneously.
 
 Expected Results:
@@ -42,7 +42,7 @@ def test_all_platforms_scenario_005():
             "--scenario",
             "005",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "summary",
         ],
@@ -59,7 +59,7 @@ def test_all_platforms_scenario_005():
     output = result.stdout
 
     # All platforms should execute successfully
-    assert "qengine" in output and "✅ OK" in output, "qengine failed to execute"
+    assert "ml4t.backtest" in output and "✅ OK" in output, "ml4t.backtest failed to execute"
     assert "vectorbt" in output and "✅ OK" in output, "vectorbt failed to execute"
     assert "backtrader" in output and "✅ OK" in output, "backtrader failed to execute"
     assert "zipline" in output and "✅ OK" in output, "zipline failed to execute"
@@ -98,7 +98,7 @@ def test_asset_isolation():
             "--scenario",
             "005",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "detailed",
         ],
@@ -138,7 +138,7 @@ def test_multi_asset_execution():
 
     Platform differences:
     - VectorBT: Native multi-asset support, vectorized execution
-    - qengine: Event-driven, handles each asset independently
+    - ml4t.backtest: Event-driven, handles each asset independently
     - Backtrader: Multiple data feeds, separate position tracking
     - Zipline: Multi-asset by default, asset-based position tracking
     """
@@ -149,7 +149,7 @@ def test_multi_asset_execution():
             "concurrent_positions": "yes",
             "notes": "Native multi-asset support with array operations",
         },
-        "qengine": {
+        "ml4t.backtest": {
             "approach": "event-driven per-asset",
             "position_tracking": "dict by asset",
             "concurrent_positions": "yes",

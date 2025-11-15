@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from qengine.core.assets import AssetClass, AssetRegistry, AssetSpec
-from qengine.portfolio.margin import MarginAccount, MarginRequirement
+from ml4t.backtest.core.assets import AssetClass, AssetRegistry, AssetSpec
+from ml4t.backtest.portfolio.margin import MarginAccount, MarginRequirement
 
 
 class TestMarginRequirement:

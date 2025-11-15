@@ -6,8 +6,8 @@
 
 ## 🎯 Overview
 
-Comprehensive validation framework for comparing QEngine against 4 other backtesting platforms:
-- **QEngine** (our implementation)
+Comprehensive validation framework for comparing ml4t.backtest against 4 other backtesting platforms:
+- **ml4t.backtest** (our implementation)
 - **VectorBT Pro** (commercial)
 - **VectorBT Free** (open source)
 - **Zipline-Reloaded** (Quantopian successor)
@@ -42,7 +42,7 @@ tests/validation/
 ├── adapters/                   # Platform-specific adapters
 │   ├── __init__.py
 │   ├── base.py                 # PlatformAdapter, Trade, BacktestResult
-│   ├── qengine_adapter.py      # QEngine integration
+│   ├── ml4t.backtest_adapter.py      # ml4t.backtest integration
 │   ├── vectorbt_adapter.py     # VectorBT Pro & Free
 │   ├── zipline_adapter.py      # Zipline-reloaded
 │   └── backtrader_adapter.py   # Backtrader
@@ -60,7 +60,7 @@ tests/validation/
 │
 └── results/                    # Validation outputs (gitignored)
     └── YYYY-MM-DD_HH-MM-SS/
-        ├── qengine_results.json
+        ├── ml4t.backtest_results.json
         ├── vectorbt_pro_results.json
         ├── zipline_results.json
         ├── backtrader_results.json
@@ -81,8 +81,8 @@ pip install vectorbt-pro          # Commercial (if licensed)
 pip install zipline-reloaded      # May have complex deps
 pip install backtrader            # Lightweight
 
-# QEngine (already in project)
-# Uses local qengine from src/
+# ml4t.backtest (already in project)
+# Uses local ml4t.backtest from src/
 ```
 
 ### 2. Run Basic Validation
@@ -90,17 +90,17 @@ pip install backtrader            # Lightweight
 ```bash
 cd tests/validation
 
-# Test QEngine only (simplest)
-python3 run_validation.py --strategy ma_cross --platforms qengine
+# Test ml4t.backtest only (simplest)
+python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest
 
-# Compare QEngine vs VectorBT Free
-python3 run_validation.py --strategy ma_cross --platforms qengine,vectorbt_free
+# Compare ml4t.backtest vs VectorBT Free
+python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest,vectorbt_free
 
 # Compare all platforms
 python3 run_validation.py --strategy ma_cross --platforms all
 
 # Test all strategies
-python3 run_validation.py --strategy all --platforms qengine,vectorbt_free
+python3 run_validation.py --strategy all --platforms ml4t.backtest,vectorbt_free
 ```
 
 ### 3. View Results
@@ -152,7 +152,7 @@ Results saved to `results/YYYY-MM-DD_HH-MM-SS/`:
 ```bash
 python3 run_validation.py \
   --strategy ma_cross \
-  --platforms qengine,vectorbt_free \
+  --platforms ml4t.backtest,vectorbt_free \
   --start-date 2015-01-01 \
   --end-date 2020-12-31
 ```
@@ -162,7 +162,7 @@ python3 run_validation.py \
 ```bash
 python3 run_validation.py \
   --strategy ma_cross \
-  --platforms qengine \
+  --platforms ml4t.backtest \
   --symbols AAPL,GOOGL,MSFT
 ```
 
@@ -171,7 +171,7 @@ python3 run_validation.py \
 ```bash
 python3 run_validation.py \
   --strategy ma_cross \
-  --platforms qengine \
+  --platforms ml4t.backtest \
   --capital 1000000 \
   --commission 0.0005  # 5 basis points
 ```
@@ -244,7 +244,7 @@ class MyStrategySignals(SignalGenerator):
 ### 3. Run
 
 ```bash
-python3 run_validation.py --strategy my_strategy --platforms qengine
+python3 run_validation.py --strategy my_strategy --platforms ml4t.backtest
 ```
 
 ## 🐛 Troubleshooting
@@ -263,7 +263,7 @@ pip install polars pandas numpy vectorbt backtrader
 
 ```bash
 # Use free version instead
---platforms qengine,vectorbt_free
+--platforms ml4t.backtest,vectorbt_free
 
 # Or install pro (requires license)
 pip install vectorbt-pro
@@ -407,18 +407,18 @@ class TradeValidator:
 
 3. **Run First Validation**
    ```bash
-   python3 run_validation.py --strategy ma_cross --platforms qengine
+   python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest
    ```
 
 4. **Add Platforms Incrementally**
    ```bash
-   python3 run_validation.py --strategy ma_cross --platforms qengine,vectorbt_free
-   python3 run_validation.py --strategy ma_cross --platforms qengine,vectorbt_free,backtrader
+   python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest,vectorbt_free
+   python3 run_validation.py --strategy ma_cross --platforms ml4t.backtest,vectorbt_free,backtrader
    ```
 
 5. **Test Multiple Strategies**
    ```bash
-   python3 run_validation.py --strategy all --platforms qengine,vectorbt_free
+   python3 run_validation.py --strategy all --platforms ml4t.backtest,vectorbt_free
    ```
 
 6. **Review HTML Reports**
@@ -456,4 +456,4 @@ class TradeValidator:
 
 **Framework Status**: ✅ Ready for initial testing
 **Last Updated**: 2025-10-08
-**Maintainer**: QEngine Team
+**Maintainer**: ml4t.backtest Team

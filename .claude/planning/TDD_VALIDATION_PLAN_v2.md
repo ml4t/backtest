@@ -1,4 +1,4 @@
-# QEngine TDD Validation Plan: 100-Scenario Roadmap
+# ml4t.backtest TDD Validation Plan: 100-Scenario Roadmap
 **Platform Parity Validation Against VectorBT Pro, Zipline, and Backtrader**
 
 **Version**: 2.0  
@@ -58,7 +58,7 @@
 **RED**: Write test reproducing Backtrader missing 5 of 14 trades  
 **GREEN**: Fix Backtrader adapter signal→order translation  
 **REFACTOR**: Add comprehensive logging for order lifecycle  
-**Acceptance**: 14/14 trades executed, matches QEngine exactly  
+**Acceptance**: 14/14 trades executed, matches ml4t.backtest exactly  
 **Files**: `tests/validation/frameworks/backtrader_adapter.py`
 
 #### TASK-002: Zipline Data Feed Complexity
@@ -74,7 +74,7 @@
 **Priority**: P0 (Critical)  
 **Status**: Implemented (lines 379-400 in broker.py)  
 **RED**: Test all 6 combinations of (SL, TSL, TP) triggering simultaneously  
-**GREEN**: Verify QEngine matches VectorBT priority (SL > TSL > TP)  
+**GREEN**: Verify ml4t.backtest matches VectorBT priority (SL > TSL > TP)  
 **REFACTOR**: Document priority logic with inline comments  
 **Acceptance**: 100% match on exit priority across 20 scenarios  
 **Files**: `tests/unit/test_exit_priority.py` (EXISTS), add multi-exit scenarios
@@ -86,7 +86,7 @@
 **GREEN**: Verify strategies use broker.get_position() consistently  
 **REFACTOR**: Deprecate portfolio.positions.get() or sync automatically  
 **Acceptance**: No stale position data after fills  
-**Files**: Strategy adapters in `src/qengine/strategy/`
+**Files**: Strategy adapters in `src/ml4t.backtest/strategy/`
 
 ### Week 3-4: Core Order Type Validation (TASKS 005-011)
 
@@ -95,7 +95,7 @@
 #### TASK-005: Market Orders - Cross-Platform Validation
 **Priority**: P1 (High)  
 **Status**: Implemented, needs validation  
-**RED**: Test 100 market orders across QEngine/VectorBT/Zipline/Backtrader  
+**RED**: Test 100 market orders across ml4t.backtest/VectorBT/Zipline/Backtrader  
 **GREEN**: Verify fill prices within 0.01% across platforms  
 **REFACTOR**: Standardize market order test harness  
 **Acceptance**: 99%+ agreement on fill price/quantity  
@@ -114,7 +114,7 @@
 **Priority**: P1 (High)  
 **Status**: Implemented (TASK-013 completed per docs)  
 **RED**: Test SL triggering with low touching stop for SELL (long exit)  
-**GREEN**: Verify QEngine matches VectorBT SL fill prices exactly  
+**GREEN**: Verify ml4t.backtest matches VectorBT SL fill prices exactly  
 **REFACTOR**: Consolidate SL tests into single parameterized suite  
 **Acceptance**: Zero discrepancies across 50 SL scenarios  
 **Files**: `tests/unit/test_sl_vectorbt_matching.py` (EXISTS), extend coverage
@@ -408,14 +408,14 @@
 **RED**: Identify Pro-only features we can replicate  
 **GREEN**: Implement subset of Pro features  
 **REFACTOR**: Document Pro vs Open feature split  
-**Acceptance**: Key Pro features available in QEngine  
+**Acceptance**: Key Pro features available in ml4t.backtest  
 **Implementation Need**: 16-40 hours (depends on features)  
-**Files**: Research `resources/vectorbt.pro-main/`, implement in qengine
+**Files**: Research `resources/vectorbt.pro-main/`, implement in ml4t.backtest
 
 #### TASK-038: VectorBT Performance Benchmarks
 **Priority**: P1 (High)  
 **Status**: Ad-hoc tests exist  
-**RED**: Systematic benchmark: QEngine vs VectorBT on 10 strategies  
+**RED**: Systematic benchmark: ml4t.backtest vs VectorBT on 10 strategies  
 **GREEN**: Document speed tradeoffs (correctness vs speed)  
 **REFACTOR**: Create benchmark suite runner  
 **Acceptance**: Clear performance comparison report  
@@ -438,7 +438,7 @@
 **REFACTOR**: Integrate with qeval for advanced metrics  
 **Acceptance**: Basic optimization working  
 **Implementation Need**: 40-80 hours  
-**Files**: `src/qengine/portfolio/optimizer.py` (NEW)
+**Files**: `src/ml4t.backtest/portfolio/optimizer.py` (NEW)
 
 ### Week 17-18: Zipline-Specific Features (TASKS 041-045)
 
@@ -454,18 +454,18 @@
 #### TASK-042: Zipline Pipeline API Compatibility
 **Priority**: P2 (Medium)  
 **Status**: Not implemented  
-**RED**: Test QEngine with Zipline Pipeline signals  
-**GREEN**: Create Zipline Pipeline → QEngine bridge  
+**RED**: Test ml4t.backtest with Zipline Pipeline signals  
+**GREEN**: Create Zipline Pipeline → ml4t.backtest bridge  
 **REFACTOR**: Document pipeline integration  
-**Acceptance**: Can use Pipeline factors in QEngine  
+**Acceptance**: Can use Pipeline factors in ml4t.backtest  
 **Implementation Need**: 24-40 hours  
-**Files**: `src/qengine/data/zipline_pipeline.py` (NEW)
+**Files**: `src/ml4t.backtest/data/zipline_pipeline.py` (NEW)
 
 #### TASK-043: Zipline Benchmark Comparison
 **Priority**: P1 (High)  
 **Status**: Untested  
-**RED**: Benchmark QEngine vs Zipline on same 5 strategies  
-**GREEN**: Document speed difference (QEngine ~126x faster)  
+**RED**: Benchmark ml4t.backtest vs Zipline on same 5 strategies  
+**GREEN**: Document speed difference (ml4t.backtest ~126x faster)  
 **REFACTOR**: Identify Zipline's bottlenecks  
 **Acceptance**: Speed comparison report  
 **Files**: `tests/performance/test_zipline_benchmark.py` (NEW)
@@ -478,7 +478,7 @@
 **REFACTOR**: Commission model compatibility guide  
 **Acceptance**: Zipline commission parity  
 **Implementation Need**: 8-16 hours  
-**Files**: `src/qengine/execution/zipline_commission.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/zipline_commission.py` (NEW)
 
 #### TASK-045: Zipline Corporate Actions
 **Priority**: P3 (Low)  
@@ -488,7 +488,7 @@
 **REFACTOR**: Corporate action event processing  
 **Acceptance**: Basic splits/dividends work  
 **Implementation Need**: 24-40 hours  
-**Files**: `src/qengine/execution/corporate_actions.py` (EXISTS, needs implementation)
+**Files**: `src/ml4t.backtest/execution/corporate_actions.py` (EXISTS, needs implementation)
 
 ### Week 19-20: Backtrader-Specific Features (TASKS 046-050)
 
@@ -504,18 +504,18 @@
 #### TASK-047: Backtrader Indicator Library
 **Priority**: P2 (Medium)  
 **Status**: Not integrated  
-**RED**: Test using Backtrader indicators with QEngine  
+**RED**: Test using Backtrader indicators with ml4t.backtest  
 **GREEN**: Create Backtrader indicator bridge  
 **REFACTOR**: Indicator compatibility layer  
 **Acceptance**: Can use BT indicators  
 **Implementation Need**: 16-32 hours  
-**Files**: `src/qengine/strategy/backtrader_indicators.py` (NEW)
+**Files**: `src/ml4t.backtest/strategy/backtrader_indicators.py` (NEW)
 
 #### TASK-048: Backtrader Benchmark Comparison
 **Priority**: P1 (High)  
 **Status**: Untested  
-**RED**: Benchmark QEngine vs Backtrader on 5 strategies  
-**GREEN**: Document speed difference (QEngine ~6x faster)  
+**RED**: Benchmark ml4t.backtest vs Backtrader on 5 strategies  
+**GREEN**: Document speed difference (ml4t.backtest ~6x faster)  
 **REFACTOR**: Identify Backtrader's strengths  
 **Acceptance**: Speed comparison report  
 **Files**: `tests/performance/test_backtrader_benchmark.py` (NEW)
@@ -528,17 +528,17 @@
 **REFACTOR**: Sizer compatibility guide  
 **Acceptance**: Backtrader sizer parity  
 **Implementation Need**: 8-16 hours  
-**Files**: `src/qengine/execution/backtrader_sizers.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/backtrader_sizers.py` (NEW)
 
 #### TASK-050: Backtrader Analyzer Compatibility
 **Priority**: P3 (Low)  
 **Status**: Not implemented  
-**RED**: Test Backtrader analyzers on QEngine results  
+**RED**: Test Backtrader analyzers on ml4t.backtest results  
 **GREEN**: Create analyzer compatibility layer  
 **REFACTOR**: Result export to Backtrader format  
 **Acceptance**: Can use BT analyzers  
 **Implementation Need**: 16-24 hours  
-**Files**: `src/qengine/reporting/backtrader_analyzers.py` (NEW)
+**Files**: `src/ml4t.backtest/reporting/backtrader_analyzers.py` (NEW)
 
 ---
 
@@ -576,7 +576,7 @@
 
 #### TASK-054: Speed Benchmarks vs Alternatives
 **Priority**: P1 (High)  
-**Status**: Ad-hoc (existing data: QEngine 9-265x faster)  
+**Status**: Ad-hoc (existing data: ml4t.backtest 9-265x faster)  
 **RED**: Systematic benchmark on 10 strategies across all platforms  
 **GREEN**: Generate performance comparison matrix  
 **REFACTOR**: Automated benchmark runner  
@@ -591,7 +591,7 @@
 **REFACTOR**: Thread-safe data structures  
 **Acceptance**: Linear speedup with cores  
 **Implementation Need**: 24-40 hours  
-**Files**: `src/qengine/engine_parallel.py` (NEW)
+**Files**: `src/ml4t.backtest/engine_parallel.py` (NEW)
 
 ### Week 23-24: Historical Depth (TASKS 056-060)
 
@@ -656,7 +656,7 @@
 **Acceptance**: Clear feature parity status  
 **Files**: `docs/FEATURE_COMPARISON_MATRIX.md` (NEW)
 
-#### TASK-062: Migration Guide - VectorBT to QEngine
+#### TASK-062: Migration Guide - VectorBT to ml4t.backtest
 **Priority**: P1 (High)  
 **Status**: Missing  
 **RED**: Document API differences  
@@ -665,7 +665,7 @@
 **Acceptance**: Users can migrate strategies  
 **Files**: `docs/guides/MIGRATION_VECTORBT.md` (NEW)
 
-#### TASK-063: Migration Guide - Zipline to QEngine
+#### TASK-063: Migration Guide - Zipline to ml4t.backtest
 **Priority**: P2 (Medium)  
 **Status**: Missing  
 **RED**: Document Pipeline API differences  
@@ -674,7 +674,7 @@
 **Acceptance**: Users can migrate strategies  
 **Files**: `docs/guides/MIGRATION_ZIPLINE.md` (NEW)
 
-#### TASK-064: Migration Guide - Backtrader to QEngine
+#### TASK-064: Migration Guide - Backtrader to ml4t.backtest
 **Priority**: P2 (Medium)  
 **Status**: Missing  
 **RED**: Document indicator/sizer differences  
@@ -717,7 +717,7 @@
 **GREEN**: Complete missing docstrings  
 **REFACTOR**: Generate Sphinx docs  
 **Acceptance**: 100% API documentation  
-**Files**: All `src/qengine/` modules
+**Files**: All `src/ml4t.backtest/` modules
 
 #### TASK-069: Example Strategy Library
 **Priority**: P2 (Medium)  
@@ -745,23 +745,23 @@
 
 #### TASK-071: Kelly Criterion Position Sizing
 **Implementation Need**: 16-24 hours  
-**Files**: `src/qengine/execution/kelly_sizer.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/kelly_sizer.py` (NEW)
 
 #### TASK-072: Mean-Variance Portfolio Optimization
 **Implementation Need**: 40-60 hours  
-**Files**: `src/qengine/portfolio/mvo.py` (NEW)
+**Files**: `src/ml4t.backtest/portfolio/mvo.py` (NEW)
 
 #### TASK-073: Realistic Volume/Liquidity Simulation
 **Implementation Need**: 24-40 hours  
-**Files**: `src/qengine/execution/realistic_liquidity.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/realistic_liquidity.py` (NEW)
 
 #### TASK-074: Position Concentration Limits
 **Implementation Need**: 8-16 hours  
-**Files**: `src/qengine/execution/risk_controls.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/risk_controls.py` (NEW)
 
 #### TASK-075: Drawdown-Based Position Sizing
 **Implementation Need**: 8-16 hours  
-**Files**: `src/qengine/execution/drawdown_sizer.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/drawdown_sizer.py` (NEW)
 
 #### TASK-076: Multi-Timeframe Strategy Validation
 **Implementation Need**: 8-16 hours (validation only)  
@@ -769,27 +769,27 @@
 
 #### TASK-077: Order Routing Logic
 **Implementation Need**: 16-24 hours  
-**Files**: `src/qengine/execution/advanced_routing.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/advanced_routing.py` (NEW)
 
 #### TASK-078: Market Impact Decay Models
 **Implementation Need**: 16-24 hours  
-**Files**: `src/qengine/execution/impact_decay.py` (NEW)
+**Files**: `src/ml4t.backtest/execution/impact_decay.py` (NEW)
 
 #### TASK-079: Walk-Forward Optimization
 **Implementation Need**: 40-60 hours  
-**Files**: `src/qengine/optimization/walk_forward.py` (NEW)
+**Files**: `src/ml4t.backtest/optimization/walk_forward.py` (NEW)
 
 #### TASK-080: Monte Carlo Simulation
 **Implementation Need**: 24-40 hours  
-**Files**: `src/qengine/analysis/monte_carlo.py` (NEW)
+**Files**: `src/ml4t.backtest/analysis/monte_carlo.py` (NEW)
 
 ### Integration & Ecosystem (TASKS 081-090)
 
 #### TASK-081: qfeatures Integration Tests
-**Files**: `tests/integration/test_qfeatures_qengine.py` (NEW)
+**Files**: `tests/integration/test_qfeatures_ml4t.backtest.py` (NEW)
 
 #### TASK-082: qeval Integration Tests
-**Files**: `tests/integration/test_qeval_qengine.py` (NEW)
+**Files**: `tests/integration/test_qeval_ml4t.backtest.py` (NEW)
 
 #### TASK-083: End-to-End ML Pipeline Test
 **Files**: `tests/integration/test_ml_pipeline_e2e.py` (NEW)
@@ -808,15 +808,15 @@
 
 #### TASK-088: Web Dashboard Integration
 **Implementation Need**: 60-100 hours  
-**Files**: `src/qengine/reporting/dashboard.py` (NEW)
+**Files**: `src/ml4t.backtest/reporting/dashboard.py` (NEW)
 
 #### TASK-089: Live Trading Bridge (Paper)
 **Implementation Need**: 80-120 hours  
-**Files**: `src/qengine/live/paper_trading.py` (NEW)
+**Files**: `src/ml4t.backtest/live/paper_trading.py` (NEW)
 
 #### TASK-090: Broker Integration Framework
 **Implementation Need**: 100-200 hours  
-**Files**: `src/qengine/live/broker_api.py` (NEW)
+**Files**: `src/ml4t.backtest/live/broker_api.py` (NEW)
 
 ### Edge Cases & Robustness (TASKS 091-100)
 
@@ -947,13 +947,13 @@ Month 1: TASKS 001-020 (Fix platforms → Validate core orders → Position sizi
 
 - **Correctness**: 95%+ agreement with VectorBT across 100 scenarios
 - **Speed**: Maintain 10-100x speed advantage for event-driven execution
-- **Coverage**: 80%+ test coverage on qengine core
+- **Coverage**: 80%+ test coverage on ml4t.backtest core
 - **Scalability**: Handle 1000-asset universe, 20-year backtests
 - **Documentation**: 100% API documentation, 4 migration guides
 
 ### Qualitative Targets
 
-- **Production Readiness**: Clear guidance on when to use QEngine vs alternatives
+- **Production Readiness**: Clear guidance on when to use ml4t.backtest vs alternatives
 - **Community Confidence**: Comprehensive validation builds trust
 - **Developer Experience**: Easy migration from other platforms
 - **Maintenance**: CI/CD automation reduces manual validation burden
@@ -995,7 +995,7 @@ Month 1: TASKS 001-020 (Fix platforms → Validate core orders → Position sizi
 - ✅ Complete API documentation (TASK 068)
 - ✅ Example strategy library (TASK 069)
 - ✅ CI/CD automation (TASK 070)
-- 📄 **Final Report: QEngine Production Readiness Assessment**
+- 📄 **Final Report: ml4t.backtest Production Readiness Assessment**
 
 ---
 

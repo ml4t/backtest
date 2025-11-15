@@ -1,7 +1,7 @@
 """
 Integration test for all 4 platforms on scenario 002 (limit orders).
 
-This test validates that qengine, VectorBT, Backtrader, and Zipline all successfully
+This test validates that ml4t.backtest, VectorBT, Backtrader, and Zipline all successfully
 execute limit orders and respect limit prices.
 
 Expected Results:
@@ -39,7 +39,7 @@ def test_all_platforms_scenario_002():
             "--scenario",
             "002",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "summary",
         ],
@@ -56,7 +56,7 @@ def test_all_platforms_scenario_002():
     output = result.stdout
 
     # All platforms should execute successfully
-    assert "qengine" in output and "✅ OK" in output, "qengine failed to execute"
+    assert "ml4t.backtest" in output and "✅ OK" in output, "ml4t.backtest failed to execute"
     assert "vectorbt" in output and "✅ OK" in output, "vectorbt failed to execute"
     assert "backtrader" in output and "✅ OK" in output, "backtrader failed to execute"
     assert "zipline" in output and "✅ OK" in output, "zipline failed to execute"
@@ -89,7 +89,7 @@ def test_limit_price_validation():
             "--scenario",
             "002",
             "--platforms",
-            "qengine,vectorbt,backtrader,zipline",
+            "ml4t.backtest,vectorbt,backtrader,zipline",
             "--report",
             "detailed",
         ],
@@ -119,7 +119,7 @@ def test_limit_order_execution_timing():
 
     Platform differences:
     - VectorBT: May execute same-bar if limit hit during bar
-    - qengine: Next-bar execution when limit is met
+    - ml4t.backtest: Next-bar execution when limit is met
     - Backtrader: Next-bar open if limit hit
     - Zipline: Next-bar execution when limit is met
     """
@@ -129,7 +129,7 @@ def test_limit_order_execution_timing():
             "price": "limit price (at or better)",
             "notes": "Executes when price touches limit during bar",
         },
-        "qengine": {
+        "ml4t.backtest": {
             "timing": "next-bar",
             "price": "limit price (at or better)",
             "notes": "Checks limit at next bar, executes if met",

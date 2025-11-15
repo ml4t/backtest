@@ -2,14 +2,14 @@
 
 ## Executive Summary
 
-We have successfully validated QEngine against multiple backtesting frameworks, proving its correctness through identical results with VectorBT.
+We have successfully validated ml4t.backtest against multiple backtesting frameworks, proving its correctness through identical results with VectorBT.
 
 ## Key Findings
 
-### ✅ Perfect Agreement: QEngine ↔ VectorBT
+### ✅ Perfect Agreement: ml4t.backtest ↔ VectorBT
 
 Using identical Wiki data and MA crossover strategy (20/50):
-- **QEngine**: Final Value: $1,507.06 | Return: -84.93% | 14 trades
+- **ml4t.backtest**: Final Value: $1,507.06 | Return: -84.93% | 14 trades
 - **VectorBT**: Final Value: $1,507.06 | Return: -84.93% | 14 trades
 
 **100% AGREEMENT** - Exact match down to the penny!
@@ -50,7 +50,7 @@ Using identical Wiki data and MA crossover strategy (20/50):
 
 | Framework | Final Value | Return (%) | Trades | Execution Time |
 |-----------|------------|------------|--------|----------------|
-| QEngine   | $1,507.06  | -84.93     | 14     | 0.008s        |
+| ml4t.backtest   | $1,507.06  | -84.93     | 14     | 0.008s        |
 | VectorBT  | $1,507.06  | -84.93     | 14     | 1.972s        |
 | Backtrader| $9,799.17  | -2.01      | 9*     | 0.056s        |
 
@@ -58,8 +58,8 @@ Using identical Wiki data and MA crossover strategy (20/50):
 
 ## Speed Comparison
 
-QEngine is **247x faster** than VectorBT:
-- QEngine: 0.008 seconds
+ml4t.backtest is **247x faster** than VectorBT:
+- ml4t.backtest: 0.008 seconds
 - VectorBT: 1.972 seconds
 
 ## High-Frequency Strategy Results
@@ -85,17 +85,17 @@ We also tested high-frequency strategies generating 50+ trades per year:
 
 ## Conclusions
 
-1. **QEngine is Correct**: Perfect agreement with VectorBT validates our implementation
-2. **QEngine is Fast**: 247x faster than VectorBT while producing identical results
+1. **ml4t.backtest is Correct**: Perfect agreement with VectorBT validates our implementation
+2. **ml4t.backtest is Fast**: 247x faster than VectorBT while producing identical results
 3. **Framework Differences**: Backtrader has implementation bugs affecting trade execution
 4. **Data Consistency**: Using the same data source (Wiki) is critical for fair comparison
 
 ## Recommendations
 
-1. **Use QEngine with Confidence**: Validated against industry-standard VectorBT
+1. **Use ml4t.backtest with Confidence**: Validated against industry-standard VectorBT
 2. **Be Aware of Framework Quirks**: Each framework has its own implementation details
 3. **Always Validate**: When in doubt, compare against multiple frameworks
-4. **Performance Matters**: QEngine's speed advantage enables more sophisticated strategies
+4. **Performance Matters**: ml4t.backtest's speed advantage enables more sophisticated strategies
 
 ## Files Created
 

@@ -6,7 +6,7 @@ The data module provides data feed abstractions and schemas.
 Data Feed
 ---------
 
-.. automodule:: qengine.data.feed
+.. automodule:: ml4t.backtest.data.feed
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ Data Feed
 Schemas
 -------
 
-.. automodule:: qengine.data.schemas
+.. automodule:: ml4t.backtest.data.schemas
    :members:
    :undoc-members:
    :show-inheritance:
@@ -22,7 +22,7 @@ Schemas
 Asset Registry
 --------------
 
-.. automodule:: qengine.data.asset_registry
+.. automodule:: ml4t.backtest.data.asset_registry
    :members:
    :undoc-members:
    :show-inheritance:

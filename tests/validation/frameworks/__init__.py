@@ -3,7 +3,7 @@ Framework adapters for cross-framework validation.
 
 This module provides standardized interfaces for running identical
 strategies across different backtesting frameworks to validate
-QEngine's correctness and performance.
+ml4t.backtest's correctness and performance.
 """
 
 from .base import (
@@ -13,7 +13,7 @@ from .base import (
     TradeRecord,
     ValidationResult,
 )
-from .qengine_adapter import QEngineAdapter
+from .ml4t.backtest_adapter import ml4t.backtestAdapter
 from .vectorbt_adapter import VectorBTAdapter
 
 try:
@@ -31,7 +31,7 @@ __all__ = [
     "BaseFrameworkAdapter",
     "BaseStrategy",
     "MomentumStrategy",
-    "QEngineAdapter",
+    "ml4t.backtestAdapter",
     "TradeRecord",
     "ValidationResult",
     "VectorBTAdapter",
