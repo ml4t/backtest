@@ -1,9 +1,21 @@
 # ml4t.backtest Validation Framework
 
-[![Validation Tests](https://github.com/YOUR_ORG/ml4t/actions/workflows/validation-tests.yml/badge.svg)](https://github.com/YOUR_ORG/ml4t/actions/workflows/validation-tests.yml)
-[![codecov](https://codecov.io/gh/YOUR_ORG/ml4t/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_ORG/ml4t)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Internal-green.svg)](LICENSE)
+⚠️ **IMPORTANT**: These tests are **EXCLUDED from default test runs** and require optional dependencies.
+
+## Installation Required
+
+To run these tests, install comparison frameworks:
+```bash
+# Install all comparison frameworks
+uv pip install -e ".[comparison]"
+```
+
+Then run explicitly:
+```bash
+pytest tests/validation/ -v
+```
+
+---
 
 **Production-quality validation infrastructure testing ml4t.backtest against VectorBT Pro, Backtrader, and Zipline using real market data.**
 

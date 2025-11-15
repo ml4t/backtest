@@ -152,6 +152,7 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--ignore=tests/private",  # Exclude private/commercial dependency tests
+    "--ignore=tests/validation",  # Exclude optional cross-framework validation tests
     "--cov=ml4t.backtest",
     "--cov-report=term-missing",
     "--cov-report=html",
