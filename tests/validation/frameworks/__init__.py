@@ -13,7 +13,7 @@ from .base import (
     TradeRecord,
     ValidationResult,
 )
-from .ml4t.backtest_adapter import ml4t.backtestAdapter
+from .qengine_adapter import QEngineAdapter as BacktestAdapter
 from .vectorbt_adapter import VectorBTAdapter
 
 try:
@@ -31,7 +31,7 @@ __all__ = [
     "BaseFrameworkAdapter",
     "BaseStrategy",
     "MomentumStrategy",
-    "ml4t.backtestAdapter",
+    "BacktestAdapter",
     "TradeRecord",
     "ValidationResult",
     "VectorBTAdapter",

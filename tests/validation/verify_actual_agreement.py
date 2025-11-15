@@ -8,11 +8,11 @@ from pathlib import Path
 import pandas as pd
 
 # Add project paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(ml4t.backtest_src))
+sys.path.insert(0, str(backtest_src))
 
-from frameworks import ml4t.backtestAdapter, VectorBTAdapter
+from frameworks import BacktestAdapter, VectorBTAdapter
 
 
 def load_real_data():
@@ -50,7 +50,7 @@ def verify_real_agreement():
     print(f"Capital: ${initial_capital:,}")
 
     # Create adapters
-    qe_adapter = ml4t.backtestAdapter()
+    qe_adapter = BacktestAdapter()
     vbt_adapter = VectorBTAdapter()
 
     print("\nRunning ml4t.backtest backtest...")

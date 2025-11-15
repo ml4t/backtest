@@ -30,7 +30,7 @@ except Exception as e:
 print("\n3. Testing adapter imports...")
 try:
     from adapters import (
-        ml4t.backtestAdapter,
+        BacktestAdapter,
         VectorBTProAdapter,
         VectorBTFreeAdapter,
         BacktraderAdapter,
@@ -83,7 +83,7 @@ except Exception as e:
 # Test 6: Test ml4t.backtest adapter initialization
 print("\n6. Testing ml4t.backtest adapter...")
 try:
-    adapter = ml4t.backtestAdapter()
+    adapter = BacktestAdapter()
     print(f"   ✓ ml4t.backtest adapter created: {adapter.name}")
     print(f"   Stop Loss: {adapter.supports_stop_loss()}")
     print(f"   Take Profit: {adapter.supports_take_profit()}")

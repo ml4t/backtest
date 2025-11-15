@@ -83,7 +83,7 @@ def generate_multi_asset_signals(n_bars: int, entries_per_asset: int = 10, hold_
     }
 
 
-class MultiAssetml4t.backtestWrapper:
+class MultiAssetBacktestWrapper:
     """Extended ml4t.backtest wrapper for multi-asset backtests."""
 
     def run_backtest(self, ohlcv_dict, signals_dict, config):
@@ -521,7 +521,7 @@ def test_2_3_asset_specific_fees():
     # Run ml4t.backtest
     print("   🔧 Running ml4t.backtest...")
     try:
-        ml4t.backtest = MultiAssetml4t.backtestWrapper()
+        ml4t.backtest = MultiAssetBacktestWrapper()
         results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv_dict, signals_dict, config)
         print(f"      ✅ Complete: {results['ml4t.backtest']['num_trades']} trades")
         print(f"      💰 Final value: ${results['ml4t.backtest']['final_value']:,.2f}")

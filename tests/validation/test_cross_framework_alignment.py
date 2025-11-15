@@ -227,7 +227,7 @@ class TestCrossFrameworkAlignment:
         instead of our test DataFrame, making direct price comparison impossible.
         Zipline validation uses the regular backtest tests instead.
         """
-        from .frameworks.ml4t.backtest_adapter import ml4t.backtestAdapter
+        from .frameworks.backtest_adapter import BacktestAdapter
         from .frameworks.vectorbt_adapter import VectorBTAdapter
         from .frameworks.backtrader_adapter import BacktraderAdapter
         from .frameworks.base import Signal
@@ -267,7 +267,7 @@ class TestCrossFrameworkAlignment:
         initial_capital = 10000.0
 
         # ml4t.backtest
-        ml4t.backtest_adapter = ml4t.backtestAdapter()
+        ml4t.backtest_adapter = BacktestAdapter()
         ml4t.backtest_result = ml4t.backtest_adapter.run_with_signals(
             data=test_data,
             signals=signals,
@@ -368,7 +368,7 @@ class TestCrossFrameworkAlignment:
         Tests ml4t.backtest, VectorBT, and Backtrader with identical signals.
         (Zipline excluded - see test_frameworks_with_predefined_signals docstring)
         """
-        from .frameworks.ml4t.backtest_adapter import ml4t.backtestAdapter
+        from .frameworks.backtest_adapter import BacktestAdapter
         from .frameworks.vectorbt_adapter import VectorBTAdapter
         from .frameworks.backtrader_adapter import BacktraderAdapter
         from .frameworks.base import Signal
@@ -413,7 +413,7 @@ class TestCrossFrameworkAlignment:
         initial_capital = 10000.0
 
         # Run all 3 frameworks (Zipline excluded - see docstring)
-        ml4t.backtest_adapter = ml4t.backtestAdapter()
+        ml4t.backtest_adapter = BacktestAdapter()
         ml4t.backtest_result = ml4t.backtest_adapter.run_with_signals(
             data=test_data,
             signals=signals,
@@ -545,7 +545,7 @@ class TestCrossFrameworkAlignment:
 
         This test runs a minimal set of signals and logs detailed execution info.
         """
-        from .frameworks.ml4t.backtest_adapter import ml4t.backtestAdapter
+        from .frameworks.backtest_adapter import BacktestAdapter
         from .frameworks.zipline_adapter import ZiplineAdapter
         from .frameworks.base import Signal
         import pandas as pd
@@ -568,7 +568,7 @@ class TestCrossFrameworkAlignment:
 
         # ml4t.backtest
         print("Running ml4t.backtest...")
-        ml4t.backtest_adapter = ml4t.backtestAdapter()
+        ml4t.backtest_adapter = BacktestAdapter()
         ml4t.backtest_result = ml4t.backtest_adapter.run_with_signals(
             data=test_data,
             signals=signals,

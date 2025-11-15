@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 
 # Add project paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+backtest_src = Path(__file__).parent.parent.parent / "src"
 validation_dir = Path(__file__).parent
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(ml4t.backtest_src))
+sys.path.insert(0, str(backtest_src))
 sys.path.insert(0, str(validation_dir))
 
 from frameworks.vectorbt_adapter import VectorBTAdapter

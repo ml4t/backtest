@@ -12,8 +12,8 @@ import pandas as pd
 import vectorbtpro as vbt
 
 # Add ml4t.backtest to path
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(ml4t.backtest_src))
+backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(backtest_src))
 
 print("=" * 70)
 print("VECTORBT PRO VALIDATION")

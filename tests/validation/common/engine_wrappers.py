@@ -56,7 +56,7 @@ class EngineWrapper(ABC):
         pass
 
 
-class ml4t.backtestWrapper(EngineWrapper):
+class BacktestWrapper(EngineWrapper):
     """Wrapper for ml4t.backtest."""
 
     def run_backtest(

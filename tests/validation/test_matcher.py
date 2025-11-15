@@ -23,7 +23,7 @@ from core.trade import StandardTrade
 # ============================================================================
 
 @pytest.fixture
-def sample_trade_ml4t.backtest():
+def sample_trade_backtest():
     """Sample ml4t.backtest trade for testing."""
     return StandardTrade(
         trade_id=1,

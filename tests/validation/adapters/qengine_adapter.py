@@ -193,7 +193,7 @@ class SignalDrivenStrategy(Strategy):
             self.broker.submit_order(order)
 
 
-class ml4t.backtestAdapter(PlatformAdapter):
+class BacktestAdapter(PlatformAdapter):
     """Adapter for ml4t.backtest backtesting platform."""
 
     def __init__(self):

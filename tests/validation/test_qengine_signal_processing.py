@@ -28,7 +28,7 @@ from market_data import get_ticker_data
 from scenario_001_simple_market_orders import Signal
 
 
-def test_ml4t.backtest_executes_market_orders():
+def test_backtest_executes_market_orders():
     """
     RED: Test that ml4t.backtest executes BUY/SELL market orders and generates trades.
 

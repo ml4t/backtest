@@ -18,9 +18,9 @@ from typing import Any
 import pandas as pd
 
 # Add project paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(ml4t.backtest_src))
+sys.path.insert(0, str(backtest_src))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from strategies.base_strategy import (

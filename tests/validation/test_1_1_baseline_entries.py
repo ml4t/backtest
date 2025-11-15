@@ -31,7 +31,7 @@ from common import (
     load_real_crypto_data,
     generate_fixed_entries,
     BacktestConfig,
-    ml4t.backtestWrapper,
+    BacktestWrapper,
     VectorBTWrapper,
     print_validation_report,
 )
@@ -78,7 +78,7 @@ def test_1_1_baseline_entries():
     # Run ml4t.backtest
     print("   🔧 Running ml4t.backtest...")
     try:
-        ml4t.backtest = ml4t.backtestWrapper()
+        ml4t.backtest = BacktestWrapper()
         results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv, entries, exits=None, config=config)
         print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
     except Exception as e:

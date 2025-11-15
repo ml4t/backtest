@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import (
     load_real_crypto_data,
     BacktestConfig,
-    ml4t.backtestWrapper,
+    BacktestWrapper,
     VectorBTWrapper,
 )
 import pandas as pd
@@ -61,7 +61,7 @@ def test_diagnostic_signal_timing():
         order_type='market',
     )
 
-    ml4t.backtest = ml4t.backtestWrapper()
+    ml4t.backtest = BacktestWrapper()
     result_qe_no_fees = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
 
     vbt = VectorBTWrapper()

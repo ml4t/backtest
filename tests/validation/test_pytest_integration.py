@@ -12,16 +12,16 @@ import pandas as pd
 import pytest
 
 # Add project paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+backtest_src = Path(__file__).parent.parent.parent / "src"
 validation_dir = Path(__file__).parent
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(ml4t.backtest_src))
+sys.path.insert(0, str(backtest_src))
 sys.path.insert(0, str(validation_dir))
 
 from frameworks import (
     BacktraderAdapter,
     MomentumStrategy,
-    ml4t.backtestAdapter,
+    BacktestAdapter,
     VectorBTAdapter,
 )
 
@@ -69,9 +69,9 @@ def momentum_strategy():
 class TestFrameworkValidation:
     """Test suite for cross-framework validation."""
 
-    def test_ml4t.backtest_vectorbt_agreement(self, test_data, momentum_strategy):
+    def test_backtest_vectorbt_agreement(self, test_data, momentum_strategy):
         """Test that ml4t.backtest and VectorBT produce identical results."""
-        qe_adapter = ml4t.backtestAdapter()
+        qe_adapter = BacktestAdapter()
         vbt_adapter = VectorBTAdapter()
 
         initial_capital = 10000
@@ -101,9 +101,9 @@ class TestFrameworkValidation:
             f"Trade count mismatch: ml4t.backtest={qe_result.num_trades}, VectorBT={vbt_result.num_trades}"
         )
 
-    def test_ml4t.backtest_performance(self, test_data, momentum_strategy):
+    def test_backtest_performance(self, test_data, momentum_strategy):
         """Test ml4t.backtest performance benchmarks."""
-        qe_adapter = ml4t.backtestAdapter()
+        qe_adapter = BacktestAdapter()
         result = qe_adapter.run_backtest(test_data, momentum_strategy, 10000)
 
         assert not result.has_errors, f"ml4t.backtest failed: {result.errors}"
@@ -120,7 +120,7 @@ class TestFrameworkValidation:
 
     def test_framework_consistency(self, test_data, momentum_strategy):
         """Test consistency across available frameworks."""
-        adapters = [ml4t.backtestAdapter()]
+        adapters = [BacktestAdapter()]
 
         # Add VectorBT if available
         try:
@@ -164,7 +164,7 @@ class TestFrameworkValidation:
             "long_window": long_window,
         }
 
-        qe_adapter = ml4t.backtestAdapter()
+        qe_adapter = BacktestAdapter()
         result = qe_adapter.run_backtest(test_data, strategy_params, 10000)
 
         assert not result.has_errors, f"Strategy failed: {result.errors}"
@@ -172,7 +172,7 @@ class TestFrameworkValidation:
 
     def test_edge_cases(self, test_data, momentum_strategy):
         """Test ml4t.backtest with edge cases."""
-        qe_adapter = ml4t.backtestAdapter()
+        qe_adapter = BacktestAdapter()
 
         # Test with minimal capital
         result = qe_adapter.run_backtest(test_data, momentum_strategy, 100)
@@ -203,7 +203,7 @@ class TestRegressionPrevention:
         # Use fixed strategy parameters
         strategy_params = {"name": "MovingAverageCrossover", "short_window": 10, "long_window": 20}
 
-        qe_adapter = ml4t.backtestAdapter()
+        qe_adapter = BacktestAdapter()
         result = qe_adapter.run_backtest(test_data, strategy_params, 10000)
 
         assert not result.has_errors, f"Regression test failed: {result.errors}"

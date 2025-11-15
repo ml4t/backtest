@@ -36,7 +36,7 @@ from common import (
     load_real_crypto_data,
     generate_entry_exit_pairs,
     BacktestConfig,
-    ml4t.backtestWrapper,
+    BacktestWrapper,
     VectorBTWrapper,
     print_validation_report,
 )
@@ -95,7 +95,7 @@ def test_2_2_combined_fees():
     # Run ml4t.backtest
     print("   🔧 Running ml4t.backtest...")
     try:
-        ml4t.backtest = ml4t.backtestWrapper()
+        ml4t.backtest = BacktestWrapper()
         results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config)
         print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
         print(f"      💰 Final value: ${results['ml4t.backtest'].final_value:,.2f}")

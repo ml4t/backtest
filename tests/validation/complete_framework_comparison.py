@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 
 # Add paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(ml4t.backtest_src))
+backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(backtest_src))
 
 
 def run_zipline_backtest(

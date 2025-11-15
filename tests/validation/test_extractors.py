@@ -40,7 +40,7 @@ class TestExtractorsIntegration:
 class TestExtractorEdgeCases:
     """Test edge cases for each extractor using minimal mocks."""
 
-    def test_ml4t.backtest_empty_results(self):
+    def test_backtest_empty_results(self):
         """Test ml4t.backtest extractor handles empty results."""
         from extractors.ml4t.backtest import extract_ml4t.backtest_trades
         import polars as pl
@@ -52,7 +52,7 @@ class TestExtractorEdgeCases:
         trades = extract_ml4t.backtest_trades(results, data)
         assert len(trades) == 0
 
-    def test_ml4t.backtest_missing_trades_key(self):
+    def test_backtest_missing_trades_key(self):
         """Test ml4t.backtest extractor handles missing 'trades' key."""
         from extractors.ml4t.backtest import extract_ml4t.backtest_trades
         import polars as pl
@@ -119,7 +119,7 @@ class TestExtractorEdgeCases:
 class TestExtractorDocumentation:
     """Document extractor implementation details for future reference."""
 
-    def test_ml4t.backtest_expects_filled_time_column(self):
+    def test_backtest_expects_filled_time_column(self):
         """
         ml4t.backtest extractor expects DataFrame with columns:
         - filled_time (datetime with timezone)

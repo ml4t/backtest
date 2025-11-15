@@ -1,7 +1,7 @@
 """
 ml4t.backtest Framework Adapter for Cross-Framework Validation
 
-Now uses the REAL ml4t.backtest library via ml4t.backtestWrapper for accurate validation.
+Now uses the REAL ml4t.backtest library via BacktestWrapper for accurate validation.
 """
 
 import time
@@ -20,10 +20,10 @@ common_path = Path(__file__).parent.parent / "common"
 if str(common_path) not in sys.path:
     sys.path.insert(0, str(common_path))
 
-from engine_wrappers import ml4t.backtestWrapper, BacktestConfig
+from engine_wrappers import BacktestWrapper, BacktestConfig
 
 
-class ml4t.backtestAdapter(BaseFrameworkAdapter):
+class BacktestAdapter(BaseFrameworkAdapter):
     """Adapter for ml4t.backtest backtesting framework using real ml4t.backtest library."""
 
     def __init__(self):
@@ -35,7 +35,7 @@ class ml4t.backtestAdapter(BaseFrameworkAdapter):
         strategy_params: dict[str, Any],
         initial_capital: float = 10000,
     ) -> ValidationResult:
-        """Run backtest using real ml4t.backtest library via ml4t.backtestWrapper."""
+        """Run backtest using real ml4t.backtest library via BacktestWrapper."""
 
         result = ValidationResult(
             framework=self.framework_name,
@@ -58,8 +58,8 @@ class ml4t.backtestAdapter(BaseFrameworkAdapter):
             entries = signals_df['entries']
             exits = signals_df['exits']
 
-            # Prepare OHLCV data for ml4t.backtestWrapper
-            # ml4t.backtestWrapper expects DatetimeIndex named 'timestamp', normalize column names
+            # Prepare OHLCV data for BacktestWrapper
+            # BacktestWrapper expects DatetimeIndex named 'timestamp', normalize column names
             ohlcv = data.copy()
 
             # Ensure we have the required OHLCV columns (lowercase)
@@ -74,7 +74,7 @@ class ml4t.backtestAdapter(BaseFrameworkAdapter):
             # Select only OHLCV columns
             ohlcv = ohlcv[required_cols]
 
-            # Rename index to 'timestamp' (ml4t.backtestWrapper expects this)
+            # Rename index to 'timestamp' (BacktestWrapper expects this)
             ohlcv.index.name = 'timestamp'
 
             # Create BacktestConfig (no fees/slippage for baseline test)
@@ -85,8 +85,8 @@ class ml4t.backtestAdapter(BaseFrameworkAdapter):
                 order_type='market',
             )
 
-            # Run backtest via ml4t.backtestWrapper
-            ml4t.backtest = ml4t.backtestWrapper()
+            # Run backtest via BacktestWrapper
+            ml4t.backtest = BacktestWrapper()
             backtest_result = ml4t.backtest.run_backtest(
                 ohlcv=ohlcv,
                 entries=entries,
@@ -268,8 +268,8 @@ class ml4t.backtestAdapter(BaseFrameworkAdapter):
                 order_type='market',
             )
 
-            # Run backtest via ml4t.backtestWrapper
-            ml4t.backtest = ml4t.backtestWrapper()
+            # Run backtest via BacktestWrapper
+            ml4t.backtest = BacktestWrapper()
             backtest_result = ml4t.backtest.run_backtest(
                 ohlcv=ohlcv,
                 entries=entries,

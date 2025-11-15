@@ -15,8 +15,8 @@ import pandas as pd
 
 # Add paths
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(ml4t.backtest_src))
+backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(backtest_src))
 sys.path.insert(0, str(Path(__file__).parent))
 
 

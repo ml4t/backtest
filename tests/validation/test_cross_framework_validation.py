@@ -13,14 +13,14 @@ import numpy as np
 import pandas as pd
 
 # Add project paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
+backtest_src = Path(__file__).parent.parent.parent / "src"
 projects_dir = Path(__file__).parent.parent.parent.parent / "projects"
-sys.path.insert(0, str(ml4t.backtest_src))
+sys.path.insert(0, str(backtest_src))
 
 from frameworks import (
     BacktraderAdapter,
     MomentumStrategy,
-    ml4t.backtestAdapter,
+    BacktestAdapter,
     ValidationResult,
     VectorBTAdapter,
 )
@@ -198,7 +198,7 @@ def test_cross_framework_validation():
     adapters = []
 
     try:
-        adapters.append(ml4t.backtestAdapter())
+        adapters.append(BacktestAdapter())
     except Exception as e:
         print(f"ml4t.backtest adapter failed to create: {e}")
 

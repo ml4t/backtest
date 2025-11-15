@@ -12,7 +12,7 @@ from pathlib import Path
 
 from adapters import (
     BacktraderAdapter,
-    ml4t.backtestAdapter,
+    BacktestAdapter,
     VectorBTFreeAdapter,
     VectorBTProAdapter,
     ZiplineAdapter,
@@ -25,7 +25,7 @@ from validators import TradeValidator
 def get_available_platforms():
     """Get list of available platform adapters."""
     return {
-        'ml4t.backtest': ml4t.backtestAdapter,
+        'ml4t.backtest': BacktestAdapter,
         'vectorbt_pro': VectorBTProAdapter,
         'vectorbt_free': VectorBTFreeAdapter,
         'zipline': ZiplineAdapter,

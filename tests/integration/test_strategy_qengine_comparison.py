@@ -15,8 +15,8 @@ import numpy as np
 import pytest
 
 # Add project paths
-ml4t.backtest_src = Path(__file__).parent.parent.parent / "src"
-sys.path.insert(0, str(ml4t.backtest_src))
+backtest_src = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(backtest_src))
 
 from ml4t.backtest.core.event import MarketEvent
 from ml4t.backtest.core.types import MarketDataType
