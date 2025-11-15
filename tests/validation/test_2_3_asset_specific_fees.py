@@ -522,7 +522,7 @@ def test_2_3_asset_specific_fees():
     print("   🔧 Running ml4t.backtest...")
     try:
         ml4t.backtest = MultiAssetBacktestWrapper()
-        results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv_dict, signals_dict, config)
+        results['ml4t.backtest'] = wrapper.run_backtest(ohlcv_dict, signals_dict, config)
         print(f"      ✅ Complete: {results['ml4t.backtest']['num_trades']} trades")
         print(f"      💰 Final value: ${results['ml4t.backtest']['final_value']:,.2f}")
     except Exception as e:

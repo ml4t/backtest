@@ -87,8 +87,8 @@ def test_1_2_entry_exit_pairs():
     # Run ml4t.backtest
     print("   🔧 Running ml4t.backtest...")
     try:
-        ml4t.backtest = BacktestWrapper()
-        results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config)
+        wrapper = BacktestWrapper()
+        results['ml4t.backtest'] = wrapper.run_backtest(ohlcv, entries, exits=exits, config=config)
         print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
     except Exception as e:
         print(f"      ❌ Failed: {e}")

@@ -1,0 +1,2071 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.5, pytest-8.4.2, pluggy-1.6.0 -- /home/stefan/ml4t/software/backtest/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+benchmark: 5.1.0 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /home/stefan/ml4t/software/backtest
+configfile: pyproject.toml
+plugins: hypothesis-6.140.2, asyncio-1.2.0, benchmark-5.1.0, cov-7.0.0, xdist-3.8.0, timeout-2.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 639 items
+
+tests/integration/test_corporate_action_integration.py::test_stock_split_integration PASSED [  0%]
+tests/integration/test_corporate_action_integration.py::test_position_adjustment_after_split PASSED [  0%]
+tests/integration/test_corporate_action_integration.py::test_cash_adjustment_after_dividend PASSED [  0%]
+tests/integration/test_strategy_qengine_comparison.py::TestCryptoBasisComparison::test_basis_calculation_consistency PASSED [  0%]
+tests/unit/test_advanced_orders.py::TestStopOrders::test_stop_order_creation PASSED [  0%]
+tests/unit/test_advanced_orders.py::TestStopOrders::test_stop_order_missing_price PASSED [  0%]
+tests/unit/test_advanced_orders.py::TestStopOrders::test_stop_order_triggering PASSED [  1%]
+tests/unit/test_advanced_orders.py::TestStopOrders::test_stop_limit_order_creation PASSED [  1%]
+tests/unit/test_advanced_orders.py::TestStopOrders::test_stop_limit_order_missing_prices PASSED [  1%]
+tests/unit/test_advanced_orders.py::TestTrailingStops::test_trailing_stop_creation_with_amount PASSED [  1%]
+tests/unit/test_advanced_orders.py::TestTrailingStops::test_trailing_stop_creation_with_percent PASSED [  1%]
+tests/unit/test_advanced_orders.py::TestTrailingStops::test_trailing_stop_missing_parameters PASSED [  1%]
+tests/unit/test_advanced_orders.py::TestTrailingStops::test_trailing_stop_update_absolute PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestTrailingStops::test_trailing_stop_update_percentage PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestTrailingStops::test_trailing_stop_triggering PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestBracketOrders::test_bracket_order_creation PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestBracketOrders::test_bracket_order_missing_parameters PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestBracketOrders::test_bracket_order_execution PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestBracketOrders::test_bracket_oco_behavior PASSED [  2%]
+tests/unit/test_advanced_orders.py::TestOrderIntegration::test_mixed_order_types_execution PASSED [  3%]
+tests/unit/test_bracket_percentage.py::TestPercentageBracketOrders::test_percentage_tp_and_tsl_long PASSED [  3%]
+tests/unit/test_bracket_percentage.py::TestPercentageBracketOrders::test_percentage_tp_and_sl_long PASSED [  3%]
+tests/unit/test_bracket_percentage.py::TestPercentageBracketOrders::test_percentage_short_position PASSED [  3%]
+tests/unit/test_bracket_percentage.py::TestPercentageBracketOrders::test_absolute_prices_still_work PASSED [  3%]
+tests/unit/test_broker.py::TestSimulationBroker::test_broker_initialization PASSED [  3%]
+tests/unit/test_broker.py::TestSimulationBroker::test_submit_market_order PASSED [  4%]
+tests/unit/test_broker.py::TestSimulationBroker::test_submit_limit_order PASSED [  4%]
+tests/unit/test_broker.py::TestSimulationBroker::test_cancel_order PASSED [  4%]
+tests/unit/test_broker.py::TestSimulationBroker::test_market_order_fill PASSED [  4%]
+tests/unit/test_broker.py::TestSimulationBroker::test_limit_order_fill_when_price_favorable PASSED [  4%]
+tests/unit/test_broker.py::TestSimulationBroker::test_limit_order_no_fill_when_price_unfavorable PASSED [  4%]
+tests/unit/test_broker.py::TestSimulationBroker::test_sell_order_with_position PASSED [  5%]
+tests/unit/test_broker.py::TestSimulationBroker::test_sell_order_without_position PASSED [  5%]
+tests/unit/test_broker.py::TestSimulationBroker::test_stop_order_trigger PASSED [  5%]
+tests/unit/test_broker.py::TestSimulationBroker::test_insufficient_cash PASSED [  5%]
+tests/unit/test_broker.py::TestSimulationBroker::test_multiple_orders_same_asset PASSED [  5%]
+tests/unit/test_broker.py::TestSimulationBroker::test_broker_statistics PASSED [  5%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_no_negative_fill_quantity_with_commission PASSED [  5%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_percentage_commission_cash_constraint PASSED [  6%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_insufficient_cash_for_commission PASSED [  6%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_minimal_cash_exact_fill PASSED [  6%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_no_commission_model PASSED [  6%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_sell_order_not_affected_by_cash PASSED [  6%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_progressive_cash_depletion PASSED [  6%]
+tests/unit/test_cash_constraints.py::TestCashConstraints::test_minimum_fill_size_constraint PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_single_feed PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_two_feeds_interleaved PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_identical_timestamps PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_different_frequencies PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_clock_with_end_time PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_empty_feeds PASSED [  7%]
+tests/unit/test_clock_multi_feed.py::TestClockMultiFeed::test_three_feeds_complex PASSED [  8%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_is_market_open_no_calendar PASSED [  8%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_is_trading_day_no_calendar PASSED [  8%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_next_market_open_no_calendar PASSED [  8%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_next_market_close_no_calendar PASSED [  8%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_market_calendar_initialization PASSED [  8%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_clock_mode_property PASSED [  9%]
+tests/unit/test_clock_multi_feed.py::TestClockMarketHours::test_clock_time_bounds PASSED [  9%]
+tests/unit/test_clock_multi_feed.py::TestClockAdvanceTo::test_advance_to_requires_backtest_mode PASSED [  9%]
+tests/unit/test_clock_multi_feed.py::TestClockAdvanceTo::test_advance_to_cannot_go_backward PASSED [  9%]
+tests/unit/test_clock_multi_feed.py::TestClockAdvanceTo::test_advance_to_with_no_events_skipped PASSED [  9%]
+tests/unit/test_clock_multi_feed.py::TestClockAdvanceTo::test_advance_to_raises_error_when_skipping_events_not_allowed PASSED [  9%]
+tests/unit/test_clock_multi_feed.py::TestClockAdvanceTo::test_advance_to_skips_events_when_allowed PASSED [ 10%]
+tests/unit/test_clock_multi_feed.py::TestClockResetAndStats::test_reset_clears_state PASSED [ 10%]
+tests/unit/test_clock_multi_feed.py::TestClockResetAndStats::test_stats_returns_correct_information PASSED [ 10%]
+tests/unit/test_clock_multi_feed.py::TestClockResetAndStats::test_stats_updates_after_processing_events PASSED [ 10%]
+tests/unit/test_clock_multi_feed.py::TestClockResetAndStats::test_repr_returns_formatted_string PASSED [ 10%]
+tests/unit/test_clock_multi_feed.py::TestClockSignalSources::test_add_signal_source_increments_count PASSED [ 10%]
+tests/unit/test_clock_multi_feed.py::TestClockSignalSources::test_mixed_feeds_and_signal_sources PASSED [ 10%]
+tests/unit/test_commission.py::TestNoCommission::test_zero_commission PASSED [ 11%]
+tests/unit/test_commission.py::TestNoCommission::test_repr PASSED        [ 11%]
+tests/unit/test_commission.py::TestFlatCommission::test_default_commission PASSED [ 11%]
+tests/unit/test_commission.py::TestFlatCommission::test_custom_commission PASSED [ 11%]
+tests/unit/test_commission.py::TestFlatCommission::test_negative_commission_raises PASSED [ 11%]
+tests/unit/test_commission.py::TestFlatCommission::test_repr PASSED      [ 11%]
+tests/unit/test_commission.py::TestPercentageCommission::test_default_rate PASSED [ 12%]
+tests/unit/test_commission.py::TestPercentageCommission::test_custom_rate PASSED [ 12%]
+tests/unit/test_commission.py::TestPercentageCommission::test_negative_rate_raises PASSED [ 12%]
+tests/unit/test_commission.py::TestPercentageCommission::test_excessive_rate_raises PASSED [ 12%]
+tests/unit/test_commission.py::TestPercentageCommission::test_repr PASSED [ 12%]
+tests/unit/test_commission.py::TestPerShareCommission::test_default_rate PASSED [ 12%]
+tests/unit/test_commission.py::TestPerShareCommission::test_custom_rate PASSED [ 12%]
+tests/unit/test_commission.py::TestPerShareCommission::test_negative_rate_raises PASSED [ 13%]
+tests/unit/test_commission.py::TestPerShareCommission::test_repr PASSED  [ 13%]
+tests/unit/test_commission.py::TestTieredCommission::test_default_tiers PASSED [ 13%]
+tests/unit/test_commission.py::TestTieredCommission::test_custom_tiers PASSED [ 13%]
+tests/unit/test_commission.py::TestTieredCommission::test_invalid_tiers_raises PASSED [ 13%]
+tests/unit/test_commission.py::TestTieredCommission::test_negative_minimum_raises PASSED [ 13%]
+tests/unit/test_commission.py::TestTieredCommission::test_repr PASSED    [ 14%]
+tests/unit/test_commission.py::TestMakerTakerCommission::test_taker_fee PASSED [ 14%]
+tests/unit/test_commission.py::TestMakerTakerCommission::test_maker_rebate PASSED [ 14%]
+tests/unit/test_commission.py::TestMakerTakerCommission::test_custom_rates PASSED [ 14%]
+tests/unit/test_commission.py::TestMakerTakerCommission::test_invalid_rates_raise PASSED [ 14%]
+tests/unit/test_commission.py::TestMakerTakerCommission::test_rebate_cap PASSED [ 14%]
+tests/unit/test_commission.py::TestMakerTakerCommission::test_repr PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_equity_commission PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_futures_commission PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_options_commission PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_forex_commission PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_crypto_commission PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_default_commission PASSED [ 15%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_no_metadata_defaults_to_equity PASSED [ 16%]
+tests/unit/test_commission.py::TestAssetClassCommission::test_repr PASSED [ 16%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_fixed_tier_minimum PASSED [ 16%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_fixed_tier_normal PASSED [ 16%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_fixed_tier_maximum PASSED [ 16%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_tiered_small_quantity PASSED [ 16%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_tiered_medium_quantity PASSED [ 17%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_tiered_large_quantity PASSED [ 17%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_tiered_minimum PASSED [ 17%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_invalid_tier_raises PASSED [ 17%]
+tests/unit/test_commission.py::TestInteractiveBrokersCommission::test_repr PASSED [ 17%]
+tests/unit/test_commission.py::TestBrokerIntegration::test_broker_with_commission_model PASSED [ 17%]
+tests/unit/test_commission.py::TestBrokerIntegration::test_broker_fallback_commission PASSED [ 17%]
+tests/unit/test_corporate_actions.py::TestCorporateAction::test_creation PASSED [ 18%]
+tests/unit/test_corporate_actions.py::TestCorporateAction::test_invalid_dates PASSED [ 18%]
+tests/unit/test_corporate_actions.py::TestCashDividend::test_creation PASSED [ 18%]
+tests/unit/test_corporate_actions.py::TestCashDividend::test_with_currency PASSED [ 18%]
+tests/unit/test_corporate_actions.py::TestStockSplit::test_creation PASSED [ 18%]
+tests/unit/test_corporate_actions.py::TestStockSplit::test_invalid_ratio PASSED [ 18%]
+tests/unit/test_corporate_actions.py::TestMerger::test_cash_merger PASSED [ 19%]
+tests/unit/test_corporate_actions.py::TestMerger::test_stock_merger PASSED [ 19%]
+tests/unit/test_corporate_actions.py::TestMerger::test_mixed_merger PASSED [ 19%]
+tests/unit/test_corporate_actions.py::TestMerger::test_invalid_merger PASSED [ 19%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_add_action PASSED [ 19%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_get_pending_actions PASSED [ 19%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_cash_dividend PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_stock_split PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_stock_dividend PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_cash_merger PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_stock_merger PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_spinoff PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_process_symbol_change PASSED [ 20%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_adjust_price_for_actions PASSED [ 21%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_adjust_price_for_dividend PASSED [ 21%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_get_processed_actions PASSED [ 21%]
+tests/unit/test_corporate_actions.py::TestCorporateActionProcessor::test_no_position_scenarios PASSED [ 21%]
+tests/unit/test_corporate_actions.py::TestCorporateActionDataProvider::test_create_dividend_from_row PASSED [ 21%]
+tests/unit/test_corporate_actions.py::TestCorporateActionDataProvider::test_get_actions_for_asset PASSED [ 21%]
+tests/unit/test_corporate_actions.py::TestRightsOffering::test_creation PASSED [ 22%]
+tests/unit/test_corporate_actions.py::TestComplexScenarios::test_multiple_actions_same_date PASSED [ 22%]
+tests/unit/test_corporate_actions.py::TestComplexScenarios::test_sequential_actions PASSED [ 22%]
+tests/unit/test_engine.py::TestBacktestEngine::test_engine_initialization PASSED [ 22%]
+tests/unit/test_engine.py::TestBacktestEngine::test_engine_creates_default_components PASSED [ 22%]
+tests/unit/test_engine.py::TestBacktestEngine::test_event_handler_setup PASSED [ 22%]
+tests/unit/test_engine.py::TestBacktestEngine::test_run_basic_flow PASSED [ 23%]
+tests/unit/test_engine.py::TestBacktestEngine::test_run_with_date_range PASSED [ 23%]
+tests/unit/test_engine.py::TestBacktestEngine::test_run_with_max_events PASSED [ 23%]
+tests/unit/test_engine.py::TestBacktestEngine::test_reset PASSED         [ 23%]
+tests/unit/test_engine.py::TestBacktestEngine::test_compile_results PASSED [ 23%]
+tests/unit/test_engine.py::TestBacktestResults::test_results_initialization PASSED [ 23%]
+tests/unit/test_engine.py::TestBacktestResults::test_properties PASSED   [ 23%]
+tests/unit/test_engine.py::TestBacktestResults::test_win_rate PASSED     [ 24%]
+tests/unit/test_engine.py::TestBacktestResults::test_win_rate_empty_trades PASSED [ 24%]
+tests/unit/test_engine.py::TestBacktestResults::test_summary PASSED      [ 24%]
+tests/unit/test_engine.py::TestBacktestResults::test_to_dict PASSED      [ 24%]
+tests/unit/test_engine.py::TestBacktestResults::test_save_parquet PASSED [ 24%]
+tests/unit/test_engine.py::TestBacktestResults::test_save_json PASSED    [ 24%]
+tests/unit/test_engine.py::TestBacktestResults::test_save_unsupported_format PASSED [ 25%]
+tests/unit/test_engine.py::TestIntegrationScenarios::test_simple_buy_and_hold_scenario PASSED [ 25%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_slippage_applied_first PASSED [ 25%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_fees_on_slippage_adjusted_price PASSED [ 25%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_size_calculation_with_slippage PASSED [ 25%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_fixed_fees_in_size_calculation PASSED [ 25%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_order_of_operations_example_1 PASSED [ 25%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_order_of_operations_example_2 PASSED [ 26%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_order_of_operations_example_3 PASSED [ 26%]
+tests/unit/test_entry_price_vectorbt.py::TestVectorBTEntryPriceLogic::test_sell_order_negative_slippage PASSED [ 26%]
+tests/unit/test_exit_priority.py::TestExitPriority::test_get_exit_priority_values PASSED [ 26%]
+tests/unit/test_exit_priority.py::TestExitPriority::test_priority_order PASSED [ 26%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_fill_simulator_initialization PASSED [ 26%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_fill_simulator_with_custom_leverage PASSED [ 27%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_simple_market_order_fill PASSED [ 27%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_limit_order_fill_at_limit_price PASSED [ 27%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_order_cannot_fill_when_price_unfavorable PASSED [ 27%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_fill_count_increments PASSED [ 27%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_reset_clears_fill_count PASSED [ 27%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_max_leverage_default_prevents_overleveraging PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_max_leverage_2x_allows_double_position PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_max_leverage_enforced_as_capital_depletes PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_max_leverage_with_large_order PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_insufficient_cash_rejects_order PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_insufficient_cash_partial_fill PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_binary_search_with_tiered_commission PASSED [ 28%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_binary_search_converges_below_min_fill_size PASSED [ 29%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_sell_order_with_position PASSED [ 29%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_sell_order_without_position_rejected PASSED [ 29%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_sell_order_with_insufficient_shares_partial PASSED [ 29%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_order_state_updated_on_fill PASSED [ 29%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_order_state_unchanged_when_cannot_fill PASSED [ 29%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_zero_cash PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_negative_cash PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_very_small_order PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_fill_result_contains_all_required_fields PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_timestamp_propagates_to_fill_event PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_default_commission PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_percentage_commission PASSED [ 30%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_default_slippage_on_market_buy PASSED [ 31%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_default_slippage_on_market_sell PASSED [ 31%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_liquidity_model_reduces_fill_quantity PASSED [ 31%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_liquidity_below_min_fill_size_rejects PASSED [ 31%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_market_impact_applied_to_price PASSED [ 31%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_margin_sufficient_fills_order PASSED [ 31%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_margin_insufficient_rejects_order PASSED [ 32%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_limit_sell_order_fill_at_market_price PASSED [ 32%]
+tests/unit/test_fill_simulator.py::TestFillSimulator::test_limit_sell_order_no_fill_when_price_unfavorable PASSED [ 32%]
+tests/unit/test_liquidity.py::TestLiquidityModels::test_constant_liquidity_model PASSED [ 32%]
+tests/unit/test_liquidity.py::TestLiquidityModels::test_volume_limited_liquidity_model PASSED [ 32%]
+tests/unit/test_liquidity.py::TestLiquidityModels::test_realistic_liquidity_model PASSED [ 32%]
+tests/unit/test_liquidity.py::TestLiquidityModels::test_max_fill_quantity PASSED [ 33%]
+tests/unit/test_liquidity.py::TestBrokerLiquidityIntegration::test_broker_without_liquidity_model PASSED [ 33%]
+tests/unit/test_liquidity.py::TestBrokerLiquidityIntegration::test_broker_with_constant_liquidity PASSED [ 33%]
+tests/unit/test_liquidity.py::TestBrokerLiquidityIntegration::test_broker_liquidity_constraint_dominates PASSED [ 33%]
+tests/unit/test_liquidity.py::TestBrokerLiquidityIntegration::test_broker_with_volume_limited_liquidity PASSED [ 33%]
+tests/unit/test_liquidity.py::TestBrokerLiquidityIntegration::test_broker_liquidity_too_small PASSED [ 33%]
+tests/unit/test_liquidity.py::TestBrokerLiquidityIntegration::test_partial_fill_with_cash_and_liquidity_constraints PASSED [ 33%]
+tests/unit/test_lookahead_prevention.py::TestLookaheadPrevention::test_execution_delay_enabled_by_default PASSED [ 34%]
+tests/unit/test_lookahead_prevention.py::TestLookaheadPrevention::test_market_order_delayed_execution PASSED [ 34%]
+tests/unit/test_lookahead_prevention.py::TestLookaheadPrevention::test_immediate_execution_mode_legacy PASSED [ 34%]
+tests/unit/test_lookahead_prevention.py::TestLookaheadPrevention::test_limit_order_delayed_execution PASSED [ 34%]
+tests/unit/test_lookahead_prevention.py::TestLookaheadPrevention::test_stop_order_trigger_and_fill_delay PASSED [ 34%]
+tests/unit/test_lookahead_prevention.py::TestLookaheadPrevention::test_multiple_orders_proper_sequencing PASSED [ 34%]
+tests/unit/test_margin.py::TestMarginRequirement::test_margin_requirement_creation PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginRequirement::test_margin_requirement_defaults PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginAccountInitialization::test_initialization PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginAccountInitialization::test_custom_risk_parameters PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginRequirementChecks::test_check_margin_for_futures PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginRequirementChecks::test_check_margin_insufficient PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginRequirementChecks::test_check_margin_for_fx PASSED [ 35%]
+tests/unit/test_margin.py::TestMarginRequirementChecks::test_check_margin_unknown_asset PASSED [ 36%]
+tests/unit/test_margin.py::TestPositionManagement::test_open_new_futures_position PASSED [ 36%]
+tests/unit/test_margin.py::TestPositionManagement::test_open_position_insufficient_margin PASSED [ 36%]
+tests/unit/test_margin.py::TestPositionManagement::test_modify_existing_position PASSED [ 36%]
+tests/unit/test_margin.py::TestPositionManagement::test_close_position PASSED [ 36%]
+tests/unit/test_margin.py::TestPositionManagement::test_open_fx_position_with_leverage PASSED [ 36%]
+tests/unit/test_margin.py::TestPriceUpdatesAndMarginCalls::test_update_prices_basic PASSED [ 37%]
+tests/unit/test_margin.py::TestPriceUpdatesAndMarginCalls::test_update_prices_ignores_non_positions PASSED [ 37%]
+tests/unit/test_margin.py::TestPriceUpdatesAndMarginCalls::test_margin_call_detection PASSED [ 37%]
+tests/unit/test_margin.py::TestLiquidationPrice::test_liquidation_price_futures_long PASSED [ 37%]
+tests/unit/test_margin.py::TestLiquidationPrice::test_liquidation_price_futures_short PASSED [ 37%]
+tests/unit/test_margin.py::TestLiquidationPrice::test_liquidation_price_fx_long PASSED [ 37%]
+tests/unit/test_margin.py::TestForcedLiquidation::test_force_liquidation_removes_position PASSED [ 38%]
+tests/unit/test_margin.py::TestForcedLiquidation::test_force_liquidation_realizes_loss PASSED [ 38%]
+tests/unit/test_margin.py::TestMarginStatus::test_get_margin_status_empty PASSED [ 38%]
+tests/unit/test_margin.py::TestMarginStatus::test_get_margin_status_with_position PASSED [ 38%]
+tests/unit/test_margin.py::TestEdgeCases::test_zero_quantity_position PASSED [ 38%]
+tests/unit/test_margin.py::TestEdgeCases::test_negative_price_handling PASSED [ 38%]
+tests/unit/test_margin.py::TestEdgeCases::test_very_high_leverage PASSED [ 38%]
+tests/unit/test_margin.py::TestEdgeCases::test_position_with_no_asset_spec PASSED [ 39%]
+tests/unit/test_market_impact.py::TestImpactState::test_initial_state PASSED [ 39%]
+tests/unit/test_market_impact.py::TestImpactState::test_total_impact PASSED [ 39%]
+tests/unit/test_market_impact.py::TestImpactState::test_decay_temporary_impact PASSED [ 39%]
+tests/unit/test_market_impact.py::TestImpactState::test_cleanup_near_zero PASSED [ 39%]
+tests/unit/test_market_impact.py::TestNoMarketImpact::test_zero_impact PASSED [ 39%]
+tests/unit/test_market_impact.py::TestNoMarketImpact::test_get_current_impact PASSED [ 40%]
+tests/unit/test_market_impact.py::TestLinearMarketImpact::test_buy_impact PASSED [ 40%]
+tests/unit/test_market_impact.py::TestLinearMarketImpact::test_sell_impact PASSED [ 40%]
+tests/unit/test_market_impact.py::TestLinearMarketImpact::test_state_tracking PASSED [ 40%]
+tests/unit/test_market_impact.py::TestLinearMarketImpact::test_impact_decay PASSED [ 40%]
+tests/unit/test_market_impact.py::TestAlmgrenChrissImpact::test_square_root_permanent_impact PASSED [ 40%]
+tests/unit/test_market_impact.py::TestAlmgrenChrissImpact::test_linear_temporary_impact PASSED [ 41%]
+tests/unit/test_market_impact.py::TestAlmgrenChrissImpact::test_volatility_scaling PASSED [ 41%]
+tests/unit/test_market_impact.py::TestPropagatorImpact::test_power_law_impact PASSED [ 41%]
+tests/unit/test_market_impact.py::TestPropagatorImpact::test_order_history PASSED [ 41%]
+tests/unit/test_market_impact.py::TestPropagatorImpact::test_history_cleanup PASSED [ 41%]
+tests/unit/test_market_impact.py::TestPropagatorImpact::test_reset PASSED [ 41%]
+tests/unit/test_market_impact.py::TestIntraDayMomentum::test_momentum_buildup PASSED [ 41%]
+tests/unit/test_market_impact.py::TestIntraDayMomentum::test_momentum_reversal PASSED [ 42%]
+tests/unit/test_market_impact.py::TestIntraDayMomentum::test_momentum_state PASSED [ 42%]
+tests/unit/test_market_impact.py::TestIntraDayMomentum::test_reset PASSED [ 42%]
+tests/unit/test_market_impact.py::TestObizhaevWangImpact::test_information_split PASSED [ 42%]
+tests/unit/test_market_impact.py::TestObizhaevWangImpact::test_book_depth_scaling PASSED [ 42%]
+tests/unit/test_market_impact.py::TestObizhaevWangImpact::test_resilience_rate PASSED [ 42%]
+tests/unit/test_market_impact.py::TestMarketImpactIntegration::test_multiple_assets PASSED [ 43%]
+tests/unit/test_market_impact.py::TestMarketImpactIntegration::test_cumulative_impact PASSED [ 43%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_broker_with_no_impact_model PASSED [ 43%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_market_impact_affects_fill_price PASSED [ 43%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_impact_accumulation PASSED [ 43%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_separate_asset_impact PASSED [ 43%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_impact_decay_over_time PASSED [ 43%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_almgren_chriss_integration PASSED [ 44%]
+tests/unit/test_market_impact_integration.py::TestMarketImpactIntegration::test_market_impact_with_limit_orders PASSED [ 44%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerInitialization::test_init_with_tracker PASSED [ 44%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerInitialization::test_init_with_mock_tracker PASSED [ 44%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerUpdate::test_update_with_no_positions PASSED [ 44%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerUpdate::test_update_tracks_equity_increase PASSED [ 44%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerUpdate::test_update_tracks_drawdown PASSED [ 45%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerUpdate::test_update_with_positions PASSED [ 45%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerUpdate::test_update_calculates_leverage PASSED [ 45%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerUpdate::test_update_calculates_concentration PASSED [ 45%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerSharpeRatio::test_sharpe_ratio_insufficient_data PASSED [ 45%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerSharpeRatio::test_sharpe_ratio_zero_std PASSED [ 45%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerSharpeRatio::test_sharpe_ratio_positive_returns PASSED [ 46%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerGetMetrics::test_get_metrics_basic PASSED [ 46%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerGetMetrics::test_get_metrics_includes_sharpe_when_available PASSED [ 46%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerGetEquityCurve::test_get_equity_curve_empty PASSED [ 46%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerGetEquityCurve::test_get_equity_curve_with_data PASSED [ 46%]
+tests/unit/test_performance_analyzer.py::TestPerformanceAnalyzerReset::test_reset_clears_all_data PASSED [ 46%]
+tests/unit/test_pnl_calculations.py::TestEquityPnL::test_long_equity_profit PASSED [ 46%]
+tests/unit/test_pnl_calculations.py::TestEquityPnL::test_short_equity_profit PASSED [ 47%]
+tests/unit/test_pnl_calculations.py::TestFuturePnL::test_long_future_profit PASSED [ 47%]
+tests/unit/test_pnl_calculations.py::TestFuturePnL::test_short_future_loss PASSED [ 47%]
+tests/unit/test_pnl_calculations.py::TestOptionPnL::test_long_call_option_premium_based PASSED [ 47%]
+tests/unit/test_pnl_calculations.py::TestOptionPnL::test_short_put_option_premium_based PASSED [ 47%]
+tests/unit/test_pnl_calculations.py::TestOptionPnL::test_option_premium_based_method PASSED [ 47%]
+tests/unit/test_pnl_calculations.py::TestOptionPnL::test_option_enhanced_method PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestFXPnL::test_long_fx_profit PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestFXPnL::test_short_fx_loss PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestFXPnL::test_fx_with_costs PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestCryptoPnL::test_spot_crypto_profit PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestCryptoPnL::test_leveraged_crypto_short PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestEdgeCases::test_zero_quantity PASSED [ 48%]
+tests/unit/test_pnl_calculations.py::TestEdgeCases::test_zero_price_change PASSED [ 49%]
+tests/unit/test_pnl_calculations.py::TestEdgeCases::test_premium_method_on_non_option PASSED [ 49%]
+tests/unit/test_pnl_calculations.py::TestOptionExpiryPnL::test_long_call_expires_in_the_money PASSED [ 49%]
+tests/unit/test_pnl_calculations.py::TestOptionExpiryPnL::test_long_put_expires_worthless PASSED [ 49%]
+tests/unit/test_pnl_calculations.py::TestOptionExpiryPnL::test_short_call_expires_worthless PASSED [ 49%]
+tests/unit/test_pnl_calculations.py::TestOptionExpiryPnL::test_short_put_expires_in_the_money PASSED [ 49%]
+tests/unit/test_pnl_calculations.py::TestOptionExpiryPnL::test_expiry_method_on_non_option PASSED [ 50%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionWithPrecisionManager::test_update_price_with_precision_rounding PASSED [ 50%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionWithPrecisionManager::test_add_shares_with_precision_rounding PASSED [ 50%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionWithPrecisionManager::test_add_shares_closing_position_with_precision PASSED [ 50%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionWithPrecisionManager::test_remove_shares_with_precision_rounding PASSED [ 50%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionWithPrecisionManager::test_remove_shares_precision_aware_error_check PASSED [ 50%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionWithPrecisionManager::test_remove_shares_without_precision_manager PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPortfolioStateMetrics::test_total_pnl_property PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPortfolioStateMetrics::test_update_metrics_with_zero_equity PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPortfolioReset::test_reset_with_analyzer_enabled PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPortfolioReset::test_reset_without_analyzer PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionTrackerWithPrecisionManager::test_update_position_buy_rounds_cash PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionTrackerWithPrecisionManager::test_update_position_sell_rounds_cash_and_pnl PASSED [ 51%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionTrackerWithPrecisionManager::test_update_position_rounds_asset_realized_pnl PASSED [ 52%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionTrackerWithPrecisionManager::test_update_position_rounds_commission_and_slippage PASSED [ 52%]
+tests/unit/test_portfolio_coverage_gaps.py::TestPositionTrackerWithPrecisionManager::test_position_removal_with_precision_check PASSED [ 52%]
+tests/unit/test_portfolio_facade.py::test_portfolio_initialization PASSED [ 52%]
+tests/unit/test_portfolio_facade.py::test_portfolio_has_all_components PASSED [ 52%]
+tests/unit/test_portfolio_facade.py::test_on_fill_event_updates_all_components PASSED [ 52%]
+tests/unit/test_portfolio_facade.py::test_on_fill_event_buy_then_sell PASSED [ 53%]
+tests/unit/test_portfolio_facade.py::test_delegate_to_position_tracker PASSED [ 53%]
+tests/unit/test_portfolio_facade.py::test_delegate_to_performance_analyzer PASSED [ 53%]
+tests/unit/test_portfolio_facade.py::test_delegate_to_trade_journal PASSED [ 53%]
+tests/unit/test_portfolio_facade.py::test_hft_mode_no_analyzer PASSED    [ 53%]
+tests/unit/test_portfolio_facade.py::test_hft_mode_get_performance_metrics_raises PASSED [ 53%]
+tests/unit/test_portfolio_facade.py::test_hft_mode_calculate_sharpe_ratio_returns_none PASSED [ 53%]
+tests/unit/test_portfolio_facade.py::test_hft_mode_still_has_tracker_and_journal PASSED [ 54%]
+tests/unit/test_portfolio_facade.py::test_custom_analyzer_class PASSED   [ 54%]
+tests/unit/test_portfolio_facade.py::test_custom_journal_class PASSED    [ 54%]
+tests/unit/test_portfolio_facade.py::test_backward_compat_positions_property PASSED [ 54%]
+tests/unit/test_portfolio_facade.py::test_backward_compat_get_current_state PASSED [ 54%]
+tests/unit/test_portfolio_facade.py::test_backward_compat_save_state PASSED [ 54%]
+tests/unit/test_portfolio_facade.py::test_backward_compat_get_position_summary PASSED [ 55%]
+tests/unit/test_portfolio_facade.py::test_precision_manager PASSED       [ 55%]
+tests/unit/test_portfolio_facade.py::test_multiple_assets PASSED         [ 55%]
+tests/unit/test_portfolio_facade.py::test_round_trip_trade PASSED        [ 55%]
+tests/unit/test_portfolio_facade.py::test_save_state_during_trading PASSED [ 55%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_initialization PASSED [ 55%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_buy_position PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_sell_position PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_partial_sell PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_update_prices PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_equity_calculation PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_returns_calculation PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_multiple_positions PASSED [ 56%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_get_summary PASSED [ 57%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_reset PASSED [ 57%]
+tests/unit/test_position_tracker.py::TestPositionTrackerCore::test_per_asset_realized_pnl PASSED [ 57%]
+tests/unit/test_position_tracker.py::TestPositionTrackerEdgeCases::test_cannot_sell_more_than_owned PASSED [ 57%]
+tests/unit/test_position_tracker.py::TestPositionTrackerEdgeCases::test_zero_initial_cash PASSED [ 57%]
+tests/unit/test_position_tracker.py::TestPositionTrackerEdgeCases::test_get_nonexistent_position PASSED [ 57%]
+tests/unit/test_precision.py::TestPrecisionManager::test_equity_whole_shares_only PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_equity_penny_prices PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_crypto_fractional_shares PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_crypto_high_precision_prices PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_cash_always_cents_for_usd PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_from_asset_spec_equity PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_from_asset_spec_crypto PASSED [ 58%]
+tests/unit/test_precision.py::TestPrecisionManager::test_from_asset_spec_with_overrides PASSED [ 59%]
+tests/unit/test_precision.py::TestPrecisionManager::test_from_asset_class_string PASSED [ 59%]
+tests/unit/test_precision.py::TestPrecisionManager::test_is_position_zero_equity PASSED [ 59%]
+tests/unit/test_precision.py::TestPrecisionManager::test_is_position_zero_crypto PASSED [ 59%]
+tests/unit/test_precision.py::TestPrecisionManager::test_precision_defaults_exist_for_all_classes PASSED [ 59%]
+tests/unit/test_precision.py::TestPrecisionManager::test_futures_whole_contracts PASSED [ 59%]
+tests/unit/test_precision.py::TestPrecisionManager::test_options_whole_contracts PASSED [ 60%]
+tests/unit/test_precision.py::TestPrecisionManager::test_consistent_rounding_eliminates_mismatches PASSED [ 60%]
+tests/unit/test_precision.py::TestPrecisionIntegrationWithAssetSpec::test_asset_spec_creates_precision_manager PASSED [ 60%]
+tests/unit/test_precision.py::TestPrecisionIntegrationWithAssetSpec::test_different_assets_get_different_precision PASSED [ 60%]
+tests/unit/test_precision.py::TestPrecisionIntegrationWithAssetSpec::test_custom_precision_overrides PASSED [ 60%]
+tests/unit/test_sl_fill_price.py::TestSLFillPrice::test_sl_fills_at_stop_price_not_low PASSED [ 60%]
+tests/unit/test_sl_fill_price.py::TestSLFillPrice::test_sl_trigger_but_not_fill_if_no_low PASSED [ 61%]
+tests/unit/test_sl_fill_price.py::TestSLFillPrice::test_sl_slippage_direction PASSED [ 61%]
+tests/unit/test_sl_fill_price.py::TestSLFillPrice::test_sl_short_cover_fills_at_stop_not_high PASSED [ 61%]
+tests/unit/test_sl_fill_price.py::TestSLFillPrice::test_sl_realistic_scenario_from_task006 PASSED [ 61%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_from_base_price_not_fill_price PASSED [ 61%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_exact_values_from_task006 PASSED [ 61%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_trigger_on_low_not_close PASSED [ 61%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_exit_at_stop_level_not_low PASSED [ 62%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_symmetry_with_tp PASSED [ 62%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_fallback_without_base_price PASSED [ 62%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_short_position PASSED [ 62%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_no_tp PASSED [ 62%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_with_tp_both_created PASSED [ 62%]
+tests/unit/test_sl_vectorbt_matching.py::TestSLVectorBTMatching::test_sl_vs_tp_exit_levels PASSED [ 63%]
+tests/unit/test_slippage.py::TestNoSlippage::test_no_slippage_fill_price PASSED [ 63%]
+tests/unit/test_slippage.py::TestNoSlippage::test_no_slippage_cost PASSED [ 63%]
+tests/unit/test_slippage.py::TestFixedSlippage::test_fixed_slippage_default PASSED [ 63%]
+tests/unit/test_slippage.py::TestFixedSlippage::test_fixed_slippage_custom_spread PASSED [ 63%]
+tests/unit/test_slippage.py::TestFixedSlippage::test_fixed_slippage_cost PASSED [ 63%]
+tests/unit/test_slippage.py::TestFixedSlippage::test_invalid_spread PASSED [ 64%]
+tests/unit/test_slippage.py::TestPercentageSlippage::test_percentage_slippage_default PASSED [ 64%]
+tests/unit/test_slippage.py::TestPercentageSlippage::test_percentage_slippage_custom PASSED [ 64%]
+tests/unit/test_slippage.py::TestPercentageSlippage::test_minimum_slippage PASSED [ 64%]
+tests/unit/test_slippage.py::TestPercentageSlippage::test_invalid_percentage PASSED [ 64%]
+tests/unit/test_slippage.py::TestLinearImpactSlippage::test_linear_impact_small_order PASSED [ 64%]
+tests/unit/test_slippage.py::TestLinearImpactSlippage::test_linear_impact_large_order PASSED [ 64%]
+tests/unit/test_slippage.py::TestLinearImpactSlippage::test_linear_impact_sell_order PASSED [ 65%]
+tests/unit/test_slippage.py::TestSquareRootImpactSlippage::test_sqrt_impact_small_order PASSED [ 65%]
+tests/unit/test_slippage.py::TestSquareRootImpactSlippage::test_sqrt_impact_large_order PASSED [ 65%]
+tests/unit/test_slippage.py::TestVolumeShareSlippage::test_volume_slippage_with_volume PASSED [ 65%]
+tests/unit/test_slippage.py::TestVolumeShareSlippage::test_volume_slippage_no_volume PASSED [ 65%]
+tests/unit/test_slippage.py::TestVolumeShareSlippage::test_volume_limit PASSED [ 65%]
+tests/unit/test_slippage.py::TestVolumeShareSlippage::test_invalid_volume_limit PASSED [ 66%]
+tests/unit/test_slippage.py::TestAssetClassSlippage::test_equity_slippage PASSED [ 66%]
+tests/unit/test_slippage.py::TestAssetClassSlippage::test_crypto_slippage PASSED [ 66%]
+tests/unit/test_slippage.py::TestAssetClassSlippage::test_fx_slippage PASSED [ 66%]
+tests/unit/test_slippage.py::TestAssetClassSlippage::test_default_asset_class PASSED [ 66%]
+tests/unit/test_slippage.py::TestBrokerIntegration::test_broker_with_no_slippage PASSED [ 66%]
+tests/unit/test_slippage.py::TestBrokerIntegration::test_broker_with_fixed_slippage PASSED [ 66%]
+tests/unit/test_slippage.py::TestBrokerIntegration::test_broker_with_percentage_slippage PASSED [ 67%]
+tests/unit/test_strategy_adapters.py::TestStrategyAdapter::test_adapter_initialization PASSED [ 67%]
+tests/unit/test_strategy_adapters.py::TestStrategyAdapter::test_adapter_lifecycle PASSED [ 67%]
+tests/unit/test_strategy_adapters.py::TestStrategyAdapter::test_market_event_processing PASSED [ 67%]
+tests/unit/test_strategy_adapters.py::TestStrategyAdapter::test_fill_event_processing PASSED [ 67%]
+tests/unit/test_strategy_adapters.py::TestStrategyAdapter::test_position_sizing PASSED [ 67%]
+tests/unit/test_strategy_adapters.py::TestStrategyAdapter::test_risk_management PASSED [ 68%]
+tests/unit/test_strategy_adapters.py::TestDataFrameAdapter::test_dataframe_updates PASSED [ 68%]
+tests/unit/test_strategy_adapters.py::TestDataFrameAdapter::test_multiple_assets PASSED [ 68%]
+tests/unit/test_strategy_adapters.py::TestCryptoBasisStrategy::test_basis_strategy_initialization PASSED [ 68%]
+tests/unit/test_strategy_adapters.py::TestCryptoBasisStrategy::test_basis_calculation PASSED [ 68%]
+tests/unit/test_strategy_adapters.py::TestCryptoBasisStrategy::test_basis_adapter_integration PASSED [ 68%]
+tests/unit/test_strategy_adapters.py::TestCryptoBasisStrategy::test_factory_function PASSED [ 69%]
+tests/unit/test_strategy_adapters.py::TestCryptoBasisStrategy::test_strategy_diagnostics PASSED [ 69%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_from_base_price_not_fill_price PASSED [ 69%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_exact_values_from_task005 PASSED [ 69%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_test2_from_task005 PASSED [ 69%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_fallback_without_base_price PASSED [ 69%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_short_position PASSED [ 69%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_with_zero_slippage PASSED [ 70%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_creates_limit_order PASSED [ 70%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_precision PASSED [ 70%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPVectorBTMatching::test_tp_oco_linking PASSED [ 70%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPEdgeCases::test_tp_very_small_percentage PASSED [ 70%]
+tests/unit/test_tp_vectorbt_matching.py::TestTPEdgeCases::test_tp_large_percentage PASSED [ 70%]
+tests/unit/test_trade_journal.py::TestTradeJournalInitialization::test_init_empty PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalRecordFill::test_record_single_fill PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalRecordFill::test_record_multiple_fills PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalGetTrades::test_get_trades_empty PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalGetTrades::test_get_trades_with_fills PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalWinRate::test_win_rate_empty PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalWinRate::test_win_rate_only_buys PASSED [ 71%]
+tests/unit/test_trade_journal.py::TestTradeJournalWinRate::test_win_rate_all_winning_trades PASSED [ 72%]
+tests/unit/test_trade_journal.py::TestTradeJournalWinRate::test_win_rate_mixed_trades PASSED [ 72%]
+tests/unit/test_trade_journal.py::TestTradeJournalProfitFactor::test_profit_factor_empty PASSED [ 72%]
+tests/unit/test_trade_journal.py::TestTradeJournalProfitFactor::test_profit_factor_only_profits PASSED [ 72%]
+tests/unit/test_trade_journal.py::TestTradeJournalProfitFactor::test_profit_factor_only_losses PASSED [ 72%]
+tests/unit/test_trade_journal.py::TestTradeJournalProfitFactor::test_profit_factor_mixed_trades PASSED [ 72%]
+tests/unit/test_trade_journal.py::TestTradeJournalAverageCommission::test_avg_commission_empty PASSED [ 73%]
+tests/unit/test_trade_journal.py::TestTradeJournalAverageCommission::test_avg_commission_with_fills PASSED [ 73%]
+tests/unit/test_trade_journal.py::TestTradeJournalAverageSlippage::test_avg_slippage_empty PASSED [ 73%]
+tests/unit/test_trade_journal.py::TestTradeJournalAverageSlippage::test_avg_slippage_with_fills PASSED [ 73%]
+tests/unit/test_trade_journal.py::TestTradeJournalReset::test_reset_clears_fills PASSED [ 73%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_empty_tracker PASSED [ 73%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_single_long_trade PASSED [ 74%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_single_short_trade PASSED [ 74%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_fifo_matching PASSED [ 74%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_reverse_position PASSED [ 74%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_trades_dataframe_output PASSED [ 74%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_statistics PASSED [ 74%]
+tests/unit/test_trade_tracker.py::TestTradeTracker::test_reset PASSED    [ 74%]
+tests/unit/test_trailing_stop_bug.py::test_trailing_stop_should_lock_profit PASSED [ 75%]
+tests/unit/test_trailing_stop_bug.py::test_trailing_stop_current_behavior PASSED [ 75%]
+tests/unit/test_trailing_stop_bug.py::test_trailing_stop_with_lower_new_peak PASSED [ 75%]
+tests/unit/test_tsl_debug.py::test_tsl_debug PASSED                      [ 75%]
+tests/unit/test_tsl_simple.py::test_tsl_tracks_peak PASSED               [ 75%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLPeakTracking::test_tsl_tracks_peak_not_current_price PASSED [ 75%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLPeakTracking::test_tsl_updates_peak_with_high_not_close PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLPeakTracking::test_tsl_initializes_to_entry_price PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLExitPrice::test_tsl_exits_at_tsl_level_not_low PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLTriggerCondition::test_tsl_triggers_when_low_touches_tsl_level PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLTriggerCondition::test_tsl_does_not_trigger_above_level PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLStageProcessing::test_tsl_updates_peak_with_open_before_check PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLStageProcessing::test_tsl_can_activate_and_trigger_same_bar PASSED [ 76%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLExactValuesTask007::test_tsl_exact_match_task007_example PASSED [ 77%]
+tests/unit/test_tsl_vectorbt_matching.py::TestTSLWithThreshold::test_tsl_only_activates_after_threshold PASSED [ 77%]
+tests/unit/test_vectorbt_commission.py::test_vectorbt_commission_percentage_only PASSED [ 77%]
+tests/unit/test_vectorbt_commission.py::test_vectorbt_commission_with_fixed_fee PASSED [ 77%]
+tests/unit/test_vectorbt_commission.py::test_vectorbt_commission_exit_fees PASSED [ 77%]
+tests/unit/test_vectorbt_commission.py::test_vectorbt_commission_two_component_formula PASSED [ 77%]
+tests/validation/test_1_1_baseline_entries.py::test_1_1_baseline_entries FAILED [ 78%]
+tests/validation/test_1_2_entry_exit_pairs.py::test_1_2_entry_exit_pairs FAILED [ 78%]
+tests/validation/test_1_3_multiple_round_trips.py::test_1_3_multiple_round_trips FAILED [ 78%]
+tests/validation/test_2_1_percentage_commission.py::test_2_1_percentage_commission FAILED [ 78%]
+tests/validation/test_2_2_combined_fees.py::test_2_2_combined_fees SKIPPED [ 78%]
+tests/validation/test_2_3_asset_specific_fees.py::test_2_3_asset_specific_fees SKIPPED [ 78%]
+tests/validation/test_3_1_fixed_slippage.py::test_3_1_fixed_slippage FAILED [ 79%]
+tests/validation/test_3_2_percentage_slippage.py::test_3_2_percentage_slippage FAILED [ 79%]
+tests/validation/test_3_3_combined_costs.py::test_3_3_combined_costs FAILED [ 79%]
+tests/validation/test_4_1_limit_orders.py::test_4_1_limit_orders FAILED  [ 79%]
+tests/validation/test_all_platforms_scenario_001.py::test_all_platforms_scenario_001 FAILED [ 79%]
+tests/validation/test_all_platforms_scenario_001.py::test_platform_execution_models PASSED [ 79%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_signal_count_matches PASSED [ 79%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_signal_dates_match_expected PASSED [ 80%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_ma_calculation_vectorbt_compatibility PASSED [ 80%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_trade_execution_logic PASSED [ 80%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_no_spurious_signals PASSED [ 80%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_ma_values_match_on_critical_dates PASSED [ 80%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_frameworks_with_predefined_signals FAILED [ 80%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_frameworks_comprehensive_100_trades FAILED [ 81%]
+tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_debug_zipline_variance SKIPPED [ 81%]
+tests/validation/test_cross_framework_alignment.py::TestFrameworkComparison::test_vectorbt_produces_expected_signals FAILED [ 81%]
+tests/validation/test_cross_framework_validation.py::test_cross_framework_validation PASSED [ 81%]
+tests/validation/test_diagnostic_signal_timing.py::test_diagnostic_signal_timing FAILED [ 81%]
+tests/validation/test_diagnostic_with_logging.py::test_diagnostic_with_logging PASSED [ 81%]
+tests/validation/test_extractors.py::TestExtractorsIntegration::test_all_extractors_validated_in_phase1 PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorEdgeCases::test_backtest_empty_results PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorEdgeCases::test_backtest_missing_trades_key PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorEdgeCases::test_vectorbt_empty_portfolio PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorEdgeCases::test_backtrader_empty_trade_list PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorEdgeCases::test_zipline_empty_transactions PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorDocumentation::test_backtest_expects_filled_time_column PASSED [ 82%]
+tests/validation/test_extractors.py::TestExtractorDocumentation::test_vectorbt_expects_portfolio_trades_records PASSED [ 83%]
+tests/validation/test_extractors.py::TestExtractorDocumentation::test_backtrader_expects_trade_dict_list PASSED [ 83%]
+tests/validation/test_extractors.py::TestExtractorDocumentation::test_zipline_expects_performance_dataframe PASSED [ 83%]
+tests/validation/test_fixtures_market_data.py::TestLoadWikiPrices::test_load_wiki_prices_unadjusted PASSED [ 83%]
+tests/validation/test_fixtures_market_data.py::TestLoadWikiPrices::test_load_wiki_prices_adjusted PASSED [ 83%]
+tests/validation/test_fixtures_market_data.py::TestLoadWikiPrices::test_load_wiki_prices_different_values PASSED [ 83%]
+tests/validation/test_fixtures_market_data.py::TestLoadWikiPrices::test_load_wiki_prices_missing_file PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_basic PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_no_dates PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_start_date_only PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_end_date_only PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_date_formats PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_adjusted PASSED [ 84%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_invalid_ticker PASSED [ 85%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_future_dates PASSED [ 85%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_reversed_dates PASSED [ 85%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_timezone_aware PASSED [ 85%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_no_missing_ohlc PASSED [ 85%]
+tests/validation/test_fixtures_market_data.py::TestGetTickerData::test_get_ticker_data_ohlc_relationships PASSED [ 85%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_basic FAILED [ 86%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_multiple_tickers FAILED [ 86%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_hdf5_structure FAILED [ 86%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_date_formats FAILED [ 86%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_creates_output_dir FAILED [ 86%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_invalid_ticker_warning FAILED [ 86%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_splits_and_dividends FAILED [ 87%]
+tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_adjusted_prices FAILED [ 87%]
+tests/validation/test_fixtures_market_data.py::TestDataPathConstants::test_wiki_prices_path_exists PASSED [ 87%]
+tests/validation/test_fixtures_market_data.py::TestDataPathConstants::test_projects_dir_structure PASSED [ 87%]
+tests/validation/test_matcher.py::TestTradeMatchProperties::test_reference_trade_returns_first_non_none PASSED [ 87%]
+tests/validation/test_matcher.py::TestTradeMatchProperties::test_reference_trade_returns_none_when_all_none PASSED [ 87%]
+tests/validation/test_matcher.py::TestTradeMatchProperties::test_all_trades_returns_non_none_trades PASSED [ 87%]
+tests/validation/test_matcher.py::TestTradeMatchProperties::test_all_trades_includes_all_four_platforms PASSED [ 88%]
+tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_single_platform FAILED [ 88%]
+tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_two_platforms_exact_timestamp FAILED [ 88%]
+tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_three_platforms_within_tolerance FAILED [ 88%]
+tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_respects_tolerance FAILED [ 88%]
+tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_separate_groups FAILED [ 88%]
+tests/validation/test_matcher.py::TestMatchTradesEdgeCases::test_empty_input PASSED [ 89%]
+tests/validation/test_matcher.py::TestMatchTradesEdgeCases::test_empty_platform_lists PASSED [ 89%]
+tests/validation/test_matcher.py::TestMatchTradesEdgeCases::test_single_platform_empty FAILED [ 89%]
+tests/validation/test_matcher.py::TestMatchTradesEdgeCases::test_unmatched_trades_different_platforms FAILED [ 89%]
+tests/validation/test_matcher.py::TestCreateMatchDeltas::test_entry_timestamp_deltas FAILED [ 89%]
+tests/validation/test_matcher.py::TestCreateMatchDeltas::test_exit_timestamp_deltas FAILED [ 89%]
+tests/validation/test_matcher.py::TestCreateMatchDeltas::test_entry_price_diffs FAILED [ 89%]
+tests/validation/test_matcher.py::TestCreateMatchDeltas::test_exit_price_diffs FAILED [ 90%]
+tests/validation/test_matcher.py::TestCreateMatchDeltas::test_component_tracking FAILED [ 90%]
+tests/validation/test_matcher.py::TestCreateMatchDifferences::test_no_differences_identical_trades FAILED [ 90%]
+tests/validation/test_matcher.py::TestCreateMatchDifferences::test_entry_timing_difference FAILED [ 90%]
+tests/validation/test_matcher.py::TestCreateMatchDifferences::test_entry_timing_difference_large FAILED [ 90%]
+tests/validation/test_matcher.py::TestCreateMatchDifferences::test_exit_timing_difference_large FAILED [ 90%]
+tests/validation/test_matcher.py::TestCreateMatchDifferences::test_price_difference_detection FAILED [ 91%]
+tests/validation/test_matcher.py::TestCreateMatchDifferences::test_component_difference_detection FAILED [ 91%]
+tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_none_identical_trades FAILED [ 91%]
+tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_minor_small_price_diff FAILED [ 91%]
+tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_major_medium_price_diff FAILED [ 91%]
+tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_critical_large_price_diff FAILED [ 91%]
+tests/validation/test_matcher.py::TestMatchTradesMultiple::test_multiple_trades_same_platform FAILED [ 92%]
+tests/validation/test_matcher.py::TestMatchTradesMultiple::test_multiple_trades_multiple_platforms FAILED [ 92%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_backtest_vectorbt_agreement FAILED [ 92%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_backtest_performance FAILED [ 92%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_framework_consistency FAILED [ 92%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_different_strategy_parameters[5-10] FAILED [ 92%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_different_strategy_parameters[10-20] FAILED [ 92%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_different_strategy_parameters[20-50] FAILED [ 93%]
+tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_edge_cases FAILED [ 93%]
+tests/validation/test_pytest_integration.py::TestRegressionPrevention::test_known_good_results FAILED [ 93%]
+tests/validation/test_qengine_signal_processing.py::test_backtest_executes_market_orders PASSED [ 93%]
+tests/validation/test_scenario_002_limit_orders.py::test_all_platforms_scenario_002 FAILED [ 93%]
+tests/validation/test_scenario_002_limit_orders.py::test_limit_price_validation FAILED [ 93%]
+tests/validation/test_scenario_002_limit_orders.py::test_limit_order_execution_timing PASSED [ 94%]
+tests/validation/test_scenario_003_stop_orders.py::test_all_platforms_scenario_003 FAILED [ 94%]
+tests/validation/test_scenario_003_stop_orders.py::test_stop_loss_validation FAILED [ 94%]
+tests/validation/test_scenario_003_stop_orders.py::test_stop_order_execution_timing PASSED [ 94%]
+tests/validation/test_scenario_004_position_reentry.py::test_all_platforms_scenario_004 FAILED [ 94%]
+tests/validation/test_scenario_004_position_reentry.py::test_position_accumulation FAILED [ 94%]
+tests/validation/test_scenario_004_position_reentry.py::test_reentry_patterns FAILED [ 94%]
+tests/validation/test_scenario_005_multi_asset.py::test_all_platforms_scenario_005 FAILED [ 95%]
+tests/validation/test_scenario_005_multi_asset.py::test_asset_isolation FAILED [ 95%]
+tests/validation/test_scenario_005_multi_asset.py::test_multi_asset_execution PASSED [ 95%]
+tests/validation/test_vectorbt_fix.py::test_vectorbt_implementation FAILED [ 95%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_adapter_initialization ERROR [ 95%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_adapter_detects_pro_version ERROR [ 95%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_ma_crossover_strategy ERROR [ 96%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_ma_crossover_metrics ERROR [ 96%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_ma_crossover_different_windows ERROR [ 96%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_bollinger_bands_strategy ERROR [ 96%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_momentum_strategy ERROR [ 96%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_volume_breakout_strategy ERROR [ 96%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_unknown_strategy ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_invalid_parameters ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_small_initial_capital ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_large_initial_capital ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_data_validation_missing_columns ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_data_validation_non_datetime_index ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_result_contains_required_fields ERROR [ 97%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_result_summary_dict ERROR [ 98%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_execution_time_reasonable ERROR [ 98%]
+tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_memory_usage_tracked ERROR [ 98%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_initialization FAILED [ 98%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_run_backtest_returns_validation_result PASSED [ 98%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_executes_without_errors FAILED [ 98%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_returns_performance_metrics FAILED [ 99%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_ma_crossover_generates_trades FAILED [ 99%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_unknown_strategy_returns_error FAILED [ 99%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_accepts_different_capital_amounts PASSED [ 99%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_accepts_different_ma_windows FAILED [ 99%]
+tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_result_fields_accessible PASSED [ 99%]
+tests/validation/test_zipline_adapter.py::TestZiplineIntegration::test_zipline_version_available SKIPPED [100%]
+
+==================================== ERRORS ====================================
+_____ ERROR at setup of TestVectorBTProAdapter.test_adapter_initialization _____
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+__ ERROR at setup of TestVectorBTProAdapter.test_adapter_detects_pro_version ___
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_____ ERROR at setup of TestVectorBTProAdapter.test_ma_crossover_strategy ______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+______ ERROR at setup of TestVectorBTProAdapter.test_ma_crossover_metrics ______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_ ERROR at setup of TestVectorBTProAdapter.test_ma_crossover_different_windows _
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+____ ERROR at setup of TestVectorBTProAdapter.test_bollinger_bands_strategy ____
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_______ ERROR at setup of TestVectorBTProAdapter.test_momentum_strategy ________
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+____ ERROR at setup of TestVectorBTProAdapter.test_volume_breakout_strategy ____
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+________ ERROR at setup of TestVectorBTProAdapter.test_unknown_strategy ________
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_______ ERROR at setup of TestVectorBTProAdapter.test_invalid_parameters _______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_____ ERROR at setup of TestVectorBTProAdapter.test_small_initial_capital ______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_____ ERROR at setup of TestVectorBTProAdapter.test_large_initial_capital ______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_ ERROR at setup of TestVectorBTProAdapter.test_data_validation_missing_columns _
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_ ERROR at setup of TestVectorBTProAdapter.test_data_validation_non_datetime_index _
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+_ ERROR at setup of TestVectorBTProAdapter.test_result_contains_required_fields _
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+______ ERROR at setup of TestVectorBTProAdapter.test_result_summary_dict _______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+___ ERROR at setup of TestVectorBTProAdapter.test_execution_time_reasonable ____
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+______ ERROR at setup of TestVectorBTProAdapter.test_memory_usage_tracked ______
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_vectorbtpro_adapter.py:19: in adapter
+    return VectorBTProAdapter()
+           ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+=================================== FAILURES ===================================
+__________________________ test_1_1_baseline_entries ___________________________
+tests/validation/test_1_1_baseline_entries.py:116: in test_1_1_baseline_entries
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 1.1: Baseline - Entry Signals Only
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+
+2️⃣  Generating fixed entry signals (every 50 bars)...
+   ✅ Generated 20 entry signals
+   📍 First 5 entry indices: [10, 60, 110, 160, 210]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.00%
+   📉 Slippage: 0.00%
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_1_1_baseline_entries.py", line 81, in test_1_1_baseline_entries
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+__________________________ test_1_2_entry_exit_pairs ___________________________
+tests/validation/test_1_2_entry_exit_pairs.py:125: in test_1_2_entry_exit_pairs
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 1.2: Entry + Exit Signal Pairs
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 20 entry signals
+   ✅ Generated 20 exit signals
+   📍 First 3 entry indices: [10, 60, 110]
+   📍 First 3 exit indices: [20, 70, 120]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.00%
+   📉 Slippage: 0.00%
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_1_2_entry_exit_pairs.py", line 90, in test_1_2_entry_exit_pairs
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+________________________ test_1_3_multiple_round_trips _________________________
+tests/validation/test_1_3_multiple_round_trips.py:131: in test_1_3_multiple_round_trips
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 1.3: Multiple Round Trips (40 Entry/Exit Pairs)
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 40 entry signals
+   ✅ Generated 40 exit signals
+   📍 First 5 entry indices: [0, 25, 50, 75, 100]
+   📍 First 5 exit indices: [5, 30, 55, 80, 105]
+   📍 Last 5 entry indices: [875, 900, 925, 950, 975]
+   📍 Last 5 exit indices: [880, 905, 930, 955, 980]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.00%
+   📉 Slippage: 0.00%
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_1_3_multiple_round_trips.py", line 94, in test_1_3_multiple_round_trips
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+________________________ test_2_1_percentage_commission ________________________
+tests/validation/test_2_1_percentage_commission.py:152: in test_2_1_percentage_commission
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 2.1: Percentage Commission (0.1% per trade)
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 20 entry signals
+   ✅ Generated 20 exit signals
+   📍 First 5 entry indices: [10, 60, 110, 160, 210]
+   📍 First 5 exit indices: [20, 70, 120, 170, 220]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.10% per trade
+   📉 Slippage: 0.00%
+   ⚠️  Expected commission impact: ~0.2% per round trip
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_2_1_percentage_commission.py", line 91, in test_2_1_percentage_commission
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+___________________________ test_3_1_fixed_slippage ____________________________
+tests/validation/test_3_1_fixed_slippage.py:195: in test_3_1_fixed_slippage
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 3.1: Fixed Slippage ($10 per trade)
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+   📊 Average BTC price: $29,281.66
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 20 entry signals
+   ✅ Generated 20 exit signals
+   📍 First 5 entry indices: [10, 60, 110, 160, 210]
+   📍 First 5 exit indices: [20, 70, 120, 170, 220]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.00%
+   📉 Target Slippage: $10.00 per trade (fixed)
+   📊 Equivalent Slippage: 0.0342% (percentage approximation)
+   ⚠️  Expected slippage: ~$10.00 per fill (±$1 due to price variation)
+   ⚠️  Expected total cost: ~$400.00 (20 round trips)
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_3_1_fixed_slippage.py", line 111, in test_3_1_fixed_slippage
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+_________________________ test_3_2_percentage_slippage _________________________
+tests/validation/test_3_2_percentage_slippage.py:175: in test_3_2_percentage_slippage
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 3.2: Percentage Slippage (0.05%)
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+   📊 Average BTC price: $29,281.66
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 20 entry signals
+   ✅ Generated 20 exit signals
+   📍 First 5 entry indices: [10, 60, 110, 160, 210]
+   📍 First 5 exit indices: [20, 70, 120, 170, 220]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.00%
+   📉 Slippage: 0.05% (percentage)
+   ⚠️  Expected per fill: ~$14.64 at avg price
+   ⚠️  Expected per round trip: ~0.1% of notional
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_3_2_percentage_slippage.py", line 101, in test_3_2_percentage_slippage
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+___________________________ test_3_3_combined_costs ____________________________
+tests/validation/test_3_3_combined_costs.py:196: in test_3_3_combined_costs
+    pytest.fail("No engines ran successfully")
+E   Failed: No engines ran successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 3.3: Combined Fees + Slippage (0.1% commission + 0.05% slippage)
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+   📊 Average BTC price: $29,281.66
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 20 entry signals
+   ✅ Generated 20 exit signals
+   📍 First 5 entry indices: [10, 60, 110, 160, 210]
+   📍 First 5 exit indices: [20, 70, 120, 170, 220]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.10%
+   📉 Slippage: 0.05%
+   ⚠️  Total cost per round trip: ~0.30%
+
+   📊 Cost breakdown (at $100K notional):
+      Slippage: $100.00 (0.1% total)
+      Commission: $200.00 (0.2% total)
+      Total: $300.00 (0.3% total)
+   ⚠️  Expected total cost for 20 trades: ~$6,000.00
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   🔧 Running VectorBT...
+      ⚠️  VectorBT Pro not installed, skipping
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_3_3_combined_costs.py", line 118, in test_3_3_combined_costs
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+____________________________ test_4_1_limit_orders _____________________________
+tests/validation/test_4_1_limit_orders.py:181: in test_4_1_limit_orders
+    pytest.fail("ml4t.backtest did not run successfully")
+E   Failed: ml4t.backtest did not run successfully
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+TEST 4.1: Limit Orders (2% offset from market)
+================================================================================
+
+1️⃣  Loading real BTC spot data (1000 bars)...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 1,000 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 16:39:00+00:00
+   💰 Price range: $28791.20 - $29653.56
+   📊 Average BTC price: $29,281.66
+
+2️⃣  Generating entry/exit signal pairs...
+   ✅ Generated 20 entry signals
+   ✅ Generated 20 exit signals
+   📍 First 5 entry indices: [10, 60, 110, 160, 210]
+   📍 First 5 exit indices: [20, 70, 120, 170, 220]
+
+3️⃣  Configuration:
+   💰 Initial Cash: $100,000.00
+   💸 Fees: 0.10%
+   📉 Slippage: 0.00%
+   📋 Order Type: LIMIT
+   📊 Limit Offset: 0.3%
+   ⚠️  BUY LIMIT: Market price * 0.9970 (buy cheaper)
+   ⚠️  SELL LIMIT: Market price * 1.0030 (sell higher)
+   ⚠️  Note: Not all orders may fill if market doesn't reach limit
+
+4️⃣  Running backtests...
+   🔧 Running ml4t.backtest...
+      ❌ Failed: name 'ml4t' is not defined
+   ⚠️  Skipping VectorBT (from_signals API doesn't support limit orders)
+   ℹ️  VectorBT would execute as market orders, not comparable
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/test_4_1_limit_orders.py", line 111, in test_4_1_limit_orders
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+_______________________ test_all_platforms_scenario_001 ________________________
+tests/validation/test_all_platforms_scenario_001.py:49: in test_all_platforms_scenario_001
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '001', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'summary'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_____ TestCrossFrameworkAlignment.test_frameworks_with_predefined_signals ______
+tests/validation/test_cross_framework_alignment.py:230: in test_frameworks_with_predefined_signals
+    from .frameworks.backtest_adapter import BacktestAdapter
+E   ModuleNotFoundError: No module named 'validation.frameworks.backtest_adapter'
+_____ TestCrossFrameworkAlignment.test_frameworks_comprehensive_100_trades _____
+tests/validation/test_cross_framework_alignment.py:371: in test_frameworks_comprehensive_100_trades
+    from .frameworks.backtest_adapter import BacktestAdapter
+E   ModuleNotFoundError: No module named 'validation.frameworks.backtest_adapter'
+_______ TestFrameworkComparison.test_vectorbt_produces_expected_signals ________
+tests/validation/frameworks/vectorbtpro_adapter.py:27: in _check_version
+    import vectorbtpro as vbt
+E   ModuleNotFoundError: No module named 'vectorbtpro'
+
+During handling of the above exception, another exception occurred:
+tests/validation/frameworks/vectorbtpro_adapter.py:34: in _check_version
+    import vectorbt as vbt
+E   ModuleNotFoundError: No module named 'vectorbt'
+
+During handling of the above exception, another exception occurred:
+tests/validation/test_cross_framework_alignment.py:623: in test_vectorbt_produces_expected_signals
+    adapter = VectorBTProAdapter()
+              ^^^^^^^^^^^^^^^^^^^^
+tests/validation/frameworks/vectorbtpro_adapter.py:22: in __init__
+    self._check_version()
+tests/validation/frameworks/vectorbtpro_adapter.py:42: in _check_version
+    raise ImportError("Neither VectorBT Pro nor open-source VectorBT available")
+E   ImportError: Neither VectorBT Pro nor open-source VectorBT available
+________________________ test_diagnostic_signal_timing _________________________
+tests/validation/test_diagnostic_signal_timing.py:64: in test_diagnostic_signal_timing
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+----------------------------- Captured stdout call -----------------------------
+
+================================================================================
+DIAGNOSTIC TEST: Signal Timing Verification
+================================================================================
+
+1️⃣  Loading 200 bars of BTC data...
+Loading real BTC spot data from BTC_spot.parquet...
+   ✅ Loaded 200 bars
+   📅 Date range: 2021-01-01 00:00:00+00:00 to 2021-01-01 03:19:00+00:00
+   💰 Price range: $28791.20 - $29507.78
+   ✅ Loaded 200 bars
+
+2️⃣  Creating explicit signals...
+   ✅ Entry signals at bars: [Timestamp('2021-01-01 00:10:00+0000', tz='UTC'), Timestamp('2021-01-01 01:00:00+0000', tz='UTC'), Timestamp('2021-01-01 01:50:00+0000', tz='UTC')]
+   ✅ Exit signals at bars: [Timestamp('2021-01-01 00:20:00+0000', tz='UTC'), Timestamp('2021-01-01 01:10:00+0000', tz='UTC'), Timestamp('2021-01-01 02:00:00+0000', tz='UTC')]
+   Expected: 3 trades at (10-20, 60-70, 110-120)
+
+3️⃣  Test A: NO FEES (should match)
+________ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_basic ________
+tests/validation/test_fixtures_market_data.py:226: in test_prepare_zipline_bundle_basic
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+__ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_multiple_tickers ___
+tests/validation/test_fixtures_market_data.py:258: in test_prepare_zipline_bundle_multiple_tickers
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+___ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_hdf5_structure ____
+tests/validation/test_fixtures_market_data.py:278: in test_prepare_zipline_bundle_hdf5_structure
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+____ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_date_formats _____
+tests/validation/test_fixtures_market_data.py:318: in test_prepare_zipline_bundle_date_formats
+    result1 = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+_ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_creates_output_dir __
+tests/validation/test_fixtures_market_data.py:355: in test_prepare_zipline_bundle_creates_output_dir
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+_ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_invalid_ticker_warning _
+tests/validation/test_fixtures_market_data.py:371: in test_prepare_zipline_bundle_invalid_ticker_warning
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+_ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_splits_and_dividends _
+tests/validation/test_fixtures_market_data.py:392: in test_prepare_zipline_bundle_splits_and_dividends
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+___ TestPrepareZiplineBundleData.test_prepare_zipline_bundle_adjusted_prices ___
+tests/validation/test_fixtures_market_data.py:423: in test_prepare_zipline_bundle_adjusted_prices
+    result = prepare_zipline_bundle_data(
+tests/validation/fixtures/market_data.py:144: in prepare_zipline_bundle_data
+    import h5py
+E   ModuleNotFoundError: No module named 'h5py'
+_______________ TestMatchTradesBasic.test_match_single_platform ________________
+tests/validation/test_matcher.py:260: in test_match_single_platform
+    matches = match_trades(trades_by_platform)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+________ TestMatchTradesBasic.test_match_two_platforms_exact_timestamp _________
+tests/validation/test_matcher.py:275: in test_match_two_platforms_exact_timestamp
+    matches = match_trades(trades_by_platform)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_______ TestMatchTradesBasic.test_match_three_platforms_within_tolerance _______
+tests/validation/test_matcher.py:291: in test_match_three_platforms_within_tolerance
+    matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+______________ TestMatchTradesBasic.test_match_respects_tolerance ______________
+tests/validation/test_matcher.py:308: in test_match_respects_tolerance
+    matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_______________ TestMatchTradesBasic.test_match_separate_groups ________________
+tests/validation/test_matcher.py:329: in test_match_separate_groups
+    matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_____________ TestMatchTradesEdgeCases.test_single_platform_empty ______________
+tests/validation/test_matcher.py:367: in test_single_platform_empty
+    matches = match_trades(trades_by_platform)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+______ TestMatchTradesEdgeCases.test_unmatched_trades_different_platforms ______
+tests/validation/test_matcher.py:382: in test_unmatched_trades_different_platforms
+    matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+______________ TestCreateMatchDeltas.test_entry_timestamp_deltas _______________
+tests/validation/test_matcher.py:404: in test_entry_timestamp_deltas
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_______________ TestCreateMatchDeltas.test_exit_timestamp_deltas _______________
+tests/validation/test_matcher.py:436: in test_exit_timestamp_deltas
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_________________ TestCreateMatchDeltas.test_entry_price_diffs _________________
+tests/validation/test_matcher.py:448: in test_entry_price_diffs
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_________________ TestCreateMatchDeltas.test_exit_price_diffs __________________
+tests/validation/test_matcher.py:462: in test_exit_price_diffs
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+________________ TestCreateMatchDeltas.test_component_tracking _________________
+tests/validation/test_matcher.py:476: in test_component_tracking
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_______ TestCreateMatchDifferences.test_no_differences_identical_trades ________
+tests/validation/test_matcher.py:517: in test_no_differences_identical_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+___________ TestCreateMatchDifferences.test_entry_timing_difference ____________
+tests/validation/test_matcher.py:528: in test_entry_timing_difference
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+________ TestCreateMatchDifferences.test_entry_timing_difference_large _________
+tests/validation/test_matcher.py:557: in test_entry_timing_difference_large
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_________ TestCreateMatchDifferences.test_exit_timing_difference_large _________
+tests/validation/test_matcher.py:587: in test_exit_timing_difference_large
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+__________ TestCreateMatchDifferences.test_price_difference_detection __________
+tests/validation/test_matcher.py:619: in test_price_difference_detection
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+________ TestCreateMatchDifferences.test_component_difference_detection ________
+tests/validation/test_matcher.py:631: in test_component_difference_detection
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_________ TestCreateMatchSeverity.test_severity_none_identical_trades __________
+tests/validation/test_matcher.py:670: in test_severity_none_identical_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_________ TestCreateMatchSeverity.test_severity_minor_small_price_diff _________
+tests/validation/test_matcher.py:702: in test_severity_minor_small_price_diff
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+________ TestCreateMatchSeverity.test_severity_major_medium_price_diff _________
+tests/validation/test_matcher.py:734: in test_severity_major_medium_price_diff
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_______ TestCreateMatchSeverity.test_severity_critical_large_price_diff ________
+tests/validation/test_matcher.py:766: in test_severity_critical_large_price_diff
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+__________ TestMatchTradesMultiple.test_multiple_trades_same_platform __________
+tests/validation/test_matcher.py:802: in test_multiple_trades_same_platform
+    matches = match_trades(trades_by_platform)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+_______ TestMatchTradesMultiple.test_multiple_trades_multiple_platforms ________
+tests/validation/test_matcher.py:853: in test_multiple_trades_multiple_platforms
+    matches = match_trades(trades_by_platform)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:129: in match_trades
+    match = _create_match_from_group(group)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/validation/comparison/matcher.py:144: in _create_match_from_group
+    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    ^^^^
+E   NameError: name 'ml4t' is not defined
+___________ TestFrameworkValidation.test_backtest_vectorbt_agreement ___________
+tests/validation/test_pytest_integration.py:84: in test_backtest_vectorbt_agreement
+    assert not qe_result.has_errors, f"ml4t.backtest errors: {qe_result.errors}"
+E   AssertionError: ml4t.backtest errors: ["ml4t.backtest backtest failed: name 'ml4t' is not defined"]
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+⚠ VectorBT not available: No module named 'vectorbt'
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+______________ TestFrameworkValidation.test_backtest_performance _______________
+tests/validation/test_pytest_integration.py:109: in test_backtest_performance
+    assert not result.has_errors, f"ml4t.backtest failed: {result.errors}"
+E   AssertionError: ml4t.backtest failed: ["ml4t.backtest backtest failed: name 'ml4t' is not defined"]
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+______________ TestFrameworkValidation.test_framework_consistency ______________
+tests/validation/test_pytest_integration.py:148: in test_framework_consistency
+    assert len(results) >= 2, "Need at least 2 successful results"
+E   AssertionError: Need at least 2 successful results
+E   assert 0 >= 2
+E    +  where 0 = len([])
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+⚠ VectorBT not available: No module named 'vectorbt'
+⚠ Backtrader not available: No module named 'backtrader'
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+_______ TestFrameworkValidation.test_different_strategy_parameters[5-10] _______
+tests/validation/test_pytest_integration.py:170: in test_different_strategy_parameters
+    assert not result.has_errors, f"Strategy failed: {result.errors}"
+E   AssertionError: Strategy failed: ["ml4t.backtest backtest failed: name 'ml4t' is not defined"]
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+______ TestFrameworkValidation.test_different_strategy_parameters[10-20] _______
+tests/validation/test_pytest_integration.py:170: in test_different_strategy_parameters
+    assert not result.has_errors, f"Strategy failed: {result.errors}"
+E   AssertionError: Strategy failed: ["ml4t.backtest backtest failed: name 'ml4t' is not defined"]
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+______ TestFrameworkValidation.test_different_strategy_parameters[20-50] _______
+tests/validation/test_pytest_integration.py:170: in test_different_strategy_parameters
+    assert not result.has_errors, f"Strategy failed: {result.errors}"
+E   AssertionError: Strategy failed: ["ml4t.backtest backtest failed: name 'ml4t' is not defined"]
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+___________________ TestFrameworkValidation.test_edge_cases ____________________
+tests/validation/test_pytest_integration.py:179: in test_edge_cases
+    assert not result.has_errors, "Failed with minimal capital"
+E   AssertionError: Failed with minimal capital
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=100, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+_______________ TestRegressionPrevention.test_known_good_results _______________
+tests/validation/test_pytest_integration.py:209: in test_known_good_results
+    assert not result.has_errors, f"Regression test failed: {result.errors}"
+E   AssertionError: Regression test failed: ["ml4t.backtest backtest failed: name 'ml4t' is not defined"]
+E   assert not True
+E    +  where True = ValidationResult(framework='ml4t.backtest', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["ml4t.backtest backtest failed: name 'ml4t' is not defined"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+✗ ml4t.backtest backtest failed: name 'ml4t' is not defined
+----------------------------- Captured stderr call -----------------------------
+Traceback (most recent call last):
+  File "/home/stefan/ml4t/software/backtest/tests/validation/frameworks/qengine_adapter.py", line 89, in run_backtest
+    ml4t.backtest = BacktestWrapper()
+    ^^^^
+NameError: name 'ml4t' is not defined
+_______________________ test_all_platforms_scenario_002 ________________________
+tests/validation/test_scenario_002_limit_orders.py:53: in test_all_platforms_scenario_002
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '002', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'summary'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_________________________ test_limit_price_validation __________________________
+tests/validation/test_scenario_002_limit_orders.py:102: in test_limit_price_validation
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '002', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'detailed'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_______________________ test_all_platforms_scenario_003 ________________________
+tests/validation/test_scenario_003_stop_orders.py:52: in test_all_platforms_scenario_003
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '003', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'summary'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+__________________________ test_stop_loss_validation ___________________________
+tests/validation/test_scenario_003_stop_orders.py:101: in test_stop_loss_validation
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '003', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'detailed'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_______________________ test_all_platforms_scenario_004 ________________________
+tests/validation/test_scenario_004_position_reentry.py:55: in test_all_platforms_scenario_004
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '004', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'summary'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+__________________________ test_position_accumulation __________________________
+tests/validation/test_scenario_004_position_reentry.py:105: in test_position_accumulation
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '004', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'detailed'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+____________________________ test_reentry_patterns _____________________________
+tests/validation/test_scenario_004_position_reentry.py:196: in test_reentry_patterns
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '004', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'summary'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_______________________ test_all_platforms_scenario_005 ________________________
+tests/validation/test_scenario_005_multi_asset.py:56: in test_all_platforms_scenario_005
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '005', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'summary'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_____________________________ test_asset_isolation _____________________________
+tests/validation/test_scenario_005_multi_asset.py:111: in test_asset_isolation
+    assert result.returncode == 0, f"Runner failed:\n{result.stderr}"
+E   AssertionError: Runner failed:
+E       File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63
+E         def run_ml4t.backtest(self) -> PlatformResult:
+E                     ^
+E     SyntaxError: expected '('
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/home/stefan/ml4t/software/backtest/.venv/bin/python', 'runner.py', '--scenario', '005', '--platforms', 'ml4t.backtest,vectorbt,backtrader,zipline', '--report', 'detailed'], returncode=1, stdout='', stderr='  File "/home/stefan/ml4t/software/backtest/tests/validation/runner.py", line 63\n    def run_ml4t.backtest(self) -> PlatformResult:\n                ^\nSyntaxError: expected \'(\'\n').returncode
+_________________________ test_vectorbt_implementation _________________________
+tests/validation/test_vectorbt_fix.py:99: in test_vectorbt_implementation
+    assert not result.has_errors, f"Backtest failed with errors: {result.errors}"
+E   AssertionError: Backtest failed with errors: ["VectorBT not available: No module named 'vectorbt'"]
+E   assert not True
+E    +  where True = ValidationResult(framework='VectorBT', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["VectorBT not available: No module named 'vectorbt'"]).has_errors
+----------------------------- Captured stdout call -----------------------------
+Testing VectorBT Implementation Fix
+==================================================
+Created test data: 731 rows from 2015-01-01 00:00:00 to 2016-12-31 00:00:00
+
+Running VectorBT backtest...
+⚠ VectorBT not available: No module named 'vectorbt'
+
+VectorBT Results:
+  Status: ✗ Failed
+  Errors:
+    • VectorBT not available: No module named 'vectorbt'
+____________________ TestZiplineAdapter.test_initialization ____________________
+tests/validation/test_zipline_adapter.py:34: in test_initialization
+    assert adapter.zipline_version is not None
+E   assert None is not None
+E    +  where None = <validation.frameworks.zipline_adapter.ZiplineAdapter object at 0x7d2467b3b890>.zipline_version
+---------------------------- Captured stdout setup -----------------------------
+⚠ Zipline-Reloaded not available
+_______________ TestZiplineAdapter.test_executes_without_errors ________________
+tests/validation/test_zipline_adapter.py:52: in test_executes_without_errors
+    assert not result.has_errors or len(result.errors) == 0
+E   assert (not True or 1 == 0)
+E    +  where True = ValidationResult(framework='Zipline-Reloaded', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["Zipline not available: No module named 'zipline'"]).has_errors
+E    +  and   1 = len(["Zipline not available: No module named 'zipline'"])
+E    +    where ["Zipline not available: No module named 'zipline'"] = ValidationResult(framework='Zipline-Reloaded', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["Zipline not available: No module named 'zipline'"]).errors
+---------------------------- Captured stdout setup -----------------------------
+⚠ Zipline-Reloaded not available
+----------------------------- Captured stdout call -----------------------------
+⚠ Zipline not available: No module named 'zipline'
+_____________ TestZiplineAdapter.test_returns_performance_metrics ______________
+tests/validation/test_zipline_adapter.py:61: in test_returns_performance_metrics
+    assert result.execution_time > 0
+E   assert 0.0 > 0
+E    +  where 0.0 = ValidationResult(framework='Zipline-Reloaded', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["Zipline not available: No module named 'zipline'"]).execution_time
+---------------------------- Captured stdout setup -----------------------------
+⚠ Zipline-Reloaded not available
+----------------------------- Captured stdout call -----------------------------
+⚠ Zipline not available: No module named 'zipline'
+____________ TestZiplineAdapter.test_ma_crossover_generates_trades _____________
+tests/validation/test_zipline_adapter.py:70: in test_ma_crossover_generates_trades
+    assert result.num_trades > 0
+E   assert 0 > 0
+E    +  where 0 = ValidationResult(framework='Zipline-Reloaded', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["Zipline not available: No module named 'zipline'"]).num_trades
+---------------------------- Captured stdout setup -----------------------------
+⚠ Zipline-Reloaded not available
+----------------------------- Captured stdout call -----------------------------
+⚠ Zipline not available: No module named 'zipline'
+____________ TestZiplineAdapter.test_unknown_strategy_returns_error ____________
+tests/validation/test_zipline_adapter.py:79: in test_unknown_strategy_returns_error
+    assert any("not implemented" in err for err in result.errors)
+E   assert False
+E    +  where False = any(<generator object TestZiplineAdapter.test_unknown_strategy_returns_error.<locals>.<genexpr> at 0x7d24651b0e10>)
+---------------------------- Captured stdout setup -----------------------------
+⚠ Zipline-Reloaded not available
+----------------------------- Captured stdout call -----------------------------
+⚠ Zipline not available: No module named 'zipline'
+_____________ TestZiplineAdapter.test_accepts_different_ma_windows _____________
+tests/validation/test_zipline_adapter.py:101: in test_accepts_different_ma_windows
+    assert not result.has_errors
+E   assert not True
+E    +  where True = ValidationResult(framework='Zipline-Reloaded', strategy='MovingAverageCrossover', initial_capital=10000, final_value=0.0, total_return=0.0, num_trades=0, win_rate=0.0, sharpe_ratio=0.0, max_drawdown=0.0, execution_time=0.0, memory_usage=0.0, trades=[], daily_returns=None, equity_curve=None, errors=["Zipline not available: No module named 'zipline'"]).has_errors
+---------------------------- Captured stdout setup -----------------------------
+⚠ Zipline-Reloaded not available
+----------------------------- Captured stdout call -----------------------------
+⚠ Zipline not available: No module named 'zipline'
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.5-final-0 ________________
+
+Name                                                 Stmts   Miss  Cover   Missing
+----------------------------------------------------------------------------------
+src/ml4t/backtest/core/assets.py                       151     34    77%   94, 104, 139-146, 159-164, 259-261, 293, 296, 313-314, 382-388, 400-411, 424-436, 447-460, 473-490
+src/ml4t/backtest/core/clock.py                        176     41    77%   142-145, 163-164, 187-188, 244, 283-289, 308-323, 336-344, 357-368, 383, 440-441
+src/ml4t/backtest/core/constants.py                     26      2    92%   83, 103
+src/ml4t/backtest/core/event.py                         76      9    88%   39, 185-192
+src/ml4t/backtest/core/precision.py                     42      0   100%
+src/ml4t/backtest/core/types.py                         74      0   100%
+src/ml4t/backtest/data/asset_registry.py                35      3    91%   38, 41, 117
+src/ml4t/backtest/data/feed.py                         123     70    43%   101-118, 122-130, 134-141, 160-167, 171, 176-182, 187, 230, 242, 259, 263, 269, 273-279, 314-327, 331-341, 355-362, 366
+src/ml4t/backtest/data/schemas.py                       58     35    40%   21, 32-50, 57-62, 77-88, 92-107, 114-119
+src/ml4t/backtest/engine.py                            165      8    95%   233-236, 253, 259, 425-429
+src/ml4t/backtest/execution/bracket_manager.py          71      7    90%   92, 147-151, 241, 262, 266-267
+src/ml4t/backtest/execution/broker.py                  513    104    80%   28-31, 144, 189, 194, 270, 287-294, 312, 315, 318, 321-324, 327, 330, 384, 412, 489-490, 502, 536, 551, 560, 578, 583-585, 617, 627, 631, 666, 688, 706, 747-757, 792-794, 804, 817-819, 828, 840-841, 845, 850-852, 862, 897, 911-917, 932-933, 976, 994-1004, 1032, 1035, 1126-1136, 1172, 1237-1238, 1269, 1277-1295
+src/ml4t/backtest/execution/commission.py              119      2    98%   7-8
+src/ml4t/backtest/execution/corporate_actions.py       283     46    84%   24-25, 331, 335, 390-393, 473, 477, 512, 534, 549, 559, 585, 592, 633, 645-651, 692-694, 729-731, 750-758, 785-814
+src/ml4t/backtest/execution/fill_simulator.py          196     13    93%   162-163, 279, 309, 325-335, 466, 477, 542, 544
+src/ml4t/backtest/execution/liquidity.py                80      2    98%   234-235
+src/ml4t/backtest/execution/market_impact.py           163      7    96%   14-15, 269-270, 328, 504-505
+src/ml4t/backtest/execution/order.py                   241     46    81%   104, 124, 184-186, 215, 227, 239, 249, 263, 269-280, 284, 290, 298, 306-308, 313, 318, 337, 344, 386, 394-397, 410, 429, 435, 447-450, 462-465
+src/ml4t/backtest/execution/order_router.py             95     31    67%   73-74, 105-115, 155, 166, 191-192, 198-199, 213-214, 225, 233-235, 239-245, 253
+src/ml4t/backtest/execution/position_sizer.py           32     21    34%   8-11, 56-58, 69, 88-90, 106-127
+src/ml4t/backtest/execution/slippage.py                105     12    89%   124, 168, 170, 193, 214, 216, 239, 249, 272, 301, 311, 366
+src/ml4t/backtest/execution/trade_tracker.py           161     19    88%   359-413
+src/ml4t/backtest/portfolio/analytics.py               125      0   100%
+src/ml4t/backtest/portfolio/core.py                     75      1    99%   126
+src/ml4t/backtest/portfolio/margin.py                  129      5    96%   132-133, 224, 252-256
+src/ml4t/backtest/portfolio/portfolio.py               111      0   100%
+src/ml4t/backtest/portfolio/state.py                    94      3    97%   70, 146-147
+src/ml4t/backtest/reporting/base.py                     15     15     0%   3-115
+src/ml4t/backtest/reporting/html.py                     63     63     0%   3-553
+src/ml4t/backtest/reporting/parquet.py                  73     73     0%   3-402
+src/ml4t/backtest/reporting/reporter.py                 79     28    65%   81, 126, 142-147, 163-166, 170-172, 180-188, 197-201, 205-206, 214
+src/ml4t/backtest/strategy/adapters.py                 138     15    89%   37, 136-139, 156-157, 165, 191, 220-221, 239, 264, 276, 282
+src/ml4t/backtest/strategy/base.py                      93     24    74%   196-197, 207, 220, 245-247, 251-256, 266-271, 299-300, 310, 322, 331-333
+src/ml4t/backtest/strategy/crypto_basis_adapter.py     176     28    84%   118, 162, 182, 205-208, 213-220, 224-225, 227-228, 264, 322-326, 404-408, 414-417, 438-439
+----------------------------------------------------------------------------------
+TOTAL                                                 4156    767    82%
+Coverage HTML written to dir htmlcov
+=========================== short test summary info ============================
+SKIPPED [1] tests/validation/test_2_2_combined_fees.py:140: Not all engines completed successfully
+SKIPPED [1] tests/validation/test_2_3_asset_specific_fees.py:605: Not all engines completed successfully
+SKIPPED [1] tests/validation/test_cross_framework_alignment.py:535: Zipline uses bundle data (bundle='quandl') instead of test DataFrame. Prices are ~4.3x different ($144.54 vs $33.46), making signal-based validation impossible. See test_frameworks_with_predefined_signals docstring.
+SKIPPED [1] tests/validation/test_zipline_adapter.py:124: Zipline not installed
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_adapter_initialization
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_adapter_detects_pro_version
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_ma_crossover_strategy
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_ma_crossover_metrics
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_ma_crossover_different_windows
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_bollinger_bands_strategy
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_momentum_strategy
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_volume_breakout_strategy
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_unknown_strategy
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_invalid_parameters
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_small_initial_capital
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_large_initial_capital
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_data_validation_missing_columns
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_data_validation_non_datetime_index
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_result_contains_required_fields
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_result_summary_dict
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_execution_time_reasonable
+ERROR tests/validation/test_vectorbtpro_adapter.py::TestVectorBTProAdapter::test_memory_usage_tracked
+FAILED tests/validation/test_1_1_baseline_entries.py::test_1_1_baseline_entries
+FAILED tests/validation/test_1_2_entry_exit_pairs.py::test_1_2_entry_exit_pairs
+FAILED tests/validation/test_1_3_multiple_round_trips.py::test_1_3_multiple_round_trips
+FAILED tests/validation/test_2_1_percentage_commission.py::test_2_1_percentage_commission
+FAILED tests/validation/test_3_1_fixed_slippage.py::test_3_1_fixed_slippage
+FAILED tests/validation/test_3_2_percentage_slippage.py::test_3_2_percentage_slippage
+FAILED tests/validation/test_3_3_combined_costs.py::test_3_3_combined_costs
+FAILED tests/validation/test_4_1_limit_orders.py::test_4_1_limit_orders - Fai...
+FAILED tests/validation/test_all_platforms_scenario_001.py::test_all_platforms_scenario_001
+FAILED tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_frameworks_with_predefined_signals
+FAILED tests/validation/test_cross_framework_alignment.py::TestCrossFrameworkAlignment::test_frameworks_comprehensive_100_trades
+FAILED tests/validation/test_cross_framework_alignment.py::TestFrameworkComparison::test_vectorbt_produces_expected_signals
+FAILED tests/validation/test_diagnostic_signal_timing.py::test_diagnostic_signal_timing
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_basic
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_multiple_tickers
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_hdf5_structure
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_date_formats
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_creates_output_dir
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_invalid_ticker_warning
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_splits_and_dividends
+FAILED tests/validation/test_fixtures_market_data.py::TestPrepareZiplineBundleData::test_prepare_zipline_bundle_adjusted_prices
+FAILED tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_single_platform
+FAILED tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_two_platforms_exact_timestamp
+FAILED tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_three_platforms_within_tolerance
+FAILED tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_respects_tolerance
+FAILED tests/validation/test_matcher.py::TestMatchTradesBasic::test_match_separate_groups
+FAILED tests/validation/test_matcher.py::TestMatchTradesEdgeCases::test_single_platform_empty
+FAILED tests/validation/test_matcher.py::TestMatchTradesEdgeCases::test_unmatched_trades_different_platforms
+FAILED tests/validation/test_matcher.py::TestCreateMatchDeltas::test_entry_timestamp_deltas
+FAILED tests/validation/test_matcher.py::TestCreateMatchDeltas::test_exit_timestamp_deltas
+FAILED tests/validation/test_matcher.py::TestCreateMatchDeltas::test_entry_price_diffs
+FAILED tests/validation/test_matcher.py::TestCreateMatchDeltas::test_exit_price_diffs
+FAILED tests/validation/test_matcher.py::TestCreateMatchDeltas::test_component_tracking
+FAILED tests/validation/test_matcher.py::TestCreateMatchDifferences::test_no_differences_identical_trades
+FAILED tests/validation/test_matcher.py::TestCreateMatchDifferences::test_entry_timing_difference
+FAILED tests/validation/test_matcher.py::TestCreateMatchDifferences::test_entry_timing_difference_large
+FAILED tests/validation/test_matcher.py::TestCreateMatchDifferences::test_exit_timing_difference_large
+FAILED tests/validation/test_matcher.py::TestCreateMatchDifferences::test_price_difference_detection
+FAILED tests/validation/test_matcher.py::TestCreateMatchDifferences::test_component_difference_detection
+FAILED tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_none_identical_trades
+FAILED tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_minor_small_price_diff
+FAILED tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_major_medium_price_diff
+FAILED tests/validation/test_matcher.py::TestCreateMatchSeverity::test_severity_critical_large_price_diff
+FAILED tests/validation/test_matcher.py::TestMatchTradesMultiple::test_multiple_trades_same_platform
+FAILED tests/validation/test_matcher.py::TestMatchTradesMultiple::test_multiple_trades_multiple_platforms
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_backtest_vectorbt_agreement
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_backtest_performance
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_framework_consistency
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_different_strategy_parameters[5-10]
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_different_strategy_parameters[10-20]
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_different_strategy_parameters[20-50]
+FAILED tests/validation/test_pytest_integration.py::TestFrameworkValidation::test_edge_cases
+FAILED tests/validation/test_pytest_integration.py::TestRegressionPrevention::test_known_good_results
+FAILED tests/validation/test_scenario_002_limit_orders.py::test_all_platforms_scenario_002
+FAILED tests/validation/test_scenario_002_limit_orders.py::test_limit_price_validation
+FAILED tests/validation/test_scenario_003_stop_orders.py::test_all_platforms_scenario_003
+FAILED tests/validation/test_scenario_003_stop_orders.py::test_stop_loss_validation
+FAILED tests/validation/test_scenario_004_position_reentry.py::test_all_platforms_scenario_004
+FAILED tests/validation/test_scenario_004_position_reentry.py::test_position_accumulation
+FAILED tests/validation/test_scenario_004_position_reentry.py::test_reentry_patterns
+FAILED tests/validation/test_scenario_005_multi_asset.py::test_all_platforms_scenario_005
+FAILED tests/validation/test_scenario_005_multi_asset.py::test_asset_isolation
+FAILED tests/validation/test_vectorbt_fix.py::test_vectorbt_implementation - ...
+FAILED tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_initialization
+FAILED tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_executes_without_errors
+FAILED tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_returns_performance_metrics
+FAILED tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_ma_crossover_generates_trades
+FAILED tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_unknown_strategy_returns_error
+FAILED tests/validation/test_zipline_adapter.py::TestZiplineAdapter::test_accepts_different_ma_windows
+============ 69 failed, 548 passed, 4 skipped, 18 errors in 25.65s =============

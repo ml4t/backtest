@@ -86,8 +86,8 @@ class BacktestAdapter(BaseFrameworkAdapter):
             )
 
             # Run backtest via BacktestWrapper
-            ml4t.backtest = BacktestWrapper()
-            backtest_result = ml4t.backtest.run_backtest(
+            wrapper = BacktestWrapper()
+            backtest_result = wrapper.run_backtest(
                 ohlcv=ohlcv,
                 entries=entries,
                 exits=exits,
@@ -269,8 +269,8 @@ class BacktestAdapter(BaseFrameworkAdapter):
             )
 
             # Run backtest via BacktestWrapper
-            ml4t.backtest = BacktestWrapper()
-            backtest_result = ml4t.backtest.run_backtest(
+            wrapper = BacktestWrapper()
+            backtest_result = wrapper.run_backtest(
                 ohlcv=ohlcv,
                 entries=entries,
                 exits=exits,

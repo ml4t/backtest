@@ -61,8 +61,8 @@ def test_diagnostic_signal_timing():
         order_type='market',
     )
 
-    ml4t.backtest = BacktestWrapper()
-    result_qe_no_fees = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
+    wrapper = BacktestWrapper()
+    result_qe_no_fees = wrapper.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
 
     vbt = VectorBTWrapper()
     result_vbt_no_fees = vbt.run_backtest(ohlcv, entries, exits=exits, config=config_no_fees)
@@ -89,7 +89,7 @@ def test_diagnostic_signal_timing():
         order_type='market',
     )
 
-    result_qe_fees = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config_with_fees)
+    result_qe_fees = wrapper.run_backtest(ohlcv, entries, exits=exits, config=config_with_fees)
     result_vbt_fees = vbt.run_backtest(ohlcv, entries, exits=exits, config=config_with_fees)
 
     print(f"\n   Results (WITH FEES):")

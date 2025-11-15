@@ -151,6 +151,7 @@ python_functions = ["test_*"]
 addopts = [
     "-ra",
     "--strict-markers",
+    "--ignore=tests/private",  # Exclude private/commercial dependency tests
     "--cov=ml4t.backtest",
     "--cov-report=term-missing",
     "--cov-report=html",
@@ -160,6 +161,8 @@ markers = [
     "integration: marks tests as integration tests",
     "benchmark: marks benchmark tests",
     "unit: marks unit tests",
+    "private: requires commercial dependencies (vectorbtpro) - excluded by default",
+    "requires_comparison: requires optional comparison frameworks (vectorbt, backtrader, zipline)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

@@ -91,8 +91,8 @@ def test_1_3_multiple_round_trips():
     # Run ml4t.backtest
     print("   🔧 Running ml4t.backtest...")
     try:
-        ml4t.backtest = BacktestWrapper()
-        results['ml4t.backtest'] = ml4t.backtest.run_backtest(ohlcv, entries, exits=exits, config=config)
+        wrapper = BacktestWrapper()
+        results['ml4t.backtest'] = wrapper.run_backtest(ohlcv, entries, exits=exits, config=config)
         print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
         print(f"      💰 Final value: ${results['ml4t.backtest'].final_value:,.2f}")
     except Exception as e:
