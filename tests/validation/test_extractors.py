@@ -42,25 +42,25 @@ class TestExtractorEdgeCases:
 
     def test_backtest_empty_results(self):
         """Test ml4t.backtest extractor handles empty results."""
-        from extractors.ml4t.backtest import extract_ml4t.backtest_trades
+        from extractors.qengine import extract_backtest_trades
         import polars as pl
 
         # Empty results
         results = {'trades': pl.DataFrame()}
         data = pl.DataFrame({'timestamp': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []})
 
-        trades = extract_ml4t.backtest_trades(results, data)
+        trades = extract_backtest_trades(results, data)
         assert len(trades) == 0
 
     def test_backtest_missing_trades_key(self):
         """Test ml4t.backtest extractor handles missing 'trades' key."""
-        from extractors.ml4t.backtest import extract_ml4t.backtest_trades
+        from extractors.qengine import extract_backtest_trades
         import polars as pl
 
         results = {}  # No 'trades' key
         data = pl.DataFrame({'timestamp': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': []})
 
-        trades = extract_ml4t.backtest_trades(results, data)
+        trades = extract_backtest_trades(results, data)
         assert len(trades) == 0
 
     def test_vectorbt_empty_portfolio(self):

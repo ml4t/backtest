@@ -136,7 +136,7 @@ class TestTradeMatchProperties:
     def test_reference_trade_returns_first_non_none(self):
         """Test reference_trade property returns first non-None trade."""
         match = TradeMatch(
-            ml4t.backtest_trade=None,
+            backtest_trade=None,
             vectorbt_trade=None,
             backtrader_trade=StandardTrade(
                 trade_id=1, platform='backtrader',
@@ -166,7 +166,7 @@ class TestTradeMatchProperties:
     def test_reference_trade_returns_none_when_all_none(self):
         """Test reference_trade property returns None when all trades are None."""
         match = TradeMatch(
-            ml4t.backtest_trade=None,
+            backtest_trade=None,
             vectorbt_trade=None,
             backtrader_trade=None,
             zipline_trade=None,
@@ -182,10 +182,10 @@ class TestTradeMatchProperties:
 
         assert match.reference_trade is None
 
-    def test_all_trades_returns_non_none_trades(self, sample_trade_ml4t.backtest, sample_trade_vectorbt):
+    def test_all_trades_returns_non_none_trades(self, sample_trade_backtest, sample_trade_vectorbt):
         """Test all_trades property returns dict of non-None trades."""
         match = TradeMatch(
-            ml4t.backtest_trade=sample_trade_ml4t.backtest,
+            backtest_trade=sample_trade_backtest,
             vectorbt_trade=sample_trade_vectorbt,
             backtrader_trade=None,
             zipline_trade=None,
@@ -207,7 +207,7 @@ class TestTradeMatchProperties:
         assert 'zipline' not in trades
 
     def test_all_trades_includes_all_four_platforms(
-        self, sample_trade_ml4t.backtest, sample_trade_vectorbt, sample_trade_backtrader
+        self, sample_trade_backtest, sample_trade_vectorbt, sample_trade_backtrader
     ):
         """Test all_trades property includes all four platforms when present."""
         zipline_trade = StandardTrade(
@@ -222,7 +222,7 @@ class TestTradeMatchProperties:
         )
 
         match = TradeMatch(
-            ml4t.backtest_trade=sample_trade_ml4t.backtest,
+            backtest_trade=sample_trade_backtest,
             vectorbt_trade=sample_trade_vectorbt,
             backtrader_trade=sample_trade_backtrader,
             zipline_trade=zipline_trade,
@@ -251,39 +251,39 @@ class TestTradeMatchProperties:
 class TestMatchTradesBasic:
     """Test basic trade matching functionality."""
 
-    def test_match_single_platform(self, sample_trade_ml4t.backtest):
+    def test_match_single_platform(self, sample_trade_backtest):
         """Test matching with single platform (no comparison)."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest],
+            'ml4t.backtest': [sample_trade_backtest],
         }
 
         matches = match_trades(trades_by_platform)
 
         assert len(matches) == 1
-        assert matches[0].ml4t.backtest_trade == sample_trade_ml4t.backtest
+        assert matches[0].backtest_trade == sample_trade_backtest
         assert matches[0].vectorbt_trade is None
         assert matches[0].backtrader_trade is None
         assert matches[0].zipline_trade is None
 
-    def test_match_two_platforms_exact_timestamp(self, sample_trade_ml4t.backtest, sample_trade_vectorbt):
+    def test_match_two_platforms_exact_timestamp(self, sample_trade_backtest, sample_trade_vectorbt):
         """Test matching two platforms with exact timestamp match."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest],
+            'ml4t.backtest': [sample_trade_backtest],
             'vectorbt': [sample_trade_vectorbt],
         }
 
         matches = match_trades(trades_by_platform)
 
         assert len(matches) == 1
-        assert matches[0].ml4t.backtest_trade == sample_trade_ml4t.backtest
+        assert matches[0].backtest_trade == sample_trade_backtest
         assert matches[0].vectorbt_trade == sample_trade_vectorbt
 
     def test_match_three_platforms_within_tolerance(
-        self, sample_trade_ml4t.backtest, sample_trade_vectorbt, sample_trade_backtrader
+        self, sample_trade_backtest, sample_trade_vectorbt, sample_trade_backtrader
     ):
         """Test matching three platforms within timestamp tolerance."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest],
+            'ml4t.backtest': [sample_trade_backtest],
             'vectorbt': [sample_trade_vectorbt],
             'backtrader': [sample_trade_backtrader],  # 30 seconds earlier
         }
@@ -291,48 +291,48 @@ class TestMatchTradesBasic:
         matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
 
         assert len(matches) == 1
-        assert matches[0].ml4t.backtest_trade == sample_trade_ml4t.backtest
+        assert matches[0].backtest_trade == sample_trade_backtest
         assert matches[0].vectorbt_trade == sample_trade_vectorbt
         assert matches[0].backtrader_trade == sample_trade_backtrader
 
     def test_match_respects_tolerance(
-        self, sample_trade_ml4t.backtest, sample_trade_backtrader
+        self, sample_trade_backtest, sample_trade_backtrader
     ):
         """Test that matching respects timestamp tolerance."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest],
+            'ml4t.backtest': [sample_trade_backtest],
             'backtrader': [sample_trade_backtrader],  # 30 seconds earlier
         }
 
         # With 60s tolerance - should match
         matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
         assert len(matches) == 1
-        assert matches[0].ml4t.backtest_trade is not None
+        assert matches[0].backtest_trade is not None
         assert matches[0].backtrader_trade is not None
 
         # With 15s tolerance - should NOT match
         matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=15)
         assert len(matches) == 2  # Two separate matches
         assert matches[0].backtrader_trade is not None
-        assert matches[0].ml4t.backtest_trade is None
-        assert matches[1].ml4t.backtest_trade is not None
+        assert matches[0].backtest_trade is None
+        assert matches[1].backtest_trade is not None
         assert matches[1].backtrader_trade is None
 
     def test_match_separate_groups(
-        self, sample_trade_ml4t.backtest, sample_trade_different_entry
+        self, sample_trade_backtest, sample_trade_different_entry
     ):
         """Test that trades outside tolerance create separate groups."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest, sample_trade_different_entry],
+            'ml4t.backtest': [sample_trade_backtest, sample_trade_different_entry],
         }
 
         matches = match_trades(trades_by_platform, timestamp_tolerance_seconds=60)
 
         assert len(matches) == 2
         # First match (earlier trade)
-        assert matches[0].ml4t.backtest_trade.entry_timestamp == sample_trade_ml4t.backtest.entry_timestamp
+        assert matches[0].backtest_trade.entry_timestamp == sample_trade_backtest.entry_timestamp
         # Second match (later trade)
-        assert matches[1].ml4t.backtest_trade.entry_timestamp == sample_trade_different_entry.entry_timestamp
+        assert matches[1].backtest_trade.entry_timestamp == sample_trade_different_entry.entry_timestamp
 
 
 # ============================================================================
@@ -357,25 +357,25 @@ class TestMatchTradesEdgeCases:
         matches = match_trades(trades_by_platform)
         assert len(matches) == 0
 
-    def test_single_platform_empty(self, sample_trade_ml4t.backtest):
+    def test_single_platform_empty(self, sample_trade_backtest):
         """Test matching when one platform has no trades."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest],
+            'ml4t.backtest': [sample_trade_backtest],
             'vectorbt': [],
         }
 
         matches = match_trades(trades_by_platform)
 
         assert len(matches) == 1
-        assert matches[0].ml4t.backtest_trade == sample_trade_ml4t.backtest
+        assert matches[0].backtest_trade == sample_trade_backtest
         assert matches[0].vectorbt_trade is None
 
     def test_unmatched_trades_different_platforms(
-        self, sample_trade_ml4t.backtest, sample_trade_different_entry
+        self, sample_trade_backtest, sample_trade_different_entry
     ):
         """Test that unmatched trades from different platforms create separate groups."""
         trades_by_platform = {
-            'ml4t.backtest': [sample_trade_ml4t.backtest],
+            'ml4t.backtest': [sample_trade_backtest],
             'vectorbt': [sample_trade_different_entry],  # Different entry time
         }
 
@@ -383,7 +383,7 @@ class TestMatchTradesEdgeCases:
 
         assert len(matches) == 2
         # Each trade should be in its own group
-        assert sum(1 for m in matches if m.ml4t.backtest_trade is not None) == 1
+        assert sum(1 for m in matches if m.backtest_trade is not None) == 1
         assert sum(1 for m in matches if m.vectorbt_trade is not None) == 1
 
 
@@ -394,10 +394,10 @@ class TestMatchTradesEdgeCases:
 class TestCreateMatchDeltas:
     """Test delta calculation in _create_match_from_group()."""
 
-    def test_entry_timestamp_deltas(self, sample_trade_ml4t.backtest, sample_trade_backtrader):
+    def test_entry_timestamp_deltas(self, sample_trade_backtest, sample_trade_backtrader):
         """Test entry timestamp delta calculation."""
         group = [
-            ('ml4t.backtest', sample_trade_ml4t.backtest),
+            ('ml4t.backtest', sample_trade_backtest),
             ('backtrader', sample_trade_backtrader),  # 30 seconds earlier
         ]
 
@@ -438,10 +438,10 @@ class TestCreateMatchDeltas:
         assert match.exit_timestamp_deltas['ml4t.backtest'] == 0.0
         assert match.exit_timestamp_deltas['vectorbt'] == 60.0
 
-    def test_entry_price_diffs(self, sample_trade_ml4t.backtest, sample_trade_vectorbt):
+    def test_entry_price_diffs(self, sample_trade_backtest, sample_trade_vectorbt):
         """Test entry price difference calculation."""
         group = [
-            ('ml4t.backtest', sample_trade_ml4t.backtest),  # 73.50
+            ('ml4t.backtest', sample_trade_backtest),  # 73.50
             ('vectorbt', sample_trade_vectorbt),  # 73.51
         ]
 
@@ -452,10 +452,10 @@ class TestCreateMatchDeltas:
         # VectorBT is 0.01 higher = (73.51 - 73.50) / 73.50 * 100 = 0.0136%
         assert abs(match.entry_price_diffs['vectorbt'] - 0.0136) < 0.001
 
-    def test_exit_price_diffs(self, sample_trade_ml4t.backtest, sample_trade_vectorbt):
+    def test_exit_price_diffs(self, sample_trade_backtest, sample_trade_vectorbt):
         """Test exit price difference calculation."""
         group = [
-            ('ml4t.backtest', sample_trade_ml4t.backtest),  # 75.20
+            ('ml4t.backtest', sample_trade_backtest),  # 75.20
             ('vectorbt', sample_trade_vectorbt),  # 75.21
         ]
 
@@ -466,10 +466,10 @@ class TestCreateMatchDeltas:
         # VectorBT is 0.01 higher = (75.21 - 75.20) / 75.20 * 100 = 0.0133%
         assert abs(match.exit_price_diffs['vectorbt'] - 0.0133) < 0.001
 
-    def test_component_tracking(self, sample_trade_ml4t.backtest, sample_trade_vectorbt):
+    def test_component_tracking(self, sample_trade_backtest, sample_trade_vectorbt):
         """Test that OHLC components are tracked."""
         group = [
-            ('ml4t.backtest', sample_trade_ml4t.backtest),  # open/open
+            ('ml4t.backtest', sample_trade_backtest),  # open/open
             ('vectorbt', sample_trade_vectorbt),  # close/close
         ]
 
@@ -518,10 +518,10 @@ class TestCreateMatchDifferences:
 
         assert len(match.differences) == 0
 
-    def test_entry_timing_difference(self, sample_trade_ml4t.backtest, sample_trade_backtrader):
+    def test_entry_timing_difference(self, sample_trade_backtest, sample_trade_backtrader):
         """Test detection of entry timing differences."""
         group = [
-            ('ml4t.backtest', sample_trade_ml4t.backtest),
+            ('ml4t.backtest', sample_trade_backtest),
             ('backtrader', sample_trade_backtrader),  # 30 seconds earlier
         ]
 
@@ -621,10 +621,10 @@ class TestCreateMatchDifferences:
         assert any('Entry prices vary' in d for d in match.differences)
         assert any('Exit prices vary' in d for d in match.differences)
 
-    def test_component_difference_detection(self, sample_trade_ml4t.backtest, sample_trade_vectorbt):
+    def test_component_difference_detection(self, sample_trade_backtest, sample_trade_vectorbt):
         """Test detection of OHLC component differences."""
         group = [
-            ('ml4t.backtest', sample_trade_ml4t.backtest),  # open/open
+            ('ml4t.backtest', sample_trade_backtest),  # open/open
             ('vectorbt', sample_trade_vectorbt),  # close/close
         ]
 
@@ -855,7 +855,7 @@ class TestMatchTradesMultiple:
         assert len(matches) == 2
         # Both matches should have both platforms
         for match in matches:
-            assert match.ml4t.backtest_trade is not None
+            assert match.backtest_trade is not None
             assert match.vectorbt_trade is not None
 
 

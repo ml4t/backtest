@@ -23,7 +23,7 @@ class TradeMatch:
     """Result of matching one trade across platforms."""
 
     # Matched trades (one per platform, or None if missing)
-    ml4t.backtest_trade: StandardTrade | None
+    backtest_trade: StandardTrade | None
     vectorbt_trade: StandardTrade | None
     backtrader_trade: StandardTrade | None
     zipline_trade: StandardTrade | None
@@ -45,7 +45,7 @@ class TradeMatch:
     @property
     def reference_trade(self) -> StandardTrade | None:
         """Get the reference trade (first non-None trade)."""
-        for trade in [self.ml4t.backtest_trade, self.vectorbt_trade, self.backtrader_trade, self.zipline_trade]:
+        for trade in [self.backtest_trade, self.vectorbt_trade, self.backtrader_trade, self.zipline_trade]:
             if trade is not None:
                 return trade
         return None
@@ -54,8 +54,8 @@ class TradeMatch:
     def all_trades(self) -> dict[str, StandardTrade]:
         """Get all non-None trades as dict."""
         trades = {}
-        if self.ml4t.backtest_trade:
-            trades['ml4t.backtest'] = self.ml4t.backtest_trade
+        if self.backtest_trade:
+            trades['ml4t.backtest'] = self.backtest_trade
         if self.vectorbt_trade:
             trades['vectorbt'] = self.vectorbt_trade
         if self.backtrader_trade:
@@ -86,7 +86,7 @@ def match_trades(
 
     Example:
         >>> trades = {
-        ...     'ml4t.backtest': extract_ml4t.backtest_trades(...),
+        ...     'ml4t.backtest': extract_backtest_trades(...),
         ...     'vectorbt': extract_vectorbt_trades(...),
         ... }
         >>> matches = match_trades(trades)
@@ -223,7 +223,7 @@ def _create_match_from_group(group: List[tuple[str, StandardTrade]]) -> TradeMat
         severity = 'critical'
 
     return TradeMatch(
-        ml4t.backtest_trade=ml4t.backtest,
+        backtest_trade=ml4t.backtest,
         vectorbt_trade=vectorbt,
         backtrader_trade=backtrader,
         zipline_trade=zipline,

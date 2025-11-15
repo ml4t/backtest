@@ -22,7 +22,7 @@ import polars as pl
 
 # Import extractors, matcher, and reporter
 from extractors import (
-    extract_ml4t.backtest_trades,
+    extract_backtest_trades,
     extract_vectorbt_trades,
     extract_backtrader_trades,
     extract_zipline_trades,
@@ -650,7 +650,7 @@ def main():
             print(f"  🔍 Extracting {platform} trades...")
 
             if platform == 'ml4t.backtest':
-                trades = extract_ml4t.backtest_trades(result.raw_results, result.data)
+                trades = extract_backtest_trades(result.raw_results, result.data)
                 trades_by_platform[platform] = trades
                 print(f"     Found {len(trades)} trades")
 

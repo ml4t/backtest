@@ -20,7 +20,7 @@ except ImportError:
     from core.trade import StandardTrade, get_bar_at_timestamp, infer_price_component
 
 
-def extract_ml4t.backtest_trades(results: dict[str, Any], data: pl.DataFrame) -> List[StandardTrade]:
+def extract_backtest_trades(results: dict[str, Any], data: pl.DataFrame) -> List[StandardTrade]:
     """
     Extract trades from ml4t.backtest broker results.
 
@@ -33,7 +33,7 @@ def extract_ml4t.backtest_trades(results: dict[str, Any], data: pl.DataFrame) ->
 
     Example:
         >>> results = engine.run()
-        >>> trades = extract_ml4t.backtest_trades(results, data)
+        >>> trades = extract_backtest_trades(results, data)
         >>> for trade in trades:
         ...     print(f"{trade.entry_timestamp} -> {trade.exit_timestamp}: ${trade.net_pnl:.2f}")
     """

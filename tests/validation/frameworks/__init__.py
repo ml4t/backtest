@@ -13,7 +13,7 @@ from .base import (
     TradeRecord,
     ValidationResult,
 )
-from .qengine_adapter import QEngineAdapter as BacktestAdapter
+from .qengine_adapter import BacktestAdapter
 from .vectorbt_adapter import VectorBTAdapter
 
 try:
