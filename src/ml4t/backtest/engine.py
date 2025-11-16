@@ -116,6 +116,9 @@ class BacktestEngine:
             for action in corporate_actions:
                 self.corporate_action_processor.add_action(action)
 
+        # Inject broker into strategy for helper methods
+        self.strategy.broker = self.broker
+
         # Wire up event handlers
         self._setup_event_handlers()
 
