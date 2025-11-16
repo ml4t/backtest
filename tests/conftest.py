@@ -12,6 +12,19 @@ from ml4t.backtest.core.clock import Clock, ClockMode
 from ml4t.backtest.core.event import Event, MarketEvent
 from ml4t.backtest.core.types import AssetId, MarketDataType
 
+# Import ML signal fixtures
+from tests.fixtures.ml_signal_data import (
+    bear_market_data,
+    bull_market_data,
+    context_data,
+    high_volatility_data,
+    low_volatility_data,
+    mean_reverting_data,
+    ml_data_scenario,
+    ml_signal_data,
+    trending_market_data,
+)
+
 
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
