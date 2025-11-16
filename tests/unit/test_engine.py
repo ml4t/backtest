@@ -440,7 +440,7 @@ class TestIntegrationScenarios:
                 self.clock = clock
                 self.bought = False
 
-            def on_market_event(self, event):
+            def on_market_event(self, event, context=None):
                 if not self.bought and self.clock:
                     # Generate buy signal
                     order = OrderEvent(

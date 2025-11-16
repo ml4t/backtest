@@ -17,6 +17,7 @@ from ml4t.backtest.core.constants import (
     bps_to_decimal,
     decimal_to_bps,
 )
+from ml4t.backtest.core.context import Context, ContextCache
 from ml4t.backtest.core.event import (
     Event,
     FillEvent,
@@ -46,6 +47,9 @@ __all__ = [
     "SLIPPAGE_CRYPTO_BPS",
     "bps_to_decimal",
     "decimal_to_bps",
+    # Context
+    "Context",
+    "ContextCache",
     # Events
     "Event",
     "FillEvent",

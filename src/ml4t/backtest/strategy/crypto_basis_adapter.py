@@ -358,8 +358,13 @@ class CryptoBasisAdapter(DataFrameAdapter):
 
         self.log(f"Subscribed to {self.spot_asset_id} (spot) and {self.futures_asset_id} (futures)")
 
-    def on_market_event(self, event) -> None:
-        """Process market events with synchronization for basis calculation."""
+    def on_market_event(self, event, context: dict | None = None) -> None:
+        """Process market events with synchronization for basis calculation.
+
+        Args:
+            event: Market data event
+            context: Market-wide context data (optional, unused by this strategy)
+        """
         # Buffer the event by timestamp and asset
         if event.timestamp not in self._event_buffer:
             self._event_buffer[event.timestamp] = {}

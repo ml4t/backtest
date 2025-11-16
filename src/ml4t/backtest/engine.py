@@ -7,7 +7,8 @@ from typing import Any
 import polars as pl
 
 from ml4t.backtest.core.clock import Clock
-from ml4t.backtest.core.event import EventType
+from ml4t.backtest.core.context import ContextCache
+from ml4t.backtest.core.event import EventType, MarketEvent
 from ml4t.backtest.data.feed import DataFeed
 from ml4t.backtest.execution.broker import Broker
 from ml4t.backtest.portfolio.portfolio import Portfolio
@@ -51,6 +52,7 @@ class BacktestEngine:
         currency: str = "USD",
         use_priority_queue: bool = True,
         corporate_actions: list | None = None,
+        context_data: dict[datetime, dict[str, Any]] | None = None,
     ):
         """Initialize the backtest engine.
 
@@ -64,11 +66,18 @@ class BacktestEngine:
             currency: Base currency for the portfolio
             use_priority_queue: Use priority queue for event ordering
             corporate_actions: List of corporate actions to process during backtest
+            context_data: Market-wide context data indexed by timestamp
+                         Example: {datetime(2024,1,15): {'VIX': 18.5, 'SPY': 485.0}}
+                         Strategies receive this as context parameter in on_market_event
         """
         self.data_feed = data_feed
         self.strategy = strategy
         self.initial_capital = initial_capital
         self.currency = currency
+
+        # Initialize context cache
+        self.context_cache = ContextCache()
+        self.context_data = context_data or {}
 
         # Event distribution now handled by Clock (subscribe/publish/dispatch)
 
@@ -117,9 +126,8 @@ class BacktestEngine:
 
     def _setup_event_handlers(self) -> None:
         """Connect components via Clock event subscriptions."""
-        # Strategy subscribes to market and fill events
-        # Note: Using on_event allows strategies to route events internally
-        self.clock.subscribe(EventType.MARKET, self.strategy.on_event)
+        # Strategy subscribes to fill events
+        # Note: MARKET events are handled specially by Engine to pass context
         self.clock.subscribe(EventType.FILL, self.strategy.on_event)
 
         # Broker subscribes to order events AND market events (for fill checking)
@@ -192,17 +200,34 @@ class BacktestEngine:
                 break
 
             # Dispatch event to all registered subscribers
-            # Subscribers handle events based on event_type:
-            # - Strategy: receives MARKET and FILL events
-            # - Broker: receives ORDER and MARKET events
-            # - Portfolio: receives FILL events
-            # - Reporter: receives ALL events
-            self.clock.dispatch_event(event)
+            # Special handling for MARKET events: pass context to strategy
+            # Other events go through normal Clock dispatch
+            if event.event_type == EventType.MARKET:
+                # Get or create context for this timestamp
+                context_dict = self.context_data.get(event.timestamp, {})
+                context = self.context_cache.get_or_create(event.timestamp, context_dict)
+
+                # Call strategy with context (convert Context to dict for simpler API)
+                self.strategy.on_market_event(event, context.data)
+
+                # Also call on_event for backward compatibility with strategies
+                # that don't override on_market_event
+                self.strategy.on_event(event)
+
+                # Still dispatch to other subscribers (broker, portfolio, reporter)
+                self.clock.dispatch_event(event)
+            else:
+                # Normal dispatch for non-MARKET events
+                # Subscribers handle events based on event_type:
+                # - Strategy: receives FILL events
+                # - Broker: receives ORDER and MARKET events
+                # - Portfolio: receives FILL and MARKET events
+                # - Reporter: receives ALL events
+                self.clock.dispatch_event(event)
 
             # Process corporate actions AFTER market events are dispatched
             # This ensures positions are filled/updated before corporate actions are applied
             # (e.g., pending orders moved to open and filled, positions exist)
-            from ml4t.backtest.core.event import EventType, MarketEvent
             if event.event_type == EventType.MARKET:
                 # Extract date from event timestamp
                 current_date = event.timestamp.date()

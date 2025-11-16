@@ -93,7 +93,7 @@ class Strategy(ABC):
             event: The event to process (MarketEvent, FillEvent, etc.)
         """
 
-    def on_market_event(self, event: MarketEvent) -> None:
+    def on_market_event(self, event: MarketEvent, context: dict[str, Any] | None = None) -> None:
         """
         Process a market data event.
 
@@ -101,6 +101,9 @@ class Strategy(ABC):
 
         Args:
             event: Market data event
+            context: Market-wide context data (VIX, SPY, regime indicators, etc.)
+                    Dictionary with timestamp-specific values shared across all assets.
+                    Example: {'VIX': 18.5, 'SPY': 485.0, 'regime': 'bull'}
         """
 
     def on_signal_event(self, event: SignalEvent) -> None:
@@ -221,6 +224,430 @@ class Strategy(ABC):
         else:
             time_str = datetime.now().isoformat()
         print(f"[{time_str}] [{self.name}] [{level}] {message}")
+
+    # ===== Trading Helper Methods =====
+    def get_position(self, asset_id: AssetId) -> float:
+        """
+        Get current position quantity for an asset.
+
+        Args:
+            asset_id: Asset identifier
+
+        Returns:
+            Current quantity (positive for long, negative for short, 0 for no position)
+
+        Raises:
+            ValueError: If broker is not initialized
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        position = self.broker.get_position(asset_id)
+        return position if position is not None else 0.0
+
+    def get_cash(self) -> float:
+        """
+        Get current available cash.
+
+        Returns:
+            Available cash balance
+
+        Raises:
+            ValueError: If broker is not initialized
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        return self.broker.get_cash()
+
+    def get_portfolio_value(self) -> float:
+        """
+        Get total portfolio value (cash + positions).
+
+        Returns:
+            Total equity value
+
+        Raises:
+            ValueError: If broker is not initialized
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        return self.broker._internal_portfolio.equity
+
+    def buy_percent(
+        self,
+        asset_id: AssetId,
+        percent: float,
+        price: float,
+        limit_price: float | None = None,
+    ) -> None:
+        """
+        Buy an asset using a percentage of portfolio value.
+
+        Args:
+            asset_id: Asset to buy
+            percent: Percentage of portfolio to allocate (0.0 to 1.0, e.g., 0.10 for 10%)
+            price: Current market price (for quantity calculation)
+            limit_price: Optional limit price for limit order (if None, uses market order)
+
+        Raises:
+            ValueError: If broker is not initialized or parameters are invalid
+
+        Example:
+            # Buy 10% of portfolio at current price
+            self.buy_percent("AAPL", 0.10, event.close)
+
+            # Buy 10% with limit order
+            self.buy_percent("AAPL", 0.10, event.close, limit_price=150.0)
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        if not 0.0 <= percent <= 1.0:
+            raise ValueError(f"Percent must be between 0.0 and 1.0, got {percent}")
+
+        if price <= 0:
+            raise ValueError(f"Price must be positive, got {price}")
+
+        # Calculate quantity based on portfolio value
+        portfolio_value = self.get_portfolio_value()
+        dollars_to_spend = portfolio_value * percent
+        quantity = dollars_to_spend / price
+
+        if quantity <= 0:
+            return  # Nothing to buy
+
+        # Import Order class here to avoid circular imports
+        from ml4t.backtest.execution.order import Order
+        from ml4t.backtest.core.types import OrderType
+
+        # Create and submit order
+        if limit_price is not None:
+            order = Order(
+                asset_id=asset_id,
+                side=OrderSide.BUY,
+                quantity=quantity,
+                order_type=OrderType.LIMIT,
+                limit_price=limit_price,
+            )
+        else:
+            order = Order(
+                asset_id=asset_id,
+                side=OrderSide.BUY,
+                quantity=quantity,
+                order_type=OrderType.MARKET,
+            )
+
+        self.broker.submit_order(order)
+
+    def sell_percent(
+        self,
+        asset_id: AssetId,
+        percent: float,
+        limit_price: float | None = None,
+    ) -> None:
+        """
+        Sell a percentage of current position.
+
+        Args:
+            asset_id: Asset to sell
+            percent: Percentage of position to sell (0.0 to 1.0, e.g., 0.50 for 50%)
+            limit_price: Optional limit price for limit order (if None, uses market order)
+
+        Raises:
+            ValueError: If broker is not initialized or parameters are invalid
+
+        Example:
+            # Sell 50% of position
+            self.sell_percent("AAPL", 0.50)
+
+            # Sell 50% with limit order
+            self.sell_percent("AAPL", 0.50, limit_price=155.0)
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        if not 0.0 <= percent <= 1.0:
+            raise ValueError(f"Percent must be between 0.0 and 1.0, got {percent}")
+
+        # Get current position
+        current_position = self.get_position(asset_id)
+
+        if current_position <= 0:
+            return  # No position to sell
+
+        # Calculate quantity to sell
+        quantity = abs(current_position) * percent
+
+        if quantity <= 0:
+            return  # Nothing to sell
+
+        # Import Order class here to avoid circular imports
+        from ml4t.backtest.execution.order import Order
+        from ml4t.backtest.core.types import OrderType
+
+        # Create and submit order
+        if limit_price is not None:
+            order = Order(
+                asset_id=asset_id,
+                side=OrderSide.SELL,
+                quantity=quantity,
+                order_type=OrderType.LIMIT,
+                limit_price=limit_price,
+            )
+        else:
+            order = Order(
+                asset_id=asset_id,
+                side=OrderSide.SELL,
+                quantity=quantity,
+                order_type=OrderType.MARKET,
+            )
+
+        self.broker.submit_order(order)
+
+    def close_position(self, asset_id: AssetId, limit_price: float | None = None) -> None:
+        """
+        Close entire position for an asset.
+
+        Args:
+            asset_id: Asset to close
+            limit_price: Optional limit price for limit order (if None, uses market order)
+
+        Raises:
+            ValueError: If broker is not initialized
+
+        Example:
+            # Close position at market
+            self.close_position("AAPL")
+
+            # Close position with limit order
+            self.close_position("AAPL", limit_price=155.0)
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        # Get current position
+        current_position = self.get_position(asset_id)
+
+        if current_position == 0:
+            return  # No position to close
+
+        # Determine side and quantity
+        if current_position > 0:
+            # Long position - sell to close
+            side = OrderSide.SELL
+            quantity = abs(current_position)
+        else:
+            # Short position - buy to cover
+            side = OrderSide.BUY
+            quantity = abs(current_position)
+
+        # Import Order class here to avoid circular imports
+        from ml4t.backtest.execution.order import Order
+        from ml4t.backtest.core.types import OrderType
+
+        # Create and submit order
+        if limit_price is not None:
+            order = Order(
+                asset_id=asset_id,
+                side=side,
+                quantity=quantity,
+                order_type=OrderType.LIMIT,
+                limit_price=limit_price,
+            )
+        else:
+            order = Order(
+                asset_id=asset_id,
+                side=side,
+                quantity=quantity,
+                order_type=OrderType.MARKET,
+            )
+
+        self.broker.submit_order(order)
+
+    # ===== ML-Specific Helper Methods =====
+    def size_by_confidence(
+        self,
+        asset_id: AssetId,
+        confidence: float,
+        max_percent: float,
+        price: float,
+        limit_price: float | None = None,
+    ) -> None:
+        """
+        Size position based on ML model confidence score.
+
+        Uses Kelly-like scaling: position_size = max_percent * confidence
+
+        Args:
+            asset_id: Asset to trade
+            confidence: ML model confidence (0.0 to 1.0)
+            max_percent: Maximum portfolio percentage at full confidence (0.0 to 1.0)
+            price: Current market price (for quantity calculation)
+            limit_price: Optional limit price for limit order (if None, uses market order)
+
+        Raises:
+            ValueError: If broker is not initialized or parameters are invalid
+
+        Example:
+            # With 80% confidence, allocate 80% of max 20% = 16% of portfolio
+            self.size_by_confidence("AAPL", confidence=0.80, max_percent=0.20, price=event.close)
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError(f"Confidence must be between 0.0 and 1.0, got {confidence}")
+
+        if not 0.0 <= max_percent <= 1.0:
+            raise ValueError(f"Max percent must be between 0.0 and 1.0, got {max_percent}")
+
+        # Calculate position size scaled by confidence
+        position_percent = max_percent * confidence
+
+        # Use existing buy_percent helper
+        self.buy_percent(asset_id, position_percent, price, limit_price)
+
+    def rebalance_to_weights(
+        self,
+        target_weights: dict[AssetId, float],
+        current_prices: dict[AssetId, float],
+        tolerance: float = 0.01,
+    ) -> None:
+        """
+        Rebalance portfolio to target weights.
+
+        For each asset:
+        - If current weight > target weight + tolerance: sell excess
+        - If current weight < target weight - tolerance: buy deficit
+
+        Args:
+            target_weights: Dictionary mapping asset_id to target weight (0.0 to 1.0)
+                          Weights should sum to <= 1.0 (remainder stays in cash)
+            current_prices: Dictionary mapping asset_id to current price
+            tolerance: Rebalancing tolerance (default: 1% = 0.01)
+
+        Raises:
+            ValueError: If broker is not initialized or parameters are invalid
+
+        Example:
+            target_weights = {"AAPL": 0.40, "MSFT": 0.30, "GOOGL": 0.20}  # 10% cash
+            current_prices = {"AAPL": event1.close, "MSFT": event2.close, "GOOGL": event3.close}
+            self.rebalance_to_weights(target_weights, current_prices, tolerance=0.02)
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        # Validate target weights sum to <= 1.0
+        total_weight = sum(target_weights.values())
+        if total_weight > 1.0:
+            raise ValueError(f"Target weights sum to {total_weight:.3f}, must be <= 1.0")
+
+        # Get portfolio value and current positions
+        portfolio_value = self.get_portfolio_value()
+
+        # Calculate current weights
+        current_weights = {}
+        for asset_id in set(list(target_weights.keys()) + list(current_prices.keys())):
+            position = self.get_position(asset_id)
+            if asset_id in current_prices and position != 0:
+                position_value = abs(position) * current_prices[asset_id]
+                current_weights[asset_id] = position_value / portfolio_value
+            else:
+                current_weights[asset_id] = 0.0
+
+        # Import Order class here to avoid circular imports
+        from ml4t.backtest.execution.order import Order
+        from ml4t.backtest.core.types import OrderType
+
+        # Rebalance each asset
+        for asset_id, target_weight in target_weights.items():
+            current_weight = current_weights.get(asset_id, 0.0)
+            weight_diff = target_weight - current_weight
+
+            # Check if rebalancing is needed (outside tolerance band)
+            if abs(weight_diff) <= tolerance:
+                continue  # Within tolerance, no rebalancing needed
+
+            if asset_id not in current_prices:
+                continue  # Can't rebalance without price
+
+            price = current_prices[asset_id]
+
+            # Calculate target position value and quantity
+            target_value = portfolio_value * target_weight
+            target_quantity = target_value / price
+
+            # Get current position
+            current_position = self.get_position(asset_id)
+
+            # Calculate quantity to trade
+            quantity_diff = target_quantity - abs(current_position)
+
+            if abs(quantity_diff) < 1e-6:  # Negligible difference
+                continue
+
+            # Create and submit rebalancing order
+            if quantity_diff > 0:
+                # Need to buy more
+                order = Order(
+                    asset_id=asset_id,
+                    side=OrderSide.BUY,
+                    quantity=abs(quantity_diff),
+                    order_type=OrderType.MARKET,
+                )
+                self.broker.submit_order(order)
+            else:
+                # Need to sell some
+                order = Order(
+                    asset_id=asset_id,
+                    side=OrderSide.SELL,
+                    quantity=abs(quantity_diff),
+                    order_type=OrderType.MARKET,
+                )
+                self.broker.submit_order(order)
+
+    def get_unrealized_pnl_pct(self, asset_id: AssetId) -> float | None:
+        """
+        Get unrealized P&L percentage for a position.
+
+        Calculates: (current_value - cost_basis) / cost_basis
+
+        Args:
+            asset_id: Asset identifier
+
+        Returns:
+            Unrealized P&L as percentage (e.g., 0.15 for 15% gain, -0.10 for 10% loss)
+            Returns None if no position exists
+
+        Raises:
+            ValueError: If broker is not initialized
+
+        Example:
+            pnl_pct = self.get_unrealized_pnl_pct("AAPL")
+            if pnl_pct and pnl_pct > 0.20:  # 20% gain
+                self.close_position("AAPL")  # Take profit
+        """
+        if self.broker is None:
+            raise ValueError("Broker not initialized. Strategy must be connected to broker.")
+
+        # Get position from broker's internal portfolio
+        position_obj = self.broker._internal_portfolio.get_position(asset_id)
+
+        if position_obj is None or position_obj.quantity == 0:
+            return None  # No position
+
+        # Calculate P&L percentage
+        # Position object should have unrealized_pnl property
+        cost_basis = position_obj.cost_basis
+        if cost_basis == 0:
+            return None  # Avoid division by zero
+
+        unrealized_pnl = position_obj.unrealized_pnl
+        pnl_pct = unrealized_pnl / abs(cost_basis)
+
+        return pnl_pct
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name='{self.name}', state={self.state})"

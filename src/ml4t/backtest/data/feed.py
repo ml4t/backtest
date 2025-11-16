@@ -78,7 +78,10 @@ class SignalSource(ABC):
 
 
 class ParquetDataFeed(DataFeed):
-    """Data feed that reads from Parquet files using Polars."""
+    """Data feed that reads from Parquet files using Polars.
+
+    Supports embedded ML signals for multi-signal strategies.
+    """
 
     def __init__(
         self,
@@ -86,6 +89,7 @@ class ParquetDataFeed(DataFeed):
         asset_id: AssetId,
         data_type: MarketDataType = MarketDataType.BAR,
         timestamp_column: str = "timestamp",
+        signal_columns: list[str] | None = None,
         filters: list[tuple] | None = None,
     ):
         """
@@ -96,12 +100,15 @@ class ParquetDataFeed(DataFeed):
             asset_id: Asset identifier
             data_type: Type of market data
             timestamp_column: Name of timestamp column
+            signal_columns: Optional list of columns containing ML signals
+                           (e.g., ['ml_pred_5d', 'confidence', 'ml_exit_pred'])
             filters: Optional Polars filters to apply
         """
         self.path = Path(path)
         self.asset_id = asset_id
         self.data_type = data_type
         self.timestamp_column = timestamp_column
+        self.signal_columns = signal_columns or []
 
         # Load data lazily with Polars
         self.lazy_df = pl.scan_parquet(str(self.path))
@@ -137,6 +144,12 @@ class ParquetDataFeed(DataFeed):
         if not isinstance(timestamp, datetime):
             timestamp = datetime.fromisoformat(str(timestamp))
 
+        # Extract signals if signal_columns specified
+        signals = {}
+        for col in self.signal_columns:
+            if col in row:
+                signals[col] = float(row[col])
+
         # Map column names to MarketEvent fields
         return MarketEvent(
             timestamp=timestamp,
@@ -153,6 +166,7 @@ class ParquetDataFeed(DataFeed):
             ask_price=row.get("ask"),
             bid_size=row.get("bid_size"),
             ask_size=row.get("ask_size"),
+            signals=signals,
         )
 
     def peek_next_timestamp(self) -> datetime | None:
@@ -188,7 +202,10 @@ class ParquetDataFeed(DataFeed):
 
 
 class CSVDataFeed(DataFeed):
-    """Data feed that reads from CSV files."""
+    """Data feed that reads from CSV files.
+
+    Supports embedded ML signals for multi-signal strategies.
+    """
 
     def __init__(
         self,
@@ -196,6 +213,7 @@ class CSVDataFeed(DataFeed):
         asset_id: AssetId,
         data_type: MarketDataType = MarketDataType.BAR,
         timestamp_column: str = "timestamp",
+        signal_columns: list[str] | None = None,
         parse_dates: bool = True,
         **csv_kwargs,
     ):
@@ -207,6 +225,8 @@ class CSVDataFeed(DataFeed):
             asset_id: Asset identifier
             data_type: Type of market data
             timestamp_column: Name of timestamp column
+            signal_columns: Optional list of columns containing ML signals
+                           (e.g., ['ml_pred_5d', 'confidence', 'ml_exit_pred'])
             parse_dates: Whether to parse dates automatically
             **csv_kwargs: Additional arguments for Polars read_csv
         """
@@ -214,6 +234,7 @@ class CSVDataFeed(DataFeed):
         self.asset_id = asset_id
         self.data_type = data_type
         self.timestamp_column = timestamp_column
+        self.signal_columns = signal_columns or []
 
         # Read CSV with Polars
         if parse_dates:
@@ -241,6 +262,12 @@ class CSVDataFeed(DataFeed):
         if not isinstance(timestamp, datetime):
             timestamp = datetime.fromisoformat(str(timestamp))
 
+        # Extract signals if signal_columns specified
+        signals = {}
+        for col in self.signal_columns:
+            if col in row:
+                signals[col] = float(row[col])
+
         return MarketEvent(
             timestamp=timestamp,
             asset_id=self.asset_id,
@@ -251,6 +278,7 @@ class CSVDataFeed(DataFeed):
             close=row.get("close"),
             volume=row.get("volume"),
             price=row.get("price", row.get("close")),
+            signals=signals,
         )
 
     def peek_next_timestamp(self) -> datetime | None:

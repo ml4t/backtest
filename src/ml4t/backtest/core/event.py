@@ -43,7 +43,13 @@ class Event(ABC):
 
 
 class MarketEvent(Event):
-    """Market data event (trade, quote, or bar)."""
+    """Market data event (trade, quote, or bar).
+
+    Attributes:
+        signals: Dictionary of ML model signals associated with this market event.
+                 Multiple signals can be stored (e.g., 'ml_pred_5d', 'confidence',
+                 'ml_exit_pred'). Supports unlimited signals via dict structure.
+    """
 
     def __init__(
         self,
@@ -61,6 +67,7 @@ class MarketEvent(Event):
         low: Price | None = None,
         close: Price | None = None,
         volume: Volume | None = None,
+        signals: dict[str, float] | None = None,
         metadata: dict[str, Any] | None = None,
     ):
         super().__init__(timestamp, EventType.MARKET, metadata)
@@ -77,6 +84,7 @@ class MarketEvent(Event):
         self.low = low
         self.close = close
         self.volume = volume
+        self.signals = signals or {}
 
 
 class SignalEvent(Event):

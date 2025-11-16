@@ -138,8 +138,13 @@ class StrategyAdapter(Strategy):
         elif isinstance(event, FillEvent):
             self.on_fill_event(event)
 
-    def on_market_event(self, event: MarketEvent) -> None:
-        """Process market event and generate signals."""
+    def on_market_event(self, event: MarketEvent, context: dict[str, Any] | None = None) -> None:
+        """Process market event and generate signals.
+
+        Args:
+            event: Market data event
+            context: Market-wide context data (optional, unused by this adapter)
+        """
         try:
             # Update data history
             self._update_data_history(event)
