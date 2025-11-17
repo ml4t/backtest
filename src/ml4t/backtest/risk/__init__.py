@@ -1,12 +1,43 @@
 """Risk management module for ml4t.backtest.
 
-This module provides risk context and rule evaluation infrastructure for
-position and portfolio risk management.
+This module provides risk context, decision, and rule evaluation infrastructure
+for position and portfolio risk management.
 
 Main Components:
     - RiskContext: Immutable snapshot of position/portfolio state for risk evaluation
+    - RiskDecision: Output of risk rule evaluation (exit, update stops, or no action)
+    - RiskRule: Abstract base class for composable risk rules
+    - CompositeRule: Combine multiple rules into a single unit
+    - RiskRuleProtocol: Protocol for callable risk rules (no inheritance needed)
+
+Example:
+    >>> from ml4t.backtest.risk import RiskContext, RiskDecision, RiskRule
+    >>>
+    >>> # Simple callable rule (no class needed)
+    >>> def stop_loss_rule(context: RiskContext) -> RiskDecision:
+    ...     if context.unrealized_pnl_pct < -0.05:
+    ...         return RiskDecision.exit_now(
+    ...             exit_type=ExitType.STOP_LOSS,
+    ...             reason="5% stop-loss breach"
+    ...         )
+    ...     return RiskDecision.no_action()
 """
 
 from ml4t.backtest.risk.context import RiskContext
+from ml4t.backtest.risk.decision import ExitType, RiskDecision
+from ml4t.backtest.risk.rule import (
+    CompositeRule,
+    RiskRule,
+    RiskRuleLike,
+    RiskRuleProtocol,
+)
 
-__all__ = ["RiskContext"]
+__all__ = [
+    "RiskContext",
+    "RiskDecision",
+    "ExitType",
+    "RiskRule",
+    "RiskRuleProtocol",
+    "RiskRuleLike",
+    "CompositeRule",
+]
