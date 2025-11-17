@@ -13,6 +13,7 @@ from ml4t.backtest.data.feed import DataFeed
 from ml4t.backtest.execution.broker import Broker
 from ml4t.backtest.portfolio.portfolio import Portfolio
 from ml4t.backtest.reporting.reporter import Reporter
+from ml4t.backtest.risk.manager import RiskManager
 from ml4t.backtest.strategy.base import Strategy
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class BacktestEngine:
         broker: Broker | None = None,
         portfolio: Portfolio | None = None,
         reporter: Reporter | None = None,
+        risk_manager: RiskManager | None = None,
         initial_capital: float = 100000.0,
         currency: str = "USD",
         use_priority_queue: bool = True,
@@ -62,6 +64,9 @@ class BacktestEngine:
             broker: Order execution broker (default: SimulationBroker)
             portfolio: Portfolio tracker (default: Portfolio)
             reporter: Results reporter (default: InMemoryReporter)
+            risk_manager: Optional risk management system (default: None)
+                          When provided, integrates position exit checking, order validation,
+                          and fill recording for risk rule enforcement
             initial_capital: Starting capital
             currency: Base currency for the portfolio
             use_priority_queue: Use priority queue for event ordering
@@ -72,6 +77,7 @@ class BacktestEngine:
         """
         self.data_feed = data_feed
         self.strategy = strategy
+        self.risk_manager = risk_manager
         self.initial_capital = initial_capital
         self.currency = currency
 
@@ -116,6 +122,11 @@ class BacktestEngine:
             for action in corporate_actions:
                 self.corporate_action_processor.add_action(action)
 
+        # Hook B: Wrap broker's submit_order if risk_manager is enabled
+        # This intercepts all strategy order submissions for validation
+        if self.risk_manager:
+            self._wrap_broker_for_risk_validation()
+
         # Inject broker into strategy for helper methods
         self.strategy.broker = self.broker
 
@@ -135,6 +146,48 @@ class BacktestEngine:
         self.start_time: datetime | None = None
         self.end_time: datetime | None = None
 
+    def _wrap_broker_for_risk_validation(self) -> None:
+        """Wrap broker's submit_order method to inject risk validation (Hook B).
+
+        This creates a wrapper around the broker's submit_order that:
+        1. Calls risk_manager.validate_order() before submission
+        2. Only submits if validation passes (returns non-None order)
+        3. Allows risk rules to reject or modify orders
+
+        The wrapper is transparent - strategies call broker.submit_order() normally.
+        """
+        # Store original submit_order method
+        original_submit_order = self.broker.submit_order
+
+        def submit_order_with_validation(order, timestamp=None):
+            """Wrapped submit_order that validates through risk_manager."""
+            # Get current market event for context (if available)
+            # Note: This is best-effort - risk_manager.validate_order will build context
+            current_event = getattr(self, '_current_market_event', None)
+
+            if current_event and self.risk_manager:
+                # Hook B: Validate order through risk manager
+                validated_order = self.risk_manager.validate_order(
+                    order=order,
+                    market_event=current_event,
+                    broker=self.broker,
+                    portfolio=self.portfolio,
+                )
+
+                # If risk manager rejects (returns None), don't submit
+                if validated_order is None:
+                    logger.info(f"Order rejected by risk manager: {order.asset_id} {order.quantity}")
+                    return None  # Return None to indicate rejection
+
+                # Use validated (possibly modified) order
+                order = validated_order
+
+            # Submit the validated order
+            return original_submit_order(order, timestamp)
+
+        # Replace broker's submit_order with wrapped version
+        self.broker.submit_order = submit_order_with_validation
+
     def _setup_event_handlers(self) -> None:
         """Connect components via Clock event subscriptions."""
         # Strategy subscribes to fill events
@@ -149,6 +202,16 @@ class BacktestEngine:
         # Market events update position prices for accurate unrealized PnL
         self.clock.subscribe(EventType.MARKET, self.portfolio.on_market_event)
         self.clock.subscribe(EventType.FILL, self.portfolio.on_fill_event)
+
+        # Hook D: Risk manager subscribes to fill events for position state tracking
+        if self.risk_manager:
+            def record_fill_with_context(fill_event):
+                """Wrapper to provide market_event context to risk_manager.record_fill."""
+                current_event = getattr(self, '_current_market_event', None)
+                if current_event:
+                    self.risk_manager.record_fill(fill_event, current_event)
+
+            self.clock.subscribe(EventType.FILL, record_fill_with_context)
 
         # Reporter subscribes to all events for logging
         for event_type in EventType:
@@ -219,6 +282,21 @@ class BacktestEngine:
                 # Get or create context for this timestamp
                 context_dict = self.context_data.get(event.timestamp, {})
                 context = self.context_cache.get_or_create(event.timestamp, context_dict)
+
+                # Store current market event for Hook B (order validation)
+                self._current_market_event = event
+
+                # Hook C: Check risk management exit conditions BEFORE strategy
+                # This allows risk rules to exit positions independently of strategy logic
+                if self.risk_manager:
+                    exit_orders = self.risk_manager.check_position_exits(
+                        market_event=event,
+                        broker=self.broker,
+                        portfolio=self.portfolio,
+                    )
+                    # Submit risk-driven exit orders immediately
+                    for order in exit_orders:
+                        self.broker.submit_order(order)
 
                 # Handle based on strategy execution mode
                 if self._strategy_mode == "batch":
