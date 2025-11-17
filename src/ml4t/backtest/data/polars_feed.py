@@ -18,6 +18,10 @@ from ml4t.backtest.core.event import MarketEvent
 from ml4t.backtest.core.types import AssetId, MarketDataType
 from ml4t.backtest.data.feature_provider import FeatureProvider
 from ml4t.backtest.data.feed import DataFeed
+from ml4t.backtest.data.validation import (
+    SignalTimingMode,
+    validate_signal_timing,
+)
 
 
 class PolarsDataFeed(DataFeed):
@@ -75,6 +79,9 @@ class PolarsDataFeed(DataFeed):
         signal_columns: list[str] | None = None,
         feature_provider: FeatureProvider | None = None,
         filters: list[pl.Expr] | None = None,
+        validate_signal_timing: bool = True,
+        signal_timing_mode: SignalTimingMode = SignalTimingMode.NEXT_BAR,
+        fail_on_timing_violation: bool = True,
     ):
         """
         Initialize PolarsDataFeed with lazy loading.
@@ -91,6 +98,12 @@ class PolarsDataFeed(DataFeed):
                            will be treated as signals
             feature_provider: Optional FeatureProvider for indicators/context
             filters: Optional list of Polars filter expressions
+            validate_signal_timing: If True, validate signals don't create
+                                   look-ahead bias (default: True)
+            signal_timing_mode: Timing mode for signal validation
+                               (default: NEXT_BAR - signal used on next bar)
+            fail_on_timing_violation: If True, raise exception on timing violation;
+                                     if False, log warning (default: True)
         """
         self.price_path = Path(price_path)
         self.asset_id = asset_id
@@ -100,6 +113,9 @@ class PolarsDataFeed(DataFeed):
         self.signals_path = Path(signals_path) if signals_path else None
         self.signal_columns = signal_columns
         self.feature_provider = feature_provider
+        self.validate_signal_timing = validate_signal_timing
+        self.signal_timing_mode = signal_timing_mode
+        self.fail_on_timing_violation = fail_on_timing_violation
 
         # Load price data lazily
         self.price_lazy = pl.scan_parquet(str(self.price_path))
@@ -156,6 +172,25 @@ class PolarsDataFeed(DataFeed):
         # For 250 symbols × 252 days × daily bars = ~63k rows = ~10MB per symbol
         # Total for 250 symbols: ~2.5GB (within target)
         self.df = self.merged_lazy.collect()
+
+        # Validate signal timing if signals are present
+        if self.signals_path and self.validate_signal_timing:
+            price_df = self.price_lazy.collect()
+            signals_df = pl.scan_parquet(str(self.signals_path)).collect()
+
+            is_valid, violations = validate_signal_timing(
+                signals_df=signals_df,
+                prices_df=price_df,
+                mode=self.signal_timing_mode,
+                timestamp_column=self.timestamp_column,
+                asset_column=self.asset_column,
+                fail_on_violation=self.fail_on_timing_violation,
+            )
+
+            if not is_valid and not self.fail_on_timing_violation:
+                # Log warnings
+                for v in violations:
+                    print(f"WARNING: {v['message']}")
 
         # Group by timestamp while maintaining chronological order
         # maintain_order=True is CRITICAL for event-driven correctness
