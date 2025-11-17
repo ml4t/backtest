@@ -91,21 +91,56 @@ class PositionTradeState:
     def update_on_market_event(self, market_price: Decimal) -> None:
         """Update bar counter and MFE/MAE on each market event.
 
+        MFE (Max Favorable Excursion): The best price movement in your favor since entry.
+        MAE (Max Adverse Excursion): The worst price movement against you since entry.
+
+        For long positions (entry_quantity > 0):
+            - MFE = max(MFE, current_price - entry_price)  # Best upward move
+            - MAE = max(MAE, entry_price - current_price)  # Worst downward move
+
+        For short positions (entry_quantity < 0):
+            - MFE = max(MFE, entry_price - current_price)  # Best downward move
+            - MAE = max(MAE, current_price - entry_price)  # Worst upward move
+
+        Both are tracked as positive values representing the magnitude of excursion.
+
         Args:
             market_price: Current market price (close price from MarketEvent)
         """
         self.bars_held += 1
 
-        # Calculate excursion from entry
-        pnl_per_share = market_price - self.entry_price if self.entry_quantity > 0 else self.entry_price - market_price
-
-        # Update MFE (max favorable) and MAE (max adverse)
+        # Calculate excursion from entry based on position direction
         if self.entry_quantity > 0:  # Long position
-            self.max_favorable_excursion = max(self.max_favorable_excursion, pnl_per_share)
-            self.max_adverse_excursion = max(self.max_adverse_excursion, -pnl_per_share)
-        else:  # Short position
-            self.max_favorable_excursion = max(self.max_favorable_excursion, pnl_per_share)
-            self.max_adverse_excursion = max(self.max_adverse_excursion, -pnl_per_share)
+            # Favorable excursion: price went up
+            favorable_excursion = market_price - self.entry_price
+            # Adverse excursion: price went down (make positive)
+            adverse_excursion = self.entry_price - market_price
+
+            # Track maximum excursions (always positive or zero)
+            self.max_favorable_excursion = max(
+                self.max_favorable_excursion,
+                max(Decimal("0"), favorable_excursion)
+            )
+            self.max_adverse_excursion = max(
+                self.max_adverse_excursion,
+                max(Decimal("0"), adverse_excursion)
+            )
+
+        else:  # Short position (entry_quantity < 0)
+            # Favorable excursion: price went down
+            favorable_excursion = self.entry_price - market_price
+            # Adverse excursion: price went up (make positive)
+            adverse_excursion = market_price - self.entry_price
+
+            # Track maximum excursions (always positive or zero)
+            self.max_favorable_excursion = max(
+                self.max_favorable_excursion,
+                max(Decimal("0"), favorable_excursion)
+            )
+            self.max_adverse_excursion = max(
+                self.max_adverse_excursion,
+                max(Decimal("0"), adverse_excursion)
+            )
 
 
 @dataclass
@@ -508,8 +543,33 @@ class RiskManager:
         # Get position state if exists
         state = self._position_state.get(asset_id)
 
+        # Create a modified market event with tracked MFE/MAE injected into signals
+        # This allows RiskContext to use tracked values instead of intra-bar OHLC
+        modified_event = market_event
+        if state is not None and position is not None:
+            # Convert MFE/MAE from price units to currency units (price × quantity)
+            quantity = abs(position.quantity) if hasattr(position, 'quantity') else abs(position)
+
+            # Inject tracked MFE/MAE into signals dict
+            # Use reserved keys prefixed with underscore to avoid conflicts
+            signals = market_event.signals.copy() if market_event.signals else {}
+            signals['_tracked_mfe'] = float(state.max_favorable_excursion * Decimal(str(quantity)))
+            signals['_tracked_mae'] = float(state.max_adverse_excursion * Decimal(str(quantity)))
+
+            # Create modified event (MarketEvent is not frozen, but we avoid mutation)
+            # Note: MarketEvent is typically immutable-ish, so we need to be careful
+            # For now, modify the signals dict in place since it's passed by reference
+            # This is safe because we're in the context building phase
+            from dataclasses import replace
+            try:
+                modified_event = replace(market_event, signals=signals)
+            except Exception:
+                # If replace fails (e.g., MarketEvent not a dataclass), modify in place
+                market_event.signals.update(signals)
+                modified_event = market_event
+
         context = RiskContext.from_state(
-            market_event=market_event,
+            market_event=modified_event,
             position=position,
             portfolio=portfolio,
             feature_provider=self.feature_provider,

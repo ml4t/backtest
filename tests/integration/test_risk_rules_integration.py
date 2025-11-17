@@ -145,19 +145,15 @@ class TestTimeBasedExitIntegration:
         # - Position closed on bar 15 (5 + 10 = 15)
         # - No position after bar 15
 
-        # Get final position
-        final_position = broker.get_position("TEST")
+        # Get final position (returns quantity as float, not Position object)
+        final_position_qty = broker.get_position("TEST")
 
         # Should be flat (position closed by time exit)
-        assert final_position.quantity == 0.0
+        assert final_position_qty == 0.0
 
         # Check that we actually had trades
-        trades = broker.trade_tracker.get_all_trades()
-        assert len(trades) > 0
-
-        # Should have at least entry and exit
-        assert any(t.side.name == "BUY" for t in trades)
-        assert any(t.side.name == "SELL" for t in trades)
+        trade_count = broker.trade_tracker.get_trade_count()
+        assert trade_count > 0, "Should have at least one completed trade (entry + exit)"
 
 
 class TestPriceBasedStopLossIntegration:
@@ -190,13 +186,11 @@ class TestPriceBasedStopLossIntegration:
         # - Position closed when price hits 95 (should be in downtrend phase)
         # - Final position is flat
 
-        final_position = broker.get_position("TEST")
-        assert final_position.quantity == 0.0
+        final_position_qty = broker.get_position("TEST")
+        assert final_position_qty == 0.0
 
-        trades = broker.trade_tracker.get_all_trades()
-        assert len(trades) > 0
-        assert any(t.side.name == "BUY" for t in trades)
-        assert any(t.side.name == "SELL" for t in trades)
+        trade_count = broker.trade_tracker.get_trade_count()
+        assert trade_count > 0, "Should have completed trades"
 
 
 class TestPriceBasedTakeProfitIntegration:
@@ -229,13 +223,11 @@ class TestPriceBasedTakeProfitIntegration:
         # - Position closed when price hits 115 (should be in uptrend phase)
         # - Final position is flat
 
-        final_position = broker.get_position("TEST")
-        assert final_position.quantity == 0.0
+        final_position_qty = broker.get_position("TEST")
+        assert final_position_qty == 0.0
 
-        trades = broker.trade_tracker.get_all_trades()
-        assert len(trades) > 0
-        assert any(t.side.name == "BUY" for t in trades)
-        assert any(t.side.name == "SELL" for t in trades)
+        trade_count = broker.trade_tracker.get_trade_count()
+        assert trade_count > 0, "Should have completed trades"
 
 
 class TestCombinedRulesIntegration:
@@ -263,11 +255,11 @@ class TestCombinedRulesIntegration:
         results = engine.run()
 
         # Verify that position was closed by one of the rules
-        final_position = broker.get_position("TEST")
-        assert final_position.quantity == 0.0
+        final_position_qty = broker.get_position("TEST")
+        assert final_position_qty == 0.0
 
-        trades = broker.trade_tracker.get_all_trades()
-        assert len(trades) > 0
+        trade_count = broker.trade_tracker.get_trade_count()
+        assert trade_count > 0, "Should have completed trades"
 
     def test_stop_loss_has_higher_priority_than_take_profit(self, temp_data_file):
         """Test that stop loss (priority 10) is checked before take profit (priority 8)."""
@@ -296,5 +288,5 @@ class TestCombinedRulesIntegration:
         results = engine.run()
 
         # Should exit (either by stop or take profit depending on price action)
-        final_position = broker.get_position("TEST")
-        assert final_position.quantity == 0.0
+        final_position_qty = broker.get_position("TEST")
+        assert final_position_qty == 0.0

@@ -198,16 +198,21 @@ class RiskContext:
     def max_favorable_excursion(self) -> float:
         """Maximum favorable excursion (MFE) - highest unrealized profit since entry.
 
+        If RiskManager is tracking MFE across bars (via PositionTradeState),
+        it will inject the tracked value into features['_tracked_mfe'].
+        Otherwise, this computes intra-bar MFE from current bar's high/low.
+
         For long positions: (high - entry_price) * quantity
         For short positions: (entry_price - low) * abs(quantity)
 
-        Note: This is the intra-bar MFE based on current bar's high/low.
-        For true MFE tracking across multiple bars, use a RiskManager
-        that maintains state history.
-
         Returns:
-            MFE in currency units (0.0 if no position or no high/low data)
+            MFE in currency units (0.0 if no position)
         """
+        # Use tracked MFE if available (from PositionTradeState via RiskManager)
+        if '_tracked_mfe' in self.features:
+            return float(self.features['_tracked_mfe'])
+
+        # Otherwise compute intra-bar MFE from OHLC
         if self.position_quantity == 0:
             return 0.0
 
@@ -225,16 +230,21 @@ class RiskContext:
     def max_adverse_excursion(self) -> float:
         """Maximum adverse excursion (MAE) - lowest unrealized profit since entry.
 
+        If RiskManager is tracking MAE across bars (via PositionTradeState),
+        it will inject the tracked value into features['_tracked_mae'].
+        Otherwise, this computes intra-bar MAE from current bar's high/low.
+
         For long positions: (low - entry_price) * quantity
         For short positions: (entry_price - high) * abs(quantity)
 
-        Note: This is the intra-bar MAE based on current bar's high/low.
-        For true MAE tracking across multiple bars, use a RiskManager
-        that maintains state history.
-
         Returns:
-            MAE in currency units (0.0 if no position or no high/low data)
+            MAE in currency units (0.0 if no position)
         """
+        # Use tracked MAE if available (from PositionTradeState via RiskManager)
+        if '_tracked_mae' in self.features:
+            return float(self.features['_tracked_mae'])
+
+        # Otherwise compute intra-bar MAE from OHLC
         if self.position_quantity == 0:
             return 0.0
 
@@ -279,6 +289,18 @@ class RiskContext:
             return 0.0
 
         return float(self.max_adverse_excursion / position_value)
+
+    @property
+    def current_price(self) -> Price:
+        """Current market price (alias for close).
+
+        This property provides a semantic alias for the close price,
+        making rule code more readable when checking current price levels.
+
+        Returns:
+            Current market price (same as close)
+        """
+        return self.close
 
     @classmethod
     def from_state(
