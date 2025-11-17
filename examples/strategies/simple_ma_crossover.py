@@ -2,9 +2,9 @@
 
 This example demonstrates:
 1. Using on_market_event() callback for single-asset strategies
-2. Reading indicators from MarketEvent.indicators dict
+2. Reading signals from MarketEvent.signals dict
 3. Using helper methods (buy_percent, close_position)
-4. Context-dependent logic (VIX filtering)
+4. Context-dependent logic (VIX filtering from event.context)
 
 Strategy Logic:
 - Buy when fast MA crosses above slow MA
@@ -65,18 +65,17 @@ class SimpleMACrossoverStrategy(Strategy):
         pass
 
     def on_market_event(self, event, context=None):
-        """Process market events with indicators (Simple Mode).
+        """Process market events with signals (Simple Mode).
 
         Args:
-            event: MarketEvent with OHLCV data and indicators dict
-            context: Optional dict with market-wide indicators (VIX, regime, etc.)
+            event: MarketEvent with OHLCV data and signals dict
+            context: Optional dict with market-wide context (VIX, regime, etc.)
         """
         # Only process our target asset
         if event.asset_id != self.asset_id:
             return
 
-        # Extract indicators from event.signals dict
-        # (They'll be in event.indicators once indicator_columns param is added)
+        # Extract signals (technical indicators in this case)
         fast_ma = event.signals.get("sma_10", None)
         slow_ma = event.signals.get("sma_50", None)
 
@@ -131,10 +130,10 @@ class SimpleMACrossoverStrategy(Strategy):
         self._prev_slow_ma = slow_ma
 
 
-def create_sample_data_with_indicators(
+def create_sample_data_with_signals(
     output_path: Path = Path("ma_sample_data.parquet"),
 ) -> tuple[Path, dict]:
-    """Create sample market data with MA indicators and VIX context.
+    """Create sample market data with MA signals and VIX context.
 
     Args:
         output_path: Path to save the sample data
@@ -201,7 +200,7 @@ def create_sample_data_with_indicators(
         vix = max(10.0, min(50.0, vix))
         vix_values.append(vix)
 
-    # Create DataFrame with indicators
+    # Create DataFrame with signals
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
@@ -234,17 +233,16 @@ def create_sample_data_with_indicators(
 def main():
     """Run simple MA crossover strategy example."""
 
-    # Create sample data with indicators
-    logger.info("Creating sample data with MA indicators...")
-    data_path, context_data = create_sample_data_with_indicators()
+    # Create sample data with signals
+    logger.info("Creating sample data with MA signals...")
+    data_path, context_data = create_sample_data_with_signals()
 
-    # Create data feed with indicators as signals (for now)
-    # TODO: Once indicator_columns parameter is added, change this
+    # Create data feed with MA signals
     data_feed = ParquetDataFeed(
         path=data_path,
         asset_id="SPY",
         timestamp_column="timestamp",
-        signal_columns=["sma_10", "sma_50"],  # Extract indicators
+        signal_columns=["sma_10", "sma_50"],  # Extract signals
     )
 
     # Create MA crossover strategy

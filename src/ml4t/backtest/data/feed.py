@@ -77,130 +77,6 @@ class SignalSource(ABC):
         """Reset the signal source."""
 
 
-class ParquetDataFeed(DataFeed):
-    """Data feed that reads from Parquet files using Polars.
-
-    Supports embedded ML signals for multi-signal strategies.
-    """
-
-    def __init__(
-        self,
-        path: Path,
-        asset_id: AssetId,
-        data_type: MarketDataType = MarketDataType.BAR,
-        timestamp_column: str = "timestamp",
-        signal_columns: list[str] | None = None,
-        filters: list[tuple] | None = None,
-    ):
-        """
-        Initialize Parquet data feed.
-
-        Args:
-            path: Path to Parquet file
-            asset_id: Asset identifier
-            data_type: Type of market data
-            timestamp_column: Name of timestamp column
-            signal_columns: Optional list of columns containing ML signals
-                           (e.g., ['ml_pred_5d', 'confidence', 'ml_exit_pred'])
-            filters: Optional Polars filters to apply
-        """
-        self.path = Path(path)
-        self.asset_id = asset_id
-        self.data_type = data_type
-        self.timestamp_column = timestamp_column
-        self.signal_columns = signal_columns or []
-
-        # Load data lazily with Polars
-        self.lazy_df = pl.scan_parquet(str(self.path))
-
-        # Apply filters if provided
-        if filters:
-            for filter_expr in filters:
-                self.lazy_df = self.lazy_df.filter(filter_expr)
-
-        # Sort by timestamp and collect
-        self.df = self.lazy_df.sort(timestamp_column).collect()
-
-        self.current_index = 0
-        self.max_index = len(self.df) - 1
-
-    def get_next_event(self) -> MarketEvent | None:
-        """Get the next market event."""
-        if self.is_exhausted:
-            return None
-
-        row = self.df.row(self.current_index, named=True)
-        self.current_index += 1
-
-        # Create MarketEvent based on data type
-        event = self._create_market_event(row)
-        return event
-
-    def _create_market_event(self, row: dict[str, Any]) -> MarketEvent:
-        """Create a MarketEvent from a data row."""
-        timestamp = row[self.timestamp_column]
-
-        # Convert timestamp if needed
-        if not isinstance(timestamp, datetime):
-            timestamp = datetime.fromisoformat(str(timestamp))
-
-        # Extract signals if signal_columns specified
-        signals = {}
-        for col in self.signal_columns:
-            if col in row:
-                signals[col] = float(row[col])
-
-        # Map column names to MarketEvent fields
-        return MarketEvent(
-            timestamp=timestamp,
-            asset_id=self.asset_id,
-            data_type=self.data_type,
-            open=row.get("open"),
-            high=row.get("high"),
-            low=row.get("low"),
-            close=row.get("close"),
-            volume=row.get("volume"),
-            price=row.get("price", row.get("close")),
-            size=row.get("size"),
-            bid_price=row.get("bid"),
-            ask_price=row.get("ask"),
-            bid_size=row.get("bid_size"),
-            ask_size=row.get("ask_size"),
-            signals=signals,
-        )
-
-    def peek_next_timestamp(self) -> datetime | None:
-        """Peek at the next timestamp."""
-        if self.is_exhausted:
-            return None
-
-        timestamp = self.df[self.timestamp_column][self.current_index]
-        if not isinstance(timestamp, datetime):
-            timestamp = datetime.fromisoformat(str(timestamp))
-
-        return timestamp
-
-    def reset(self) -> None:
-        """Reset to the beginning."""
-        self.current_index = 0
-
-    def seek(self, timestamp: datetime) -> None:
-        """Seek to a specific timestamp."""
-        # Find the index of the first row >= timestamp
-        mask = self.df[self.timestamp_column] >= timestamp
-        indices = mask.arg_true()
-
-        if len(indices) > 0:
-            self.current_index = indices[0]
-        else:
-            self.current_index = self.max_index + 1
-
-    @property
-    def is_exhausted(self) -> bool:
-        """Check if all data has been consumed."""
-        return self.current_index > self.max_index
-
-
 class CSVDataFeed(DataFeed):
     """Data feed that reads from CSV files.
 
@@ -265,7 +141,7 @@ class CSVDataFeed(DataFeed):
         # Extract signals if signal_columns specified
         signals = {}
         for col in self.signal_columns:
-            if col in row:
+            if col in row and row[col] is not None:
                 signals[col] = float(row[col])
 
         return MarketEvent(

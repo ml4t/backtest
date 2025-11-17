@@ -21,7 +21,7 @@ import numpy as np
 import polars as pl
 
 from ml4t.backtest import BacktestEngine, Strategy
-from ml4t.backtest.data.feed import PolarsDataFeed
+from ml4t.backtest.data import PolarsDataFeed
 
 # Configure logging
 logging.basicConfig(
@@ -277,19 +277,15 @@ def main():
     n_assets = 10
     data_path, context_data = create_multi_asset_data_with_momentum(n_assets=n_assets)
 
-    # Create Polars data feed (supports multi-asset naturally)
-    # Note: PolarsDataFeed requires price_path and asset_id, not multi-asset from one file
-    # For this example, we need to use a different approach or load data differently
-    # TODO: This example needs multi-asset data feed support to be properly implemented
-    from ml4t.backtest.data.feed import ParquetDataFeed
-
-    # For now, create a simple single-asset feed as a placeholder
-    # The batch mode logic is still demonstrated, just not with truly multi-asset data
-    data_feed = ParquetDataFeed(
-        path=data_path,
+    # Create Polars data feed
+    # Note: For proper multi-asset support, you would create multiple feeds
+    # or implement a multi-asset data feed. For this demo, we use single asset.
+    data_feed = PolarsDataFeed(
+        price_path=data_path,
         asset_id="ASSET_00",  # First asset only for demo
         timestamp_column="timestamp",
         signal_columns=["momentum"],
+        validate_signal_timing=False,
     )
 
     # Create multi-asset momentum strategy

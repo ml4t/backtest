@@ -143,7 +143,6 @@ class TestPolarsDataFeedBasic:
         assert event.close == 100.5
         assert event.volume == 1000000
         assert event.signals == {}  # No signals provided
-        assert event.indicators == {}  # No feature provider
         assert event.context == {}  # No feature provider
 
         # Verify lazy loading happened
@@ -288,6 +287,7 @@ class TestPolarsDataFeedMultiSource:
             asset_id=AssetId("AAPL"),
             signals_path=signals_path,
             signal_columns=["ml_pred", "confidence"],
+            validate_signal_timing=False,  # Disable for this test
         )
 
         # Get first event
@@ -317,6 +317,7 @@ class TestPolarsDataFeedMultiSource:
             asset_id=AssetId("AAPL"),
             signals_path=signals_path,
             # No signal_columns specified - should auto-detect
+            validate_signal_timing=False,  # Disable for this test
         )
 
         event = feed.get_next_event()
@@ -348,6 +349,7 @@ class TestPolarsDataFeedMultiSource:
             price_path=price_path,
             asset_id=AssetId("AAPL"),
             signals_path=signals_path,
+            validate_signal_timing=False,  # Disable for this test
         )
 
         events = []
@@ -401,12 +403,12 @@ class TestPolarsDataFeedFeatureProvider:
         # Verify price data
         assert event.close == 100.5
 
-        # Verify indicators populated
-        assert "atr" in event.indicators
-        assert "rsi" in event.indicators
-        assert "volatility" in event.indicators
-        assert event.indicators["atr"] == 2.5
-        assert event.indicators["rsi"] == 60.0
+        # Verify signals populated (includes features from FeatureProvider)
+        assert "atr" in event.signals
+        assert "rsi" in event.signals
+        assert "volatility" in event.signals
+        assert event.signals["atr"] == 2.5
+        assert event.signals["rsi"] == 60.0
 
         # Verify context populated
         assert "vix" in event.context
@@ -438,9 +440,9 @@ class TestPolarsDataFeedFeatureProvider:
 
         event = feed.get_next_event()
 
-        # Verify indicators from callable
-        assert event.indicators["atr"] == 2.5
-        assert event.indicators["atr_pct"] == 0.025
+        # Verify signals from callable (merged into signals dict)
+        assert event.signals["atr"] == 2.5
+        assert event.signals["atr_pct"] == 0.025
 
         # Verify context from callable
         assert event.context["vix"] == 15.0
@@ -471,19 +473,20 @@ class TestPolarsDataFeedFeatureProvider:
             signals_path=signals_path,
             signal_columns=["ml_pred"],
             feature_provider=feature_provider,
+            validate_signal_timing=False,  # Disable for this test
         )
 
         event = feed.get_next_event()
 
-        # Verify all three dicts populated
+        # Verify both dicts populated
         assert event.close == 100.5  # Price data
-        assert "ml_pred" in event.signals  # Signals
-        assert "atr" in event.indicators  # Indicators
+        assert "ml_pred" in event.signals  # Signals from file
+        assert "atr" in event.signals  # Signals from FeatureProvider
         assert "vix" in event.context  # Context
 
         # Verify values
         assert event.signals["ml_pred"] == 0.0
-        assert event.indicators["atr"] == 2.5
+        assert event.signals["atr"] == 2.5
         assert event.context["vix"] == 15.0
 
 

@@ -1,35 +1,39 @@
-"""Feature provider interface for ML strategies and risk management.
+"""Feature provider interface for per-asset signals and market-wide context.
 
-The FeatureProvider abstraction enables pluggable feature computation/retrieval,
-serving both ML trading strategies and risk management rules.
+The FeatureProvider abstraction enables pluggable feature computation/retrieval.
+It provides two types of data:
+
+1. **Per-asset signals** (get_features): All numerical features for one asset
+   - ML predictions, technical indicators, computed features
+   - Goes into MarketEvent.signals dict
+   - Used for: entry/exit decisions, position sizing, risk management
+
+2. **Market context** (get_market_features): Market-wide data shared across all assets
+   - VIX, SPY returns, sector indices, regime indicators
+   - Goes into MarketEvent.context dict
+   - Used for: regime filtering, volatility adjustment, correlation
 
 Design Principles:
-    - Unified interface for per-asset and market-wide features
+    - Unified signals model: ML scores and indicators treated identically
+    - Point-in-time correctness - only return data available at decision time
     - Supports both precomputed (fast) and on-the-fly (flexible) patterns
-    - Point-in-time correctness - features only available at decision time
-    - Enables feature reuse between ML strategies and risk rules
-
-Usage Patterns:
-    1. **ML Strategies**: Read signals and features for trading decisions
-    2. **Risk Management**: Access technical indicators (ATR, volatility) for
-       adaptive stops and position sizing
-    3. **Context-Dependent Logic**: Market-wide features (VIX, SPY) for regime
-       filtering and multi-asset correlation
 
 Examples:
     >>> # Precomputed features (common for backtesting)
     >>> features_df = pl.read_parquet("features.parquet")
     >>> provider = PrecomputedFeatureProvider(features_df)
-    >>> atr = provider.get_features("AAPL", timestamp)['atr']
+    >>> signals = provider.get_features("AAPL", timestamp)
+    >>> # signals = {'ml_score': 0.85, 'atr_20': 2.5, 'rsi_14': 65}
     >>>
     >>> # Callable features (on-the-fly computation)
-    >>> def compute_features(asset_id, timestamp):
-    ...     # Custom computation logic
-    ...     return {'custom_indicator': value}
-    >>> provider = CallableFeatureProvider(compute_features)
+    >>> def compute_signals(asset_id, timestamp):
+    ...     # Custom computation logic (ML inference, indicators, etc.)
+    ...     return {'custom_signal': value, 'atr': atr_value}
+    >>> provider = CallableFeatureProvider(compute_signals)
     >>>
     >>> # Market-wide context
-    >>> vix = provider.get_market_features(timestamp)['vix']
+    >>> context = provider.get_market_features(timestamp)
+    >>> # context = {'vix': 18.5, 'spy_return': 0.005}
 """
 
 from abc import ABC, abstractmethod
@@ -42,13 +46,13 @@ from ml4t.backtest.core.types import AssetId
 
 
 class FeatureProvider(ABC):
-    """Abstract base for feature computation/retrieval.
+    """Abstract base for signal and context computation/retrieval.
 
-    Provides two types of features:
-    1. **Per-asset features**: Technical indicators, ML scores specific to one asset
-    2. **Market features**: Market-wide context (VIX, SPY, sector indices)
+    Provides two types of data:
+    1. **Per-asset signals**: All numerical features for one asset (ML + indicators)
+    2. **Market context**: Market-wide data shared across all assets (VIX, SPY, etc.)
 
-    Implementations must ensure point-in-time correctness - only return features
+    Implementations must ensure point-in-time correctness - only return data
     available at the requested timestamp.
     """
 
@@ -56,21 +60,27 @@ class FeatureProvider(ABC):
     def get_features(
         self, asset_id: AssetId, timestamp: datetime
     ) -> dict[str, float]:
-        """Get per-asset features at specific timestamp.
+        """Get per-asset signals at specific timestamp.
+
+        This includes ALL per-asset numerical features: ML predictions,
+        technical indicators, computed features, etc. The user's strategy
+        code decides how to use them (entry, exit, sizing, risk management).
 
         Args:
             asset_id: Asset identifier (e.g., "AAPL", "BTC-USD")
             timestamp: Point in time for feature retrieval
 
         Returns:
-            Dictionary of feature name → value pairs
-            Empty dict if no features available
+            Dictionary of signal name → value pairs
+            Empty dict if no signals available
 
         Examples:
-            >>> features = provider.get_features("AAPL", timestamp)
-            >>> atr = features.get('atr', 0.0)
-            >>> rsi = features.get('rsi', 50.0)
-            >>> ml_score = features.get('ml_score', 0.0)
+            >>> signals = provider.get_features("AAPL", timestamp)
+            >>> # All numerical features in one dict:
+            >>> atr = signals.get('atr_20', 0.0)
+            >>> rsi = signals.get('rsi_14', 50.0)
+            >>> ml_score = signals.get('ml_score', 0.0)
+            >>> momentum = signals.get('momentum_20', 0.0)
 
         Note:
             Must respect point-in-time correctness - only return features

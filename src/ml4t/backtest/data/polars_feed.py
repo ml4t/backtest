@@ -3,9 +3,9 @@
 This module implements PolarsDataFeed, a high-performance data feed that:
 - Uses lazy loading for memory efficiency (<2GB for 250 symbols × 1 year)
 - Merges multiple data sources (prices, signals, features)
-- Integrates with FeatureProvider for indicators and context data
+- Integrates with FeatureProvider for market context data
 - Uses group_by optimization for 10-50x faster iteration vs row-by-row
-- Populates all three MarketEvent dicts: signals, indicators, context
+- Populates MarketEvent dicts: signals (per-asset), context (market-wide)
 """
 
 from datetime import datetime
@@ -30,14 +30,14 @@ class PolarsDataFeed(DataFeed):
     This implementation addresses limitations of ParquetDataFeed:
     - Lazy loading: Defers DataFrame collection for memory efficiency
     - Multi-source: Merges price, signals, and features from separate files
-    - FeatureProvider integration: Populates indicators/context dicts
+    - FeatureProvider integration: Populates market context dict
     - group_by optimization: 10-50x faster than row-by-row iteration
 
     Architecture:
         1. Constructor: Load lazy frames for each source (price, signals)
         2. Initialization: Merge sources and group by timestamp
         3. Iteration: Process events timestamp by timestamp (group_by)
-        4. Event creation: Call FeatureProvider for indicators/context
+        4. Event creation: Call FeatureProvider for market context
 
     Memory target: <2GB for 250 symbols × 1 year × daily bars
 
@@ -46,11 +46,11 @@ class PolarsDataFeed(DataFeed):
         >>> from ml4t.backtest.data.polars_feed import PolarsDataFeed
         >>> from ml4t.backtest.data.feature_provider import PrecomputedFeatureProvider
         >>>
-        >>> # Setup feature provider
-        >>> features_df = pl.DataFrame({...})
-        >>> feature_provider = PrecomputedFeatureProvider(features_df)
+        >>> # Setup feature provider for market context
+        >>> context_df = pl.DataFrame({...})
+        >>> feature_provider = PrecomputedFeatureProvider(context_df)
         >>>
-        >>> # Create feed with price + signals + features
+        >>> # Create feed with price + signals + context
         >>> feed = PolarsDataFeed(
         ...     price_path=Path("prices.parquet"),
         ...     asset_id="AAPL",
@@ -64,7 +64,6 @@ class PolarsDataFeed(DataFeed):
         ...     if event:
         ...         print(f"{event.timestamp}: {event.asset_id}")
         ...         print(f"  Signals: {event.signals}")
-        ...         print(f"  Indicators: {event.indicators}")
         ...         print(f"  Context: {event.context}")
     """
 
@@ -241,18 +240,17 @@ class PolarsDataFeed(DataFeed):
         return event
 
     def _create_market_event(self, row: dict[str, Any]) -> MarketEvent:
-        """Create a MarketEvent with all three data dicts populated.
+        """Create a MarketEvent with signals and context populated.
 
         This method populates:
-        1. signals: ML predictions from signal columns
-        2. indicators: Per-asset features from FeatureProvider
-        3. context: Market-wide data from FeatureProvider
+        1. signals: Per-asset numerical features (ML predictions, indicators, etc.)
+        2. context: Market-wide data from FeatureProvider
 
         Args:
             row: Dictionary of column values for this row
 
         Returns:
-            MarketEvent with all dicts populated
+            MarketEvent with signals and context populated
         """
         # Extract timestamp
         timestamp = row[self.timestamp_column]
@@ -260,16 +258,17 @@ class PolarsDataFeed(DataFeed):
             # Handle Polars datetime conversion
             timestamp = datetime.fromisoformat(str(timestamp))
 
-        # 1. Extract signals from signal columns
+        # 1. Extract signals from signal columns in the data file
         signals = self._extract_signals(row)
 
-        # 2. Get per-asset indicators from FeatureProvider
-        indicators = {}
+        # 2. Merge in additional per-asset features from FeatureProvider
+        # These could be indicators computed on-the-fly or from a separate features file
         if self.feature_provider:
-            indicators = self.feature_provider.get_features(
+            additional_signals = self.feature_provider.get_features(
                 asset_id=self.asset_id,
                 timestamp=timestamp,
             )
+            signals.update(additional_signals)
 
         # 3. Get market-wide context from FeatureProvider
         # NOTE: This is called once per event, but FeatureProvider should
@@ -279,7 +278,7 @@ class PolarsDataFeed(DataFeed):
         if self.feature_provider:
             context = self.feature_provider.get_market_features(timestamp=timestamp)
 
-        # Create MarketEvent with all three dicts
+        # Create MarketEvent with signals and context
         return MarketEvent(
             timestamp=timestamp,
             asset_id=self.asset_id,
@@ -298,10 +297,9 @@ class PolarsDataFeed(DataFeed):
             ask_price=row.get("ask"),
             bid_size=row.get("bid_size"),
             ask_size=row.get("ask_size"),
-            # Three-tier data model
-            signals=signals,      # ML predictions for strategy decisions
-            indicators=indicators,  # Per-asset features for risk management
-            context=context,      # Market-wide data for regime filtering
+            # Two-tier data model
+            signals=signals,  # Per-asset numerical features (ML + indicators)
+            context=context,  # Market-wide data for regime filtering
         )
 
     def _extract_signals(self, row: dict[str, Any]) -> dict[str, float]:

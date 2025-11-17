@@ -242,23 +242,23 @@ def test_scenario_names_are_correct(ml_data_scenario):
 # ============================================================================
 
 
-def test_can_use_with_parquet_datafeed(ml_signal_data):
-    """Test that fixture data works with ParquetDataFeed."""
+def test_can_use_with_polars_datafeed(ml_signal_data):
+    """Test that fixture data works with PolarsDataFeed."""
     from ml4t.backtest import BacktestEngine, Strategy
-    from ml4t.backtest.data.feed import ParquetDataFeed
+    from ml4t.backtest.data import PolarsDataFeed
 
     data_path, _ = ml_signal_data
 
     # Create data feed with signal columns
-    feed = ParquetDataFeed(
-        path=data_path,
+    feed = PolarsDataFeed(
+        price_path=data_path,
         asset_id="TEST",
         timestamp_column="timestamp",
         signal_columns=["prediction", "confidence"],
+        validate_signal_timing=False,
     )
 
     # Verify feed works by running a simple backtest
-    # (ParquetDataFeed requires an engine to iterate)
     class TestStrategy(Strategy):
         def __init__(self):
             super().__init__()
@@ -290,7 +290,7 @@ def test_can_use_with_parquet_datafeed(ml_signal_data):
 def test_can_create_backtest_engine(bull_market_data):
     """Test that fixture data works with BacktestEngine."""
     from ml4t.backtest import BacktestEngine, Strategy
-    from ml4t.backtest.data.feed import ParquetDataFeed
+    from ml4t.backtest.data import PolarsDataFeed
 
     data_path, context = bull_market_data
 
@@ -300,11 +300,12 @@ def test_can_create_backtest_engine(bull_market_data):
             pass
 
     # Create data feed
-    feed = ParquetDataFeed(
-        path=data_path,
+    feed = PolarsDataFeed(
+        price_path=data_path,
         asset_id="TEST",
         timestamp_column="timestamp",
         signal_columns=["prediction", "confidence"],
+        validate_signal_timing=False,
     )
 
     # Create engine (should not raise)
@@ -330,7 +331,7 @@ def test_example_ml_strategy_usage(ml_signal_data):
     in strategy testing.
     """
     from ml4t.backtest import BacktestEngine, Strategy
-    from ml4t.backtest.data.feed import ParquetDataFeed
+    from ml4t.backtest.data import PolarsDataFeed
 
     # Unpack fixture
     data_path, df = ml_signal_data
@@ -354,11 +355,12 @@ def test_example_ml_strategy_usage(ml_signal_data):
                 self.entries += 1
 
     # Create data feed
-    feed = ParquetDataFeed(
-        path=data_path,
+    feed = PolarsDataFeed(
+        price_path=data_path,
         asset_id="TEST",
         timestamp_column="timestamp",
         signal_columns=["prediction", "confidence"],
+        validate_signal_timing=False,
     )
 
     # Create and run backtest

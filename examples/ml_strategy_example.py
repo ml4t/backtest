@@ -15,7 +15,7 @@ import numpy as np
 import polars as pl
 
 from ml4t.backtest import BacktestEngine, Strategy
-from ml4t.backtest.data.feed import ParquetDataFeed
+from ml4t.backtest.data import PolarsDataFeed
 
 # Configure logging
 logging.basicConfig(
@@ -300,11 +300,12 @@ def main():
     data_path, context_data = create_ml_data_with_context()
 
     # Create data feed with signal columns
-    data_feed = ParquetDataFeed(
-        path=data_path,
+    data_feed = PolarsDataFeed(
+        price_path=data_path,
         asset_id="SPY",
         timestamp_column="timestamp",
         signal_columns=["prediction", "confidence"],  # Extract these as signals
+        validate_signal_timing=False,
     )
 
     # Create ML strategy

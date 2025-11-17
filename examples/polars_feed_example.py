@@ -3,7 +3,7 @@
 This example demonstrates the full capabilities of PolarsDataFeed:
 1. Multi-source data merging (prices + signals + features)
 2. Signal timing validation to prevent look-ahead bias
-3. Strategy using all three data tiers (signals, indicators, context)
+3. Strategy using signals (ML + indicators) and context
 4. Performance comparison with ParquetDataFeed
 """
 
@@ -101,13 +101,15 @@ def create_sample_data(output_dir: Path):
 
 
 class MLSignalStrategy(Strategy):
-    """Strategy that uses ML signals with risk management and regime filtering.
+    """Strategy that uses ML signals with technical indicators for risk management.
 
     Decision logic:
     1. ML signal > 0.7 with high confidence → consider buy
     2. RSI < 70 → not overbought (risk check)
-    3. VIX < 25 → low market stress (regime filter)
+    3. VIX < 25 → low market stress (regime filter from context)
     4. Use ATR for position sizing (volatility adjustment)
+
+    Note: All per-asset data (ML + indicators) now in event.signals dict
     """
 
     def __init__(self):
@@ -127,19 +129,19 @@ class MLSignalStrategy(Strategy):
         pass  # We use on_market_event instead
 
     def on_market_event(self, event, context=None):
-        """Process market data with ML signals, indicators, and context.
+        """Process market data with ML signals and technical indicators.
 
         Args:
-            event: MarketEvent with signals (ML) and indicators (features)
+            event: MarketEvent with signals (ML predictions + technical indicators)
             context: Market-wide data (VIX, SPY, regime)
         """
-        # Extract ML signal
+        # Extract ML signals
         ml_signal = event.signals.get('ml_signal', 0.0)
         confidence = event.signals.get('confidence', 0.0)
 
-        # Extract risk indicators
-        rsi = event.indicators.get('rsi_14', 50.0)
-        atr = event.indicators.get('atr_14', 1.0)
+        # Extract technical indicators (also in signals dict now)
+        rsi = event.signals.get('rsi_14', 50.0)
+        atr = event.signals.get('atr_14', 1.0)
 
         # Extract market context
         vix = context.get('VIX', 0.0) if context else 0.0

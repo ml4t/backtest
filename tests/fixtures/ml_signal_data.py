@@ -307,6 +307,8 @@ def ml_signal_data(tmp_path: Path) -> tuple[Path, pl.DataFrame]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             "open": ohlcv["open"],
             "high": ohlcv["high"],
             "low": ohlcv["low"],
@@ -408,6 +410,7 @@ def bull_market_data(tmp_path: Path) -> tuple[Path, dict[datetime, dict]]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             **ohlcv,
             "prediction": predictions,
             "confidence": confidences,
@@ -466,6 +469,7 @@ def bear_market_data(tmp_path: Path) -> tuple[Path, dict[datetime, dict]]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             **ohlcv,
             "prediction": predictions,
             "confidence": confidences,
@@ -524,6 +528,7 @@ def high_volatility_data(tmp_path: Path) -> tuple[Path, dict[datetime, dict]]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             **ohlcv,
             "prediction": predictions,
             "confidence": confidences,
@@ -582,6 +587,7 @@ def low_volatility_data(tmp_path: Path) -> tuple[Path, dict[datetime, dict]]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             **ohlcv,
             "prediction": predictions,
             "confidence": confidences,
@@ -641,6 +647,7 @@ def trending_market_data(tmp_path: Path) -> tuple[Path, dict[datetime, dict]]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             **ohlcv,
             "prediction": predictions,
             "confidence": confidences,
@@ -700,6 +707,7 @@ def mean_reverting_data(tmp_path: Path) -> tuple[Path, dict[datetime, dict]]:
     df = pl.DataFrame(
         {
             "timestamp": timestamps,
+            "asset_id": ["TEST"] * n_days,  # Required by PolarsDataFeed
             **ohlcv,
             "prediction": predictions,
             "confidence": confidences,

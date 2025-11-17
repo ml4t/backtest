@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 from ml4t_backtest import BacktestEngine
 
-from ml4t.backtest.data.feed import ParquetDataFeed
+from ml4t.backtest.data import PolarsDataFeed
 from ml4t.backtest.strategy.base import Strategy
 
 # Configure logging
@@ -131,7 +131,12 @@ def main():
     data_path = create_sample_data()
 
     # Create data feed
-    data_feed = ParquetDataFeed(path=data_path, asset_id="SPY", timestamp_column="timestamp")
+    data_feed = PolarsDataFeed(
+        price_path=data_path,
+        asset_id="SPY",
+        timestamp_column="timestamp",
+        validate_signal_timing=False,
+    )
 
     # Create strategy
     strategy = BuyAndHoldStrategy(asset_id="SPY", position_size=0.95)

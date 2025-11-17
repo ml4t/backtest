@@ -45,24 +45,20 @@ class Event(ABC):
 class MarketEvent(Event):
     """Market data event (trade, quote, or bar).
 
-    This event carries three types of auxiliary data beyond OHLCV prices:
+    This event carries two types of auxiliary data beyond OHLCV prices:
 
-    1. **signals**: ML model predictions and scores for trading decisions
-       - Examples: 'ml_score', 'predicted_return', 'confidence', 'ml_exit_signal'
-       - Use case: Strategy reads these to make buy/sell decisions
-       - Populated by: ML model inference (precomputed or real-time)
+    1. **signals**: Per-asset numerical features (ML predictions, technical indicators, etc.)
+       - Examples: 'ml_score', 'rsi_14', 'atr_20', 'momentum_20', 'predicted_return'
+       - Use case: All per-asset data for trading decisions and risk management
+       - Populated by: ML model inference, feature engineering pipeline, or precomputed features
+       - Note: Signals are just numbers - user code decides if they're for entry, exit, or sizing
 
-    2. **indicators**: Per-asset technical indicators and features
-       - Examples: 'atr', 'rsi', 'volatility', 'volume_sma', 'beta'
-       - Use case: Risk management rules (volatility-scaled stops, regime detection)
-       - Populated by: FeatureProvider or precomputed feature pipeline
-
-    3. **context**: Market-wide context and regime data
+    2. **context**: Market-wide context and regime data (same for all assets at timestamp)
        - Examples: 'vix', 'spy_return', 'market_regime', 'sector_performance'
        - Use case: Context-dependent strategy logic (VIX filtering, sector rotation)
-       - Populated by: FeatureProvider.get_market_features()
+       - Populated by: Market data providers or precomputed market features
 
-    All three dictionaries are optional and default to empty dicts for backward compatibility.
+    Both dictionaries are optional and default to empty dicts for backward compatibility.
 
     Attributes:
         timestamp: Event timestamp
@@ -79,8 +75,7 @@ class MarketEvent(Event):
         low: Low price (for BAR events)
         close: Close price (for BAR events)
         volume: Volume (for BAR events)
-        signals: ML predictions and trading signals
-        indicators: Per-asset technical indicators and features
+        signals: Per-asset numerical features (ML predictions, indicators, etc.)
         context: Market-wide context and regime data
         metadata: Additional event metadata
 
@@ -90,8 +85,8 @@ class MarketEvent(Event):
         >>> if ml_score > 0.7:
         ...     strategy.buy(event.asset_id)
         >>>
-        >>> # Risk management usage
-        >>> atr = event.indicators.get('atr', 0.0)
+        >>> # Risk management using technical indicators
+        >>> atr = event.signals.get('atr_20', 0.0)
         >>> stop_loss = entry_price - 2.0 * atr  # Volatility-scaled stop
         >>>
         >>> # Context-dependent logic
@@ -118,7 +113,6 @@ class MarketEvent(Event):
         close: Price | None = None,
         volume: Volume | None = None,
         signals: dict[str, float] | None = None,
-        indicators: dict[str, float] | None = None,
         context: dict[str, float] | None = None,
         metadata: dict[str, Any] | None = None,
     ):
@@ -137,7 +131,6 @@ class MarketEvent(Event):
         self.close = close
         self.volume = volume
         self.signals = signals or {}
-        self.indicators = indicators or {}
         self.context = context or {}
 
 

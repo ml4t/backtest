@@ -53,10 +53,10 @@ results = engine.run()
 **Features:**
 - ✅ Lazy loading (memory efficient)
 - ✅ Multi-source merging (prices + signals + features)
-- ✅ FeatureProvider integration (indicators + context)
+- ✅ FeatureProvider integration (market context)
 - ✅ Signal timing validation (prevent look-ahead bias)
 - ✅ 10-50x faster iteration (group_by optimization)
-- ✅ Comprehensive data dicts (signals, indicators, context)
+- ✅ Unified signals model (ML + indicators in one dict)
 
 **Example:**
 ```python
@@ -201,19 +201,17 @@ feed = PolarsDataFeed(
 ```python
 class MyStrategy(Strategy):
     def on_market_event(self, event, context=None):
-        # ML signals for decision making
+        # ML signals and indicators (unified in signals dict)
         ml_score = event.signals.get('ml_pred', 0.0)
         confidence = event.signals.get('confidence', 0.0)
-
-        # Per-asset indicators for risk management
-        rsi = event.indicators.get('rsi_14', 50.0)
-        atr = event.indicators.get('atr_14', 1.0)
+        rsi = event.signals.get('rsi_14', 50.0)
+        atr = event.signals.get('atr_14', 1.0)
 
         # Market-wide context for regime filtering
         vix = context.get('VIX', 0.0) if context else 0.0
         regime = context.get('market_regime', 'neutral') if context else 'neutral'
 
-        # Trading logic with all three data sources
+        # Trading logic using signals and context
         if ml_score > 0.7 and vix < 20 and rsi < 70:
             self.buy_percent(event.asset_id, 0.10, event.close)
 ```

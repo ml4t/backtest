@@ -109,8 +109,7 @@ class TestSimpleModeExecution:
             low=149.0,
             close=151.0,
             volume=1000000,
-            signals={"ml_score": 0.85},
-            indicators={"sma_10": 150.5, "sma_50": 148.2},
+            signals={"ml_score": 0.85, "sma_10": 150.5, "sma_50": 148.2},
             context={"VIX": 18.5},
         )
 
@@ -158,7 +157,7 @@ class TestSimpleModeExecution:
         received_event = simple_strategy.events_received[0]
         assert received_event.close == 151.0
         assert received_event.signals.get("ml_score") == 0.85
-        assert received_event.indicators.get("sma_10") == 150.5
+        assert received_event.signals.get("sma_10") == 150.5
 
     def test_simple_mode_works_without_context(self, simple_strategy, market_event):
         """Test that simple mode works when context is None."""
@@ -190,7 +189,7 @@ class TestBatchModeExecution:
                 low=149.0,
                 close=151.0,
                 volume=1000000,
-                indicators={"momentum": 0.05},
+                signals={"momentum": 0.05},
             ),
             MarketEvent(
                 timestamp=timestamp,
@@ -201,7 +200,7 @@ class TestBatchModeExecution:
                 low=2790.0,
                 close=2810.0,
                 volume=500000,
-                indicators={"momentum": 0.08},
+                signals={"momentum": 0.08},
             ),
             MarketEvent(
                 timestamp=timestamp,
@@ -212,7 +211,7 @@ class TestBatchModeExecution:
                 low=378.0,
                 close=383.0,
                 volume=800000,
-                indicators={"momentum": 0.03},
+                signals={"momentum": 0.03},
             ),
         ]
 
@@ -245,8 +244,8 @@ class TestBatchModeExecution:
 
         received_batch = batch_strategy.batches_received[0]
 
-        # Rank by momentum
-        scores = {e.asset_id: e.indicators.get("momentum", 0) for e in received_batch}
+        # Rank by momentum (now in signals dict)
+        scores = {e.asset_id: e.signals.get("momentum", 0) for e in received_batch}
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
         assert ranked[0][0] == "GOOGL"  # Highest momentum (0.08)
