@@ -147,7 +147,51 @@ def test_2_1_percentage_commission():
             pytest.skip("Commission discrepancy under investigation - systematic validation in progress")
     elif len(results) == 1:
         print(f"\n⚠️  Only 1 engine ran successfully")
-        print(f"Result: {list(results.values())[0]}")
+        result = list(results.values())[0]
+        print(f"Result: {result}")
+
+        # Validate commission calculations for single engine
+        print("\n5️⃣  Single Engine Commission Validation:")
+        if 'entry_commission' in result.trades.columns and 'exit_commission' in result.trades.columns:
+            entry_commission = result.trades['entry_commission'].sum()
+            exit_commission = result.trades['exit_commission'].sum()
+            total_commission = entry_commission + exit_commission
+
+            print(f"   Entry commission: ${entry_commission:,.2f}")
+            print(f"   Exit commission: ${exit_commission:,.2f}")
+            print(f"   Total commission: ${total_commission:,.2f}")
+            print(f"   As % of initial cash: {total_commission / config.initial_cash * 100:.3f}%")
+
+            # Verify commission > 0
+            assert total_commission > 0, "Total commission should be > 0"
+            print("   ✅ Total commission > 0")
+
+            # Verify commission is reasonable (should be ~0.2% per round trip × num_trades)
+            # With 20 trades and 0.1% each way, expect roughly 0.2% × 20 = 4% of trading volume
+            # But actual will be less due to compounding losses
+            min_expected_commission = result.num_trades * 100  # At least $100 per round trip
+            assert total_commission > min_expected_commission, \
+                f"Commission ${total_commission:.2f} seems too low for {result.num_trades} trades"
+            print(f"   ✅ Commission ${total_commission:,.2f} is reasonable for {result.num_trades} trades")
+
+            # Verify exit commissions are exactly 0.1% (exit_quantity is accurate)
+            # Note: Entry commissions may differ from naive calculation due to commission
+            # being deducted from cash before fill, affecting actual filled quantity
+            print("\n   Verifying exit commission accuracy (0.1% of exit notional):")
+            for idx, trade in result.trades.head(3).iterrows():
+                exit_notional = trade.exit_price * trade.exit_quantity
+                expected_exit_comm = exit_notional * config.fees
+
+                # Exit commissions should be exact (within rounding tolerance)
+                assert abs(trade.exit_commission - expected_exit_comm) < 0.01, \
+                    f"Trade {idx} exit commission mismatch: expected ${expected_exit_comm:.2f}, got ${trade.exit_commission:.2f}"
+
+                exit_pct = trade.exit_commission / exit_notional * 100
+                print(f"   ✅ Trade {idx}: Exit ${trade.exit_commission:.2f} ({exit_pct:.3f}% of ${exit_notional:,.2f})")
+
+            print("\n   ✅ All commission validations passed")
+        else:
+            pytest.fail("Commission columns not found in trades DataFrame")
     else:
         pytest.fail("No engines ran successfully")
 

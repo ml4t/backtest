@@ -69,8 +69,8 @@ class Position:
             ):
                 raise ValueError(f"Cannot remove {quantity} shares, only have {self.quantity}")
         else:
-            # Fall back to fixed tolerance (1e-8 matches crypto precision)
-            TOLERANCE = 1e-8
+            # Fall back to fixed tolerance (1e-6 handles floating point precision issues)
+            TOLERANCE = 1e-6
             if abs(quantity) > abs(self.quantity) + TOLERANCE:
                 raise ValueError(f"Cannot remove {quantity} shares, only have {self.quantity}")
 

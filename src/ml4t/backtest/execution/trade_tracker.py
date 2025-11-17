@@ -85,6 +85,7 @@ class OpenPosition:
     entry_order_id: str
     direction: str
     entry_bar_idx: int
+    entry_metadata: dict[str, Any] = field(default_factory=dict)  # Capture entry signals/reasons
 
 
 class TradeTracker:
@@ -215,6 +216,7 @@ class TradeTracker:
             entry_order_id=str(fill_event.order_id),
             direction="long" if fill_event.side == OrderSide.BUY else "short",
             entry_bar_idx=self._current_bar_idx,
+            entry_metadata=fill_event.metadata.copy() if fill_event.metadata else {},
         )
 
         self._open_positions[asset_id].append(position)
@@ -268,6 +270,12 @@ class TradeTracker:
             proportional_entry_commission = self.precision_manager.round_cash(proportional_entry_commission)
             proportional_entry_slippage = self.precision_manager.round_cash(proportional_entry_slippage)
 
+        # Combine entry and exit metadata
+        trade_metadata = {
+            "entry": position.entry_metadata,
+            "exit": exit_fill.metadata.copy() if exit_fill.metadata else {},
+        }
+
         # Create trade record
         trade = TradeRecord(
             trade_id=self._next_trade_id,
@@ -288,6 +296,7 @@ class TradeTracker:
             return_pct=return_pct,
             duration_bars=duration_bars,
             direction=position.direction,
+            metadata=trade_metadata,
         )
 
         self._next_trade_id += 1

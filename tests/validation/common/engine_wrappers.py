@@ -16,6 +16,8 @@ class BacktestConfig:
     order_type: str = 'market'  # 'market', 'limit', 'stop'
     limit_offset: float = 0.02  # Offset from market price for limit orders (default 2%)
     size: Optional[float] = None  # None = use all cash (size=np.inf in VBT)
+    close_final_position: bool = False  # Auto-close open positions at backtest end (default: False)
+    execution_delay_days: int = 0  # Execute signals N days later (0=same-day, 1=next-day like Zipline)
 
 
 @dataclass
@@ -28,6 +30,8 @@ class BacktestResult:
     total_pnl: float
     num_trades: int
     engine_name: str
+    returns: pd.Series | None = None  # Daily returns (percentage)
+    equity_curve: pd.Series | None = None  # Portfolio value over time
 
 
 class EngineWrapper(ABC):
@@ -78,6 +82,20 @@ class BacktestWrapper(EngineWrapper):
         if config is None:
             config = BacktestConfig()
 
+        # Apply execution delay if configured (e.g., to match Zipline's next-day fills)
+        if config.execution_delay_days > 0:
+            # Shift signals forward by N days to execute later
+            entries = entries.shift(config.execution_delay_days, fill_value=False)
+            if exits is not None:
+                exits = exits.shift(config.execution_delay_days, fill_value=False)
+
+        # CRITICAL FIX: Align signals with OHLCV index
+        # Problem: signals DataFrame may have different index than ohlcv
+        # When using iloc[bar_idx], we need signals aligned by position with ohlcv rows
+        # Solution: Reindex signals to match ohlcv index exactly
+        entries_aligned = entries.reindex(ohlcv.index, fill_value=False)
+        exits_aligned = exits.reindex(ohlcv.index, fill_value=False) if exits is not None else None
+
         # Create asset
         from ml4t.backtest.core.assets import AssetClass
         asset_spec = AssetSpec(
@@ -107,16 +125,20 @@ class BacktestWrapper(EngineWrapper):
                 self.event_bus = event_bus
 
             def on_event(self, event):
-                """Route events to appropriate handlers."""
+                """Handle non-market events only.
+
+                CRITICAL: Do NOT call on_market_event for MarketEvents here!
+                BacktestEngine calls BOTH on_market_event AND on_event for MarketEvents (engine.py:214-218)
+                If we call on_market_event here, it gets called TWICE per event, causing misalignment.
+                """
                 from ml4t.backtest.core.event import FillEvent
 
-                if isinstance(event, MarketEvent):
-                    self.on_market_event(event)
-                elif isinstance(event, FillEvent):
+                if isinstance(event, FillEvent):
                     # Let base class update internal position tracking
                     super().on_fill_event(event)
+                # Do nothing for MarketEvents - handled by on_market_event() directly
 
-            def on_market_event(self, event: MarketEvent):
+            def on_market_event(self, event: MarketEvent, context: dict = None):
                 from ml4t.backtest.core.event import OrderEvent
                 from ml4t.backtest.core.types import OrderSide, OrderType
 
@@ -314,16 +336,25 @@ class BacktestWrapper(EngineWrapper):
 
         # Create broker with commission/slippage models
         from ml4t.backtest.execution.broker import SimulationBroker
+
+        # Configure execution timing based on execution_delay_days
+        # execution_delay=False: execution_delay_days=0 → Fill at SAME bar's close (Backtrader COC compat)
+        # execution_delay=True: execution_delay_days>0 → Fill at NEXT bar's open (realistic)
+        # Mapping: execution_delay_days=0 means "no delay" = same-bar fills
+        execution_delay_days = getattr(config, 'execution_delay_days', 1)  # Default to 1 (next-bar) for backward compat
+        execution_delay = execution_delay_days > 0
+
         broker = SimulationBroker(
             initial_cash=config.initial_cash,
             asset_registry=registry,
             commission_model=commission_model,
             slippage_model=slippage_model,
-            execution_delay=False,  # Disable for VectorBT comparison (VectorBT fills same-bar)
+            execution_delay=execution_delay,
         )
 
         # Create strategy and data feed
-        strategy = SignalStrategy(entries, exits, precision_mgr)
+        # Use ALIGNED signals (reindexed to match ohlcv)
+        strategy = SignalStrategy(entries_aligned, exits_aligned, precision_mgr)
         data_feed = SimpleDataFeed(ohlcv)
 
         # Run backtest
@@ -341,8 +372,10 @@ class BacktestWrapper(EngineWrapper):
         # trade_tracker.get_trades_df() returns entry/exit paired trades
         trades = engine.broker.trade_tracker.get_trades_df()
 
-        # Also get open positions as trades (for comparison with VectorBT which includes open positions)
-        if engine.broker.trade_tracker.get_open_position_count() > 0:
+        # Optionally convert open positions to trade records
+        # By default (close_final_position=False), we do NOT auto-close positions
+        # because the framework should not make trading decisions
+        if config.close_final_position and engine.broker.trade_tracker.get_open_position_count() > 0:
             # Get final timestamp and price
             final_timestamp = ohlcv.index[-1]
             final_price = ohlcv['close'].iloc[-1]

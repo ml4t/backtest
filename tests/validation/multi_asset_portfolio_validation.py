@@ -180,7 +180,7 @@ def momentum_ranking_strategy(
     return signals, entries, exits
 
 
-def run_multi_asset_ml4t.backtest(
+def run_multi_asset_qengine(
     data: pd.DataFrame,
     signals: pd.DataFrame,
     entries: pd.DataFrame,
@@ -589,7 +589,7 @@ def main():
     # 2. Run ml4t.backtest
     print("\n2. Running ml4t.backtest...")
     try:
-        ml4t.backtest_result = run_multi_asset_ml4t.backtest(
+        qengine_result = run_multi_asset_qengine(
             data,
             signals,
             entries,
@@ -597,11 +597,11 @@ def main():
             tickers,
             initial_capital,
         )
-        results.append(ml4t.backtest_result)
+        results.append(qengine_result)
         print(
-            f"   ✓ Final: ${ml4t.backtest_result['final_value']:,.2f} | "
-            f"Return: {ml4t.backtest_result['total_return']:.2f}% | "
-            f"Trades: {ml4t.backtest_result['num_trades']}",
+            f"   ✓ Final: ${qengine_result['final_value']:,.2f} | "
+            f"Return: {qengine_result['total_return']:.2f}% | "
+            f"Trades: {qengine_result['num_trades']}",
         )
     except Exception as e:
         print(f"   ✗ Error: {e}")

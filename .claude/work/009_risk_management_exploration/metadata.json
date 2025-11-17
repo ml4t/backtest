@@ -1,0 +1,153 @@
+{
+  "name": "009_integrated_ml_risk",
+  "original_name": "009_risk_management_exploration",
+  "date": "2025-11-17",
+  "counter": "09",
+  "created_at": "2025-11-17T03:22:00Z",
+  "updated_at": "2025-11-17T08:00:00Z",
+  "integration_date": "2025-11-17T07:38:00Z",
+  "requirement_type": "integrated_architecture",
+  "requirement_sources": [
+    ".claude/reference/risk_management.md",
+    ".claude/work/009_risk_management_exploration/ML_DATA_ARCHITECTURE_PROPOSAL.md"
+  ],
+  "phase": "planning_complete",
+  "status": "ready_for_implementation",
+  "description": "Integrated implementation of ML-first data architecture and comprehensive risk management for ml4t.backtest event-driven backtesting engine. Merged from separate implementations after discovering critical dependency: Risk Management requires ML Data Architecture foundation.",
+  "exploration_completed_at": "2025-11-17T03:22:00Z",
+  "planning_completed_at": "2025-11-17T08:00:00Z",
+  "integration_analysis_completed_at": "2025-11-17T07:38:00Z",
+  "deliverables": {
+    "exploration": {
+      "exploration.md": "1,608 lines - Complete architectural analysis (Risk Management)",
+      "README.md": "314 lines - Quick start guide",
+      "summary.md": "129 lines - Executive summary",
+      "INDEX.md": "318 lines - Cross-referenced index"
+    },
+    "planning": {
+      "state.json": "50 integrated tasks (reduced from 93 separate)",
+      "INTEGRATED_IMPLEMENTATION_PLAN.md": "Comprehensive 10-week plan with merged ML Data + Risk architecture",
+      "implementation-plan.md": "Original 7-week Risk Management plan (superseded)",
+      "ML_DATA_ARCHITECTURE_PROPOSAL.md": "11,000 words - ML Data Architecture detailed design",
+      "ML_DATA_ARCHITECTURE_TASKS.md": "27 tasks - Original ML Data plan (merged into state.json)",
+      "MERGE_ANALYSIS.md": "Integration analysis showing 46% task reduction",
+      "PHASE_0_COMPLETION_SUMMARY.md": "External review results and validation"
+    }
+  },
+  "metrics": {
+    "integrated": {
+      "total_tasks": 50,
+      "total_hours": 420,
+      "total_weeks": 10,
+      "phases": 4,
+      "task_reduction_pct": 46,
+      "timeline_reduction_pct": 35,
+      "effort_reduction_pct": 30
+    },
+    "comparison": {
+      "separate_implementation": {
+        "ml_data_tasks": 27,
+        "ml_data_hours": 320,
+        "ml_data_weeks": 8,
+        "risk_management_tasks": 66,
+        "risk_management_hours": 280,
+        "risk_management_weeks": 7.5,
+        "total_tasks": 93,
+        "total_hours": 600,
+        "total_weeks": 15.5
+      },
+      "integrated_implementation": {
+        "total_tasks": 50,
+        "total_hours": 420,
+        "total_weeks": 10
+      },
+      "savings": {
+        "tasks_eliminated": 43,
+        "hours_saved": 180,
+        "weeks_saved": 5.5
+      }
+    },
+    "phase_breakdown": {
+      "phase_1_ml_data_foundation": {
+        "tasks": 15,
+        "hours": 110,
+        "weeks": 3,
+        "priority": "critical"
+      },
+      "phase_2_risk_management_core": {
+        "tasks": 10,
+        "hours": 85,
+        "weeks": 2,
+        "priority": "high"
+      },
+      "phase_3_advanced_features": {
+        "tasks": 15,
+        "hours": 120,
+        "weeks": 3,
+        "priority": "medium",
+        "parallel_execution": true,
+        "batches": {
+          "batch_A_trade_recording": 5,
+          "batch_B_advanced_risk_rules": 7,
+          "batch_C_enhanced_slippage": 3
+        }
+      },
+      "phase_4_integration_docs": {
+        "tasks": 10,
+        "hours": 105,
+        "weeks": 2,
+        "priority": "varies"
+      }
+    },
+    "estimated_code_lines": 2500,
+    "estimated_test_count": 500
+  },
+  "integration_summary": {
+    "critical_dependency": "Risk Management requires ML Data Architecture foundation (RiskContext needs enhanced MarketEvent with indicators/context dicts)",
+    "rationale": "Implementing separately would require rework. ML Data provides foundation Risk Management requires. Integration eliminates 46% duplication.",
+    "shared_infrastructure": [
+      "Enhanced MarketEvent (signals, indicators, context)",
+      "FeatureProvider (unified interface for ML + Risk)",
+      "Configuration system (YAML/JSON)",
+      "PolarsDataFeed (lazy loading, validation)",
+      "Performance optimizations (caching, lazy evaluation)"
+    ],
+    "benefits": [
+      "46% task reduction (50 vs 93)",
+      "35% timeline reduction (10 weeks vs 15.5 weeks)",
+      "30% effort reduction (420 hours vs 600 hours)",
+      "Better integration (designed together, not retrofitted)",
+      "Simplified maintenance (single codebase)"
+    ]
+  },
+  "performance_targets": {
+    "throughput": "10-30k events/sec with ML strategy + risk rules",
+    "memory": "<2GB for 250 symbols × 1 year",
+    "backtest_time": "2-5 minutes for typical workload",
+    "overhead": {
+      "data_layer": "<5%",
+      "risk_layer": "<3%",
+      "total": "<8%"
+    }
+  },
+  "quality_gates": {
+    "phase_1": "Event generation >100k events/sec, memory <2GB, no look-ahead bias, 80%+ coverage",
+    "phase_2": "RiskManager overhead <3%, all 3 hooks working, backward compatible, 80%+ coverage",
+    "phase_3": "All advanced features implemented, overhead <5%, all tracks integrated",
+    "phase_4": "Examples executable, cross-framework <0.5% variance, 80%+ overall coverage, release ready"
+  },
+  "next_steps": [
+    "Run `/workflow:next` to begin TASK-INT-001 (Enhanced MarketEvent)",
+    "Create feature branch: feature/integrated-ml-risk",
+    "Set up CI for integrated system",
+    "Begin Phase 1: ML Data Foundation (critical path)"
+  ],
+  "notes": {
+    "name_change": "Changed from '009_risk_management_exploration' to '009_integrated_ml_risk' to reflect broader scope covering both ML Data Architecture and Risk Management",
+    "superseded_plans": [
+      "implementation-plan.md (Risk Management only)",
+      "ML_DATA_ARCHITECTURE_TASKS.md (ML Data only)"
+    ],
+    "current_plan": "INTEGRATED_IMPLEMENTATION_PLAN.md and state.json represent merged, integrated approach"
+  }
+}

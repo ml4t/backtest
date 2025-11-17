@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from .base import BaseFrameworkAdapter, Signal, TradeRecord, ValidationResult
+from .base import BaseFrameworkAdapter, FrameworkConfig, Signal, TradeRecord, ValidationResult
 
 
 class BacktraderAdapter(BaseFrameworkAdapter):
@@ -167,9 +167,11 @@ class BacktraderAdapter(BaseFrameworkAdapter):
             cerebro.broker.setcash(initial_capital)
             cerebro.broker.setcommission(commission=0.0)  # No commission for comparison
 
-            # CRITICAL: Enable cheat-on-close to execute at close of current bar (not next bar open)
-            # This matches ml4t.backtest/VectorBT behavior which execute on same bar as signal
-            cerebro.broker.set_coc(True)
+            # CRITICAL: Disable cheat-on-close to execute at NEXT bar's OPEN (not signal bar's close)
+            # COC=True would fill at signal bar's close (look-ahead bias)
+            # COC=False fills at next bar's open (industry standard for daily data)
+            # Source: backtrader/brokers/bbroker.py:895-903
+            cerebro.broker.set_coc(False)
 
             # Run backtest
             strategies = cerebro.run()
@@ -248,24 +250,33 @@ class BacktraderAdapter(BaseFrameworkAdapter):
     def run_with_signals(
         self,
         data: pd.DataFrame,
-        signals: list[Signal],
-        initial_capital: float = 10000,
+        signals: pd.DataFrame,
+        config: FrameworkConfig | None = None,
     ) -> ValidationResult:
         """
         Run backtest with pre-computed signals (pure execution validation).
 
         Args:
             data: OHLCV data with DatetimeIndex
-            signals: Pre-computed trading signals
-            initial_capital: Starting capital
+            signals: DataFrame with 'entry' and 'exit' boolean columns
+            config: FrameworkConfig for execution parameters (costs, timing, etc.).
+                   If None, uses FrameworkConfig.realistic() defaults.
 
         Returns:
             ValidationResult with performance metrics
         """
+        # Use default config if not provided
+        if config is None:
+            config = FrameworkConfig.realistic()
+
+        # Validate inputs
+        self.validate_data(data)
+        self.validate_signals(signals, data)
+
         result = ValidationResult(
             framework=self.framework_name,
             strategy="SignalBased",
-            initial_capital=initial_capital,
+            initial_capital=config.initial_capital,
         )
 
         try:
@@ -274,13 +285,24 @@ class BacktraderAdapter(BaseFrameworkAdapter):
             tracemalloc.start()
             start_time = time.time()
 
-            # Convert signals to date-indexed dict for quick lookup
+            # Apply execution delay if configured (e.g., to match Zipline's next-day fills)
+            if config.fill_timing in ["next_open", "next_close"]:
+                # Shift signals forward by 1 day to execute later
+                signals = signals.shift(1, fill_value=False)
+
+            # Convert boolean signals to date-indexed dict for quick lookup
             signal_dict = {}
-            for signal in signals:
-                date = signal["timestamp"].date()
-                if date not in signal_dict:
-                    signal_dict[date] = []
-                signal_dict[date].append(signal)
+            for timestamp, row in signals.iterrows():
+                date = timestamp.date()
+                if row["entry"]:
+                    if date not in signal_dict:
+                        signal_dict[date] = []
+                    signal_dict[date].append({"action": "BUY"})
+                if row["exit"]:
+                    if date not in signal_dict:
+                        signal_dict[date] = []
+                    signal_dict[date].append({"action": "SELL"})
+
 
             class SignalStrategy(bt.Strategy):
                 """Strategy that trades on pre-computed signals."""
@@ -289,13 +311,21 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                     self.signal_dict = signal_dict
                     self.trade_log = []
                     self.order = None
+                    self.portfolio_values = []  # Track portfolio value over time
 
                 def next(self):
+                    # Track portfolio value at each bar for daily returns calculation
+                    current_date = self.data.datetime.date(0)
+                    portfolio_value = self.broker.getvalue()
+                    self.portfolio_values.append({
+                        "date": current_date,
+                        "value": portfolio_value,
+                    })
+
                     # Skip if we have a pending order
                     if self.order:
                         return
 
-                    current_date = self.data.datetime.date(0)
                     current_price = self.data.close[0]
 
                     # Check if we have signals for today
@@ -304,16 +334,18 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                             action = signal["action"]
 
                             if action == "BUY" and not self.position:
-                                # Enter long position
+                                # Enter long position using target value (not fixed size)
+                                # With COC=True, order fills at SAME bar's close (same price used for sizing)
+                                # Minimal buffer needed for commission/slippage
                                 cash = self.broker.getcash()
-                                size = cash / current_price
+                                target_value = cash * 0.998  # 0.2% buffer for commission + slippage
 
-                                self.order = self.buy(size=size)
+                                self.order = self.order_target_value(target=target_value)
                                 self.trade_log.append({
                                     "date": current_date,
                                     "action": "BUY_SIGNAL",
                                     "price": current_price,
-                                    "size": size,
+                                    "target_value": target_value,
                                 })
 
                             elif action == "SELL" and self.position:
@@ -339,6 +371,15 @@ class BacktraderAdapter(BaseFrameworkAdapter):
                             "value": order.executed.value,
                             "commission": order.executed.comm,
                         })
+                    elif order.status in [order.Margin, order.Rejected]:
+                        # Log rejected orders to understand why Backtrader skips signals
+                        self.trade_log.append({
+                            "date": self.data.datetime.date(0),
+                            "action": f"ORDER_REJECTED_{order.Margin if order.status == order.Margin else 'OTHER'}",
+                            "reason": "Insufficient cash/margin",
+                            "cash": self.broker.getcash(),
+                            "value": self.broker.getvalue(),
+                        })
 
                     if not order.alive():
                         self.order = None
@@ -348,11 +389,13 @@ class BacktraderAdapter(BaseFrameworkAdapter):
             cerebro.addstrategy(SignalStrategy)
 
             # Prepare data for Backtrader
-            bt_data = data.copy().reset_index()
+            bt_data = data.copy()
+            # Ensure index is named 'date' for Backtrader compatibility
+            bt_data.index.name = 'date'
+            bt_data = bt_data.reset_index()
 
-            # Backtrader expects the datetime column to be named appropriately
-            # After reset_index(), the column name depends on the original index name
-            datetime_col = bt_data.columns[0]  # First column is the datetime after reset_index
+            # Backtrader expects the datetime column
+            datetime_col = 'date'
 
             # Create Backtrader data feed
             data_feed = bt.feeds.PandasData(
@@ -367,12 +410,30 @@ class BacktraderAdapter(BaseFrameworkAdapter):
             )
             cerebro.adddata(data_feed)
 
-            # Set broker parameters (no commission for signal validation)
-            cerebro.broker.setcash(initial_capital)
-            cerebro.broker.setcommission(commission=0.0)
+            # Set broker parameters from config
+            cerebro.broker.setcash(config.initial_capital)
+            cerebro.broker.setcommission(commission=config.commission_pct)
 
-            # Enable cheat-on-close to match other frameworks
-            cerebro.broker.set_coc(True)
+            # Configure slippage
+            # Note: Backtrader slip_perc expects percentage as decimal (0.01 = 1%)
+            # Our config.slippage_pct is also decimal (0.0005 = 0.05%)
+            if config.slippage_pct > 0 or config.slippage_fixed > 0:
+                cerebro.broker.set_slippage_perc(
+                    perc=config.slippage_pct,
+                    slip_open=True,   # Apply slippage to opening fills
+                    slip_limit=True,  # Limit slippage to bar high/low
+                )
+
+            # Configure execution timing based on config
+            # COO (Cheat-On-Open): Execute at bar open
+            # COC (Cheat-On-Close): Execute at bar close
+            if config.backtrader_coo:
+                cerebro.broker.set_coo(True)
+            if config.backtrader_coc:
+                cerebro.broker.set_coc(True)
+
+            # Default behavior (coo=False, coc=False): Execute at next bar open
+            # This is realistic and avoids look-ahead bias
 
             # Run backtest
             strategies = cerebro.run()
@@ -380,14 +441,39 @@ class BacktraderAdapter(BaseFrameworkAdapter):
 
             # Extract results
             result.final_value = cerebro.broker.getvalue()
-            result.total_return = (result.final_value / initial_capital - 1) * 100
+            result.total_return = (result.final_value / config.initial_capital - 1) * 100
 
-            # Process trade log
+            # Process trade log to create trade records
             executed_trades = [
                 log for log in strategy_instance.trade_log if log["action"].endswith("_EXECUTED")
             ]
 
+            result.trades = []
+            for trade_info in executed_trades:
+                trade_record = TradeRecord(
+                    timestamp=pd.to_datetime(trade_info["date"]),
+                    action=trade_info["action"].replace("_EXECUTED", ""),
+                    quantity=abs(trade_info["size"]),
+                    price=trade_info["price"],
+                    value=abs(trade_info["value"]),
+                    commission=trade_info.get("commission", 0.0),
+                )
+                result.trades.append(trade_record)
+
             result.num_trades = len(executed_trades) // 2
+
+            # Extract equity curve and daily returns
+            if strategy_instance.portfolio_values:
+                # Convert portfolio values to DataFrame
+                equity_df = pd.DataFrame(strategy_instance.portfolio_values)
+                equity_df["date"] = pd.to_datetime(equity_df["date"])
+                equity_df = equity_df.set_index("date")
+
+                # Create equity curve (portfolio value over time)
+                result.equity_curve = equity_df["value"]
+
+                # Calculate daily returns from portfolio values
+                result.daily_returns = result.equity_curve.pct_change().fillna(0.0)
 
             # Performance tracking
             current, peak = tracemalloc.get_traced_memory()
@@ -395,11 +481,21 @@ class BacktraderAdapter(BaseFrameworkAdapter):
             result.execution_time = time.time() - start_time
             result.memory_usage = peak / 1024 / 1024
 
+            num_entry_signals = signals["entry"].sum()
+            num_exit_signals = signals["exit"].sum()
+
+            # Count rejections
+            rejected_orders = [log for log in strategy_instance.trade_log if "REJECTED" in log.get("action", "")]
+            num_signals_generated = len([log for log in strategy_instance.trade_log if log["action"].endswith("_SIGNAL")])
+
             print("✓ Backtrader signal-based backtest completed")
-            print(f"  Signals Processed: {len(signals)}")
+            print(f"  Entry Signals: {num_entry_signals}, Exit Signals: {num_exit_signals}")
             print(f"  Final Value: ${result.final_value:,.2f}")
             print(f"  Total Return: {result.total_return:.2f}%")
             print(f"  Total Trades: {result.num_trades}")
+            if rejected_orders:
+                print(f"  ⚠️  Rejected Orders: {len(rejected_orders)} (insufficient cash/margin)")
+                print(f"  Signal Generation: {num_signals_generated} signals → {len(executed_trades)} executions")
 
         except ImportError as e:
             error_msg = f"Backtrader not available: {e}"

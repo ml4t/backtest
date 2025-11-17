@@ -608,19 +608,36 @@ class SimulationBroker(Broker):
         fills = []
         asset_id = event.asset_id
 
-        # Determine execution price
-        if event.close is not None:
-            price = event.close
+        # FIX #1: Move pending orders to open FIRST (at START of event)
+        # This allows orders placed on day T to fill on day T+1 (next bar), not T+2
+        # Industry standard for daily data: signal T → fill T+1
+        if self.execution_delay and asset_id in self._pending_orders:
+            for order, _ in self._pending_orders[asset_id]:
+                if order.order_type == OrderType.BRACKET:
+                    # Bracket orders start as regular orders and create legs after fill
+                    self._open_orders[asset_id].append(order)
+                else:
+                    self._open_orders[asset_id].append(order)
+            # Clear pending orders after moving them
+            self._pending_orders[asset_id].clear()
+
+        # FIX #2: Determine execution price - use OPEN for realistic daily backtesting
+        # When execution_delay=True (next-bar fills), fill at next bar's OPEN (not CLOSE!)
+        # This is the industry standard: you see day T's data, place order end-of-day,
+        # order fills at day T+1's open (first available price)
+        if self.execution_delay and event.open is not None:
+            price = event.open  # Use next bar's open (realistic for daily data)
+        elif event.close is not None:
+            price = event.close  # Fallback to close (legacy behavior or intraday)
         elif event.price is not None:
-            price = event.price
+            price = event.price  # Fallback to generic price
         else:
             return fills  # No price available
 
         # Update last known price
         self._last_prices[asset_id] = price
 
-        # Process existing open orders FIRST (before moving pending orders)
-        # This ensures pending orders wait for the next event
+        # Process open orders (includes orders that were just moved from pending)
         # IMPORTANT: Skip bracket exit orders here - they're handled with priority logic below
         for order in list(self._open_orders[asset_id]):
             if not order.is_active:
@@ -634,6 +651,11 @@ class SimulationBroker(Broker):
             if order.metadata.get("bracket_type") in ["take_profit", "stop_loss", "trailing_stop"]:
                 continue
 
+            # For next-bar fills (execution_delay=True), pass OPEN as close parameter
+            # Fill simulator prefers 'close' over 'market_price', so we need to pass
+            # the correct price (open) as the 'close' parameter for proper fill pricing
+            fill_close = event.open if self.execution_delay else event.close
+
             fill_result = self.fill_simulator.try_fill_order(
                 order,
                 market_price=price,
@@ -642,7 +664,7 @@ class SimulationBroker(Broker):
                 timestamp=event.timestamp,
                 high=event.high,
                 low=event.low,
-                close=event.close,
+                close=fill_close,  # Use open for next-bar fills, close for same-bar
             )
             if fill_result:
                 # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
@@ -865,6 +887,11 @@ class SimulationBroker(Broker):
             # (FillSimulator._calculate_fill_price handles TRAILING_STOP specially)
             order.metadata["original_type"] = "TRAILING_STOP"
 
+            # For next-bar fills (execution_delay=True), pass OPEN as close parameter
+            # Fill simulator prefers 'close' over 'market_price', so we need to pass
+            # the correct price (open) as the 'close' parameter for proper fill pricing
+            fill_close = event.open if self.execution_delay else event.close
+
             fill_result = self.fill_simulator.try_fill_order(
                 order,
                 market_price=price,
@@ -873,7 +900,7 @@ class SimulationBroker(Broker):
                 timestamp=event.timestamp,
                 high=event.high,
                 low=event.low,
-                close=event.close,
+                close=fill_close,  # Use open for next-bar fills, close for same-bar
             )
             if fill_result:
                 # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
@@ -1002,19 +1029,6 @@ class SimulationBroker(Broker):
                         self._stop_orders[asset_id].append(winning_order)
                     elif bracket_type == "trailing_stop":
                         self._trailing_stops[asset_id].append(winning_order)
-
-        # CRITICAL FIX: Move pending orders to open AFTER processing current orders
-        # This ensures orders cannot be filled on the same event that triggered them
-        if self.execution_delay and asset_id in self._pending_orders:
-            # Move pending orders to open orders for NEXT event's processing
-            for order, _ in self._pending_orders[asset_id]:
-                if order.order_type == OrderType.BRACKET:
-                    # Bracket orders start as regular orders and create legs after fill
-                    self._open_orders[asset_id].append(order)
-                else:
-                    self._open_orders[asset_id].append(order)
-            # Clear pending orders after moving them
-            self._pending_orders[asset_id].clear()
 
         # Publish fill events to the event bus (if available)
         if hasattr(self, "event_bus") and self.event_bus:

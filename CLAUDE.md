@@ -80,8 +80,72 @@ When modifying execution logic:
 4. Check against VectorBT reference results
 5. Verify fill prices are within OHLC bounds
 
+## 🚨 CRITICAL: Framework Source Code Availability
+
+**ALL BENCHMARK FRAMEWORKS HAVE COMPLETE SOURCE CODE LOCALLY AVAILABLE**
+
+**Locations**:
+- ✅ **Zipline-reloaded**: `resources/zipline-reloaded-main/src/zipline/`
+- ✅ **Backtrader**: `resources/backtrader-master/backtrader/`
+- ✅ **VectorBT OSS**: `resources/vectorbt/vectorbt/`
+- ✅ **VectorBT Pro**: `resources/vectorbt.pro-main/vectorbtpro/`
+
+### Zero Tolerance Policy for "I Don't Know"
+
+**NEVER ACCEPTABLE**:
+- ❌ "Unclear how VectorBT executes fills"
+- ❌ "Need to research Backtrader's order logic"
+- ❌ "Not sure why Zipline produces different results"
+
+**ALWAYS REQUIRED**:
+1. Read the actual source code (`Read resources/framework/relevant_file.py`)
+2. Cite specific files and line numbers
+3. Explain the exact implementation difference with code evidence
+4. Document findings in validation report
+
+### Investigation Protocol (Mandatory)
+
+When frameworks produce different results:
+
+```bash
+# 1. Search for relevant code
+grep -rn "fill.*price\|execution" resources/vectorbt/vectorbt/portfolio/
+grep -rn "fill.*price\|execution" resources/backtrader-master/backtrader/brokers/
+
+# 2. Read the implementation
+Read resources/vectorbt/vectorbt/portfolio/base.py
+Read resources/backtrader-master/backtrader/brokers/bbroker.py
+
+# 3. Compare and cite specific lines
+# Example: "VectorBT fills at close (base.py:3245),
+#           Backtrader fills at next open (bbroker.py:467)"
+
+# 4. Use Serena for semantic search (if available)
+mcp__serena__find_symbol("from_signals", "resources/vectorbt/")
+```
+
+**This is not optional. This is mandatory for all validation work.**
+
+### Key Framework Files
+
+**VectorBT OSS/Pro**:
+- Portfolio API: `portfolio/base.py` (from_signals, from_orders, from_holding)
+- Numba execution: `portfolio/nb/from_signals.py` (vectorized fill logic)
+- Orders: `portfolio/orders.py` (order types, execution)
+
+**Backtrader**:
+- Broker: `brokers/bbroker.py` (order execution, COO/COC, fills)
+- Orders: `order.py` (order types, status)
+- Cerebro: `cerebro.py` (engine orchestration)
+
+**Zipline**:
+- Execution: `finance/execution.py` (order placement, fills)
+- Commission: `finance/commission.py` (PerShare, PerTrade, PerDollar)
+- Slippage: `finance/slippage.py` (FixedSlippage, VolumeShareSlippage)
+
 ## References
 
 - Event-driven architecture patterns
 - VectorBT Pro fill model documentation
 - Position tracking best practices
+- Framework source code in `resources/` (see above)

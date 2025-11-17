@@ -1,0 +1,262 @@
+{
+  "project": {
+    "name": "Comprehensive Cross-Framework Validation & Performance Testing",
+    "description": "Validate ml4t.backtest execution against Backtrader, VectorBT, and Zipline using pre-computed signals at scale (1-1000 assets)",
+    "created_at": "2025-11-16T12:30:00Z",
+    "updated_at": "2025-11-16T15:30:00Z",
+    "scope": "Prove correctness and performance at production scale with complete transparency"
+  },
+  "status": "in_progress",
+  "current_phase": "phase_1_foundation",
+  "validation_protocol": {
+    "source_code_access": "complete",
+    "investigation_required": "mandatory",
+    "acceptable_uncertainty": "zero",
+    "evidence_standard": "file paths and line numbers required"
+  },
+  "phases": {
+    "phase_1_foundation_memory": {
+      "status": "completed",
+      "description": "Clone VectorBT OSS, establish source code investigation protocol",
+      "estimated_hours": 2,
+      "actual_hours": 1.5,
+      "completed_at": "2025-11-16T15:30:00Z",
+      "deliverables": [
+        "resources/vectorbt/ (VectorBT OSS cloned)",
+        "CLAUDE.md updated (framework source code availability section)",
+        ".claude/memory/framework_source_code_protocol.md (investigation protocol)",
+        ".claude/memory/framework_execution_models.md (source code analysis)",
+        ".claude/memory/framework_comparison_matrix.md (quick reference)"
+      ],
+      "key_outcomes": [
+        "All 4 framework source codes available locally",
+        "Zero-tolerance policy for 'I don't know' established",
+        "Investigation protocol documented and in memory",
+        "Framework comparison matrix created"
+      ]
+    },
+    "phase_1_signal_generation_previous": {
+      "status": "completed",
+      "description": "Single-asset signal validation (BTC)",
+      "deliverables": [
+        "tests/validation/signals/generate.py (306 lines)",
+        "tests/validation/signals/test_generate.py (128 lines)",
+        "tests/validation/signals/btc_sma_crossover_daily.pkl (119 KB, 2,367 days)"
+      ],
+      "results": {
+        "variance": "0.197%",
+        "status": "PASSED"
+      }
+    },
+    "phase_2_adapter_updates_previous": {
+      "status": "completed",
+      "description": "Framework adapters with run_with_signals()",
+      "deliverables": [
+        "tests/validation/frameworks/base.py (validate_data, validate_signals methods)",
+        "tests/validation/frameworks/qengine_adapter.py (run_with_signals)",
+        "tests/validation/frameworks/backtrader_adapter.py (run_with_signals, margin fix)",
+        "tests/validation/frameworks/vectorbt_adapter.py (run_with_signals)",
+        "tests/validation/test_signal_adapter.py (163 lines, 3 adapter tests)"
+      ]
+    },
+    "phase_3_validation_previous": {
+      "status": "completed",
+      "description": "Single-asset 3-way validation",
+      "results": {
+        "ml4t.backtest": "$65,109.18 (551.09%, 60 trades)",
+        "Backtrader": "$64,981.09 (549.81%, 62 trades)",
+        "VectorBT": "$64,981.14 (549.81%, 63 trades)",
+        "variance": "0.197%",
+        "tolerance": "0.5%",
+        "status": "PASSED"
+      }
+    },
+    "phase_4_documentation_previous": {
+      "status": "completed",
+      "deliverables": [
+        "tests/validation/SIGNAL_BASED_VALIDATION.md (architecture, 372 lines)",
+        "tests/validation/VALIDATION_RESULTS.md (results report, 311 lines)"
+      ]
+    },
+    "phase_5_baseline_multi_asset": {
+      "status": "completed",
+      "description": "30-asset baseline test",
+      "results": {
+        "assets": 30,
+        "ml4t.backtest": "$95,481.01 (-4.52%, 4,960 trades, 0.433s)",
+        "VectorBT": "$95,481.01 (-4.52%, 4,960 trades, 7.244s)",
+        "variance": "0.000%",
+        "performance": "ml4t.backtest 16.7x faster",
+        "throughput": "11,455 trades/sec, 87,150 events/sec"
+      }
+    },
+    "phase_2_enhanced_adapters": {
+      "status": "completed",
+      "description": "Add full configuration support to adapters",
+      "estimated_hours": 3,
+      "actual_hours": 2,
+      "completed_at": "2025-11-16T16:00:00Z",
+      "tasks": [
+        "Create unified FrameworkConfig schema",
+        "Update all adapters with configuration parameters",
+        "Add COO/COC, accumulate, fill timing controls",
+        "Create configuration presets (backtrader_compatible, etc.)",
+        "Test configuration alignment"
+      ],
+      "deliverables": [
+        "tests/validation/frameworks/base.py (FrameworkConfig with 3 presets: realistic, backtrader_compatible, vectorbt_compatible)",
+        "tests/validation/frameworks/backtrader_adapter.py (COO/COC, commission, slippage configuration)",
+        "tests/validation/frameworks/vectorbt_adapter.py (fill_timing, accumulate, fees, slippage configuration)",
+        "tests/validation/frameworks/qengine_adapter.py (BacktestConfig mapping from FrameworkConfig)",
+        "tests/validation/test_framework_config.py (12 tests, all passing)"
+      ],
+      "key_outcomes": [
+        "Unified configuration schema enables exact framework behavior replication",
+        "Look-ahead bias warnings for unsafe configurations (same_close, COO/COC)",
+        "All 3 adapters accept FrameworkConfig with realistic defaults",
+        "Configuration presets allow users to match Backtrader or VectorBT behavior",
+        "12/12 tests passing (config validation, presets, adapter signatures)"
+      ]
+    },
+    "phase_3_large_scale_signals": {
+      "status": "pending",
+      "description": "Generate 10, 50, 100, 1000-stock signal datasets",
+      "estimated_hours": 4,
+      "tasks": [
+        "Generate 10-stock signals (SP500 top 10)",
+        "Generate 50-stock signals (SP500 top 50)",
+        "Generate 100-stock signals (SP500 top 100)",
+        "Generate 1000-stock signals (Russell 1000 filtered)",
+        "Create random signals for stress testing",
+        "Generate minute-frequency signals (NASDAQ 100)"
+      ]
+    },
+    "phase_4_correctness_validation": {
+      "status": "pending",
+      "description": "Validate correctness at scale (10-1000 assets)",
+      "estimated_hours": 6,
+      "tasks": [
+        "Run validation on 10 stocks",
+        "Run validation on 50 stocks",
+        "Run validation on 100 stocks",
+        "Run validation on 1000 stocks",
+        "Investigate all discrepancies via source code",
+        "Document legitimate differences vs bugs",
+        "Create edge case tests"
+      ]
+    },
+    "phase_5_performance_benchmarking": {
+      "status": "pending",
+      "description": "Comprehensive performance analysis",
+      "estimated_hours": 5,
+      "tasks": [
+        "Add memory profiling infrastructure",
+        "Add CPU timing breakdown",
+        "Run benchmarks: 1, 10, 50, 100, 500, 1000 assets",
+        "Generate scalability curves",
+        "Compare frameworks (speed, memory, throughput)",
+        "Create performance report with charts"
+      ]
+    },
+    "phase_6_minute_data_testing": {
+      "status": "pending",
+      "description": "High-frequency data validation",
+      "estimated_hours": 3,
+      "tasks": [
+        "Locate NASDAQ 100 minute data",
+        "Generate minute-frequency signals",
+        "Run 1-week backtest (195,000 events)",
+        "Stress test with random signals",
+        "Document performance at minute frequency"
+      ]
+    },
+    "phase_7_configuration_mimicry": {
+      "status": "pending",
+      "description": "Allow users to replicate any framework's behavior",
+      "estimated_hours": 2,
+      "tasks": [
+        "Create framework-specific presets",
+        "Document configuration cookbook",
+        "Write migration guide (Backtrader → ml4t.backtest, etc.)",
+        "Test preset equivalence"
+      ]
+    },
+    "phase_8_reporting": {
+      "status": "pending",
+      "description": "Comprehensive validation and performance reports",
+      "estimated_hours": 4,
+      "tasks": [
+        "Create VALIDATION_FINAL_REPORT.md",
+        "Create PERFORMANCE_BENCHMARKS.md",
+        "Create FRAMEWORK_MIGRATION_GUIDE.md",
+        "Generate scalability charts",
+        "Document all source code findings"
+      ]
+    },
+    "phase_9_optimization": {
+      "status": "pending",
+      "description": "Profile and optimize based on benchmarks",
+      "estimated_hours": "ongoing",
+      "tasks": [
+        "Identify bottlenecks from profiling",
+        "Optimize hot paths",
+        "Add caching where appropriate",
+        "Document performance improvements"
+      ]
+    }
+  },
+  "current_next_steps": {
+    "immediate": "Phase 3: Large-scale signal generation",
+    "tasks": [
+      "Generate 10-stock signal dataset (SP500 top 10 by market cap)",
+      "Generate 50-stock signal dataset (SP500 top 50)",
+      "Generate 100-stock signal dataset (SP500 top 100)",
+      "Generate 1000-stock signal dataset (Russell 1000 filtered by $365 day volume)",
+      "Create random signal generator for stress testing",
+      "Generate minute-frequency signals (NASDAQ 100)"
+    ]
+  },
+  "resources": {
+    "framework_source_code": {
+      "zipline": "resources/zipline-reloaded-main/",
+      "backtrader": "resources/backtrader-master/",
+      "vectorbt_oss": "resources/vectorbt/",
+      "vectorbt_pro": "resources/vectorbt.pro-main/"
+    },
+    "memory_files": {
+      "protocol": ".claude/memory/framework_source_code_protocol.md",
+      "execution_models": ".claude/memory/framework_execution_models.md",
+      "comparison_matrix": ".claude/memory/framework_comparison_matrix.md"
+    }
+  },
+  "metrics": {
+    "completed_phases": 7,
+    "pending_phases": 6,
+    "total_estimated_hours": 29,
+    "hours_completed": 3.5,
+    "validation_variance_single_asset": "0.197%",
+    "validation_variance_multi_asset_30": "0.000%",
+    "performance_advantage_30_assets": "16.7x faster than VectorBT",
+    "configuration_tests_passing": "12/12"
+  },
+  "success_criteria": {
+    "correctness": [
+      "ml4t.backtest matches Backtrader within 0.1% (all scales)",
+      "ml4t.backtest matches VectorBT within 0.1% (all scales)",
+      "All discrepancies explained with source code evidence",
+      "Edge cases handled correctly"
+    ],
+    "performance": [
+      "Benchmarks complete for 1-1000 assets",
+      "Scalability curves generated",
+      "Performance characterized vs competitors",
+      "Recommendations documented"
+    ],
+    "transparency": [
+      "All implementation differences documented",
+      "Source code citations for all discrepancies",
+      "Performance characteristics clearly communicated",
+      "Users can replicate any framework's behavior"
+    ]
+  }
+}

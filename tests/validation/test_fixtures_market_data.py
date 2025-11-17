@@ -12,7 +12,7 @@ import polars as pl
 import pandas as pd
 from tempfile import TemporaryDirectory
 
-from fixtures.market_data import (
+from tests.validation.fixtures.market_data import (
     load_wiki_prices,
     get_ticker_data,
     prepare_zipline_bundle_data,

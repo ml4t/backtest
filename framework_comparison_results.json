@@ -1,0 +1,34 @@
+{
+  "ml4t": {
+    "framework": "ml4t.backtest",
+    "final_value": 786916.7524440516,
+    "total_return": -21.308324755594843,
+    "total_pnl": -213083.24755594844,
+    "total_commission": 12955.959999999995,
+    "num_positions": 28,
+    "sharpe_ratio": -0.02538764491550893,
+    "max_drawdown": 163.72201035179563,
+    "execution_time": 44.01181697845459
+  },
+  "vectorbt": {
+    "framework": "VectorBT Pro",
+    "error": "Portfolio.from_order_func() missing 1 required positional argument: 'order_func_nb'"
+  },
+  "zipline": {
+    "framework": "Zipline",
+    "error": "Requires custom data bundle setup",
+    "note": "Zipline needs a data bundle to be registered and ingested first"
+  },
+  "backtrader": {
+    "framework": "Backtrader (20 tickers)",
+    "final_value": 2266518.0041816407,
+    "total_return": 126.65180041816409,
+    "total_pnl": 1266518.0041816407,
+    "total_commission": 0,
+    "num_positions": 0,
+    "sharpe_ratio": null,
+    "max_drawdown": null,
+    "execution_time": 3.293055772781372,
+    "note": "Limited to 20 tickers for performance"
+  }
+}

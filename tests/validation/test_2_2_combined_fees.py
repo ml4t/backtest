@@ -117,10 +117,14 @@ def test_2_2_combined_fees():
         traceback.print_exc()
 
     # 5. Validation
-    print_validation_report(results, test_name="Test 2.2: Combined Fees (0.1% + $2)")
+    if len(results) >= 2:
+        success = print_validation_report(
+            results,
+            test_name="Test 2.2: Combined Fees (0.1% + $2)",
+            show_first_trades=5,
+        )
 
-    # 6. Assertions
-    if len(results) == 2:
+        # 6. Dual-engine validation
         qe = results['ml4t.backtest']
         vbt_result = results['VectorBT']
 
@@ -136,8 +140,65 @@ def test_2_2_combined_fees():
         print("\n" + "=" * 80)
         print("✅ TEST 2.2 PASSED: Combined fees validated successfully")
         print("=" * 80)
+    elif len(results) == 1:
+        # Single-engine validation (when VectorBT not available)
+        print_validation_report(
+            results,
+            test_name="Test 2.2: Combined Fees (0.1% + $2)",
+            show_first_trades=5,
+        )
+
+        result = list(results.values())[0]
+        print(f"\n⚠️  Only 1 engine ran successfully")
+        print(f"Result: {result}")
+
+        # Validate combined fee calculations for single engine
+        print("\n5️⃣  Combined Fee Validation:")
+        if 'entry_commission' in result.trades.columns and 'exit_commission' in result.trades.columns:
+            entry_commission = result.trades['entry_commission'].sum()
+            exit_commission = result.trades['exit_commission'].sum()
+            total_commission = entry_commission + exit_commission
+
+            print(f"   Entry commission: ${entry_commission:,.2f}")
+            print(f"   Exit commission: ${exit_commission:,.2f}")
+            print(f"   Total commission: ${total_commission:,.2f}")
+            print(f"   As % of initial cash: {total_commission / config.initial_cash * 100:.3f}%")
+
+            # Verify commission > 0
+            assert total_commission > 0, "Total commission should be > 0"
+            print("   ✅ Total commission > 0")
+
+            # Verify commission is reasonable (should be more than test 2.1 due to fixed fees)
+            # Expected: (0.1% × notional) + $2 per trade
+            # With 20 trades × 2 (entry+exit) = 40 fills
+            # Fixed fees = 40 × $2 = $80
+            # Plus percentage fees (~$3,910 from test_2.1)
+            # Total ≈ $3,990
+            min_expected_commission = 40 * 2.0  # At least $80 from fixed fees alone
+            assert total_commission > min_expected_commission, \
+                f"Commission ${total_commission:.2f} seems too low for {result.num_trades} trades with $2 fixed fee"
+            print(f"   ✅ Commission ${total_commission:,.2f} is reasonable for {result.num_trades} trades with combined fees")
+
+            # Verify exit commission structure (percentage + fixed on each exit)
+            print("\n   Verifying exit commission structure (0.1% + $2):")
+            for idx, trade in result.trades.head(3).iterrows():
+                exit_notional = trade.exit_price * trade.exit_quantity
+                expected_pct_comm = exit_notional * config.fees['percentage']
+                expected_fixed_comm = config.fees['fixed']
+                expected_total_comm = expected_pct_comm + expected_fixed_comm
+
+                # Exit commissions should be exact (within rounding tolerance)
+                assert abs(trade.exit_commission - expected_total_comm) < 0.10, \
+                    f"Trade {idx} exit commission mismatch: expected ${expected_total_comm:.2f}, got ${trade.exit_commission:.2f}"
+
+                exit_pct = expected_pct_comm / exit_notional * 100
+                print(f"   ✅ Trade {idx}: Exit ${trade.exit_commission:.2f} = ${expected_pct_comm:.2f} ({exit_pct:.3f}%) + ${expected_fixed_comm:.2f} (fixed)")
+
+            print("\n   ✅ All combined fee validations passed")
+        else:
+            pytest.fail("Commission columns not found in trades DataFrame")
     else:
-        pytest.skip("Not all engines completed successfully")
+        pytest.fail("No engines ran successfully")
 
 
 if __name__ == "__main__":

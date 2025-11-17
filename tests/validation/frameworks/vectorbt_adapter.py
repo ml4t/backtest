@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from .base import BaseFrameworkAdapter, Signal, TradeRecord, ValidationResult
+from .base import BaseFrameworkAdapter, FrameworkConfig, Signal, TradeRecord, ValidationResult
 
 
 class VectorBTAdapter(BaseFrameworkAdapter):
@@ -175,34 +175,45 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             try:
                 result.equity_curve = pf.value if hasattr(pf.value, 'index') else pf.value()
                 result.daily_returns = pf.returns if hasattr(pf.returns, 'index') else pf.returns()
-            except:
-                result.equity_curve = pd.Series()
-                result.daily_returns = pd.Series()
 
-            # Extract individual trades
+                print(f"  DEBUG: equity_curve type={type(result.equity_curve)}, len={len(result.equity_curve) if hasattr(result.equity_curve, '__len__') else 'N/A'}")
+                print(f"  DEBUG: daily_returns type={type(result.daily_returns)}, len={len(result.daily_returns) if hasattr(result.daily_returns, '__len__') else 'N/A'}")
+
+                # Ensure we have actual data, not empty Series
+                if result.daily_returns is not None and len(result.daily_returns) == 0:
+                    print("  DEBUG: daily_returns is empty, setting to None")
+                    result.daily_returns = None
+                if result.equity_curve is not None and len(result.equity_curve) == 0:
+                    print("  DEBUG: equity_curve is empty, setting to None")
+                    result.equity_curve = None
+            except Exception as e:
+                print(f"  Warning: Failed to extract daily returns/equity curve from VectorBT: {e}")
+                import traceback
+                traceback.print_exc()
+                result.equity_curve = None
+                result.daily_returns = None
+
+            # Extract individual orders (not complete round-trip trades)
+            # This matches ml4t.backtest and Backtrader behavior
             result.trades = []
             try:
-                if hasattr(pf, "trades") and hasattr(pf.trades, "records_readable"):
-                    trades_df = pf.trades.records_readable
+                if hasattr(pf, "orders") and hasattr(pf.orders, "records_readable"):
+                    orders_df = pf.orders.records_readable
 
-                    for _, trade in trades_df.iterrows():
+                    for _, order in orders_df.iterrows():
                         trade_record = TradeRecord(
-                            timestamp=trade.get("Entry Timestamp", trade.get("entry_timestamp")),
-                            action="BUY" if trade.get("Size", trade.get("size", 0)) > 0 else "SELL",
-                            quantity=abs(float(trade.get("Size", trade.get("size", 0)))),
-                            price=float(
-                                trade.get("Avg Entry Price", trade.get("avg_entry_price", 0)),
-                            ),
+                            timestamp=order.get("Timestamp", order.get("timestamp")),
+                            action=str(order.get("Side", "")).upper(),  # 'BUY' or 'SELL'
+                            quantity=abs(float(order.get("Size", order.get("size", 0)))),
+                            price=float(order.get("Price", order.get("price", 0))),
                             value=abs(
-                                float(trade.get("Size", trade.get("size", 0)))
-                                * float(
-                                    trade.get("Avg Entry Price", trade.get("avg_entry_price", 0)),
-                                ),
+                                float(order.get("Size", order.get("size", 0)))
+                                * float(order.get("Price", order.get("price", 0)))
                             ),
                         )
                         result.trades.append(trade_record)
             except Exception as e:
-                print(f"Warning: Could not extract trade details: {e}")
+                print(f"Warning: Could not extract order details: {e}")
 
             # Calculate win rate from trades
             if len(result.trades) >= 2:
@@ -248,8 +259,8 @@ class VectorBTAdapter(BaseFrameworkAdapter):
     def run_with_signals(
         self,
         data: pd.DataFrame,
-        signals: list[Signal],
-        initial_capital: float = 10000,
+        signals: pd.DataFrame,
+        config: FrameworkConfig | None = None,
     ) -> ValidationResult:
         """
         Run backtest with pre-computed signals (pure execution validation).
@@ -259,16 +270,25 @@ class VectorBTAdapter(BaseFrameworkAdapter):
 
         Args:
             data: OHLCV data with DatetimeIndex
-            signals: Pre-computed trading signals
-            initial_capital: Starting capital
+            signals: DataFrame with 'entry' and 'exit' boolean columns
+            config: FrameworkConfig for execution parameters (costs, timing, etc.).
+                   If None, uses FrameworkConfig.realistic() defaults.
 
         Returns:
             ValidationResult with performance metrics
         """
+        # Use default config if not provided
+        if config is None:
+            config = FrameworkConfig.realistic()
+
+        # Validate inputs
+        self.validate_data(data)
+        self.validate_signals(signals, data)
+
         result = ValidationResult(
             framework=self.framework_name,
             strategy="SignalBased",
-            initial_capital=initial_capital,
+            initial_capital=config.initial_capital,
         )
 
         try:
@@ -277,39 +297,44 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             tracemalloc.start()
             start_time = time.time()
 
-            # Convert signal list to boolean entry/exit series
-            # Initialize with all False
-            entries = pd.Series(False, index=data.index)
-            exits = pd.Series(False, index=data.index)
-
-            # Process signals and set True at signal timestamps
-            for signal in signals:
-                timestamp = signal["timestamp"]
-                action = signal["action"]
-
-                # Find closest timestamp in data index (handles minor timing differences)
-                if timestamp in data.index:
-                    idx = timestamp
-                else:
-                    # Find nearest timestamp
-                    idx = data.index[data.index.get_indexer([timestamp], method='nearest')[0]]
-
-                if action == "BUY":
-                    entries.loc[idx] = True
-                elif action == "SELL":
-                    exits.loc[idx] = True
-
-            print(f"VectorBT signal-based: {entries.sum()} entries, {exits.sum()} exits")
-
-            # Create portfolio using from_signals
+            # Determine execution price based on fill_timing config
             close_prices = data["close"]
+            open_prices = data["open"]
+
+            # Apply execution delay if configured (e.g., to match Zipline's next-day fills)
+            if config.fill_timing in ["next_open", "next_close"]:
+                # Shift signals forward by 1 day to execute later
+                signals = signals.shift(1, fill_value=False)
+                # When signals are shifted, we DON'T shift prices
+                # Signal on T → shifted to T+1 → fill at T+1's open (no price shift needed)
+                if config.fill_timing == "next_open":
+                    fill_price = open_prices  # Use current bar's open (signal already shifted)
+                else:  # next_close
+                    fill_price = close_prices  # Use current bar's close (signal already shifted)
+            elif config.fill_timing == "same_close":
+                # Default VectorBT behavior - fill at same bar close (look-ahead bias!)
+                fill_price = close_prices
+                # No signal shift needed - execute on same bar
+            else:
+                raise ValueError(f"Unknown fill_timing: {config.fill_timing}")
+
+            # Use signals directly (already boolean Series)
+            entries = signals["entry"]
+            exits = signals["exit"]
+
+            num_entry_signals = entries.sum()
+            num_exit_signals = exits.sum()
+
+            # Create portfolio using from_signals with configuration
             pf = vbt.Portfolio.from_signals(
                 close_prices,
                 entries=entries,
                 exits=exits,
-                init_cash=initial_capital,
-                fees=0.0,  # No fees for signal validation
-                slippage=0.0,  # No slippage for signal validation
+                price=fill_price,  # Configure execution price
+                init_cash=config.initial_capital,
+                fees=config.commission_pct,  # Commission rate
+                slippage=config.slippage_pct,  # Slippage percentage
+                accumulate=config.vectorbt_accumulate,  # Allow/prevent same-bar re-entry
                 freq="D",
             )
 
@@ -363,6 +388,55 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             else:
                 result.num_trades = 0
 
+            # Extract individual orders (not complete round-trip trades)
+            # This matches ml4t.backtest and Backtrader behavior where each
+            # BUY and SELL is counted as a separate trade
+            result.trades = []
+            try:
+                if hasattr(pf, "orders") and hasattr(pf.orders, "records_readable"):
+                    orders_df = pf.orders.records_readable
+
+                    for _, order in orders_df.iterrows():
+                        trade_record = TradeRecord(
+                            timestamp=order.get("Timestamp", order.get("timestamp")),
+                            action=str(order.get("Side", "")).upper(),  # 'BUY' or 'SELL'
+                            quantity=abs(float(order.get("Size", order.get("size", 0)))),
+                            price=float(order.get("Price", order.get("price", 0))),
+                            value=abs(
+                                float(order.get("Size", order.get("size", 0)))
+                                * float(order.get("Price", order.get("price", 0)))
+                            ),
+                        )
+                        result.trades.append(trade_record)
+            except Exception as e:
+                print(f"Warning: Could not extract order details: {e}")
+
+            # Get equity curve and daily returns
+            try:
+                # Extract equity curve
+                value = pf.value
+                if callable(value):
+                    result.equity_curve = value()
+                else:
+                    result.equity_curve = value
+
+                # Extract daily returns
+                returns = pf.returns
+                if callable(returns):
+                    result.daily_returns = returns()
+                else:
+                    result.daily_returns = returns
+
+                # Ensure we have valid Series, not empty
+                if result.daily_returns is not None and hasattr(result.daily_returns, '__len__') and len(result.daily_returns) == 0:
+                    result.daily_returns = None
+                if result.equity_curve is not None and hasattr(result.equity_curve, '__len__') and len(result.equity_curve) == 0:
+                    result.equity_curve = None
+            except Exception as e:
+                print(f"  Warning: Failed to extract daily returns/equity curve: {e}")
+                result.equity_curve = None
+                result.daily_returns = None
+
             # Performance tracking
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
@@ -370,7 +444,7 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             result.memory_usage = peak / 1024 / 1024
 
             print("✓ VectorBT signal-based backtest completed")
-            print(f"  Signals Processed: {len(signals)}")
+            print(f"  Entry Signals: {num_entry_signals}, Exit Signals: {num_exit_signals}")
             print(f"  Final Value: ${result.final_value:,.2f}")
             print(f"  Total Return: {result.total_return:.2f}%")
             print(f"  Total Trades: {result.num_trades}")

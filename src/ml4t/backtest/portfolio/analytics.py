@@ -147,6 +147,60 @@ class PerformanceAnalyzer:
             "returns": [0.0, *self.daily_returns],  # Pad with 0 for first timestamp
         })
 
+    def get_returns(self, frequency: str = "daily") -> pl.DataFrame:
+        """Get returns resampled to specified frequency.
+
+        Args:
+            frequency: Frequency for resampling ("daily", "weekly", "monthly", "event")
+                - "event": Returns raw equity curve (one row per fill/update)
+                - "daily": Returns end-of-day equity and returns
+                - "weekly": Returns end-of-week equity and returns
+                - "monthly": Returns end-of-month equity and returns
+
+        Returns:
+            DataFrame with columns: date, equity, returns
+        """
+        equity_df = self.get_equity_curve()
+
+        if equity_df.is_empty():
+            return pl.DataFrame(schema={"date": pl.Date, "equity": pl.Float64, "returns": pl.Float64})
+
+        if frequency == "event":
+            # Return raw event-based equity curve
+            return equity_df.with_columns(pl.col("timestamp").cast(pl.Date).alias("date"))
+
+        # Resample to specified frequency
+        freq_map = {
+            "daily": "1d",
+            "weekly": "1w",
+            "monthly": "1mo",
+        }
+
+        if frequency not in freq_map:
+            raise ValueError(f"Invalid frequency: {frequency}. Choose from {list(freq_map.keys()) + ['event']}")
+
+        # Group by dynamic time periods and take last equity value
+        resampled = (
+            equity_df.sort("timestamp")
+            .group_by_dynamic("timestamp", every=freq_map[frequency])
+            .agg([
+                pl.col("equity").last().alias("equity"),
+                pl.col("timestamp").last().alias("last_timestamp"),
+            ])
+        )
+
+        # Calculate period returns
+        resampled = resampled.with_columns([
+            # Calculate return as (current - previous) / previous
+            ((pl.col("equity") - pl.col("equity").shift(1)) / pl.col("equity").shift(1))
+            .fill_null(0.0)
+            .alias("returns"),
+            # Convert timestamp to date
+            pl.col("timestamp").cast(pl.Date).alias("date"),
+        ])
+
+        return resampled.select(["date", "equity", "returns"])
+
     def reset(self) -> None:
         """Reset analyzer state."""
         self.high_water_mark = self.tracker.initial_cash

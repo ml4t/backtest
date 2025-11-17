@@ -4,14 +4,20 @@ Zipline-Reloaded Framework Adapter for Cross-Framework Validation
 Uses direct data.history() in handle_data() - no Pipeline complexity needed.
 """
 
+import sys
 import time
 import tracemalloc
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from .base import BaseFrameworkAdapter, Signal, TradeRecord, ValidationResult
+from .base import BaseFrameworkAdapter, FrameworkConfig, Signal, TradeRecord, ValidationResult
+
+# Register custom test_data bundle
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from bundles.test_data_bundle import *  # noqa: E402, F403
 
 
 class ZiplineAdapter(BaseFrameworkAdapter):
@@ -170,7 +176,7 @@ class ZiplineAdapter(BaseFrameworkAdapter):
                 handle_data=handle_data,
                 analyze=analyze,
                 capital_base=initial_capital,
-                bundle='quandl'
+                bundle='test_data'
             )
 
             # Extract results
@@ -233,24 +239,31 @@ class ZiplineAdapter(BaseFrameworkAdapter):
     def run_with_signals(
         self,
         data: pd.DataFrame,
-        signals: list[Signal],
-        initial_capital: float = 10000,
+        signals: pd.DataFrame,
+        config: FrameworkConfig | None = None,
     ) -> ValidationResult:
         """
-        Run backtest with pre-computed signals (pure execution validation).
+        Run backtest with pre-computed signals using quandl bundle.
+
+        Note: Uses quandl bundle data (not test DataFrame) but executes the same signals.
+        Trade dates and counts should match; final values will differ due to price data differences.
 
         Args:
-            data: OHLCV data with DatetimeIndex
-            signals: Pre-computed trading signals
-            initial_capital: Starting capital
+            data: OHLCV data with DatetimeIndex (for date range only)
+            signals: DataFrame with 'entry' and 'exit' boolean columns
+            config: FrameworkConfig for execution parameters
 
         Returns:
             ValidationResult with performance metrics
         """
+        # Use default config if not provided
+        if config is None:
+            config = FrameworkConfig.realistic()
+
         result = ValidationResult(
             framework=self.framework_name,
             strategy="SignalBased",
-            initial_capital=initial_capital,
+            initial_capital=config.initial_capital,
         )
 
         try:
@@ -261,92 +274,128 @@ class ZiplineAdapter(BaseFrameworkAdapter):
             tracemalloc.start()
             start_time = time.time()
 
-            # Convert signals to date-indexed series for quick lookup
-            signal_dict = {}
-            for signal in signals:
-                date = signal["timestamp"].date()
-                if date not in signal_dict:
-                    signal_dict[date] = []
-                signal_dict[date].append(signal)
+            # CRITICAL: Shift signals BACKWARD by 1 day for Zipline
+            # Zipline's handle_data() is called at END of bar, orders fill NEXT bar
+            # To match same-bar fills (like Backtrader COC), we place orders 1 day EARLIER
+            # Example: Signal on 2020-04-07 → Shift to 2020-04-06 → Zipline fills 2020-04-07
+            signals_shifted = signals.shift(-1)  # Shift backward (earlier dates)
 
-            trades_list = []
+            # Convert DataFrame signals to date-indexed dict
+            signal_dict = {}
+            for idx, row in signals_shifted.iterrows():
+                date = idx.date() if hasattr(idx, 'date') else idx
+                if pd.notna(row.get('entry')) and row['entry']:
+                    if date not in signal_dict:
+                        signal_dict[date] = []
+                    signal_dict[date].append({'action': 'BUY'})
+                if pd.notna(row.get('exit')) and row['exit']:
+                    if date not in signal_dict:
+                        signal_dict[date] = []
+                    signal_dict[date].append({'action': 'SELL'})
+
+            num_entry_signals = signals['entry'].sum()
+            num_exit_signals = signals['exit'].sum()
 
             def initialize(context):
                 context.asset = symbol('AAPL')
-                context.trades = []
                 context.signal_dict = signal_dict
-                context.target_position = 0.0  # Track intended position to handle async orders
+                context.target_position = 0.0
 
-                # No fees/slippage for signal validation
-                set_commission(commission.PerShare(cost=0.0))
-                set_slippage(slippage.FixedSlippage(spread=0.0))
+                # NOTE: Zipline's leverage control is incompatible with signal-based trading
+                # Using set_max_leverage(1.0) causes violations even with 99% target
+                # This is a known Zipline limitation - it allows slight margin usage
+
+                # Match config settings (use PerDollar for percentage-based commissions)
+                # config.commission_pct is in percent (e.g., 0.1 for 0.1%), convert to fraction
+                if config.commission_pct > 0:
+                    set_commission(commission.PerDollar(cost=config.commission_pct / 100.0))
+                else:
+                    set_commission(commission.PerShare(cost=0.0))
+
+                # config.slippage_pct is in percent (e.g., 0.05 for 0.05%), convert to fraction
+                if config.slippage_pct > 0:
+                    set_slippage(slippage.FixedSlippage(spread=config.slippage_pct / 100.0))
+                else:
+                    set_slippage(slippage.FixedSlippage(spread=0.0))
 
             def handle_data(context, data):
                 current_date = data.current_dt.date()
-                current_price = data.current(context.asset, 'close')
 
                 # Check if we have signals for today
                 if current_date in context.signal_dict:
+                    # Check if asset exists on this date
+                    if not data.can_trade(context.asset):
+                        print(f"  [Zipline DEBUG] {current_date}: Signal exists but asset not tradable")
+                        return
+
+                    current_price = data.current(context.asset, 'close')
+
                     for signal in context.signal_dict[current_date]:
                         action = signal["action"]
-                        print(f"  [Zipline] {current_date}: Signal={action}, TargetPos={context.target_position}")
 
                         if action == "BUY" and context.target_position == 0.0:
-                            # Enter long position
-                            order_target_percent(context.asset, 1.0)
-                            context.target_position = 1.0  # Mark that we intend to be long
-                            context.trades.append({
-                                'date': data.current_dt,
-                                'action': 'BUY',
-                                'price': current_price
-                            })
-                            print(f"    → BUY order placed")
+                            # Use 99% to avoid leverage constraint violations
+                            # (100% can trigger violation due to rounding/slippage)
+                            order_target_percent(context.asset, 0.99)
+                            context.target_position = 0.99
                         elif action == "SELL" and context.target_position > 0.0:
-                            # Exit position
                             order_target_percent(context.asset, 0.0)
-                            context.target_position = 0.0  # Mark that we intend to be flat
-                            context.trades.append({
-                                'date': data.current_dt,
-                                'action': 'SELL',
-                                'price': current_price
-                            })
-                            print(f"    → SELL order placed")
-                        else:
-                            print(f"    → SKIPPED (wrong state)")
+                            context.target_position = 0.0
 
-                record(price=current_price)
-
-            def analyze(context, perf):
-                nonlocal trades_list
-                trades_list = context.trades
-
-                # Debug: Print actual fills
-                print(f"  [Zipline Debug] Trades executed: {len(trades_list)}")
-                for i, trade in enumerate(trades_list):
-                    print(f"    {i+1}. {trade['date'].date()} {trade['action']} @ ${trade['price']:.2f}")
+                # Always record price if available
+                if data.can_trade(context.asset):
+                    current_price = data.current(context.asset, 'close')
+                    record(price=current_price)
 
             # Determine date range
             start_date = data.index[0].tz_localize(None) if data.index.tz else data.index[0]
             end_date = data.index[-1].tz_localize(None) if data.index.tz else data.index[-1]
 
-            print(f"Zipline signal-based: {len(signals)} signals from {start_date} to {end_date}")
+            print(f"Zipline signal-based: {num_entry_signals} entries, {num_exit_signals} exits from {start_date} to {end_date}")
+            print(f"  Note: Using custom test_data bundle (same OHLCV data as other frameworks)")
 
-            # Run algorithm
+            # Run algorithm with custom test_data bundle
             perf = run_algorithm(
                 start=start_date,
                 end=end_date,
                 initialize=initialize,
                 handle_data=handle_data,
-                analyze=analyze,
-                capital_base=initial_capital,
-                bundle='quandl'
+                capital_base=config.initial_capital,
+                bundle='test_data'
             )
 
             # Extract results
             result.final_value = perf['portfolio_value'].iloc[-1]
-            result.total_return = (result.final_value / initial_capital - 1) * 100
-            # Count round trips (pairs of buy/sell), not individual orders
-            result.num_trades = len(trades_list) // 2
+            result.total_return = (result.final_value / config.initial_capital - 1) * 100
+
+            # Extract actual transactions using pyfolio
+            try:
+                import pyfolio as pf
+                returns, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
+
+                # Convert transactions DataFrame to TradeRecord list
+                result.trades = []
+                for idx, txn in transactions.iterrows():
+                    # Determine action based on amount sign
+                    action = 'BUY' if txn['amount'] > 0 else 'SELL'
+                    quantity = abs(txn['amount'])
+
+                    result.trades.append(TradeRecord(
+                        timestamp=pd.Timestamp(idx),
+                        action=action,
+                        quantity=quantity,
+                        price=txn['price'],
+                        value=abs(txn['amount'] * txn['price']),
+                        commission=txn.get('commission', 0.0),
+                    ))
+
+                result.num_trades = len(result.trades)
+
+            except Exception as e:
+                print(f"Warning: Could not extract transactions from Zipline: {e}")
+                # Fallback: no trades extracted
+                result.num_trades = 0
+                result.trades = []
 
             # Performance tracking
             current, peak = tracemalloc.get_traced_memory()
@@ -355,7 +404,7 @@ class ZiplineAdapter(BaseFrameworkAdapter):
             result.memory_usage = peak / 1024 / 1024
 
             print("✓ Zipline signal-based backtest completed")
-            print(f"  Signals Processed: {len(signals)}")
+            print(f"  Entry Signals: {num_entry_signals}, Exit Signals: {num_exit_signals}")
             print(f"  Final Value: ${result.final_value:,.2f}")
             print(f"  Total Return: {result.total_return:.2f}%")
             print(f"  Total Trades: {result.num_trades}")

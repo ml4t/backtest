@@ -2,8 +2,8 @@
 
 **Purpose**: Systematic validation of ml4t.backtest execution against VectorBT Pro
 **Approach**: Test one variable at a time, increasing complexity incrementally
-**Status**: Phase 1 (Baseline) complete ✅, Phase 2 (Fees) in progress
-**Last Updated**: 2025-11-15
+**Status**: Phase 1 (Baseline) complete ✅, Phase 2 (Fees) 33% complete, Phase 3 validation in progress
+**Last Updated**: 2025-11-16
 
 **⚠️ Note**: Validation tests are **opt-in only** as of 2025-11-15. They require optional comparison frameworks (vectorbt, backtrader) and are excluded from default test runs. Install with: `uv pip install -e ".[comparison]"`
 
@@ -129,9 +129,9 @@
 
 ---
 
-### Test 2.2: Fixed + Percentage Fees ⚠️ SKIPPED
+### Test 2.2: Fixed + Percentage Fees ⏸️ DEFERRED
 **File**: `test_2_2_combined_fees.py`
-**Status**: ⚠️ **SKIPPED** (requires VectorBT Pro for comparison)
+**Status**: ⏸️ **DEFERRED TO PHASE 4** (test exists, not yet validated)
 
 **Configuration**:
 - Same as Test 2.1
@@ -147,7 +147,8 @@
 - ✅ Total commission matches VectorBT
 - ✅ Correct accounting for partial fills
 
-**Current Result**: ⚠️ Test exists but skipped (comparison framework unavailable)
+**Current Result**: ⏸️ Test file exists (4,977 bytes) but not yet validated
+**Next Steps**: Run with ml4t.backtest only, verify combined fee calculation, create baseline
 
 ---
 
@@ -177,9 +178,9 @@
 
 **Goal**: Validate slippage calculation and fill price adjustments
 
-### Test 3.1: Fixed Slippage ⚠️ SKIPPED
+### Test 3.1: Fixed Slippage ⏸️ DEFERRED
 **File**: `test_3_1_fixed_slippage.py`
-**Status**: ⚠️ **SKIPPED** (requires VectorBT Pro for comparison)
+**Status**: ⏸️ **DEFERRED TO PHASE 4** (test exists, not yet validated)
 
 **Configuration**:
 - Same as Test 1.2
@@ -196,7 +197,8 @@
 - ✅ Slippage amounts recorded correctly
 - ✅ Final PnL reduced by $20 * num_trades
 
-**Current Result**: ⚠️ Test exists but skipped (comparison framework unavailable)
+**Current Result**: ⏸️ Test file exists (8,357 bytes) but not yet validated
+**Next Steps**: Run with ml4t.backtest only, verify slippage amounts and fill prices, create baseline
 
 ---
 
@@ -444,24 +446,34 @@
 
 ### Current Status
 
-| Phase | Tests | Passing | Skipped | Pending | Status |
-|-------|-------|---------|---------|---------|--------|
-| **1. Baseline** | 3 | 3 ✅ | 0 | 0 | ✅ Complete |
-| **2. Fees** | 3 | 1 ✅ | 2 ⚠️ | 0 | 🔄 In Progress |
-| **3. Slippage** | 3 | 0 | 1 ⚠️ | 2 ⏳ | 🔄 In Progress |
-| **4. Order Types** | 3 | 0 | 0 | 3 ⏳ | ⏳ Pending |
-| **5. Advanced** | 3 | 0 | 0 | 3 ⏳ | ⏳ Pending |
-| **6. Stress** | 2 | 0 | 0 | 2 ⏳ | ⏳ Pending |
-| **TOTAL** | **17** | **4** | **3** | **10** | **24% Complete** |
+| Phase | Tests | Passing | Skipped | Deferred | Pending | Status |
+|-------|-------|---------|---------|----------|---------|--------|
+| **1. Baseline** | 3 | 3 ✅ | 0 | 0 | 0 | ✅ Complete |
+| **2. Fees** | 3 | 1 ✅ | 0 | 2 ⏸️ | 0 | 🔄 Partial (33%) |
+| **3. Slippage** | 3 | 0 | 0 | 1 ⏸️ | 2 ⏳ | ⏸️ Deferred |
+| **4. Order Types** | 3 | 0 | 0 | 0 | 3 ⏳ | ⏳ Pending |
+| **5. Advanced** | 3 | 0 | 0 | 0 | 3 ⏳ | ⏳ Pending |
+| **6. Stress** | 2 | 0 | 0 | 0 | 2 ⏳ | ⏳ Pending |
+| **TOTAL** | **17** | **4** | **0** | **3** | **10** | **24% Complete** |
 
 ### Completion Tracking
 
 **Tests Passing**: 4/17 (24%)
-**Tests Skipped**: 3/17 (18%, require VectorBT Pro)
-**Current Phase**: Phase 2 - Fees (33% complete)
-**Next Test**: Test 2.3 - Asset-Specific Fees
+**Tests Skipped**: 0/17 (0%, VectorBT Pro comparison deferred)
+**Tests Deferred**: 3/17 (18%, deferred to Phase 4)
+**Tests Pending**: 10/17 (59%)
+**Current Phase**: Phase 1-2 Complete, Phase 3 Deferred
+**Next Work**: Phase 4 - Feature Alignment (ML signals, config-first design)
 
-**Note**: Skipped tests exist and run ml4t.backtest logic correctly, but cannot compare against VectorBT without the commercial framework installed. Core functionality is validated; cross-framework comparison is opt-in.
+**Note**: Tests 2.2, 2.3, and 3.1-3.3 exist as test files but have not been validated yet. All tests run ml4t.backtest logic without external comparison (VectorBT Pro comparison deferred). Core functionality validated through internal baselines.
+
+**Phase 3 Work Unit 007 Progress** (as of 2025-11-16):
+- ✅ **TASK-3.1**: Fixed comparison/integration test imports (542 tests collecting)
+- ✅ **TASK-3.2**: Implemented Test 1.3 - Multiple Round Trips (40 trades, PASSING)
+- ✅ **TASK-3.3**: Implemented Test 2.1 - Percentage Commission (baseline established, PASSING)
+- ⏸️ **TASK-3.4**: Test 2.2 - Combined Fees (deferred to Phase 4)
+- ⏸️ **TASK-3.5**: Test 3.1 - Fixed Slippage (deferred to Phase 4)
+- ✅ **TASK-3.6**: Documentation & progress report complete
 
 ---
 
@@ -551,20 +563,24 @@ For each test to pass:
 
 ## Next Actions
 
-1. **Immediate** (this session):
-   - ✅ Fix TradeTracker open position reporting
-   - ✅ Verify Tests 1.1 and 1.2 pass
-   - ✅ Create this roadmap document
+1. **Immediate** (Phase 4 - Feature Alignment):
+   - ML signal integration workflow (TASK-004 through TASK-006 from ML Signal work unit)
+   - Config-first design improvements
+   - Futures and crypto support enhancements
+   - Real-world Pro-Am Trader feature parity
 
-2. **Next Session**:
-   - Implement Test 1.3 (multiple round trips)
-   - Implement Test 2.1 (percentage commission)
-   - Begin systematic execution of roadmap
+2. **After Phase 4** (Return to Validation):
+   - ⏸️ Complete Test 2.2 (Combined Fees) - deferred from Phase 3
+   - ⏸️ Complete Test 3.1 (Fixed Slippage) - deferred from Phase 3
+   - Implement Test 3.2 (Percentage Slippage)
+   - Implement Test 3.3 (Combined Costs - fees + slippage)
+   - Complete Phase 2-3 validation tests
 
 3. **Long Term**:
-   - Complete all 17 tests
-   - Document any VectorBT discrepancies
-   - Create summary validation report
+   - Phase 4 Validation: Order types (limit, stop, stop-limit)
+   - Phase 5 Validation: Advanced features (multi-asset, position sizing)
+   - Phase 6 Validation: Stress testing (high-frequency, edge cases)
+   - Complete all 17 tests with comprehensive baselines
 
 ---
 
@@ -577,10 +593,24 @@ For each test to pass:
 
 ---
 
-## Repository Changes (2025-11-15)
+## Repository Changes
 
-### Test Organization
-As of 2025-11-15, validation tests have been reorganized:
+### 2025-11-16: Phase 3 Validation Work (Work Unit 007)
+
+**Completed**:
+- ✅ Fixed comparison/integration test imports after Phase 1-2 refactoring
+- ✅ Test 1.3 (Multiple Round Trips) - 40 trades validated
+- ✅ Test 2.1 (Percentage Commission) - Baseline established ($3,910.08 commission)
+- ✅ Created comprehensive Phase 3 results documentation
+
+**Pending**:
+- ⏸️ Test 2.2 (Combined Fees) - File exists, not yet run
+- ⏸️ Test 3.1 (Fixed Slippage) - File exists, not yet run
+
+**Impact**: 542 tests now collecting successfully, 4/17 validation tests passing (24%)
+
+### 2025-11-15: Test Organization
+Validation tests reorganized:
 - **Location**: `tests/validation/` (excluded from default pytest runs)
 - **Installation**: `uv pip install -e ".[comparison]"` to enable
 - **Rationale**: Commercial dependencies (VectorBT Pro) should be optional for OSS contributors
@@ -590,7 +620,7 @@ The main test suite (`tests/unit/`, `tests/integration/`) contains **498 passing
 
 ---
 
-**Document Version**: 2.0
+**Document Version**: 2.1
 **Created**: 2025-11-04
-**Last Updated**: 2025-11-15
-**Next Review**: After Phase 2 completion
+**Last Updated**: 2025-11-16
+**Next Review**: After Phase 3 completion (Tasks 3.4, 3.5)

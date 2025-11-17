@@ -5,20 +5,86 @@ rootdir: /home/stefan/ml4t/software/backtest
 configfile: pyproject.toml
 plugins: hypothesis-6.140.2, asyncio-1.2.0, benchmark-5.1.0, cov-7.0.0, xdist-3.8.0, timeout-2.4.0
 asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collected 639 items / 1 error
+collected 498 items
 
-==================================== ERRORS ====================================
-____________ ERROR collecting tests/validation/test_vectorbtpro.py _____________
-ImportError while importing test module '/home/stefan/ml4t/software/backtest/tests/validation/test_vectorbtpro.py'.
-Hint: make sure your test modules/packages have valid Python names.
-Traceback:
-../../../.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-tests/validation/test_vectorbtpro.py:12: in <module>
-    import vectorbtpro as vbt
-E   ModuleNotFoundError: No module named 'vectorbtpro'
-=========================== short test summary info ============================
-ERROR tests/validation/test_vectorbtpro.py
-!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
-=============================== 1 error in 0.57s ===============================
+tests/integration/test_corporate_action_integration.py ...               [  0%]
+tests/integration/test_strategy_qengine_comparison.py .                  [  0%]
+tests/unit/test_advanced_orders.py ................                      [  4%]
+tests/unit/test_bracket_percentage.py ....                               [  4%]
+tests/unit/test_broker.py .............                                  [  7%]
+tests/unit/test_cash_constraints.py ........                             [  9%]
+tests/unit/test_clock_multi_feed.py .........................            [ 14%]
+tests/unit/test_commission.py .......................................... [ 22%]
+...                                                                      [ 23%]
+tests/unit/test_corporate_actions.py ............................        [ 28%]
+tests/unit/test_engine.py ..................                             [ 32%]
+tests/unit/test_entry_price_vectorbt.py ........                         [ 33%]
+tests/unit/test_exit_priority.py ..                                      [ 34%]
+tests/unit/test_fill_simulator.py ....................................   [ 41%]
+tests/unit/test_liquidity.py ..........                                  [ 43%]
+tests/unit/test_lookahead_prevention.py ......                           [ 44%]
+tests/unit/test_margin.py ...........................                    [ 50%]
+tests/unit/test_market_impact.py ..........................              [ 55%]
+tests/unit/test_market_impact_integration.py .......                     [ 56%]
+tests/unit/test_performance_analyzer.py ................                 [ 60%]
+tests/unit/test_pnl_calculations.py .....................                [ 64%]
+tests/unit/test_portfolio_coverage_gaps.py ...............               [ 67%]
+tests/unit/test_portfolio_facade.py .....................                [ 71%]
+tests/unit/test_position_tracker.py ..............                       [ 74%]
+tests/unit/test_precision.py ..................                          [ 77%]
+tests/unit/test_sl_fill_price.py .....                                   [ 78%]
+tests/unit/test_sl_vectorbt_matching.py ..........                       [ 80%]
+tests/unit/test_slippage.py ..........................                   [ 86%]
+tests/unit/test_strategy_adapters.py .............                       [ 88%]
+tests/unit/test_tp_vectorbt_matching.py ...........                      [ 90%]
+tests/unit/test_trade_journal.py ..................                      [ 94%]
+tests/unit/test_trade_tracker.py ........                                [ 96%]
+tests/unit/test_trailing_stop_bug.py ...                                 [ 96%]
+tests/unit/test_tsl_debug.py .                                           [ 96%]
+tests/unit/test_tsl_simple.py .                                          [ 97%]
+tests/unit/test_tsl_vectorbt_matching.py ..........                      [ 99%]
+tests/unit/test_vectorbt_commission.py ....                              [100%]
+
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.5-final-0 ________________
+
+Name                                                 Stmts   Miss  Cover   Missing
+----------------------------------------------------------------------------------
+src/ml4t/backtest/core/assets.py                       151     34    77%   94, 104, 139-146, 159-164, 259-261, 293, 296, 313-314, 382-388, 400-411, 424-436, 447-460, 473-490
+src/ml4t/backtest/core/clock.py                        176     41    77%   142-145, 163-164, 187-188, 244, 283-289, 308-323, 336-344, 357-368, 383, 440-441
+src/ml4t/backtest/core/constants.py                     26      2    92%   83, 103
+src/ml4t/backtest/core/event.py                         76      9    88%   39, 185-192
+src/ml4t/backtest/core/precision.py                     42      0   100%
+src/ml4t/backtest/core/types.py                         74      0   100%
+src/ml4t/backtest/data/asset_registry.py                35      3    91%   38, 41, 117
+src/ml4t/backtest/data/feed.py                         123     70    43%   101-118, 122-130, 134-141, 160-167, 171, 176-182, 187, 230, 242, 259, 263, 269, 273-279, 314-327, 331-341, 355-362, 366
+src/ml4t/backtest/data/schemas.py                       58     35    40%   21, 32-50, 57-62, 77-88, 92-107, 114-119
+src/ml4t/backtest/engine.py                            165      8    95%   233-236, 253, 259, 425-429
+src/ml4t/backtest/execution/bracket_manager.py          71      7    90%   92, 147-151, 241, 262, 266-267
+src/ml4t/backtest/execution/broker.py                  513    107    79%   28-31, 144, 189, 194, 270, 287-294, 312, 315, 318, 321-324, 327, 330, 376, 384, 412, 489-490, 502, 536, 551, 560, 578, 583-585, 617, 627, 631, 666, 688, 706, 747-757, 792-794, 804, 817-819, 828, 840-841, 845, 850-852, 862, 897, 911-917, 932-933, 976, 994-1004, 1032, 1035, 1126-1136, 1172, 1232-1233, 1237-1238, 1269, 1277-1295
+src/ml4t/backtest/execution/commission.py              119      2    98%   7-8
+src/ml4t/backtest/execution/corporate_actions.py       283     46    84%   24-25, 331, 335, 390-393, 473, 477, 512, 534, 549, 559, 585, 592, 633, 645-651, 692-694, 729-731, 750-758, 785-814
+src/ml4t/backtest/execution/fill_simulator.py          196     13    93%   162-163, 279, 309, 325-335, 466, 477, 542, 544
+src/ml4t/backtest/execution/liquidity.py                80      2    98%   234-235
+src/ml4t/backtest/execution/market_impact.py           163      7    96%   14-15, 269-270, 328, 504-505
+src/ml4t/backtest/execution/order.py                   241     46    81%   104, 124, 184-186, 215, 227, 239, 249, 263, 269-280, 284, 290, 298, 306-308, 313, 318, 337, 344, 386, 394-397, 410, 429, 435, 447-450, 462-465
+src/ml4t/backtest/execution/order_router.py             95     31    67%   73-74, 105-115, 155, 166, 191-192, 198-199, 213-214, 225, 233-235, 239-245, 253
+src/ml4t/backtest/execution/position_sizer.py           32     21    34%   8-11, 56-58, 69, 88-90, 106-127
+src/ml4t/backtest/execution/slippage.py                105     12    89%   124, 168, 170, 193, 214, 216, 239, 249, 272, 301, 311, 366
+src/ml4t/backtest/execution/trade_tracker.py           161     19    88%   359-413
+src/ml4t/backtest/portfolio/analytics.py               125      0   100%
+src/ml4t/backtest/portfolio/core.py                     75      1    99%   126
+src/ml4t/backtest/portfolio/margin.py                  129      5    96%   132-133, 224, 252-256
+src/ml4t/backtest/portfolio/portfolio.py               111      0   100%
+src/ml4t/backtest/portfolio/state.py                    94      3    97%   70, 146-147
+src/ml4t/backtest/reporting/base.py                     15     15     0%   3-115
+src/ml4t/backtest/reporting/html.py                     63     63     0%   3-553
+src/ml4t/backtest/reporting/parquet.py                  73     73     0%   3-402
+src/ml4t/backtest/reporting/reporter.py                 79     28    65%   81, 126, 142-147, 163-166, 170-172, 180-188, 197-201, 205-206, 214
+src/ml4t/backtest/strategy/adapters.py                 138     15    89%   37, 136-139, 156-157, 165, 191, 220-221, 239, 264, 276, 282
+src/ml4t/backtest/strategy/base.py                      93     27    71%   77, 79, 131, 196-197, 207, 220, 245-247, 251-256, 266-271, 299-300, 310, 322, 331-333
+src/ml4t/backtest/strategy/crypto_basis_adapter.py     176     28    84%   118, 162, 182, 205-208, 213-220, 224-225, 227-228, 264, 322-326, 404-408, 414-417, 438-439
+----------------------------------------------------------------------------------
+TOTAL                                                 4156    773    81%
+Coverage HTML written to dir htmlcov
+============================= 498 passed in 1.34s ==============================
