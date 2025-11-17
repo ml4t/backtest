@@ -40,6 +40,20 @@ class Strategy(ABC):
     This class defines the interface that all strategies must implement.
     Strategies receive events through the on_event method and can submit
     orders through the broker interface.
+
+    The Strategy class supports two execution modes:
+
+    1. **Simple Mode** (default): Override on_market_event(event, context)
+       - Called once per market event
+       - Best for single-asset strategies
+       - Lower memory overhead
+
+    2. **Batch Mode**: Override on_timestamp_batch(timestamp, events, context)
+       - Called once per timestamp with all events at that time
+       - Best for multi-asset strategies (pairs trading, portfolio optimization)
+       - Enables cross-asset decision making
+
+    Mode is auto-detected based on which methods are overridden.
     """
 
     def __init__(self, name: str | None = None):
@@ -58,6 +72,30 @@ class Strategy(ABC):
         self._positions: dict[AssetId, float] = {}
         self._orders: list[Any] = []
         self._trades: list[Any] = []
+
+        # Auto-detect execution mode based on method override
+        self._execution_mode = self._detect_execution_mode()
+
+    def _detect_execution_mode(self) -> str:
+        """
+        Detect strategy execution mode based on method overrides.
+
+        Returns:
+            "batch" if on_timestamp_batch is overridden, else "simple"
+        """
+        # Check if on_timestamp_batch is overridden in subclass
+        # Compare with base Strategy class method
+        base_method = Strategy.on_timestamp_batch
+        instance_method = self.__class__.on_timestamp_batch
+
+        if instance_method is not base_method:
+            return "batch"
+        return "simple"
+
+    @property
+    def execution_mode(self) -> str:
+        """Get the detected execution mode ("simple" or "batch")."""
+        return self._execution_mode
 
     def on_start(self, portfolio=None, event_bus=None) -> None:
         """
@@ -95,15 +133,57 @@ class Strategy(ABC):
 
     def on_market_event(self, event: MarketEvent, context: dict[str, Any] | None = None) -> None:
         """
-        Process a market data event.
+        Process a market data event (Simple Mode callback).
 
-        Override this for specialized market data handling.
+        Override this for single-asset strategies that process one event at a time.
+        This is the default mode and works well for most strategies.
 
         Args:
-            event: Market data event
+            event: Market data event with OHLCV, signals, indicators
             context: Market-wide context data (VIX, SPY, regime indicators, etc.)
                     Dictionary with timestamp-specific values shared across all assets.
                     Example: {'VIX': 18.5, 'SPY': 485.0, 'regime': 'bull'}
+
+        Example:
+            >>> def on_market_event(self, event, context=None):
+            ...     if event.signals.get('ml_score', 0) > 0.7:
+            ...         self.buy_percent(event.asset_id, 0.10, event.close)
+        """
+
+    def on_timestamp_batch(
+        self,
+        timestamp: datetime,
+        events: list[MarketEvent],
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Process all market events at a single timestamp (Batch Mode callback).
+
+        Override this for multi-asset strategies that need to make decisions
+        across multiple assets simultaneously (e.g., pairs trading, portfolio
+        optimization, cross-asset ranking).
+
+        Args:
+            timestamp: The timestamp for this batch of events
+            events: List of all MarketEvent objects at this timestamp
+            context: Market-wide context data shared across all events
+                    Example: {'VIX': 18.5, 'SPY': 485.0, 'regime': 'bull'}
+
+        Example:
+            >>> def on_timestamp_batch(self, timestamp, events, context=None):
+            ...     # Rank assets by momentum
+            ...     scores = {e.asset_id: e.indicators.get('momentum', 0) for e in events}
+            ...     top_5 = sorted(scores, key=scores.get, reverse=True)[:5]
+            ...
+            ...     # Rebalance to equal weight top 5
+            ...     weights = {asset: 0.20 for asset in top_5}
+            ...     prices = {e.asset_id: e.close for e in events}
+            ...     self.rebalance_to_weights(weights, prices)
+
+        Note:
+            - All events in the list have the same timestamp
+            - Context dict is the same for all events (memory efficient)
+            - Mode is auto-detected: if this method is overridden, engine uses batch mode
         """
 
     def on_signal_event(self, event: SignalEvent) -> None:
@@ -514,6 +594,7 @@ class Strategy(ABC):
         target_weights: dict[AssetId, float],
         current_prices: dict[AssetId, float],
         tolerance: float = 0.01,
+        metadata_per_asset: dict[AssetId, dict[str, Any]] | None = None,
     ) -> None:
         """
         Rebalance portfolio to target weights.
@@ -527,6 +608,8 @@ class Strategy(ABC):
                           Weights should sum to <= 1.0 (remainder stays in cash)
             current_prices: Dictionary mapping asset_id to current price
             tolerance: Rebalancing tolerance (default: 1% = 0.01)
+            metadata_per_asset: Optional metadata for each asset (for trade tracking)
+                              Example: {"AAPL": {"rank": 1, "signal": "momentum"}}
 
         Raises:
             ValueError: If broker is not initialized or parameters are invalid
@@ -534,7 +617,8 @@ class Strategy(ABC):
         Example:
             target_weights = {"AAPL": 0.40, "MSFT": 0.30, "GOOGL": 0.20}  # 10% cash
             current_prices = {"AAPL": event1.close, "MSFT": event2.close, "GOOGL": event3.close}
-            self.rebalance_to_weights(target_weights, current_prices, tolerance=0.02)
+            metadata = {"AAPL": {"rank": 1}, "MSFT": {"rank": 2}, "GOOGL": {"rank": 3}}
+            self.rebalance_to_weights(target_weights, current_prices, tolerance=0.02, metadata_per_asset=metadata)
         """
         if self.broker is None:
             raise ValueError("Broker not initialized. Strategy must be connected to broker.")
@@ -588,6 +672,11 @@ class Strategy(ABC):
             if abs(quantity_diff) < 1e-6:  # Negligible difference
                 continue
 
+            # Get metadata for this asset if provided
+            asset_metadata = {}
+            if metadata_per_asset and asset_id in metadata_per_asset:
+                asset_metadata = metadata_per_asset[asset_id]
+
             # Create and submit rebalancing order
             if quantity_diff > 0:
                 # Need to buy more
@@ -596,6 +685,7 @@ class Strategy(ABC):
                     side=OrderSide.BUY,
                     quantity=abs(quantity_diff),
                     order_type=OrderType.MARKET,
+                    metadata=asset_metadata,
                 )
                 self.broker.submit_order(order)
             else:
@@ -605,6 +695,7 @@ class Strategy(ABC):
                     side=OrderSide.SELL,
                     quantity=abs(quantity_diff),
                     order_type=OrderType.MARKET,
+                    metadata=asset_metadata,
                 )
                 self.broker.submit_order(order)
 

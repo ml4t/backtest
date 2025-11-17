@@ -122,6 +122,14 @@ class BacktestEngine:
         # Wire up event handlers
         self._setup_event_handlers()
 
+        # Check strategy execution mode for batch processing
+        self._strategy_mode = self.strategy.execution_mode
+        logger.info(f"Strategy execution mode: {self._strategy_mode}")
+
+        # Batch mode state
+        self._event_batch: list[MarketEvent] = []
+        self._current_batch_timestamp: datetime | None = None
+
         # Statistics
         self.events_processed = 0
         self.start_time: datetime | None = None
@@ -199,7 +207,9 @@ class BacktestEngine:
             # Get next event from Clock's priority queue (across ALL feeds)
             event = self.clock.get_next_event()
             if event is None:
-                # All feeds exhausted
+                # All feeds exhausted - process any remaining batch
+                if self._strategy_mode == "batch" and self._event_batch:
+                    self._process_event_batch()
                 break
 
             # Dispatch event to all registered subscribers
@@ -210,16 +220,25 @@ class BacktestEngine:
                 context_dict = self.context_data.get(event.timestamp, {})
                 context = self.context_cache.get_or_create(event.timestamp, context_dict)
 
-                # Call strategy with context (convert Context to dict for simpler API)
-                self.strategy.on_market_event(event, context.data)
+                # Handle based on strategy execution mode
+                if self._strategy_mode == "batch":
+                    # Batch mode: collect events for same timestamp
+                    self._collect_or_process_batch(event, context.data)
+                else:
+                    # Simple mode: process immediately (original behavior)
+                    self.strategy.on_market_event(event, context.data)
 
-                # Also call on_event for backward compatibility with strategies
-                # that don't override on_market_event
-                self.strategy.on_event(event)
+                    # Also call on_event for backward compatibility with strategies
+                    # that don't override on_market_event
+                    self.strategy.on_event(event)
 
-                # Still dispatch to other subscribers (broker, portfolio, reporter)
+                # Dispatch to other subscribers (broker, portfolio, reporter)
                 self.clock.dispatch_event(event)
             else:
+                # Non-MARKET events: flush batch if in batch mode (timestamp changed)
+                if self._strategy_mode == "batch" and self._event_batch:
+                    self._process_event_batch()
+
                 # Normal dispatch for non-MARKET events
                 # Subscribers handle events based on event_type:
                 # - Strategy: receives FILL events
@@ -340,6 +359,28 @@ class BacktestEngine:
 
         return results
 
+    def get_results(self) -> "BacktestResultsExporter":
+        """Get results exporter for trade and return data.
+
+        Returns:
+            BacktestResultsExporter with access to trades and returns
+
+        Example:
+            >>> engine = BacktestEngine(...)
+            >>> engine.run()
+            >>> results = engine.get_results()
+            >>> results.export_all("results/")
+        """
+        from ml4t.backtest.results import BacktestResults as BacktestResultsExporter
+
+        # Get performance analyzer from portfolio (may be None if analytics disabled)
+        analyzer = getattr(self.broker.portfolio, "_analyzer", None)
+
+        return BacktestResultsExporter(
+            trade_tracker=self.broker.trade_tracker,
+            performance_analyzer=analyzer,
+        )
+
     def reset(self) -> None:
         """Reset the engine for another run."""
         logger.info("Resetting backtest engine")
@@ -361,6 +402,61 @@ class BacktestEngine:
 
         # Re-setup event handlers
         self._setup_event_handlers()
+
+        # Reset batch mode state
+        self._event_batch = []
+        self._current_batch_timestamp = None
+
+    def _collect_or_process_batch(
+        self,
+        event: MarketEvent,
+        context: dict[str, Any],
+    ) -> None:
+        """
+        Collect events into batch or process batch when timestamp changes.
+
+        Args:
+            event: Market event to add to batch
+            context: Market-wide context for this timestamp
+        """
+        # Check if this is a new timestamp
+        if self._current_batch_timestamp is None:
+            # First event - start new batch
+            self._current_batch_timestamp = event.timestamp
+            self._event_batch = [event]
+            self._batch_context = context
+        elif event.timestamp == self._current_batch_timestamp:
+            # Same timestamp - add to batch
+            self._event_batch.append(event)
+        else:
+            # New timestamp - process previous batch first
+            self._process_event_batch()
+
+            # Start new batch
+            self._current_batch_timestamp = event.timestamp
+            self._event_batch = [event]
+            self._batch_context = context
+
+    def _process_event_batch(self) -> None:
+        """Process collected batch of events for same timestamp."""
+        if not self._event_batch:
+            return
+
+        # Call strategy's batch handler
+        self.strategy.on_timestamp_batch(
+            timestamp=self._current_batch_timestamp,
+            events=self._event_batch,
+            context=self._batch_context,
+        )
+
+        # Also call on_event for backward compatibility
+        for event in self._event_batch:
+            self.strategy.on_event(event)
+
+        # Clear batch
+        self._event_batch = []
+        self._current_batch_timestamp = None
+        self._batch_context = None
 
 
 class BacktestResults:
