@@ -37,6 +37,11 @@ from ml4t.backtest.risk.rule import (
     RiskRuleLike,
     RiskRuleProtocol,
 )
+from ml4t.backtest.risk.rules import (
+    PriceBasedStopLoss,
+    PriceBasedTakeProfit,
+    TimeBasedExit,
+)
 
 __all__ = [
     "RiskContext",
@@ -47,4 +52,7 @@ __all__ = [
     "RiskRuleLike",
     "CompositeRule",
     "RiskManager",
+    "TimeBasedExit",
+    "PriceBasedStopLoss",
+    "PriceBasedTakeProfit",
 ]
