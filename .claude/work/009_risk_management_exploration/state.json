@@ -1,0 +1,1666 @@
+{
+  "project": {
+    "name": "Integrated ML Data + Risk Management",
+    "description": "Merged implementation of ML-first data architecture and comprehensive risk management for ml4t.backtest event-driven backtesting engine",
+    "created_at": "2025-11-17T03:30:00Z",
+    "updated_at": "2025-11-17T08:00:00Z",
+    "integration_date": "2025-11-17T07:38:00Z"
+  },
+  "status": "implementing",
+  "current_task": "TASK-INT-006",
+  "integration_summary": {
+    "tasks_merged": "50 tasks (reduced from 93 separate)",
+    "timeline_reduction": "35% (10 weeks vs 15.5 weeks)",
+    "effort_reduction": "30% (420 hours vs 600 hours)",
+    "task_reduction": "46% by eliminating duplication",
+    "critical_dependency": "Risk Management requires ML Data Architecture foundation (RiskContext needs enhanced MarketEvent with indicators/context dicts)"
+  },
+  "phases": {
+    "phase_1": {
+      "name": "ML Data Foundation",
+      "description": "Enhanced MarketEvent, PolarsDataFeed with lazy loading, FeatureProvider interface, configuration system, performance optimizations",
+      "status": "in_progress",
+      "estimated_hours": 110,
+      "estimated_weeks": 3,
+      "priority": "critical",
+      "dependencies": [],
+      "tasks": [
+        "TASK-INT-001",
+        "TASK-INT-002",
+        "TASK-INT-003",
+        "TASK-INT-004",
+        "TASK-INT-005",
+        "TASK-INT-006",
+        "TASK-INT-007",
+        "TASK-INT-008",
+        "TASK-INT-009",
+        "TASK-INT-010",
+        "TASK-INT-011",
+        "TASK-INT-012",
+        "TASK-INT-013",
+        "TASK-INT-014",
+        "TASK-INT-015"
+      ],
+      "notes": "Foundation for both ML strategies and Risk Management. Must complete before Phase 2."
+    },
+    "phase_2": {
+      "name": "Risk Management Core",
+      "description": "RiskContext/RiskDecision/RiskRule, RiskManager with engine integration, basic risk rules, position monitoring",
+      "status": "pending",
+      "dependencies": [
+        "phase_1"
+      ],
+      "estimated_hours": 85,
+      "estimated_weeks": 2,
+      "priority": "high",
+      "tasks": [
+        "TASK-INT-016",
+        "TASK-INT-017",
+        "TASK-INT-018",
+        "TASK-INT-019",
+        "TASK-INT-020",
+        "TASK-INT-021",
+        "TASK-INT-022",
+        "TASK-INT-023",
+        "TASK-INT-024",
+        "TASK-INT-025"
+      ],
+      "notes": "Depends on Phase 1 for enhanced MarketEvent and FeatureProvider. Sequential execution required."
+    },
+    "phase_3": {
+      "name": "Advanced Features (Parallel Execution)",
+      "description": "Three independent tracks: trade recording enhancements, advanced risk rules, enhanced slippage models",
+      "status": "pending",
+      "dependencies": [
+        "phase_2"
+      ],
+      "estimated_hours": 120,
+      "estimated_weeks": 3,
+      "priority": "medium",
+      "parallel_execution": true,
+      "batches": {
+        "batch_A": {
+          "name": "Trade Recording",
+          "tasks": [
+            "TASK-INT-026",
+            "TASK-INT-027",
+            "TASK-INT-028",
+            "TASK-INT-029",
+            "TASK-INT-030"
+          ],
+          "estimated_hours": 38
+        },
+        "batch_B": {
+          "name": "Advanced Risk Rules",
+          "tasks": [
+            "TASK-INT-031",
+            "TASK-INT-032",
+            "TASK-INT-033",
+            "TASK-INT-034",
+            "TASK-INT-035",
+            "TASK-INT-036",
+            "TASK-INT-037"
+          ],
+          "estimated_hours": 50
+        },
+        "batch_C": {
+          "name": "Enhanced Slippage",
+          "tasks": [
+            "TASK-INT-038",
+            "TASK-INT-039",
+            "TASK-INT-040"
+          ],
+          "estimated_hours": 32
+        }
+      },
+      "notes": "Three tracks can run in parallel. Total sequential time 150h, parallel time 120h (3 weeks with 3 developers or batched execution)."
+    },
+    "phase_4": {
+      "name": "Integration & Documentation",
+      "description": "Complete example notebook (ML + Risk), comprehensive documentation, performance validation, cross-framework testing",
+      "status": "pending",
+      "dependencies": [
+        "phase_3"
+      ],
+      "estimated_hours": 105,
+      "estimated_weeks": 2,
+      "priority": "varies",
+      "tasks": [
+        "TASK-INT-041",
+        "TASK-INT-042",
+        "TASK-INT-043",
+        "TASK-INT-044",
+        "TASK-INT-045",
+        "TASK-INT-046",
+        "TASK-INT-047",
+        "TASK-INT-048",
+        "TASK-INT-049",
+        "TASK-INT-050"
+      ],
+      "notes": "Validates integration of ML Data + Risk Management. Sequential execution."
+    }
+  },
+  "tasks": [
+    {
+      "id": "TASK-INT-001",
+      "phase": "phase_1",
+      "title": "Enhanced MarketEvent with signals, indicators, context dicts",
+      "description": "Extend MarketEvent dataclass to include three separate dictionaries: signals (ML predictions), indicators (technical metrics like ATR, RSI), and context (market-wide data like VIX, SPY). This provides the foundation for both ML strategies and risk management rules.",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [],
+      "files": [
+        "src/ml4t/backtest/core/event.py"
+      ],
+      "acceptance_criteria": [
+        "Add indicators: dict[str, float] = field(default_factory=dict) to MarketEvent",
+        "Add context: dict[str, float] = field(default_factory=dict) to MarketEvent",
+        "Keep existing signals dict (backward compatible)",
+        "All dicts are optional with empty dict defaults",
+        "Update MarketEvent docstring documenting purpose of each dict with examples",
+        "Type hints properly specified",
+        "Backward compatibility verified: existing code works unchanged"
+      ],
+      "estimated_hours": 4,
+      "priority": "critical",
+      "notes": "Simple change but critical foundation. Both ML strategies and Risk Management depend on this.",
+      "completed_at": "2025-11-17T14:37:57.149457Z",
+      "actual_hours": 1
+    },
+    {
+      "id": "TASK-INT-002",
+      "phase": "phase_1",
+      "title": "Create FeatureProvider unified interface",
+      "description": "Define abstract FeatureProvider interface for pluggable feature computation/retrieval, serving both ML strategies and risk rules. Supports per-asset features (ATR, ML scores) and market-wide features (VIX, SPY).",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [],
+      "files": [
+        "src/ml4t/backtest/data/feature_provider.py",
+        "docs/guides/feature_provider.md"
+      ],
+      "acceptance_criteria": [
+        "FeatureProvider ABC created in data/feature_provider.py",
+        "Abstract get_features(asset_id: AssetId, timestamp: datetime) \u2192 dict[str, float] method for per-asset features",
+        "Abstract get_market_features(timestamp: datetime) \u2192 dict[str, float] method for market-wide features",
+        "PrecomputedFeatureProvider concrete implementation (loads from DataFrame)",
+        "CallableFeatureProvider concrete implementation (on-the-fly computation from callable)",
+        "Comprehensive docstrings with usage examples for both ML and risk use cases",
+        "Unit tests with mock FeatureProvider implementations",
+        "Documentation guide explaining when to use each pattern"
+      ],
+      "estimated_hours": 4,
+      "priority": "critical",
+      "notes": "Unified interface serves both ML strategies and risk rules. Answers 'how do features get into RiskContext' question.",
+      "completed_at": "2025-11-17T14:37:57.149466Z",
+      "actual_hours": 1
+    },
+    {
+      "id": "TASK-INT-003",
+      "phase": "phase_1",
+      "title": "PolarsDataFeed core implementation with lazy loading",
+      "description": "Implement PolarsDataFeed with lazy loading (scan_parquet), monthly chunking for memory efficiency, multi-source data merging, and comprehensive event generation.",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-INT-001",
+        "TASK-INT-002"
+      ],
+      "files": [
+        "src/ml4t/backtest/data/polars_data_feed.py"
+      ],
+      "acceptance_criteria": [
+        "PolarsDataFeed(DataFeed) class created",
+        "Lazy loading: uses scan_parquet not read_parquet for memory efficiency",
+        "Monthly chunking strategy: load data in monthly batches to limit memory",
+        "Multi-source merging: combine price data + signals + features from separate files",
+        "Event generation: creates MarketEvent with OHLCV + signals + indicators + context populated",
+        "Memory efficient: <500MB for 250 symbols \u00d7 1 year daily data",
+        "Loading benchmark: <500ms for initial load (lazy)",
+        "Support both single-file and multi-file configurations",
+        "Proper type hints and error handling for missing files",
+        "Unit tests with synthetic Parquet data"
+      ],
+      "estimated_hours": 16,
+      "priority": "critical",
+      "notes": "Core data engine. Lazy loading is critical for large universes (500+ stocks).",
+      "completed_at": "2025-11-17T14:37:57.149468Z",
+      "actual_hours": 4
+    },
+    {
+      "id": "TASK-INT-004",
+      "phase": "phase_1",
+      "title": "Event generation optimization - group_by vs filter",
+      "description": "Replace filter-based event generation (O(T\u00d7N)) with group_by iteration (O(N)) for 10-50x performance improvement. Critical optimization identified in external review.",
+      "type": "optimization",
+      "status": "completed",
+      "dependencies": [
+        "TASK-INT-003"
+      ],
+      "files": [
+        "src/ml4t/backtest/data/polars_data_feed.py"
+      ],
+      "acceptance_criteria": [
+        "Event generation uses group_by('timestamp', maintain_order=True) NOT filter loop",
+        "Single-pass iteration over grouped data",
+        "Benchmark shows 10-50x speedup vs filter approach",
+        "Maintains correct chronological order (maintain_order=True)",
+        "Memory usage similar or better than filter approach",
+        "Unit test verifying event order correctness",
+        "Performance benchmark comparing filter vs group_by with 250 symbols \u00d7 1 year"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical",
+      "notes": "10-50x performance difference. NON-NEGOTIABLE optimization - must be group_by, not filter. [INTEGRATED INTO TASK-INT-003]",
+      "completed_at": "2025-11-17T14:37:57.149470Z",
+      "actual_hours": 0
+    },
+    {
+      "id": "TASK-INT-005",
+      "phase": "phase_1",
+      "title": "Signal timing validation - prevent look-ahead bias",
+      "description": "Implement validation to ensure signals are not used before they were generated, preventing look-ahead bias. Critical correctness requirement.",
+      "type": "validation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-INT-003"
+      ],
+      "files": [
+        "src/ml4t/backtest/data/polars_data_feed.py",
+        "src/ml4t/backtest/data/validation.py"
+      ],
+      "acceptance_criteria": [
+        "For each signal: assert signal.timestamp <= first_use_timestamp",
+        "Configurable timing modes: 'strict' (same bar), 'next_bar' (1 bar lag), 'custom' (N bar lag)",
+        "Clear error messages identifying which signal violates timing constraint and by how much",
+        "Optional warning mode (log violations but don't fail)",
+        "Unit tests with intentional timing violations",
+        "Integration test with real signal data verifying no look-ahead",
+        "Documentation explaining timing modes and when to use each"
+      ],
+      "estimated_hours": 6,
+      "priority": "critical",
+      "notes": "Correctness issue, not just nice-to-have. Look-ahead bias invalidates backtest results.",
+      "completed_at": "2025-11-17T14:30:00Z",
+      "actual_hours": 2
+    },
+    {
+      "id": "TASK-INT-006",
+      "phase": "phase_1",
+      "title": "Comprehensive data validation - check ALL rows",
+      "description": "Implement exhaustive data validation checking all rows (not sampling) for duplicates, missing values, price sanity, and OHLC consistency. Critical quality requirement.",
+      "type": "validation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-INT-003"
+      ],
+      "files": [
+        "src/ml4t/backtest/data/validation.py"
+      ],
+      "acceptance_criteria": [
+        "Duplicate detection: group_by(['timestamp', 'symbol']).len() checks ALL rows",
+        "Price sanity checks: high >= low, open/close within [low, high], all prices > 0",
+        "Volume sanity: volume >= 0, realistic ranges",
+        "Missing value detection: identify gaps in time series",
+        "OHLC consistency: verify open/high/low/close relationships",
+        "Performance: validation < 1 second for 250 symbols \u00d7 1 year",
+        "Detailed error reports with row numbers and specific violations",
+        "Unit tests with synthetic bad data",
+        "Integration test with real data"
+      ],
+      "estimated_hours": 10,
+      "priority": "critical",
+      "notes": "External review highlighted sampling is insufficient - must check ALL rows for production use."
+    },
+    {
+      "id": "TASK-INT-007",
+      "phase": "phase_1",
+      "title": "Configuration schema and loader (YAML/JSON)",
+      "description": "Implement configuration system for declarative specification of data sources, feature providers, risk rules, and execution parameters using YAML or JSON.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-002"
+      ],
+      "files": [
+        "src/ml4t/backtest/config/schema.py",
+        "src/ml4t/backtest/config/loader.py"
+      ],
+      "acceptance_criteria": [
+        "Pydantic schema for configuration with sections: data_sources, features, risk_rules, execution",
+        "YAML loader: from_yaml(path) factory method",
+        "JSON loader: from_json(path) factory method",
+        "Validation: clear error messages for invalid configs",
+        "Support environment variable substitution (e.g., ${DATA_PATH})",
+        "Example configs for common scenarios (simple strategy, multi-asset, ML + risk)",
+        "Unit tests with valid and invalid configs",
+        "Documentation guide for configuration best practices"
+      ],
+      "estimated_hours": 12,
+      "priority": "high",
+      "notes": "Enables declarative strategy specification without code changes. Used by both ML and risk components."
+    },
+    {
+      "id": "TASK-INT-008",
+      "phase": "phase_1",
+      "title": "Polars optimizations - compression, categorical, partitioning",
+      "description": "Implement Polars-specific optimizations for memory efficiency and query performance: compression, categorical encoding for symbol column, and partitioning strategies.",
+      "type": "optimization",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-003"
+      ],
+      "files": [
+        "src/ml4t/backtest/data/polars_data_feed.py",
+        "docs/guides/data_optimization.md"
+      ],
+      "acceptance_criteria": [
+        "Compression: use zstd compression for Parquet files (30-50% size reduction)",
+        "Categorical encoding: symbol column as pl.Categorical (10-20% memory reduction for 500+ symbols)",
+        "Partitioning: monthly or quarterly partitions for large datasets",
+        "Lazy evaluation: use lazy frames and collect() only when needed",
+        "Memory benchmark showing <2GB for 250 symbols \u00d7 1 year with all optimizations",
+        "Performance benchmark showing no regression vs unoptimized version",
+        "Documentation guide explaining when to use each optimization",
+        "Unit tests verifying optimization correctness"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Enables scaling to 500+ symbol universes. Zstd + categorical = 40-60% total memory reduction."
+    },
+    {
+      "id": "TASK-INT-009",
+      "phase": "phase_1",
+      "title": "Unified Strategy API - simple + batch modes",
+      "description": "Extend Strategy base class to support both simple on_market_data() callback and batch on_timestamp_batch() for multi-asset strategies. Auto-detect mode based on method presence.",
+      "type": "integration",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-001"
+      ],
+      "files": [
+        "src/ml4t/backtest/strategy/base.py"
+      ],
+      "acceptance_criteria": [
+        "Keep existing on_market_data(event: MarketEvent) callback (backward compatible)",
+        "Add optional on_timestamp_batch(timestamp: datetime, events: list[MarketEvent], context: dict) method",
+        "Auto-detect mode: if on_timestamp_batch defined, use batch mode; else use simple mode",
+        "Batch mode: collect all events for same timestamp, call once with list",
+        "Context dict contains market-wide data (VIX, SPY, etc.) from FeatureProvider",
+        "Simple example strategy using on_market_data",
+        "Multi-asset example strategy using on_timestamp_batch",
+        "Unit tests for both modes",
+        "Documentation explaining when to use each mode"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Serves both simple single-asset and complex multi-asset use cases. Backward compatible."
+    },
+    {
+      "id": "TASK-INT-010",
+      "phase": "phase_1",
+      "title": "Engine integration with PolarsDataFeed",
+      "description": "Integrate PolarsDataFeed into BacktestEngine with backward compatibility for existing ParquetDataFeed. Feature flag for gradual rollout.",
+      "type": "integration",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-003",
+        "TASK-INT-009"
+      ],
+      "files": [
+        "src/ml4t/backtest/engine.py"
+      ],
+      "acceptance_criteria": [
+        "BacktestEngine supports both ParquetDataFeed and PolarsDataFeed",
+        "Auto-detect feed type or explicit parameter",
+        "Feature flag USE_POLARS_FEED (default False for backward compat)",
+        "All existing integration tests pass with ParquetDataFeed",
+        "New integration tests pass with PolarsDataFeed",
+        "Performance regression test: PolarsDataFeed >= ParquetDataFeed throughput",
+        "Documentation migration guide from ParquetDataFeed to PolarsDataFeed",
+        "No breaking changes to existing Strategy API"
+      ],
+      "estimated_hours": 12,
+      "priority": "high",
+      "notes": "Careful integration ensures backward compatibility. Feature flag allows gradual adoption."
+    },
+    {
+      "id": "TASK-INT-011",
+      "phase": "phase_1",
+      "title": "Trade recording schema with ML + Risk fields",
+      "description": "Define comprehensive trade recording schema capturing ML signals, features, risk rule decisions, and execution details for post-backtest analysis.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-001"
+      ],
+      "files": [
+        "src/ml4t/backtest/reporting/trade_schema.py"
+      ],
+      "acceptance_criteria": [
+        "Trade schema includes: entry/exit timestamps, prices, quantities",
+        "ML fields: ml_score, predicted_return, confidence at entry/exit",
+        "Feature fields: ATR, volatility, regime at entry/exit",
+        "Risk fields: triggered_rule, sl_price, tp_price, exit_reason",
+        "Context fields: VIX, market_regime, sector_performance",
+        "Polars-native schema (not pandas) for efficiency",
+        "Support incremental writes (append mode)",
+        "Parquet export with compression",
+        "Unit tests with synthetic trades",
+        "Documentation of schema fields"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Enables rich post-backtest analysis of ML and risk performance."
+    },
+    {
+      "id": "TASK-INT-012",
+      "phase": "phase_1",
+      "title": "Unit tests - Data layer (PolarsDataFeed, FeatureProvider, validation)",
+      "description": "Comprehensive unit tests for all data layer components ensuring correctness and performance.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-002",
+        "TASK-INT-003",
+        "TASK-INT-004",
+        "TASK-INT-005",
+        "TASK-INT-006"
+      ],
+      "files": [
+        "tests/unit/test_polars_data_feed.py",
+        "tests/unit/test_feature_provider.py",
+        "tests/unit/test_data_validation.py"
+      ],
+      "acceptance_criteria": [
+        "PolarsDataFeed tests: lazy loading, chunking, event generation, multi-source merging (20+ tests)",
+        "FeatureProvider tests: PrecomputedFeatureProvider, CallableFeatureProvider, missing features (15+ tests)",
+        "Validation tests: duplicates, price sanity, signal timing, OHLC consistency (25+ tests)",
+        "Edge cases: empty data, single row, missing columns, malformed timestamps",
+        "Performance tests: verify group_by speedup, memory usage targets",
+        "80%+ code coverage for data layer",
+        "All tests pass with pytest",
+        "Tests run in <30 seconds total"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Foundation quality assurance. Must achieve 80%+ coverage."
+    },
+    {
+      "id": "TASK-INT-013",
+      "phase": "phase_1",
+      "title": "Integration test - End-to-end ML strategy with PolarsDataFeed",
+      "description": "End-to-end integration test validating complete workflow from PolarsDataFeed through strategy execution to trade recording.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-010",
+        "TASK-INT-011"
+      ],
+      "files": [
+        "tests/integration/test_ml_strategy_polars.py"
+      ],
+      "acceptance_criteria": [
+        "Create synthetic multi-asset dataset (10 symbols, 252 days) with ML scores and features",
+        "Simple ML strategy: buy top 3 by ml_score, equal weight",
+        "Execute backtest using PolarsDataFeed",
+        "Verify trades recorded with ML fields populated",
+        "Verify features available in strategy via MarketEvent.indicators",
+        "Verify context available via MarketEvent.context",
+        "Performance benchmark: >10k events/sec with empty strategy",
+        "Memory benchmark: <200MB for test data",
+        "Test completes in <5 seconds"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Validates entire ML data pipeline works end-to-end."
+    },
+    {
+      "id": "TASK-INT-014",
+      "phase": "phase_1",
+      "title": "Documentation - Data architecture guide and API reference",
+      "description": "Comprehensive documentation for data architecture including PolarsDataFeed usage, FeatureProvider integration, configuration, and optimization guidelines.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-003",
+        "TASK-INT-007"
+      ],
+      "files": [
+        "docs/guides/data_architecture.md",
+        "docs/api/data_layer.md"
+      ],
+      "acceptance_criteria": [
+        "Data architecture guide covering: PolarsDataFeed design, lazy loading, chunking, validation",
+        "FeatureProvider integration guide: when to use PrecomputedFeatureProvider vs CallableFeatureProvider",
+        "Configuration guide: YAML examples for common scenarios",
+        "Migration guide: ParquetDataFeed \u2192 PolarsDataFeed with code examples",
+        "Optimization guide: compression, categorical encoding, partitioning strategies",
+        "Performance tuning section: memory targets, throughput targets, profiling tips",
+        "API reference for all public classes and methods",
+        "Code examples for typical workflows",
+        "Troubleshooting section with common issues"
+      ],
+      "estimated_hours": 8,
+      "priority": "medium",
+      "notes": "Users need clear guidance on data layer usage and optimization."
+    },
+    {
+      "id": "TASK-INT-015",
+      "phase": "phase_1",
+      "title": "Performance benchmarks - Phase 1 validation",
+      "description": "Comprehensive performance benchmarks validating Phase 1 meets all performance targets before proceeding to Phase 2.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-013"
+      ],
+      "files": [
+        "tests/benchmarks/benchmark_data_layer.py"
+      ],
+      "acceptance_criteria": [
+        "Event generation throughput: 100k+ events/sec with empty strategy (target: 10-30k with real strategy)",
+        "Memory usage: <2GB for 250 symbols \u00d7 1 year daily data",
+        "Data loading: <500ms for lazy load initialization",
+        "Validation overhead: <1 second for full dataset validation",
+        "FeatureProvider lookup: <10\u03bcs per feature (cached)",
+        "Benchmarks document results with hardware specs",
+        "Comparison to baseline (ParquetDataFeed) showing improvement or parity",
+        "Profiling results identifying any bottlenecks",
+        "Pass/fail determination based on targets"
+      ],
+      "estimated_hours": 6,
+      "priority": "medium",
+      "notes": "Quality gate for Phase 1. Must pass before Phase 2 begins."
+    },
+    {
+      "id": "TASK-INT-016",
+      "phase": "phase_2",
+      "title": "Create RiskContext dataclass with lazy properties",
+      "description": "Implement immutable RiskContext dataclass capturing position, market, and portfolio state for rule evaluation. Includes lazy @property evaluation for performance and explicit per-asset vs market-wide features.",
+      "type": "foundation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-001",
+        "TASK-INT-002"
+      ],
+      "files": [
+        "src/ml4t/backtest/risk/context.py"
+      ],
+      "acceptance_criteria": [
+        "RiskContext frozen dataclass in risk/context.py",
+        "Fields: timestamp, asset_id, market prices (OHLCV, bid/ask)",
+        "Position state fields: quantity, entry_price, entry_time, bars_held",
+        "Portfolio state fields: equity, cash, leverage",
+        "features: dict[str, float] for per-asset features (ATR, ml_score) - populated from MarketEvent.indicators",
+        "market_features: dict[str, float] for market-wide features (VIX, SPY) - populated from MarketEvent.context",
+        "Lazy @property for expensive fields: unrealized_pnl, max_favorable_excursion, max_adverse_excursion",
+        "Builder method: from_state(market_event, position, portfolio, feature_provider) \u2192 RiskContext",
+        "Comprehensive docstring with multi-asset examples",
+        "Unit tests verifying lazy evaluation and field population"
+      ],
+      "estimated_hours": 6,
+      "priority": "critical",
+      "notes": "Lazy properties reduce context build time by 50-70% when rules don't use all fields."
+    },
+    {
+      "id": "TASK-INT-017",
+      "phase": "phase_2",
+      "title": "Create RiskDecision and RiskRule interfaces",
+      "description": "Implement RiskDecision output dataclass and RiskRule abstract base for composable risk rules.",
+      "type": "foundation",
+      "status": "pending",
+      "dependencies": [],
+      "files": [
+        "src/ml4t/backtest/risk/decision.py",
+        "src/ml4t/backtest/risk/rule.py"
+      ],
+      "acceptance_criteria": [
+        "RiskDecision dataclass: should_exit, exit_type, exit_price, update_sl/tp, reason, metadata",
+        "Factory methods: no_action(), exit_now(), update_stops()",
+        "Merge method for combining multiple decisions with priority rules",
+        "RiskRule ABC with abstract evaluate(context: RiskContext) \u2192 RiskDecision",
+        "Optional validate_order(order, context) \u2192 Order | None method",
+        "Optional priority property for conflict resolution",
+        "Protocol support for callable rules",
+        "Comprehensive docstrings with implementation guide",
+        "Unit tests for decision merging and rule interface"
+      ],
+      "estimated_hours": 4,
+      "priority": "critical",
+      "notes": "Clean abstractions enable composable risk rules."
+    },
+    {
+      "id": "TASK-INT-018",
+      "phase": "phase_2",
+      "title": "Create RiskManager with context caching",
+      "description": "Implement RiskManager orchestrating rule evaluation with context caching for performance. Integrates with FeatureProvider for feature access.",
+      "type": "foundation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-016",
+        "TASK-INT-017"
+      ],
+      "files": [
+        "src/ml4t/backtest/risk/manager.py"
+      ],
+      "acceptance_criteria": [
+        "RiskManager class with register_rule(rule: RiskRule) method",
+        "check_position_exits(market_event, broker, portfolio) \u2192 list[Order] implementation",
+        "validate_order(order, context) \u2192 Order | None implementation",
+        "record_fill(fill_event, market_event) method updating position state",
+        "_position_state: dict[AssetId, PositionTradeState] tracking",
+        "_position_levels: dict[AssetId, PositionLevels] for SL/TP price tracking",
+        "_context_cache: dict[tuple[AssetId, datetime], RiskContext] for per-event caching (10x speedup)",
+        "_build_context(asset_id, market_event, broker, portfolio, feature_provider) helper with cache lookup",
+        "Optional feature_provider parameter in __init__",
+        "Comprehensive docstrings and type hints",
+        "Unit tests for all methods with mocked dependencies"
+      ],
+      "estimated_hours": 10,
+      "priority": "critical",
+      "notes": "Context caching reduces builds from O(n\u00d7m) to O(n), ~10x improvement with 10 rules."
+    },
+    {
+      "id": "TASK-INT-019",
+      "phase": "phase_2",
+      "title": "Engine integration - Risk Management hooks",
+      "description": "Integrate RiskManager into BacktestEngine event loop with three hooks: position exit checking, order validation, fill recording.",
+      "type": "integration",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-018"
+      ],
+      "files": [
+        "src/ml4t/backtest/engine.py"
+      ],
+      "acceptance_criteria": [
+        "Add optional risk_manager parameter to BacktestEngine.__init__()",
+        "Hook C (before strategy): exit_orders = risk_manager.check_position_exits() if risk_manager",
+        "Hook B (after strategy, before broker): validated = risk_manager.validate_order(order) if risk_manager",
+        "Hook D (after fills): risk_manager.record_fill(fill_event, market_event) if risk_manager",
+        "Feature flag USE_RISK_MANAGER (default False for backward compat)",
+        "No behavior change when risk_manager=None",
+        "Integration tests with mock RiskManager verifying each hook",
+        "Backward compatibility tests: all existing tests pass with risk_manager=None",
+        "Performance test: overhead <2% with empty RiskManager"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical",
+      "notes": "Careful integration preserves backward compatibility. Three hooks cover all use cases."
+    },
+    {
+      "id": "TASK-INT-020",
+      "phase": "phase_2",
+      "title": "Implement basic risk rules - TimeBasedExit, PriceBasedStopLoss, PriceBasedTakeProfit",
+      "description": "Implement three basic risk rules for infrastructure testing and simple strategies.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-017"
+      ],
+      "files": [
+        "src/ml4t/backtest/risk/rules/time_based.py",
+        "src/ml4t/backtest/risk/rules/price_based.py"
+      ],
+      "acceptance_criteria": [
+        "TimeBasedExit(max_bars) rule exits position after holding period",
+        "PriceBasedStopLoss(sl_price) rule exits if price <= sl_price (long) or price >= sl_price (short)",
+        "PriceBasedTakeProfit(tp_price) rule exits if price >= tp_price (long) or price <= tp_price (short)",
+        "All rules return proper RiskDecision with exit reasons",
+        "Unit tests for each rule with synthetic RiskContext",
+        "Integration tests with real backtest",
+        "Docstrings with usage examples"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Simple rules validate infrastructure and serve common use cases."
+    },
+    {
+      "id": "TASK-INT-021",
+      "phase": "phase_2",
+      "title": "Position state tracking - entry bars, MFE, MAE",
+      "description": "Implement PositionTradeState tracking entry info, bars held, max favorable/adverse excursion for rule evaluation.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-018"
+      ],
+      "files": [
+        "src/ml4t/backtest/risk/position_state.py"
+      ],
+      "acceptance_criteria": [
+        "PositionTradeState dataclass with: asset_id, entry_time, entry_price, entry_quantity",
+        "Tracking fields: entry_bars (counter), max_favorable_excursion, max_adverse_excursion",
+        "update_on_market_event(market_price, timestamp) method incrementing bar counter and updating MFE/MAE",
+        "MFE tracking: max(MFE, current_price - entry_price) for long, max(MFE, entry_price - current_price) for short",
+        "MAE tracking: max(MAE, entry_price - current_price) for long, max(MAE, current_price - entry_price) for short",
+        "RiskManager.check_position_exits() calls update_on_market_event() for each position",
+        "RiskContext populated from PositionTradeState",
+        "Unit tests verifying bar count, MFE, MAE updates",
+        "Integration test: TimeBasedExit triggers at exact bar count"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Essential for time-based and trailing stop rules."
+    },
+    {
+      "id": "TASK-INT-022",
+      "phase": "phase_2",
+      "title": "Unit tests - Risk Management core",
+      "description": "Comprehensive unit tests for RiskContext, RiskDecision, RiskRule, RiskManager core functionality.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-016",
+        "TASK-INT-017",
+        "TASK-INT-018",
+        "TASK-INT-020",
+        "TASK-INT-021"
+      ],
+      "files": [
+        "tests/unit/test_risk_context.py",
+        "tests/unit/test_risk_decision.py",
+        "tests/unit/test_risk_manager.py"
+      ],
+      "acceptance_criteria": [
+        "RiskContext tests: immutability, builder method, lazy properties, field validation (20+ tests)",
+        "RiskDecision tests: factory methods, merge logic, priority, edge cases (15+ tests)",
+        "RiskManager tests: register_rule, record_fill, _build_context, position state tracking (25+ tests)",
+        "Basic rule tests: TimeBasedExit, PriceBasedStopLoss, PriceBasedTakeProfit (15+ tests)",
+        "Mock MarketEvent, FillEvent, Broker, Portfolio for isolation",
+        "80%+ code coverage for risk module",
+        "All tests pass with pytest",
+        "Tests run in <20 seconds"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical",
+      "notes": "Foundation quality assurance for risk management."
+    },
+    {
+      "id": "TASK-INT-023",
+      "phase": "phase_2",
+      "title": "Integration test - Risk Management engine integration",
+      "description": "End-to-end integration test verifying all three hooks (exit checking, order validation, fill recording) work correctly in backtest.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-019"
+      ],
+      "files": [
+        "tests/integration/test_risk_engine_integration.py"
+      ],
+      "acceptance_criteria": [
+        "Test Hook C: verify check_position_exits called before strategy signal generation",
+        "Test Hook B: verify validate_order called after strategy, verify order rejection works",
+        "Test Hook D: verify record_fill updates position state correctly",
+        "End-to-end scenario: TimeBasedExit rule triggers exit in real backtest",
+        "Verify fills, portfolio updates, trades recorded with exit reasons",
+        "5+ scenarios covering different rule combinations",
+        "Performance test: verify overhead <3% vs no RiskManager",
+        "Test completes in <10 seconds"
+      ],
+      "estimated_hours": 6,
+      "priority": "critical",
+      "notes": "Validates complete integration of risk management into engine."
+    },
+    {
+      "id": "TASK-INT-024",
+      "phase": "phase_2",
+      "title": "Documentation - Risk Management core guide",
+      "description": "User guide for risk management system covering RiskContext, rules, RiskManager usage, and integration patterns.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-018"
+      ],
+      "files": [
+        "docs/guides/risk_management_quickstart.md",
+        "docs/api/risk_management.md"
+      ],
+      "acceptance_criteria": [
+        "Quickstart guide: 5-minute intro to RiskManager with simple example",
+        "Core concepts: RiskContext fields, RiskDecision structure, RiskRule interface",
+        "Basic rules guide: TimeBasedExit, PriceBasedStopLoss/TakeProfit usage",
+        "Integration guide: how to add RiskManager to backtest",
+        "Feature integration: how FeatureProvider connects to RiskContext",
+        "API reference for all public classes and methods",
+        "Code examples for common scenarios",
+        "Troubleshooting section"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Clear documentation essential for user adoption."
+    },
+    {
+      "id": "TASK-INT-025",
+      "phase": "phase_2",
+      "title": "Performance benchmarks - Phase 2 validation",
+      "description": "Benchmark RiskManager performance validating <3% overhead target before proceeding to Phase 3.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-023"
+      ],
+      "files": [
+        "tests/benchmarks/benchmark_risk_core.py"
+      ],
+      "acceptance_criteria": [
+        "Baseline: backtest throughput without RiskManager",
+        "With RiskManager: throughput with 3 basic rules, 20 open positions",
+        "Overhead calculation: (baseline - with_risk) / baseline < 3%",
+        "Context caching validation: verify 10x fewer context builds with 10 rules",
+        "Lazy property validation: verify properties only evaluated when accessed",
+        "Memory overhead: <5% increase with RiskManager",
+        "Benchmark results documented with hardware specs",
+        "Pass/fail determination based on overhead target"
+      ],
+      "estimated_hours": 4,
+      "priority": "medium",
+      "notes": "Quality gate for Phase 2. Must pass before Phase 3 begins."
+    },
+    {
+      "id": "TASK-INT-026",
+      "phase": "phase_3",
+      "title": "Enhanced trade recording with ML and risk attribution",
+      "description": "Extend trade recording to capture ML signals, features, risk rule decisions for comprehensive post-backtest analysis.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-011",
+        "TASK-INT-018"
+      ],
+      "parallel_batch": "batch_A",
+      "files": [
+        "src/ml4t/backtest/reporting/trade_recorder.py"
+      ],
+      "acceptance_criteria": [
+        "Trade record includes: ml_score_entry, ml_score_exit, predicted_return",
+        "Feature values at entry/exit: ATR, volatility, regime",
+        "Risk attribution: triggered_rule, sl_price, tp_price, exit_reason",
+        "Context at entry/exit: VIX, market_regime",
+        "Timing: bars_held, entry_time, exit_time",
+        "P&L attribution: strategy_pnl, risk_pnl (from early/late exits)",
+        "Parquet export with schema validation",
+        "Unit tests with synthetic trades",
+        "Integration test with ML strategy + risk rules"
+      ],
+      "estimated_hours": 8,
+      "priority": "medium",
+      "notes": "Enables attribution analysis: which rules helped/hurt performance."
+    },
+    {
+      "id": "TASK-INT-027",
+      "phase": "phase_3",
+      "title": "Trade analysis utilities - win rate by rule, avg hold time, attribution",
+      "description": "Utility functions for analyzing trades by risk rule, calculating performance attribution, and generating summary statistics.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-026"
+      ],
+      "parallel_batch": "batch_A",
+      "files": [
+        "src/ml4t/backtest/reporting/trade_analysis.py"
+      ],
+      "acceptance_criteria": [
+        "win_rate_by_rule(trades) \u2192 dict[str, float] calculating win rate per exit rule",
+        "avg_hold_time_by_rule(trades) \u2192 dict[str, timedelta]",
+        "pnl_attribution(trades) \u2192 dict[str, float] showing contribution of each rule to total P&L",
+        "rule_effectiveness(trades) \u2192 DataFrame with rule stats (triggers, wins, avg_pnl)",
+        "feature_correlation(trades) \u2192 correlation of features with trade outcomes",
+        "Polars-native implementation for performance",
+        "Unit tests with synthetic trade data",
+        "Example notebook demonstrating analysis"
+      ],
+      "estimated_hours": 6,
+      "priority": "medium",
+      "notes": "Essential for understanding which risk rules are effective."
+    },
+    {
+      "id": "TASK-INT-028",
+      "phase": "phase_3",
+      "title": "Visualization utilities for trade analysis",
+      "description": "Plotting utilities for visualizing trade distributions, rule performance, and feature importance.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-027"
+      ],
+      "parallel_batch": "batch_A",
+      "files": [
+        "src/ml4t/backtest/reporting/visualizations.py"
+      ],
+      "acceptance_criteria": [
+        "plot_rule_performance(trades) showing win rate, avg P&L by rule",
+        "plot_hold_time_distribution(trades) histogram of bars held",
+        "plot_feature_importance(trades) showing feature correlation with outcomes",
+        "plot_exit_reasons(trades) pie chart of exit rule triggers",
+        "plot_mfe_mae_scatter(trades) visualizing exit efficiency",
+        "Uses matplotlib with clean, publication-ready styling",
+        "All plots have proper labels, legends, titles",
+        "Unit tests generating plots with synthetic data",
+        "Example notebook with visualization gallery"
+      ],
+      "estimated_hours": 8,
+      "priority": "low",
+      "notes": "Helps users understand risk rule effectiveness visually."
+    },
+    {
+      "id": "TASK-INT-029",
+      "phase": "phase_3",
+      "title": "Unit tests - Trade recording and analysis",
+      "description": "Comprehensive tests for enhanced trade recording and analysis utilities.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-027",
+        "TASK-INT-028"
+      ],
+      "parallel_batch": "batch_A",
+      "files": [
+        "tests/unit/test_trade_recorder.py",
+        "tests/unit/test_trade_analysis.py"
+      ],
+      "acceptance_criteria": [
+        "Trade recorder tests: schema validation, field population, Parquet export (15+ tests)",
+        "Trade analysis tests: win_rate_by_rule, pnl_attribution, feature_correlation (20+ tests)",
+        "Visualization tests: plot generation without errors (10+ tests)",
+        "Edge cases: no trades, single trade, all losing trades",
+        "Performance tests: analysis of 10k trades < 1 second",
+        "80%+ code coverage",
+        "All tests pass"
+      ],
+      "estimated_hours": 6,
+      "priority": "medium",
+      "notes": "Quality assurance for reporting features."
+    },
+    {
+      "id": "TASK-INT-030",
+      "phase": "phase_3",
+      "title": "Integration test - Complete trade analysis workflow",
+      "description": "End-to-end test validating trade recording, analysis, and visualization with ML strategy + risk rules.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-026",
+        "TASK-INT-027"
+      ],
+      "parallel_batch": "batch_A",
+      "files": [
+        "tests/integration/test_trade_analysis_workflow.py"
+      ],
+      "acceptance_criteria": [
+        "Run backtest with ML strategy + multiple risk rules (volatility-scaled, time-based)",
+        "Verify trades recorded with all ML and risk fields populated",
+        "Compute win_rate_by_rule and verify reasonable results",
+        "Compute pnl_attribution and verify sum equals total P&L",
+        "Generate all visualizations without errors",
+        "Export to Parquet and reload for analysis",
+        "Test completes in <15 seconds",
+        "Results match expected values for synthetic data"
+      ],
+      "estimated_hours": 4,
+      "priority": "medium",
+      "notes": "Validates complete reporting pipeline."
+    },
+    {
+      "id": "TASK-INT-031",
+      "phase": "phase_3",
+      "title": "Implement VolatilityScaledStopLoss and TakeProfit rules",
+      "description": "Implement stop loss and take profit rules scaled to ATR or realized volatility for adaptive risk management.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-017"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "src/ml4t/backtest/risk/rules/volatility_scaled.py"
+      ],
+      "acceptance_criteria": [
+        "VolatilityScaledStopLoss(atr_multiplier) rule: SL = entry_price - (multiplier \u00d7 ATR)",
+        "VolatilityScaledTakeProfit(atr_multiplier) rule: TP = entry_price + (multiplier \u00d7 ATR)",
+        "Reads ATR from context.features['atr'] (populated from MarketEvent.indicators)",
+        "Supports both ATR and realized volatility (configurable)",
+        "evaluate() returns RiskDecision with update_sl/update_tp",
+        "Handles long and short positions correctly",
+        "Unit tests with synthetic volatility data",
+        "Integration test comparing to fixed percentage stops",
+        "Docstring with usage examples and recommended multipliers"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Critical advanced rule. Adapts to market volatility for better risk management."
+    },
+    {
+      "id": "TASK-INT-032",
+      "phase": "phase_3",
+      "title": "Implement DynamicTrailingStop rule",
+      "description": "Implement trailing stop that tightens over position lifetime for profit protection.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-021"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "src/ml4t/backtest/risk/rules/dynamic_trailing.py"
+      ],
+      "acceptance_criteria": [
+        "DynamicTrailingStop(initial_trail_pct, tighten_rate) rule",
+        "Trail tightens over time: trail = initial - (bars_held \u00d7 tighten_rate)",
+        "SL tracks max_favorable_excursion with current trail distance",
+        "Never moves SL backward (only tightens)",
+        "evaluate() returns RiskDecision with updated SL",
+        "Unit tests verifying trail tightening behavior",
+        "Integration test comparing to fixed trailing stop",
+        "Scenario test: captures most of large move, exits on reversal"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Protects profits while allowing trend to develop."
+    },
+    {
+      "id": "TASK-INT-033",
+      "phase": "phase_3",
+      "title": "Implement RegimeDependentRule with VIX filtering",
+      "description": "Implement rule with different parameters based on market regime (high/low volatility, trending/mean-reverting).",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-017"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "src/ml4t/backtest/risk/rules/regime_dependent.py"
+      ],
+      "acceptance_criteria": [
+        "RegimeDependentRule(regime_rules: dict[str, RiskRule]) composite rule",
+        "Reads regime from context.market_features['regime'] or context.market_features['vix']",
+        "Delegates to appropriate rule based on current regime",
+        "Support regime labels: 'high_vol', 'low_vol', 'trending', 'mean_reverting'",
+        "VIX-based regime: high_vol if VIX > threshold, else low_vol",
+        "Unit tests with regime transitions",
+        "Integration test with real regime classification",
+        "Example: tight stops in high VIX, wide stops in low VIX"
+      ],
+      "estimated_hours": 8,
+      "priority": "medium",
+      "notes": "Enables context-dependent risk management. VIX filtering is common use case."
+    },
+    {
+      "id": "TASK-INT-034",
+      "phase": "phase_3",
+      "title": "Implement portfolio constraint rules - MaxDailyLoss, MaxDrawdown, MaxLeverage",
+      "description": "Implement portfolio-level constraint rules limiting daily loss, drawdown, and leverage.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-017"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "src/ml4t/backtest/risk/rules/portfolio_constraints.py"
+      ],
+      "acceptance_criteria": [
+        "MaxDailyLossRule(max_loss_pct) rejects orders when daily_pnl < -threshold",
+        "MaxDrawdownRule(max_dd_pct) rejects orders when current_dd > threshold",
+        "MaxLeverageRule(max_leverage) reduces/rejects orders to maintain leverage limit",
+        "All rules implement validate_order() method (not evaluate())",
+        "Track daily P&L with session reset",
+        "Track high-water mark for drawdown calculation",
+        "Calculate proposed leverage if order filled",
+        "Unit tests with constraint violations",
+        "Integration tests verifying trading halts/resumes correctly"
+      ],
+      "estimated_hours": 10,
+      "priority": "high",
+      "notes": "Portfolio protection rules prevent catastrophic losses."
+    },
+    {
+      "id": "TASK-INT-035",
+      "phase": "phase_3",
+      "title": "Implement rule priority and conflict resolution",
+      "description": "Add priority system to resolve conflicts when multiple rules modify same order. Most conservative (tightest) stop wins by default.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-017",
+        "TASK-INT-018"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "src/ml4t/backtest/risk/rule.py",
+        "src/ml4t/backtest/risk/manager.py",
+        "docs/guides/conflict_resolution.md"
+      ],
+      "acceptance_criteria": [
+        "Add priority: int property to RiskRule (default 100)",
+        "_resolve_sl_conflicts() method: uses max(sl_values) for long (tightest/most conservative)",
+        "_resolve_tp_conflicts() method: uses min(tp_values) for long (most conservative)",
+        "Priority override: higher priority (200) overrides lower (100) when explicitly set",
+        "Default (same priority): most conservative wins automatically",
+        "Unit test: two rules set different SL, verify max() chosen",
+        "Unit test: rules with different priorities, verify priority override",
+        "Integration test: VolatilityScaled + DynamicTrailing, verify tightest SL used",
+        "Documentation with decision matrix and examples"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Clear conflict resolution critical for user confidence with multiple rules."
+    },
+    {
+      "id": "TASK-INT-036",
+      "phase": "phase_3",
+      "title": "Unit tests - Advanced risk rules",
+      "description": "Comprehensive tests for advanced risk rules: volatility-scaled, trailing stops, regime-dependent, portfolio constraints.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-031",
+        "TASK-INT-032",
+        "TASK-INT-033",
+        "TASK-INT-034",
+        "TASK-INT-035"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "tests/unit/test_volatility_scaled.py",
+        "tests/unit/test_dynamic_trailing.py",
+        "tests/unit/test_regime_dependent.py",
+        "tests/unit/test_portfolio_constraints.py",
+        "tests/unit/test_rule_conflicts.py"
+      ],
+      "acceptance_criteria": [
+        "Volatility-scaled tests: ATR scaling, long/short positions, different volatility regimes (15+ tests)",
+        "Trailing stop tests: tightening behavior, MFE tracking, no backward movement (12+ tests)",
+        "Regime-dependent tests: regime transitions, VIX thresholds, rule delegation (10+ tests)",
+        "Portfolio constraint tests: daily loss limit, drawdown limit, leverage limit (15+ tests)",
+        "Conflict resolution tests: same priority (conservative wins), different priority (override), SL vs TP (12+ tests)",
+        "Edge cases: zero volatility, extreme regimes, constraint recovery",
+        "80%+ code coverage",
+        "All tests pass"
+      ],
+      "estimated_hours": 10,
+      "priority": "high",
+      "notes": "Quality assurance for advanced features."
+    },
+    {
+      "id": "TASK-INT-037",
+      "phase": "phase_3",
+      "title": "Integration test - Advanced risk rules in backtest",
+      "description": "End-to-end scenarios validating advanced rules work correctly in real backtests.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-031",
+        "TASK-INT-032",
+        "TASK-INT-033",
+        "TASK-INT-034"
+      ],
+      "parallel_batch": "batch_B",
+      "files": [
+        "tests/integration/test_advanced_risk_scenarios.py"
+      ],
+      "acceptance_criteria": [
+        "Scenario 1: Volatility-scaled stops adapt to changing ATR correctly",
+        "Scenario 2: Dynamic trailing stop captures trend and exits on reversal",
+        "Scenario 3: Regime-dependent rules switch at VIX threshold",
+        "Scenario 4: Portfolio constraints halt trading during drawdown, resume after recovery",
+        "Scenario 5: Multiple rules combined (volatility + trailing + time), verify conflict resolution",
+        "Each scenario validates expected trades, exit reasons, P&L",
+        "Performance: overhead <5% vs simple rules",
+        "All scenarios complete in <30 seconds total"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Validates advanced rules work correctly in realistic scenarios."
+    },
+    {
+      "id": "TASK-INT-038",
+      "phase": "phase_3",
+      "title": "Refactor FillSimulator to accept MarketEvent (with backward compatibility)",
+      "description": "Refactor FillSimulator to accept full MarketEvent instead of separate OHLC parameters, enabling access to bid/ask, volume for enhanced slippage models.",
+      "type": "refactoring",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-001"
+      ],
+      "parallel_batch": "batch_C",
+      "files": [
+        "src/ml4t/backtest/execution/fill_simulator.py"
+      ],
+      "acceptance_criteria": [
+        "Change simulate_fill() signature to accept MarketEvent (plus order, commission, slippage)",
+        "Extract OHLC from market_event internally",
+        "BACKWARD COMPATIBILITY: Support both old (OHLC params) and new (MarketEvent) signatures with deprecation warning",
+        "Update all call sites in Broker to use new signature",
+        "Update all existing tests to use new signature",
+        "Comprehensive backward compat test suite (100+ tests)",
+        "Performance: no overhead vs old implementation",
+        "Migration guide in documentation"
+      ],
+      "estimated_hours": 10,
+      "priority": "high",
+      "risk": "high",
+      "notes": "HIGH RISK breaking change. Backward compat testing is critical."
+    },
+    {
+      "id": "TASK-INT-039",
+      "phase": "phase_3",
+      "title": "Implement enhanced slippage models - SpreadAware, VolumeAware, OrderTypeDependent",
+      "description": "Implement realistic slippage models using bid/ask spread, volume participation rate, and order type from MarketEvent.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-038"
+      ],
+      "parallel_batch": "batch_C",
+      "files": [
+        "src/ml4t/backtest/execution/slippage.py"
+      ],
+      "acceptance_criteria": [
+        "SpreadAwareSlippage: for market orders, fill at mid \u00b1 k \u00d7 spread (k configurable, default 0.5)",
+        "VolumeAwareSlippage: slippage = f(order_size / avg_volume) with square-root or linear impact",
+        "OrderTypeDependentSlippage: different slippage for MARKET, LIMIT, STOP orders",
+        "Extract bid/ask, volume from MarketEvent.bid_price, ask_price, volume fields",
+        "Fallback to PercentageSlippage if bid/ask missing",
+        "Unit tests with known spreads/volumes",
+        "Integration test comparing models with synthetic data",
+        "Documentation on model selection and calibration"
+      ],
+      "estimated_hours": 12,
+      "priority": "medium",
+      "notes": "Enables more realistic transaction cost modeling."
+    },
+    {
+      "id": "TASK-INT-040",
+      "phase": "phase_3",
+      "title": "Integration test - Enhanced slippage models validation",
+      "description": "Validate enhanced slippage models produce realistic transaction costs in backtests.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-039"
+      ],
+      "parallel_batch": "batch_C",
+      "files": [
+        "tests/integration/test_enhanced_slippage.py"
+      ],
+      "acceptance_criteria": [
+        "Test SpreadAwareSlippage: verify slippage scales with bid/ask spread",
+        "Test VolumeAwareSlippage: verify participation rate impact on slippage",
+        "Test OrderTypeDependentSlippage: verify different fills by order type",
+        "Compare all models to baseline PercentageSlippage",
+        "Verify slippage costs are within realistic ranges (0.01% - 0.5% depending on model)",
+        "Performance: no significant overhead vs simple slippage",
+        "Documentation on when to use each model",
+        "Test completes in <10 seconds"
+      ],
+      "estimated_hours": 6,
+      "priority": "medium",
+      "notes": "Validates slippage models are realistic and performant."
+    },
+    {
+      "id": "TASK-INT-041",
+      "phase": "phase_4",
+      "title": "Complete Top 25 ML Strategy example notebook",
+      "description": "Create comprehensive end-to-end example demonstrating ML-driven multi-asset strategy with integrated risk management. THE reference example users will copy.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-031",
+        "TASK-INT-032",
+        "TASK-INT-020"
+      ],
+      "files": [
+        "examples/integrated/00_top25_ml_strategy.ipynb",
+        "examples/integrated/data/"
+      ],
+      "acceptance_criteria": [
+        "Complete working example: 500-stock universe, select top 25 by ML scores",
+        "Multi-asset data preparation with features (ATR, ml_score, volume, regime)",
+        "FeatureProvider setup: PrecomputedFeatureProvider with features DataFrame",
+        "Strategy implementation using on_timestamp_batch() for multi-asset",
+        "Risk rules: VolatilityScaledStopLoss(2.0 \u00d7 ATR) + DynamicTrailingStop(5%, 0.1%/bar) + TimeBasedExit(60 bars)",
+        "Context integration: VIX filtering (don't trade if VIX > 30)",
+        "Position sizing: equal weight allocation (4% per position, max 25 positions)",
+        "Clear explanation of data flow: Parquet \u2192 PolarsDataFeed \u2192 MarketEvent \u2192 Strategy/RiskManager",
+        "Demonstrates conflict resolution: trailing stop tightens over volatility-scaled base",
+        "Performance metrics: Sharpe, max DD, avg hold time, win rate by rule",
+        "Trade analysis: attribution by rule, feature correlation",
+        "Includes synthetic ML scores for reproducibility",
+        "Executable without errors, completes in <60 seconds",
+        "Step-by-step documentation explaining each section"
+      ],
+      "estimated_hours": 12,
+      "priority": "critical",
+      "notes": "THE reference example. Must be crystal clear, comprehensive, and executable."
+    },
+    {
+      "id": "TASK-INT-042",
+      "phase": "phase_4",
+      "title": "Create example notebooks for specific features",
+      "description": "Create focused example notebooks demonstrating specific features: volatility-scaled stops, regime-dependent rules, enhanced slippage.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-041"
+      ],
+      "files": [
+        "examples/integrated/01_volatility_scaled.ipynb",
+        "examples/integrated/02_regime_dependent.ipynb",
+        "examples/integrated/03_enhanced_slippage.ipynb"
+      ],
+      "acceptance_criteria": [
+        "01_volatility_scaled.ipynb: Compare volatility-scaled vs fixed percentage stops, visualize ATR and stop levels",
+        "02_regime_dependent.ipynb: VIX-based regime classification, different rules per regime, regime transition visualization",
+        "03_enhanced_slippage.ipynb: Compare spread-aware, volume-aware, order-type slippage models",
+        "Each notebook focuses on ONE feature with clear before/after comparison",
+        "Performance metrics showing improvement from feature",
+        "Visualizations for key concepts",
+        "All executable without errors",
+        "Each completes in <30 seconds"
+      ],
+      "estimated_hours": 10,
+      "priority": "medium",
+      "notes": "Focused examples help users understand specific features in isolation."
+    },
+    {
+      "id": "TASK-INT-043",
+      "phase": "phase_4",
+      "title": "Create configuration examples (YAML/JSON)",
+      "description": "Create example configuration files for common scenarios: simple strategy, ML strategy, ML + risk, multi-asset.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-007"
+      ],
+      "files": [
+        "examples/configs/simple_strategy.yaml",
+        "examples/configs/ml_strategy.yaml",
+        "examples/configs/ml_risk_multiasset.yaml"
+      ],
+      "acceptance_criteria": [
+        "simple_strategy.yaml: Single asset, basic rules (time-based exit, fixed stop)",
+        "ml_strategy.yaml: ML signals, features, basic risk rules",
+        "ml_risk_multiasset.yaml: Complete config for Top 25 example (data sources, features, risk rules)",
+        "All configs validated against Pydantic schema",
+        "Comments explaining each section",
+        "README explaining how to use configs with engine",
+        "Test script that loads each config and runs backtest"
+      ],
+      "estimated_hours": 4,
+      "priority": "medium",
+      "notes": "Declarative configs make it easy to experiment with different setups."
+    },
+    {
+      "id": "TASK-INT-044",
+      "phase": "phase_4",
+      "title": "Integration documentation - ML Data + Risk Management guide",
+      "description": "Comprehensive guide explaining how ML Data Architecture and Risk Management work together, data flow, integration patterns.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-014",
+        "TASK-INT-024"
+      ],
+      "files": [
+        "docs/guides/integrated_ml_risk.md"
+      ],
+      "acceptance_criteria": [
+        "Section 1: Architecture overview - how ML Data and Risk Management integrate",
+        "Section 2: Data flow diagram - Parquet \u2192 PolarsDataFeed \u2192 MarketEvent \u2192 Strategy/RiskManager",
+        "Section 3: Enhanced MarketEvent - signals vs indicators vs context usage patterns",
+        "Section 4: FeatureProvider integration - serving both ML strategies and risk rules",
+        "Section 5: Multi-asset workflows - batch mode strategy, context sharing",
+        "Section 6: Performance optimization - caching, lazy evaluation, memory management",
+        "Section 7: Common patterns - ML filtering with risk protection, regime-dependent strategies",
+        "Code examples for each pattern",
+        "Troubleshooting section"
+      ],
+      "estimated_hours": 8,
+      "priority": "high",
+      "notes": "Explains the integration story - why these systems work well together."
+    },
+    {
+      "id": "TASK-INT-045",
+      "phase": "phase_4",
+      "title": "API reference documentation (auto-generated + manual)",
+      "description": "Complete API reference for all public classes and methods, auto-generated from docstrings plus manual curation.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-044"
+      ],
+      "files": [
+        "docs/api/complete_reference.md"
+      ],
+      "acceptance_criteria": [
+        "Auto-generated API docs from docstrings using Sphinx or mkdocs",
+        "Manual curation for complex classes (RiskContext, RiskManager, PolarsDataFeed)",
+        "Cross-references between related classes",
+        "Code examples in docstrings",
+        "Organized by module: data, risk, execution, strategy, reporting",
+        "Search functionality",
+        "Version badge showing which version docs apply to",
+        "Build script for generating docs"
+      ],
+      "estimated_hours": 6,
+      "priority": "medium",
+      "notes": "Good API docs are essential for library adoption."
+    },
+    {
+      "id": "TASK-INT-046",
+      "phase": "phase_4",
+      "title": "Migration guide from separate ML/Risk implementations",
+      "description": "Guide for users migrating from basic setups to integrated ML + Risk architecture.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-044"
+      ],
+      "files": [
+        "docs/guides/migration_to_integrated.md"
+      ],
+      "acceptance_criteria": [
+        "Migration from ParquetDataFeed to PolarsDataFeed with code examples",
+        "Migration from simple Strategy to batch-mode Strategy",
+        "Migration from bracket orders to RiskManager",
+        "Adding FeatureProvider to existing strategy",
+        "Performance tuning checklist",
+        "Common migration issues and solutions",
+        "Backward compatibility guarantees",
+        "Incremental migration path (can adopt features gradually)"
+      ],
+      "estimated_hours": 4,
+      "priority": "high",
+      "notes": "Makes it easy for existing users to adopt new features."
+    },
+    {
+      "id": "TASK-INT-047",
+      "phase": "phase_4",
+      "title": "Performance validation - Complete system benchmarks",
+      "description": "Comprehensive performance benchmarks validating integrated system meets all targets.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-015",
+        "TASK-INT-025"
+      ],
+      "files": [
+        "tests/benchmarks/benchmark_integrated_system.py"
+      ],
+      "acceptance_criteria": [
+        "Throughput: 10-30k events/sec with real ML strategy + risk rules (250 symbols, 20 positions)",
+        "Memory: <2GB for 250 symbols \u00d7 1 year with all features",
+        "Backtest time: 2-5 minutes for 250 symbols \u00d7 1 year (typical workload)",
+        "Overhead breakdown: data layer <5%, risk layer <3%, total <8%",
+        "Scalability test: 500 symbols performance characteristics",
+        "Comparison to baseline (simple strategy, no risk)",
+        "Hardware specs documented",
+        "Pass/fail based on targets",
+        "Profiling results showing hot paths"
+      ],
+      "estimated_hours": 8,
+      "priority": "critical",
+      "notes": "Final validation that integrated system meets performance goals."
+    },
+    {
+      "id": "TASK-INT-048",
+      "phase": "phase_4",
+      "title": "Cross-framework validation - VectorBT/Backtrader alignment",
+      "description": "Validate ml4t.backtest produces equivalent results to VectorBT and Backtrader for same strategy configuration.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-041"
+      ],
+      "files": [
+        "tests/validation/test_integrated_framework_alignment.py"
+      ],
+      "acceptance_criteria": [
+        "Implement Top 25 ML strategy in VectorBT Pro using from_signals()",
+        "Implement same strategy in Backtrader with equivalent logic",
+        "Compare final portfolio values: ml4t.backtest vs VectorBT vs Backtrader",
+        "Variance tolerance: <0.5% difference (tighter than previous 2%)",
+        "Trade count and timing alignment",
+        "Commission and slippage equivalence verification",
+        "Document any systematic differences with explanations",
+        "Test passes with aligned results"
+      ],
+      "estimated_hours": 10,
+      "priority": "high",
+      "notes": "Proves correctness by matching established frameworks."
+    },
+    {
+      "id": "TASK-INT-049",
+      "phase": "phase_4",
+      "title": "Quality assurance - Complete test suite validation",
+      "description": "Final validation that complete test suite passes, coverage targets met, no regressions.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-047",
+        "TASK-INT-048"
+      ],
+      "files": [
+        "tests/"
+      ],
+      "acceptance_criteria": [
+        "All unit tests pass (300+ tests)",
+        "All integration tests pass (50+ tests)",
+        "All benchmark tests meet targets (10+ benchmarks)",
+        "Cross-framework validation passes (3-way alignment)",
+        "Overall code coverage: 80%+ (measured, not estimated)",
+        "Coverage by module: data 85%+, risk 85%+, execution 75%+, strategy 80%+",
+        "No critical or high severity linting issues (ruff)",
+        "Type checking passes with mypy --strict",
+        "All example notebooks execute without errors",
+        "Test suite completes in <5 minutes (excluding benchmarks)"
+      ],
+      "estimated_hours": 6,
+      "priority": "critical",
+      "notes": "Final quality gate before declaring implementation complete."
+    },
+    {
+      "id": "TASK-INT-050",
+      "phase": "phase_4",
+      "title": "Release preparation - Changelog, version, announcement",
+      "description": "Prepare for release: update changelog, bump version, create announcement, finalize documentation.",
+      "type": "release",
+      "status": "pending",
+      "dependencies": [
+        "TASK-INT-049"
+      ],
+      "files": [
+        "CHANGELOG.md",
+        "pyproject.toml",
+        "docs/releases/integrated_ml_risk.md"
+      ],
+      "acceptance_criteria": [
+        "CHANGELOG.md updated with all features, breaking changes, migrations",
+        "Version bumped to appropriate semver (e.g., 0.5.0 for major feature addition)",
+        "Release announcement drafted explaining features and benefits",
+        "Documentation site updated and deployed",
+        "All example notebooks tested on clean environment",
+        "Migration guide reviewed and tested",
+        "Breaking changes clearly documented",
+        "Deprecation warnings in place for old APIs",
+        "Release notes include performance improvements and benchmarks",
+        "Ready for GitHub release and PyPI upload"
+      ],
+      "estimated_hours": 6,
+      "priority": "high",
+      "notes": "Professional release preparation ensures smooth adoption."
+    }
+  ],
+  "completed_tasks": [],
+  "next_available": [
+    "TASK-INT-001",
+    "TASK-INT-002"
+  ],
+  "metrics": {
+    "total_tasks": 50,
+    "completed": 0,
+    "pending": 50,
+    "in_progress": 0,
+    "estimated_total_hours": 420,
+    "estimated_weeks": 10,
+    "phases_total": 4,
+    "phases_complete": 0,
+    "task_reduction_pct": 46,
+    "timeline_reduction_pct": 35,
+    "effort_reduction_pct": 30,
+    "comparison": {
+      "separate_implementation": {
+        "ml_data_tasks": 27,
+        "risk_management_tasks": 66,
+        "total_tasks": 93,
+        "total_hours": 600,
+        "total_weeks": 15.5
+      },
+      "integrated_implementation": {
+        "total_tasks": 50,
+        "total_hours": 420,
+        "total_weeks": 10
+      },
+      "savings": {
+        "tasks_eliminated": 43,
+        "hours_saved": 180,
+        "weeks_saved": 5.5
+      }
+    }
+  },
+  "quality_gates": {
+    "phase_1_exit": {
+      "performance": "Event generation >100k events/sec, memory <2GB for 250 symbols \u00d7 1 year",
+      "validation": "All data validation tests pass, no look-ahead bias possible",
+      "tests": "80%+ coverage, all unit and integration tests pass"
+    },
+    "phase_2_exit": {
+      "performance": "RiskManager overhead <3% vs baseline",
+      "integration": "All three hooks working correctly in engine",
+      "tests": "Risk management core tests pass, integration validated"
+    },
+    "phase_3_exit": {
+      "functionality": "All advanced features implemented and tested",
+      "performance": "Advanced rules overhead <5%",
+      "tests": "All parallel batch tests pass"
+    },
+    "phase_4_exit": {
+      "documentation": "All examples executable, documentation complete",
+      "validation": "Cross-framework alignment <0.5% variance",
+      "tests": "80%+ overall coverage, all tests pass",
+      "release_ready": "Changelog complete, version bumped, ready for release"
+    }
+  },
+  "notes": {
+    "critical_dependency": "Risk Management REQUIRES ML Data Architecture foundation. RiskContext needs enhanced MarketEvent with indicators/context dicts. Phase 1 must complete before Phase 2.",
+    "performance_optimizations": "group_by (not filter) is NON-NEGOTIABLE - 10-50x difference. Context caching gives 10x speedup with multiple rules. Lazy properties reduce build time 50-70%.",
+    "parallel_execution": "Phase 3 has three independent tracks (trade recording, advanced rules, slippage) that can run in parallel, reducing 150h sequential to 120h parallel (3 weeks).",
+    "integration_validation": "Top 25 ML strategy example (TASK-INT-041) is THE reference - must be comprehensive and executable. Cross-framework validation (TASK-INT-048) proves correctness."
+  },
+  "updated_at": "2025-11-17T14:37:57.149483Z"
+}

@@ -8,10 +8,15 @@ import pytest
 from ml4t.backtest.data.validation import (
     SignalTimingMode,
     SignalTimingViolation,
+    _parse_frequency_to_timedelta,
+    validate_comprehensive,
     validate_missing_data,
     validate_no_duplicate_timestamps,
     validate_ohlc_consistency,
+    validate_price_sanity,
     validate_signal_timing,
+    validate_time_series_gaps,
+    validate_volume_sanity,
 )
 
 
@@ -444,3 +449,424 @@ class TestMissingData:
         assert len(missing) == 1
         assert missing[0]["column"] == "asset_id"
         assert missing[0]["type"] == "missing_column"
+
+
+class TestVolumeSanityValidation:
+    """Test volume sanity validation."""
+
+    def test_valid_volumes(self):
+        """Test validation passes with valid volume data."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                "asset_id": ["AAPL", "AAPL"],
+                "volume": [1_000_000, 2_000_000],
+            }
+        )
+
+        is_valid, violations = validate_volume_sanity(df)
+
+        assert is_valid
+        assert len(violations) == 0
+
+    def test_negative_volume_detected(self):
+        """Test detection of negative volume (critical error)."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                "asset_id": ["AAPL", "AAPL"],
+                "volume": [1_000_000, -100],
+            }
+        )
+
+        is_valid, violations = validate_volume_sanity(df)
+
+        assert not is_valid
+        assert len(violations) == 1
+        assert violations[0]["type"] == "negative_volume"
+        assert violations[0]["severity"] == "CRITICAL"
+        assert violations[0]["volume"] == -100
+
+    def test_volume_outlier_detected(self):
+        """Test detection of extreme volume outliers."""
+        # More normal volumes, then one extreme outlier
+        # With more data points, the outlier won't inflate std as much
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2025, 1, i + 1) for i in range(20)
+                ],
+                "asset_id": ["AAPL"] * 20,
+                "volume": [1_000_000] * 19 + [500_000_000],  # 500x outlier
+            }
+        )
+
+        # Use stricter threshold to ensure detection
+        is_valid, violations = validate_volume_sanity(df, max_outlier_std=3.0)
+
+        assert not is_valid
+        assert len(violations) >= 1
+        assert violations[0]["type"] == "volume_outlier"
+        assert violations[0]["severity"] == "WARNING"
+
+    def test_zero_volume_allowed(self):
+        """Test that zero volume is valid (not negative)."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1)],
+                "asset_id": ["AAPL"],
+                "volume": [0],
+            }
+        )
+
+        is_valid, violations = validate_volume_sanity(df)
+
+        assert is_valid
+        assert len(violations) == 0
+
+
+class TestTimeSeriesGapValidation:
+    """Test time series gap detection."""
+
+    def test_no_gaps_in_daily_data(self):
+        """Test validation passes with complete daily data."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2025, 1, 1) + timedelta(days=i) for i in range(5)
+                ],
+                "asset_id": ["AAPL"] * 5,
+                "close": [100.0 + i for i in range(5)],
+            }
+        )
+
+        is_valid, gaps = validate_time_series_gaps(df, expected_frequency="1d")
+
+        assert is_valid
+        assert len(gaps) == 0
+
+    def test_gap_detected_in_daily_data(self):
+        """Test detection of missing days in daily data."""
+        # Missing days 2, 3, 4 (jump from day 1 to day 5)
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2025, 1, 1),
+                    datetime(2025, 1, 5),  # Gap of 4 days
+                ],
+                "asset_id": ["AAPL", "AAPL"],
+                "close": [100.0, 104.0],
+            }
+        )
+
+        is_valid, gaps = validate_time_series_gaps(df, expected_frequency="1d", max_gap_multiplier=2.0)
+
+        assert not is_valid
+        assert len(gaps) == 1
+        assert gaps[0]["type"] == "time_series_gap"
+        assert gaps[0]["severity"] == "WARNING"
+        assert gaps[0]["asset_id"] == "AAPL"
+
+    def test_gap_detection_with_inferred_frequency(self):
+        """Test gap detection with auto-inferred frequency from median."""
+        # Daily data with one large gap
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2025, 1, 1),
+                    datetime(2025, 1, 2),
+                    datetime(2025, 1, 3),
+                    datetime(2025, 1, 10),  # 7-day gap
+                ],
+                "asset_id": ["AAPL"] * 4,
+                "close": [100.0, 101.0, 102.0, 109.0],
+            }
+        )
+
+        is_valid, gaps = validate_time_series_gaps(df, expected_frequency=None, max_gap_multiplier=3.0)
+
+        assert not is_valid
+        assert len(gaps) == 1
+
+    def test_empty_dataframe(self):
+        """Test validation handles empty DataFrame."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [],
+                "asset_id": [],
+                "close": [],
+            },
+            schema={
+                "timestamp": pl.Datetime,
+                "asset_id": pl.Utf8,
+                "close": pl.Float64,
+            },
+        )
+
+        is_valid, gaps = validate_time_series_gaps(df)
+
+        assert is_valid
+        assert len(gaps) == 0
+
+    def test_single_row_dataframe(self):
+        """Test validation handles single-row DataFrame (no gaps possible)."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1)],
+                "asset_id": ["AAPL"],
+                "close": [100.0],
+            }
+        )
+
+        is_valid, gaps = validate_time_series_gaps(df)
+
+        assert is_valid
+        assert len(gaps) == 0
+
+    def test_multi_asset_gap_detection(self):
+        """Test gap detection works independently for multiple assets."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2025, 1, 1),
+                    datetime(2025, 1, 2),  # AAPL: no gap
+                    datetime(2025, 1, 1),
+                    datetime(2025, 1, 10),  # MSFT: 9-day gap
+                ],
+                "asset_id": ["AAPL", "AAPL", "MSFT", "MSFT"],
+                "close": [100.0, 101.0, 200.0, 209.0],
+            }
+        )
+
+        is_valid, gaps = validate_time_series_gaps(df, expected_frequency="1d", max_gap_multiplier=3.0)
+
+        assert not is_valid
+        assert len(gaps) == 1
+        assert gaps[0]["asset_id"] == "MSFT"
+
+
+class TestPriceSanityValidation:
+    """Test price sanity validation."""
+
+    def test_valid_prices(self):
+        """Test validation passes with reasonable prices."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                "asset_id": ["AAPL", "AAPL"],
+                "open": [100.0, 101.0],
+                "high": [102.0, 103.0],
+                "low": [99.0, 100.0],
+                "close": [101.0, 102.0],
+            }
+        )
+
+        is_valid, violations = validate_price_sanity(df)
+
+        assert is_valid
+        assert len(violations) == 0
+
+    def test_price_too_low_detected(self):
+        """Test detection of suspiciously low prices."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1)],
+                "asset_id": ["AAPL"],
+                "open": [0.001],  # Below default min_price of 0.01
+                "high": [0.002],
+                "low": [0.0005],
+                "close": [0.0015],
+            }
+        )
+
+        is_valid, violations = validate_price_sanity(df, min_price=0.01)
+
+        assert not is_valid
+        assert len(violations) == 4  # All 4 OHLC columns below minimum
+        for v in violations:
+            assert v["type"] == "price_too_low"
+            assert v["severity"] == "WARNING"
+
+    def test_price_too_high_detected(self):
+        """Test detection of suspiciously high prices."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1)],
+                "asset_id": ["AAPL"],
+                "close": [2_000_000.0],  # Above default max_price of 1M
+            }
+        )
+
+        is_valid, violations = validate_price_sanity(df, max_price=1_000_000.0)
+
+        assert not is_valid
+        assert len(violations) == 1
+        assert violations[0]["type"] == "price_too_high"
+        assert violations[0]["price"] == 2_000_000.0
+
+    def test_extreme_price_change_detected(self):
+        """Test detection of extreme percentage changes."""
+        # 100% increase in one bar (from 100 to 200)
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                "asset_id": ["AAPL", "AAPL"],
+                "close": [100.0, 200.0],
+            }
+        )
+
+        is_valid, violations = validate_price_sanity(df, max_daily_change=0.20)  # 20% max
+
+        assert not is_valid
+        assert len(violations) == 1
+        assert violations[0]["type"] == "extreme_price_change"
+        assert violations[0]["severity"] == "WARNING"
+        assert violations[0]["pct_change"] > 0.20
+
+    def test_normal_price_change_allowed(self):
+        """Test that normal price changes are not flagged."""
+        # 5% increase (well within 50% default threshold)
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                "asset_id": ["AAPL", "AAPL"],
+                "close": [100.0, 105.0],
+            }
+        )
+
+        is_valid, violations = validate_price_sanity(df)
+
+        assert is_valid
+        assert len(violations) == 0
+
+
+class TestComprehensiveValidation:
+    """Test comprehensive validation orchestrator."""
+
+    def test_all_validations_pass(self):
+        """Test comprehensive validation with clean data."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 2)],
+                "asset_id": ["AAPL", "AAPL"],
+                "open": [100.0, 101.0],
+                "high": [102.0, 103.0],
+                "low": [99.0, 100.0],
+                "close": [101.0, 102.0],
+                "volume": [1_000_000, 1_100_000],
+            }
+        )
+
+        is_valid, violations = validate_comprehensive(df, expected_frequency="1d")
+
+        assert is_valid
+        assert len(violations) == 0
+
+    def test_multiple_violations_detected(self):
+        """Test comprehensive validation detects multiple types of violations."""
+        # Create data with multiple issues:
+        # - Duplicate timestamp
+        # - OHLC inconsistency
+        # - Negative volume
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2025, 1, 1),
+                    datetime(2025, 1, 1),  # Duplicate
+                ],
+                "asset_id": ["AAPL", "AAPL"],
+                "open": [100.0, 101.0],
+                "high": [90.0, 103.0],  # First high < low (invalid)
+                "low": [99.0, 100.0],
+                "close": [101.0, 102.0],
+                "volume": [1_000_000, -100],  # Negative volume
+            }
+        )
+
+        is_valid, violations = validate_comprehensive(df)
+
+        assert not is_valid
+        assert len(violations) >= 2  # Should have duplicates and volume violations
+        assert "duplicates" in violations
+        assert "volume_sanity" in violations
+
+    def test_selective_validation(self):
+        """Test that individual validations can be disabled."""
+        # Data with duplicate timestamps but otherwise valid
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1), datetime(2025, 1, 1)],
+                "asset_id": ["AAPL", "AAPL"],
+                "open": [100.0, 101.0],
+                "high": [102.0, 103.0],
+                "low": [99.0, 100.0],
+                "close": [100.0, 101.0],
+            }
+        )
+
+        # Disable duplicate check
+        is_valid, violations = validate_comprehensive(
+            df, validate_duplicates=False
+        )
+
+        assert is_valid  # Should pass because duplicate check is disabled
+        assert len(violations) == 0
+
+    def test_violations_grouped_by_category(self):
+        """Test that violations are properly categorized."""
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2025, 1, 1)],
+                "asset_id": ["AAPL"],
+                "open": [100.0],
+                "high": [90.0],  # Invalid: high < open
+                "low": [99.0],
+                "close": [101.0],
+                "volume": [-100],  # Negative
+            }
+        )
+
+        is_valid, violations = validate_comprehensive(df)
+
+        assert not is_valid
+        assert "ohlc_consistency" in violations
+        assert "volume_sanity" in violations
+        assert isinstance(violations["ohlc_consistency"], list)
+        assert isinstance(violations["volume_sanity"], list)
+
+
+class TestFrequencyParsing:
+    """Test frequency string parsing helper."""
+
+    def test_parse_seconds(self):
+        """Test parsing seconds frequency."""
+        td = _parse_frequency_to_timedelta("30s")
+        assert td == timedelta(seconds=30)
+
+    def test_parse_minutes(self):
+        """Test parsing minutes frequency."""
+        td = _parse_frequency_to_timedelta("5m")
+        assert td == timedelta(minutes=5)
+
+    def test_parse_hours(self):
+        """Test parsing hours frequency."""
+        td = _parse_frequency_to_timedelta("4h")
+        assert td == timedelta(hours=4)
+
+    def test_parse_days(self):
+        """Test parsing days frequency."""
+        td = _parse_frequency_to_timedelta("1d")
+        assert td == timedelta(days=1)
+
+    def test_parse_weeks(self):
+        """Test parsing weeks frequency."""
+        td = _parse_frequency_to_timedelta("2w")
+        assert td == timedelta(weeks=2)
+
+    def test_invalid_frequency_string(self):
+        """Test handling of invalid frequency strings."""
+        with pytest.raises(ValueError, match="Cannot parse frequency string"):
+            _parse_frequency_to_timedelta("invalid")
+
+        with pytest.raises(ValueError, match="Cannot parse frequency string"):
+            _parse_frequency_to_timedelta("1x")
