@@ -10,8 +10,66 @@ from decimal import Decimal
 from ml4t.backtest.risk.manager import RiskManager, PositionTradeState
 from ml4t.backtest.risk.rules.time_based import TimeBasedExit
 from ml4t.backtest.core.event import MarketEvent, FillEvent
+from ml4t.backtest.core.types import MarketDataType, OrderSide
 from ml4t.backtest.portfolio.state import Position
 from ml4t.backtest.portfolio.portfolio import Portfolio
+
+
+def make_fill_event(
+    asset_id: str = "AAPL",
+    timestamp: datetime = None,
+    side: OrderSide = OrderSide.BUY,
+    fill_quantity: float = 10.0,
+    fill_price: Decimal = Decimal("100.0"),
+    commission: float = 1.0,
+    order_id: str = "order-001",
+    trade_id: str = "trade-001",
+) -> FillEvent:
+    """Helper to create FillEvent with sensible defaults."""
+    if timestamp is None:
+        timestamp = datetime(2024, 1, 1, 10, 0)
+
+    return FillEvent(
+        timestamp=timestamp,
+        order_id=order_id,
+        trade_id=trade_id,
+        asset_id=asset_id,
+        side=side,
+        fill_quantity=fill_quantity,
+        fill_price=fill_price,
+        commission=commission,
+    )
+
+
+def make_market_event(
+    asset_id: str = "AAPL",
+    timestamp: datetime = None,
+    close: Decimal = Decimal("100.0"),
+    open: Decimal = None,
+    high: Decimal = None,
+    low: Decimal = None,
+    volume: int = 1000,
+) -> MarketEvent:
+    """Helper to create MarketEvent with sensible defaults."""
+    if timestamp is None:
+        timestamp = datetime(2024, 1, 1, 10, 0)
+    if open is None:
+        open = close - Decimal("1.0")
+    if high is None:
+        high = close + Decimal("1.0")
+    if low is None:
+        low = close - Decimal("2.0")
+
+    return MarketEvent(
+        timestamp=timestamp,
+        asset_id=asset_id,
+        data_type=MarketDataType.BAR,
+        open=open,
+        high=high,
+        low=low,
+        close=close,
+        volume=volume,
+    )
 
 
 class MockBroker:
@@ -47,22 +105,8 @@ class TestRiskManagerPositionTracking:
 
         # Create fill event (buy 10 shares at $100)
         entry_time = datetime(2024, 1, 1, 10, 0)
-        fill_event = FillEvent(
-            timestamp=entry_time,
-            asset_id="AAPL",
-            order_id="order1",
-            fill_quantity=10.0,  # Long position
-            fill_price=Decimal("100.00"),
-            commission=Decimal("1.00"),
-            slippage=Decimal("0.10"),
-        )
-
-        market_event = MarketEvent(
-            timestamp=entry_time,
-            asset_id="AAPL",
-            price=Decimal("100.00"),
-            close=Decimal("100.00"),
-        )
+        fill_event = make_fill_event(timestamp=entry_time)
+        market_event = make_market_event(timestamp=entry_time)
 
         # Record fill
         manager.record_fill(fill_event, market_event)
@@ -232,18 +276,16 @@ class TestRiskManagerPositionTracking:
 
         # Create entry fill
         entry_time = datetime(2024, 1, 1, 10, 0)
-        entry_fill = FillEvent(
-            timestamp=entry_time,
-            asset_id="AAPL",
-            order_id="entry",
-            fill_quantity=10.0,
-            fill_price=Decimal("100.00"),
-            commission=Decimal("1.00"),
-        )
+        entry_fill = make_fill_event(timestamp=entry_time, order_id="entry")
         entry_event = MarketEvent(
             timestamp=entry_time,
             asset_id="AAPL",
+            data_type=MarketDataType.BAR,
+            open=Decimal("99.0"),
+            high=Decimal("101.0"),
+            low=Decimal("98.0"),
             close=Decimal("100.00"),
+            volume=1000,
         )
 
         manager.record_fill(entry_fill, entry_event)
@@ -251,18 +293,22 @@ class TestRiskManagerPositionTracking:
 
         # Create exit fill (closes position)
         exit_time = entry_time + timedelta(minutes=5)
-        exit_fill = FillEvent(
+        exit_fill = make_fill_event(
             timestamp=exit_time,
-            asset_id="AAPL",
-            order_id="exit",
-            fill_quantity=-10.0,  # Opposite quantity
+            side=OrderSide.SELL,
             fill_price=Decimal("105.00"),
-            commission=Decimal("1.00"),
+            order_id="exit",
+            trade_id="exit-trade",
         )
         exit_event = MarketEvent(
             timestamp=exit_time,
             asset_id="AAPL",
+            data_type=MarketDataType.BAR,
+            open=Decimal("104.0"),
+            high=Decimal("106.0"),
+            low=Decimal("103.0"),
             close=Decimal("105.00"),
+            volume=1000,
         )
 
         manager.record_fill(exit_fill, exit_event)

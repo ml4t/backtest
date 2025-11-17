@@ -362,7 +362,7 @@ class RiskContext:
         if position is not None:
             position_quantity = position.quantity
             entry_price = (
-                position.cost_basis / position.quantity
+                float(position.cost_basis) / position.quantity
                 if position.quantity != 0
                 else 0.0
             )

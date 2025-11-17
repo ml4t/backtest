@@ -17,7 +17,7 @@ from decimal import Decimal
 from unittest.mock import Mock, MagicMock
 
 from ml4t.backtest.core.event import FillEvent, MarketEvent
-from ml4t.backtest.core.types import AssetId, MarketDataType, OrderType
+from ml4t.backtest.core.types import AssetId, MarketDataType, OrderSide, OrderType
 from ml4t.backtest.execution.order import Order
 from ml4t.backtest.portfolio.portfolio import Portfolio
 from ml4t.backtest.portfolio.state import Position
@@ -51,6 +51,8 @@ def mock_portfolio():
     portfolio.equity = 10000.0
     portfolio.cash = 5000.0
     portfolio.leverage = 1.0
+    # Mock positions as empty dict so iteration works in RiskContext.from_state
+    portfolio.positions = {}
     return portfolio
 
 
@@ -75,6 +77,35 @@ def market_event():
 def manager():
     """Create RiskManager instance."""
     return RiskManager()
+
+
+# Helper Functions
+
+
+def make_fill_event(
+    asset_id: str = "TEST",
+    timestamp: datetime = None,
+    side: OrderSide = OrderSide.BUY,
+    fill_quantity: float = 100.0,
+    fill_price: Decimal = Decimal("100.0"),
+    commission: float = 1.0,
+    order_id: str = "ORDER-001",
+    trade_id: str = "TRADE-001",
+) -> FillEvent:
+    """Helper to create FillEvent with sensible defaults."""
+    if timestamp is None:
+        timestamp = datetime(2025, 1, 1, 10, 0)
+
+    return FillEvent(
+        timestamp=timestamp,
+        order_id=order_id,
+        trade_id=trade_id,
+        asset_id=asset_id,
+        side=side,
+        fill_quantity=fill_quantity,
+        fill_price=fill_price,
+        commission=commission,
+    )
 
 
 # Mock Rules for Testing
@@ -129,10 +160,11 @@ class ModifyOrderRule(RiskRule):
     def validate_order(self, order, context):
         # Reduce order size
         modified = Order(
+            order_id=order.order_id,
             asset_id=order.asset_id,
-            order_type=OrderType.MARKET,
+            order_type=order.order_type,
+            side=order.side,
             quantity=order.quantity * self.scale_factor,
-            timestamp=order.timestamp,
         )
         return modified
 
@@ -318,13 +350,7 @@ def test_validate_order_multiple_rules_chain(manager, market_event, mock_broker,
 
 def test_record_fill_new_position_creates_state(manager, market_event):
     """Test recording fill for new position creates PositionTradeState."""
-    fill_event = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill_event = make_fill_event()
 
     manager.record_fill(fill_event, market_event)
 
@@ -339,13 +365,7 @@ def test_record_fill_new_position_creates_state(manager, market_event):
 
 def test_record_fill_new_position_creates_levels(manager, market_event):
     """Test recording fill creates PositionLevels."""
-    fill_event = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill_event = make_fill_event()
 
     manager.record_fill(fill_event, market_event)
 
@@ -359,22 +379,15 @@ def test_record_fill_new_position_creates_levels(manager, market_event):
 def test_record_fill_add_to_position_updates_avg_price(manager, market_event):
     """Test adding to position updates average entry price."""
     # Initial fill: 100 shares @ $100
-    fill1 = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill1 = make_fill_event()
     manager.record_fill(fill1, market_event)
 
     # Add: 100 shares @ $110
-    fill2 = FillEvent(
-        asset_id="TEST",
+    fill2 = make_fill_event(
         timestamp=market_event.timestamp + timedelta(hours=1),
-        quantity=100.0,
         fill_price=Decimal("110.0"),
-        commission=Decimal("1.0"),
+        order_id="ORDER-002",
+        trade_id="TRADE-002",
     )
     manager.record_fill(fill2, market_event)
 
@@ -387,22 +400,17 @@ def test_record_fill_add_to_position_updates_avg_price(manager, market_event):
 def test_record_fill_close_position_removes_state(manager, market_event):
     """Test closing position removes PositionTradeState and PositionLevels."""
     # Open position
-    fill_open = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill_open = make_fill_event()
     manager.record_fill(fill_open, market_event)
 
     # Close position
-    fill_close = FillEvent(
-        asset_id="TEST",
+    fill_close = make_fill_event(
         timestamp=market_event.timestamp + timedelta(hours=1),
-        quantity=-100.0,  # Opposite quantity
+        side=OrderSide.SELL,
+        fill_quantity=100.0,
         fill_price=Decimal("105.0"),
-        commission=Decimal("1.0"),
+        order_id="ORDER-002",
+        trade_id="TRADE-002",
     )
     manager.record_fill(fill_close, market_event)
 
@@ -413,28 +421,23 @@ def test_record_fill_close_position_removes_state(manager, market_event):
 def test_record_fill_reverse_position_resets_state(manager, market_event):
     """Test reversing position resets PositionTradeState."""
     # Open long position
-    fill_long = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill_long = make_fill_event()
     manager.record_fill(fill_long, market_event)
 
-    # Reverse to short
-    fill_short = FillEvent(
-        asset_id="TEST",
+    # Reverse to short (sell more than we have)
+    fill_short = make_fill_event(
         timestamp=market_event.timestamp + timedelta(hours=1),
-        quantity=-200.0,  # Close 100 long + open 100 short
+        side=OrderSide.SELL,
+        fill_quantity=200.0,  # Close 100 long + open 100 short
         fill_price=Decimal("105.0"),
-        commission=Decimal("1.0"),
+        order_id="ORDER-002",
+        trade_id="TRADE-002",
     )
     manager.record_fill(fill_short, market_event)
 
     state = manager._position_state["TEST"]
     assert state.entry_price == Decimal("105.0")  # New entry
-    assert state.entry_quantity == -100.0  # Short position
+    assert state.entry_quantity == -100.0  # Short position (net result)
     assert state.bars_held == 0  # Reset
 
 
@@ -563,13 +566,7 @@ def test_check_position_exits_updates_levels(manager, market_event, mock_broker,
     mock_broker.get_position.return_value = position
 
     # Record fill to create state
-    fill_event = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill_event = make_fill_event()
     manager.record_fill(fill_event, market_event)
 
     # Add rule that updates stops
@@ -600,13 +597,7 @@ def test_check_position_exits_updates_position_state(manager, market_event, mock
     mock_broker.get_position.return_value = position
 
     # Record fill to create state
-    fill_event = FillEvent(
-        asset_id="TEST",
-        
-        quantity=100.0,
-        fill_price=Decimal("100.0"),
-        commission=Decimal("1.0"),
-    )
+    fill_event = make_fill_event()
     manager.record_fill(fill_event, market_event)
 
     # Add rule (doesn't matter what it does)

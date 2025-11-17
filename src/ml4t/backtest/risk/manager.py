@@ -55,7 +55,7 @@ from decimal import Decimal
 from typing import Optional, Union
 
 from ml4t.backtest.core.event import FillEvent, MarketEvent
-from ml4t.backtest.core.types import AssetId, OrderType, Price
+from ml4t.backtest.core.types import AssetId, OrderSide, OrderType, Price
 from ml4t.backtest.data.feature_provider import FeatureProvider
 from ml4t.backtest.execution.order import Order
 from ml4t.backtest.portfolio.portfolio import Portfolio
@@ -319,12 +319,14 @@ class RiskManager:
             if decision.should_exit:
                 # Exit entire position (opposite quantity)
                 exit_quantity = -position.quantity
+                # Determine side: if closing long (negative qty), we SELL. If closing short (positive qty), we BUY.
+                side = OrderSide.SELL if exit_quantity < 0 else OrderSide.BUY
 
                 exit_order = Order(
                     asset_id=asset_id,
                     order_type=OrderType.MARKET,
+                    side=side,
                     quantity=abs(exit_quantity),
-                    timestamp=market_event.timestamp,
                 )
                 exit_orders.append(exit_order)
 
@@ -419,8 +421,10 @@ class RiskManager:
         # Get current position from position_state (may not exist yet)
         current_state = self._position_state.get(asset_id)
 
-        # Use fill_quantity from FillEvent (signed quantity)
-        fill_qty = fill_event.fill_quantity
+        # Convert fill_quantity to signed based on side
+        # BUY adds to position (positive), SELL subtracts (negative)
+        from ml4t.backtest.core.types import OrderSide
+        fill_qty = fill_event.fill_quantity if fill_event.side == OrderSide.BUY else -fill_event.fill_quantity
 
         # Determine if opening, adding, closing, or reversing position
         if current_state is None:
