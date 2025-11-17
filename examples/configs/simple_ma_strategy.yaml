@@ -1,0 +1,75 @@
+# Simple Moving Average Crossover Strategy Configuration
+#
+# This configuration demonstrates a basic single-asset strategy using
+# precomputed signals from a moving average crossover indicator.
+#
+# Usage:
+#   from pathlib import Path
+#   from ml4t.backtest.config import BacktestConfig
+#   config = BacktestConfig.from_yaml(Path("simple_ma_strategy.yaml"))
+
+name: simple_ma_crossover
+description: |
+  Basic moving average crossover strategy for AAPL.
+  Enters long when 50-day MA crosses above 200-day MA.
+  Exits when 50-day MA crosses below 200-day MA.
+
+# Data Sources
+data_sources:
+  prices:
+    path: ${DATA_PATH}/aapl_prices.parquet
+    format: parquet
+    timestamp_column: timestamp
+    asset_column: asset_id
+    columns:
+      - timestamp
+      - asset_id
+      - open
+      - high
+      - low
+      - close
+      - volume
+
+  signals:
+    path: ${DATA_PATH}/aapl_ma_signals.parquet
+    format: parquet
+    columns:
+      - timestamp
+      - asset_id
+      - signal  # 1.0 = long, 0.0 = neutral, -1.0 = short
+      - ma_50
+      - ma_200
+
+# Feature Provider (optional - for risk management indicators)
+features:
+  type: precomputed
+  path: ${DATA_PATH}/aapl_features.parquet
+  columns:
+    - atr  # Average True Range for position sizing
+    - volatility  # Historical volatility
+  timestamp_column: timestamp
+  asset_column: asset_id
+
+# Execution Parameters
+execution:
+  initial_capital: 100000
+
+  commission:
+    type: per_share
+    rate: 0.005  # $0.005 per share
+    minimum: 1.0  # $1 minimum per trade
+
+  slippage:
+    type: percentage
+    rate: 0.001  # 0.1% slippage
+
+  enable_margin: false
+  max_leverage: 1.0
+  execution_delay: true  # Prevent lookahead bias
+  allow_immediate_reentry: true
+
+# Risk Rules (optional)
+risk_rules:
+  max_position_size: 0.5  # Maximum 50% of portfolio in one position
+  stop_loss: 0.05  # 5% stop loss
+  take_profit: 0.15  # 15% take profit

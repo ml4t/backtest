@@ -1,0 +1,107 @@
+# ML Strategy with Risk Management Configuration
+#
+# This configuration demonstrates a machine learning-based strategy
+# with comprehensive risk management using market context and technical indicators.
+#
+# Usage:
+#   from pathlib import Path
+#   from ml4t.backtest.config import BacktestConfig
+#   config = BacktestConfig.from_yaml(Path("ml_with_risk.yaml"))
+
+name: ml_long_short_equity
+description: |
+  Machine learning long/short equity strategy.
+  Uses gradient boosting model to predict future returns.
+  Dynamically adjusts exposure based on VIX and market regime.
+  Applies volatility-based position sizing with ATR.
+
+# Data Sources
+data_sources:
+  # Price data
+  prices:
+    path: ${DATA_PATH}/universe_prices.parquet
+    format: parquet
+    timestamp_column: timestamp
+    asset_column: asset_id
+
+  # ML model predictions
+  signals:
+    path: ${DATA_PATH}/ml_predictions.parquet
+    format: parquet
+    columns:
+      - timestamp
+      - asset_id
+      - signal  # Model prediction: -1.0 to 1.0
+      - confidence  # Model confidence: 0.0 to 1.0
+      - expected_return  # Predicted 5-day return
+      - prediction_sharpe  # Model's predicted Sharpe ratio
+
+  # Market context for regime detection
+  context:
+    path: ${DATA_PATH}/market_context.parquet
+    format: parquet
+    columns:
+      - timestamp
+      - vix  # Volatility regime indicator
+      - spy_return  # Broad market return
+      - treasury_yield  # Risk-free rate proxy
+      - credit_spread  # Credit market stress indicator
+      - market_regime  # ML-predicted regime (0=crisis, 1=normal, 2=bull)
+      - correlation_regime  # Cross-asset correlation state
+
+# Feature Provider for risk management
+features:
+  type: precomputed
+  path: ${DATA_PATH}/risk_features.parquet
+  columns:
+    # Volatility measures
+    - atr  # Average True Range (14-day)
+    - garman_klass_vol  # Garman-Klass volatility estimator
+    - parkinson_vol  # Parkinson high-low volatility
+
+    # Liquidity measures
+    - volume_ma  # 20-day average volume
+    - amihud_illiquidity  # Amihud illiquidity measure
+    - bid_ask_spread  # Estimated spread from OHLC
+
+    # Momentum and mean reversion
+    - momentum_12m  # 12-month momentum
+    - rsi  # Relative Strength Index
+    - z_score  # Mean reversion z-score
+  timestamp_column: timestamp
+  asset_column: asset_id
+
+# Execution Parameters
+execution:
+  initial_capital: 10000000  # $10M starting capital
+
+  commission:
+    type: tiered
+    rate: 0.0005  # 5 bps for large trades
+    minimum: 2.0  # $2 minimum
+
+  slippage:
+    type: volume_share
+    rate: 0.1  # Market impact based on volume participation
+
+  enable_margin: true
+  max_leverage: 2.0  # Allow 2x leverage for short positions
+  execution_delay: true
+  allow_immediate_reentry: false  # Prevent high-frequency artifacts
+
+# Comprehensive Risk Rules
+risk_rules:
+  # Position-level limits
+  max_position_size: 0.05  # Maximum 5% per position
+  stop_loss: 0.15  # 15% maximum loss per position
+  take_profit: 0.40  # 40% profit target
+
+  # Portfolio-level limits
+  max_portfolio_heat: 0.20  # Maximum 20% total portfolio risk
+
+  # Market regime filters
+  min_vix: 9.0   # Don't trade when VIX too low (complacency)
+  max_vix: 50.0  # Don't trade when VIX too high (crisis)
+
+  # Note: Additional risk rules (correlations, sector exposure, liquidity)
+  # will be implemented in Phase 2 with full risk management system

@@ -3,11 +3,11 @@
     "name": "Integrated ML Data + Risk Management",
     "description": "Merged implementation of ML-first data architecture and comprehensive risk management for ml4t.backtest event-driven backtesting engine",
     "created_at": "2025-11-17T03:30:00Z",
-    "updated_at": "2025-11-17T08:00:00Z",
+    "updated_at": "2025-11-17T15:37:35.878441Z",
     "integration_date": "2025-11-17T07:38:00Z"
   },
   "status": "implementing",
-  "current_task": "TASK-INT-006",
+  "current_task": "TASK-INT-007",
   "integration_summary": {
     "tasks_merged": "50 tasks (reduced from 93 separate)",
     "timeline_reduction": "35% (10 weeks vs 15.5 weeks)",
@@ -318,7 +318,7 @@
       "title": "Configuration schema and loader (YAML/JSON)",
       "description": "Implement configuration system for declarative specification of data sources, feature providers, risk rules, and execution parameters using YAML or JSON.",
       "type": "feature",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         "TASK-INT-002"
       ],
@@ -338,7 +338,9 @@
       ],
       "estimated_hours": 12,
       "priority": "high",
-      "notes": "Enables declarative strategy specification without code changes. Used by both ML and risk components."
+      "notes": "Enables declarative strategy specification without code changes. Used by both ML and risk components.",
+      "completed_at": "2025-11-17T15:37:35.878409Z",
+      "actual_hours": 3
     },
     {
       "id": "TASK-INT-008",
