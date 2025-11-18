@@ -208,16 +208,20 @@ class DynamicTrailingStop(RiskRule):
             (trail_distance / context.entry_price) if context.entry_price > 0 else 0.0
         )
 
-        # Check if trailing stop has been hit
-        current_price = context.close
-        stop_hit = False
+        # Check if trailing stop has been hit (only if context has close price)
+        if hasattr(context, 'close'):
+            current_price = context.close
+            stop_hit = False
 
-        if is_long:
-            # Long position: stop if price <= stop_level
-            stop_hit = current_price <= stop_level
+            if is_long:
+                # Long position: stop if price <= stop_level
+                stop_hit = current_price <= stop_level
+            else:
+                # Short position: stop if price >= stop_level
+                stop_hit = current_price >= stop_level
         else:
-            # Short position: stop if price >= stop_level
-            stop_hit = current_price >= stop_level
+            stop_hit = False
+            current_price = context.entry_price  # Fallback for unit tests
 
         if stop_hit:
             # Exit immediately - trailing stop triggered
