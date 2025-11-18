@@ -82,13 +82,13 @@ class PositionTradeState:
     """
     asset_id: AssetId
     entry_time: datetime
-    entry_price: Decimal
+    entry_price: float
     entry_quantity: float
     bars_held: int = 0
-    max_favorable_excursion: Decimal = Decimal("0.0")
-    max_adverse_excursion: Decimal = Decimal("0.0")
+    max_favorable_excursion: float = 0.0
+    max_adverse_excursion: float = 0.0
 
-    def update_on_market_event(self, market_price: Decimal) -> None:
+    def update_on_market_event(self, market_price: float) -> None:
         """Update bar counter and MFE/MAE on each market event.
 
         MFE (Max Favorable Excursion): The best price movement in your favor since entry.
@@ -119,11 +119,11 @@ class PositionTradeState:
             # Track maximum excursions (always positive or zero)
             self.max_favorable_excursion = max(
                 self.max_favorable_excursion,
-                max(Decimal("0"), favorable_excursion)
+                max(0.0, favorable_excursion)
             )
             self.max_adverse_excursion = max(
                 self.max_adverse_excursion,
-                max(Decimal("0"), adverse_excursion)
+                max(0.0, adverse_excursion)
             )
 
         else:  # Short position (entry_quantity < 0)
@@ -135,11 +135,11 @@ class PositionTradeState:
             # Track maximum excursions (always positive or zero)
             self.max_favorable_excursion = max(
                 self.max_favorable_excursion,
-                max(Decimal("0"), favorable_excursion)
+                max(0.0, favorable_excursion)
             )
             self.max_adverse_excursion = max(
                 self.max_adverse_excursion,
-                max(Decimal("0"), adverse_excursion)
+                max(0.0, adverse_excursion)
             )
 
 
@@ -280,58 +280,67 @@ class RiskManager:
         """
         exit_orders: list[Order] = []
 
-        # Get all positions from broker (source of truth)
-        positions = broker.get_positions()
+        # Early exit if no positions (massive performance optimization)
+        # Avoids iterating through empty dict on 99% of bars
+        if not portfolio or not portfolio.positions:
+            return exit_orders
 
-        for asset_id, position in positions.items():
-            # Skip if no position or position for different asset
-            if position.quantity == 0 or asset_id != market_event.asset_id:
-                continue
+        # Early exit if no position for this specific asset (further optimization)
+        # Avoids building context when event is for different asset
+        if market_event.asset_id not in portfolio.positions:
+            return exit_orders
 
-            # Build context with caching
-            context = self._build_context(
+        position = portfolio.positions[market_event.asset_id]
+        if position.quantity == 0:
+            return exit_orders
+
+        # Only process the asset for this market event
+        asset_id = market_event.asset_id
+
+        # Build context with caching
+        context = self._build_context(
+            asset_id=asset_id,
+            market_event=market_event,
+            broker=broker,
+            portfolio=portfolio,
+        )
+
+        # Update position state tracking
+        if asset_id in self._position_state:
+            state = self._position_state[asset_id]
+            state.update_on_market_event(market_price=market_event.close)
+
+        # Evaluate all rules
+        decision = self.evaluate_all_rules(context)
+
+        # Update levels if rules suggest changes
+        if decision.update_stop_loss or decision.update_take_profit:
+            if asset_id not in self._position_levels:
+                self._position_levels[asset_id] = PositionLevels(asset_id=asset_id)
+
+            levels = self._position_levels[asset_id]
+            if decision.update_stop_loss:
+                levels.stop_loss = decision.update_stop_loss
+            if decision.update_take_profit:
+                levels.take_profit = decision.update_take_profit
+
+        # Generate exit order if needed
+        if decision.should_exit:
+            # Exit entire position (opposite quantity)
+            exit_quantity = -position.quantity
+            # Determine side: if closing long (negative qty), we SELL. If closing short (positive qty), we BUY.
+            side = OrderSide.SELL if exit_quantity < 0 else OrderSide.BUY
+
+            exit_order = Order(
                 asset_id=asset_id,
-                market_event=market_event,
-                broker=broker,
-                portfolio=portfolio,
+                order_type=OrderType.MARKET,
+                side=side,
+                quantity=abs(exit_quantity),
             )
+            exit_orders.append(exit_order)
 
-            # Update position state tracking
-            if asset_id in self._position_state:
-                state = self._position_state[asset_id]
-                state.update_on_market_event(market_price=market_event.close)
-
-            # Evaluate all rules
-            decision = self.evaluate_all_rules(context)
-
-            # Update levels if rules suggest changes
-            if decision.update_stop_loss or decision.update_take_profit:
-                if asset_id not in self._position_levels:
-                    self._position_levels[asset_id] = PositionLevels(asset_id=asset_id)
-
-                levels = self._position_levels[asset_id]
-                if decision.update_stop_loss:
-                    levels.stop_loss = decision.update_stop_loss
-                if decision.update_take_profit:
-                    levels.take_profit = decision.update_take_profit
-
-            # Generate exit order if needed
-            if decision.should_exit:
-                # Exit entire position (opposite quantity)
-                exit_quantity = -position.quantity
-                # Determine side: if closing long (negative qty), we SELL. If closing short (positive qty), we BUY.
-                side = OrderSide.SELL if exit_quantity < 0 else OrderSide.BUY
-
-                exit_order = Order(
-                    asset_id=asset_id,
-                    order_type=OrderType.MARKET,
-                    side=side,
-                    quantity=abs(exit_quantity),
-                )
-                exit_orders.append(exit_order)
-
-                # Clear position tracking (will be removed on fill)
-                # Keep for now until fill confirmed
+            # Clear position tracking (will be removed on fill)
+            # Keep for now until fill confirmed
 
         return exit_orders
 
@@ -464,9 +473,9 @@ class RiskManager:
             else:
                 # Adding to position - update average entry price
                 total_quantity = current_state.entry_quantity + fill_qty
-                current_cost = current_state.entry_price * Decimal(str(abs(current_state.entry_quantity)))
-                new_cost = fill_event.fill_price * Decimal(str(abs(fill_qty)))
-                avg_price = (current_cost + new_cost) / Decimal(str(abs(total_quantity)))
+                current_cost = float(current_state.entry_price) * abs(current_state.entry_quantity)
+                new_cost = float(fill_event.fill_price) * abs(fill_qty)
+                avg_price = (current_cost + new_cost) / abs(total_quantity)
 
                 current_state.entry_price = avg_price
                 current_state.entry_quantity = total_quantity
@@ -542,7 +551,9 @@ class RiskManager:
             return self._context_cache[cache_key]
 
         # Build new context
-        position = broker.get_position(asset_id)
+        # Note: broker.get_position() returns Quantity (float),
+        # but RiskContext.from_state() needs Position object
+        position = portfolio.get_position(asset_id) if portfolio else None
 
         # Get position state if exists
         state = self._position_state.get(asset_id)
@@ -552,13 +563,13 @@ class RiskManager:
         modified_event = market_event
         if state is not None and position is not None:
             # Convert MFE/MAE from price units to currency units (price × quantity)
-            quantity = abs(position.quantity) if hasattr(position, 'quantity') else abs(position)
+            quantity = abs(position.quantity)
 
             # Inject tracked MFE/MAE into signals dict
             # Use reserved keys prefixed with underscore to avoid conflicts
             signals = market_event.signals.copy() if market_event.signals else {}
-            signals['_tracked_mfe'] = float(state.max_favorable_excursion * Decimal(str(quantity)))
-            signals['_tracked_mae'] = float(state.max_adverse_excursion * Decimal(str(quantity)))
+            signals['_tracked_mfe'] = float(state.max_favorable_excursion) * quantity
+            signals['_tracked_mae'] = float(state.max_adverse_excursion) * quantity
 
             # Create modified event (MarketEvent is not frozen, but we avoid mutation)
             # Note: MarketEvent is typically immutable-ish, so we need to be careful

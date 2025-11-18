@@ -103,7 +103,7 @@ class PriceBasedStopLoss(RiskRule):
                     "stop_distance": sl_distance,
                     "stop_percent": sl_percent,
                     "position_direction": "long" if is_long else "short",
-                    "mae": context.mae,
+                    "mae": context.max_adverse_excursion,
                 },
                 asset_id=context.asset_id,
             )
@@ -225,7 +225,7 @@ class PriceBasedTakeProfit(RiskRule):
                     "profit_distance": profit_distance,
                     "profit_percent": profit_percent,
                     "position_direction": "long" if is_long else "short",
-                    "mfe": context.mfe,
+                    "mfe": context.max_favorable_excursion,
                 },
                 asset_id=context.asset_id,
             )
