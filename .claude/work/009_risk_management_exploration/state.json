@@ -1244,7 +1244,7 @@
       "title": "Implement rule priority and conflict resolution",
       "description": "Add priority system to resolve conflicts when multiple rules modify same order. Most conservative (tightest) stop wins by default.",
       "type": "feature",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         "TASK-INT-017",
         "TASK-INT-018"
@@ -1268,7 +1268,14 @@
       ],
       "estimated_hours": 8,
       "priority": "high",
-      "notes": "Clear conflict resolution critical for user confidence with multiple rules."
+      "notes": "Clear conflict resolution critical for user confidence with multiple rules.",
+      "completed_at": "2025-11-17T22:18:00.089698Z",
+      "actual_hours": 3,
+      "deliverables": [
+        "Enhanced RiskDecision.merge() with _resolve_sl_conflicts() and _resolve_tp_conflicts()",
+        "tests/unit/test_conflict_resolution.py (17 tests, 77% coverage)",
+        "Updated RiskDecision docstrings with decision matrix"
+      ]
     },
     {
       "id": "TASK-INT-036",
@@ -1722,6 +1729,7 @@
     "TASK-INT-003",
     "TASK-INT-004",
     "TASK-INT-005",
+    "TASK-INT-006",
     "TASK-INT-007",
     "TASK-INT-009",
     "TASK-INT-010",
@@ -1738,7 +1746,8 @@
     "TASK-INT-031",
     "TASK-INT-032",
     "TASK-INT-033",
-    "TASK-INT-034"
+    "TASK-INT-034",
+    "TASK-INT-035"
   ],
   "next_available": [
     "TASK-INT-008",
@@ -1755,8 +1764,8 @@
   ],
   "metrics": {
     "total_tasks": 50,
-    "completed": 22,
-    "pending": 28,
+    "completed": 24,
+    "pending": 26,
     "in_progress": 0,
     "estimated_total_hours": 420,
     "estimated_weeks": 10,
