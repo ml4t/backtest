@@ -16,7 +16,7 @@ Acceptance Criteria:
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import polars as pl
 import pytest
@@ -298,14 +298,23 @@ def market_data_varying_spreads() -> pl.DataFrame:
 @pytest.fixture
 def market_data_varying_volume() -> pl.DataFrame:
     """Create market data with varying volume (high vs low liquidity)."""
-    timestamps = [datetime(2024, 1, i, 9, 30, tzinfo=timezone.utc) for i in range(1, 21)]
+    # Changed from 20 to 40 bars to allow both buy AND sell signals
+    # Pattern: uptrend (0-19), downtrend (20-39)
+    base_date = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    timestamps = [base_date + timedelta(days=i) for i in range(40)]
 
     base_price = 100.0
-    prices = [base_price + i * 0.3 for i in range(20)]
+    # Up for first 20 bars, down for next 20 bars
+    prices = []
+    for i in range(40):
+        if i < 20:
+            prices.append(base_price + i * 0.3)  # Uptrend
+        else:
+            prices.append(base_price + (40 - i) * 0.3)  # Downtrend
 
     # Alternate between high and low volume
     volumes = []
-    for i in range(20):
+    for i in range(40):
         if i % 2 == 0:
             # High volume (low participation rate)
             volumes.append(5_000_000)
@@ -315,7 +324,7 @@ def market_data_varying_volume() -> pl.DataFrame:
 
     data = {
         "timestamp": timestamps,
-        "asset_id": ["SPY"] * 20,
+        "asset_id": ["SPY"] * 40,
         "open": [p - 0.5 for p in prices],
         "high": [p + 1.0 for p in prices],
         "low": [p - 1.0 for p in prices],
@@ -515,10 +524,10 @@ class TestSpreadAwareSlippageIntegration:
 
         slippage_cost = calculate_slippage_cost_percentage(results)
 
-        # Should fall back to ~0.1% (fallback_slippage_pct)
+        # Should fall back to ~0.2% (fallback_slippage_pct 0.1% × 2 for round-trip)
         # Allow some variance due to market price differences
-        assert 0.05 <= slippage_cost <= 0.15, (
-            f"Fallback slippage {slippage_cost:.4f}% should be close to 0.1%"
+        assert 0.15 <= slippage_cost <= 0.25, (
+            f"Fallback slippage {slippage_cost:.4f}% should be close to 0.2% (round-trip)"
         )
 
 
@@ -564,7 +573,8 @@ class TestVolumeAwareSlippageIntegration:
 
             def __init__(self):
                 super().__init__()
-                self.traded = False
+                self.bar_count = 0
+                self.position_opened = False
 
             def on_start(self, portfolio=None, event_bus=None):
                 self.portfolio = portfolio
@@ -575,7 +585,10 @@ class TestVolumeAwareSlippageIntegration:
                     self.on_market_data(event)
 
             def on_market_data(self, event: MarketEvent):
-                if not self.traded:
+                self.bar_count += 1
+
+                # Buy on bar 5
+                if self.bar_count == 5 and not self.position_opened:
                     # Small order: 100 shares (0.01% of 1M volume)
                     order_event = OrderEvent(
                         timestamp=event.timestamp,
@@ -587,14 +600,30 @@ class TestVolumeAwareSlippageIntegration:
                         time_in_force=TimeInForce.DAY,
                     )
                     self.event_bus.publish(order_event)
-                    self.traded = True
+                    self.position_opened = True
+
+                # Sell on bar 10 to complete round-trip
+                elif self.bar_count == 10 and self.position_opened:
+                    position = self.portfolio.get_position(event.asset_id)
+                    if position and position.quantity > 0:
+                        order_event = OrderEvent(
+                            timestamp=event.timestamp,
+                            order_id=str(uuid.uuid4()),
+                            asset_id=event.asset_id,
+                            order_type=OrderType.MARKET,
+                            side=OrderSide.SELL,
+                            quantity=position.quantity,
+                            time_in_force=TimeInForce.DAY,
+                        )
+                        self.event_bus.publish(order_event)
 
         class LargeOrderStrategy(Strategy):
             """Strategy with large orders (high participation)."""
 
             def __init__(self):
                 super().__init__()
-                self.traded = False
+                self.bar_count = 0
+                self.position_opened = False
 
             def on_start(self, portfolio=None, event_bus=None):
                 self.portfolio = portfolio
@@ -605,7 +634,10 @@ class TestVolumeAwareSlippageIntegration:
                     self.on_market_data(event)
 
             def on_market_data(self, event: MarketEvent):
-                if not self.traded:
+                self.bar_count += 1
+
+                # Buy on bar 5
+                if self.bar_count == 5 and not self.position_opened:
                     # Large order: 50,000 shares (5% of 1M volume)
                     order_event = OrderEvent(
                         timestamp=event.timestamp,
@@ -617,7 +649,22 @@ class TestVolumeAwareSlippageIntegration:
                         time_in_force=TimeInForce.DAY,
                     )
                     self.event_bus.publish(order_event)
-                    self.traded = True
+                    self.position_opened = True
+
+                # Sell on bar 10 to complete round-trip
+                elif self.bar_count == 10 and self.position_opened:
+                    position = self.portfolio.get_position(event.asset_id)
+                    if position and position.quantity > 0:
+                        order_event = OrderEvent(
+                            timestamp=event.timestamp,
+                            order_id=str(uuid.uuid4()),
+                            asset_id=event.asset_id,
+                            order_type=OrderType.MARKET,
+                            side=OrderSide.SELL,
+                            quantity=position.quantity,
+                            time_in_force=TimeInForce.DAY,
+                        )
+                        self.event_bus.publish(order_event)
 
         volume_model = VolumeAwareSlippage(
             base_slippage_pct=0.0001,
@@ -689,7 +736,7 @@ class TestVolumeAwareSlippageIntegration:
 
         # Both should be in realistic range
         assert 0.01 <= slippage_volume <= 0.5
-        assert 0.05 <= slippage_pct <= 0.15  # Should be ~0.1%
+        assert 0.15 <= slippage_pct <= 0.25  # Should be ~0.2% (round-trip: 0.1% × 2)
 
         # VolumeAware should differ from fixed percentage
         # (may be higher or lower depending on participation rates)
@@ -771,7 +818,7 @@ class TestOrderTypeDependentSlippageIntegration:
 
         # Both should be in realistic range
         assert 0.01 <= slippage_order_type <= 0.5
-        assert 0.05 <= slippage_pct <= 0.15  # Should be ~0.1%
+        assert 0.15 <= slippage_pct <= 0.27  # Should be ~0.2% (round-trip: 0.1% × 2), allow variance
 
 
 class TestSlippageModelComparison:
