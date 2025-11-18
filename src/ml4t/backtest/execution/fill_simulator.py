@@ -7,10 +7,14 @@ SimulationBroker to follow the Single Responsibility Principle.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from ml4t.backtest.core.constants import MAX_COMMISSION_CALC_ITERATIONS, MIN_FILL_SIZE
 from ml4t.backtest.core.event import FillEvent
 from ml4t.backtest.core.types import Price, Quantity
+
+if TYPE_CHECKING:
+    from ml4t.backtest.core.event import MarketEvent
 from ml4t.backtest.data.asset_registry import AssetRegistry, AssetSpec
 from ml4t.backtest.execution.commission import CommissionModel
 from ml4t.backtest.execution.liquidity import LiquidityModel
@@ -111,15 +115,18 @@ class FillSimulator:
     def try_fill_order(
         self,
         order: Order,
-        market_price: Price | None = None,
+        market_event: "MarketEvent | None" = None,  # noqa: F821
+        *,
         current_cash: float = 0.0,
         current_position: Quantity = 0.0,
+        # Legacy parameters (deprecated, for backward compatibility)
+        market_price: Price | None = None,
         timestamp: datetime | None = None,
         high: Price | None = None,
         low: Price | None = None,
         close: Price | None = None,
     ) -> FillResult | None:
-        """Attempt to fill an order at the given market price or OHLC data.
+        """Attempt to fill an order using MarketEvent or legacy OHLC parameters.
 
         This method applies all market realism constraints:
         1. Validates order can fill at market price (using intrabar if high/low provided)
@@ -134,18 +141,29 @@ class FillSimulator:
 
         Args:
             order: Order to attempt filling
-            market_price: Current market price (for backward compatibility)
+            market_event: MarketEvent containing OHLCV and other market data (PREFERRED)
             current_cash: Available cash for purchases
             current_position: Current position quantity for the asset
-            timestamp: Event timestamp
-            high: Bar's high price (for intrabar limit order detection)
-            low: Bar's low price (for intrabar stop order detection)
-            close: Bar's close price (used as fill price and fallback)
+            market_price: (DEPRECATED) Current market price - use market_event instead
+            timestamp: (DEPRECATED) Event timestamp - use market_event.timestamp instead
+            high: (DEPRECATED) Bar's high price - use market_event.high instead
+            low: (DEPRECATED) Bar's low price - use market_event.low instead
+            close: (DEPRECATED) Bar's close price - use market_event.close instead
 
         Returns:
             FillResult if order was filled, None if order cannot be filled
 
         Note:
+            **BACKWARD COMPATIBILITY**: This method supports both old and new signatures:
+
+            NEW (recommended):
+                fill_simulator.try_fill_order(order, market_event, current_cash=..., current_position=...)
+
+            OLD (deprecated, will be removed in v0.6.0):
+                fill_simulator.try_fill_order(order, market_price=..., high=..., low=..., close=...)
+
+            Using legacy parameters will emit a deprecation warning.
+
             This method has side effects:
             - Modifies order state via order.update_fill()
             - Updates market impact model state
@@ -155,22 +173,55 @@ class FillSimulator:
             For VectorBT Pro compatibility, prefer passing high/low/close for intrabar
             execution. If only market_price is provided, falls back to end-of-bar logic.
         """
+        import warnings
+
+        # Extract parameters from market_event or use legacy parameters
+        if market_event is not None:
+            # NEW SIGNATURE: Extract from MarketEvent
+            _timestamp = market_event.timestamp
+            _high = market_event.high
+            _low = market_event.low
+            _close = market_event.close
+            _market_price = market_event.price or market_event.close
+            _volume = market_event.volume
+            _bid_price = market_event.bid_price
+            _ask_price = market_event.ask_price
+        else:
+            # OLD SIGNATURE: Use legacy parameters with deprecation warning
+            if any(p is not None for p in [market_price, timestamp, high, low, close]):
+                warnings.warn(
+                    "Passing OHLC parameters directly to try_fill_order() is deprecated "
+                    "and will be removed in v0.6.0. "
+                    "Please pass a MarketEvent instance instead: "
+                    "fill_simulator.try_fill_order(order, market_event, current_cash=..., current_position=...)",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            _timestamp = timestamp
+            _high = high
+            _low = low
+            _close = close
+            _market_price = market_price
+            _volume = None
+            _bid_price = None
+            _ask_price = None
+
         # Determine the price to use for checks and fills
         # Prefer close from OHLC, fallback to market_price for backward compatibility
-        check_price = close if close is not None else market_price
+        check_price = _close if _close is not None else _market_price
         if check_price is None:
             logger.warning("No price data provided to try_fill_order")
             return None
 
         # Check if order can be filled using intrabar execution if high/low available
-        if not order.can_fill(price=check_price, high=high, low=low):
+        if not order.can_fill(price=check_price, high=_high, low=_low):
             return None
 
         # Apply market impact to the market price
         impacted_market_price = self._get_market_price_with_impact(
             order,
             check_price,
-            timestamp,
+            _timestamp,
         )
 
         # Determine fill price (with slippage on top of impact)
@@ -218,14 +269,14 @@ class FillSimulator:
         )
 
         # Update order
-        order.update_fill(fill_quantity, fill_price, commission, timestamp)
+        order.update_fill(fill_quantity, fill_price, commission, _timestamp)
 
         # Update market impact after fill
         self._update_market_impact(
             order,
             fill_quantity,
             check_price,
-            timestamp,
+            _timestamp,
         )
 
         # Update liquidity model after fill
@@ -236,7 +287,7 @@ class FillSimulator:
 
         # Create fill event
         fill_event = FillEvent(
-            timestamp=timestamp,
+            timestamp=_timestamp,
             order_id=order.order_id,
             trade_id=f"T{self._fill_count:06d}",
             asset_id=order.asset_id,

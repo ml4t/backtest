@@ -344,12 +344,20 @@ class SimulationBroker(Broker):
         # Legacy immediate execution for market orders (no delay mode)
         if not self.execution_delay and order.order_type == OrderType.MARKET:
             if order.asset_id in self._last_prices:
+                # Create minimal MarketEvent for legacy immediate execution
+                from ml4t.backtest.core.event import MarketEvent
+                fill_event = MarketEvent(
+                    timestamp=timestamp,
+                    asset_id=order.asset_id,
+                    data_type="trade",
+                    price=self._last_prices[order.asset_id],
+                    close=self._last_prices[order.asset_id],
+                )
                 fill_result = self.fill_simulator.try_fill_order(
                     order,
-                    market_price=self._last_prices[order.asset_id],
+                    fill_event,
                     current_cash=self._internal_portfolio.cash,
                     current_position=self.get_position(order.asset_id),
-                    timestamp=timestamp,
                 )
                 if fill_result:
                     # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
@@ -661,20 +669,33 @@ class SimulationBroker(Broker):
             if order.metadata.get("bracket_type") in ["take_profit", "stop_loss", "trailing_stop"]:
                 continue
 
-            # For next-bar fills (execution_delay=True), pass OPEN as close parameter
-            # Fill simulator prefers 'close' over 'market_price', so we need to pass
-            # the correct price (open) as the 'close' parameter for proper fill pricing
-            fill_close = event.open if self.execution_delay else event.close
+            # For next-bar fills (execution_delay=True), override close with open
+            # Create a modified event if needed for next-bar execution
+            if self.execution_delay:
+                from ml4t.backtest.core.event import MarketEvent
+                fill_event = MarketEvent(
+                    timestamp=event.timestamp,
+                    asset_id=event.asset_id,
+                    data_type=event.data_type,
+                    price=event.open,
+                    open=event.open,
+                    high=event.high,
+                    low=event.low,
+                    close=event.open,  # Override close with open for next-bar fills
+                    volume=event.volume,
+                    bid_price=event.bid_price,
+                    ask_price=event.ask_price,
+                    signals=event.signals,
+                    context=event.context,
+                )
+            else:
+                fill_event = event
 
             fill_result = self.fill_simulator.try_fill_order(
                 order,
-                market_price=price,
+                fill_event,
                 current_cash=self._internal_portfolio.cash,
                 current_position=self.get_position(asset_id),
-                timestamp=event.timestamp,
-                high=event.high,
-                low=event.low,
-                close=fill_close,  # Use open for next-bar fills, close for same-bar
             )
             if fill_result:
                 # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
@@ -743,13 +764,9 @@ class SimulationBroker(Broker):
                 order.metadata["original_type"] = "STOP"
                 fill_result = self.fill_simulator.try_fill_order(
                     order,
-                    market_price=price,
+                    event,
                     current_cash=self._internal_portfolio.cash,
                     current_position=self.get_position(asset_id),
-                    timestamp=event.timestamp,
-                    high=event.high,
-                    low=event.low,
-                    close=event.close,
                 )
                 if fill_result:
                     # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
@@ -897,20 +914,33 @@ class SimulationBroker(Broker):
             # (FillSimulator._calculate_fill_price handles TRAILING_STOP specially)
             order.metadata["original_type"] = "TRAILING_STOP"
 
-            # For next-bar fills (execution_delay=True), pass OPEN as close parameter
-            # Fill simulator prefers 'close' over 'market_price', so we need to pass
-            # the correct price (open) as the 'close' parameter for proper fill pricing
-            fill_close = event.open if self.execution_delay else event.close
+            # For next-bar fills (execution_delay=True), override close with open
+            # Create a modified event if needed for next-bar execution
+            if self.execution_delay:
+                from ml4t.backtest.core.event import MarketEvent
+                fill_event = MarketEvent(
+                    timestamp=event.timestamp,
+                    asset_id=event.asset_id,
+                    data_type=event.data_type,
+                    price=event.open,
+                    open=event.open,
+                    high=event.high,
+                    low=event.low,
+                    close=event.open,  # Override close with open for next-bar fills
+                    volume=event.volume,
+                    bid_price=event.bid_price,
+                    ask_price=event.ask_price,
+                    signals=event.signals,
+                    context=event.context,
+                )
+            else:
+                fill_event = event
 
             fill_result = self.fill_simulator.try_fill_order(
                 order,
-                market_price=price,
+                fill_event,
                 current_cash=self._internal_portfolio.cash,
                 current_position=self.get_position(asset_id),
-                timestamp=event.timestamp,
-                high=event.high,
-                low=event.low,
-                close=fill_close,  # Use open for next-bar fills, close for same-bar
             )
             if fill_result:
                 # Note: order.update_fill() is already called by FillSimulator.try_fill_order()
@@ -982,13 +1012,9 @@ class SimulationBroker(Broker):
                 # Fill the winning exit
                 fill_result = self.fill_simulator.try_fill_order(
                     winning_order,
-                    market_price=price,
+                    event,
                     current_cash=self._internal_portfolio.cash,
                     current_position=self.get_position(asset_id),
-                    timestamp=event.timestamp,
-                    high=event.high,
-                    low=event.low,
-                    close=event.close,
                 )
 
                 if fill_result:
