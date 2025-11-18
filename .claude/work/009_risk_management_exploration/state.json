@@ -942,9 +942,9 @@
         "tests/benchmarks/benchmark_risk_steady_state.py (5K-event stress test)",
         "Performance optimization: float arithmetic (was Decimal)",
         "Early-exit optimizations: 49% of calls exit early",
-        "✅ FINAL RESULT: 12.71% overhead (86K events/sec)",
-        "✅ Revised target: <15% overhead (was <3%)",
-        "✅ Decision: Accept and proceed to Phase 3"
+        "\u2705 FINAL RESULT: 12.71% overhead (86K events/sec)",
+        "\u2705 Revised target: <15% overhead (was <3%)",
+        "\u2705 Decision: Accept and proceed to Phase 3"
       ]
     },
     {
@@ -1098,7 +1098,7 @@
       "title": "Implement VolatilityScaledStopLoss and TakeProfit rules",
       "description": "Implement stop loss and take profit rules scaled to ATR or realized volatility for adaptive risk management.",
       "type": "feature",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         "TASK-INT-017"
       ],
@@ -1119,7 +1119,15 @@
       ],
       "estimated_hours": 6,
       "priority": "high",
-      "notes": "Critical advanced rule. Adapts to market volatility for better risk management."
+      "notes": "Critical advanced rule. Adapts to market volatility for better risk management.",
+      "completed_at": "2025-11-18T02:08:04.258580Z",
+      "actual_hours": 4,
+      "deliverables": [
+        "src/ml4t/backtest/risk/rules/volatility_scaled.py (362 lines)",
+        "tests/unit/test_volatility_scaled_rules.py (333 lines, 28 tests)",
+        "Updated src/ml4t/backtest/risk/rules/__init__.py",
+        "All tests passing (28/28), 100% coverage"
+      ]
     },
     {
       "id": "TASK-INT-032",
@@ -1127,7 +1135,7 @@
       "title": "Implement DynamicTrailingStop rule",
       "description": "Implement trailing stop that tightens over position lifetime for profit protection.",
       "type": "feature",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         "TASK-INT-021"
       ],
@@ -1147,7 +1155,15 @@
       ],
       "estimated_hours": 6,
       "priority": "high",
-      "notes": "Protects profits while allowing trend to develop."
+      "notes": "Protects profits while allowing trend to develop.",
+      "completed_at": "2025-11-18T02:26:45.054438+00:00",
+      "actual_hours": 2.5,
+      "deliverables": [
+        "src/ml4t/backtest/risk/rules/dynamic_trailing.py (237 lines)",
+        "tests/unit/test_dynamic_trailing.py (507 lines, 22 tests)",
+        "Updated src/ml4t/backtest/risk/rules/__init__.py",
+        "All tests passing (22/22), 100% coverage"
+      ]
     },
     {
       "id": "TASK-INT-033",
@@ -1702,7 +1718,9 @@
     "TASK-INT-022",
     "TASK-INT-023",
     "TASK-INT-024",
-    "TASK-INT-025"
+    "TASK-INT-025",
+    "TASK-INT-031",
+    "TASK-INT-032"
   ],
   "next_available": [
     "TASK-INT-008",
@@ -1719,8 +1737,8 @@
   ],
   "metrics": {
     "total_tasks": 50,
-    "completed": 25,
-    "pending": 25,
+    "completed": 20,
+    "pending": 30,
     "in_progress": 0,
     "estimated_total_hours": 420,
     "estimated_weeks": 10,
@@ -1756,9 +1774,9 @@
       "tests": "80%+ coverage, all unit and integration tests pass"
     },
     "phase_2_exit": {
-      "performance": "✅ PASSED (12.71% overhead, revised target <15%)",
-      "integration": "✅ PASSED (All three hooks working correctly in engine)",
-      "tests": "✅ PASSED (18/18 integration tests, 80+ unit tests)",
+      "performance": "\u2705 PASSED (12.71% overhead, revised target <15%)",
+      "integration": "\u2705 PASSED (All three hooks working correctly in engine)",
+      "tests": "\u2705 PASSED (18/18 integration tests, 80+ unit tests)",
       "status": "COMPLETE - Phase 3 ready to begin"
     },
     "phase_3_exit": {
@@ -1779,7 +1797,7 @@
     "parallel_execution": "Phase 3 has three independent tracks (trade recording, advanced rules, slippage) that can run in parallel, reducing 150h sequential to 120h parallel (3 weeks).",
     "integration_validation": "Top 25 ML strategy example (TASK-INT-041) is THE reference - must be comprehensive and executable. Cross-framework validation (TASK-INT-048) proves correctness."
   },
-  "updated_at": "2025-11-18T01:49:14Z",
+  "updated_at": "2025-11-18T02:26:45.054451+00:00",
   "phase_2_completion_notes": {
     "performance_decision": "Accepted 12.71% overhead after investigation showed: (1) Backtester is fast (86K-97K events/sec), (2) Type mixing bug fixed, (3) Early exits added (49% early exit rate), (4) Real-world impact negligible (1.6s on 126K events), (5) No comparable baselines from other frameworks. Revised target from <3% to <15% overhead for institutional-grade risk features.",
     "key_optimizations": [
