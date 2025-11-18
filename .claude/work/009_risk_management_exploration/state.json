@@ -526,7 +526,7 @@
       "title": "Integration test - End-to-end ML strategy with PolarsDataFeed",
       "description": "End-to-end integration test validating complete workflow from PolarsDataFeed through strategy execution to trade recording.",
       "type": "testing",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         "TASK-INT-010",
         "TASK-INT-011"
@@ -547,7 +547,12 @@
       ],
       "estimated_hours": 6,
       "priority": "high",
-      "notes": "Validates entire ML data pipeline works end-to-end."
+      "notes": "Validates entire ML data pipeline works end-to-end.",
+      "completed_at": "2025-11-18T13:24:53Z",
+      "actual_hours": 2,
+      "deliverables": [
+        "tests/integration/test_ml_strategy_polars.py"
+      ]
     },
     {
       "id": "TASK-INT-014",
