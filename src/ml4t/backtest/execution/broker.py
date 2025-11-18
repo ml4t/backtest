@@ -608,9 +608,13 @@ class SimulationBroker(Broker):
         fills = []
         asset_id = event.asset_id
 
+        # Track orders activated in this event (to prevent same-event fills)
+        newly_activated_orders = set()
+
         # FIX #1: Move pending orders to open FIRST (at START of event)
         # This allows orders placed on day T to fill on day T+1 (next bar), not T+2
         # Industry standard for daily data: signal T → fill T+1
+        # IMPORTANT: Orders activated in this event should NOT fill until next event
         if self.execution_delay and asset_id in self._pending_orders:
             for order, _ in self._pending_orders[asset_id]:
                 if order.order_type == OrderType.BRACKET:
@@ -618,6 +622,8 @@ class SimulationBroker(Broker):
                     self._open_orders[asset_id].append(order)
                 else:
                     self._open_orders[asset_id].append(order)
+                # Mark as newly activated so we don't fill it this event
+                newly_activated_orders.add(order.order_id)
             # Clear pending orders after moving them
             self._pending_orders[asset_id].clear()
 
@@ -641,6 +647,10 @@ class SimulationBroker(Broker):
         # IMPORTANT: Skip bracket exit orders here - they're handled with priority logic below
         for order in list(self._open_orders[asset_id]):
             if not order.is_active:
+                continue
+
+            # Skip orders that were just activated in this event (execution delay)
+            if self.execution_delay and order.order_id in newly_activated_orders:
                 continue
 
             # Skip already-filled orders (prevent double-fill attempts)
