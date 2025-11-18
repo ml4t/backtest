@@ -9,6 +9,14 @@
 # from ml4t.backtest.reporting.parquet import ParquetReportGenerator
 
 from ml4t.backtest.reporting.reporter import ConsoleReporter, InMemoryReporter, Reporter
+from ml4t.backtest.reporting.trade_analysis import (
+    analyze_trades,
+    avg_hold_time_by_rule,
+    feature_correlation,
+    pnl_attribution,
+    rule_effectiveness,
+    win_rate_by_rule,
+)
 from ml4t.backtest.reporting.trade_schema import (
     ExitReason,
     MLTradeRecord,
@@ -18,6 +26,13 @@ from ml4t.backtest.reporting.trade_schema import (
     import_parquet,
     polars_to_trades,
     trades_to_polars,
+)
+from ml4t.backtest.reporting.visualizations import (
+    plot_exit_reasons,
+    plot_feature_importance,
+    plot_hold_time_distribution,
+    plot_mfe_mae_scatter,
+    plot_rule_performance,
 )
 
 __all__ = [
@@ -36,4 +51,17 @@ __all__ = [
     "export_parquet",
     "import_parquet",
     "append_trades",
+    # Trade analysis
+    "win_rate_by_rule",
+    "avg_hold_time_by_rule",
+    "pnl_attribution",
+    "rule_effectiveness",
+    "feature_correlation",
+    "analyze_trades",
+    # Visualizations
+    "plot_rule_performance",
+    "plot_hold_time_distribution",
+    "plot_feature_importance",
+    "plot_exit_reasons",
+    "plot_mfe_mae_scatter",
 ]
