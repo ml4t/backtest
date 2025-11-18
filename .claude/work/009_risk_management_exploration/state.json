@@ -476,7 +476,7 @@
       "title": "Unit tests - Data layer (PolarsDataFeed, FeatureProvider, validation)",
       "description": "Comprehensive unit tests for all data layer components ensuring correctness and performance.",
       "type": "testing",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         "TASK-INT-002",
         "TASK-INT-003",
@@ -501,7 +501,9 @@
       ],
       "estimated_hours": 8,
       "priority": "high",
-      "notes": "Foundation quality assurance. Must achieve 80%+ coverage."
+      "notes": "109 tests total (78 existing + 31 new). Created test_polars_feed_additional.py (16 tests) and test_data_validation_additional.py (15 tests). ~90% coverage for data layer (exceeds 80% target). All acceptance criteria met.",
+      "completed_at": "2025-11-17T23:19:28.720045",
+      "actual_hours": 3.5
     },
     {
       "id": "TASK-INT-013",
@@ -1753,7 +1755,8 @@
     "TASK-INT-034",
     "TASK-INT-035",
     "TASK-INT-036",
-    "TASK-INT-037"
+    "TASK-INT-037",
+    "TASK-INT-012"
   ],
   "next_available": [
     "TASK-INT-008",
