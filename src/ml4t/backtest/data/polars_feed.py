@@ -81,6 +81,9 @@ class PolarsDataFeed(DataFeed):
         validate_signal_timing: bool = True,
         signal_timing_mode: SignalTimingMode = SignalTimingMode.NEXT_BAR,
         fail_on_timing_violation: bool = True,
+        # Optimization parameters
+        use_categorical: bool = False,
+        compression: str | None = None,
     ):
         """
         Initialize PolarsDataFeed with lazy loading.
@@ -103,6 +106,15 @@ class PolarsDataFeed(DataFeed):
                                (default: NEXT_BAR - signal used on next bar)
             fail_on_timing_violation: If True, raise exception on timing violation;
                                      if False, log warning (default: True)
+            use_categorical: If True, convert asset_id column to categorical
+                            for memory savings (10-20% reduction for 500+ symbols)
+                            Default: False (opt-in optimization)
+            compression: Compression codec for Parquet writes. Options:
+                        'zstd' (recommended, 30-50% size reduction),
+                        'snappy' (faster, less compression),
+                        'gzip' (slower, good compression),
+                        'lz4' (fast, moderate compression),
+                        None (no compression, default)
         """
         self.price_path = Path(price_path)
         self.asset_id = asset_id
@@ -115,6 +127,10 @@ class PolarsDataFeed(DataFeed):
         self.validate_signal_timing = validate_signal_timing
         self.signal_timing_mode = signal_timing_mode
         self.fail_on_timing_violation = fail_on_timing_violation
+
+        # Optimization parameters
+        self.use_categorical = use_categorical
+        self.compression = compression
 
         # Load price data lazily
         self.price_lazy = pl.scan_parquet(str(self.price_path))
@@ -171,6 +187,10 @@ class PolarsDataFeed(DataFeed):
         # For 250 symbols × 252 days × daily bars = ~63k rows = ~10MB per symbol
         # Total for 250 symbols: ~2.5GB (within target)
         self.df = self.merged_lazy.collect()
+
+        # Apply categorical encoding if enabled (10-20% memory reduction)
+        if self.use_categorical and self.asset_column in self.df.columns:
+            self.df = self.df.with_columns(pl.col(self.asset_column).cast(pl.Categorical))
 
         # Validate signal timing if signals are present
         if self.signals_path and self.validate_signal_timing:
@@ -421,3 +441,178 @@ class PolarsDataFeed(DataFeed):
             return False  # Haven't started yet
 
         return self._exhausted
+
+
+# Helper functions for Parquet optimization
+
+
+def write_optimized_parquet(
+    df: pl.DataFrame,
+    path: Path,
+    compression: str = "zstd",
+    use_categorical: bool = False,
+    categorical_columns: list[str] | None = None,
+) -> None:
+    """Write DataFrame to Parquet with optimizations.
+
+    Args:
+        df: DataFrame to write
+        path: Output path
+        compression: Compression codec ('zstd', 'snappy', 'gzip', 'lz4', None)
+                    Default: 'zstd' (best compression ratio, 30-50% size reduction)
+        use_categorical: If True, convert specified columns to categorical
+        categorical_columns: Column names to convert to categorical
+                           Default: ['asset_id'] if use_categorical=True
+
+    Example:
+        >>> df = pl.DataFrame({...})
+        >>> write_optimized_parquet(
+        ...     df,
+        ...     Path("prices.parquet"),
+        ...     compression="zstd",
+        ...     use_categorical=True,
+        ... )
+    """
+    if use_categorical:
+        if categorical_columns is None:
+            categorical_columns = ["asset_id"]
+
+        # Convert specified columns to categorical
+        for col in categorical_columns:
+            if col in df.columns:
+                df = df.with_columns(pl.col(col).cast(pl.Categorical))
+
+    # Write with compression
+    df.write_parquet(path, compression=compression)
+
+
+def create_partitioned_dataset(
+    df: pl.DataFrame,
+    base_path: Path,
+    partition_by: str = "month",
+    timestamp_column: str = "timestamp",
+    compression: str = "zstd",
+    use_categorical: bool = False,
+    categorical_columns: list[str] | None = None,
+) -> dict[str, Path]:
+    """Create partitioned Parquet dataset for large data.
+
+    Partitioning improves query performance by allowing selective loading
+    of only relevant time periods.
+
+    Args:
+        df: DataFrame to partition
+        base_path: Base directory for partitioned files
+        partition_by: Partitioning strategy ('month', 'quarter', 'year')
+        timestamp_column: Name of timestamp column
+        compression: Compression codec
+        use_categorical: If True, convert specified columns to categorical
+        categorical_columns: Column names to convert to categorical
+
+    Returns:
+        Dictionary mapping partition keys to file paths
+
+    Example:
+        >>> df = pl.DataFrame({...})  # 1 year of data
+        >>> partitions = create_partitioned_dataset(
+        ...     df,
+        ...     Path("data/partitioned"),
+        ...     partition_by="month",
+        ...     compression="zstd",
+        ... )
+        >>> # Creates: data/partitioned/2025-01.parquet, 2025-02.parquet, ...
+    """
+    base_path = Path(base_path)
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    # Add partition column
+    if partition_by == "month":
+        df = df.with_columns(
+            pl.col(timestamp_column).dt.strftime("%Y-%m").alias("partition_key")
+        )
+    elif partition_by == "quarter":
+        df = df.with_columns(
+            (
+                pl.col(timestamp_column).dt.year().cast(str)
+                + "-Q"
+                + pl.col(timestamp_column).dt.quarter().cast(str)
+            ).alias("partition_key")
+        )
+    elif partition_by == "year":
+        df = df.with_columns(
+            pl.col(timestamp_column).dt.year().cast(str).alias("partition_key")
+        )
+    else:
+        raise ValueError(f"Invalid partition_by: {partition_by}")
+
+    # Group by partition and write
+    partitions = {}
+    for partition_key, partition_df in df.partition_by("partition_key", as_dict=True).items():
+        # partition_by returns tuples as keys, extract first element
+        if isinstance(partition_key, tuple):
+            partition_key = partition_key[0]
+
+        # Remove partition_key column from data
+        partition_df = partition_df.drop("partition_key")
+
+        # Write partition
+        partition_path = base_path / f"{partition_key}.parquet"
+        write_optimized_parquet(
+            partition_df,
+            partition_path,
+            compression=compression,
+            use_categorical=use_categorical,
+            categorical_columns=categorical_columns,
+        )
+        partitions[partition_key] = partition_path
+
+    return partitions
+
+
+def load_partitioned_dataset(
+    base_path: Path,
+    partitions: list[str] | None = None,
+    lazy: bool = True,
+) -> pl.DataFrame | pl.LazyFrame:
+    """Load partitioned Parquet dataset.
+
+    Args:
+        base_path: Base directory containing partitioned files
+        partitions: Optional list of partition keys to load (e.g., ['2025-01', '2025-02'])
+                   If None, loads all partitions
+        lazy: If True, return LazyFrame; otherwise collect and return DataFrame
+
+    Returns:
+        Combined DataFrame or LazyFrame from specified partitions
+
+    Example:
+        >>> # Load only Q1 2025
+        >>> df = load_partitioned_dataset(
+        ...     Path("data/partitioned"),
+        ...     partitions=["2025-01", "2025-02", "2025-03"],
+        ...     lazy=True,
+        ... )
+    """
+    base_path = Path(base_path)
+
+    if partitions is None:
+        # Load all .parquet files
+        pattern = str(base_path / "*.parquet")
+    else:
+        # Load specific partitions
+        partition_paths = [base_path / f"{p}.parquet" for p in partitions]
+        pattern = partition_paths
+
+    if lazy:
+        if isinstance(pattern, list):
+            # Scan multiple files and concat
+            lazy_frames = [pl.scan_parquet(str(p)) for p in pattern]
+            return pl.concat(lazy_frames)
+        else:
+            return pl.scan_parquet(pattern)
+    else:
+        if isinstance(pattern, list):
+            dfs = [pl.read_parquet(str(p)) for p in pattern]
+            return pl.concat(dfs)
+        else:
+            return pl.read_parquet(pattern)
