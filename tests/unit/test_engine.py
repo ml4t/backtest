@@ -429,8 +429,7 @@ class TestIntegrationScenarios:
         # Create a simple buy and hold strategy
         class SimpleBuyAndHold(Strategy):
             def __init__(self):
-                self.name = "SimpleBuyAndHold"  # Required by Strategy.__repr__
-                self.state = "INACTIVE"  # Required by Strategy.__repr__
+                super().__init__(name="SimpleBuyAndHold")  # Call parent __init__ to set up _execution_mode
                 self.bought = False
                 self.portfolio = None
                 self.clock = None

@@ -144,9 +144,9 @@ class TestOHLCConsistencyEdgeCases:
         """Test OHLC when high equals low (zero range bar)."""
         df = pl.DataFrame(
             {
-                "open": [100.0],
+                "open": [100.5],  # Fixed: must be within [low, high] range
                 "high": [100.5],
-                "low": [100.5],  # high == low
+                "low": [100.5],  # high == low (zero range)
                 "close": [100.5],
             }
         )
@@ -429,7 +429,7 @@ class TestComprehensiveValidationEdgeCases:
         )
 
         is_valid, violations = validate_comprehensive(
-            df, expected_frequency="1d", max_gap_multiplier=3.0
+            df, expected_frequency="1d"
         )
 
         assert not is_valid
