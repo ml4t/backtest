@@ -313,28 +313,33 @@ class PolarsDataFeed(DataFeed):
         """
         signals = {}
 
+        # Define standard OHLCV and metadata columns to exclude
+        exclude_cols = {
+            self.timestamp_column,
+            self.asset_column,
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "price",
+            "size",
+            "bid",
+            "ask",
+            "bid_size",
+            "ask_size",
+        }
+
         if self.signal_columns:
             # Use specified signal columns
             for col in self.signal_columns:
                 if col in row and row[col] is not None:
                     signals[col] = float(row[col])
-        elif self.signals_path:
-            # Auto-detect: all numeric columns except timestamp/asset
-            exclude_cols = {
-                self.timestamp_column,
-                self.asset_column,
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "price",
-                "size",
-                "bid",
-                "ask",
-                "bid_size",
-                "ask_size",
-            }
+        else:
+            # Auto-detect: all numeric columns except OHLCV and metadata
+            # This works for both:
+            # 1. Separate signals file (when signals_path is provided)
+            # 2. Additional columns in price file (indicators, features, etc.)
             for col, value in row.items():
                 if col not in exclude_cols and isinstance(value, (int, float)):
                     signals[col] = float(value)

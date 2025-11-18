@@ -200,7 +200,7 @@ class SimpleEntryStrategy(Strategy):
         """Handle events (required abstract method)."""
         pass
 
-    def on_market_data(self, event: MarketEvent, context=None) -> None:
+    def on_market_event(self, event: MarketEvent, context=None) -> None:
         """Enter position on specified day."""
         if self.days_seen == self.entry_day and not self.entered:
             self.entered = True
@@ -234,7 +234,7 @@ class MultipleEntryStrategy(Strategy):
         """Handle events (required abstract method)."""
         pass
 
-    def on_market_data(self, event: MarketEvent, context=None) -> None:
+    def on_market_event(self, event: MarketEvent, context=None) -> None:
         """Enter position on specified days."""
         if self.days_seen in self.entry_days:
             order = Order(
@@ -299,7 +299,7 @@ class TestScenario1VolatilityScaledStops:
         assert execution_time < 30, f"Should complete in <30s, took {execution_time:.2f}s"
 
         # Check that position was entered
-        trades = broker.trade_tracker.get_all_trades()
+        trades = broker.trade_tracker.get_trades_df()
         assert len(trades) > 0, "Should have at least one trade"
 
         entry_trade = trades[0]
@@ -423,7 +423,7 @@ class TestScenario2DynamicTrailingStop:
         assert execution_time < 30, f"Should complete in <30s, took {execution_time:.2f}s"
 
         # Check trades
-        trades = broker.trade_tracker.get_all_trades()
+        trades = broker.trade_tracker.get_trades_df()
         assert len(trades) > 0, "Should have trades"
 
         # Entry should occur
@@ -496,7 +496,7 @@ class TestScenario3RegimeDependentRules:
         assert execution_time < 30, f"Should complete in <30s, took {execution_time:.2f}s"
 
         # Check trades
-        trades = broker.trade_tracker.get_all_trades()
+        trades = broker.trade_tracker.get_trades_df()
         assert len(trades) > 0, "Should have trades"
 
         # Verify regime switching occurred
@@ -563,7 +563,7 @@ class TestScenario4PortfolioConstraints:
         assert execution_time < 30, f"Should complete in <30s, took {execution_time:.2f}s"
 
         # Check trades
-        trades = broker.trade_tracker.get_all_trades()
+        trades = broker.trade_tracker.get_trades_df()
 
         # Day 5 entry should succeed (before drawdown)
         # Day 20 entry should be rejected (during drawdown)
@@ -615,7 +615,7 @@ class TestScenario4PortfolioConstraints:
         assert execution_time < 30, f"Should complete in <30s, took {execution_time:.2f}s"
 
         # Check that rule prevented some trades during high loss days
-        trades = broker.trade_tracker.get_all_trades()
+        trades = broker.trade_tracker.get_trades_df()
         entry_trades = [t for t in trades if t.quantity > 0]
 
         print(
@@ -691,7 +691,7 @@ class TestScenario5MultipleRulesCombined:
         assert execution_time < 30, f"Should complete in <30s, took {execution_time:.2f}s"
 
         # Check trades
-        trades = broker.trade_tracker.get_all_trades()
+        trades = broker.trade_tracker.get_trades_df()
         assert len(trades) > 0, "Should have trades"
 
         # Entry should occur
