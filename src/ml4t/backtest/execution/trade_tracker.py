@@ -10,9 +10,10 @@ from typing import Any, Optional
 
 import polars as pl
 
-from ml4t.backtest.core.event import FillEvent
+from ml4t.backtest.core.event import FillEvent, MarketEvent
 from ml4t.backtest.core.precision import PrecisionManager
 from ml4t.backtest.core.types import AssetId, OrderSide
+from ml4t.backtest.reporting.trade_schema import ExitReason, MLTradeRecord
 
 
 @dataclass
@@ -86,6 +87,8 @@ class OpenPosition:
     direction: str
     entry_bar_idx: int
     entry_metadata: dict[str, Any] = field(default_factory=dict)  # Capture entry signals/reasons
+    # ML/risk fields captured at entry
+    entry_market_event: Optional[MarketEvent] = None  # Store full event for later extraction
 
 
 class TradeTracker:
@@ -131,12 +134,17 @@ class TradeTracker:
         """Increment bar counter for duration tracking."""
         self._current_bar_idx += 1
 
-    def on_fill(self, fill_event: FillEvent) -> list[TradeRecord]:
+    def on_fill(
+        self,
+        fill_event: FillEvent,
+        market_event: Optional[MarketEvent] = None
+    ) -> list[TradeRecord]:
         """
         Process a fill event and generate completed trades if applicable.
 
         Args:
             fill_event: Fill event from broker
+            market_event: Optional market event for capturing ML signals, features, and context
 
         Returns:
             List of completed trade records (empty if position still open)
@@ -157,7 +165,7 @@ class TradeTracker:
         # Determine if this is opening or closing
         if not position_queue:
             # Opening new position
-            self._open_new_position(fill_event)
+            self._open_new_position(fill_event, market_event=market_event)
         else:
             # Check if this closes existing positions
             existing_position = position_queue[0]
@@ -172,7 +180,7 @@ class TradeTracker:
                     close_qty = min(remaining, position.quantity)
 
                     # Create completed trade
-                    trade = self._close_position(position, fill_event, close_qty)
+                    trade = self._close_position(position, fill_event, close_qty, market_event)
                     completed_trades.append(trade)
 
                     # Update position
@@ -193,16 +201,27 @@ class TradeTracker:
                     has_remaining = not self.precision_manager.is_position_zero(remaining)
                 if has_remaining:
                     # Create new fill event for remaining quantity
-                    self._open_new_position(fill_event, remaining)
+                    self._open_new_position(fill_event, remaining, market_event)
             else:
                 # Adding to existing position
-                self._open_new_position(fill_event)
+                self._open_new_position(fill_event, market_event=market_event)
 
         self._total_trades_completed += len(completed_trades)
         return completed_trades
 
-    def _open_new_position(self, fill_event: FillEvent, quantity: float | None = None) -> None:
-        """Open a new position from a fill."""
+    def _open_new_position(
+        self,
+        fill_event: FillEvent,
+        quantity: float | None = None,
+        market_event: Optional[MarketEvent] = None
+    ) -> None:
+        """Open a new position from a fill.
+
+        Args:
+            fill_event: Fill event triggering the position
+            quantity: Optional override quantity
+            market_event: Optional market event for capturing ML signals and context
+        """
         asset_id = fill_event.asset_id
         qty = quantity if quantity is not None else abs(fill_event.fill_quantity)
 
@@ -217,14 +236,26 @@ class TradeTracker:
             direction="long" if fill_event.side == OrderSide.BUY else "short",
             entry_bar_idx=self._current_bar_idx,
             entry_metadata=fill_event.metadata.copy() if fill_event.metadata else {},
+            entry_market_event=market_event,  # Store for later ML/risk field extraction
         )
 
         self._open_positions[asset_id].append(position)
 
     def _close_position(
-        self, position: OpenPosition, exit_fill: FillEvent, close_quantity: float
+        self,
+        position: OpenPosition,
+        exit_fill: FillEvent,
+        close_quantity: float,
+        exit_market_event: Optional[MarketEvent] = None
     ) -> TradeRecord:
-        """Close a position and create trade record."""
+        """Close a position and create trade record.
+
+        Args:
+            position: Open position to close
+            exit_fill: Fill event for the exit
+            close_quantity: Quantity being closed
+            exit_market_event: Optional market event at exit for ML/risk field extraction
+        """
         # Calculate P&L
         if position.direction == "long":
             gross_pnl = close_quantity * (exit_fill.fill_price - position.entry_price)
@@ -270,10 +301,12 @@ class TradeTracker:
             proportional_entry_commission = self.precision_manager.round_cash(proportional_entry_commission)
             proportional_entry_slippage = self.precision_manager.round_cash(proportional_entry_slippage)
 
-        # Combine entry and exit metadata
+        # Combine entry and exit metadata, including market events for ML/risk extraction
         trade_metadata = {
             "entry": position.entry_metadata,
             "exit": exit_fill.metadata.copy() if exit_fill.metadata else {},
+            "entry_market_event": position.entry_market_event,  # Store for to_ml_trade_record()
+            "exit_market_event": exit_market_event,  # Store for to_ml_trade_record()
         }
 
         # Create trade record
@@ -433,6 +466,166 @@ class TradeTracker:
                 else 0.0
             ),
         }
+
+    def to_ml_trade_record(self, trade: TradeRecord) -> MLTradeRecord:
+        """Convert TradeRecord to MLTradeRecord with ML signals and risk attribution.
+
+        Extracts ML signals, features, context, and risk management data from
+        the entry/exit MarketEvents stored in trade.metadata.
+
+        Args:
+            trade: TradeRecord to convert
+
+        Returns:
+            MLTradeRecord with all available ML/risk fields populated
+        """
+        # Extract market events from metadata
+        entry_event = trade.metadata.get("entry_market_event")
+        exit_event = trade.metadata.get("exit_market_event")
+
+        # Extract exit reason from metadata (set by RiskManager)
+        exit_metadata = trade.metadata.get("exit", {})
+        exit_reason_str = exit_metadata.get("exit_reason", "signal")
+        try:
+            exit_reason = ExitReason(exit_reason_str)
+        except ValueError:
+            exit_reason = ExitReason.UNKNOWN
+
+        # Calculate duration in seconds
+        duration_seconds = None
+        if trade.exit_dt and trade.entry_dt:
+            duration_seconds = (trade.exit_dt - trade.entry_dt).total_seconds()
+
+        # Extract ML signals at entry
+        ml_score_entry = None
+        predicted_return_entry = None
+        confidence_entry = None
+        if entry_event:
+            ml_score_entry = entry_event.signals.get("ml_score")
+            predicted_return_entry = entry_event.signals.get("predicted_return")
+            confidence_entry = entry_event.signals.get("confidence")
+
+        # Extract ML signals at exit
+        ml_score_exit = None
+        predicted_return_exit = None
+        confidence_exit = None
+        if exit_event:
+            ml_score_exit = exit_event.signals.get("ml_score")
+            predicted_return_exit = exit_event.signals.get("predicted_return")
+            confidence_exit = exit_event.signals.get("confidence")
+
+        # Extract technical indicators at entry
+        atr_entry = None
+        volatility_entry = None
+        momentum_entry = None
+        rsi_entry = None
+        if entry_event:
+            atr_entry = entry_event.signals.get("atr")
+            volatility_entry = entry_event.signals.get("volatility")
+            momentum_entry = entry_event.signals.get("momentum")
+            rsi_entry = entry_event.signals.get("rsi")
+
+        # Extract technical indicators at exit
+        atr_exit = None
+        volatility_exit = None
+        momentum_exit = None
+        rsi_exit = None
+        if exit_event:
+            atr_exit = exit_event.signals.get("atr")
+            volatility_exit = exit_event.signals.get("volatility")
+            momentum_exit = exit_event.signals.get("momentum")
+            rsi_exit = exit_event.signals.get("rsi")
+
+        # Extract risk management data from metadata
+        entry_meta = trade.metadata.get("entry", {})
+        stop_loss_price = entry_meta.get("stop_loss_price")
+        take_profit_price = entry_meta.get("take_profit_price")
+        risk_reward_ratio = entry_meta.get("risk_reward_ratio")
+        position_size_pct = entry_meta.get("position_size_pct")
+
+        # Extract market context at entry
+        vix_entry = None
+        market_regime_entry = None
+        sector_performance_entry = None
+        if entry_event:
+            vix_entry = entry_event.context.get("vix")
+            market_regime_entry = entry_event.context.get("market_regime")
+            sector_performance_entry = entry_event.context.get("sector_performance")
+
+        # Extract market context at exit
+        vix_exit = None
+        market_regime_exit = None
+        sector_performance_exit = None
+        if exit_event:
+            vix_exit = exit_event.context.get("vix")
+            market_regime_exit = exit_event.context.get("market_regime")
+            sector_performance_exit = exit_event.context.get("sector_performance")
+
+        return MLTradeRecord(
+            # Core trade details
+            trade_id=trade.trade_id,
+            asset_id=trade.asset_id,
+            direction=trade.direction,
+            # Entry details
+            entry_dt=trade.entry_dt,
+            entry_price=trade.entry_price,
+            entry_quantity=trade.entry_quantity,
+            entry_commission=trade.entry_commission,
+            entry_slippage=trade.entry_slippage,
+            entry_order_id=trade.entry_order_id,
+            # Exit details
+            exit_dt=trade.exit_dt,
+            exit_price=trade.exit_price,
+            exit_quantity=trade.exit_quantity,
+            exit_commission=trade.exit_commission,
+            exit_slippage=trade.exit_slippage,
+            exit_order_id=trade.exit_order_id,
+            exit_reason=exit_reason,
+            # Trade metrics
+            pnl=trade.pnl,
+            return_pct=trade.return_pct,
+            duration_bars=trade.duration_bars,
+            duration_seconds=duration_seconds,
+            # ML signals at entry
+            ml_score_entry=ml_score_entry,
+            predicted_return_entry=predicted_return_entry,
+            confidence_entry=confidence_entry,
+            # ML signals at exit
+            ml_score_exit=ml_score_exit,
+            predicted_return_exit=predicted_return_exit,
+            confidence_exit=confidence_exit,
+            # Technical indicators at entry
+            atr_entry=atr_entry,
+            volatility_entry=volatility_entry,
+            momentum_entry=momentum_entry,
+            rsi_entry=rsi_entry,
+            # Technical indicators at exit
+            atr_exit=atr_exit,
+            volatility_exit=volatility_exit,
+            momentum_exit=momentum_exit,
+            rsi_exit=rsi_exit,
+            # Risk management
+            stop_loss_price=stop_loss_price,
+            take_profit_price=take_profit_price,
+            risk_reward_ratio=risk_reward_ratio,
+            position_size_pct=position_size_pct,
+            # Market context at entry
+            vix_entry=vix_entry,
+            market_regime_entry=market_regime_entry,
+            sector_performance_entry=sector_performance_entry,
+            # Market context at exit
+            vix_exit=vix_exit,
+            market_regime_exit=market_regime_exit,
+            sector_performance_exit=sector_performance_exit,
+        )
+
+    def get_ml_trades(self) -> list[MLTradeRecord]:
+        """Get all completed trades as MLTradeRecords with ML/risk attribution.
+
+        Returns:
+            List of MLTradeRecord with full ML signals, features, and risk data
+        """
+        return [self.to_ml_trade_record(trade) for trade in self._trades]
 
     def reset(self) -> None:
         """Reset tracker to initial state."""

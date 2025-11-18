@@ -9,6 +9,16 @@
 # from ml4t.backtest.reporting.parquet import ParquetReportGenerator
 
 from ml4t.backtest.reporting.reporter import ConsoleReporter, InMemoryReporter, Reporter
+from ml4t.backtest.reporting.trade_schema import (
+    ExitReason,
+    MLTradeRecord,
+    append_trades,
+    export_parquet,
+    get_schema,
+    import_parquet,
+    polars_to_trades,
+    trades_to_polars,
+)
 
 __all__ = [
     "ConsoleReporter",
@@ -17,4 +27,13 @@ __all__ = [
     # "HTMLReportGenerator",  # TODO: Update to use Portfolio
     # "ParquetReportGenerator",  # TODO: Update to use Portfolio
     # "ReportGenerator",  # TODO: Update to use Portfolio
+    # Trade schema
+    "MLTradeRecord",
+    "ExitReason",
+    "get_schema",
+    "trades_to_polars",
+    "polars_to_trades",
+    "export_parquet",
+    "import_parquet",
+    "append_trades",
 ]
