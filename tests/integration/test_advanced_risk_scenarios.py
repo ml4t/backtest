@@ -443,8 +443,27 @@ class TestScenario3RegimeDependentRules:
         - Days 50+: Low VIX (18), switch back to tight stops
         - Verify that stops adapt to regime
         """
-        # Setup
-        feed = PolarsDataFeed(price_path=trending_data_file, asset_id="TEST")
+        # Setup - Load price data and extract VIX for feature provider
+        price_df = pl.read_parquet(trending_data_file)
+
+        # Create market features DataFrame (VIX with asset_id=None for market-wide)
+        market_features_df = price_df.select([
+            pl.col("timestamp"),
+            pl.lit(None).alias("asset_id"),  # Market-wide features have asset_id=None
+            pl.col("vix"),
+            pl.col("atr"),  # Include ATR as well
+        ])
+
+        # Create feature provider with market features
+        from ml4t.backtest.data.feature_provider import PrecomputedFeatureProvider
+        feature_provider = PrecomputedFeatureProvider(market_features_df)
+
+        # Create data feed with feature provider
+        feed = PolarsDataFeed(
+            price_path=trending_data_file,
+            asset_id="TEST",
+            feature_provider=feature_provider
+        )
         strategy = SimpleEntryStrategy(entry_day=5, quantity=100)
         broker = SimulationBroker(initial_cash=10000.0)
 
@@ -519,7 +538,7 @@ class TestScenario4PortfolioConstraints:
         risk_manager = RiskManager()
         risk_manager.add_rule(
             MaxDrawdownRule(
-                max_loss_pct=0.10  # 10% max drawdown
+                max_dd_pct=0.10  # 10% max drawdown
             )
         )
 
@@ -800,7 +819,7 @@ class TestPerformanceSummary:
         strategy4 = MultipleEntryStrategy(entry_days=[5, 20, 30, 45], quantity=100)
         broker4 = SimulationBroker(initial_cash=10000.0)
         risk_manager4 = RiskManager()
-        risk_manager4.add_rule(MaxDrawdownRule(max_loss_pct=0.10))
+        risk_manager4.add_rule(MaxDrawdownRule(max_dd_pct=0.10))
         engine4 = BacktestEngine(
             data_feed=feed4,
             strategy=strategy4,

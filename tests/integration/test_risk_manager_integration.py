@@ -38,14 +38,44 @@ class MockDataFeed:
         ]
         self._index = 0
 
+    def get_next_event(self):
+        """Get next event (required by DataFeed interface)."""
+        if self._index >= len(self.events):
+            return None
+        event = self.events[self._index]
+        self._index += 1
+        return event
+
+    def peek_next_timestamp(self):
+        """Peek at next timestamp without consuming."""
+        if self._index >= len(self.events):
+            return None
+        return self.events[self._index].timestamp
+
+    def reset(self):
+        """Reset to beginning."""
+        self._index = 0
+
+    def seek(self, timestamp):
+        """Seek to timestamp."""
+        for i, event in enumerate(self.events):
+            if event.timestamp >= timestamp:
+                self._index = i
+                return
+        self._index = len(self.events)
+
+    @property
+    def is_exhausted(self):
+        """Check if no more events."""
+        return self._index >= len(self.events)
+
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self._index >= len(self.events):
+        event = self.get_next_event()
+        if event is None:
             raise StopIteration
-        event = self.events[self._index]
-        self._index += 1
         return event
 
     def get_time_range(self):
@@ -71,11 +101,31 @@ class MockStrategy:
         pass
 
 
+# Helper to create properly mocked risk manager
+class MockRiskManager:
+    """Mock risk manager with all required methods."""
+    def __init__(self):
+        self.check_position_exits = Mock(return_value=[])
+        self.validate_order = Mock(side_effect=lambda *args, **kwargs: kwargs.get('order', args[0] if args else None))
+        self.record_fill = Mock()
+
+    def set_check_position_exits_return(self, value):
+        """Set return value for check_position_exits."""
+        self.check_position_exits = Mock(return_value=value)
+
+    def set_validate_order_return(self, value):
+        """Set return value for validate_order."""
+        if value is None:
+            self.validate_order = Mock(return_value=None)
+        else:
+            # If value is not None and not 'passthrough', return the order unchanged
+            self.validate_order = Mock(side_effect=lambda *args, **kwargs: kwargs.get('order', args[0] if args else None))
+
+
 def test_hook_c_check_position_exits_called():
     """Test that Hook C (check_position_exits) is called before strategy."""
     # Create mock risk manager
-    mock_risk_manager = Mock(spec=RiskManager)
-    mock_risk_manager.check_position_exits = Mock(return_value=[])
+    mock_risk_manager = MockRiskManager()
 
     # Create engine with risk manager
     engine = BacktestEngine(
@@ -96,14 +146,14 @@ def test_hook_c_check_position_exits_called():
 def test_hook_c_generates_exit_orders():
     """Test that Hook C can generate exit orders that are submitted."""
     # Create risk manager that generates an exit order
-    mock_risk_manager = Mock(spec=RiskManager)
     exit_order = Order(
         asset_id="TEST",
         order_type=OrderType.MARKET,
         side=OrderSide.SELL,
         quantity=100.0,
     )
-    mock_risk_manager.check_position_exits = Mock(return_value=[exit_order])
+    mock_risk_manager = MockRiskManager()
+    mock_risk_manager.set_check_position_exits_return([exit_order])
 
     # Create engine
     engine = BacktestEngine(
@@ -134,10 +184,8 @@ def test_hook_c_generates_exit_orders():
 
 def test_hook_b_validate_order_called():
     """Test that Hook B (validate_order) is called when strategy submits order."""
-    # Create mock risk manager
-    mock_risk_manager = Mock(spec=RiskManager)
-    # validate_order should pass through the order
-    mock_risk_manager.validate_order = Mock(side_effect=lambda o, *args, **kwargs: o)
+    # Create mock risk manager (validate_order passes through by default)
+    mock_risk_manager = MockRiskManager()
 
     # Create strategy that submits an order
     class OrderSubmittingStrategy(MockStrategy):
@@ -169,8 +217,8 @@ def test_hook_b_validate_order_called():
 def test_hook_b_can_reject_orders():
     """Test that Hook B can reject orders (return None)."""
     # Create risk manager that rejects all orders
-    mock_risk_manager = Mock(spec=RiskManager)
-    mock_risk_manager.validate_order = Mock(return_value=None)  # Reject
+    mock_risk_manager = MockRiskManager()
+    mock_risk_manager.set_validate_order_return(None)  # Reject
 
     # Create strategy that submits an order
     class OrderSubmittingStrategy(MockStrategy):
@@ -204,8 +252,7 @@ def test_hook_d_record_fill_called():
     """Test that Hook D (record_fill) is called after fills."""
     # This test requires actual fills, which is complex to set up
     # For now, just verify the subscription is registered
-    mock_risk_manager = Mock(spec=RiskManager)
-    mock_risk_manager.check_position_exits = Mock(return_value=[])
+    mock_risk_manager = MockRiskManager()
 
     engine = BacktestEngine(
         data_feed=MockDataFeed(),
