@@ -490,3 +490,58 @@ class TestEdgeCases:
 
         # Should still compute (garbage in, garbage out)
         assert "stop_loss" in result
+
+
+class TestPerformance:
+    """Test performance with large datasets."""
+
+    def test_analysis_of_10k_trades(self):
+        """Test that analysis functions complete in <1 second with 10k trades."""
+        import time
+
+        # Create 10,000 synthetic trades
+        n_trades = 10_000
+        trades = pl.DataFrame(
+            {
+                "trade_id": list(range(n_trades)),
+                "asset_id": [f"ASSET_{i % 100}" for i in range(n_trades)],
+                "exit_reason": [
+                    ["stop_loss", "take_profit", "time_stop", "risk_rule"][i % 4]
+                    for i in range(n_trades)
+                ],
+                "pnl": [100.0 if i % 2 == 0 else -50.0 for i in range(n_trades)],
+                "return_pct": [0.05 if i % 2 == 0 else -0.025 for i in range(n_trades)],
+                "duration_bars": [20 + (i % 30) for i in range(n_trades)],
+                "duration_seconds": [
+                    float((20 + (i % 30)) * 60) for i in range(n_trades)
+                ],
+                "atr_entry": [2.5 + (i % 10) * 0.1 for i in range(n_trades)],
+                "volatility_entry": [0.02 + (i % 10) * 0.005 for i in range(n_trades)],
+                "ml_score_entry": [0.5 + (i % 10) * 0.05 for i in range(n_trades)],
+            }
+        )
+
+        # Test all analysis functions
+        start = time.perf_counter()
+
+        win_rates = win_rate_by_rule(trades)
+        hold_times = avg_hold_time_by_rule(trades)
+        pnl_attr = pnl_attribution(trades)
+        effectiveness = rule_effectiveness(trades)
+        correlations = feature_correlation(
+            trades, features=["atr_entry", "volatility_entry", "ml_score_entry"]
+        )
+        summary = analyze_trades(trades)
+
+        elapsed = time.perf_counter() - start
+
+        # Verify all functions completed successfully
+        assert len(win_rates) > 0
+        assert len(hold_times) > 0
+        assert len(pnl_attr) > 0
+        assert len(effectiveness) > 0
+        assert len(correlations) > 0
+        assert summary["summary"]["total_trades"] == n_trades
+
+        # Performance requirement: < 1 second
+        assert elapsed < 1.0, f"Analysis took {elapsed:.3f}s, expected < 1.0s"
