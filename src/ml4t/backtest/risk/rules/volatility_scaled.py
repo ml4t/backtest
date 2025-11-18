@@ -10,7 +10,7 @@ from typing import Optional
 
 from ml4t.backtest.core.types import Price
 from ml4t.backtest.risk.context import RiskContext
-from ml4t.backtest.risk.decision import RiskDecision
+from ml4t.backtest.risk.decision import RiskDecision, ExitType
 from ml4t.backtest.risk.rule import RiskRule
 
 logger = logging.getLogger(__name__)
@@ -158,6 +158,42 @@ class VolatilityScaledStopLoss(RiskRule):
             (stop_distance / context.entry_price) if context.entry_price > 0 else 0.0
         )
 
+        # Check if stop loss has been hit
+        current_price = context.close
+        stop_hit = False
+
+        if is_long:
+            # Long position: stop if price <= stop_loss_price
+            stop_hit = current_price <= stop_loss_price
+        else:
+            # Short position: stop if price >= stop_loss_price
+            stop_hit = current_price >= stop_loss_price
+
+        if stop_hit:
+            # Exit immediately - stop loss triggered
+            return RiskDecision.exit_now(
+                exit_type=ExitType.STOP_LOSS,
+                reason=(
+                    f"Volatility-scaled stop loss hit: {self.atr_multiplier:.1f}x "
+                    f"{self.volatility_key}={volatility:.4f}, "
+                    f"price={current_price:.2f} <= SL={stop_loss_price:.2f}"
+                ),
+                priority=self.priority,
+                metadata={
+                    "volatility_key": self.volatility_key,
+                    "volatility_value": volatility,
+                    "atr_multiplier": self.atr_multiplier,
+                    "stop_loss_price": stop_loss_price,
+                    "current_price": current_price,
+                    "entry_price": context.entry_price,
+                    "stop_distance": abs(current_price - stop_loss_price),
+                    "exit_type": "stop_loss",
+                    "position_direction": "long" if is_long else "short",
+                },
+                asset_id=context.asset_id,
+            )
+
+        # Stop not hit - update stop level for monitoring
         return RiskDecision.update_stops(
             update_stop_loss=stop_loss_price,
             reason=(
@@ -172,8 +208,10 @@ class VolatilityScaledStopLoss(RiskRule):
                 "atr_multiplier": self.atr_multiplier,
                 "stop_loss_price": stop_loss_price,
                 "entry_price": context.entry_price,
+                "current_price": current_price,
                 "stop_distance": stop_distance,
                 "stop_distance_pct": stop_distance_pct,
+                "distance_to_stop": abs(current_price - stop_loss_price),
                 "position_direction": "long" if is_long else "short",
             },
             asset_id=context.asset_id,
@@ -328,6 +366,42 @@ class VolatilityScaledTakeProfit(RiskRule):
             (target_distance / context.entry_price) if context.entry_price > 0 else 0.0
         )
 
+        # Check if take profit has been hit
+        current_price = context.close
+        target_hit = False
+
+        if is_long:
+            # Long position: target if price >= take_profit_price
+            target_hit = current_price >= take_profit_price
+        else:
+            # Short position: target if price <= take_profit_price
+            target_hit = current_price <= take_profit_price
+
+        if target_hit:
+            # Exit immediately - take profit triggered
+            return RiskDecision.exit_now(
+                exit_type=ExitType.TAKE_PROFIT,
+                reason=(
+                    f"Volatility-scaled take profit hit: {self.atr_multiplier:.1f}x "
+                    f"{self.volatility_key}={volatility:.4f}, "
+                    f"price={current_price:.2f} >= TP={take_profit_price:.2f}"
+                ),
+                priority=self.priority,
+                metadata={
+                    "volatility_key": self.volatility_key,
+                    "volatility_value": volatility,
+                    "atr_multiplier": self.atr_multiplier,
+                    "take_profit_price": take_profit_price,
+                    "current_price": current_price,
+                    "entry_price": context.entry_price,
+                    "target_distance": abs(current_price - take_profit_price),
+                    "exit_type": "take_profit",
+                    "position_direction": "long" if is_long else "short",
+                },
+                asset_id=context.asset_id,
+            )
+
+        # Target not hit - update take profit level for monitoring
         return RiskDecision.update_stops(
             update_take_profit=take_profit_price,
             reason=(
