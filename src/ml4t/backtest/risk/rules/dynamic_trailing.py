@@ -10,7 +10,7 @@ from typing import Optional
 
 from ml4t.backtest.core.types import Price
 from ml4t.backtest.risk.context import RiskContext
-from ml4t.backtest.risk.decision import RiskDecision
+from ml4t.backtest.risk.decision import RiskDecision, ExitType
 from ml4t.backtest.risk.rule import RiskRule
 
 logger = logging.getLogger(__name__)
@@ -208,6 +208,46 @@ class DynamicTrailingStop(RiskRule):
             (trail_distance / context.entry_price) if context.entry_price > 0 else 0.0
         )
 
+        # Check if trailing stop has been hit
+        current_price = context.close
+        stop_hit = False
+
+        if is_long:
+            # Long position: stop if price <= stop_level
+            stop_hit = current_price <= stop_level
+        else:
+            # Short position: stop if price >= stop_level
+            stop_hit = current_price >= stop_level
+
+        if stop_hit:
+            # Exit immediately - trailing stop triggered
+            return RiskDecision.exit_now(
+                exit_type=ExitType.STOP_LOSS,
+                reason=(
+                    f"Dynamic trailing stop hit: {current_trail_pct*100:.2f}% trail "
+                    f"at bar {context.bars_held}, price={current_price:.2f} <= SL={stop_level:.2f}"
+                ),
+                priority=self.priority,
+                metadata={
+                    "bars_held": context.bars_held,
+                    "initial_trail_pct": self.initial_trail_pct,
+                    "current_trail_pct": current_trail_pct,
+                    "tighten_rate": self.tighten_rate,
+                    "minimum_trail_pct": self.minimum_trail_pct,
+                    "peak_price": peak_price,
+                    "stop_level": stop_level,
+                    "current_price": current_price,
+                    "trail_distance": abs(current_price - stop_level),
+                    "exit_type": "stop_loss",
+                    "mfe": context.max_favorable_excursion,
+                    "mfe_per_share": mfe_per_share,
+                    "entry_price": context.entry_price,
+                    "position_direction": "long" if is_long else "short",
+                },
+                asset_id=context.asset_id,
+            )
+
+        # Stop not hit - update trailing stop level for monitoring
         return RiskDecision.update_stops(
             update_stop_loss=stop_level,
             reason=(
