@@ -53,6 +53,8 @@ def mock_portfolio():
     portfolio.leverage = 1.0
     # Mock positions as empty dict so iteration works in RiskContext.from_state
     portfolio.positions = {}
+    # Mock get_position to return None (no position) by default
+    portfolio.get_position = Mock(return_value=None)
     return portfolio
 
 
@@ -540,6 +542,7 @@ def test_check_position_exits_exit_rule_generates_order(manager, market_event, m
     )
     mock_broker.get_positions.return_value = {"TEST": position}
     mock_broker.get_position.return_value = position
+    mock_portfolio.get_position.return_value = position
 
     # Add rule that exits
     manager.add_rule(AlwaysExitRule())
@@ -564,6 +567,7 @@ def test_check_position_exits_updates_levels(manager, market_event, mock_broker,
     )
     mock_broker.get_positions.return_value = {"TEST": position}
     mock_broker.get_position.return_value = position
+    mock_portfolio.get_position.return_value = position
 
     # Record fill to create state
     fill_event = make_fill_event()
@@ -595,6 +599,7 @@ def test_check_position_exits_updates_position_state(manager, market_event, mock
     )
     mock_broker.get_positions.return_value = {"TEST": position}
     mock_broker.get_position.return_value = position
+    mock_portfolio.get_position.return_value = position
 
     # Record fill to create state
     fill_event = make_fill_event()
