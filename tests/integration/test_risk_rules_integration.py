@@ -105,13 +105,13 @@ class SimpleStrategy(Strategy):
         # Delegate to specific handlers
         pass
 
-    def on_market_data(self, event: MarketEvent) -> None:
+    def on_market_event(self, event: MarketEvent, context=None) -> None:
         """Enter position on specified bar."""
         self.bar_count += 1
 
         if self.bar_count == self.entry_bar and not self.entered:
-            # Buy 100 shares at market
-            self.buy_percent(event.asset_id, percent=0.5, limit_price=None)
+            # Buy 50% of portfolio at current price
+            self.buy_percent(event.asset_id, percent=0.5, price=event.close)
             self.entered = True
 
 
