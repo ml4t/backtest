@@ -312,9 +312,9 @@ class PolarsDataFeed(DataFeed):
             # Price fields (for tick data)
             price=row.get("price", row.get("close")),
             size=row.get("size"),
-            # Bid/ask (for quote data)
-            bid_price=row.get("bid"),
-            ask_price=row.get("ask"),
+            # Bid/ask (for quote data) - check both "bid" and "bid_price" for compatibility
+            bid_price=row.get("bid") or row.get("bid_price"),
+            ask_price=row.get("ask") or row.get("ask_price"),
             bid_size=row.get("bid_size"),
             ask_size=row.get("ask_size"),
             # Two-tier data model

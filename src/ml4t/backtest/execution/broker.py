@@ -673,6 +673,20 @@ class SimulationBroker(Broker):
             # Create a modified event if needed for next-bar execution
             if self.execution_delay:
                 from ml4t.backtest.core.event import MarketEvent
+
+                # Adjust bid/ask to be relative to open price (not close)
+                # This is critical for correct slippage calculation with spread-aware models
+                if event.bid_price is not None and event.ask_price is not None and event.close is not None:
+                    # Calculate offset: how much open differs from close
+                    offset = event.open - event.close
+                    # Shift bid/ask by same offset to maintain spread but center at open
+                    adjusted_bid = event.bid_price + offset
+                    adjusted_ask = event.ask_price + offset
+                else:
+                    # No bid/ask data or can't adjust - pass through unchanged
+                    adjusted_bid = event.bid_price
+                    adjusted_ask = event.ask_price
+
                 fill_event = MarketEvent(
                     timestamp=event.timestamp,
                     asset_id=event.asset_id,
@@ -683,8 +697,8 @@ class SimulationBroker(Broker):
                     low=event.low,
                     close=event.open,  # Override close with open for next-bar fills
                     volume=event.volume,
-                    bid_price=event.bid_price,
-                    ask_price=event.ask_price,
+                    bid_price=adjusted_bid,
+                    ask_price=adjusted_ask,
                     signals=event.signals,
                     context=event.context,
                 )
@@ -918,6 +932,20 @@ class SimulationBroker(Broker):
             # Create a modified event if needed for next-bar execution
             if self.execution_delay:
                 from ml4t.backtest.core.event import MarketEvent
+
+                # Adjust bid/ask to be relative to open price (not close)
+                # This is critical for correct slippage calculation with spread-aware models
+                if event.bid_price is not None and event.ask_price is not None and event.close is not None:
+                    # Calculate offset: how much open differs from close
+                    offset = event.open - event.close
+                    # Shift bid/ask by same offset to maintain spread but center at open
+                    adjusted_bid = event.bid_price + offset
+                    adjusted_ask = event.ask_price + offset
+                else:
+                    # No bid/ask data or can't adjust - pass through unchanged
+                    adjusted_bid = event.bid_price
+                    adjusted_ask = event.ask_price
+
                 fill_event = MarketEvent(
                     timestamp=event.timestamp,
                     asset_id=event.asset_id,
@@ -928,8 +956,8 @@ class SimulationBroker(Broker):
                     low=event.low,
                     close=event.open,  # Override close with open for next-bar fills
                     volume=event.volume,
-                    bid_price=event.bid_price,
-                    ask_price=event.ask_price,
+                    bid_price=adjusted_bid,
+                    ask_price=adjusted_ask,
                     signals=event.signals,
                     context=event.context,
                 )

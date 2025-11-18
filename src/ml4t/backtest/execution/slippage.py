@@ -1,9 +1,15 @@
 """Slippage models for ml4t.backtest."""
 
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from ml4t.backtest.core.types import Price, Quantity
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+from ml4t.backtest.core.types import OrderSide, OrderType, Price, Quantity
 from ml4t.backtest.execution.order import Order
+
+if TYPE_CHECKING:
+    from ml4t.backtest.core.event import MarketEvent
 
 
 class SlippageModel(ABC):
@@ -14,12 +20,18 @@ class SlippageModel(ABC):
     """
 
     @abstractmethod
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate the fill price with slippage.
 
         Args:
             order: The order being filled
             market_price: Current market price
+            market_event: Optional MarketEvent with additional data (bid/ask, volume, etc.)
 
         Returns:
             The fill price including slippage
@@ -52,7 +64,12 @@ class NoSlippage(SlippageModel):
     Primarily used for testing or ideal conditions.
     """
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Fill at market price."""
         return market_price
 
@@ -84,7 +101,12 @@ class FixedSlippage(SlippageModel):
             raise ValueError("Spread must be non-negative")
         self.spread = spread
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate fill price with fixed spread."""
         half_spread = self.spread / 2
 
@@ -126,7 +148,12 @@ class PercentageSlippage(SlippageModel):
         self.slippage_pct = slippage_pct
         self.min_slippage = min_slippage
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate fill price with percentage slippage."""
         # Calculate slippage amount
         slippage_amount = max(market_price * self.slippage_pct, self.min_slippage)
@@ -172,7 +199,12 @@ class LinearImpactSlippage(SlippageModel):
         self.base_slippage = base_slippage
         self.impact_coefficient = impact_coefficient
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate fill price with linear impact."""
         # Linear impact based on order size
         impact = self.base_slippage + self.impact_coefficient * order.quantity
@@ -218,7 +250,12 @@ class SquareRootImpactSlippage(SlippageModel):
         self.temporary_impact = temporary_impact
         self.permanent_impact = permanent_impact
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate fill price with square root impact."""
         import math
 
@@ -283,7 +320,12 @@ class VolumeShareSlippage(SlippageModel):
         """
         self._daily_volume = volume
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate fill price based on volume impact."""
         if self._daily_volume is None or self._daily_volume == 0:
             # No volume data, use minimal slippage
@@ -343,7 +385,12 @@ class AssetClassSlippage(SlippageModel):
         }
         self.default_slippage = equity_slippage
 
-    def calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
         """Calculate fill price based on asset class."""
         # Get asset class from order metadata or default
         asset_class = order.metadata.get("asset_class", "equity")
@@ -354,6 +401,240 @@ class AssetClassSlippage(SlippageModel):
         if order.is_buy:
             return market_price + slippage_amount
         return market_price - slippage_amount
+
+    def calculate_slippage_cost(
+        self,
+        order: Order,
+        fill_quantity: Quantity,
+        market_price: Price,
+        fill_price: Price,
+    ) -> float:
+        """Calculate slippage cost."""
+        return abs(fill_price - market_price) * fill_quantity
+
+
+class SpreadAwareSlippage(SlippageModel):
+    """Slippage model that uses bid/ask spread from MarketEvent.
+
+    Fills at mid-price ± k × spread, where k is a configurable factor (default 0.5).
+    If bid/ask data is unavailable, falls back to PercentageSlippage.
+
+    Args:
+        spread_factor: Fraction of spread to pay (default 0.5 = fill at mid)
+        fallback_slippage_pct: Fallback percentage when spread unavailable (default 0.001)
+
+    Example:
+        If bid=99.98, ask=100.02 (spread=0.04), mid=100.00:
+        - Buy with k=0.5: Fill at 100.00 + 0.5×0.04/2 = 100.01
+        - Sell with k=0.5: Fill at 100.00 - 0.5×0.04/2 = 99.99
+    """
+
+    def __init__(self, spread_factor: float = 0.5, fallback_slippage_pct: float = 0.001):
+        """Initialize spread-aware slippage model."""
+        if spread_factor < 0:
+            raise ValueError("Spread factor must be non-negative")
+        if fallback_slippage_pct < 0:
+            raise ValueError("Fallback slippage percentage must be non-negative")
+
+        self.spread_factor = spread_factor
+        self.fallback_slippage_pct = fallback_slippage_pct
+
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
+        """Calculate fill price using bid/ask spread if available."""
+        # Try to use bid/ask from MarketEvent
+        if (
+            market_event is not None
+            and market_event.bid_price is not None
+            and market_event.ask_price is not None
+            and market_event.bid_price > 0
+            and market_event.ask_price > 0
+        ):
+            bid = market_event.bid_price
+            ask = market_event.ask_price
+            spread = ask - bid
+            mid = (bid + ask) / 2
+
+            # Fill at mid ± k × half_spread
+            half_spread = spread / 2
+            slippage = self.spread_factor * half_spread
+
+            if order.is_buy:
+                return mid + slippage
+            else:
+                return mid - slippage
+
+        # Fallback to percentage slippage
+        slippage_amount = market_price * self.fallback_slippage_pct
+        if order.is_buy:
+            return market_price + slippage_amount
+        else:
+            return market_price - slippage_amount
+
+    def calculate_slippage_cost(
+        self,
+        order: Order,
+        fill_quantity: Quantity,
+        market_price: Price,
+        fill_price: Price,
+    ) -> float:
+        """Calculate slippage cost."""
+        return abs(fill_price - market_price) * fill_quantity
+
+
+class VolumeAwareSlippage(SlippageModel):
+    """Slippage model that scales with order size relative to volume.
+
+    Calculates slippage as f(order_size / volume), where f can be:
+    - Linear: impact = base + linear_coeff × participation_rate
+    - Square-root: impact = base + sqrt_coeff × sqrt(participation_rate)
+
+    If volume data is unavailable, falls back to PercentageSlippage.
+
+    Args:
+        base_slippage_pct: Base slippage percentage (default 0.0001)
+        linear_impact_coeff: Linear impact coefficient (default 0.01)
+        sqrt_impact_coeff: Square-root impact coefficient (default 0.0)
+        fallback_slippage_pct: Fallback when volume unavailable (default 0.001)
+        max_participation_rate: Maximum participation rate (default 0.1 = 10%)
+
+    Example:
+        Order size = 1000, Volume = 100000 (participation = 0.01 = 1%)
+        Linear model: impact = 0.0001 + 0.01 × 0.01 = 0.0002 = 0.02%
+    """
+
+    def __init__(
+        self,
+        base_slippage_pct: float = 0.0001,
+        linear_impact_coeff: float = 0.01,
+        sqrt_impact_coeff: float = 0.0,
+        fallback_slippage_pct: float = 0.001,
+        max_participation_rate: float = 0.1,
+    ):
+        """Initialize volume-aware slippage model."""
+        if base_slippage_pct < 0:
+            raise ValueError("Base slippage must be non-negative")
+        if linear_impact_coeff < 0:
+            raise ValueError("Linear impact coefficient must be non-negative")
+        if sqrt_impact_coeff < 0:
+            raise ValueError("Square-root impact coefficient must be non-negative")
+        if fallback_slippage_pct < 0:
+            raise ValueError("Fallback slippage must be non-negative")
+        if max_participation_rate <= 0 or max_participation_rate > 1:
+            raise ValueError("Max participation rate must be in (0, 1]")
+
+        self.base_slippage_pct = base_slippage_pct
+        self.linear_impact_coeff = linear_impact_coeff
+        self.sqrt_impact_coeff = sqrt_impact_coeff
+        self.fallback_slippage_pct = fallback_slippage_pct
+        self.max_participation_rate = max_participation_rate
+
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
+        """Calculate fill price using volume impact if available."""
+        # Try to use volume from MarketEvent
+        if market_event is not None and market_event.volume is not None and market_event.volume > 0:
+            volume = market_event.volume
+            participation_rate = min(order.quantity / volume, self.max_participation_rate)
+
+            # Calculate impact: base + linear × rate + sqrt × sqrt(rate)
+            import math
+
+            impact_pct = (
+                self.base_slippage_pct
+                + self.linear_impact_coeff * participation_rate
+                + self.sqrt_impact_coeff * math.sqrt(participation_rate)
+            )
+
+            slippage_amount = market_price * impact_pct
+        else:
+            # Fallback to percentage slippage
+            slippage_amount = market_price * self.fallback_slippage_pct
+
+        if order.is_buy:
+            return market_price + slippage_amount
+        else:
+            return market_price - slippage_amount
+
+    def calculate_slippage_cost(
+        self,
+        order: Order,
+        fill_quantity: Quantity,
+        market_price: Price,
+        fill_price: Price,
+    ) -> float:
+        """Calculate slippage cost."""
+        return abs(fill_price - market_price) * fill_quantity
+
+
+class OrderTypeDependentSlippage(SlippageModel):
+    """Slippage model with different rates per order type.
+
+    Market orders pay more slippage (immediate execution, worse price).
+    Limit orders pay less (patient, better price).
+    Stop orders pay medium slippage (conditional execution).
+
+    Args:
+        market_slippage_pct: Slippage for MARKET orders (default 0.001)
+        limit_slippage_pct: Slippage for LIMIT orders (default 0.0001)
+        stop_slippage_pct: Slippage for STOP/STOP_LIMIT orders (default 0.0005)
+        default_slippage_pct: Slippage for other order types (default 0.001)
+
+    Example:
+        Market order: 0.10% slippage (aggressive execution)
+        Limit order: 0.01% slippage (patient execution)
+        Stop order: 0.05% slippage (conditional execution)
+    """
+
+    def __init__(
+        self,
+        market_slippage_pct: float = 0.001,
+        limit_slippage_pct: float = 0.0001,
+        stop_slippage_pct: float = 0.0005,
+        default_slippage_pct: float = 0.001,
+    ):
+        """Initialize order-type-dependent slippage model."""
+        if market_slippage_pct < 0:
+            raise ValueError("Market slippage must be non-negative")
+        if limit_slippage_pct < 0:
+            raise ValueError("Limit slippage must be non-negative")
+        if stop_slippage_pct < 0:
+            raise ValueError("Stop slippage must be non-negative")
+        if default_slippage_pct < 0:
+            raise ValueError("Default slippage must be non-negative")
+
+        self.slippage_rates = {
+            OrderType.MARKET: market_slippage_pct,
+            OrderType.LIMIT: limit_slippage_pct,
+            OrderType.STOP: stop_slippage_pct,
+            OrderType.STOP_LIMIT: stop_slippage_pct,  # Same as STOP
+            OrderType.TRAILING_STOP: stop_slippage_pct,  # Same as STOP
+        }
+        self.default_slippage_pct = default_slippage_pct
+
+    def calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: MarketEvent | None = None,
+    ) -> Price:
+        """Calculate fill price based on order type."""
+        # Get slippage rate for this order type
+        slippage_pct = self.slippage_rates.get(order.order_type, self.default_slippage_pct)
+        slippage_amount = market_price * slippage_pct
+
+        if order.is_buy:
+            return market_price + slippage_amount
+        else:
+            return market_price - slippage_amount
 
     def calculate_slippage_cost(
         self,

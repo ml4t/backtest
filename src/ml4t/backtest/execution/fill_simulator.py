@@ -225,7 +225,7 @@ class FillSimulator:
         )
 
         # Determine fill price (with slippage on top of impact)
-        fill_price = self._calculate_fill_price(order, impacted_market_price)
+        fill_price = self._calculate_fill_price(order, impacted_market_price, market_event)
 
         # Determine fill quantity considering liquidity constraints
         fill_quantity = order.remaining_quantity
@@ -504,14 +504,19 @@ class FillSimulator:
         # Apply existing impact to market price
         return market_price + current_impact
 
-    def _calculate_fill_price(self, order: Order, market_price: Price) -> Price:
+    def _calculate_fill_price(
+        self,
+        order: Order,
+        market_price: Price,
+        market_event: "MarketEvent | None" = None,
+    ) -> Price:
         """Calculate the actual fill price including slippage."""
         # For STOP orders (including SL), use stop_price as the base price (not market_price)
         # This ensures stop orders fill at their stop level, not at the bar's extreme (low/high)
         if order.order_type == OrderType.STOP and order.stop_price is not None:
             base_price = order.stop_price
             if self.slippage_model:
-                return self.slippage_model.calculate_fill_price(order, base_price)
+                return self.slippage_model.calculate_fill_price(order, base_price, market_event)
             # Default simple slippage for stops
             if order.is_buy:
                 return base_price * 1.0001  # Buy stops pay more
@@ -522,14 +527,14 @@ class FillSimulator:
         if order.order_type == OrderType.TRAILING_STOP and order.trailing_stop_price is not None:
             base_price = order.trailing_stop_price
             if self.slippage_model:
-                return self.slippage_model.calculate_fill_price(order, base_price)
+                return self.slippage_model.calculate_fill_price(order, base_price, market_event)
             # Default simple slippage for trailing stops
             if order.is_buy:
                 return base_price * 1.0001
             return base_price * 0.9999
 
         if self.slippage_model:
-            return self.slippage_model.calculate_fill_price(order, market_price)
+            return self.slippage_model.calculate_fill_price(order, market_price, market_event)
 
         # Default simple slippage: 0.01% for market orders
         if order.order_type == OrderType.MARKET:
