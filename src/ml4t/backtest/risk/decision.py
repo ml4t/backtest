@@ -200,6 +200,107 @@ class RiskDecision:
         )
 
     @classmethod
+    def _resolve_sl_conflicts(
+        cls,
+        decisions: list["RiskDecision"],
+    ) -> Optional[Price]:
+        """Resolve stop-loss conflicts using priority + conservative logic.
+
+        Resolution logic:
+        1. Filter to decisions with stop-loss updates
+        2. Find highest priority
+        3. Among same priority: use max(sl_values) for long (tightest/most conservative)
+
+        Args:
+            decisions: List of risk decisions (assumed non-exit decisions)
+
+        Returns:
+            Resolved stop-loss price, or None if no stop-loss updates
+
+        Examples:
+            >>> # Different priorities: highest priority wins
+            >>> d1 = RiskDecision.update_stops(update_stop_loss=98.0, priority=5)
+            >>> d2 = RiskDecision.update_stops(update_stop_loss=99.0, priority=10)
+            >>> assert _resolve_sl_conflicts([d1, d2]) == 99.0  # Priority 10 wins
+
+            >>> # Same priority: most conservative (tightest, highest price for long)
+            >>> d1 = RiskDecision.update_stops(update_stop_loss=98.0, priority=5)
+            >>> d2 = RiskDecision.update_stops(update_stop_loss=99.0, priority=5)
+            >>> assert _resolve_sl_conflicts([d1, d2]) == 99.0  # max() wins
+        """
+        # Filter to decisions with stop-loss updates
+        sl_decisions = [d for d in decisions if d.update_stop_loss is not None]
+        if not sl_decisions:
+            return None
+
+        # Find highest priority
+        max_priority = max(d.priority for d in sl_decisions)
+
+        # Get all decisions with highest priority
+        top_priority_decisions = [d for d in sl_decisions if d.priority == max_priority]
+
+        # If only one decision at highest priority, use it
+        if len(top_priority_decisions) == 1:
+            return top_priority_decisions[0].update_stop_loss
+
+        # Multiple decisions at same priority: use most conservative (tightest)
+        # For long positions: max(stop_loss) is tightest (closest to current price)
+        # For short positions: min(stop_loss) is tightest
+        # Since we don't have position direction here, assume long (most common)
+        # Future enhancement: could pass position direction if needed
+        return max(d.update_stop_loss for d in top_priority_decisions)
+
+    @classmethod
+    def _resolve_tp_conflicts(
+        cls,
+        decisions: list["RiskDecision"],
+    ) -> Optional[Price]:
+        """Resolve take-profit conflicts using priority + conservative logic.
+
+        Resolution logic:
+        1. Filter to decisions with take-profit updates
+        2. Find highest priority
+        3. Among same priority: use min(tp_values) for long (most conservative/nearest)
+
+        Args:
+            decisions: List of risk decisions (assumed non-exit decisions)
+
+        Returns:
+            Resolved take-profit price, or None if no take-profit updates
+
+        Examples:
+            >>> # Different priorities: highest priority wins
+            >>> d1 = RiskDecision.update_stops(update_take_profit=105.0, priority=5)
+            >>> d2 = RiskDecision.update_stops(update_take_profit=110.0, priority=10)
+            >>> assert _resolve_tp_conflicts([d1, d2]) == 110.0  # Priority 10 wins
+
+            >>> # Same priority: most conservative (nearest target for long)
+            >>> d1 = RiskDecision.update_stops(update_take_profit=105.0, priority=5)
+            >>> d2 = RiskDecision.update_stops(update_take_profit=110.0, priority=5)
+            >>> assert _resolve_tp_conflicts([d1, d2]) == 105.0  # min() wins (nearest)
+        """
+        # Filter to decisions with take-profit updates
+        tp_decisions = [d for d in decisions if d.update_take_profit is not None]
+        if not tp_decisions:
+            return None
+
+        # Find highest priority
+        max_priority = max(d.priority for d in tp_decisions)
+
+        # Get all decisions with highest priority
+        top_priority_decisions = [d for d in tp_decisions if d.priority == max_priority]
+
+        # If only one decision at highest priority, use it
+        if len(top_priority_decisions) == 1:
+            return top_priority_decisions[0].update_take_profit
+
+        # Multiple decisions at same priority: use most conservative (nearest target)
+        # For long positions: min(take_profit) is most conservative (easier to hit)
+        # For short positions: max(take_profit) is most conservative
+        # Assume long (most common)
+        return min(d.update_take_profit for d in top_priority_decisions)
+
+    @classmethod
     def merge(
         cls,
         decisions: list["RiskDecision"],
@@ -211,7 +312,9 @@ class RiskDecision:
         1. Exit decisions take precedence over stop updates and no-action
         2. Among exit decisions, highest priority wins
         3. If priorities are equal, use default_priority_order (if provided)
-        4. Stop-loss/take-profit updates use highest priority values
+        4. Stop-loss/take-profit updates resolved via priority + conservative logic:
+           - Highest priority wins
+           - Same priority: most conservative value wins (tightest stop, nearest target)
         5. Metadata is merged (later decisions override earlier ones)
 
         Args:
@@ -295,19 +398,11 @@ class RiskDecision:
             )
 
         # No exit decisions - merge stop updates
-        # Find highest priority stop-loss update
-        stop_loss_decisions = [d for d in non_exit_decisions if d.update_stop_loss is not None]
-        stop_loss = None
-        if stop_loss_decisions:
-            stop_loss_decisions.sort(key=lambda d: d.priority, reverse=True)
-            stop_loss = stop_loss_decisions[0].update_stop_loss
+        # Resolve stop-loss conflicts: highest priority wins, same priority uses most conservative
+        stop_loss = cls._resolve_sl_conflicts(non_exit_decisions)
 
-        # Find highest priority take-profit update
-        take_profit_decisions = [d for d in non_exit_decisions if d.update_take_profit is not None]
-        take_profit = None
-        if take_profit_decisions:
-            take_profit_decisions.sort(key=lambda d: d.priority, reverse=True)
-            take_profit = take_profit_decisions[0].update_take_profit
+        # Resolve take-profit conflicts: highest priority wins, same priority uses most conservative
+        take_profit = cls._resolve_tp_conflicts(non_exit_decisions)
 
         # Merge metadata
         merged_metadata = {}
