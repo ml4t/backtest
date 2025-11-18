@@ -6,8 +6,7 @@ in realistic backtest scenarios verifying:
 2. Trading resumes when constraints satisfied
 3. Multiple constraints work together
 
-NOTE: These tests are currently skipped pending SimulationBroker API updates.
-The portfolio constraint rules are fully tested via unit tests with 98% coverage.
+All tests updated to use current BacktestEngine API (Nov 2025).
 """
 
 from datetime import datetime, timedelta
@@ -16,8 +15,7 @@ from decimal import Decimal
 import polars as pl
 import pytest
 
-# Skip all integration tests for now - API needs updating
-pytestmark = pytest.mark.skip(reason="Pending SimulationBroker API updates")
+# Integration tests for portfolio constraints using current BacktestEngine API
 
 from ml4t.backtest.core.types import OrderSide, OrderType
 from ml4t.backtest.data.polars_feed import PolarsDataFeed
@@ -115,11 +113,15 @@ def volatile_data_file(tmp_path):
 class SimpleStrategy(Strategy):
     """Simple buy-and-hold strategy for testing constraints."""
 
-    def __init__(self, broker, portfolio):
-        super().__init__(broker, portfolio)
+    def __init__(self):
+        super().__init__()
         self.position_taken = False
 
-    def on_market_data(self, event):
+    def on_event(self, event):
+        """Handle events (required abstract method)."""
+        pass
+
+    def on_market_event(self, event, context=None):
         """Buy on first bar, hold forever."""
         # Only buy once
         if not self.position_taken:
@@ -145,28 +147,27 @@ class TestMaxDailyLossIntegration:
     def test_daily_loss_halts_trading(self, volatile_data_file):
         """Test that daily loss constraint prevents trading after loss threshold."""
         # Setup with 5% daily loss limit
-        portfolio = Portfolio(initial_cash=100000.0)
         broker = SimulationBroker(
-            portfolio=portfolio,
+            initial_cash=100_000,
             commission_model=PercentageCommission(rate=0.001),
         )
 
         risk_manager = RiskManager()
         risk_manager.add_rule(MaxDailyLossRule(max_loss_pct=0.05))  # 5% daily loss limit
 
-        feed = PolarsDataFeed.from_parquet(str(volatile_data_file))
-        strategy = SimpleStrategy(broker, portfolio)
+        feed = PolarsDataFeed(volatile_data_file, asset_id="VOL")
+        strategy = SimpleStrategy()
 
         engine = BacktestEngine(
-            feed=feed,
-            broker=broker,
-            portfolio=portfolio,
+            data_feed=feed,
             strategy=strategy,
+            broker=broker,
             risk_manager=risk_manager,
+            initial_capital=100_000,
         )
 
         # Run backtest
-        results = engine.run()
+        engine.run()
 
         # Verify strategy tried to buy but might have been rejected
         # We can't easily assert order rejection without broker order history
@@ -180,28 +181,27 @@ class TestMaxDrawdownIntegration:
     def test_drawdown_halts_trading(self, volatile_data_file):
         """Test that drawdown constraint prevents trading after drawdown threshold."""
         # Setup with 10% max drawdown
-        portfolio = Portfolio(initial_cash=100000.0)
         broker = SimulationBroker(
-            portfolio=portfolio,
+            initial_cash=100_000,
             commission_model=PercentageCommission(rate=0.001),
         )
 
         risk_manager = RiskManager()
         risk_manager.add_rule(MaxDrawdownRule(max_dd_pct=0.10))  # 10% max drawdown
 
-        feed = PolarsDataFeed.from_parquet(str(volatile_data_file))
-        strategy = SimpleStrategy(broker, portfolio)
+        feed = PolarsDataFeed(volatile_data_file, asset_id="VOL")
+        strategy = SimpleStrategy()
 
         engine = BacktestEngine(
-            feed=feed,
-            broker=broker,
-            portfolio=portfolio,
+            data_feed=feed,
             strategy=strategy,
+            broker=broker,
             risk_manager=risk_manager,
+            initial_capital=100_000,
         )
 
         # Run backtest
-        results = engine.run()
+        engine.run()
 
         # Verify risk manager was active
         assert risk_manager is not None
@@ -213,28 +213,27 @@ class TestMaxLeverageIntegration:
     def test_leverage_prevents_excessive_positions(self, volatile_data_file):
         """Test that leverage constraint prevents excessive position sizes."""
         # Setup with 2x max leverage
-        portfolio = Portfolio(initial_cash=100000.0)
         broker = SimulationBroker(
-            portfolio=portfolio,
+            initial_cash=100_000,
             commission_model=PercentageCommission(rate=0.001),
         )
 
         risk_manager = RiskManager()
         risk_manager.add_rule(MaxLeverageRule(max_leverage=2.0))  # 2x max leverage
 
-        feed = PolarsDataFeed.from_parquet(str(volatile_data_file))
-        strategy = SimpleStrategy(broker, portfolio)
+        feed = PolarsDataFeed(volatile_data_file, asset_id="VOL")
+        strategy = SimpleStrategy()
 
         engine = BacktestEngine(
-            feed=feed,
-            broker=broker,
-            portfolio=portfolio,
+            data_feed=feed,
             strategy=strategy,
+            broker=broker,
             risk_manager=risk_manager,
+            initial_capital=100_000,
         )
 
         # Run backtest
-        results = engine.run()
+        engine.run()
 
         # Verify risk manager was active and leverage never exceeded limit
         # This requires access to broker.portfolio.leverage throughout run
@@ -247,9 +246,8 @@ class TestCombinedConstraintsIntegration:
     def test_all_constraints_together(self, volatile_data_file):
         """Test that multiple portfolio constraints work together."""
         # Setup with all three constraints
-        portfolio = Portfolio(initial_cash=100000.0)
         broker = SimulationBroker(
-            portfolio=portfolio,
+            initial_cash=100_000,
             commission_model=PercentageCommission(rate=0.001),
         )
 
@@ -258,15 +256,15 @@ class TestCombinedConstraintsIntegration:
         risk_manager.add_rule(MaxDrawdownRule(max_dd_pct=0.10))
         risk_manager.add_rule(MaxLeverageRule(max_leverage=2.0))
 
-        feed = PolarsDataFeed.from_parquet(str(volatile_data_file))
-        strategy = SimpleStrategy(broker, portfolio)
+        feed = PolarsDataFeed(volatile_data_file, asset_id="VOL")
+        strategy = SimpleStrategy()
 
         engine = BacktestEngine(
-            feed=feed,
-            broker=broker,
-            portfolio=portfolio,
+            data_feed=feed,
             strategy=strategy,
+            broker=broker,
             risk_manager=risk_manager,
+            initial_capital=100_000,
         )
 
         # Run backtest
