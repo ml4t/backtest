@@ -6,6 +6,7 @@ from ml4t.backtest.risk.rules.volatility_scaled import (
     VolatilityScaledStopLoss,
     VolatilityScaledTakeProfit,
 )
+from ml4t.backtest.risk.rules.dynamic_trailing import DynamicTrailingStop
 
 __all__ = [
     "TimeBasedExit",
@@ -13,4 +14,5 @@ __all__ = [
     "PriceBasedTakeProfit",
     "VolatilityScaledStopLoss",
     "VolatilityScaledTakeProfit",
+    "DynamicTrailingStop",
 ]
