@@ -297,18 +297,19 @@ class RiskManager:
         # Only process the asset for this market event
         asset_id = market_event.asset_id
 
-        # Build context with caching
+        # Update position state tracking BEFORE building context
+        # This ensures context has current bars_held for time-based rules
+        if asset_id in self._position_state:
+            state = self._position_state[asset_id]
+            state.update_on_market_event(market_price=market_event.close)
+
+        # Build context with caching (uses updated bars_held)
         context = self._build_context(
             asset_id=asset_id,
             market_event=market_event,
             broker=broker,
             portfolio=portfolio,
         )
-
-        # Update position state tracking
-        if asset_id in self._position_state:
-            state = self._position_state[asset_id]
-            state.update_on_market_event(market_price=market_event.close)
 
         # Evaluate all rules
         decision = self.evaluate_all_rules(context)

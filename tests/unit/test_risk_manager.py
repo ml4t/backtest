@@ -537,12 +537,13 @@ def test_check_position_exits_exit_rule_generates_order(manager, market_event, m
     position = Position(
         asset_id="TEST",
         quantity=100.0,
-        cost_basis=Decimal("100.0"),
-        last_price=Decimal("100.0"),
+        cost_basis=10000.0,  # 100 shares * $100
+        last_price=100.0,
     )
     mock_broker.get_positions.return_value = {"TEST": position}
     mock_broker.get_position.return_value = position
     mock_portfolio.get_position.return_value = position
+    mock_portfolio.positions = {"TEST": position}  # Must be in positions dict for check_position_exits
 
     # Add rule that exits
     manager.add_rule(AlwaysExitRule())
@@ -562,12 +563,13 @@ def test_check_position_exits_updates_levels(manager, market_event, mock_broker,
     position = Position(
         asset_id="TEST",
         quantity=100.0,
-        cost_basis=Decimal("100.0"),
-        last_price=Decimal("100.0"),
+        cost_basis=10000.0,  # 100 shares * $100
+        last_price=100.0,
     )
     mock_broker.get_positions.return_value = {"TEST": position}
     mock_broker.get_position.return_value = position
     mock_portfolio.get_position.return_value = position
+    mock_portfolio.positions = {"TEST": position}  # Must be in positions dict for check_position_exits
 
     # Record fill to create state
     fill_event = make_fill_event()
@@ -594,12 +596,13 @@ def test_check_position_exits_updates_position_state(manager, market_event, mock
     position = Position(
         asset_id="TEST",
         quantity=100.0,
-        cost_basis=Decimal("100.0"),
-        last_price=Decimal("100.0"),
+        cost_basis=10000.0,  # 100 shares * $100
+        last_price=100.0,
     )
     mock_broker.get_positions.return_value = {"TEST": position}
     mock_broker.get_position.return_value = position
     mock_portfolio.get_position.return_value = position
+    mock_portfolio.positions = {"TEST": position}  # Must be in positions dict for check_position_exits
 
     # Record fill to create state
     fill_event = make_fill_event()

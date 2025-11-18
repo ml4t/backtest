@@ -129,9 +129,11 @@ class TestRiskManagerPositionTracking:
         broker = MockBroker()
         portfolio = Portfolio(initial_cash=100_000)
 
-        # Set up position
+        # Set up position (both in broker and portfolio)
         entry_time = datetime(2024, 1, 1, 10, 0)
+        position = Position(asset_id="AAPL", quantity=10.0, cost_basis=1000.0, last_price=100.0)
         broker.set_position("AAPL", quantity=10.0, cost_basis=1000.0)
+        portfolio.positions["AAPL"] = position  # Must be in portfolio.positions for check_position_exits
 
         # Create position state manually
         manager._position_state["AAPL"] = PositionTradeState(
@@ -147,6 +149,7 @@ class TestRiskManagerPositionTracking:
             market_event = MarketEvent(
                 timestamp=event_time,
                 asset_id="AAPL",
+                data_type=MarketDataType.BAR,
                 close=Decimal("101.00"),
             )
 
@@ -167,9 +170,11 @@ class TestRiskManagerPositionTracking:
         broker = MockBroker()
         portfolio = Portfolio(initial_cash=100_000)
 
-        # Set up long position at $100
+        # Set up long position at $100 (both in broker and portfolio)
         entry_time = datetime(2024, 1, 1, 10, 0)
+        position = Position(asset_id="AAPL", quantity=10.0, cost_basis=1000.0, last_price=100.0)
         broker.set_position("AAPL", quantity=10.0, cost_basis=1000.0)
+        portfolio.positions["AAPL"] = position  # Must be in portfolio.positions for check_position_exits
 
         manager._position_state["AAPL"] = PositionTradeState(
             asset_id="AAPL",
@@ -182,6 +187,7 @@ class TestRiskManagerPositionTracking:
         event1 = MarketEvent(
             timestamp=entry_time + timedelta(minutes=1),
             asset_id="AAPL",
+            data_type=MarketDataType.BAR,
             close=Decimal("105.00"),
         )
         manager.check_position_exits(event1, broker, portfolio)
@@ -194,6 +200,7 @@ class TestRiskManagerPositionTracking:
         event2 = MarketEvent(
             timestamp=entry_time + timedelta(minutes=2),
             asset_id="AAPL",
+            data_type=MarketDataType.BAR,
             close=Decimal("95.00"),
         )
         manager.check_position_exits(event2, broker, portfolio)
@@ -206,6 +213,7 @@ class TestRiskManagerPositionTracking:
         event3 = MarketEvent(
             timestamp=entry_time + timedelta(minutes=3),
             asset_id="AAPL",
+            data_type=MarketDataType.BAR,
             close=Decimal("102.00"),
         )
         manager.check_position_exits(event3, broker, portfolio)
@@ -222,9 +230,11 @@ class TestRiskManagerPositionTracking:
         broker = MockBroker()
         portfolio = Portfolio(initial_cash=100_000)
 
-        # Set up position
+        # Set up position (both in broker and portfolio)
         entry_time = datetime(2024, 1, 1, 10, 0)
+        position = Position(asset_id="AAPL", quantity=10.0, cost_basis=1000.0, last_price=100.0)
         broker.set_position("AAPL", quantity=10.0, cost_basis=1000.0)
+        portfolio.positions["AAPL"] = position  # Must be in portfolio.positions for check_position_exits
 
         manager._position_state["AAPL"] = PositionTradeState(
             asset_id="AAPL",
@@ -239,6 +249,7 @@ class TestRiskManagerPositionTracking:
             market_event = MarketEvent(
                 timestamp=event_time,
                 asset_id="AAPL",
+                data_type=MarketDataType.BAR,
                 close=Decimal("101.00"),
             )
 
@@ -256,6 +267,7 @@ class TestRiskManagerPositionTracking:
         market_event = MarketEvent(
             timestamp=event_time,
             asset_id="AAPL",
+            data_type=MarketDataType.BAR,
             close=Decimal("101.00"),
         )
 
