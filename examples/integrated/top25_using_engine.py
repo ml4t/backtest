@@ -95,14 +95,16 @@ class Top25MLStrategy(Strategy):
         """Stub implementation for abstract method (not used in batch mode)."""
         pass
 
-    def on_data_batch(self, timestamp: datetime, market_map: dict[AssetId, MarketEvent], context: dict = None):
+    def on_timestamp_batch(self, timestamp: datetime, events: list[MarketEvent], context: dict = None):
         """Process all assets simultaneously for this timestamp.
 
-        This is the new batch API that enables correct portfolio rebalancing:
+        This is the batch API that enables correct portfolio rebalancing:
         - Receives ALL assets at once (not one-by-one)
         - Fills have already been processed (correct sequencing)
         - Can use order_target_percent() for proper rebalancing
         """
+        # Convert list of events to dict for easier lookup
+        market_map = {event.asset_id: event for event in events}
         # VIX filter
         vix = context.get('vix', 0.0) if context else 0.0
         if vix > self.max_vix:

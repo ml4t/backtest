@@ -639,17 +639,12 @@ class Strategy(ABC):
         # Calculate DELTA (this is the key fix!)
         delta_qty = target_qty - current_qty
 
-        # DEBUG: Track order calculations
-        print(f"DEBUG order_target_percent: {asset_id[:12]:<12} target={target_pct:.2%} price=${price:>7.2f} "
-              f"curr_qty={current_qty:>6.0f} target_qty={target_qty:>6.0f} delta={delta_qty:>6.1f}")
-
         # Round to avoid fractional share issues
         # For now, using simple rounding (could be floor for conservative approach)
         trade_qty = int(round(delta_qty))
 
         # Only submit if meaningful quantity
         if trade_qty == 0:
-            print(f"  → SKIP: trade_qty=0 after rounding")
             return  # No trade needed
 
         # Determine side
@@ -676,7 +671,6 @@ class Strategy(ABC):
                 order_type=OrderType.MARKET,
             )
 
-        print(f"  → SUBMIT: {side.name} {abs(trade_qty)} @ {'MARKET' if limit_price is None else f'LIMIT ${limit_price:.2f}'}")
         self.broker.submit_order(order)
 
     def order_target_value(

@@ -1248,8 +1248,11 @@ class SimulationBroker(Broker):
                     fill_event = fill_result.fill_event
                     print(f"  FILL: {order.asset_id[:12]:<12} {order.side.name} {fill_event.fill_quantity:>6.0f} @ ${fill_event.fill_price:>7.2f} "
                           f"status={order.status.name}")
-                    # Apply fill to portfolio (broker uses its internal portfolio for tracking)
-                    self._internal_portfolio.on_fill_event(fill_event)
+
+                    # CRITICAL FIX: Do NOT apply fill directly to portfolio here!
+                    # Fills will be published to event bus and portfolio will receive via subscription.
+                    # Applying twice causes float precision drift and crashes.
+                    # self._internal_portfolio.on_fill_event(fill_event)  # REMOVED - let event bus handle
 
                     # Track statistics
                     self._fill_count += 1
@@ -1283,6 +1286,11 @@ class SimulationBroker(Broker):
 
         # Clear newly-activated orders set for next batch
         self._newly_created_brackets.clear()
+
+        # Dispatch fills to event bus (subscribers will apply them to portfolio)
+        if hasattr(self, 'event_bus') and self.event_bus:
+            for fill_event in all_fills:
+                self.event_bus.dispatch_event(fill_event)
 
         return all_fills
 
