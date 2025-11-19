@@ -201,6 +201,9 @@ class VectorBTAdapter(BaseFrameworkAdapter):
                     orders_df = pf.orders.records_readable
 
                     for _, order in orders_df.iterrows():
+                        # Extract commission (VectorBT may store as 'Fees' or 'fees')
+                        commission = float(order.get("Fees", order.get("fees", 0.0)))
+
                         trade_record = TradeRecord(
                             timestamp=order.get("Timestamp", order.get("timestamp")),
                             action=str(order.get("Side", "")).upper(),  # 'BUY' or 'SELL'
@@ -210,6 +213,7 @@ class VectorBTAdapter(BaseFrameworkAdapter):
                                 float(order.get("Size", order.get("size", 0)))
                                 * float(order.get("Price", order.get("price", 0)))
                             ),
+                            commission=commission,
                         )
                         result.trades.append(trade_record)
             except Exception as e:
@@ -258,7 +262,7 @@ class VectorBTAdapter(BaseFrameworkAdapter):
 
     def run_with_signals(
         self,
-        data: pd.DataFrame,
+        data: pd.DataFrame | dict[str, pd.DataFrame],
         signals: pd.DataFrame,
         config: FrameworkConfig | None = None,
     ) -> ValidationResult:
@@ -269,8 +273,12 @@ class VectorBTAdapter(BaseFrameworkAdapter):
         pre-computed entry/exit signals.
 
         Args:
-            data: OHLCV data with DatetimeIndex
-            signals: DataFrame with 'entry' and 'exit' boolean columns
+            data: OHLCV data - either:
+                  - Single DataFrame with DatetimeIndex (single-asset)
+                  - Dict mapping symbol -> DataFrame (multi-asset)
+            signals: DataFrame with either:
+                  - 'entry' and 'exit' boolean columns (single-asset)
+                  - 'timestamp', 'symbol', 'signal' columns (multi-asset)
             config: FrameworkConfig for execution parameters (costs, timing, etc.).
                    If None, uses FrameworkConfig.realistic() defaults.
 
@@ -281,6 +289,13 @@ class VectorBTAdapter(BaseFrameworkAdapter):
         if config is None:
             config = FrameworkConfig.realistic()
 
+        # Check if this is multi-asset (dict) or single-asset (DataFrame)
+        is_multi_asset = isinstance(data, dict)
+
+        if is_multi_asset:
+            return self._run_multi_asset_with_signals(data, signals, config)
+
+        # Single-asset path (original logic)
         # Validate inputs
         self.validate_data(data)
         self.validate_signals(signals, data)
@@ -397,6 +412,9 @@ class VectorBTAdapter(BaseFrameworkAdapter):
                     orders_df = pf.orders.records_readable
 
                     for _, order in orders_df.iterrows():
+                        # Extract commission (VectorBT may store as 'Fees' or 'fees')
+                        commission = float(order.get("Fees", order.get("fees", 0.0)))
+
                         trade_record = TradeRecord(
                             timestamp=order.get("Timestamp", order.get("timestamp")),
                             action=str(order.get("Side", "")).upper(),  # 'BUY' or 'SELL'
@@ -406,6 +424,7 @@ class VectorBTAdapter(BaseFrameworkAdapter):
                                 float(order.get("Size", order.get("size", 0)))
                                 * float(order.get("Price", order.get("price", 0)))
                             ),
+                            commission=commission,
                         )
                         result.trades.append(trade_record)
             except Exception as e:
@@ -456,6 +475,241 @@ class VectorBTAdapter(BaseFrameworkAdapter):
 
         except Exception as e:
             error_msg = f"VectorBT signal-based backtest failed: {e}"
+            print(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            result.errors.append(error_msg)
+
+        return result
+
+    def _run_multi_asset_with_signals(
+        self,
+        data: dict[str, pd.DataFrame],
+        signals: pd.DataFrame,
+        config: FrameworkConfig,
+    ) -> ValidationResult:
+        """
+        Run backtest with multi-asset rotation signals using VectorBT Pro.
+
+        Args:
+            data: Dict mapping symbol -> OHLCV DataFrame
+            signals: DataFrame with columns: timestamp, symbol, signal (1=buy, -1=sell)
+            config: FrameworkConfig for execution parameters
+
+        Returns:
+            ValidationResult with performance metrics
+        """
+        result = ValidationResult(
+            framework=self.framework_name,
+            strategy="TopNMomentum",
+            initial_capital=config.initial_capital,
+        )
+
+        try:
+            import vectorbt as vbt
+
+            tracemalloc.start()
+            start_time = time.time()
+
+            # Build prices DataFrame (columns = symbols, index = timestamps)
+            # Get all unique timestamps across all symbols
+            all_timestamps = set()
+            for df in data.values():
+                all_timestamps.update(df.index)
+            all_timestamps = sorted(all_timestamps)
+
+            # Build wide-format prices
+            prices = pd.DataFrame(index=all_timestamps)
+            for symbol, df in data.items():
+                prices[symbol] = df['close']
+
+            # Fill forward any missing values (should be minimal with synthetic data)
+            prices = prices.ffill()  # Use ffill() instead of deprecated fillna(method='ffill')
+
+            # Convert signals from long format to wide format
+            # signals has: [timestamp, symbol, signal]  (1=buy, -1=sell)
+            # Need: entries and exits DataFrames (booleans, same shape as prices)
+
+            entries = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+            exits = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+
+            for _, row in signals.iterrows():
+                timestamp = pd.Timestamp(row['timestamp'])
+                symbol = row['symbol']
+                signal_value = row['signal']
+
+                if timestamp not in prices.index or symbol not in prices.columns:
+                    continue
+
+                if signal_value == 1:  # BUY
+                    entries.loc[timestamp, symbol] = True
+                elif signal_value == -1:  # SELL
+                    exits.loc[timestamp, symbol] = True
+
+            num_entry_signals = entries.sum().sum()
+            num_exit_signals = exits.sum().sum()
+
+            print(f"\nVectorBT multi-asset setup:")
+            print(f"  Prices shape: {prices.shape}")
+            print(f"  Entry signals: {num_entry_signals}")
+            print(f"  Exit signals: {num_exit_signals}")
+
+            # Calculate position sizes for equal weighting
+            # For Top-5 strategy, each position should be 20% of portfolio
+            target_pct_per_position = 0.20
+            portfolio_value = config.initial_capital
+
+            # VectorBT Pro 'size' parameter can be:
+            # - Scalar: fixed shares
+            # - Series/DataFrame: varies by time/asset
+            # For equal weighting, calculate shares based on target percentage
+            # size_shares[timestamp, symbol] = (target_pct * portfolio_value) / price
+            size_shares = (target_pct_per_position * portfolio_value) / prices
+
+            # Create portfolio using from_signals with multi-asset configuration
+            pf = vbt.Portfolio.from_signals(
+                prices,  # DataFrame with all symbols
+                entries=entries,
+                exits=exits,
+                size=size_shares,  # Equal weight sizing
+                init_cash=config.initial_capital,
+                fees=config.commission_pct,  # Commission rate
+                slippage=config.slippage_pct,  # Slippage percentage
+                freq="D",
+                group_by=True,  # Treat all columns as one portfolio
+                cash_sharing=True,  # Share cash across all assets
+            )
+
+            # Extract results using robust API handling
+            try:
+                value = pf.value
+                if callable(value):
+                    value_result = value()
+                    if hasattr(value_result, 'iloc'):
+                        result.final_value = float(value_result.iloc[-1])
+                    else:
+                        result.final_value = float(value_result)
+                elif hasattr(value, 'iloc'):
+                    last_val = value.iloc[-1]
+                    if hasattr(last_val, 'iloc'):
+                        result.final_value = float(last_val.iloc[0])
+                    else:
+                        result.final_value = float(last_val)
+                else:
+                    result.final_value = float(value)
+            except Exception as e:
+                print(f"Warning: Could not extract final_value: {e}")
+                result.final_value = 0.0
+
+            try:
+                total_return = pf.total_return
+                if callable(total_return):
+                    tr_result = total_return()
+                    if hasattr(tr_result, 'iloc'):
+                        last_tr = tr_result.iloc[-1]
+                        result.total_return = float(last_tr.iloc[0] if hasattr(last_tr, 'iloc') else last_tr) * 100
+                    else:
+                        result.total_return = float(tr_result) * 100
+                elif hasattr(total_return, 'iloc'):
+                    last_tr = total_return.iloc[-1]
+                    if hasattr(last_tr, 'iloc'):
+                        result.total_return = float(last_tr.iloc[0]) * 100
+                    else:
+                        result.total_return = float(last_tr) * 100
+                else:
+                    result.total_return = float(total_return) * 100
+            except Exception as e:
+                print(f"Warning: Could not extract total_return: {e}")
+                result.total_return = 0.0
+
+            # Get number of trades (count individual orders: BUY and SELL separately)
+            # Use orders.records instead of trades.records for consistency with ml4t.backtest
+            if hasattr(pf, "orders") and hasattr(pf.orders, "records"):
+                result.num_trades = len(pf.orders.records)
+            elif hasattr(pf, "trades") and hasattr(pf.trades, "records"):
+                # Fallback: if only trades available, multiply by 2 to estimate orders
+                result.num_trades = len(pf.trades.records) * 2
+            else:
+                result.num_trades = 0
+
+            # Extract individual orders for trade list
+            result.trades = []
+            try:
+                if hasattr(pf, "orders") and hasattr(pf.orders, "records_readable"):
+                    orders_df = pf.orders.records_readable
+
+                    for _, order in orders_df.iterrows():
+                        # Get symbol name from column index
+                        symbol_idx = order.get("Column", order.get("column", 0))
+                        if isinstance(symbol_idx, int) and symbol_idx < len(prices.columns):
+                            symbol = prices.columns[symbol_idx]
+                        else:
+                            symbol = str(symbol_idx)
+
+                        # Extract commission (VectorBT may store as 'Fees' or 'fees')
+                        commission = float(order.get("Fees", order.get("fees", 0.0)))
+
+                        trade_record = TradeRecord(
+                            timestamp=order.get("Timestamp", order.get("timestamp")),
+                            action=str(order.get("Side", "")).upper(),  # 'BUY' or 'SELL'
+                            quantity=abs(float(order.get("Size", order.get("size", 0)))),
+                            price=float(order.get("Price", order.get("price", 0))),
+                            value=abs(
+                                float(order.get("Size", order.get("size", 0)))
+                                * float(order.get("Price", order.get("price", 0)))
+                            ),
+                            commission=commission,
+                        )
+                        result.trades.append(trade_record)
+            except Exception as e:
+                print(f"Warning: Could not extract order details: {e}")
+
+            # Get equity curve and daily returns
+            try:
+                # Extract equity curve
+                value = pf.value
+                if callable(value):
+                    result.equity_curve = value()
+                else:
+                    result.equity_curve = value
+
+                # Extract daily returns
+                returns = pf.returns
+                if callable(returns):
+                    result.daily_returns = returns()
+                else:
+                    result.daily_returns = returns
+
+                # Ensure we have valid Series, not empty
+                if result.daily_returns is not None and hasattr(result.daily_returns, '__len__') and len(result.daily_returns) == 0:
+                    result.daily_returns = None
+                if result.equity_curve is not None and hasattr(result.equity_curve, '__len__') and len(result.equity_curve) == 0:
+                    result.equity_curve = None
+            except Exception as e:
+                print(f"  Warning: Failed to extract daily returns/equity curve: {e}")
+                result.equity_curve = None
+                result.daily_returns = None
+
+            # Performance tracking
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            result.execution_time = time.time() - start_time
+            result.memory_usage = peak / 1024 / 1024
+
+            print("✓ VectorBT multi-asset backtest completed")
+            print(f"  Entry Signals: {num_entry_signals}, Exit Signals: {num_exit_signals}")
+            print(f"  Final Value: ${result.final_value:,.2f}")
+            print(f"  Total Return: {result.total_return:.2f}%")
+            print(f"  Total Trades: {result.num_trades}")
+            print(f"  Execution Time: {result.execution_time:.3f}s")
+
+        except ImportError as e:
+            error_msg = f"VectorBT not available: {e}"
+            print(f"⚠ {error_msg}")
+            result.errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"VectorBT multi-asset backtest failed: {e}"
             print(f"✗ {error_msg}")
             import traceback
             traceback.print_exc()

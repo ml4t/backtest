@@ -1,9 +1,21 @@
 ml4t.backtest Documentation
-=====================
+============================
+
+.. image:: https://img.shields.io/badge/version-0.1.0-blue.svg
+   :alt: Version 0.1.0
+
+.. image:: https://img.shields.io/badge/python-3.9+-blue.svg
+   :alt: Python 3.9+
+
+.. image:: https://img.shields.io/badge/license-MIT-green.svg
+   :alt: MIT License
 
 ml4t.backtest is an event-driven backtesting engine with institutional-grade execution fidelity.
 
 **Core Mission**: Replicate real trading conditions with point-in-time correctness and realistic execution.
+
+**Version:** 0.1.0 (Beta)
+**Last Updated:** November 2025
 
 Features
 --------
@@ -25,11 +37,13 @@ Quick Links
    :maxdepth: 2
    :caption: Contents:
 
+   modules/engine
    modules/core
+   modules/data
    modules/execution
    modules/portfolio
+   modules/risk
    modules/strategy
-   modules/data
    modules/reporting
 
 Getting Started

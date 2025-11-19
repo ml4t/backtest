@@ -392,6 +392,8 @@ class SimulationBroker(Broker):
                             self._handle_bracket_fill(order, fill_result.fill_event)
 
         logger.debug(f"Submitted order: {order}")
+        print(f"BROKER submit_order: {order.asset_id[:12]:<12} {order.side.name} {order.quantity:>6.0f} {order.order_type.name} "
+              f"status={order.status.name} id={order.order_id}")
         return order.order_id
 
     def cancel_order(self, order_id: OrderId) -> bool:
@@ -662,7 +664,13 @@ class SimulationBroker(Broker):
                 continue
 
             # Skip already-filled orders (prevent double-fill attempts)
+            # DEBUG: Log when we're skipping filled orders
             if order.remaining_quantity <= 0:
+                if not hasattr(self, '_debug_skip_count'):
+                    self._debug_skip_count = 0
+                if self._debug_skip_count < 10:
+                    print(f"  [BROKER] Skipping filled order: {order.order_id} for {asset_id}, remaining={order.remaining_quantity}")
+                    self._debug_skip_count += 1
                 continue
 
             # Skip bracket exits (TP, SL, TSL) - they use priority-based processing
@@ -1104,6 +1112,180 @@ class SimulationBroker(Broker):
 
         return fills
 
+    def process_batch_fills(
+        self,
+        timestamp: datetime,
+        market_data_map: dict[AssetId, MarketEvent],
+    ) -> list[FillEvent]:
+        """
+        Process fills for all assets simultaneously in batch mode.
+
+        This method fixes Critical Issues #2 and #3 from the architecture review:
+        - Issue #2: Per-asset event processing prevents portfolio-level decisions
+        - Issue #3: Execution delay timing causes duplicate orders
+
+        Unlike on_market_event() which processes ONE asset at a time, this method:
+        1. Moves pending → open for ALL assets with market data
+        2. Fills ALL orders against their corresponding market events
+        3. Enables simultaneous cross-asset rebalancing
+
+        Args:
+            timestamp: Current timestamp for the batch
+            market_data_map: Dictionary mapping asset_id to MarketEvent for this timestamp
+
+        Returns:
+            List of FillEvent objects generated from all assets
+
+        Example:
+            # Engine groups events by timestamp
+            timestamp = datetime(2024, 1, 15)
+            market_map = {
+                "AAPL": MarketEvent(...),
+                "MSFT": MarketEvent(...),
+                "GOOGL": MarketEvent(...),
+            }
+            fills = broker.process_batch_fills(timestamp, market_map)
+
+        Note:
+            This method should be called BEFORE strategy logic to ensure fills
+            from previous orders are applied before new decisions are made.
+        """
+        # Increment bar counter once per batch
+        self.trade_tracker.on_bar()
+
+        print(f"\nBATCH FILLS @ {timestamp.strftime('%Y-%m-%d')}: {len(market_data_map)} assets with data, "
+              f"{len(self.order_router.get_open_orders())} open orders")
+
+        all_fills = []
+
+        # Phase 1: Move pending → open for ALL assets with market data
+        # This enables execution delay while processing all assets together
+        newly_activated_orders = set()
+
+        if self.execution_delay:
+            for asset_id in market_data_map.keys():
+                # CRITICAL FIX: Use OrderRouter's method instead of direct dict manipulation
+                activated = self.order_router.activate_pending_orders(asset_id)
+                for order in activated:
+                    # Mark as newly activated (won't fill until next batch)
+                    newly_activated_orders.add(order.order_id)
+
+        # Phase 2: Process fills for ALL assets
+        for asset_id, event in market_data_map.items():
+            # Determine execution price (use open for next-bar fills)
+            if self.execution_delay and event.open is not None:
+                price = event.open  # Next bar's open (realistic for daily)
+            elif event.close is not None:
+                price = event.close
+            elif event.price is not None:
+                price = event.price
+            else:
+                continue  # No price available for this asset
+
+            # Update last known price
+            self._last_prices[asset_id] = price
+
+            # Process open orders for this asset
+            # CRITICAL FIX: Access orders through order_router, not broker's own dict
+            orders_for_asset = list(self.order_router._open_orders[asset_id])
+            if orders_for_asset:
+                print(f"  Processing {len(orders_for_asset)} orders for {asset_id[:12]}")
+
+            for order in orders_for_asset:
+                if not order.is_active:
+                    print(f"    SKIP: Order {order.order_id[:8]} not active (status={order.status})")
+                    continue
+
+                # Skip newly activated orders (execution delay)
+                if self.execution_delay and order.order_id in newly_activated_orders:
+                    print(f"    SKIP: Order {order.order_id[:8]} newly activated (execution delay)")
+                    continue
+
+                # Skip already-filled orders
+                if order.remaining_quantity <= 0:
+                    print(f"    SKIP: Order {order.order_id[:8]} already filled")
+                    continue
+
+                # Skip bracket exits (handled separately with priority logic)
+                if order.metadata.get("bracket_type") in ["take_profit", "stop_loss", "trailing_stop"]:
+                    print(f"    SKIP: Order {order.order_id[:8]} is bracket exit")
+                    continue
+
+                print(f"    ATTEMPTING FILL: Order {order.order_id[:8]} {order.side.name} {order.quantity}")
+
+                # Create modified event for next-bar execution if needed
+                if self.execution_delay and event.open is not None:
+                    # For next-bar fills, override close with open
+                    # This ensures we fill at next bar's open, not close
+                    event_for_fill = MarketEvent(
+                        timestamp=event.timestamp,
+                        asset_id=event.asset_id,
+                        data_type=event.data_type,
+                        open=event.open,
+                        high=event.high,
+                        low=event.low,
+                        close=event.open,  # Override: use open as execution price
+                        volume=event.volume,
+                        signals=event.signals,
+                        context=event.context,
+                    )
+                else:
+                    event_for_fill = event
+
+                # Attempt fill using FillSimulator
+                # NOTE: try_fill_order returns FillResult (not FillEvent), extract fill_event from it
+                # Get current position quantity (Position object has .quantity attribute)
+                position = self._internal_portfolio.positions.get(asset_id)
+                current_position_qty = position.quantity if position is not None else 0.0
+
+                fill_result = self.fill_simulator.try_fill_order(
+                    order, event_for_fill,
+                    current_cash=self._internal_portfolio.cash,
+                    current_position=current_position_qty
+                )
+
+                if fill_result is not None:
+                    fill_event = fill_result.fill_event
+                    print(f"  FILL: {order.asset_id[:12]:<12} {order.side.name} {fill_event.fill_quantity:>6.0f} @ ${fill_event.fill_price:>7.2f} "
+                          f"status={order.status.name}")
+                    # Apply fill to portfolio (broker uses its internal portfolio for tracking)
+                    self._internal_portfolio.on_fill_event(fill_event)
+
+                    # Track statistics
+                    self._fill_count += 1
+                    self._total_commission += fill_result.commission
+                    self._total_slippage += fill_result.slippage
+
+                    # Handle bracket orders if parent filled
+                    if fill_event.fill_quantity == order.quantity and order.order_type == OrderType.BRACKET:
+                        self._handle_bracket_fill(order, fill_event)
+
+                    # Record trade
+                    self.trade_tracker.on_fill(fill_event)
+
+                    all_fills.append(fill_event)
+
+            # Phase 3: Process stop orders for this asset
+            # (Similar logic to on_market_event, but in batch context)
+            triggered_stops = []
+            for order in list(self._stop_orders[asset_id]):
+                if self._should_trigger_stop(order, price):
+                    triggered_stops.append(order)
+                    self._stop_orders[asset_id].remove(order)
+
+                    # Convert to market/limit order based on original type
+                    if order.order_type == OrderType.STOP:
+                        order.order_type = OrderType.MARKET
+                        self._open_orders[asset_id].append(order)
+                    elif order.order_type == OrderType.STOP_LIMIT:
+                        order.order_type = OrderType.LIMIT
+                        self._open_orders[asset_id].append(order)
+
+        # Clear newly-activated orders set for next batch
+        self._newly_created_brackets.clear()
+
+        return all_fills
+
     def _should_trigger_stop(self, order: Order, price: Price) -> bool:
         """Check if stop order should be triggered."""
         if order.stop_price is None:
@@ -1271,6 +1453,9 @@ class SimulationBroker(Broker):
             portfolio: Portfolio instance for position tracking
             event_bus: Event bus for publishing fill events
         """
+        # CRITICAL FIX: Use the provided portfolio as _internal_portfolio to avoid dual-portfolio drift
+        # This ensures broker's internal tracking and engine's portfolio are the SAME object
+        self._internal_portfolio = portfolio
         self.portfolio = portfolio
         self.event_bus = event_bus
         logger.debug("SimulationBroker initialized")

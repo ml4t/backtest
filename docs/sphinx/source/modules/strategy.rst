@@ -26,3 +26,11 @@ Crypto Basis Adapter
    :members:
    :undoc-members:
    :show-inheritance:
+
+SPY Order Flow Adapter
+----------------------
+
+.. automodule:: ml4t.backtest.strategy.spy_order_flow_adapter
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -214,7 +214,12 @@ class FillSimulator:
             return None
 
         # Check if order can be filled using intrabar execution if high/low available
-        if not order.can_fill(price=check_price, high=_high, low=_low):
+        can_fill = order.can_fill(price=check_price, high=_high, low=_low)
+        high_str = f"{_high:.2f}" if _high is not None else "None"
+        low_str = f"{_low:.2f}" if _low is not None else "None"
+        print(f"    FILL CHECK: {order.order_id[:8]} type={order.order_type.value} side={order.side.value} "
+              f"check_price=${check_price:.2f} high={high_str} low={low_str} can_fill={can_fill}")
+        if not can_fill:
             return None
 
         # Apply market impact to the market price
@@ -229,6 +234,11 @@ class FillSimulator:
 
         # Determine fill quantity considering liquidity constraints
         fill_quantity = order.remaining_quantity
+
+        # CRITICAL FIX: Skip orders with no remaining quantity (already filled)
+        # This prevents zero-quantity fills and duplicate processing
+        if fill_quantity <= 0:
+            return None
 
         # Get asset specification
         asset_spec = self.asset_registry.get(order.asset_id)

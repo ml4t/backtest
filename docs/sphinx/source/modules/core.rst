@@ -42,3 +42,19 @@ Constants
    :members:
    :undoc-members:
    :show-inheritance:
+
+Precision
+---------
+
+.. automodule:: ml4t.backtest.core.precision
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Context
+-------
+
+.. automodule:: ml4t.backtest.core.context
+   :members:
+   :undoc-members:
+   :show-inheritance:

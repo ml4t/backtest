@@ -59,18 +59,42 @@ Trade Tracker
    :undoc-members:
    :show-inheritance:
 
-Position Tracker
-----------------
-
-.. automodule:: ml4t.backtest.execution.position_tracker
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Bracket Manager
 ---------------
 
 .. automodule:: ml4t.backtest.execution.bracket_manager
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Order Router
+------------
+
+.. automodule:: ml4t.backtest.execution.order_router
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Market Impact Models
+--------------------
+
+.. automodule:: ml4t.backtest.execution.market_impact
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Liquidity Models
+----------------
+
+.. automodule:: ml4t.backtest.execution.liquidity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Corporate Actions
+-----------------
+
+.. automodule:: ml4t.backtest.execution.corporate_actions
    :members:
    :undoc-members:
    :show-inheritance:

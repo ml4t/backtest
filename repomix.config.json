@@ -1,39 +1,27 @@
 {
   "output": {
-    "filePath": "repomix.xml",
-    "style": "xml",
-    "includeEmptyDirectories": false,
-    "topFilesLength": 12,
-    "showLineNumbers": false,
-    "removeComments": false,
-    "removeEmptyLines": false
+    "filePath": "ml4t-backtest-review.xml",
+    "style": "xml"
   },
   "include": [
-    "README.md",
-    "src/qengine/__init__.py",
-    "src/qengine/engine.py",
-    "src/qengine/core/*.py",
-    "src/qengine/data/*.py",
-    "src/qengine/execution/*.py",
-    "src/qengine/portfolio/*.py",
-    "src/qengine/strategy/*.py",
-    "src/qengine/reporting/*.py",
-    "src/*"
+    "src/**/*.py",
+    "examples/integrated/*.py",
+    "*.md",
+    "pyproject.toml"
   ],
   "ignore": {
-    "useGitignore": true,
-    "useDefaultPatterns": true,
+    "useGitignore": false,
+    "useDefaultPatterns": false,
     "customPatterns": [
-      ".venv/**",
-      "docs/**",
-      "examples/**",
       "tests/**",
-      "resources/**",
-      "htmlcov/**",
-      "__pycache__/**",
-      "*.pyc",
-      "benchmarks/**",
-      "config/**"
+      "**/__pycache__/**",
+      "**/*.pyc",
+      ".venv/**",
+      "*.egg-info/**",
+      ".pytest_cache/**",
+      "examples/integrated/data/**",
+      "docs/sphinx/build/**",
+      ".git/**"
     ]
   }
 }

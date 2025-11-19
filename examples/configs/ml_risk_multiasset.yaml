@@ -1,0 +1,292 @@
+# =============================================================================
+# ML + Risk + Multi-Asset Configuration (Top 25 Example)
+# =============================================================================
+#
+# This configuration demonstrates a production-ready ML-driven multi-asset
+# strategy with comprehensive risk management:
+# - 500-stock universe, select top 25 by ML scores
+# - Precomputed ML signals and features (ATR)
+# - VIX-based regime filtering
+# - Multiple integrated risk rules (volatility-scaled, trailing, time-based)
+# - Position sizing and rebalancing
+#
+# This maps directly to: examples/integrated/top25_ml_strategy_complete.py
+#
+# Use Case: Production ML trading, portfolio optimization, multi-asset research
+# Expected Runtime: 30-60 seconds for 126,000 events
+# =============================================================================
+
+name: "Top 25 ML Strategy with Integrated Risk"
+description: "Production multi-asset ML strategy: 500 stocks → top 25, VIX filter, 3 risk rules"
+
+# -----------------------------------------------------------------------------
+# Data Sources
+# -----------------------------------------------------------------------------
+
+data_sources:
+  # REQUIRED: Price data for 500-stock universe
+  # Contains: timestamp, asset_id, open, high, low, close, volume
+  # Plus precomputed features: ml_score, atr
+  prices:
+    path: "examples/integrated/data/stock_data.parquet"
+    format: parquet
+    timestamp_column: timestamp
+    asset_column: asset_id
+    # Note: No filters - we want all 500 stocks for ranking
+    # Strategy will select top 25 dynamically
+
+  # ML Signals: Already embedded in price data (ml_score column)
+  # In production, you might have a separate signals file from your ML pipeline
+  signals:
+    path: "examples/integrated/data/stock_data.parquet"
+    format: parquet
+    columns: [timestamp, asset_id, ml_score]
+    timestamp_column: timestamp
+    asset_column: asset_id
+
+  # Market Context: VIX for regime detection
+  # Used for: "Don't trade if VIX > 30" (high volatility filter)
+  context:
+    path: "examples/integrated/data/vix_data.parquet"
+    format: parquet
+    columns: [timestamp, vix]
+    timestamp_column: timestamp
+    asset_column: asset_id  # Will be null for market-wide data
+
+# -----------------------------------------------------------------------------
+# Feature Provider
+# -----------------------------------------------------------------------------
+# Precomputed features for risk management and strategy logic
+# Features flow: Parquet → PrecomputedFeatureProvider → RiskManager → MarketEvent
+
+features:
+  type: precomputed
+  path: "examples/integrated/data/stock_data.parquet"
+  columns: [ml_score, atr]  # ML scores + ATR for volatility stops
+  timestamp_column: timestamp
+  asset_column: asset_id
+
+# Note on Multi-Asset Feature Efficiency:
+# - Per-asset features (ml_score, atr): Stored per (timestamp, asset_id)
+# - Market features (vix): Stored per timestamp with asset_id=null
+# - PrecomputedFeatureProvider handles both efficiently
+# - Memory usage: ~5MB for 500 stocks × 252 days × 2 features
+
+# Alternative: Callable feature provider for on-the-fly computation
+# features:
+#   type: callable
+#   module: my_ml_pipeline
+#   function: get_features  # get_features(asset_id, timestamp) -> dict
+#   kwargs:
+#     model_version: "v2.3"
+#     cache_size: 10000
+
+# -----------------------------------------------------------------------------
+# Risk Rules
+# -----------------------------------------------------------------------------
+# Comprehensive risk management for multi-asset portfolio
+#
+# Strategy exits are managed by THREE integrated rules:
+# 1. VolatilityScaledStopLoss: Stop at entry - 2.0 × ATR
+# 2. DynamicTrailingStop: Starts at 5%, tightens 0.1%/bar to min 0.5%
+# 3. TimeBasedExit: Force exit after 60 bars (12 weeks for daily data)
+#
+# Conflict Resolution: Priority-based, picks tighter stop if same priority
+
+risk_rules:
+  # Position Sizing
+  # max_position_size: 4% (implicit from N_POSITIONS=25)
+  # In multi-asset, strategy handles position sizing
+  max_position_size: 0.04  # 4% per position (25 positions = 100%)
+
+  # Stop Loss: Fallback for simple percentage stop
+  # Note: VolatilityScaledStopLoss overrides this if ATR available
+  stop_loss: 0.02  # 2% hard stop if ATR fails
+
+  # Take Profit: Optional profit target
+  take_profit: 0.10  # 10% profit target
+
+  # Portfolio Heat: Maximum total risk across all positions
+  # Example: 15% = sum of all position risks ≤ 15% of NAV
+  max_portfolio_heat: 0.15
+
+  # VIX Filtering: Regime-based trading
+  # Only trade when 10 < VIX < 30 (normal volatility regime)
+  min_vix: 10.0  # Avoid extremely quiet markets (may signal incoming shock)
+  max_vix: 30.0  # Avoid panic/crisis periods (too volatile, wide spreads)
+
+# Risk Rule Implementation Notes:
+# These config parameters are READ by your strategy code.
+# The actual RiskManager rules are instantiated programmatically:
+#
+# ```python
+# risk_manager = RiskManager(feature_provider)
+#
+# # Rule 1: Volatility-scaled stop
+# risk_manager.add_rule(VolatilityScaledStopLoss(
+#     atr_multiplier=2.0,
+#     volatility_key='atr',
+#     priority=100
+# ))
+#
+# # Rule 2: Dynamic trailing stop
+# risk_manager.add_rule(DynamicTrailingStop(
+#     initial_trail_pct=0.05,
+#     tighten_rate=0.001,
+#     minimum_trail_pct=0.005,
+#     priority=100
+# ))
+#
+# # Rule 3: Time-based exit
+# risk_manager.add_rule(TimeBasedExit(
+#     max_bars=60,
+#     priority=5
+# ))
+# ```
+
+# -----------------------------------------------------------------------------
+# Execution Parameters
+# -----------------------------------------------------------------------------
+
+execution:
+  # Starting Capital
+  initial_capital: 1000000.0  # $1M for realistic multi-asset backtest
+
+  # Commission Model: Interactive Brokers tiered
+  # For multi-asset with frequent rebalancing, commissions matter
+  commission:
+    type: per_share
+    rate: 0.005  # $0.005/share (IB typical for retail)
+    minimum: 1.0  # $1 minimum per order
+
+  # Slippage Model: Percentage-based
+  # For multi-asset, use conservative slippage estimate
+  slippage:
+    type: percentage
+    rate: 0.001  # 10 bps (0.1%) - realistic for liquid stocks
+
+  # Alternative: Volume-based slippage for less liquid assets
+  # slippage:
+  #   type: volume_share
+  #   rate: 0.10  # Fill 10% of bar's volume → estimate slippage
+
+  # Margin: Disabled for safety
+  # Enable only if you understand margin calls and liquidation
+  enable_margin: false
+  max_leverage: 1.0
+
+  # Execution Delay: CRITICAL for preventing lookahead bias
+  # TRUE: Orders submitted on bar N fill at bar N+1 open
+  # FALSE: Orders fill on current bar close (LOOKAHEAD BIAS - unrealistic)
+  execution_delay: true
+
+  # Same-Bar Re-Entry: Allow or prevent
+  # TRUE: Can exit position A and enter position B on same bar
+  # FALSE: Must wait for next bar after exit
+  allow_immediate_reentry: true
+
+# =============================================================================
+# Multi-Asset Strategy Implementation
+# =============================================================================
+#
+# This config supports the "Top 25" portfolio construction:
+#
+# 1. Universe Selection: 500 stocks (no filter in config)
+# 2. Ranking: Sort by ml_score descending
+# 3. Selection: Pick top 25 stocks
+# 4. Position Sizing: Equal weight (4% each = 100% / 25)
+# 5. Rebalancing: Daily or when top 25 changes
+# 6. Risk Management: 3 rules (vol stop, trailing, time exit)
+# 7. Regime Filter: VIX > 30 → skip rebalancing
+#
+# Strategy Pseudocode:
+# ```python
+# class Top25MLStrategy(Strategy):
+#     def on_market_data(self, events: List[MarketEvent]):
+#         # Get VIX from context
+#         vix = events[0].context.get('vix', 0.0)
+#
+#         # VIX filter
+#         if vix > 30.0:
+#             return  # Don't rebalance during high vol
+#
+#         # Rank all stocks by ML score
+#         scores = [(e.asset_id, e.signals['ml_score'], e.close)
+#                   for e in events if e.signals.get('atr') is not None]
+#         scores.sort(key=lambda x: x[1], reverse=True)
+#
+#         # Select top 25
+#         top_25 = scores[:25]
+#
+#         # Target weights: 4% each
+#         target_weights = {asset_id: 0.04 for asset_id, _, _ in top_25}
+#
+#         # Rebalance portfolio
+#         self.rebalance(target_weights)
+# ```
+#
+# =============================================================================
+# Performance Expectations (Synthetic Data)
+# =============================================================================
+#
+# Based on examples/integrated/top25_ml_strategy_complete.py:
+#
+# - Events Processed: ~126,000 (500 stocks × 252 days)
+# - Execution Time: 30-60 seconds (2,000-4,000 events/sec)
+# - Rebalances: ~200-250 (daily rebalancing)
+# - VIX Filtered Days: ~10-20 (days skipped due to VIX > 30)
+# - Final Positions: 25 (fully invested in top-ranked stocks)
+# - ML Signal Accuracy: ~58% (realistic for financial ML)
+# - Sharpe Ratio: 0.8-1.2 (depends on synthetic data generation)
+#
+# Risk Rule Exits:
+# - VolatilityScaledStopLoss: ~30% of exits (hit 2×ATR stop)
+# - DynamicTrailingStop: ~40% of exits (trailing stop tightened)
+# - TimeBasedExit: ~30% of exits (held 60 bars, forced exit)
+#
+# =============================================================================
+# Production Deployment Checklist
+# =============================================================================
+#
+# Before deploying this config to live trading:
+#
+# ✅ 1. Validate ML model performance on out-of-sample data
+# ✅ 2. Test with realistic transaction costs (commissions + slippage)
+# ✅ 3. Verify execution_delay is TRUE (prevent lookahead bias)
+# ✅ 4. Backtest across multiple market regimes (bull, bear, sideways)
+# ✅ 5. Stress test with historical crisis periods (2008, 2020)
+# ✅ 6. Calculate maximum drawdown and verify acceptable
+# ✅ 7. Verify position sizing doesn't exceed risk tolerance
+# ✅ 8. Test VIX filter effectiveness (compare with/without)
+# ✅ 9. Validate ATR calculation matches expectations
+# ✅ 10. Review all risk rule parameters (stop loss, trailing, time exit)
+# ✅ 11. Implement monitoring and alerting for live trading
+# ✅ 12. Test with paper trading for 1-3 months before live capital
+#
+# =============================================================================
+# Troubleshooting Common Issues
+# =============================================================================
+#
+# Issue: "Data file not found"
+# → Check path is correct, use absolute path or ${ENV_VAR}
+#
+# Issue: "ATR feature not available"
+# → Verify stock_data.parquet has 'atr' column
+# → Check feature provider columns list
+#
+# Issue: "VIX filtering not working"
+# → Verify context data has 'vix' column
+# → Check event.context.get('vix') in strategy code
+#
+# Issue: "Risk rules not triggering"
+# → Verify RiskManager.check_position_exits() is called BEFORE strategy
+# → Check priority values (higher priority rules evaluated first)
+# → Inspect risk_manager._position_state for debugging
+#
+# Issue: "Poor performance"
+# → Validate ML model on holdout set (avoid overfitting)
+# → Increase transaction costs to realistic levels
+# → Test with/without VIX filter
+# → Review exit rule parameters (stops may be too tight/loose)
+#
+# =============================================================================

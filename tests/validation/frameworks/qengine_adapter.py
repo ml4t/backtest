@@ -214,7 +214,7 @@ class BacktestAdapter(BaseFrameworkAdapter):
 
     def run_with_signals(
         self,
-        data: pd.DataFrame,
+        data: pd.DataFrame | dict[str, pd.DataFrame],
         signals: pd.DataFrame,
         config: FrameworkConfig | None = None,
     ) -> ValidationResult:
@@ -237,6 +237,11 @@ class BacktestAdapter(BaseFrameworkAdapter):
         if config is None:
             config = FrameworkConfig.realistic()
 
+        # Check if multi-asset (dict) or single-asset (DataFrame)
+        if isinstance(data, dict):
+            return self._run_multi_asset_with_signals(data, signals, config)
+
+        # Single-asset path
         # Validate inputs
         self.validate_data(data)
         self.validate_signals(signals, data)
@@ -425,6 +430,236 @@ class BacktestAdapter(BaseFrameworkAdapter):
 
         except Exception as e:
             error_msg = f"ml4t.backtest signal-based backtest failed: {e}"
+            print(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            result.errors.append(error_msg)
+
+        return result
+    def _run_multi_asset_with_signals(
+        self,
+        data: dict[str, pd.DataFrame],
+        signals: pd.DataFrame,
+        config: FrameworkConfig,
+    ) -> ValidationResult:
+        """Run backtest with multi-asset rotation signals.
+
+        Strategy logic MATCHES Backtrader:
+        - BUY signal: Only buy if NO existing position (no accumulation)
+        - SELL signal: Only sell if HAVE a position to close
+        """
+        from datetime import datetime
+        from ml4t.backtest import BacktestEngine
+        from ml4t.backtest.data import DataFeed
+        from ml4t.backtest.execution import SimulationBroker
+        from ml4t.backtest.execution.slippage import PercentageSlippage
+        from ml4t.backtest.execution.commission import PercentageCommission
+        from ml4t.backtest.strategy import Strategy
+        from ml4t.backtest.core.event import MarketEvent
+        from ml4t.backtest.core.types import MarketDataType
+        from ml4t.backtest.execution.order import Order, OrderType, OrderSide
+
+        result = ValidationResult(
+            framework=self.framework_name,
+            strategy="TopNMomentum",
+            initial_capital=config.initial_capital,
+        )
+
+        try:
+            import tracemalloc
+            import time
+
+            tracemalloc.start()
+            start_time = time.time()
+
+            # Convert signals to dict for fast lookup
+            signal_dict = {}
+            for _, row in signals.iterrows():
+                key = (pd.Timestamp(row['timestamp']), row['symbol'])
+                signal_dict[key] = row['signal']
+
+            # Strategy class matching Backtrader logic EXACTLY
+            class RotationStrategy(Strategy):
+                def __init__(self, signals_dict, target_pct=0.20):
+                    super().__init__()
+                    self.signals_dict = signals_dict
+                    self.target_pct = target_pct
+                    self.pending_orders = {}  # Track pending orders by symbol (CRITICAL)
+
+                def on_event(self, event):
+                    from ml4t.backtest.core.event import FillEvent
+                    if isinstance(event, MarketEvent):
+                        self.on_market_data(event)
+                    elif isinstance(event, FillEvent):
+                        self.on_fill_event(event)
+
+                def on_market_data(self, event):
+                    timestamp = event.timestamp
+                    symbol = event.asset_id
+
+                    key = (timestamp, symbol)
+                    if key not in self.signals_dict:
+                        return
+
+                    signal_value = self.signals_dict[key]
+                    current_qty = self.broker.get_position(symbol)
+
+                    # CRITICAL: Skip if we already have a pending order for this symbol
+                    # (Matches Backtrader logic at backtrader_adapter.py:608-610)
+                    if symbol in self.pending_orders and self.pending_orders[symbol]:
+                        return
+
+                    # MATCHES Backtrader: if action == "BUY" and current_size == 0
+                    if signal_value == 1 and abs(current_qty) < 0.001:
+                        portfolio_value = self.broker.portfolio.equity
+                        target_value = portfolio_value * self.target_pct
+                        quantity = target_value / event.close
+
+                        if quantity > 0.01:
+                            order = Order(
+                                asset_id=symbol,
+                                order_type=OrderType.MARKET,
+                                side=OrderSide.BUY,
+                                quantity=quantity,
+                            )
+                            self.broker.submit_order(order)
+                            self.pending_orders[symbol] = order  # Track pending order
+
+                    # MATCHES Backtrader: elif action == "SELL" and current_size > 0
+                    elif signal_value == -1 and abs(current_qty) > 0.001:
+                        order = Order(
+                            asset_id=symbol,
+                            order_type=OrderType.MARKET,
+                            side=OrderSide.SELL,
+                            quantity=abs(current_qty),
+                        )
+                        self.broker.submit_order(order)
+                        self.pending_orders[symbol] = order  # Track pending order
+
+                def on_fill_event(self, fill_event):
+                    """Clear pending order when filled."""
+                    symbol = fill_event.asset_id
+                    if symbol in self.pending_orders:
+                        del self.pending_orders[symbol]
+
+            # Create data feed
+            class MultiAssetDataFeed(DataFeed):
+                def __init__(self, ohlcv_dict):
+                    self.data_list = []
+                    for asset_id, ohlcv in ohlcv_dict.items():
+                        for idx in range(len(ohlcv)):
+                            row = ohlcv.iloc[idx]
+                            self.data_list.append({
+                                'timestamp': row.name,
+                                'asset_id': asset_id,
+                                'open': row['open'],
+                                'high': row['high'],
+                                'low': row['low'],
+                                'close': row['close'],
+                                'volume': row['volume'],
+                            })
+                    self.data_list.sort(key=lambda x: x['timestamp'])
+                    self.index = 0
+
+                def get_next_event(self) -> MarketEvent | None:
+                    """Get next event from data feed."""
+                    if self.is_exhausted:
+                        return None
+                    data = self.data_list[self.index]
+                    self.index += 1
+                    return MarketEvent(
+                        timestamp=data['timestamp'],
+                        asset_id=data['asset_id'],
+                        data_type=MarketDataType.BAR,
+                        open=data['open'],
+                        high=data['high'],
+                        low=data['low'],
+                        close=data['close'],
+                        volume=data['volume'],
+                    )
+
+                @property
+                def is_exhausted(self) -> bool:
+                    """Check if feed exhausted."""
+                    return self.index >= len(self.data_list)
+
+                def peek_next_timestamp(self) -> datetime | None:
+                    """Peek at next timestamp without consuming."""
+                    if self.is_exhausted:
+                        return None
+                    return self.data_list[self.index]['timestamp']
+
+                def reset(self) -> None:
+                    """Reset to beginning."""
+                    self.index = 0
+
+                def seek(self, timestamp: datetime) -> None:
+                    """Seek to timestamp."""
+                    for i, data in enumerate(self.data_list):
+                        if data['timestamp'] >= timestamp:
+                            self.index = i
+                            return
+                    self.index = len(self.data_list)  # Exhausted if not found
+
+            feed = MultiAssetDataFeed(data)
+
+            commission = PercentageCommission(rate=config.commission_pct)
+            slippage = PercentageSlippage(slippage_pct=config.slippage_pct)
+
+            broker = SimulationBroker(
+                initial_cash=config.initial_capital,
+                commission_model=commission,
+                slippage_model=slippage,
+            )
+
+            strategy = RotationStrategy(signal_dict, target_pct=0.20)
+
+            engine = BacktestEngine(
+                data_feed=feed,
+                broker=broker,
+                strategy=strategy,
+            )
+
+            engine.run()
+
+            result.final_value = broker.portfolio.equity
+            result.total_return = ((result.final_value / config.initial_capital) - 1) * 100
+
+            # Extract trades
+            trades = []
+            if hasattr(broker, 'trade_tracker') and broker.trade_tracker:
+                raw_trades = broker.trade_tracker._trades
+                result.num_trades = len(raw_trades) * 2
+
+                for trade in raw_trades:
+                    trades.append(TradeRecord(
+                        timestamp=trade.entry_dt,
+                        action="BUY" if trade.direction == "long" else "SELL",
+                        quantity=trade.entry_quantity,
+                        price=trade.entry_price,
+                        value=trade.entry_quantity * trade.entry_price,
+                        commission=trade.entry_commission,
+                    ))
+                    trades.append(TradeRecord(
+                        timestamp=trade.exit_dt,
+                        action="SELL" if trade.direction == "long" else "BUY",
+                        quantity=trade.exit_quantity,
+                        price=trade.exit_price,
+                        value=trade.exit_quantity * trade.exit_price,
+                        commission=trade.exit_commission,
+                    ))
+            else:
+                result.num_trades = 0
+
+            result.trades = trades
+
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            result.execution_time = time.time() - start_time
+            result.memory_usage = peak / 1024 / 1024
+
+        except Exception as e:
+            error_msg = f"ml4t.backtest multi-asset failed: {e}"
             print(f"✗ {error_msg}")
             import traceback
             traceback.print_exc()

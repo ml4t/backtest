@@ -249,7 +249,7 @@ class BacktraderAdapter(BaseFrameworkAdapter):
 
     def run_with_signals(
         self,
-        data: pd.DataFrame,
+        data: pd.DataFrame | dict[str, pd.DataFrame],
         signals: pd.DataFrame,
         config: FrameworkConfig | None = None,
     ) -> ValidationResult:
@@ -257,8 +257,12 @@ class BacktraderAdapter(BaseFrameworkAdapter):
         Run backtest with pre-computed signals (pure execution validation).
 
         Args:
-            data: OHLCV data with DatetimeIndex
-            signals: DataFrame with 'entry' and 'exit' boolean columns
+            data: OHLCV data - either:
+                  - Single DataFrame with DatetimeIndex (single-asset)
+                  - Dict mapping symbol -> DataFrame (multi-asset)
+            signals: DataFrame with either:
+                  - 'entry' and 'exit' boolean columns (single-asset)
+                  - 'timestamp', 'symbol', 'signal' columns (multi-asset)
             config: FrameworkConfig for execution parameters (costs, timing, etc.).
                    If None, uses FrameworkConfig.realistic() defaults.
 
@@ -269,6 +273,13 @@ class BacktraderAdapter(BaseFrameworkAdapter):
         if config is None:
             config = FrameworkConfig.realistic()
 
+        # Check if this is multi-asset (dict) or single-asset (DataFrame)
+        is_multi_asset = isinstance(data, dict)
+
+        if is_multi_asset:
+            return self._run_multi_asset_with_signals(data, signals, config)
+
+        # Single-asset path (original logic)
         # Validate inputs
         self.validate_data(data)
         self.validate_signals(signals, data)
@@ -504,6 +515,270 @@ class BacktraderAdapter(BaseFrameworkAdapter):
 
         except Exception as e:
             error_msg = f"Backtrader signal-based backtest failed: {e}"
+            print(f"✗ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            result.errors.append(error_msg)
+
+        return result
+
+    def _run_multi_asset_with_signals(
+        self,
+        data: dict[str, pd.DataFrame],
+        signals: pd.DataFrame,
+        config: FrameworkConfig,
+    ) -> ValidationResult:
+        """
+        Run backtest with multi-asset rotation signals using Backtrader.
+
+        Args:
+            data: Dict mapping symbol -> OHLCV DataFrame
+            signals: DataFrame with columns: timestamp, symbol, signal (1=buy, -1=sell)
+            config: FrameworkConfig for execution parameters
+
+        Returns:
+            ValidationResult with performance metrics
+        """
+        result = ValidationResult(
+            framework=self.framework_name,
+            strategy="TopNMomentum",
+            initial_capital=config.initial_capital,
+        )
+
+        try:
+            import backtrader as bt
+
+            tracemalloc.start()
+            start_time = time.time()
+
+            # Convert signals from long format to dict for fast lookup
+            # signal_dict[date][symbol] = action ("BUY" or "SELL")
+            signal_dict = {}
+            for _, row in signals.iterrows():
+                date = pd.Timestamp(row['timestamp']).date()
+                symbol = row['symbol']
+                signal_value = row['signal']
+
+                if date not in signal_dict:
+                    signal_dict[date] = {}
+
+                if signal_value == 1:  # BUY
+                    signal_dict[date][symbol] = "BUY"
+                elif signal_value == -1:  # SELL
+                    signal_dict[date][symbol] = "SELL"
+
+            num_entry_signals = (signals['signal'] == 1).sum()
+            num_exit_signals = (signals['signal'] == -1).sum()
+
+            print(f"\nBacktrader multi-asset setup:")
+            print(f"  Assets: {len(data)}")
+            print(f"  Entry signals: {num_entry_signals}")
+            print(f"  Exit signals: {num_exit_signals}")
+
+            # Create the signal-based rotation strategy
+            class MultiAssetSignalStrategy(bt.Strategy):
+                """Multi-asset rotation strategy using pre-computed signals."""
+
+                def __init__(self):
+                    self.signal_dict = signal_dict
+                    self.target_pct = 0.20  # 20% per position (5 positions max)
+                    self.trade_log = []
+                    self.orders = {}  # Track pending orders by symbol
+
+                    # Create a mapping from data feed to symbol name
+                    self.data_to_symbol = {}
+                    for i, d in enumerate(self.datas):
+                        # Symbol name is stored in data feed's _name attribute
+                        symbol = d._name
+                        self.data_to_symbol[d] = symbol
+
+                def next(self):
+                    current_date = self.data.datetime.date(0)
+
+                    # Check if we have signals for today
+                    if current_date not in self.signal_dict:
+                        return
+
+                    day_signals = self.signal_dict[current_date]
+
+                    # Process each data feed (symbol)
+                    for data_feed in self.datas:
+                        symbol = self.data_to_symbol[data_feed]
+
+                        # Skip if we have a pending order for this symbol
+                        if symbol in self.orders and self.orders[symbol]:
+                            continue
+
+                        # Check if we have a signal for this symbol today
+                        if symbol not in day_signals:
+                            continue
+
+                        action = day_signals[symbol]
+                        current_price = data_feed.close[0]
+
+                        # Get current position size for this symbol
+                        position = self.getposition(data_feed)
+                        current_size = position.size if position else 0
+
+                        if action == "BUY" and current_size == 0:
+                            # Calculate target value (20% of portfolio)
+                            portfolio_value = self.broker.getvalue()
+                            target_value = portfolio_value * self.target_pct
+
+                            # Place order using order_target_value for exact percentage
+                            # With COC=True, this fills at same bar's close
+                            order = self.order_target_value(
+                                data=data_feed,
+                                target=target_value,
+                            )
+
+                            if order:
+                                self.orders[symbol] = order
+                                self.trade_log.append({
+                                    "date": current_date,
+                                    "symbol": symbol,
+                                    "action": "BUY_SIGNAL",
+                                    "price": current_price,
+                                    "target_value": target_value,
+                                })
+
+                        elif action == "SELL" and current_size > 0:
+                            # Close position (target = 0)
+                            order = self.order_target_value(
+                                data=data_feed,
+                                target=0.0,
+                            )
+
+                            if order:
+                                self.orders[symbol] = order
+                                self.trade_log.append({
+                                    "date": current_date,
+                                    "symbol": symbol,
+                                    "action": "SELL_SIGNAL",
+                                    "price": current_price,
+                                    "position_size": current_size,
+                                })
+
+                def notify_order(self, order):
+                    """Called when order status changes."""
+                    if order.status in [order.Completed]:
+                        # Find which symbol this order belongs to
+                        symbol = None
+                        for data_feed, sym in self.data_to_symbol.items():
+                            if order.data == data_feed:
+                                symbol = sym
+                                break
+
+                        action = "BUY" if order.isbuy() else "SELL"
+
+                        self.trade_log.append({
+                            "date": bt.num2date(order.executed.dt).date(),
+                            "symbol": symbol,
+                            "action": f"{action}_EXECUTED",
+                            "price": order.executed.price,
+                            "size": abs(order.executed.size),
+                            "value": abs(order.executed.value),
+                            "commission": order.executed.comm,
+                        })
+
+                    # Clear pending order when completed/cancelled/rejected
+                    if not order.alive():
+                        for sym, ord in list(self.orders.items()):
+                            if ord == order:
+                                self.orders[sym] = None
+                                break
+
+            # Create Cerebro engine
+            cerebro = bt.Cerebro()
+            cerebro.addstrategy(MultiAssetSignalStrategy)
+
+            # Add data feed for each symbol
+            for symbol, ohlcv in sorted(data.items()):
+                bt_data = ohlcv.copy()
+                bt_data.index.name = 'date'
+                bt_data = bt_data.reset_index()
+
+                data_feed = bt.feeds.PandasData(
+                    dataname=bt_data,
+                    datetime='date',
+                    open='open',
+                    high='high',
+                    low='low',
+                    close='close',
+                    volume='volume',
+                    openinterest=-1,
+                )
+
+                # Set the name of the data feed to the symbol
+                data_feed._name = symbol
+                cerebro.adddata(data_feed, name=symbol)
+
+            # Set broker parameters from config
+            cerebro.broker.setcash(config.initial_capital)
+            cerebro.broker.setcommission(commission=config.commission_pct)
+
+            # Configure slippage
+            if config.slippage_pct > 0 or config.slippage_fixed > 0:
+                cerebro.broker.set_slippage_perc(
+                    perc=config.slippage_pct,
+                    slip_open=True,
+                    slip_limit=True,
+                )
+
+            # Configure execution timing
+            # Use COC (Cheat-On-Close) for same-bar fills like VectorBT
+            # This matches the behavior of from_signals where signals execute immediately
+            if config.backtrader_coc:
+                cerebro.broker.set_coc(True)
+
+            # Run backtest
+            strategies = cerebro.run()
+            strategy_instance = strategies[0]
+
+            # Extract results
+            result.final_value = cerebro.broker.getvalue()
+            result.total_return = (result.final_value / config.initial_capital - 1) * 100
+
+            # Process trade log to create trade records
+            executed_trades = [
+                log for log in strategy_instance.trade_log if log["action"].endswith("_EXECUTED")
+            ]
+
+            result.trades = []
+            for trade_info in executed_trades:
+                trade_record = TradeRecord(
+                    timestamp=pd.to_datetime(trade_info["date"]),
+                    action=trade_info["action"].replace("_EXECUTED", ""),
+                    quantity=trade_info["size"],
+                    price=trade_info["price"],
+                    value=trade_info["value"],
+                    commission=trade_info.get("commission", 0.0),
+                )
+                result.trades.append(trade_record)
+
+            # Count trades (individual orders, not round trips)
+            result.num_trades = len(executed_trades)
+
+            # Performance tracking
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            result.execution_time = time.time() - start_time
+            result.memory_usage = peak / 1024 / 1024
+
+            print("✓ Backtrader multi-asset backtest completed")
+            print(f"  Entry Signals: {num_entry_signals}, Exit Signals: {num_exit_signals}")
+            print(f"  Final Value: ${result.final_value:,.2f}")
+            print(f"  Total Return: {result.total_return:.2f}%")
+            print(f"  Total Trades: {result.num_trades}")
+            print(f"  Execution Time: {result.execution_time:.3f}s")
+
+        except ImportError as e:
+            error_msg = f"Backtrader not available: {e}"
+            print(f"⚠ {error_msg}")
+            result.errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"Backtrader multi-asset backtest failed: {e}"
             print(f"✗ {error_msg}")
             import traceback
             traceback.print_exc()

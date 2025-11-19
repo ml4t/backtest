@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview: module code &mdash; qengine 0.1.0 documentation</title>
+  <title>Overview: module code &mdash; ml4t.backtest 0.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
 
@@ -29,7 +29,7 @@
           
           
           <a href="../index.html" class="icon icon-home">
-            qengine
+            ml4t.backtest
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -41,11 +41,13 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/engine.html">Engine &amp; Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/data.html">Data Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/execution.html">Execution Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/portfolio.html">Portfolio Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/risk.html">Risk Management Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/strategy.html">Strategy Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/data.html">Data Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../modules/reporting.html">Reporting Module</a></li>
 </ul>
 
@@ -55,7 +57,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">qengine</a>
+          <a href="../index.html">ml4t.backtest</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -73,34 +75,57 @@
            <div itemprop="articleBody">
              
   <h1>All modules for which code is available</h1>
-<ul><li><a href="qengine/core/assets.html">qengine.core.assets</a></li>
-<li><a href="qengine/core/clock.html">qengine.core.clock</a></li>
-<li><a href="qengine/core/constants.html">qengine.core.constants</a></li>
-<li><a href="qengine/core/event.html">qengine.core.event</a></li>
-<li><a href="qengine/core/types.html">qengine.core.types</a></li>
-<li><a href="qengine/data/asset_registry.html">qengine.data.asset_registry</a></li>
-<li><a href="qengine/data/feed.html">qengine.data.feed</a></li>
-<li><a href="qengine/data/schemas.html">qengine.data.schemas</a></li>
-<li><a href="qengine/execution/bracket_manager.html">qengine.execution.bracket_manager</a></li>
-<li><a href="qengine/execution/broker.html">qengine.execution.broker</a></li>
-<li><a href="qengine/execution/commission.html">qengine.execution.commission</a></li>
-<li><a href="qengine/execution/fill_simulator.html">qengine.execution.fill_simulator</a></li>
-<li><a href="qengine/execution/order.html">qengine.execution.order</a></li>
-<li><a href="qengine/execution/position_sizer.html">qengine.execution.position_sizer</a></li>
-<li><a href="qengine/execution/position_tracker.html">qengine.execution.position_tracker</a></li>
-<li><a href="qengine/execution/slippage.html">qengine.execution.slippage</a></li>
-<li><a href="qengine/execution/trade_tracker.html">qengine.execution.trade_tracker</a></li>
-<li><a href="qengine/portfolio/accounting.html">qengine.portfolio.accounting</a></li>
-<li><a href="qengine/portfolio/margin.html">qengine.portfolio.margin</a></li>
-<li><a href="qengine/portfolio/portfolio.html">qengine.portfolio.portfolio</a></li>
-<li><a href="qengine/portfolio/simple.html">qengine.portfolio.simple</a></li>
-<li><a href="qengine/reporting/base.html">qengine.reporting.base</a></li>
-<li><a href="qengine/reporting/html.html">qengine.reporting.html</a></li>
-<li><a href="qengine/reporting/parquet.html">qengine.reporting.parquet</a></li>
-<li><a href="qengine/reporting/reporter.html">qengine.reporting.reporter</a></li>
-<li><a href="qengine/strategy/adapters.html">qengine.strategy.adapters</a></li>
-<li><a href="qengine/strategy/base.html">qengine.strategy.base</a></li>
-<li><a href="qengine/strategy/crypto_basis_adapter.html">qengine.strategy.crypto_basis_adapter</a></li>
+<ul><li><a href="ml4t/backtest/config.html">ml4t.backtest.config</a></li>
+<li><a href="ml4t/backtest/core/assets.html">ml4t.backtest.core.assets</a></li>
+<li><a href="ml4t/backtest/core/clock.html">ml4t.backtest.core.clock</a></li>
+<li><a href="ml4t/backtest/core/constants.html">ml4t.backtest.core.constants</a></li>
+<li><a href="ml4t/backtest/core/context.html">ml4t.backtest.core.context</a></li>
+<li><a href="ml4t/backtest/core/event.html">ml4t.backtest.core.event</a></li>
+<li><a href="ml4t/backtest/core/precision.html">ml4t.backtest.core.precision</a></li>
+<li><a href="ml4t/backtest/core/types.html">ml4t.backtest.core.types</a></li>
+<li><a href="ml4t/backtest/data/asset_registry.html">ml4t.backtest.data.asset_registry</a></li>
+<li><a href="ml4t/backtest/data/feature_provider.html">ml4t.backtest.data.feature_provider</a></li>
+<li><a href="ml4t/backtest/data/feed.html">ml4t.backtest.data.feed</a></li>
+<li><a href="ml4t/backtest/data/polars_feed.html">ml4t.backtest.data.polars_feed</a></li>
+<li><a href="ml4t/backtest/data/schemas.html">ml4t.backtest.data.schemas</a></li>
+<li><a href="ml4t/backtest/data/validation.html">ml4t.backtest.data.validation</a></li>
+<li><a href="ml4t/backtest/engine.html">ml4t.backtest.engine</a></li>
+<li><a href="ml4t/backtest/execution/bracket_manager.html">ml4t.backtest.execution.bracket_manager</a></li>
+<li><a href="ml4t/backtest/execution/broker.html">ml4t.backtest.execution.broker</a></li>
+<li><a href="ml4t/backtest/execution/commission.html">ml4t.backtest.execution.commission</a></li>
+<li><a href="ml4t/backtest/execution/corporate_actions.html">ml4t.backtest.execution.corporate_actions</a></li>
+<li><a href="ml4t/backtest/execution/fill_simulator.html">ml4t.backtest.execution.fill_simulator</a></li>
+<li><a href="ml4t/backtest/execution/liquidity.html">ml4t.backtest.execution.liquidity</a></li>
+<li><a href="ml4t/backtest/execution/market_impact.html">ml4t.backtest.execution.market_impact</a></li>
+<li><a href="ml4t/backtest/execution/order.html">ml4t.backtest.execution.order</a></li>
+<li><a href="ml4t/backtest/execution/order_router.html">ml4t.backtest.execution.order_router</a></li>
+<li><a href="ml4t/backtest/execution/position_sizer.html">ml4t.backtest.execution.position_sizer</a></li>
+<li><a href="ml4t/backtest/execution/slippage.html">ml4t.backtest.execution.slippage</a></li>
+<li><a href="ml4t/backtest/execution/trade_tracker.html">ml4t.backtest.execution.trade_tracker</a></li>
+<li><a href="ml4t/backtest/portfolio/analytics.html">ml4t.backtest.portfolio.analytics</a></li>
+<li><a href="ml4t/backtest/portfolio/core.html">ml4t.backtest.portfolio.core</a></li>
+<li><a href="ml4t/backtest/portfolio/margin.html">ml4t.backtest.portfolio.margin</a></li>
+<li><a href="ml4t/backtest/portfolio/portfolio.html">ml4t.backtest.portfolio.portfolio</a></li>
+<li><a href="ml4t/backtest/portfolio/state.html">ml4t.backtest.portfolio.state</a></li>
+<li><a href="ml4t/backtest/reporting/reporter.html">ml4t.backtest.reporting.reporter</a></li>
+<li><a href="ml4t/backtest/reporting/trade_analysis.html">ml4t.backtest.reporting.trade_analysis</a></li>
+<li><a href="ml4t/backtest/reporting/trade_schema.html">ml4t.backtest.reporting.trade_schema</a></li>
+<li><a href="ml4t/backtest/reporting/visualizations.html">ml4t.backtest.reporting.visualizations</a></li>
+<li><a href="ml4t/backtest/results.html">ml4t.backtest.results</a></li>
+<li><a href="ml4t/backtest/risk/context.html">ml4t.backtest.risk.context</a></li>
+<li><a href="ml4t/backtest/risk/decision.html">ml4t.backtest.risk.decision</a></li>
+<li><a href="ml4t/backtest/risk/manager.html">ml4t.backtest.risk.manager</a></li>
+<li><a href="ml4t/backtest/risk/rule.html">ml4t.backtest.risk.rule</a></li>
+<li><a href="ml4t/backtest/risk/rules/dynamic_trailing.html">ml4t.backtest.risk.rules.dynamic_trailing</a></li>
+<li><a href="ml4t/backtest/risk/rules/portfolio_constraints.html">ml4t.backtest.risk.rules.portfolio_constraints</a></li>
+<li><a href="ml4t/backtest/risk/rules/price_based.html">ml4t.backtest.risk.rules.price_based</a></li>
+<li><a href="ml4t/backtest/risk/rules/regime_dependent.html">ml4t.backtest.risk.rules.regime_dependent</a></li>
+<li><a href="ml4t/backtest/risk/rules/time_based.html">ml4t.backtest.risk.rules.time_based</a></li>
+<li><a href="ml4t/backtest/risk/rules/volatility_scaled.html">ml4t.backtest.risk.rules.volatility_scaled</a></li>
+<li><a href="ml4t/backtest/strategy/adapters.html">ml4t.backtest.strategy.adapters</a></li>
+<li><a href="ml4t/backtest/strategy/base.html">ml4t.backtest.strategy.base</a></li>
+<li><a href="ml4t/backtest/strategy/crypto_basis_adapter.html">ml4t.backtest.strategy.crypto_basis_adapter</a></li>
+<li><a href="ml4t/backtest/strategy/spy_order_flow_adapter.html">ml4t.backtest.strategy.spy_order_flow_adapter</a></li>
 </ul>
 
            </div>

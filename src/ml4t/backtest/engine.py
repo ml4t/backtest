@@ -94,7 +94,7 @@ class BacktestEngine:
         if broker is None:
             from ml4t.backtest.execution.broker import SimulationBroker
 
-            self.broker = SimulationBroker()
+            self.broker = SimulationBroker(initial_cash=initial_capital)
         else:
             self.broker = broker
 
@@ -255,6 +255,45 @@ class BacktestEngine:
             data_start, data_end = self.data_feed.get_time_range()
             self.clock.advance_to(start_date or data_start)
 
+        # Choose processing path based on strategy execution mode
+        if self._strategy_mode == "batch":
+            # Batch mode: Use timestamp-grouped processing for portfolio strategies
+            self._run_batch_mode(start_date, end_date, max_events)
+        else:
+            # Atomic mode: Use Clock-driven event-by-event processing
+            self._run_atomic_mode(start_date, end_date, max_events)
+
+        # Finalize
+        self.strategy.on_end()
+        self.broker.finalize()
+        # Portfolio has no finalize() method - state is already complete
+        self.reporter.on_end()
+
+        self.end_time = datetime.now()  # Wall clock time for performance measurement
+        duration = (self.end_time - self.start_time).total_seconds()
+
+        logger.info(
+            f"Backtest complete: {self.events_processed:,} events in {duration:.2f}s "
+            f"({self.events_processed / duration:.0f} events/sec)",
+        )
+
+        # Compile results
+        results = self._compile_results()
+        return results
+
+    def _run_atomic_mode(
+        self,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        max_events: int | None,
+    ) -> None:
+        """Run backtest in atomic mode (event-by-event processing).
+
+        This is the traditional event-driven approach where each market event
+        is processed individually. Used by simple single-asset strategies.
+        """
+        logger.info("Running in ATOMIC mode (event-by-event processing)")
+
         # Main event loop - Clock-driven (Phase 1 redesign complete)
         # The Clock pulls events from all registered feeds (market data, signals, corporate actions)
         # and returns them in strict chronological order, ensuring point-in-time correctness
@@ -270,9 +309,6 @@ class BacktestEngine:
             # Get next event from Clock's priority queue (across ALL feeds)
             event = self.clock.get_next_event()
             if event is None:
-                # All feeds exhausted - process any remaining batch
-                if self._strategy_mode == "batch" and self._event_batch:
-                    self._process_event_batch()
                 break
 
             # Dispatch event to all registered subscribers
@@ -298,25 +334,16 @@ class BacktestEngine:
                     for order in exit_orders:
                         self.broker.submit_order(order)
 
-                # Handle based on strategy execution mode
-                if self._strategy_mode == "batch":
-                    # Batch mode: collect events for same timestamp
-                    self._collect_or_process_batch(event, context.data)
-                else:
-                    # Simple mode: process immediately (original behavior)
-                    self.strategy.on_market_event(event, context.data)
+                # Atomic mode: process immediately
+                self.strategy.on_market_event(event, context.data)
 
-                    # Also call on_event for backward compatibility with strategies
-                    # that don't override on_market_event
-                    self.strategy.on_event(event)
+                # Also call on_event for backward compatibility with strategies
+                # that don't override on_market_event
+                self.strategy.on_event(event)
 
                 # Dispatch to other subscribers (broker, portfolio, reporter)
                 self.clock.dispatch_event(event)
             else:
-                # Non-MARKET events: flush batch if in batch mode (timestamp changed)
-                if self._strategy_mode == "batch" and self._event_batch:
-                    self._process_event_batch()
-
                 # Normal dispatch for non-MARKET events
                 # Subscribers handle events based on event_type:
                 # - Strategy: receives FILL events
@@ -385,23 +412,181 @@ class BacktestEngine:
                     f"Processed {self.events_processed:,} events at {event.timestamp}"
                 )
 
-        # Finalize
-        self.strategy.on_end()
-        self.broker.finalize()
-        # Portfolio has no finalize() method - state is already complete
-        self.reporter.on_end()
+    def _run_batch_mode(
+        self,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        max_events: int | None,
+    ) -> None:
+        """Run backtest in batch mode (time-slice processing).
 
-        self.end_time = datetime.now()  # Wall clock time for performance measurement
-        duration = (self.end_time - self.start_time).total_seconds()
+        This is the optimized approach for portfolio strategies where all assets
+        need to be processed simultaneously. Events are grouped by timestamp and
+        processed in three phases:
+          1. Fill old orders (from previous timestamp)
+          2. Mark-to-market (update portfolio values)
+          3. Strategy decisions (new orders)
 
-        logger.info(
-            f"Backtest complete: {self.events_processed:,} events in {duration:.2f}s "
-            f"({self.events_processed / duration:.0f} events/sec)",
-        )
+        This approach:
+          - Reduces iterations from 126,000 (500 × 252) to 252 (timestamps only)
+          - Enables simultaneous cross-asset portfolio rebalancing
+          - Eliminates T+2 execution delay bugs
+        """
+        logger.info("Running in BATCH mode (time-slice processing)")
 
-        # Compile results
-        results = self._compile_results()
-        return results
+        # Check if data feed supports batch streaming
+        if not hasattr(self.data_feed, 'stream_by_timestamp'):
+            raise ValueError(
+                f"Data feed {type(self.data_feed).__name__} does not support "
+                "stream_by_timestamp(). Use MultiSymbolDataFeed for batch mode."
+            )
+
+        self.events_processed = 0
+        PROGRESS_LOG_INTERVAL = 50  # Log every 50 timestamps (not 10k events)
+
+        # Iterate by timestamp using the feed's batch streaming
+        for timestamp, events in self.data_feed.stream_by_timestamp():
+            # Check max events limit
+            if max_events and self.events_processed >= max_events:
+                logger.info(f"Reached max events limit: {max_events}")
+                break
+
+            # Filter by date range if specified
+            if start_date and timestamp < start_date:
+                continue
+            if end_date and timestamp > end_date:
+                break
+
+            # Process this time-slice
+            self._process_time_slice(timestamp, events)
+
+            self.events_processed += len(events)
+
+            # Log progress periodically
+            if (self.events_processed // len(events)) % PROGRESS_LOG_INTERVAL == 0:
+                logger.info(
+                    f"Processed {self.events_processed:,} events "
+                    f"({self.events_processed // len(events)} timestamps) at {timestamp}"
+                )
+
+    def _process_time_slice(self, timestamp: datetime, events: list[MarketEvent]) -> None:
+        """Process all events for a single timestamp in three phases.
+
+        Args:
+            timestamp: The current timestamp being processed
+            events: All MarketEvents for this timestamp (one per asset)
+
+        Processing phases:
+            1. Fill old orders: Process pending orders using new market data
+            2. Mark-to-market: Update portfolio values with current prices
+            3. Strategy logic: Allow strategy to make new decisions
+
+        This ensures correct sequencing: fills happen before strategy sees state.
+        """
+        # Create market data map for efficient lookup
+        market_map = {event.asset_id: event for event in events}
+
+        # Get or create context for this timestamp
+        context_dict = self.context_data.get(timestamp, {})
+        context = self.context_cache.get_or_create(timestamp, context_dict)
+
+        # --- PHASE 1: Fill old orders (from previous timestamp) ---
+        # This must happen BEFORE strategy sees portfolio state
+        # Uses the new market data to fill pending orders
+        if hasattr(self.broker, 'process_batch_fills'):
+            self.broker.process_batch_fills(timestamp, market_map)
+        else:
+            # Fallback: Process each event individually through broker
+            for event in events:
+                self.broker.on_market_event(event)
+
+        # --- PHASE 2: Mark-to-market (update portfolio values) ---
+        # Update portfolio with current market prices for accurate equity/margin
+        for event in events:
+            self.portfolio.on_market_event(event)
+
+        # Check for corporate actions at this timestamp
+        current_date = timestamp.date()
+        pending_actions = self.corporate_action_processor.get_pending_actions(current_date)
+        if pending_actions:
+            self._process_corporate_actions(current_date, timestamp)
+
+        # Hook C: Risk management exit checks BEFORE strategy
+        if self.risk_manager:
+            for event in events:
+                self._current_market_event = event
+                exit_orders = self.risk_manager.check_position_exits(
+                    market_event=event,
+                    broker=self.broker,
+                    portfolio=self.portfolio,
+                )
+                for order in exit_orders:
+                    self.broker.submit_order(order)
+
+        # --- PHASE 3: Strategy logic (new decisions) ---
+        # Strategy sees post-fill portfolio state and can make new decisions
+        # Update strategy's market data cache for helper methods
+        self.strategy._current_market_data = market_map
+
+        # Call batch handler if available
+        if hasattr(self.strategy, 'on_data_batch'):
+            self.strategy.on_data_batch(timestamp, market_map, context.data)
+        elif hasattr(self.strategy, 'on_timestamp_batch'):
+            # Backward compatibility with old batch API
+            self.strategy.on_timestamp_batch(timestamp, events, context.data)
+        else:
+            # Fallback: Call on_market_event for each event
+            for event in events:
+                self._current_market_event = event
+                self.strategy.on_market_event(event, context.data)
+
+        # Dispatch to reporter for logging
+        for event in events:
+            self.reporter.on_event(event)
+
+    def _process_corporate_actions(self, current_date, timestamp) -> None:
+        """Process corporate actions for a given date.
+
+        Args:
+            current_date: Date to check for corporate actions
+            timestamp: Timestamp for logging
+        """
+        # Get current state from broker (after fills)
+        positions = self.broker.get_positions()  # Returns dict[AssetId, Quantity]
+        orders = self.broker.get_open_orders()
+        cash = self.broker.get_cash()
+
+        # Process all actions for this date
+        updated_positions, updated_orders, updated_cash, notifications = \
+            self.corporate_action_processor.process_actions(
+                current_date,
+                positions,
+                orders,
+                cash,
+            )
+
+        # Apply position adjustments to broker
+        for asset_id, new_quantity in updated_positions.items():
+            if asset_id in positions:
+                # Existing position - adjust quantity
+                self.broker.adjust_position_quantity(asset_id, new_quantity)
+            elif new_quantity > 0:
+                # New position created (e.g., spin-off, merger)
+                logger.warning(
+                    f"Corporate action created new position for {asset_id} "
+                    f"with quantity {new_quantity}. Manual position creation not yet supported."
+                )
+
+        # Apply cash adjustment (dividends, merger proceeds, etc.)
+        cash_change = updated_cash - cash
+        if cash_change != 0:
+            self.broker.adjust_cash(cash_change)
+
+        # Log notifications
+        for notification in notifications:
+            logger.info(f"Corporate action: {notification}")
+            if self.reporter and hasattr(self.reporter, 'add_note'):
+                self.reporter.add_note(timestamp, notification)
 
     def _compile_results(self) -> dict[str, Any]:
         """Compile backtest results from all components.
@@ -427,8 +612,8 @@ class BacktestEngine:
             "duration_seconds": duration,
             "events_per_second": self.events_processed / duration if duration > 0 else 0,
             "initial_capital": self.initial_capital,
-            "final_value": self.portfolio.equity,  # New API: property
-            "total_return": (self.portfolio.equity / self.initial_capital - 1) * 100,
+            "final_value": self.broker._internal_portfolio.equity,  # Use broker's portfolio (source of truth)
+            "total_return": (self.broker._internal_portfolio.equity / self.initial_capital - 1) * 100,
         }
 
         # Add reporter data if available

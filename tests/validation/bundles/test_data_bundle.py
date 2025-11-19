@@ -1,8 +1,7 @@
 """
 Custom Zipline bundle for cross-framework validation test data.
 
-Ingests the AAPL test data from sp500_top10_sma_crossover.pkl
-to enable Zipline validation against ml4t.backtest, Backtrader, and VectorBT.
+Supports both single-asset (AAPL) and multi-asset (STOCK00-STOCK24) synthetic data.
 """
 
 import pickle
@@ -12,8 +11,30 @@ import numpy as np
 from zipline.data.bundles import register
 
 
+# Global variable to store multi-asset test data
+# This will be set by the test fixture before bundle ingestion
+_MULTI_ASSET_TEST_DATA = None
+
+
+def set_multi_asset_data(data_dict):
+    """Set multi-asset test data for bundle ingestion.
+
+    Args:
+        data_dict: Dictionary mapping symbol -> OHLCV DataFrame
+    """
+    global _MULTI_ASSET_TEST_DATA
+    _MULTI_ASSET_TEST_DATA = data_dict
+
+
 def load_test_data():
-    """Load AAPL data from test signals pickle file."""
+    """Load test data - either AAPL or multi-asset synthetic data."""
+    global _MULTI_ASSET_TEST_DATA
+
+    # If multi-asset data is available, use it
+    if _MULTI_ASSET_TEST_DATA is not None:
+        return _MULTI_ASSET_TEST_DATA
+
+    # Otherwise, load AAPL data from pickle file
     signal_file = Path(__file__).parent.parent / "signals" / "sp500_top10_sma_crossover.pkl"
     with open(signal_file, 'rb') as f:
         signal_set = pickle.load(f)
@@ -27,10 +48,10 @@ def load_test_data():
     # Ensure timezone-aware UTC index
     if df.index.tz is None:
         df.index = df.index.tz_localize('UTC')
-    elif df.index.tz != pd.UTC:
+    else:
         df.index = df.index.tz_convert('UTC')
 
-    return df
+    return {'AAPL': df}
 
 
 def test_data_bundle(interval='1d'):
@@ -60,24 +81,43 @@ def test_data_bundle(interval='1d'):
                show_progress,
                output_dir):
 
-        # Load test data
-        df = load_test_data()
+        # Load test data (returns dict: symbol -> DataFrame)
+        data_dict = load_test_data()
 
-        # Define asset metadata (index must be the sid)
-        metadata = pd.DataFrame({
-            'symbol': ['AAPL'],
-            'asset_name': ['Apple Inc.'],
-            'start_date': [df.index[0]],
-            'end_date': [df.index[-1]],
-            'first_traded': [df.index[0]],
-            'auto_close_date': [df.index[-1] + pd.Timedelta(days=1)],
-            'exchange': ['NASDAQ'],
-        }, index=[0])  # sid=0 for AAPL
+        # Build metadata for all symbols
+        metadata_rows = []
+        for sid, (symbol, df) in enumerate(sorted(data_dict.items())):
+            # Ensure column names are lowercase
+            df.columns = df.columns.str.lower()
+
+            # Ensure timezone-aware UTC index
+            if df.index.tz is None:
+                df.index = df.index.tz_localize('UTC')
+            else:
+                df.index = df.index.tz_convert('UTC')
+
+            metadata_rows.append({
+                'symbol': symbol,
+                'asset_name': symbol,  # Use symbol as name for synthetic data
+                'start_date': df.index[0],
+                'end_date': df.index[-1],
+                'first_traded': df.index[0],
+                'auto_close_date': df.index[-1] + pd.Timedelta(days=1),
+                'exchange': 'NASDAQ',
+            })
+
+        metadata = pd.DataFrame(metadata_rows, index=range(len(metadata_rows)))
 
         # Generator for bar writer (yields (sid, dataframe) tuples)
         def data_generator():
-            sid = 0  # AAPL gets sid=0 (matches Zipline's symbol() lookup)
-            yield (sid, df)
+            for sid, (symbol, df) in enumerate(sorted(data_dict.items())):
+                # Ensure lowercase columns and UTC timezone
+                df.columns = df.columns.str.lower()
+                if df.index.tz is None:
+                    df.index = df.index.tz_localize('UTC')
+                else:
+                    df.index = df.index.tz_convert('UTC')
+                yield (sid, df)
 
         # Write OHLCV bars
         if interval == '1m':

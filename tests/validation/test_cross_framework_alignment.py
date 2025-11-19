@@ -227,10 +227,10 @@ class TestCrossFrameworkAlignment:
         instead of our test DataFrame, making direct price comparison impossible.
         Zipline validation uses the regular backtest tests instead.
         """
-        from .frameworks.backtest_adapter import BacktestAdapter
+        from .frameworks.qengine_adapter import BacktestAdapter
         from .frameworks.vectorbt_adapter import VectorBTAdapter
         from .frameworks.backtrader_adapter import BacktraderAdapter
-        from .frameworks.base import Signal
+        from .frameworks.base import Signal, FrameworkConfig
 
         # Generate signals using standardized calculation
         signal_data = self.calculate_ma_signals(test_data)
@@ -255,6 +255,14 @@ class TestCrossFrameworkAlignment:
                     quantity=100.0,
                 ))
 
+        # Convert list[Signal] to DataFrame with 'entry'/'exit' boolean columns
+        signals_df = pd.DataFrame(False, index=test_data.index, columns=['entry', 'exit'])
+        for sig in signals:
+            if sig['action'] == 'BUY':
+                signals_df.loc[sig['timestamp'], 'entry'] = True
+            elif sig['action'] == 'SELL':
+                signals_df.loc[sig['timestamp'], 'exit'] = True
+
         print(f"\n{'=' * 80}")
         print(f"3-WAY FRAMEWORK VALIDATION: Signal-Based Execution")
         print(f"{'=' * 80}")
@@ -264,35 +272,36 @@ class TestCrossFrameworkAlignment:
         print(f"{'=' * 80}\n")
 
         # Run all frameworks with identical signals
-        initial_capital = 10000.0
+        # Use FrameworkConfig for unified configuration
+        config = FrameworkConfig.for_matching()  # Zero fees, same-bar fills
 
         # ml4t.backtest
-        ml4t.backtest_adapter = BacktestAdapter()
-        ml4t.backtest_result = ml4t.backtest_adapter.run_with_signals(
+        qengine_adapter = BacktestAdapter()
+        qengine_result = qengine_adapter.run_with_signals(
             data=test_data,
-            signals=signals,
-            initial_capital=initial_capital,
+            signals=signals_df,
+            config=config,
         )
 
         # VectorBT
         vectorbt_adapter = VectorBTAdapter()
         vectorbt_result = vectorbt_adapter.run_with_signals(
             data=test_data,
-            signals=signals,
-            initial_capital=initial_capital,
+            signals=signals_df,
+            config=config,
         )
 
         # Backtrader
         backtrader_adapter = BacktraderAdapter()
         backtrader_result = backtrader_adapter.run_with_signals(
             data=test_data,
-            signals=signals,
-            initial_capital=initial_capital,
+            signals=signals_df,
+            config=config,
         )
 
         # Collect all results
         results = {
-            "ml4t.backtest": ml4t.backtest_result,
+            "ml4t.backtest": qengine_result,
             "VectorBT": vectorbt_result,
             "Backtrader": backtrader_result,
         }
@@ -315,7 +324,7 @@ class TestCrossFrameworkAlignment:
 
         if len(final_values) > 1:
             value_range = max(final_values) - min(final_values)
-            value_pct_range = (value_range / initial_capital) * 100
+            value_pct_range = (value_range / config.initial_capital) * 100
             return_range = max(returns) - min(returns)
 
             print(f"\n{'Variance Statistics':}")
@@ -341,7 +350,7 @@ class TestCrossFrameworkAlignment:
         for i, (name1, result1) in enumerate(available_results.items()):
             for name2, result2 in list(available_results.items())[i+1:]:
                 value_diff = abs(result1.final_value - result2.final_value)
-                value_pct_diff = (value_diff / initial_capital) * 100
+                value_pct_diff = (value_diff / config.initial_capital) * 100
                 return_diff = abs(result1.total_return - result2.total_return)
 
                 assert value_pct_diff < 1.0, \
@@ -368,10 +377,10 @@ class TestCrossFrameworkAlignment:
         Tests ml4t.backtest, VectorBT, and Backtrader with identical signals.
         (Zipline excluded - see test_frameworks_with_predefined_signals docstring)
         """
-        from .frameworks.backtest_adapter import BacktestAdapter
+        from .frameworks.qengine_adapter import BacktestAdapter
         from .frameworks.vectorbt_adapter import VectorBTAdapter
         from .frameworks.backtrader_adapter import BacktraderAdapter
-        from .frameworks.base import Signal
+        from .frameworks.base import Signal, FrameworkConfig
 
         # Generate many signals using shorter windows
         signal_data = self.calculate_ma_signals(test_data, short_window=5, long_window=15)
@@ -410,33 +419,42 @@ class TestCrossFrameworkAlignment:
         for i, sig in enumerate(signals[:10]):
             print(f"  {i+1}. {sig['timestamp'].date()}: {sig['action']}")
 
-        initial_capital = 10000.0
+        # Convert list[Signal] to DataFrame with 'entry'/'exit' boolean columns
+        signals_df = pd.DataFrame(False, index=test_data.index, columns=['entry', 'exit'])
+        for sig in signals:
+            if sig['action'] == 'BUY':
+                signals_df.loc[sig['timestamp'], 'entry'] = True
+            elif sig['action'] == 'SELL':
+                signals_df.loc[sig['timestamp'], 'exit'] = True
+
+        # Use FrameworkConfig for unified configuration
+        config = FrameworkConfig.for_matching()
 
         # Run all 3 frameworks (Zipline excluded - see docstring)
-        ml4t.backtest_adapter = BacktestAdapter()
-        ml4t.backtest_result = ml4t.backtest_adapter.run_with_signals(
+        qengine_adapter = BacktestAdapter()
+        qengine_result = qengine_adapter.run_with_signals(
             data=test_data,
-            signals=signals,
-            initial_capital=initial_capital,
+            signals=signals_df,
+            config=config,
         )
 
         vectorbt_adapter = VectorBTAdapter()
         vectorbt_result = vectorbt_adapter.run_with_signals(
             data=test_data,
-            signals=signals,
-            initial_capital=initial_capital,
+            signals=signals_df,
+            config=config,
         )
 
         backtrader_adapter = BacktraderAdapter()
         backtrader_result = backtrader_adapter.run_with_signals(
             data=test_data,
-            signals=signals,
-            initial_capital=initial_capital,
+            signals=signals_df,
+            config=config,
         )
 
         # Collect results
         results = {
-            "ml4t.backtest": ml4t.backtest_result,
+            "ml4t.backtest": qengine_result,
             "VectorBT": vectorbt_result,
             "Backtrader": backtrader_result,
         }
@@ -466,7 +484,7 @@ class TestCrossFrameworkAlignment:
             trade_counts = [r.num_trades for r in available_results.values()]
 
             value_range = max(final_values) - min(final_values)
-            value_pct_range = (value_range / initial_capital) * 100
+            value_pct_range = (value_range / config.initial_capital) * 100
             return_range = max(returns) - min(returns)
             trade_range = max(trade_counts) - min(trade_counts)
 
@@ -545,7 +563,7 @@ class TestCrossFrameworkAlignment:
 
         This test runs a minimal set of signals and logs detailed execution info.
         """
-        from .frameworks.backtest_adapter import BacktestAdapter
+        from .frameworks.qengine_adapter import BacktestAdapter
         from .frameworks.zipline_adapter import ZiplineAdapter
         from .frameworks.base import Signal
         import pandas as pd

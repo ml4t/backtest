@@ -11,18 +11,26 @@ Portfolio
    :undoc-members:
    :show-inheritance:
 
-Simple Portfolio
-----------------
+Core Position Types
+-------------------
 
-.. automodule:: ml4t.backtest.portfolio.simple
+.. automodule:: ml4t.backtest.portfolio.core
    :members:
    :undoc-members:
    :show-inheritance:
 
-Accounting
-----------
+Portfolio State
+---------------
 
-.. automodule:: ml4t.backtest.portfolio.accounting
+.. automodule:: ml4t.backtest.portfolio.state
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Analytics
+---------
+
+.. automodule:: ml4t.backtest.portfolio.analytics
    :members:
    :undoc-members:
    :show-inheritance:
