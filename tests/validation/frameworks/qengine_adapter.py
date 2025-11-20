@@ -491,64 +491,68 @@ class BacktestAdapter(BaseFrameworkAdapter):
                     self.target_pct = target_pct
                     self.pending_orders = {}  # Track pending orders by symbol (CRITICAL)
 
-                def on_event(self, event):
-                    from ml4t.backtest.core.event import FillEvent
-                    if isinstance(event, MarketEvent):
-                        self.on_market_data(event)
-                    elif isinstance(event, FillEvent):
-                        self.on_fill_event(event)
+                def on_data(self, timestamp, data, context, broker):
+                    """New callback-based API."""
+                    # Process each asset's data
+                    for symbol, asset_data in data.items():
+                        # Check if we have a signal for this timestamp+symbol
+                        key = (pd.Timestamp(timestamp), symbol)
+                        if key not in self.signals_dict:
+                            continue
 
-                def on_market_data(self, event):
-                    timestamp = event.timestamp
-                    symbol = event.asset_id
+                        signal_value = self.signals_dict[key]
 
-                    key = (timestamp, symbol)
-                    if key not in self.signals_dict:
-                        return
+                        # Get current position
+                        position = broker.get_position(symbol)
+                        current_qty = position.quantity if position else 0.0
 
-                    signal_value = self.signals_dict[key]
-                    current_qty = self.broker.get_position(symbol)
+                        # CRITICAL: Skip if we already have a pending order for this symbol
+                        # (Matches Backtrader logic at backtrader_adapter.py:608-610)
+                        if symbol in self.pending_orders and self.pending_orders[symbol]:
+                            continue
 
-                    # CRITICAL: Skip if we already have a pending order for this symbol
-                    # (Matches Backtrader logic at backtrader_adapter.py:608-610)
-                    if symbol in self.pending_orders and self.pending_orders[symbol]:
-                        return
-
-                    # MATCHES Backtrader: if action == "BUY" and current_size == 0
-                    if signal_value == 1 and abs(current_qty) < 0.001:
-                        portfolio_value = self.broker.portfolio.equity
-                        target_value = portfolio_value * self.target_pct
-                        quantity = target_value / event.close
-
-                        if quantity > 0.01:
-                            order = Order(
-                                asset_id=symbol,
-                                order_type=OrderType.MARKET,
-                                side=OrderSide.BUY,
-                                quantity=quantity,
+                        # MATCHES Backtrader: if action == "BUY" and current_size == 0
+                        if signal_value == 1 and abs(current_qty) < 0.001:
+                            portfolio_value = broker.cash + sum(
+                                broker.get_position(s).quantity * data[s].get('close', 0)
+                                for s in data.keys()
+                                if broker.get_position(s) is not None
                             )
-                            self.broker.submit_order(order)
-                            self.pending_orders[symbol] = order  # Track pending order
+                            target_value = portfolio_value * self.target_pct
+                            price = asset_data.get('close')
+                            quantity = target_value / price if price > 0 else 0
 
-                    # MATCHES Backtrader: elif action == "SELL" and current_size > 0
-                    elif signal_value == -1 and abs(current_qty) > 0.001:
-                        order = Order(
-                            asset_id=symbol,
-                            order_type=OrderType.MARKET,
-                            side=OrderSide.SELL,
-                            quantity=abs(current_qty),
-                        )
-                        self.broker.submit_order(order)
-                        self.pending_orders[symbol] = order  # Track pending order
+                            if quantity > 0.01:
+                                broker.submit_order(
+                                    asset=symbol,
+                                    side=OrderSide.BUY,
+                                    quantity=quantity,
+                                    order_type=OrderType.MARKET,
+                                )
+                                self.pending_orders[symbol] = True  # Track pending order
 
-                def on_fill_event(self, fill_event):
-                    """Clear pending order when filled."""
-                    symbol = fill_event.asset_id
-                    if symbol in self.pending_orders:
-                        del self.pending_orders[symbol]
+                        # MATCHES Backtrader: elif action == "SELL" and current_size > 0
+                        elif signal_value == -1 and abs(current_qty) > 0.001:
+                            broker.submit_order(
+                                asset=symbol,
+                                side=OrderSide.SELL,
+                                quantity=abs(current_qty),
+                                order_type=OrderType.MARKET,
+                            )
+                            self.pending_orders[symbol] = True  # Track pending order
 
+            # TODO: Multi-asset support needs complete rewrite for new modular API
+            # The old event-driven approach with custom MultiAssetDataFeed doesn't work
+            # Need to create Polars DataFrame with multi-asset data and use new DataFeed
+            raise NotImplementedError(
+                "Multi-asset backtesting with new modular API not yet implemented. "
+                "The old event-driven architecture has been replaced. This requires a "
+                "complete rewrite to use Polars DataFrames and the new callback-based Strategy API."
+            )
+
+            # OLD CODE BELOW - needs to be rewritten for new API
             # Create data feed
-            class MultiAssetDataFeed(DataFeed):
+            class MultiAssetDataFeed_OLD(DataFeed):
                 def __init__(self, ohlcv_dict):
                     self.data_list = []
                     for asset_id, ohlcv in ohlcv_dict.items():
