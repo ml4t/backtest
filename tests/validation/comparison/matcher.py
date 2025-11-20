@@ -141,7 +141,7 @@ def _create_match_from_group(group: List[tuple[str, StandardTrade]]) -> TradeMat
     # Organize by platform
     trades_by_platform = {platform: trade for platform, trade in group}
 
-    ml4t.backtest = trades_by_platform.get('ml4t.backtest')
+    backtest_trade = trades_by_platform.get('ml4t.backtest')
     vectorbt = trades_by_platform.get('vectorbt')
     backtrader = trades_by_platform.get('backtrader')
     zipline = trades_by_platform.get('zipline')
@@ -223,7 +223,7 @@ def _create_match_from_group(group: List[tuple[str, StandardTrade]]) -> TradeMat
         severity = 'critical'
 
     return TradeMatch(
-        backtest_trade=ml4t.backtest,
+        backtest_trade=backtest_trade,
         vectorbt_trade=vectorbt,
         backtrader_trade=backtrader,
         zipline_trade=zipline,

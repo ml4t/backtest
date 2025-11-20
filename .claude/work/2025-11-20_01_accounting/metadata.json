@@ -1,0 +1,60 @@
+{
+    "name": "2025-11-20_01_accounting",
+    "date": "2025-11-20",
+    "counter": "01",
+    "created_at": "2025-11-20T15:00:00Z",
+    "requirement_type": "description",
+    "requirement_source": "Build robust accounting logic",
+    "phase": "explored",
+    "status": "active",
+    "clarification": "Engine needs to handle both cash equities and margin accounts",
+    "external_review": ".claude/code_review/251120-01/gemini_01.md",
+    "critical_bug": "Engine executes with unlimited debt (99.4% difference vs VectorBT)",
+    "estimated_effort_hours": 12,
+    "estimated_duration_days": 3,
+    "phases": [
+        {
+            "name": "Phase 1: Accounting Infrastructure",
+            "hours": 3,
+            "tasks": [
+                "Create accounting package structure",
+                "Implement unified Position class",
+                "Create AccountPolicy interface",
+                "Implement CashAccountPolicy",
+                "Write unit tests for Position and CashAccountPolicy"
+            ]
+        },
+        {
+            "name": "Phase 2: Cash Account Integration",
+            "hours": 3,
+            "tasks": [
+                "Update Broker initialization",
+                "Integrate Gatekeeper validation",
+                "Add exit-first sequencing",
+                "Update 17 existing tests",
+                "Validate against VectorBT"
+            ]
+        },
+        {
+            "name": "Phase 3: Margin Account Support",
+            "hours": 4,
+            "tasks": [
+                "Implement MarginAccountPolicy",
+                "Add short selling support",
+                "Handle position reversals",
+                "Write margin-specific tests",
+                "Bankruptcy and Flipping tests"
+            ]
+        },
+        {
+            "name": "Phase 4: Documentation",
+            "hours": 2,
+            "tasks": [
+                "Update README with examples",
+                "Document margin calculations",
+                "Add architecture decision records",
+                "Final cleanup"
+            ]
+        }
+    ]
+}

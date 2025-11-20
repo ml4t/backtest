@@ -11,6 +11,12 @@ Note: The matcher is already validated end-to-end in Phase 1 (test_all_platforms
 These unit tests provide regression coverage and test edge cases in isolation.
 """
 
+import sys
+from pathlib import Path
+
+# Add validation directory to path
+sys.path.insert(0, str(Path(__file__).parent))
+
 import pytest
 from datetime import datetime, timedelta, timezone
 

@@ -1,24 +1,69 @@
-"""ml4t.backtest - A state-of-the-art event-driven backtesting engine.
+"""ml4t.backtest - Minimal event-driven backtesting engine.
 
-ml4t.backtest is designed for high-performance backtesting of machine learning-driven
-trading strategies with a focus on preventing data leakage and providing
-realistic market simulation.
+A clean, extensible backtesting engine with:
+- Multi-asset support
+- Polars-first data handling
+- Pluggable commission/slippage models
+- Same-bar and next-bar execution modes
+- Live trading compatible interface
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
-from ml4t.backtest.config import BacktestConfig
-from ml4t.backtest.core import Clock, Event
-from ml4t.backtest.data import DataFeed
-from ml4t.backtest.engine import BacktestEngine, BacktestResults
-from ml4t.backtest.strategy import Strategy
+# Import from modules
+from .types import (
+    OrderType,
+    OrderSide,
+    OrderStatus,
+    ExecutionMode,
+    Order,
+    Position,
+    Fill,
+    Trade,
+)
+from .models import (
+    CommissionModel,
+    SlippageModel,
+    NoCommission,
+    PercentageCommission,
+    PerShareCommission,
+    TieredCommission,
+    NoSlippage,
+    FixedSlippage,
+    PercentageSlippage,
+    VolumeShareSlippage,
+)
+from .datafeed import DataFeed
+from .broker import Broker
+from .strategy import Strategy
+from .engine import Engine, run_backtest, BacktestEngine
 
 __all__ = [
-    "BacktestConfig",
-    "BacktestEngine",
-    "BacktestResults",
-    "Clock",
+    # Types
+    "OrderType",
+    "OrderSide",
+    "OrderStatus",
+    "ExecutionMode",
+    "Order",
+    "Position",
+    "Fill",
+    "Trade",
+    # Models
+    "CommissionModel",
+    "SlippageModel",
+    "NoCommission",
+    "PercentageCommission",
+    "PerShareCommission",
+    "TieredCommission",
+    "NoSlippage",
+    "FixedSlippage",
+    "PercentageSlippage",
+    "VolumeShareSlippage",
+    # Core
     "DataFeed",
-    "Event",
+    "Broker",
     "Strategy",
+    "Engine",
+    "BacktestEngine",  # Backward compatibility alias
+    "run_backtest",
 ]

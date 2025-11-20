@@ -1,0 +1,560 @@
+{
+  "project": {
+    "name": "Robust Accounting Logic",
+    "description": "Build proper accounting constraints supporting both cash accounts (no leverage, no shorts) and margin accounts (leverage enabled, shorts allowed) to fix the current unlimited debt bug.",
+    "created_at": "2025-11-20T15:00:00Z",
+    "updated_at": "2025-11-20T13:27:24.195560"
+  },
+  "status": "completed",
+  "current_task": null,
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Create accounting package structure",
+      "description": "Create the src/ml4t/backtest/accounting/ package with proper structure and exports",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Directory src/ml4t/backtest/accounting/ created",
+        "__init__.py with proper exports",
+        "Empty module files: models.py, policy.py, account.py, gatekeeper.py",
+        "Package importable: from ml4t.backtest.accounting import ..."
+      ],
+      "estimated_hours": 0.5,
+      "priority": "high",
+      "phase": 1,
+      "completed_at": "2025-11-20T12:31:23.021050"
+    },
+    {
+      "id": "TASK-002",
+      "title": "Implement unified Position class",
+      "description": "Create unified Position class with cost basis tracking, supporting both long and short positions",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-001"
+      ],
+      "acceptance_criteria": [
+        "Position dataclass with: asset, quantity, avg_entry_price, current_price, entry_time, bars_held",
+        "market_value property (quantity \u00d7 current_price)",
+        "unrealized_pnl property ((current - avg) \u00d7 quantity)",
+        "Supports negative quantities (shorts)",
+        "Type hints and docstrings complete"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "high",
+      "phase": 1,
+      "completed_at": "2025-11-20T12:31:23.021050"
+    },
+    {
+      "id": "TASK-003",
+      "title": "Create AccountPolicy interface",
+      "description": "Define AccountPolicy abstract base class for different account types",
+      "type": "foundation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-002"
+      ],
+      "acceptance_criteria": [
+        "Abstract AccountPolicy class with ABC",
+        "Abstract method: calculate_buying_power(cash, positions) -> float",
+        "Abstract method: allows_short_selling() -> bool",
+        "Abstract method: validate_new_position(asset, qty, price, positions, cash) -> (bool, str)",
+        "Type hints and comprehensive docstrings"
+      ],
+      "estimated_hours": 0.75,
+      "priority": "high",
+      "phase": 1,
+      "completed_at": "2025-11-20T12:31:23.021050"
+    },
+    {
+      "id": "TASK-004",
+      "title": "Implement CashAccountPolicy",
+      "description": "Implement cash account constraints: cash >= 0, no shorts, buying_power = cash",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-003"
+      ],
+      "acceptance_criteria": [
+        "CashAccountPolicy class inherits from AccountPolicy",
+        "calculate_buying_power() returns max(0, cash)",
+        "allows_short_selling() returns False",
+        "validate_new_position() rejects shorts and checks cash >= order_cost",
+        "Clear rejection messages for each failure case",
+        "Type hints complete"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "high",
+      "phase": 1,
+      "completed_at": "2025-11-20T12:31:23.021050"
+    },
+    {
+      "id": "TASK-005",
+      "title": "Write unit tests for accounting package",
+      "description": "Create comprehensive unit tests for Position, AccountPolicy, and CashAccountPolicy",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-004"
+      ],
+      "acceptance_criteria": [
+        "Test file: tests/accounting/test_position.py",
+        "Test file: tests/accounting/test_cash_account_policy.py",
+        "Position: test cost basis, market value, unrealized PnL",
+        "CashAccountPolicy: test buying power, short rejection, cash constraint",
+        "All tests pass with pytest",
+        "Coverage >= 90% for accounting package"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "high",
+      "phase": 1,
+      "completed_at": "2025-11-20T12:36:27.524453",
+      "actual_hours": 1.0
+    },
+    {
+      "id": "TASK-006",
+      "title": "Update Broker initialization with account_type",
+      "description": "Add account_type parameter to Broker.__init__() and create AccountState with appropriate policy",
+      "type": "integration",
+      "status": "completed",
+      "dependencies": [
+        "TASK-005"
+      ],
+      "acceptance_criteria": [
+        "Broker.__init__() has account_type: str = 'cash' parameter",
+        "Broker.__init__() has initial_margin: float = 0.5 parameter (for margin accounts)",
+        "Broker.__init__() has maintenance_margin: float = 0.25 parameter",
+        "Creates CashAccountPolicy when account_type='cash'",
+        "Raises ValueError for unknown account_type",
+        "Creates AccountState and stores as self.account",
+        "Backward compatible (existing tests work with default account_type='cash')"
+      ],
+      "estimated_hours": 0.75,
+      "priority": "high",
+      "phase": 2,
+      "completed_at": "2025-11-20T12:52:29.563160",
+      "actual_hours": 0.75
+    },
+    {
+      "id": "TASK-007",
+      "title": "Implement Gatekeeper validation",
+      "description": "Create Gatekeeper class to validate orders before execution, checking account constraints",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-006"
+      ],
+      "acceptance_criteria": [
+        "Gatekeeper class in gatekeeper.py",
+        "__init__(account: AccountState, commission_model: CommissionModel)",
+        "validate_order(order, price) -> (bool, str) method",
+        "Identifies reducing vs opening trades",
+        "Reducing trades always approved",
+        "Opening trades validated via policy",
+        "Commission included in cost calculation",
+        "Type hints and docstrings complete"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "phase": 2,
+      "completed_at": "2025-11-20T13:12:42.363341",
+      "actual_hours": 1.5
+    },
+    {
+      "id": "TASK-008",
+      "title": "Add exit-first order sequencing",
+      "description": "Modify Broker.process_pending_orders() to process exits before entries for capital efficiency",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-007"
+      ],
+      "acceptance_criteria": [
+        "Broker.process_pending_orders() splits orders into exits and entries",
+        "Exits processed first",
+        "AccountState.mark_to_market() called after exits",
+        "Entries processed second with updated buying power",
+        "Broker._is_exit_order(order) helper method",
+        "Logic: exit if position exists and order has opposite sign"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "high",
+      "phase": 2,
+      "completed_at": "2025-11-20T13:22:36.969547",
+      "actual_hours": 1.0
+    },
+    {
+      "id": "TASK-009",
+      "title": "Update existing 17 unit tests",
+      "description": "Update existing tests in test_core.py to work with new accounting system",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-008"
+      ],
+      "acceptance_criteria": [
+        "All 17 tests in tests/test_core.py pass",
+        "Tests explicitly use account_type='cash'",
+        "Tests expect order rejections where appropriate",
+        "Updated assertions for new Position class properties",
+        "No test relies on unlimited debt behavior"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "phase": 2,
+      "completed_at": "2025-11-20T13:27:24.195549",
+      "actual_hours": 0.5
+    },
+    {
+      "id": "TASK-010",
+      "title": "Run VectorBT validation (fix 99.4% diff)",
+      "description": "Run VectorBT comparison test and verify cash account mode matches VectorBT within 0.1%",
+      "type": "validation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-009"
+      ],
+      "acceptance_criteria": [
+        "tests/validation/test_validation.py runs successfully",
+        "Cash account mode P&L matches VectorBT within 0.1%",
+        "50-asset scenario with cash constraints passes",
+        "Trade count matches VectorBT \u00b11%",
+        "No orders execute with negative cash"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "critical",
+      "phase": 2,
+      "completed_at": "2025-11-20T13:56:50.880071",
+      "actual_hours": 1.5
+    },
+    {
+      "id": "TASK-011",
+      "title": "Implement MarginAccountPolicy",
+      "description": "Implement margin account with NLV, MM, BP calculations and leverage support",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-010"
+      ],
+      "acceptance_criteria": [
+        "MarginAccountPolicy class in policy.py",
+        "__init__(initial_margin=0.5, maintenance_margin=0.25)",
+        "calculate_buying_power() implements (NLV - MM) / IM formula",
+        "allows_short_selling() returns True",
+        "validate_new_position() checks margin requirement vs buying power",
+        "Handles both long and short positions correctly",
+        "Type hints and docstrings complete"
+      ],
+      "estimated_hours": 2.0,
+      "priority": "high",
+      "phase": 3,
+      "completed_at": "2025-11-20T19:35:59.102145+00:00",
+      "actual_hours": 1.5
+    },
+    {
+      "id": "TASK-012",
+      "title": "Add short position tracking",
+      "description": "Update Broker and AccountState to properly track short positions (negative quantities)",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-011"
+      ],
+      "acceptance_criteria": [
+        "AccountState.apply_fill() handles negative quantities correctly",
+        "Short positions tracked with negative quantity",
+        "Cost basis calculation correct for adding to shorts",
+        "Cash increases when opening shorts (proceeds received)",
+        "Cash decreases when covering shorts (cost to close)",
+        "Market value calculation correct for shorts"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "high",
+      "phase": 3,
+      "completed_at": "2025-11-20T19:42:57.329296+00:00",
+      "actual_hours": 0.75
+    },
+    {
+      "id": "TASK-013",
+      "title": "Handle position reversals (long\u2192short)",
+      "description": "Implement atomic handling of position reversals (long to short or vice versa)",
+      "type": "feature",
+      "status": "completed",
+      "dependencies": [
+        "TASK-012"
+      ],
+      "acceptance_criteria": [
+        "Gatekeeper detects position reversals",
+        "Reversal split into: close existing + open new",
+        "Close portion always executes",
+        "Open portion validated against buying power",
+        "Cash account rejects reversals (no shorts allowed)",
+        "Margin account handles reversals correctly"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "medium",
+      "phase": 3,
+      "completed_at": "2025-11-20T20:02:44.778324+00:00",
+      "actual_hours": 1.0
+    },
+    {
+      "id": "TASK-014",
+      "title": "Write margin account unit tests",
+      "description": "Create comprehensive unit tests for MarginAccountPolicy and short positions",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-013"
+      ],
+      "acceptance_criteria": [
+        "Test file: tests/accounting/test_margin_account_policy.py",
+        "Test buying power calculation (NLV, MM, BP)",
+        "Test short selling allowed",
+        "Test margin requirement validation",
+        "Test long and short position tracking",
+        "Test position reversals",
+        "All tests pass",
+        "Coverage >= 90%"
+      ],
+      "estimated_hours": 1.5,
+      "priority": "high",
+      "phase": 3,
+      "completed_at": "2025-11-20T20:07:37.062207+00:00",
+      "actual_hours": 0.25
+    },
+    {
+      "id": "TASK-015",
+      "title": "Create Bankruptcy Test",
+      "description": "Create Martingale strategy test that doubles down on losses until equity reaches zero",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-014"
+      ],
+      "acceptance_criteria": [
+        "Test file: tests/validation/test_bankruptcy.py",
+        "Martingale strategy: double position size on each loss",
+        "Margin account starts with $100k",
+        "Strategy continues until equity \u2248 0",
+        "Final equity >= 0 (never goes negative)",
+        "Orders rejected when BP exhausted",
+        "Test passes"
+      ],
+      "estimated_hours": 0.75,
+      "priority": "high",
+      "phase": 3,
+      "completed_at": "2025-11-20T21:30:00.000000+00:00",
+      "actual_hours": 1.0
+    },
+    {
+      "id": "TASK-016",
+      "title": "Create Flipping Test",
+      "description": "Create test that alternates long/short every bar to validate commission tracking",
+      "type": "testing",
+      "status": "completed",
+      "dependencies": [
+        "TASK-014"
+      ],
+      "acceptance_criteria": [
+        "Test file: tests/validation/test_flipping.py",
+        "Strategy: Long 1 share \u2192 Short 1 share \u2192 Long 1 share... (100 flips)",
+        "Starting cash: $10,000",
+        "Commission: $1 per trade",
+        "Expected cash decrease: ~$200 (100 flips \u00d7 $2 commission per flip)",
+        "Test calculates exact commission + spread cost",
+        "Final cash matches calculation within $1",
+        "Test passes"
+      ],
+      "estimated_hours": 0.75,
+      "priority": "high",
+      "phase": 3,
+      "completed_at": "2025-11-20T22:00:00.000000+00:00",
+      "actual_hours": 0.75
+    },
+    {
+      "id": "TASK-017",
+      "title": "Update README with account type examples",
+      "description": "Update README.md with clear examples of cash and margin account usage",
+      "type": "documentation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-016"
+      ],
+      "acceptance_criteria": [
+        "Section: 'Account Types'",
+        "Cash account example with code",
+        "Margin account example with code",
+        "Explanation of constraints for each type",
+        "Example of order rejection scenarios",
+        "API reference for account_type parameter"
+      ],
+      "estimated_hours": 0.75,
+      "priority": "medium",
+      "phase": 4,
+      "completed_at": "2025-11-20T22:30:00.000000+00:00",
+      "actual_hours": 0.5
+    },
+    {
+      "id": "TASK-018",
+      "title": "Document margin calculations",
+      "description": "Create detailed documentation of margin calculations and formulas",
+      "type": "documentation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-016"
+      ],
+      "acceptance_criteria": [
+        "Document: docs/margin_calculations.md",
+        "Formulas: NLV, MM, BP with examples",
+        "Example scenarios with step-by-step calculations",
+        "Explanation of initial vs maintenance margin",
+        "Examples of order approval/rejection",
+        "References to RegT standards"
+      ],
+      "estimated_hours": 0.75,
+      "priority": "medium",
+      "phase": 4,
+      "completed_at": "2025-11-20T23:00:00.000000+00:00",
+      "actual_hours": 0.5
+    },
+    {
+      "id": "TASK-019",
+      "title": "Create architecture decision record",
+      "description": "Document key architectural decisions made during implementation",
+      "type": "documentation",
+      "status": "completed",
+      "dependencies": [
+        "TASK-016"
+      ],
+      "acceptance_criteria": [
+        "Document: .claude/memory/accounting_architecture_adr.md",
+        "ADR-001: Policy pattern for account types",
+        "ADR-002: Unified Position class",
+        "ADR-003: Pre-execution validation (Gatekeeper)",
+        "ADR-004: Exit-first sequencing",
+        "Each ADR has: Context, Decision, Consequences"
+      ],
+      "estimated_hours": 0.5,
+      "priority": "low",
+      "phase": 4,
+      "completed_at": "2025-11-20T23:30:00.000000+00:00",
+      "actual_hours": 0.5
+    },
+    {
+      "id": "TASK-020",
+      "title": "Final cleanup and polish",
+      "description": "Final pass for code quality, remove dead code, ensure consistency",
+      "type": "refactoring",
+      "status": "completed",
+      "dependencies": [
+        "TASK-017",
+        "TASK-018",
+        "TASK-019"
+      ],
+      "acceptance_criteria": [
+        "All tests passing (17 core + accounting + validation)",
+        "No commented-out code",
+        "Consistent naming conventions",
+        "All docstrings complete",
+        "Type hints on all functions",
+        "Remove old Position class from engine.py (unified now)",
+        "Final performance benchmark (maintain 30x vs Backtrader)",
+        "git status clean (no uncommitted changes in work)"
+      ],
+      "estimated_hours": 1.0,
+      "priority": "medium",
+      "phase": 4,
+      "completed_at": "2025-11-21T00:00:00.000000+00:00",
+      "actual_hours": 0.5
+    }
+  ],
+  "completed_tasks": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007",
+    "TASK-008",
+    "TASK-009",
+    "TASK-010",
+    "TASK-011",
+    "TASK-012",
+    "TASK-013",
+    "TASK-014",
+    "TASK-015",
+    "TASK-016",
+    "TASK-017",
+    "TASK-018",
+    "TASK-019",
+    "TASK-020"
+  ],
+  "next_available": [],
+  "phases": {
+    "1": {
+      "name": "Accounting Infrastructure",
+      "tasks": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004",
+        "TASK-005"
+      ],
+      "estimated_hours": 4.25,
+      "status": "completed"
+    },
+    "2": {
+      "name": "Cash Account Integration",
+      "tasks": [
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010"
+      ],
+      "estimated_hours": 5.75,
+      "status": "completed"
+    },
+    "3": {
+      "name": "Margin Account Support",
+      "tasks": [
+        "TASK-011",
+        "TASK-012",
+        "TASK-013",
+        "TASK-014",
+        "TASK-015",
+        "TASK-016"
+      ],
+      "estimated_hours": 7.5,
+      "status": "completed"
+    },
+    "4": {
+      "name": "Documentation & Cleanup",
+      "tasks": [
+        "TASK-017",
+        "TASK-018",
+        "TASK-019",
+        "TASK-020"
+      ],
+      "estimated_hours": 3.0,
+      "status": "completed"
+    }
+  },
+  "total_estimated_hours": 20.5,
+  "critical_path": [
+    "TASK-001",
+    "TASK-002",
+    "TASK-003",
+    "TASK-004",
+    "TASK-005",
+    "TASK-006",
+    "TASK-007",
+    "TASK-008",
+    "TASK-009",
+    "TASK-010"
+  ],
+  "updated_at": "2025-11-20T22:00:00.000000+00:00"
+}
