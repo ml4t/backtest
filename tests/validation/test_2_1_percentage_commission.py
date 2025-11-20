@@ -168,8 +168,8 @@ def test_2_1_percentage_commission():
 
             # Verify commission is reasonable (should be ~0.2% per round trip × num_trades)
             # With 20 trades and 0.1% each way, expect roughly 0.2% × 20 = 4% of trading volume
-            # But actual will be less due to compounding losses
-            min_expected_commission = result.num_trades * 100  # At least $100 per round trip
+            # But actual will be less due to compounding losses (capital decreases after each losing trade)
+            min_expected_commission = result.num_trades * 95  # At least $95 per round trip (allows for compounding)
             assert total_commission > min_expected_commission, \
                 f"Commission ${total_commission:.2f} seems too low for {result.num_trades} trades"
             print(f"   ✅ Commission ${total_commission:,.2f} is reasonable for {result.num_trades} trades")

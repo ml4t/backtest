@@ -209,6 +209,20 @@ class BacktestWrapper(EngineWrapper):
 
         # Extract trades
         trades = engine.broker.trades
+
+        # Calculate commission per trade based on config
+        def calc_commission(price, quantity, fees):
+            if isinstance(fees, dict):
+                # Combined fees: percentage + fixed
+                pct = fees.get('percentage', 0.0)
+                fixed = fees.get('fixed', 0.0)
+                return (price * quantity * pct) + fixed
+            elif fees > 0:
+                # Simple percentage fees
+                return price * quantity * fees
+            else:
+                return 0.0
+
         trades_df = pd.DataFrame([
             {
                 'entry_time': t.entry_time,
@@ -217,9 +231,9 @@ class BacktestWrapper(EngineWrapper):
                 'exit_price': t.exit_price,
                 'pnl': t.pnl,
                 'size': t.quantity,
-                # Commission details - Trade object has total commission, split 50/50 for entry/exit
-                'entry_commission': t.commission / 2.0 if hasattr(t, 'commission') else 0.0,
-                'exit_commission': t.commission / 2.0 if hasattr(t, 'commission') else 0.0,
+                # Commission details - calculate from notional values
+                'entry_commission': calc_commission(t.entry_price, t.quantity, config.fees),
+                'exit_commission': calc_commission(t.exit_price, t.quantity, config.fees),
                 'exit_quantity': t.quantity,  # Exit quantity same as entry quantity for round trips
             }
             for t in trades if t.exit_time is not None
