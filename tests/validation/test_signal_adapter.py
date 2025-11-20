@@ -10,6 +10,7 @@ from tests.validation.signals.generate import load_signal_set
 from tests.validation.frameworks.qengine_adapter import BacktestAdapter
 from tests.validation.frameworks.backtrader_adapter import BacktraderAdapter
 from tests.validation.frameworks.vectorbt_adapter import VectorBTAdapter
+from tests.validation.frameworks.base import FrameworkConfig
 
 
 def test_ml4t_backtest_adapter():
@@ -34,11 +35,16 @@ def test_ml4t_backtest_adapter():
     print("\n2. Running backtest with ml4t.backtest adapter...")
     adapter = BacktestAdapter()
 
+    config = FrameworkConfig(
+        initial_capital=10000.0,
+        commission_pct=0.001,
+        slippage_pct=0.0,
+    )
+
     result = adapter.run_with_signals(
         data=data,
         signals=signals,
-        initial_capital=10000.0,
-        commission_rate=0.001,
+        config=config,
     )
 
     # Display results
@@ -82,11 +88,16 @@ def test_backtrader_adapter():
     print("\n2. Running backtest with Backtrader adapter...")
     adapter = BacktraderAdapter()
 
+    config = FrameworkConfig(
+        initial_capital=10000.0,
+        commission_pct=0.001,
+        slippage_pct=0.0,
+    )
+
     result = adapter.run_with_signals(
         data=data,
         signals=signals,
-        initial_capital=10000.0,
-        commission_rate=0.001,
+        config=config,
     )
 
     # Display results
@@ -124,11 +135,16 @@ def test_vectorbt_adapter():
     print("\n2. Running backtest with VectorBT adapter...")
     adapter = VectorBTAdapter()
 
+    config = FrameworkConfig(
+        initial_capital=10000.0,
+        commission_pct=0.001,
+        slippage_pct=0.0,
+    )
+
     result = adapter.run_with_signals(
         data=data,
         signals=signals,
-        initial_capital=10000.0,
-        commission_rate=0.001,
+        config=config,
     )
 
     # Display results

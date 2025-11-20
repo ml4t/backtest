@@ -71,367 +71,172 @@ class BacktestWrapper(EngineWrapper):
         config: Optional[BacktestConfig] = None,
     ) -> BacktestResult:
         """Run ml4t.backtest backtest."""
-        from ml4t.backtest.engine import BacktestEngine
-        from ml4t.backtest.core.assets import AssetSpec, AssetRegistry
-        from ml4t.backtest.data.feed import DataFeed
-        from ml4t.backtest.strategy.base import Strategy
-        from ml4t.backtest.core.event import MarketEvent
-        from ml4t.backtest.execution.commission import PercentageCommission
-        from ml4t.backtest.execution.slippage import PercentageSlippage
+        # Import from new modular API
+        from ml4t.backtest import (
+            Engine,
+            DataFeed,
+            Strategy,
+            PercentageCommission,
+            NoCommission,
+            NoSlippage,
+            Order,
+            OrderType,
+            OrderSide,
+            ExecutionMode,
+        )
+        import polars as pl
 
         if config is None:
             config = BacktestConfig()
 
-        # Apply execution delay if configured (e.g., to match Zipline's next-day fills)
-        if config.execution_delay_days > 0:
-            # Shift signals forward by N days to execute later
-            entries = entries.shift(config.execution_delay_days, fill_value=False)
-            if exits is not None:
-                exits = exits.shift(config.execution_delay_days, fill_value=False)
+        # Convert OHLCV to Polars DataFrame for DataFeed
+        # Add asset column (single asset "BTC")
+        # Ensure timestamps are datetime objects, not pandas Timestamps
+        timestamps = [pd.Timestamp(ts).to_pydatetime() for ts in ohlcv.index]
 
-        # CRITICAL FIX: Align signals with OHLCV index
-        # Problem: signals DataFrame may have different index than ohlcv
-        # When using iloc[bar_idx], we need signals aligned by position with ohlcv rows
-        # Solution: Reindex signals to match ohlcv index exactly
-        entries_aligned = entries.reindex(ohlcv.index, fill_value=False)
-        exits_aligned = exits.reindex(ohlcv.index, fill_value=False) if exits is not None else None
+        prices_df = pl.DataFrame({
+            'timestamp': timestamps,
+            'asset': ['BTC'] * len(ohlcv),
+            'open': ohlcv['open'].values.astype(float),
+            'high': ohlcv['high'].values.astype(float),
+            'low': ohlcv['low'].values.astype(float),
+            'close': ohlcv['close'].values.astype(float),
+            'volume': ohlcv['volume'].values.astype(float),
+        })
 
-        # Create asset
-        from ml4t.backtest.core.assets import AssetClass
-        asset_spec = AssetSpec(
-            asset_id="BTC",
-            asset_class=AssetClass.CRYPTO,
-        )
-        registry = AssetRegistry()
-        registry.register(asset_spec)
-
-        # Create PrecisionManager for consistent rounding
-        precision_mgr = asset_spec.get_precision_manager()
+        # Convert signals to Polars DataFrame
+        signals_df = pl.DataFrame({
+            'timestamp': timestamps,
+            'asset': ['BTC'] * len(entries),
+            'entry': entries.values,
+            'exit': exits.values if exits is not None else [False] * len(entries),
+        })
 
         # Create strategy that trades on signals
         class SignalStrategy(Strategy):
-            def __init__(self, entries_ser, exits_ser, precision_mgr):
+            def __init__(self):
                 super().__init__()
-                self.entries = entries_ser
-                self.exits = exits_ser if exits_ser is not None else pd.Series([False] * len(entries_ser))
-                self.bar_idx = 0
-                self._order_counter = 0
-                self.precision_mgr = precision_mgr  # Store for use in calculations
 
-            def on_start(self, portfolio, event_bus):
-                super().on_start(portfolio, event_bus)
-                # Store references
-                self.portfolio = portfolio
-                self.event_bus = event_bus
+            def on_data(self, timestamp, data, context, broker):
+                # data is dict[asset, dict] with keys: open, high, low, close, volume, signals
+                asset_data = data.get('BTC', {})
+                signals = asset_data.get('signals', {})
 
-            def on_event(self, event):
-                """Handle non-market events only.
+                entry_signal = signals.get('entry', False)
+                exit_signal = signals.get('exit', False)
 
-                CRITICAL: Do NOT call on_market_event for MarketEvents here!
-                BacktestEngine calls BOTH on_market_event AND on_event for MarketEvents (engine.py:214-218)
-                If we call on_market_event here, it gets called TWICE per event, causing misalignment.
-                """
-                from ml4t.backtest.core.event import FillEvent
-
-                if isinstance(event, FillEvent):
-                    # Let base class update internal position tracking
-                    super().on_fill_event(event)
-                # Do nothing for MarketEvents - handled by on_market_event() directly
-
-            def on_market_event(self, event: MarketEvent, context: dict = None):
-                from ml4t.backtest.core.event import OrderEvent
-                from ml4t.backtest.core.types import OrderSide, OrderType
-
-                # Get signal for this bar
-                entry_signal = self.entries.iloc[self.bar_idx] if self.bar_idx < len(self.entries) else False
-                exit_signal = self.exits.iloc[self.bar_idx] if self.bar_idx < len(self.exits) else False
-
-                # Check current position from portfolio (updated by FillEvents)
-                # CRITICAL: Use portfolio.get_position() instead of self._positions
-                # because portfolio is updated directly by FillEvents with actual filled quantities
-                position = self.portfolio.get_position(event.asset_id)
+                # Get current position
+                position = broker.get_position('BTC')
                 current_qty = position.quantity if position else 0.0
 
-                # Exit logic: exit if signal and have position
-                # Use PrecisionManager to determine if position is effectively zero
-                if exit_signal and not self.precision_mgr.is_position_zero(current_qty):
-                    # Exit EXACTLY the quantity we actually hold in portfolio
-                    # This prevents position tracking mismatches with fixed fees/rounding
-                    self._order_counter += 1
-                    exit_qty = abs(current_qty)
+                # Exit logic (explicit exit signal OR new entry while holding position)
+                should_exit = (exit_signal and current_qty != 0) or (entry_signal and current_qty != 0)
 
-                    # Determine order type and limit price for exits
-                    if config.order_type == 'limit':
-                        # SELL LIMIT: Set limit 2% ABOVE market (sell higher)
-                        # BUY LIMIT (to cover short): Set limit 2% BELOW market (buy cheaper)
-                        if current_qty > 0:  # Long position -> SELL LIMIT
-                            limit_price = event.close * (1 + config.limit_offset)
-                        else:  # Short position -> BUY LIMIT
-                            limit_price = event.close * (1 - config.limit_offset)
-                        order_type = OrderType.LIMIT
-                    else:
-                        limit_price = None
-                        order_type = OrderType.MARKET
-
-                    order_event = OrderEvent(
-                        timestamp=event.timestamp,
-                        order_id=f"EXIT_{self._order_counter:04d}",
-                        asset_id=event.asset_id,
-                        order_type=order_type,
+                if should_exit:
+                    # Close position
+                    broker.submit_order(
+                        asset='BTC',
                         side=OrderSide.SELL if current_qty > 0 else OrderSide.BUY,
-                        quantity=exit_qty,
-                        limit_price=limit_price,
+                        quantity=abs(current_qty),
+                        order_type=OrderType.MARKET,
                     )
-                    self.event_bus.publish(order_event)
 
-                # Entry logic: enter only if flat (use portfolio position)
-                # Use PrecisionManager to determine if position is effectively zero
-                if entry_signal and self.precision_mgr.is_position_zero(current_qty):
-                    # Calculate position size (use all cash if size not specified)
+                # Entry logic
+                if entry_signal:
+                    # Calculate position size
                     if config.size is None:
-                        # Use all available cash, accounting for BOTH slippage and commission
-                        cash = self.portfolio.cash
-                        # CRITICAL FIX: Must account for slippage in position sizing
-                        # Actual fill price = market_price * (1 + slippage) for BUYs
-                        # Commission = filled_notional * commission_rate
-                        # Total cost = size * fill_price * (1 + commission_rate)
-                        #            = size * market_price * (1 + slippage) * (1 + commission)
+                        # Use all available cash
+                        cash = broker.cash
+                        price = asset_data.get('close')
 
-                        # Calculate effective price including slippage
-                        slippage_multiplier = 1.0 + config.slippage if config.slippage > 0 else 1.0
-                        effective_price = event.close * slippage_multiplier
+                        # Account for slippage and commission in sizing
+                        slippage_mult = 1.0 + config.slippage
+                        effective_price = price * slippage_mult
 
                         if isinstance(config.fees, dict):
-                            # Combined fees: solve for size in: cash = size * effective_price * (1 + pct) + fixed
-                            pct_rate = config.fees.get('percentage', 0.0)
-                            fixed_fee = config.fees.get('fixed', 0.0)
-                            # size = (cash - fixed) / (effective_price * (1 + pct))
-                            # TASK-019: Buffer (0.9999) still needed despite PrecisionManager integration
-                            # Root cause: Order sizing happens at signal generation (before fill),
-                            # but actual costs include additional rounding at execution time.
-                            # Buffer prevents "insufficient funds" errors from accumulated micro-differences.
-                            size_raw = (cash * 0.9999 - fixed_fee) / (effective_price * (1 + pct_rate))
-                            # Round DOWN to valid precision for this asset
-                            size = self.precision_mgr.round_quantity(size_raw)
+                            pct = config.fees.get('percentage', 0.0)
+                            fixed = config.fees.get('fixed', 0.0)
+                            size = (cash * 0.9999 - fixed) / (effective_price * (1 + pct))
                         elif config.fees > 0:
-                            # Percentage commission only
-                            # TASK-019: Buffer still needed (see combined fees comment above)
-                            size_raw = (cash * 0.9999) / (effective_price * (1 + config.fees))
-                            # Round DOWN to valid precision for this asset
-                            size = self.precision_mgr.round_quantity(size_raw)
+                            size = (cash * 0.9999) / (effective_price * (1 + config.fees))
                         else:
-                            # No fees, but may have slippage
-                            # TASK-019: Buffer still needed (see combined fees comment above)
-                            size_raw = (cash * 0.9999) / effective_price
-                            # Round DOWN to valid precision for this asset
-                            size = self.precision_mgr.round_quantity(size_raw)
+                            size = (cash * 0.9999) / effective_price
                     else:
                         size = config.size
 
-                    self._order_counter += 1
-
-                    # Determine order type and limit price for entries
-                    if config.order_type == 'limit':
-                        # BUY LIMIT: Set limit 2% BELOW market (buy cheaper)
-                        limit_price = event.close * (1 - config.limit_offset)
-                        order_type = OrderType.LIMIT
-                    else:
-                        limit_price = None
-                        order_type = OrderType.MARKET
-
-                    order_event = OrderEvent(
-                        timestamp=event.timestamp,
-                        order_id=f"ENTRY_{self._order_counter:04d}",
-                        asset_id=event.asset_id,
-                        order_type=order_type,
-                        side=OrderSide.BUY,
-                        quantity=size,
-                        limit_price=limit_price,
-                    )
-                    self.event_bus.publish(order_event)
-
-                self.bar_idx += 1
-
-        # Create data feed
-        class SimpleDataFeed(DataFeed):
-            def __init__(self, ohlcv_df):
-                self.ohlcv = ohlcv_df.reset_index()
-                self.idx = 0
-
-            @property
-            def is_exhausted(self) -> bool:
-                """Check if all data has been consumed."""
-                return self.idx >= len(self.ohlcv)
-
-            def get_next_event(self) -> MarketEvent:
-                """Get next market event."""
-                from ml4t.backtest.core.types import MarketDataType
-
-                if self.is_exhausted:
-                    return None
-
-                row = self.ohlcv.iloc[self.idx]
-                event = MarketEvent(
-                    timestamp=row['timestamp'],
-                    asset_id="BTC",
-                    data_type=MarketDataType.BAR,
-                    price=row['close'],
-                    open=row['open'],
-                    high=row['high'],
-                    low=row['low'],
-                    close=row['close'],
-                    volume=row['volume'],
-                )
-                self.idx += 1
-                return event
-
-            def peek_next_timestamp(self) -> datetime:
-                """Peek at timestamp of next event without consuming it."""
-                if self.is_exhausted:
-                    return None
-                return self.ohlcv.iloc[self.idx]['timestamp']
-
-            def reset(self):
-                """Reset to beginning."""
-                self.idx = 0
-
-            def seek(self, timestamp: datetime):
-                """Seek to specific timestamp."""
-                # Find first row with timestamp >= target
-                mask = self.ohlcv['timestamp'] >= timestamp
-                indices = mask[mask].index
-                if len(indices) > 0:
-                    self.idx = indices[0]
-                else:
-                    self.idx = len(self.ohlcv)
+                    if size > 0:
+                        broker.submit_order(
+                            asset='BTC',
+                            side=OrderSide.BUY,
+                            quantity=size,
+                            order_type=OrderType.MARKET,
+                        )
 
         # Create commission and slippage models
-        # IMPORTANT: Must pass NoCommission/NoSlippage instead of None to avoid FillSimulator defaults
-        from ml4t.backtest.execution.commission import NoCommission
-        from ml4t.backtest.execution.slippage import NoSlippage
-        # Import validation-specific VectorBT models
-        import sys
-        from pathlib import Path
-        tests_path = Path(__file__).parent.parent.parent
-        if str(tests_path) not in sys.path:
-            sys.path.insert(0, str(tests_path))
-        from validation.models import VectorBTCommission, VectorBTSlippage
-
-        # Handle combined fees (percentage + fixed) or simple percentage
         if isinstance(config.fees, dict):
-            # Combined fee model (percentage + fixed)
-            commission_model = VectorBTCommission(
-                fee_rate=config.fees.get('percentage', 0.0),
-                fixed_fee=config.fees.get('fixed', 0.0)
-            )
+            # Combined fee model not supported in new API - use percentage only
+            from ml4t.backtest import PerShareCommission
+            commission_model = PercentageCommission(rate=config.fees.get('percentage', 0.0))
         elif config.fees > 0:
-            # Simple percentage fee
             commission_model = PercentageCommission(rate=config.fees)
         else:
-            # No fees
             commission_model = NoCommission()
 
-        # Use VectorBTSlippage for validation (matches VectorBT's multiplicative formula)
-        slippage_model = VectorBTSlippage(slippage=config.slippage) if config.slippage > 0 else NoSlippage()
+        from ml4t.backtest import PercentageSlippage
+        slippage_model = PercentageSlippage(rate=config.slippage) if config.slippage > 0 else NoSlippage()
 
-        # Create broker with commission/slippage models
-        from ml4t.backtest.execution.broker import SimulationBroker
+        # Create DataFeed with prices and signals
+        feed = DataFeed(prices_df=prices_df, signals_df=signals_df)
 
-        # Configure execution timing based on execution_delay_days
-        # execution_delay=False: execution_delay_days=0 → Fill at SAME bar's close (Backtrader COC compat)
-        # execution_delay=True: execution_delay_days>0 → Fill at NEXT bar's open (realistic)
-        # Mapping: execution_delay_days=0 means "no delay" = same-bar fills
-        execution_delay_days = getattr(config, 'execution_delay_days', 1)  # Default to 1 (next-bar) for backward compat
-        execution_delay = execution_delay_days > 0
+        # Create strategy
+        strategy = SignalStrategy()
 
-        broker = SimulationBroker(
-            initial_cash=config.initial_cash,
-            asset_registry=registry,
-            commission_model=commission_model,
-            slippage_model=slippage_model,
-            execution_delay=execution_delay,
-        )
-
-        # Create strategy and data feed
-        # Use ALIGNED signals (reindexed to match ohlcv)
-        strategy = SignalStrategy(entries_aligned, exits_aligned, precision_mgr)
-        data_feed = SimpleDataFeed(ohlcv)
+        # Determine execution mode
+        execution_mode = ExecutionMode.NEXT_BAR if config.execution_delay_days > 0 else ExecutionMode.SAME_BAR
 
         # Run backtest
-        engine = BacktestEngine(
-            data_feed=data_feed,
+        engine = Engine(
+            feed=feed,
             strategy=strategy,
-            broker=broker,
-            initial_capital=config.initial_cash,
+            initial_cash=config.initial_cash,
+            commission_model=commission_model,
+            slippage_model=slippage_model,
+            execution_mode=execution_mode,
+            account_type='cash',  # Use cash account for validation
         )
 
         results = engine.run()
 
-        # Get round-trip trades from trade_tracker, not broker.get_trades()
-        # broker.get_trades() returns individual orders/fills
-        # trade_tracker.get_trades_df() returns entry/exit paired trades
-        trades = engine.broker.trade_tracker.get_trades_df()
-
-        # Optionally convert open positions to trade records
-        # By default (close_final_position=False), we do NOT auto-close positions
-        # because the framework should not make trading decisions
-        if config.close_final_position and engine.broker.trade_tracker.get_open_position_count() > 0:
-            # Get final timestamp and price
-            final_timestamp = ohlcv.index[-1]
-            final_price = ohlcv['close'].iloc[-1]
-
-            # Convert open positions to trade records
-            open_position_trades = engine.broker.trade_tracker.get_open_positions_as_trades(
-                current_timestamp=final_timestamp,
-                current_price=final_price
-            )
-
-            # Convert to DataFrame and append
-            if open_position_trades:
-                import polars as pl
-                # Convert to pandas directly to avoid Polars schema issues
-                open_trades_dicts = [t.to_dict() for t in open_position_trades]
-                open_trades_pd = pd.DataFrame(open_trades_dicts)
-
-                # Concatenate with existing trades
-                if len(trades) > 0:
-                    # Convert both to pandas for concatenation
-                    if hasattr(trades, 'to_pandas'):
-                        trades_pd = trades.to_pandas()
-                    else:
-                        trades_pd = trades
-                    trades = pd.concat([trades_pd, open_trades_pd], ignore_index=True)
-                else:
-                    trades = open_trades_pd
-
-        if hasattr(trades, 'to_pandas'):
-            # Convert Polars DataFrame to pandas
-            trades_df = trades.to_pandas()
-        else:
-            trades_df = trades
-
-        # Standardize column names to match expected format
-        # ml4t.backtest uses: entry_dt, exit_dt, entry_quantity, exit_quantity
-        # expected: entry_time, exit_time, size, pnl, entry_price, exit_price
-        if len(trades_df) > 0:
-            trades_df = trades_df.rename(columns={
-                'entry_dt': 'entry_time',
-                'exit_dt': 'exit_time',
-                'entry_quantity': 'size',
-            })
+        # Extract trades
+        trades = engine.broker.trades
+        trades_df = pd.DataFrame([
+            {
+                'entry_time': t.entry_time,
+                'entry_price': t.entry_price,
+                'exit_time': t.exit_time,
+                'exit_price': t.exit_price,
+                'pnl': t.pnl,
+                'size': t.quantity,
+                # Commission details - Trade object has total commission, split 50/50 for entry/exit
+                'entry_commission': t.commission / 2.0 if hasattr(t, 'commission') else 0.0,
+                'exit_commission': t.commission / 2.0 if hasattr(t, 'commission') else 0.0,
+                'exit_quantity': t.quantity,  # Exit quantity same as entry quantity for round trips
+            }
+            for t in trades if t.exit_time is not None
+        ])
 
         # Get final values from results
         final_value = results['final_value']
-        final_cash = engine.portfolio.cash
-        final_position = engine.portfolio.get_position("BTC")
-        final_price = ohlcv['close'].iloc[-1]
+        final_cash = engine.broker.cash
+        position = engine.broker.get_position('BTC')
+        final_position = position.quantity if position else 0.0
 
         return BacktestResult(
             trades=trades_df,
             final_value=final_value,
             final_cash=final_cash,
             final_position=final_position,
-            total_pnl=results['total_return'] / 100 * config.initial_cash,  # Convert percentage to dollar PnL
+            total_pnl=results['total_return'] * config.initial_cash,  # Convert ratio to dollars
             num_trades=len(trades_df),
             engine_name='ml4t.backtest',
         )
