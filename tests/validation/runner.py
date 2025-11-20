@@ -60,7 +60,7 @@ class ScenarioRunner:
             raise ValueError(f"No Scenario class found in module {scenario_module}")
         self.scenario_class = scenario_classes[0]
 
-    def run_ml4t.backtest(self) -> PlatformResult:
+    def run_backtest(self) -> PlatformResult:
         """Run scenario on ml4t.backtest."""
         print(f"  🔧 Running ml4t.backtest...")
         start = datetime.now()
@@ -551,7 +551,7 @@ class ScenarioRunner:
 
         for platform in platforms:
             if platform == 'ml4t.backtest':
-                results[platform] = self.run_ml4t.backtest()
+                results[platform] = self.run_backtest()
             elif platform == 'vectorbt':
                 results[platform] = self.run_vectorbt()
             elif platform == 'backtrader':
