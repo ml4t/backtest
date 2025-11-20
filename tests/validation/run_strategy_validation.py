@@ -65,7 +65,7 @@ def load_test_data() -> pd.DataFrame:
     raise FileNotFoundError(f"Wiki data not found at {wiki_path}")
 
 
-def execute_with_ml4t.backtest(
+def execute_with_backtest(
     data: pd.DataFrame,
     signals: pd.DataFrame,
     initial_capital: float,
@@ -441,7 +441,7 @@ def validate_strategy(
 
     # ml4t.backtest
     print("   Running ml4t.backtest...")
-    qe_result = execute_with_ml4t.backtest(data, signals, initial_capital)
+    qe_result = execute_with_backtest(data, signals, initial_capital)
     results.append(qe_result)
     print(f"      Final value: ${qe_result.final_value:,.2f} | Trades: {qe_result.num_trades}")
 

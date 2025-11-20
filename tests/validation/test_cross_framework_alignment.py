@@ -586,8 +586,8 @@ class TestCrossFrameworkAlignment:
 
         # ml4t.backtest
         print("Running ml4t.backtest...")
-        ml4t.backtest_adapter = BacktestAdapter()
-        ml4t.backtest_result = ml4t.backtest_adapter.run_with_signals(
+        backtest_adapter = BacktestAdapter()
+        backtest_result = backtest_adapter.run_with_signals(
             data=test_data,
             signals=signals,
             initial_capital=initial_capital,
@@ -605,11 +605,11 @@ class TestCrossFrameworkAlignment:
         print(f"COMPARISON")
         print(f"{'=' * 80}")
         print(f"ml4t.backtest:")
-        print(f"  Final Value: ${ml4t.backtest_result.final_value:,.2f}")
-        print(f"  Return: {ml4t.backtest_result.total_return:.2f}%")
-        print(f"  Trades: {ml4t.backtest_result.num_trades}")
+        print(f"  Final Value: ${backtest_result.final_value:,.2f}")
+        print(f"  Return: {backtest_result.total_return:.2f}%")
+        print(f"  Trades: {backtest_result.num_trades}")
         print(f"  Trade Details:")
-        for i, trade in enumerate(ml4t.backtest_result.trades):
+        for i, trade in enumerate(backtest_result.trades):
             print(f"    {i+1}. {trade.timestamp.date()} {trade.action} {trade.quantity:.2f} @ ${trade.price:.2f} = ${trade.value:.2f}")
 
         print(f"\nZipline:")
@@ -617,13 +617,13 @@ class TestCrossFrameworkAlignment:
         print(f"  Return: {zipline_result.total_return:.2f}%")
         print(f"  Trades: {zipline_result.num_trades}")
 
-        variance_pct = abs(ml4t.backtest_result.final_value - zipline_result.final_value) / initial_capital * 100
-        print(f"\nVariance: ${abs(ml4t.backtest_result.final_value - zipline_result.final_value):,.2f} ({variance_pct:.4f}%)")
+        variance_pct = abs(backtest_result.final_value - zipline_result.final_value) / initial_capital * 100
+        print(f"\nVariance: ${abs(backtest_result.final_value - zipline_result.final_value):,.2f} ({variance_pct:.4f}%)")
         print(f"{'=' * 80}\n")
 
         # Allow up to 0.5% variance for execution differences
         assert variance_pct < 0.5, \
-            f"Zipline variance too high: {variance_pct:.4f}% (ml4t.backtest: ${ml4t.backtest_result.final_value:,.2f}, Zipline: ${zipline_result.final_value:,.2f})"
+            f"Zipline variance too high: {variance_pct:.4f}% (ml4t.backtest: ${backtest_result.final_value:,.2f}, Zipline: ${zipline_result.final_value:,.2f})"
 
 
 @pytest.mark.integration
