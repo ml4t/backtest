@@ -1,7 +1,7 @@
 """Platform adapters for cross-platform validation."""
 from .backtrader_adapter import BacktraderAdapter
 from .base import BacktestResult, PlatformAdapter, Trade
-from .ml4t.backtest_adapter import BacktestAdapter
+from .qengine_adapter import BacktestAdapter
 from .vectorbt_adapter import VectorBTFreeAdapter, VectorBTProAdapter
 from .zipline_adapter import ZiplineAdapter
 

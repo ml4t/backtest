@@ -199,7 +199,7 @@ def generate_summary_report(matches: List[TradeMatch]) -> str:
     platform_counts = {p: 0 for p in platforms}
 
     for match in matches:
-        if match.ml4t.backtest_trade:
+        if match.backtest_trade:
             platform_counts['ml4t.backtest'] += 1
         if match.vectorbt_trade:
             platform_counts['vectorbt'] += 1
