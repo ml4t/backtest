@@ -26,7 +26,7 @@ from pathlib import Path
 
 # Add validation directory to path for fixtures
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from tests.validation.fixtures.market_data import get_ticker_data
+from fixtures.market_data import get_ticker_data
 
 
 @dataclass

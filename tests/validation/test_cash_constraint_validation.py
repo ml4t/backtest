@@ -93,10 +93,8 @@ def run_engine_cash_account(
     initial_cash: float,
 ) -> dict:
     """Run engine with cash account constraints."""
-    from ml4t.backtest.engine import (
-        Strategy, Broker, DataFeed, Engine,
-        NoCommission, NoSlippage, OrderSide
-    )
+    from ml4t.backtest.engine import Strategy, Broker, DataFeed, Engine, OrderSide
+    from ml4t.backtest.models import NoCommission, NoSlippage
 
     class SimpleSignalStrategy(Strategy):
         """Simple strategy that allocates equal cash to each signal."""
