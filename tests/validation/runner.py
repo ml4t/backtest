@@ -67,14 +67,12 @@ class ScenarioRunner:
 
         try:
             # Import ml4t.backtest components
-            from ml4t.backtest.engine import BacktestEngine
-            from ml4t.backtest.strategy.base import Strategy
-            from ml4t.backtest.execution.broker import SimulationBroker
-            from ml4t.backtest.execution.commission import PercentageCommission
-            from ml4t.backtest.execution.order import Order
-            from ml4t.backtest.core.types import OrderType, OrderSide, EventType, MarketDataType
-            from ml4t.backtest.core.event import MarketEvent
-            from ml4t.backtest.data.feed import DataFeed
+            from ml4t.backtest.engine import Engine
+            from ml4t.backtest.strategy import Strategy
+            from ml4t.backtest.broker import Broker
+            from ml4t.backtest.models import PercentageCommission
+            from ml4t.backtest.types import OrderType, OrderSide
+            from ml4t.backtest.datafeed import DataFeed
 
             # Get data and signals
             data = self.scenario_class.get_data()
