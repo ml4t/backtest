@@ -906,7 +906,7 @@ class TestEngineValidation:
         """Test that VectorBT runs successfully."""
         _, prices_pd, signals_pl = test_data
 
-        result = run_vectorbt(
+        result = run_vectorbt_oss(
             prices_pd, signals_pl,
             self.INITIAL_CASH,
             self.COMMISSION_RATE,

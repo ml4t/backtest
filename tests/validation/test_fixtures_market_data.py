@@ -72,7 +72,7 @@ class TestLoadWikiPrices:
         """Test error handling when wiki_prices.parquet is missing."""
         # Mock WIKI_PRICES_PATH to non-existent location
         monkeypatch.setattr(
-            'fixtures.market_data.WIKI_PRICES_PATH',
+            'tests.validation.fixtures.market_data.WIKI_PRICES_PATH',
             Path('/nonexistent/path/wiki_prices.parquet')
         )
 

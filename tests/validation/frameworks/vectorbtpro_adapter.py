@@ -201,6 +201,112 @@ class VectorBTProAdapter(BaseFrameworkAdapter):
 
         return result
 
+    def run_with_signals(
+        self,
+        data: pd.DataFrame,
+        signals: pd.DataFrame,
+        config: "FrameworkConfig | None" = None,
+    ) -> ValidationResult:
+        """Run backtest with pre-computed signals."""
+        from .base import FrameworkConfig
+
+        # Validate inputs
+        self.validate_data(data)
+        self.validate_signals(signals, data)
+
+        # Use default config if none provided
+        if config is None:
+            config = FrameworkConfig.realistic()
+
+        result = ValidationResult(
+            framework=self.framework_name if self.is_pro else "VectorBT",
+            strategy="PrecomputedSignals",
+            initial_capital=config.initial_capital,
+        )
+
+        try:
+            vbt = self.vbt
+            tracemalloc.start()
+            start_time = time.time()
+
+            # Extract signals
+            entries = signals["entry"]
+            exits = signals["exit"]
+
+            print(f"VectorBT{'Pro' if self.is_pro else ''} signals: {entries.sum()} entries, {exits.sum()} exits")
+
+            # Create portfolio
+            close_prices = data["close"]
+
+            # Map config to VectorBT parameters
+            fees = config.commission_pct if config.commission_pct > 0 else 0.0
+            slippage = config.slippage_pct if config.slippage_pct > 0 else 0.0
+
+            pf = vbt.Portfolio.from_signals(
+                close_prices,
+                entries=entries,
+                exits=exits,
+                init_cash=config.initial_capital,
+                fees=fees,
+                slippage=slippage,
+                freq="D",
+            )
+
+            # Extract results (same as run_backtest)
+            result.final_value = (
+                float(pf.final_value()) if callable(pf.final_value) else float(pf.final_value)
+            )
+            result.total_return = (
+                float(pf.total_return()) * 100
+                if callable(pf.total_return)
+                else float(pf.total_return) * 100
+            )
+
+            # Get trade count
+            if hasattr(pf, "orders") and hasattr(pf.orders, "records"):
+                result.num_trades = len(pf.orders.records)
+            elif hasattr(pf, "orders"):
+                result.num_trades = len(pf.orders)
+            else:
+                result.num_trades = 0
+
+            # Performance metrics
+            try:
+                result.sharpe_ratio = (
+                    float(pf.sharpe_ratio())
+                    if callable(pf.sharpe_ratio)
+                    else float(pf.sharpe_ratio)
+                )
+            except:
+                result.sharpe_ratio = 0.0
+
+            try:
+                result.max_drawdown = (
+                    float(pf.max_drawdown()) * 100
+                    if callable(pf.max_drawdown)
+                    else float(pf.max_drawdown) * 100
+                )
+            except:
+                result.max_drawdown = 0.0
+
+            # Performance tracking
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            result.execution_time = time.time() - start_time
+            result.memory_usage = peak / 1024 / 1024
+
+            print(f"✓ VectorBT{'Pro' if self.is_pro else ''} backtest completed")
+            print(f"  Final Value: ${result.final_value:,.2f}")
+            print(f"  Total Return: {result.total_return:.2f}%")
+            print(f"  Total Trades: {result.num_trades}")
+
+        except Exception as e:
+            error_msg = f"VectorBT{'Pro' if self.is_pro else ''} backtest with signals failed: {e}"
+            print(f"✗ {error_msg}")
+            result.errors.append(error_msg)
+
+        return result
+
     def _run_ma_crossover(self, data: pd.DataFrame, params: dict) -> tuple:
         """Run MA crossover strategy."""
         vbt = self.vbt
