@@ -111,6 +111,49 @@ def generate_random_signals(
     return entries, exits
 
 
+def generate_exit_on_next_entry(entries: pd.Series, close_final: bool = True) -> pd.Series:
+    """
+    Generate exit signals one bar before each subsequent entry.
+
+    This creates explicit exit signals that simulate "hold until next entry" behavior
+    in a framework-agnostic way. Each entry triggers an exit one bar before the next
+    entry signal.
+
+    This approach avoids VectorBT's conflict resolution issues where simultaneous
+    exit+entry signals on the same bar cannot both be executed.
+
+    Args:
+        entries: Boolean series with True at entry signals
+        close_final: If True, add exit signal at final bar to close last position
+
+    Returns:
+        Boolean series with True at exit signals (one bar before each subsequent entry,
+        plus optionally at the final bar)
+
+    Example:
+        >>> entries = pd.Series([False, True, False, False, True, False])
+        >>> exits = generate_exit_on_next_entry(entries, close_final=True)
+        >>> # exits = [False, False, False, True, False, True]
+        >>> # Exit at index 3 (one bar before second entry at index 4)
+        >>> # Exit at index 5 (close final position)
+    """
+    exits = pd.Series([False] * len(entries), index=entries.index)
+    entry_indices = entries[entries].index.tolist()
+
+    # For each entry after the first, place exit one bar before
+    for i in range(1, len(entry_indices)):
+        entry_time = entry_indices[i]
+        idx_pos = entries.index.get_loc(entry_time)
+        if idx_pos > 0:
+            exits.iloc[idx_pos - 1] = True
+
+    # Optionally close the final position at the last bar
+    if close_final and len(entry_indices) > 0:
+        exits.iloc[-1] = True
+
+    return exits
+
+
 def validate_signals(
     entries: pd.Series,
     exits: pd.Series,

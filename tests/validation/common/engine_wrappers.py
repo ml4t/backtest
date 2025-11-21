@@ -129,8 +129,8 @@ class BacktestWrapper(EngineWrapper):
                 position = broker.get_position('BTC')
                 current_qty = position.quantity if position else 0.0
 
-                # Exit logic (explicit exit signal OR new entry while holding position)
-                should_exit = (exit_signal and current_qty != 0) or (entry_signal and current_qty != 0)
+                # Exit logic (only on explicit exit signal - matches VectorBT/Backtrader behavior)
+                should_exit = exit_signal and current_qty != 0
 
                 if should_exit:
                     # Close position
@@ -174,9 +174,12 @@ class BacktestWrapper(EngineWrapper):
 
         # Create commission and slippage models
         if isinstance(config.fees, dict):
-            # Combined fee model not supported in new API - use percentage only
-            from ml4t.backtest import PerShareCommission
-            commission_model = PercentageCommission(rate=config.fees.get('percentage', 0.0))
+            # Combined percentage + fixed fee model
+            from ml4t.backtest import CombinedCommission
+            commission_model = CombinedCommission(
+                percentage=config.fees.get('percentage', 0.0),
+                fixed=config.fees.get('fixed', 0.0),
+            )
         elif config.fees > 0:
             commission_model = PercentageCommission(rate=config.fees)
         else:
@@ -275,15 +278,21 @@ class VectorBTWrapper(EngineWrapper):
         if config is None:
             config = BacktestConfig()
 
+        # Validate signal length matches OHLCV length
+        assert len(entries) == len(ohlcv), \
+            f"Signal length ({len(entries)}) must match OHLCV length ({len(ohlcv)})"
+
         # Align signals with OHLCV index
         # entries and exits come with integer index, need to map to datetime index
         entries_aligned = pd.Series(entries.values, index=ohlcv.index)
 
         if exits is not None:
+            assert len(exits) == len(ohlcv), \
+                f"Exit signal length ({len(exits)}) must match OHLCV length ({len(ohlcv)})"
             exits_aligned = pd.Series(exits.values, index=ohlcv.index)
         else:
-            # No exits - let VectorBT handle (will exit on next entry)
-            exits_aligned = None
+            # No explicit exits: just pass empty exits (matches standard behavior)
+            exits_aligned = pd.Series([False] * len(entries_aligned), index=ohlcv.index)
 
         # Run portfolio simulation
         size = np.inf if config.size is None else config.size
@@ -298,7 +307,8 @@ class VectorBTWrapper(EngineWrapper):
             percentage_fees = config.fees
             fixed_fees = 0.0
 
-        pf = vbt.Portfolio.from_signals(
+        # Build kwargs for Portfolio.from_signals
+        pf_kwargs = dict(
             close=ohlcv['close'],
             open=ohlcv['open'],
             high=ohlcv['high'],
@@ -312,6 +322,8 @@ class VectorBTWrapper(EngineWrapper):
             slippage=config.slippage,
             freq='1min',
         )
+
+        pf = vbt.Portfolio.from_signals(**pf_kwargs)
 
         # Extract trades
         trades = pf.trades.records_readable

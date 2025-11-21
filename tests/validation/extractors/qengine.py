@@ -38,11 +38,18 @@ def extract_backtest_trades(results: dict[str, Any], data: pl.DataFrame) -> List
         ...     print(f"{trade.entry_timestamp} -> {trade.exit_timestamp}: ${trade.net_pnl:.2f}")
     """
     trades = results.get('trades')
-    if not trades:
+    if trades is None:
         return []
+
+    # Handle Polars DataFrame (old API or empty DataFrame)
+    if isinstance(trades, pl.DataFrame):
+        if trades.is_empty():
+            return []
 
     # Handle new API: list of Trade objects (already complete trades)
     if isinstance(trades, list):
+        if len(trades) == 0:
+            return []
         from ml4t.backtest.types import Trade
 
         standard_trades = []

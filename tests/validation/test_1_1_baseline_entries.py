@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import (
     load_real_crypto_data,
     generate_fixed_entries,
+    generate_exit_on_next_entry,
     BacktestConfig,
     BacktestWrapper,
     VectorBTWrapper,
@@ -55,7 +56,9 @@ def test_1_1_baseline_entries():
     # 2. Generate signals
     print("\n2️⃣  Generating fixed entry signals (every 50 bars)...")
     entries = generate_fixed_entries(n_bars=1000, entry_every=50, start_offset=10)
+    exits = generate_exit_on_next_entry(entries)
     print(f"   ✅ Generated {entries.sum()} entry signals")
+    print(f"   ✅ Generated {exits.sum()} exit signals (one bar before each subsequent entry)")
     print(f"   📍 First 5 entry indices: {entries[entries].index[:5].tolist()}")
 
     # 3. Configuration (same for all engines)
@@ -79,7 +82,7 @@ def test_1_1_baseline_entries():
     print("   🔧 Running ml4t.backtest...")
     try:
         wrapper = BacktestWrapper()
-        results['ml4t.backtest'] = wrapper.run_backtest(ohlcv, entries, exits=None, config=config)
+        results['ml4t.backtest'] = wrapper.run_backtest(ohlcv, entries, exits=exits, config=config)
         print(f"      ✅ Complete: {results['ml4t.backtest'].num_trades} trades")
     except Exception as e:
         print(f"      ❌ Failed: {e}")
@@ -90,7 +93,7 @@ def test_1_1_baseline_entries():
     print("   🔧 Running VectorBT...")
     try:
         vbt = VectorBTWrapper()
-        results['VectorBT'] = vbt.run_backtest(ohlcv, entries, exits=None, config=config)
+        results['VectorBT'] = vbt.run_backtest(ohlcv, entries, exits=exits, config=config)
         print(f"      ✅ Complete: {results['VectorBT'].num_trades} trades")
     except ImportError:
         print("      ⚠️  VectorBT Pro not installed, skipping")

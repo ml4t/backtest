@@ -42,7 +42,7 @@ class TestExtractorEdgeCases:
 
     def test_backtest_empty_results(self):
         """Test ml4t.backtest extractor handles empty results."""
-        from extractors.qengine import extract_backtest_trades
+        from tests.validation.extractors.qengine import extract_backtest_trades
         import polars as pl
 
         # Empty results
@@ -54,7 +54,7 @@ class TestExtractorEdgeCases:
 
     def test_backtest_missing_trades_key(self):
         """Test ml4t.backtest extractor handles missing 'trades' key."""
-        from extractors.qengine import extract_backtest_trades
+        from tests.validation.extractors.qengine import extract_backtest_trades
         import polars as pl
 
         results = {}  # No 'trades' key

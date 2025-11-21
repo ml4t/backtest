@@ -2,14 +2,13 @@
 Integration test for all 4 platforms on scenario 001 (simple market orders).
 
 This test validates that ml4t.backtest, VectorBT, Backtrader, and Zipline all successfully
-execute the scenario and produce comparable results with expected differences.
+execute the scenario and produce comparable results.
 
 Expected Results:
 - All 4 platforms execute successfully
 - Each platform extracts 2 trades
-- 6 total trade groups matched (different execution models)
-- 4 perfect matches
-- 2 minor differences (Backtrader uses OPEN, others use CLOSE)
+- 6 total trade groups matched
+- 6 perfect matches (all frameworks aligned)
 """
 
 import subprocess
@@ -63,17 +62,13 @@ def test_all_platforms_scenario_001():
     # Should match 6 trade groups
     assert "Matched 6 trade groups" in output
 
-    # Should have 4 perfect matches and 2 minor differences
-    assert "Perfect matches:     4" in output
-    assert "Minor differences:   2" in output
+    # All 6 should be perfect matches
+    assert "Perfect matches:     6" in output
+    assert "Minor differences:   0" in output
 
     # No major or critical differences expected
     assert "Major differences:   0" in output
     assert "Critical differences: 0" in output
-
-    # Expected differences should be documented
-    assert "Entry uses different OHLC components" in output
-    assert "Entry prices vary by" in output
 
 
 def test_platform_execution_models():

@@ -58,6 +58,17 @@ class TieredCommission:
         return value * self.tiers[-1][1]
 
 
+class CombinedCommission:
+    """Combined percentage + fixed commission per trade."""
+    def __init__(self, percentage: float = 0.0, fixed: float = 0.0):
+        self.percentage = percentage
+        self.fixed = fixed
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        value = abs(quantity * price)
+        return value * self.percentage + self.fixed
+
+
 # === Slippage Models ===
 
 class NoSlippage:
@@ -76,12 +87,14 @@ class FixedSlippage:
 
 
 class PercentageSlippage:
-    """Slippage as percentage of price."""
+    """Slippage as percentage of price (per-unit price adjustment)."""
     def __init__(self, rate: float = 0.001):
         self.rate = rate
 
     def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
-        return abs(quantity * price * self.rate)
+        # Return per-unit price adjustment (not total dollars)
+        # Broker adds this to fill price: fill = base_price ± slippage
+        return price * self.rate
 
 
 class VolumeShareSlippage:
@@ -94,4 +107,5 @@ class VolumeShareSlippage:
             return 0.0
         volume_fraction = abs(quantity) / volume
         impact = volume_fraction * self.impact_factor
-        return abs(quantity * price * impact)
+        # Return per-unit price adjustment (not total dollars)
+        return price * impact
