@@ -554,30 +554,26 @@ class VectorBTAdapter(BaseFrameworkAdapter):
             print(f"  Entry signals: {num_entry_signals}")
             print(f"  Exit signals: {num_exit_signals}")
 
-            # Calculate position sizes for equal weighting
             # For Top-5 strategy, each position should be 20% of portfolio
+            # Use percentage-based sizing for dynamic position sizing like Backtrader/ml4t.backtest
             target_pct_per_position = 0.20
-            portfolio_value = config.initial_capital
-
-            # VectorBT Pro 'size' parameter can be:
-            # - Scalar: fixed shares
-            # - Series/DataFrame: varies by time/asset
-            # For equal weighting, calculate shares based on target percentage
-            # size_shares[timestamp, symbol] = (target_pct * portfolio_value) / price
-            size_shares = (target_pct_per_position * portfolio_value) / prices
 
             # Create portfolio using from_signals with multi-asset configuration
+            # Use size_type='percent' for percentage of available cash
+            # Note: 'percent' uses % of current cash, not portfolio value
             pf = vbt.Portfolio.from_signals(
                 prices,  # DataFrame with all symbols
                 entries=entries,
                 exits=exits,
-                size=size_shares,  # Equal weight sizing
+                size=target_pct_per_position,  # 20% of cash per position
+                size_type='percent',  # Percentage of available cash (supported by OSS VectorBT)
                 init_cash=config.initial_capital,
                 fees=config.commission_pct,  # Commission rate
                 slippage=config.slippage_pct,  # Slippage percentage
                 freq="D",
                 group_by=True,  # Treat all columns as one portfolio
                 cash_sharing=True,  # Share cash across all assets
+                accumulate=config.vectorbt_accumulate,  # Prevent same-bar re-entry (matches Backtrader)
             )
 
             # Extract results using robust API handling

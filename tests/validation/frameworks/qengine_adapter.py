@@ -457,7 +457,6 @@ class BacktestAdapter(BaseFrameworkAdapter):
             PercentageSlippage,
             NoCommission,
             NoSlippage,
-            Order,
             OrderType,
             OrderSide,
             ExecutionMode,
@@ -477,47 +476,76 @@ class BacktestAdapter(BaseFrameworkAdapter):
             tracemalloc.start()
             start_time = time.time()
 
-            # Convert signals to dict for fast lookup
-            signal_dict = {}
-            for _, row in signals.iterrows():
-                key = (pd.Timestamp(row['timestamp']), row['symbol'])
-                signal_dict[key] = row['signal']
+            # Convert multi-asset data dict to Polars DataFrame for DataFeed
+            # Format: timestamp, asset, open, high, low, close, volume
+            price_records = []
+            for symbol, ohlcv in data.items():
+                for idx in range(len(ohlcv)):
+                    row = ohlcv.iloc[idx]
+                    ts = row.name
+                    # Convert to Python datetime if needed
+                    if hasattr(ts, 'to_pydatetime'):
+                        ts = ts.to_pydatetime()
+                    price_records.append({
+                        'timestamp': ts,
+                        'asset': symbol,
+                        'open': float(row['open']),
+                        'high': float(row['high']),
+                        'low': float(row['low']),
+                        'close': float(row['close']),
+                        'volume': float(row['volume']),
+                    })
 
-            # Strategy class matching Backtrader logic EXACTLY
+            prices_df = pl.DataFrame(price_records)
+
+            # Convert signals DataFrame to Polars signals DataFrame
+            # Input format: timestamp, symbol, signal (1=BUY, -1=SELL)
+            # Output format: timestamp, asset, entry (bool), exit (bool)
+            signal_records = []
+            for _, row in signals.iterrows():
+                ts = row['timestamp']
+                if hasattr(ts, 'to_pydatetime'):
+                    ts = ts.to_pydatetime()
+                signal_records.append({
+                    'timestamp': ts,
+                    'asset': row['symbol'],
+                    'entry': row['signal'] == 1,
+                    'exit': row['signal'] == -1,
+                })
+
+            signals_df = pl.DataFrame(signal_records)
+
+            print(f"\nml4t.backtest multi-asset setup:")
+            print(f"  Prices shape: ({len(prices_df)}, {len(prices_df.columns)})")
+            print(f"  Entry signals: {signals_df['entry'].sum()}")
+            print(f"  Exit signals: {signals_df['exit'].sum()}")
+
+            # Strategy class matching Backtrader logic
             class RotationStrategy(Strategy):
-                def __init__(self, signals_dict, target_pct=0.20):
+                def __init__(self, target_pct=0.20):
                     super().__init__()
-                    self.signals_dict = signals_dict
                     self.target_pct = target_pct
-                    self.pending_orders = {}  # Track pending orders by symbol (CRITICAL)
 
                 def on_data(self, timestamp, data, context, broker):
-                    """New callback-based API."""
-                    # Process each asset's data
+                    """Process signals for all assets at this timestamp."""
                     for symbol, asset_data in data.items():
-                        # Check if we have a signal for this timestamp+symbol
-                        key = (pd.Timestamp(timestamp), symbol)
-                        if key not in self.signals_dict:
-                            continue
-
-                        signal_value = self.signals_dict[key]
+                        signals = asset_data.get('signals', {})
+                        entry_signal = signals.get('entry', False)
+                        exit_signal = signals.get('exit', False)
 
                         # Get current position
                         position = broker.get_position(symbol)
                         current_qty = position.quantity if position else 0.0
 
-                        # CRITICAL: Skip if we already have a pending order for this symbol
-                        # (Matches Backtrader logic at backtrader_adapter.py:608-610)
-                        if symbol in self.pending_orders and self.pending_orders[symbol]:
-                            continue
-
                         # MATCHES Backtrader: if action == "BUY" and current_size == 0
-                        if signal_value == 1 and abs(current_qty) < 0.001:
-                            portfolio_value = broker.cash + sum(
-                                broker.get_position(s).quantity * data[s].get('close', 0)
-                                for s in data.keys()
-                                if broker.get_position(s) is not None
-                            )
+                        if entry_signal and abs(current_qty) < 0.001:
+                            # Calculate portfolio value for position sizing
+                            portfolio_value = broker.cash
+                            for s, s_data in data.items():
+                                pos = broker.get_position(s)
+                                if pos and pos.quantity > 0:
+                                    portfolio_value += pos.quantity * s_data.get('close', 0)
+
                             target_value = portfolio_value * self.target_pct
                             price = asset_data.get('close')
                             quantity = target_value / price if price > 0 else 0
@@ -529,136 +557,65 @@ class BacktestAdapter(BaseFrameworkAdapter):
                                     quantity=quantity,
                                     order_type=OrderType.MARKET,
                                 )
-                                self.pending_orders[symbol] = True  # Track pending order
 
                         # MATCHES Backtrader: elif action == "SELL" and current_size > 0
-                        elif signal_value == -1 and abs(current_qty) > 0.001:
+                        elif exit_signal and abs(current_qty) > 0.001:
                             broker.submit_order(
                                 asset=symbol,
                                 side=OrderSide.SELL,
                                 quantity=abs(current_qty),
                                 order_type=OrderType.MARKET,
                             )
-                            self.pending_orders[symbol] = True  # Track pending order
 
-            # TODO: Multi-asset support needs complete rewrite for new modular API
-            # The old event-driven approach with custom MultiAssetDataFeed doesn't work
-            # Need to create Polars DataFrame with multi-asset data and use new DataFeed
-            raise NotImplementedError(
-                "Multi-asset backtesting with new modular API not yet implemented. "
-                "The old event-driven architecture has been replaced. This requires a "
-                "complete rewrite to use Polars DataFrames and the new callback-based Strategy API."
-            )
+            # Create commission and slippage models
+            commission = PercentageCommission(rate=config.commission_pct) if config.commission_pct > 0 else NoCommission()
+            slippage = PercentageSlippage(rate=config.slippage_pct) if config.slippage_pct > 0 else NoSlippage()
 
-            # OLD CODE BELOW - needs to be rewritten for new API
-            # Create data feed
-            class MultiAssetDataFeed_OLD(DataFeed):
-                def __init__(self, ohlcv_dict):
-                    self.data_list = []
-                    for asset_id, ohlcv in ohlcv_dict.items():
-                        for idx in range(len(ohlcv)):
-                            row = ohlcv.iloc[idx]
-                            self.data_list.append({
-                                'timestamp': row.name,
-                                'asset_id': asset_id,
-                                'open': row['open'],
-                                'high': row['high'],
-                                'low': row['low'],
-                                'close': row['close'],
-                                'volume': row['volume'],
-                            })
-                    self.data_list.sort(key=lambda x: x['timestamp'])
-                    self.index = 0
+            # Create DataFeed with prices and signals
+            feed = DataFeed(prices_df=prices_df, signals_df=signals_df)
 
-                def get_next_event(self) -> MarketEvent | None:
-                    """Get next event from data feed."""
-                    if self.is_exhausted:
-                        return None
-                    data = self.data_list[self.index]
-                    self.index += 1
-                    return MarketEvent(
-                        timestamp=data['timestamp'],
-                        asset_id=data['asset_id'],
-                        data_type=MarketDataType.BAR,
-                        open=data['open'],
-                        high=data['high'],
-                        low=data['low'],
-                        close=data['close'],
-                        volume=data['volume'],
-                    )
+            # Create strategy
+            strategy = RotationStrategy(target_pct=0.20)
 
-                @property
-                def is_exhausted(self) -> bool:
-                    """Check if feed exhausted."""
-                    return self.index >= len(self.data_list)
-
-                def peek_next_timestamp(self) -> datetime | None:
-                    """Peek at next timestamp without consuming."""
-                    if self.is_exhausted:
-                        return None
-                    return self.data_list[self.index]['timestamp']
-
-                def reset(self) -> None:
-                    """Reset to beginning."""
-                    self.index = 0
-
-                def seek(self, timestamp: datetime) -> None:
-                    """Seek to timestamp."""
-                    for i, data in enumerate(self.data_list):
-                        if data['timestamp'] >= timestamp:
-                            self.index = i
-                            return
-                    self.index = len(self.data_list)  # Exhausted if not found
-
-            feed = MultiAssetDataFeed(data)
-
-            commission = PercentageCommission(rate=config.commission_pct)
-            slippage = PercentageSlippage(slippage_pct=config.slippage_pct)
-
-            broker = SimulationBroker(
+            # Run backtest
+            engine = Engine(
+                feed=feed,
+                strategy=strategy,
                 initial_cash=config.initial_capital,
                 commission_model=commission,
                 slippage_model=slippage,
+                execution_mode=ExecutionMode.SAME_BAR,
+                account_type='cash',
             )
 
-            strategy = RotationStrategy(signal_dict, target_pct=0.20)
+            results = engine.run()
 
-            engine = BacktestEngine(
-                data_feed=feed,
-                broker=broker,
-                strategy=strategy,
-            )
-
-            engine.run()
-
-            result.final_value = broker.portfolio.equity
-            result.total_return = ((result.final_value / config.initial_capital) - 1) * 100
+            result.final_value = results['final_value']
+            result.total_return = results['total_return'] * 100
 
             # Extract trades
             trades = []
-            if hasattr(broker, 'trade_tracker') and broker.trade_tracker:
-                raw_trades = broker.trade_tracker._trades
-                result.num_trades = len(raw_trades) * 2
+            raw_trades = engine.broker.trades
+            result.num_trades = len(raw_trades)
 
-                for trade in raw_trades:
+            for trade in raw_trades:
+                if trade.exit_time is not None:
                     trades.append(TradeRecord(
-                        timestamp=trade.entry_dt,
-                        action="BUY" if trade.direction == "long" else "SELL",
-                        quantity=trade.entry_quantity,
+                        timestamp=trade.entry_time,
+                        action="BUY",
+                        quantity=trade.quantity,
                         price=trade.entry_price,
-                        value=trade.entry_quantity * trade.entry_price,
-                        commission=trade.entry_commission,
+                        value=trade.quantity * trade.entry_price,
+                        commission=trade.commission / 2,
                     ))
                     trades.append(TradeRecord(
-                        timestamp=trade.exit_dt,
-                        action="SELL" if trade.direction == "long" else "BUY",
-                        quantity=trade.exit_quantity,
+                        timestamp=trade.exit_time,
+                        action="SELL",
+                        quantity=trade.quantity,
                         price=trade.exit_price,
-                        value=trade.exit_quantity * trade.exit_price,
-                        commission=trade.exit_commission,
+                        value=trade.quantity * trade.exit_price,
+                        commission=trade.commission / 2,
                     ))
-            else:
-                result.num_trades = 0
 
             result.trades = trades
 
@@ -666,6 +623,13 @@ class BacktestAdapter(BaseFrameworkAdapter):
             tracemalloc.stop()
             result.execution_time = time.time() - start_time
             result.memory_usage = peak / 1024 / 1024
+
+            print(f"✓ ml4t.backtest multi-asset backtest completed")
+            print(f"  Entry Signals: {signals_df['entry'].sum()}, Exit Signals: {signals_df['exit'].sum()}")
+            print(f"  Final Value: ${result.final_value:,.2f}")
+            print(f"  Total Return: {result.total_return:.2f}%")
+            print(f"  Total Trades: {result.num_trades}")
+            print(f"  Execution Time: {result.execution_time:.3f}s")
 
         except Exception as e:
             error_msg = f"ml4t.backtest multi-asset failed: {e}"
