@@ -37,8 +37,62 @@ def extract_backtest_trades(results: dict[str, Any], data: pl.DataFrame) -> List
         >>> for trade in trades:
         ...     print(f"{trade.entry_timestamp} -> {trade.exit_timestamp}: ${trade.net_pnl:.2f}")
     """
-    trades_df = results.get('trades')
-    if trades_df is None or trades_df.is_empty():
+    trades = results.get('trades')
+    if not trades:
+        return []
+
+    # Handle new API: list of Trade objects (already complete trades)
+    if isinstance(trades, list):
+        from ml4t.backtest.types import Trade
+
+        standard_trades = []
+        for idx, trade in enumerate(trades):
+            # Trade objects are already round-trip trades
+            if not isinstance(trade, Trade):
+                continue
+
+            # Look up OHLC bars
+            entry_bar = get_bar_at_timestamp(data, trade.entry_time)
+            exit_bar = get_bar_at_timestamp(data, trade.exit_time)
+
+            # Infer price components
+            entry_component = infer_price_component(trade.entry_price, entry_bar)
+            exit_component = infer_price_component(trade.exit_price, exit_bar)
+
+            # Calculate gross P&L
+            gross_pnl = trade.pnl + trade.commission + trade.slippage
+
+            # Map Trade object to StandardTrade
+            # Split commission equally between entry and exit
+            half_commission = trade.commission / 2.0
+
+            standard_trades.append(StandardTrade(
+                trade_id=idx,
+                platform='ml4t.backtest',
+                entry_timestamp=trade.entry_time,
+                entry_price=trade.entry_price,
+                entry_price_component=entry_component,
+                entry_bar_ohlc=entry_bar,
+                exit_timestamp=trade.exit_time,
+                exit_price=trade.exit_price,
+                exit_price_component=exit_component,
+                exit_bar_ohlc=exit_bar,
+                exit_reason='signal',
+                symbol=trade.asset,
+                quantity=trade.quantity,
+                side='long',  # Assume long for now (new API doesn't track shorts yet)
+                gross_pnl=gross_pnl,
+                entry_commission=half_commission,
+                exit_commission=half_commission,
+                slippage=trade.slippage,
+                net_pnl=trade.pnl,
+            ))
+
+        return standard_trades
+
+    # Handle old API: Polars DataFrame of individual fills
+    trades_df = trades
+    if trades_df.is_empty():
         return []
 
     standard_trades = []

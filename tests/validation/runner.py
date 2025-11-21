@@ -66,131 +66,61 @@ class ScenarioRunner:
         start = datetime.now()
 
         try:
-            # Import ml4t.backtest components
-            from ml4t.backtest.engine import Engine
-            from ml4t.backtest.strategy import Strategy
-            from ml4t.backtest.broker import Broker
-            from ml4t.backtest.models import PercentageCommission
-            from ml4t.backtest.types import OrderType, OrderSide
-            from ml4t.backtest.datafeed import DataFeed
+            # Import ml4t.backtest components from package (new API)
+            from ml4t.backtest import (
+                Engine,
+                Strategy,
+                DataFeed,
+                PercentageCommission,
+                NoCommission,
+                NoSlippage,
+                OrderType,
+                OrderSide,
+            )
+            import polars as pl
 
             # Get data and signals
             data = self.scenario_class.get_data()
-            signals = self.scenario_class.signals
+            signals_list = self.scenario_class.signals
             config = self.scenario_class.config
 
-            # Create simple data feed from DataFrame
-            class SimpleDataFeed(DataFeed):
-                """In-memory data feed from Polars DataFrame."""
-
-                def __init__(self, df: pl.DataFrame):
-                    self.df = df.sort('timestamp')
-                    self.index = 0
-                    self._exhausted = False
-
-                def get_next_event(self) -> MarketEvent | None:
-                    if self.index >= len(self.df):
-                        self._exhausted = True
-                        return None
-
-                    row = self.df[self.index]
-                    self.index += 1
-
-                    return MarketEvent(
-                        timestamp=row['timestamp'][0],
-                        asset_id=row['symbol'][0],
-                        data_type=MarketDataType.BAR,
-                        open=row['open'][0],
-                        high=row['high'][0],
-                        low=row['low'][0],
-                        close=row['close'][0],
-                        volume=row['volume'][0],
-                    )
-
-                def peek_next_timestamp(self) -> datetime | None:
-                    """Peek at next timestamp without consuming it."""
-                    if self.index >= len(self.df):
-                        return None
-                    return self.df[self.index]['timestamp'][0]
-
-                def reset(self) -> None:
-                    """Reset to beginning."""
-                    self.index = 0
-                    self._exhausted = False
-
-                def seek(self, timestamp: datetime) -> None:
-                    """Seek to specific timestamp."""
-                    for i in range(len(self.df)):
-                        if self.df[i]['timestamp'][0] >= timestamp:
-                            self.index = i
-                            self._exhausted = False
-                            return
-                    self.index = len(self.df)
-                    self._exhausted = True
-
-                @property
-                def is_exhausted(self) -> bool:
-                    return self._exhausted
+            # Rename 'symbol' column to 'asset' if needed (DataFeed expects 'asset')
+            if 'symbol' in data.columns and 'asset' not in data.columns:
+                data = data.rename({'symbol': 'asset'})
 
             # Create signal-driven strategy
             class SignalStrategy(Strategy):
-                """Execute pre-defined signals."""
+                """Execute pre-defined signals using new API."""
 
                 def __init__(self, signals: list):
-                    super().__init__("SignalStrategy")
                     self.signals = {sig.timestamp: sig for sig in signals}
-                    self.positions = {}
 
-                def on_start(self, portfolio, event_bus):
-                    self.portfolio = portfolio
-                    self.event_bus = event_bus
-
-                def on_event(self, event):
-                    if event.event_type != EventType.MARKET:
+                def on_data(self, timestamp, data_dict, context, broker):
+                    """Called on each timestamp with market data."""
+                    if timestamp not in self.signals:
                         return
 
-                    if event.timestamp not in self.signals:
-                        return
+                    signal = self.signals[timestamp]
 
-                    signal = self.signals[event.timestamp]
-
+                    # Submit order
                     if signal.action == 'BUY':
-                        side = OrderSide.BUY
+                        broker.submit_order(signal.asset, signal.quantity, OrderSide.BUY)
                     elif signal.action == 'SELL':
-                        side = OrderSide.SELL
-                    else:
-                        return
-
-                    order = Order(
-                        asset_id=signal.asset,
-                        order_type=OrderType.MARKET,
-                        side=side,
-                        quantity=signal.quantity,
-                    )
-
-                    if hasattr(self, 'broker') and self.broker:
-                        self.broker.submit_order(order)
-
-                        if signal.action == 'BUY':
-                            self.positions[signal.asset] = self.positions.get(signal.asset, 0) + signal.quantity
-                        elif signal.action == 'SELL':
-                            self.positions[signal.asset] = self.positions.get(signal.asset, 0) - signal.quantity
+                        broker.submit_order(signal.asset, signal.quantity, OrderSide.SELL)
 
             # Set up backtest
-            data_feed = SimpleDataFeed(data)
-            strategy = SignalStrategy(signals)
-            commission_model = PercentageCommission(rate=config['commission'])
-            broker = SimulationBroker(
-                initial_cash=config['initial_capital'],
-                commission_model=commission_model,
-            )
-            engine = BacktestEngine(
-                data_feed=data_feed,
+            datafeed = DataFeed(prices_df=data)
+            strategy = SignalStrategy(signals_list)
+            commission = PercentageCommission(rate=config['commission']) if config.get('commission', 0) > 0 else NoCommission()
+            slippage = NoSlippage()  # Scenario doesn't specify slippage
+
+            engine = Engine(
+                feed=datafeed,
                 strategy=strategy,
-                broker=broker,
-                initial_capital=config['initial_capital'],
+                initial_cash=config['initial_capital'],
+                commission_model=commission,
+                slippage_model=slippage,
             )
-            strategy.broker = broker
 
             # Run
             results = engine.run()
