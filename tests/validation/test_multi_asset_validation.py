@@ -15,10 +15,10 @@ from typing import Dict, Any
 
 import pandas as pd
 
-from frameworks.backtrader_adapter import BacktraderAdapter
-from frameworks.qengine_adapter import BacktestAdapter  # ml4t.backtest adapter
-from frameworks.vectorbt_adapter import VectorBTAdapter
-from frameworks.base import FrameworkConfig
+from .frameworks.backtrader_adapter import BacktraderAdapter
+from .frameworks.qengine_adapter import BacktestAdapter  # ml4t.backtest adapter
+from .frameworks.vectorbt_adapter import VectorBTAdapter
+from .frameworks.base import FrameworkConfig
 
 
 SIGNAL_DIR = Path(__file__).parent / "signals"

@@ -168,14 +168,11 @@ def momentum_ranking_strategy(
     exits = pd.DataFrame(index=data.index, columns=tickers, data=False)
 
     for ticker in tickers:
-        # Detect position changes
-        signals[ticker].diff()
-
-        # Entry when position goes from 0 to non-zero
-        entries[ticker] = (signals[ticker] != 0) & (signals[ticker].shift(1) == 0)
+        # Entry when position goes from 0 to non-zero (either long or short)
+        entries[ticker] = (signals[ticker] != 0) & (signals[ticker].shift(1).fillna(0) == 0)
 
         # Exit when position goes to 0 from non-zero
-        exits[ticker] = (signals[ticker] == 0) & (signals[ticker].shift(1) != 0)
+        exits[ticker] = (signals[ticker] == 0) & (signals[ticker].shift(1).fillna(0) != 0)
 
     return signals, entries, exits
 
@@ -188,12 +185,17 @@ def run_multi_asset_qengine(
     tickers: list[str],
     initial_capital: float = 100000,
 ) -> dict[str, Any]:
-    """Run multi-asset backtest using ml4t.backtest approach."""
+    """Run multi-asset backtest using ml4t.backtest approach.
+
+    Handles both LONG (signal=1) and SHORT (signal=-1) positions.
+    - Long: Buy shares, profit when price goes up
+    - Short: Sell borrowed shares, profit when price goes down
+    """
     start_time = time.time()
 
     # Initialize portfolio
     cash = initial_capital
-    positions = dict.fromkeys(tickers, 0)  # Shares held
+    positions = dict.fromkeys(tickers, 0.0)  # Shares held (positive=long, negative=short)
     trades = []
     portfolio_values = []
 
@@ -204,45 +206,71 @@ def run_multi_asset_qengine(
         # Get current prices
         current_prices = data.loc[date, "close"]
 
-        # Process exits first (to free up capital)
+        # Get current signals (1=long, -1=short, 0=flat)
+        current_signals = signals.loc[date] if date in signals.index else pd.Series(0, index=tickers)
+
         for ticker in tickers:
-            if exits.loc[date, ticker] and positions[ticker] != 0:
-                # Close position
-                cash += positions[ticker] * current_prices[ticker]
-                trades.append(
-                    {
+            current_pos = positions[ticker]
+            target_signal = current_signals.get(ticker, 0)
+            price = current_prices[ticker]
+
+            # Determine if we need to change position
+            # Current position direction: 1 if long, -1 if short, 0 if flat
+            current_direction = 1 if current_pos > 0 else (-1 if current_pos < 0 else 0)
+
+            if target_signal != current_direction:
+                # Close existing position first
+                if current_pos != 0:
+                    # Close position: for long, sell shares; for short, buy back shares
+                    pnl = current_pos * price  # Works for both: long pos * price = positive, short pos * price = negative
+                    cash += pnl
+                    action = "SELL" if current_pos > 0 else "COVER"
+                    trades.append({
                         "date": date,
                         "ticker": ticker,
-                        "action": "SELL",
-                        "shares": positions[ticker],
-                        "price": current_prices[ticker],
-                    },
-                )
-                positions[ticker] = 0
+                        "action": action,
+                        "shares": abs(current_pos),
+                        "price": price,
+                    })
+                    positions[ticker] = 0.0
 
-        # Process entries
-        for ticker in tickers:
-            if entries.loc[date, ticker] and positions[ticker] == 0:
-                # Open position
-                shares_to_buy = position_size / current_prices[ticker]
-                if cash >= position_size:
-                    positions[ticker] = shares_to_buy
-                    cash -= shares_to_buy * current_prices[ticker]
-                    trades.append(
-                        {
+                # Open new position if target is non-zero
+                if target_signal != 0:
+                    shares = position_size / price
+                    if target_signal == 1:
+                        # Long: buy shares
+                        if cash >= position_size:
+                            positions[ticker] = shares
+                            cash -= shares * price
+                            trades.append({
+                                "date": date,
+                                "ticker": ticker,
+                                "action": "BUY",
+                                "shares": shares,
+                                "price": price,
+                            })
+                    elif target_signal == -1:
+                        # Short: sell borrowed shares (receive cash)
+                        positions[ticker] = -shares
+                        cash += shares * price  # Receive cash from short sale
+                        trades.append({
                             "date": date,
                             "ticker": ticker,
-                            "action": "BUY",
-                            "shares": shares_to_buy,
-                            "price": current_prices[ticker],
-                        },
-                    )
+                            "action": "SHORT",
+                            "shares": shares,
+                            "price": price,
+                        })
 
         # Calculate portfolio value
+        # For longs: position * price adds value
+        # For shorts: we owe shares, so liability = abs(position) * price
+        #            but we received cash when shorting, so net = cash - liability
         portfolio_value = cash
         for ticker in tickers:
-            if positions[ticker] != 0:
-                portfolio_value += positions[ticker] * current_prices[ticker]
+            pos = positions[ticker]
+            if pos != 0:
+                # Long positions add value, short positions subtract (we owe shares)
+                portfolio_value += pos * current_prices[ticker]
         portfolio_values.append(portfolio_value)
 
     # Calculate metrics
