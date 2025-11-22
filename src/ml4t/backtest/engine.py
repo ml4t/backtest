@@ -1,13 +1,17 @@
 """Backtesting engine orchestration."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 import polars as pl
 
 from .types import ExecutionMode
-from .models import CommissionModel, SlippageModel
+from .models import CommissionModel, SlippageModel, PercentageCommission, PercentageSlippage
 from .datafeed import DataFeed
 from .broker import Broker
 from .strategy import Strategy
+
+if TYPE_CHECKING:
+    from .config import BacktestConfig
 
 
 class Engine:
@@ -24,10 +28,12 @@ class Engine:
         account_type: str = "cash",
         initial_margin: float = 0.5,
         maintenance_margin: float = 0.25,
+        config: "BacktestConfig | None" = None,
     ):
         self.feed = feed
         self.strategy = strategy
         self.execution_mode = execution_mode
+        self.config = config  # Store config for strategy access
         self.broker = Broker(
             initial_cash=initial_cash,
             commission_model=commission_model,
@@ -107,6 +113,85 @@ class Engine:
             "fills": self.broker.fills,
         }
 
+    @classmethod
+    def from_config(
+        cls,
+        feed: DataFeed,
+        strategy: Strategy,
+        config: "BacktestConfig",
+    ) -> "Engine":
+        """
+        Create an Engine instance from a BacktestConfig.
+
+        This is the recommended way to create an engine when you want
+        to replicate specific framework behavior (Backtrader, VectorBT, etc.).
+
+        Example:
+            from ml4t.backtest import Engine, BacktestConfig, DataFeed, Strategy
+
+            # Use Backtrader-compatible settings
+            config = BacktestConfig.from_preset("backtrader")
+            engine = Engine.from_config(feed, strategy, config)
+            results = engine.run()
+
+        Args:
+            feed: DataFeed with price data
+            strategy: Strategy to execute
+            config: BacktestConfig with all behavioral settings
+
+        Returns:
+            Configured Engine instance
+        """
+        from .config import FillTiming, CommissionModel as CommModelEnum, SlippageModel as SlipModelEnum
+
+        # Map config fill timing to ExecutionMode
+        if config.fill_timing == FillTiming.SAME_BAR:
+            execution_mode = ExecutionMode.SAME_BAR
+        else:
+            # NEXT_BAR_OPEN or NEXT_BAR_CLOSE both use NEXT_BAR mode
+            execution_mode = ExecutionMode.NEXT_BAR
+
+        # Build commission model from config
+        commission_model: CommissionModel | None = None
+        if config.commission_model == CommModelEnum.PERCENTAGE:
+            commission_model = PercentageCommission(
+                rate=config.commission_rate,
+                min_commission=config.commission_minimum,
+            )
+        elif config.commission_model == CommModelEnum.PER_SHARE:
+            from .models import PerShareCommission
+            commission_model = PerShareCommission(
+                per_share=config.commission_per_share,
+                min_commission=config.commission_minimum,
+            )
+        elif config.commission_model == CommModelEnum.PER_TRADE:
+            from .models import NoCommission
+            # For per-trade, we'd need a new model, use NoCommission for now
+            commission_model = NoCommission()
+        # NONE or unrecognized -> None (will use NoCommission in Broker)
+
+        # Build slippage model from config
+        slippage_model: SlippageModel | None = None
+        if config.slippage_model == SlipModelEnum.PERCENTAGE:
+            slippage_model = PercentageSlippage(rate=config.slippage_rate)
+        elif config.slippage_model == SlipModelEnum.FIXED:
+            from .models import FixedSlippage
+            slippage_model = FixedSlippage(fixed=config.slippage_fixed)
+        # NONE, VOLUME_BASED, or unrecognized -> None (will use NoSlippage)
+
+        return cls(
+            feed=feed,
+            strategy=strategy,
+            initial_cash=config.initial_cash,
+            commission_model=commission_model,
+            slippage_model=slippage_model,
+            execution_mode=execution_mode,
+            account_type=config.account_type,
+            initial_margin=config.margin_requirement,
+            maintenance_margin=config.margin_requirement * 0.5,  # Standard ratio
+            config=config,  # Store config for strategy access
+        )
+
 
 # === Convenience Function ===
 
@@ -115,12 +200,39 @@ def run_backtest(
     strategy: Strategy,
     signals: pl.DataFrame | str | None = None,
     context: pl.DataFrame | str | None = None,
+    config: "BacktestConfig | str | None" = None,
+    # Legacy parameters (used if config is None)
     initial_cash: float = 100000.0,
     commission_model: CommissionModel | None = None,
     slippage_model: SlippageModel | None = None,
     execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
 ) -> dict:
-    """Run a backtest with minimal setup."""
+    """
+    Run a backtest with minimal setup.
+
+    Args:
+        prices: Price DataFrame or path to parquet file
+        strategy: Strategy instance to execute
+        signals: Optional signals DataFrame or path
+        context: Optional context DataFrame or path
+        config: BacktestConfig instance, preset name (str), or None for legacy params
+        initial_cash: Starting cash (legacy, ignored if config provided)
+        commission_model: Commission model (legacy, ignored if config provided)
+        slippage_model: Slippage model (legacy, ignored if config provided)
+        execution_mode: Execution mode (legacy, ignored if config provided)
+
+    Returns:
+        Results dictionary with metrics, trades, equity curve
+
+    Example:
+        # Using config preset
+        results = run_backtest(prices_df, strategy, config="backtrader")
+
+        # Using custom config
+        config = BacktestConfig.from_preset("backtrader")
+        config.commission_rate = 0.002  # Higher commission
+        results = run_backtest(prices_df, strategy, config=config)
+    """
     feed = DataFeed(
         prices_path=prices if isinstance(prices, str) else None,
         signals_path=signals if isinstance(signals, str) else None,
@@ -129,6 +241,15 @@ def run_backtest(
         signals_df=signals if isinstance(signals, pl.DataFrame) else None,
         context_df=context if isinstance(context, pl.DataFrame) else None,
     )
+
+    # Handle config parameter
+    if config is not None:
+        from .config import BacktestConfig as ConfigCls
+        if isinstance(config, str):
+            config = ConfigCls.from_preset(config)
+        return Engine.from_config(feed, strategy, config).run()
+
+    # Legacy path: use individual parameters
     engine = Engine(
         feed, strategy, initial_cash,
         commission_model=commission_model,

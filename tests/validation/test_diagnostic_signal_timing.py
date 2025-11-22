@@ -19,6 +19,9 @@ from common import (
 )
 import pandas as pd
 
+# Skip this test if VectorBT Pro is not installed
+vectorbtpro = pytest.importorskip("vectorbtpro", reason="VectorBT Pro not installed")
+
 
 def test_diagnostic_signal_timing():
     """Diagnostic: Verify engines execute at identical signal times"""

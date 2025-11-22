@@ -230,9 +230,16 @@ class ZiplineAdapter(BaseFrameworkAdapter):
         except Exception as e:
             error_msg = f"Zipline backtest failed: {e}"
             print(f"✗ {error_msg}")
-            import traceback
             result.errors.append(error_msg)
-            result.errors.append(traceback.format_exc())
+            # Note: traceback.format_exc() can crash on Python 3.12 with
+            # "RuntimeError: generator raised StopIteration" when formatting
+            # certain Zipline exception chains. Use str(e) instead.
+            try:
+                import traceback
+                result.errors.append(traceback.format_exc())
+            except RuntimeError:
+                # Python 3.12 traceback bug - fall back to simple error
+                result.errors.append(f"Exception type: {type(e).__name__}")
 
         return result
 

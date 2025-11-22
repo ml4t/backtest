@@ -1,8 +1,8 @@
 """
 Pytest configuration for validation tests.
 
-These tests require optional dependencies (VectorBT Pro, Backtrader, Zipline).
-If dependencies aren't installed, tests are automatically skipped.
+These tests require optional dependencies (VectorBT, Backtrader, Zipline).
+Tests are only skipped if they EXPLICITLY require a missing dependency.
 """
 import pytest
 
@@ -11,7 +11,11 @@ def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line(
         "markers",
-        "requires_vectorbt: Test requires VectorBT Pro (commercial, optional dependency)"
+        "requires_vectorbt_pro: Test requires VectorBT Pro (commercial, optional dependency)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_vectorbt: Test requires VectorBT OSS (optional dependency)"
     )
     config.addinivalue_line(
         "markers",
@@ -25,17 +29,25 @@ def pytest_configure(config):
 
 def pytest_collection_modifyitems(config, items):
     """
-    Automatically skip tests requiring optional dependencies when not installed.
+    Skip tests based on EXPLICIT markers, not based on file content.
 
-    This allows validation tests to be run without failures when dependencies
-    are missing. Tests will show as "skipped" instead of "failed".
+    Tests should use explicit markers like @pytest.mark.requires_vectorbt_pro
+    if they require specific dependencies. This avoids over-aggressive skipping.
     """
     # Check which optional dependencies are available
+    # NOTE: VectorBT OSS and Pro CANNOT coexist - they both register .vbt accessor.
+    # If Pro is available, we skip importing OSS to avoid accessor collision.
     try:
         import vectorbtpro  # noqa: F401
-        has_vectorbt = True
+        has_vectorbt_pro = True
+        has_vectorbt_oss = False  # Don't import OSS if Pro is available
     except ImportError:
-        has_vectorbt = False
+        has_vectorbt_pro = False
+        try:
+            import vectorbt  # noqa: F401
+            has_vectorbt_oss = True
+        except ImportError:
+            has_vectorbt_oss = False
 
     try:
         import backtrader  # noqa: F401
@@ -49,33 +61,20 @@ def pytest_collection_modifyitems(config, items):
     except ImportError:
         has_zipline = False
 
-    # Auto-skip tests based on imports in test files
-    skip_vectorbt = pytest.mark.skip(reason="VectorBT Pro not installed (optional dependency)")
-    skip_backtrader = pytest.mark.skip(reason="Backtrader not installed (optional dependency)")
-    skip_zipline = pytest.mark.skip(reason="Zipline not installed (optional dependency)")
-
+    # Skip tests with explicit markers when dependencies missing
     for item in items:
-        # Read test file to check for imports
-        try:
-            with open(item.fspath, 'r') as f:
-                content = f.read()
+        # Skip if marked requires_vectorbt_pro but Pro not installed
+        if item.get_closest_marker("requires_vectorbt_pro") and not has_vectorbt_pro:
+            item.add_marker(pytest.mark.skip(reason="VectorBT Pro not installed"))
 
-            # Skip if test imports vectorbt/vectorbtpro but it's not installed
-            if not has_vectorbt:
-                if ('import vectorbt' in content or 'import vectorbtpro' in content or
-                    'from vectorbt' in content or 'from common' in content):
-                    item.add_marker(skip_vectorbt)
+        # Skip if marked requires_vectorbt but OSS not installed
+        if item.get_closest_marker("requires_vectorbt") and not has_vectorbt_oss:
+            item.add_marker(pytest.mark.skip(reason="VectorBT OSS not installed"))
 
-            # Skip if test imports backtrader but it's not installed
-            if not has_backtrader:
-                if 'import backtrader' in content or 'from backtrader' in content or 'from common' in content:
-                    item.add_marker(skip_backtrader)
+        # Skip if marked requires_backtrader but not installed
+        if item.get_closest_marker("requires_backtrader") and not has_backtrader:
+            item.add_marker(pytest.mark.skip(reason="Backtrader not installed"))
 
-            # Skip if test imports zipline but it's not installed
-            if not has_zipline:
-                if 'import zipline' in content or 'from zipline' in content or 'from common' in content:
-                    item.add_marker(skip_zipline)
-
-        except Exception:
-            # If we can't read the file, continue without skipping
-            pass
+        # Skip if marked requires_zipline but not installed
+        if item.get_closest_marker("requires_zipline") and not has_zipline:
+            item.add_marker(pytest.mark.skip(reason="Zipline not installed"))

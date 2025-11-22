@@ -38,6 +38,17 @@ from .datafeed import DataFeed
 from .broker import Broker
 from .strategy import Strategy
 from .engine import Engine, run_backtest, BacktestEngine
+from .config import (
+    BacktestConfig,
+    FillTiming,
+    ExecutionPrice,
+    ShareType,
+    SizingMethod,
+    SignalProcessing,
+    CommissionModel as CommissionModelType,
+    SlippageModel as SlippageModelType,
+    PRESETS_DIR,
+)
 
 __all__ = [
     # Types
@@ -68,4 +79,14 @@ __all__ = [
     "Engine",
     "BacktestEngine",  # Backward compatibility alias
     "run_backtest",
+    # Configuration
+    "BacktestConfig",
+    "FillTiming",
+    "ExecutionPrice",
+    "ShareType",
+    "SizingMethod",
+    "SignalProcessing",
+    "CommissionModelType",
+    "SlippageModelType",
+    "PRESETS_DIR",
 ]

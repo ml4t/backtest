@@ -18,6 +18,7 @@ class BacktestConfig:
     size: Optional[float] = None  # None = use all cash (size=np.inf in VBT)
     close_final_position: bool = False  # Auto-close open positions at backtest end (default: False)
     execution_delay_days: int = 0  # Execute signals N days later (0=same-day, 1=next-day like Zipline)
+    share_type: str = 'fractional'  # 'fractional' (VectorBT) or 'integer' (Backtrader)
 
 
 @dataclass
@@ -161,8 +162,14 @@ class BacktestWrapper(EngineWrapper):
                             size = (cash * 0.9999) / (effective_price * (1 + config.fees))
                         else:
                             size = (cash * 0.9999) / effective_price
+
+                        # Apply share type rounding (integer vs fractional)
+                        if config.share_type == 'integer':
+                            size = int(size)  # Round DOWN to integer shares
                     else:
                         size = config.size
+                        if config.share_type == 'integer':
+                            size = int(size)
 
                     if size > 0:
                         broker.submit_order(

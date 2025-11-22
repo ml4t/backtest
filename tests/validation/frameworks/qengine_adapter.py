@@ -546,11 +546,17 @@ class BacktestAdapter(BaseFrameworkAdapter):
                                 if pos and pos.quantity > 0:
                                     portfolio_value += pos.quantity * s_data.get('close', 0)
 
+                            # MATCH BACKTRADER: Use integer shares and account for commission
+                            # Backtrader rounds down to whole shares, which leaves small buffers
+                            # that accumulate to allow more positions to fit
                             target_value = portfolio_value * self.target_pct
                             price = asset_data.get('close')
-                            quantity = target_value / price if price > 0 else 0
 
-                            if quantity > 0.01:
+                            # Calculate quantity and round to integer shares (like Backtrader)
+                            raw_quantity = target_value / price if price > 0 else 0
+                            quantity = int(raw_quantity)  # Round DOWN to integer shares
+
+                            if quantity > 0:
                                 broker.submit_order(
                                     asset=symbol,
                                     side=OrderSide.BUY,
@@ -577,6 +583,14 @@ class BacktestAdapter(BaseFrameworkAdapter):
             # Create strategy
             strategy = RotationStrategy(target_pct=0.20)
 
+            # Determine execution mode from config
+            # - "next_open" -> NEXT_BAR (matches Backtrader default)
+            # - "same_close" -> SAME_BAR (look-ahead bias, but matches some frameworks)
+            if config.fill_timing == "next_open":
+                exec_mode = ExecutionMode.NEXT_BAR
+            else:
+                exec_mode = ExecutionMode.SAME_BAR
+
             # Run backtest
             engine = Engine(
                 feed=feed,
@@ -584,7 +598,7 @@ class BacktestAdapter(BaseFrameworkAdapter):
                 initial_cash=config.initial_capital,
                 commission_model=commission,
                 slippage_model=slippage,
-                execution_mode=ExecutionMode.SAME_BAR,
+                execution_mode=exec_mode,
                 account_type='cash',
             )
 
