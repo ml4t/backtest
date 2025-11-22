@@ -50,6 +50,37 @@ ml4t.backtest provides an event-driven backtesting engine with institutional-gra
 
 See `../projects/crypto_futures/` for validation work.
 
+### VectorBT OSS/Pro Conflict (Critical)
+**Problem**: VectorBT OSS and Pro CANNOT coexist in the same environment.
+Both register a pandas `.vbt` accessor which collide. Running OSS imports before Pro causes:
+```
+AttributeError: 'OHLCVDFAccessor' object has no attribute 'has_ohlc'
+```
+
+**Solution**: Use separate virtual environments:
+- `.venv` - Main development with VectorBT OSS only (validation tests work here)
+- `.venv-pro` - VectorBT Pro only for Pro-specific tests (private, commercial license)
+
+**Test conftest.py behavior**: Don't import VectorBT OSS if Pro is available to avoid accessor conflict.
+
+### Python 3.12 Traceback Formatting Bug
+**Problem**: `traceback.format_exc()` can crash with `RuntimeError: generator raised StopIteration` when formatting certain exception chains (especially from Zipline).
+
+**Solution**: Wrap traceback calls in try/except:
+```python
+try:
+    result.errors.append(traceback.format_exc())
+except RuntimeError:
+    result.errors.append(f"Exception type: {type(e).__name__}")
+```
+
+### Zipline Bundle/Symbol Resolution (Excluded)
+**Problem**: Zipline `run_algorithm()` has environment-specific bundle/symbol issues.
+The bundle may have AAPL registered but `symbol('AAPL')` fails at runtime.
+
+**Decision**: Zipline excluded from cross-framework validation (see AD-001 in docs).
+Test file `test_zipline_adapter.py` is fully skipped.
+
 ## Development Standards
 
 - **Python**: 3.9+ with type hints
