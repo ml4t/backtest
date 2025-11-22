@@ -17,8 +17,8 @@ ml4t.backtest is a high-performance, event-driven backtesting engine for quantit
 - ✅ **Performance**: 30x faster than Backtrader, 5x faster than VectorBT
 - ✅ **Point-in-Time Correctness**: No look-ahead bias
 - ✅ **Flexible Execution**: Same-bar and next-bar modes
-- ✅ **Comprehensive Testing**: 160+ tests with 69% coverage
-- ✅ **Type-Safe**: Full type hints with mypy validation
+- ✅ **Comprehensive Testing**: 154 tests passing
+- ✅ **Type-Safe**: Full type hints
 
 ---
 
@@ -413,13 +413,13 @@ VolumeShareSlippage(
 
 ## Validation
 
-ml4t.backtest has been validated against industry-standard frameworks:
+ml4t.backtest validation uses **per-framework isolated environments** to avoid dependency conflicts:
 
-- **vs Backtrader**: 0.39% P&L difference (same-bar mode)
-- **vs VectorBT**: <1% difference (cash-constrained mode)
-- **Test Coverage**: 69% with 160+ tests
+- **VectorBT Pro**: Internal validation (commercial license)
+- **Backtrader**: Open source validation (can be CI-integrated)
+- **Zipline**: Excluded (bundle data issues)
 
-See `tests/validation/` for validation studies.
+See `validation/README.md` for the validation strategy.
 
 ---
 
@@ -438,37 +438,41 @@ Benchmarks on 250 assets × 252 trading days:
 ## Testing
 
 ```bash
-# Run all tests
-pytest
-
-# Run unit tests only
-pytest tests/unit/
-
-# Run validation tests
-pytest tests/validation/
+# Run all tests (154 pass in ~1s)
+source .venv/bin/activate
+pytest tests/ -q
 
 # Run with coverage
-pytest --cov=src/ml4t/backtest --cov-report=html
+pytest tests/ --cov=src/ml4t/backtest --cov-report=html
 ```
 
 ---
 
 ## Examples
 
-See `examples/` directory for:
-- Simple moving average crossover
-- ML-based strategies
-- Multi-asset portfolios
-- Crypto basis trading
-- Commission and slippage demos
+```python
+# Simple signal-based strategy
+from ml4t.backtest import Engine, Strategy, DataFeed
+
+class SignalStrategy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        for asset, bar in data.items():
+            signals = bar.get("signals", {})
+            position = broker.get_position(asset)
+
+            if signals.get("buy") and (not position or position.quantity == 0):
+                broker.submit_order(asset, 100)  # Buy 100 shares
+            elif signals.get("sell") and position and position.quantity > 0:
+                broker.close_position(asset)  # Sell all
+```
 
 ---
 
 ## Documentation
 
-- **Architecture**: See `.claude/memory/` for design decisions
-- **Margin Calculations**: See `docs/margin_calculations.md` (coming soon)
-- **Trade Schema**: See `.claude/reference/TRADE_SCHEMA.md`
+- **Project Map**: See `.claude/PROJECT_MAP.md` for codebase structure
+- **Architecture**: See `.claude/memory/accounting_architecture_adr.md` for design decisions
+- **Validation**: See `validation/README.md` for framework validation strategy
 
 ---
 
@@ -492,21 +496,20 @@ MIT License - See LICENSE file
 
 ## Changelog
 
-### v0.2.0 (2025-11-20)
-- ✅ Complete accounting system overhaul
-- ✅ Cash account support with proper constraints
-- ✅ Margin account support (leverage + short selling)
-- ✅ Position reversal handling
-- ✅ 160+ tests with validation studies
+### v0.2.0 (2025-11-22)
+- ✅ Major repository cleanup (99.2% code reduction)
+- ✅ Complete accounting system (cash + margin accounts)
 - ✅ Exit-first order sequencing
+- ✅ 154 tests passing
+- ✅ Per-framework validation strategy
+- ✅ Clean flat module structure
 
 ### v0.1.0 (2025-01-20)
 - Initial prototype
 - Event-driven architecture
 - Basic order execution
-- Performance benchmarks
 
 ---
 
-**Status**: Beta - Accounting system complete, ready for testing
-**Last updated**: 2025-11-20
+**Status**: Beta - Post-cleanup, accounting complete
+**Last updated**: 2025-11-22

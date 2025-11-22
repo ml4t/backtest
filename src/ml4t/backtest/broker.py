@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from .types import Order, OrderSide, OrderStatus, OrderType, Position, Fill, Trade, ExecutionMode
-from .models import CommissionModel, SlippageModel, NoCommission, NoSlippage
+from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
+from .types import ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, Trade
 
 
 class Broker:
@@ -23,8 +23,8 @@ class Broker:
         from .accounting import (
             AccountState,
             CashAccountPolicy,
-            MarginAccountPolicy,
             Gatekeeper,
+            MarginAccountPolicy,
         )
 
         self.initial_cash = initial_cash
@@ -41,10 +41,7 @@ class Broker:
                 initial_margin=initial_margin, maintenance_margin=maintenance_margin
             )
         else:
-            raise ValueError(
-                f"Unknown account_type: '{account_type}'. "
-                f"Must be 'cash' or 'margin'"
-            )
+            raise ValueError(f"Unknown account_type: '{account_type}'. Must be 'cash' or 'margin'")
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
         self.account_type = account_type
@@ -62,7 +59,7 @@ class Broker:
         self._order_counter = 0
         self._current_time: datetime | None = None
         self._current_prices: dict[str, float] = {}  # close prices
-        self._current_opens: dict[str, float] = {}   # open prices for next-bar execution
+        self._current_opens: dict[str, float] = {}  # open prices for next-bar execution
         self._current_volumes: dict[str, float] = {}
         self._current_signals: dict[str, dict[str, float]] = {}
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
@@ -127,10 +124,14 @@ class Broker:
         """Submit entry with take-profit and stop-loss."""
         entry = self.submit_order(asset, quantity, order_type=entry_type, limit_price=entry_limit)
 
-        tp = self.submit_order(asset, quantity, OrderSide.SELL, OrderType.LIMIT, limit_price=take_profit)
+        tp = self.submit_order(
+            asset, quantity, OrderSide.SELL, OrderType.LIMIT, limit_price=take_profit
+        )
         tp.parent_id = entry.order_id
 
-        sl = self.submit_order(asset, quantity, OrderSide.SELL, OrderType.STOP, stop_price=stop_loss)
+        sl = self.submit_order(
+            asset, quantity, OrderSide.SELL, OrderType.STOP, stop_price=stop_loss
+        )
         sl.parent_id = entry.order_id
 
         return entry, tp, sl
@@ -207,7 +208,14 @@ class Broker:
             # Same sign - adding to position, not exiting
             return False
 
-    def _update_time(self, timestamp: datetime, prices: dict[str, float], opens: dict[str, float], volumes: dict[str, float], signals: dict[str, dict]):
+    def _update_time(
+        self,
+        timestamp: datetime,
+        prices: dict[str, float],
+        opens: dict[str, float],
+        volumes: dict[str, float],
+        signals: dict[str, dict],
+    ):
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens
@@ -314,22 +322,27 @@ class Broker:
         if order.order_type == OrderType.MARKET:
             return price
         elif order.order_type == OrderType.LIMIT:
-            if order.side == OrderSide.BUY and price <= order.limit_price:
-                return order.limit_price
-            elif order.side == OrderSide.SELL and price >= order.limit_price:
+            if (
+                order.side == OrderSide.BUY
+                and price <= order.limit_price
+                or order.side == OrderSide.SELL
+                and price >= order.limit_price
+            ):
                 return order.limit_price
         elif order.order_type == OrderType.STOP:
-            if order.side == OrderSide.BUY and price >= order.stop_price:
+            if (
+                order.side == OrderSide.BUY
+                and price >= order.stop_price
+                or order.side == OrderSide.SELL
+                and price <= order.stop_price
+            ):
                 return price
-            elif order.side == OrderSide.SELL and price <= order.stop_price:
+        elif order.order_type == OrderType.TRAILING_STOP and order.side == OrderSide.SELL:
+            new_stop = price - order.trail_amount
+            if order.stop_price is None or new_stop > order.stop_price:
+                order.stop_price = new_stop
+            if price <= order.stop_price:
                 return price
-        elif order.order_type == OrderType.TRAILING_STOP:
-            if order.side == OrderSide.SELL:
-                new_stop = price - order.trail_amount
-                if order.stop_price is None or new_stop > order.stop_price:
-                    order.stop_price = new_stop
-                if price <= order.stop_price:
-                    return price
         return None
 
     def _execute_fill(self, order: Order, base_price: float):
@@ -338,10 +351,7 @@ class Broker:
 
         # Calculate slippage
         slippage = self.slippage_model.calculate(order.asset, order.quantity, base_price, volume)
-        if order.side == OrderSide.BUY:
-            fill_price = base_price + slippage
-        else:
-            fill_price = base_price - slippage
+        fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
 
         # Calculate commission
         commission = self.commission_model.calculate(order.asset, order.quantity, fill_price)
@@ -390,7 +400,9 @@ class Broker:
                     exit_price=fill_price,
                     quantity=abs(old_qty),
                     pnl=pnl,
-                    pnl_percent=(fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0,
+                    pnl_percent=(fill_price - pos.entry_price) / pos.entry_price
+                    if pos.entry_price
+                    else 0,
                     bars_held=pos.bars_held,
                     commission=commission,
                     slippage=slippage,
@@ -402,19 +414,23 @@ class Broker:
             elif (old_qty > 0) != (new_qty > 0):
                 # Position flipped
                 pnl = (fill_price - pos.entry_price) * old_qty - commission
-                self.trades.append(Trade(
-                    asset=order.asset,
-                    entry_time=pos.entry_time,
-                    exit_time=self._current_time,
-                    entry_price=pos.entry_price,
-                    exit_price=fill_price,
-                    quantity=abs(old_qty),
-                    pnl=pnl,
-                    pnl_percent=(fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0,
-                    bars_held=pos.bars_held,
-                    commission=commission,
-                    slippage=slippage,
-                ))
+                self.trades.append(
+                    Trade(
+                        asset=order.asset,
+                        entry_time=pos.entry_time,
+                        exit_time=self._current_time,
+                        entry_price=pos.entry_price,
+                        exit_price=fill_price,
+                        quantity=abs(old_qty),
+                        pnl=pnl,
+                        pnl_percent=(fill_price - pos.entry_price) / pos.entry_price
+                        if pos.entry_price
+                        else 0,
+                        bars_held=pos.bars_held,
+                        commission=commission,
+                        slippage=slippage,
+                    )
+                )
                 self.positions[order.asset] = Position(
                     asset=order.asset,
                     quantity=new_qty,

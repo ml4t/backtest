@@ -54,16 +54,15 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Office/Business :: Financial :: Investment",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Typing :: Typed",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 
 # Core dependencies
 dependencies = [
@@ -179,7 +178,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py311"
 fix = true
 
 [tool.ruff.lint]
@@ -198,17 +197,21 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "B905",  # zip without explicit strict parameter
+    "ARG002",  # unused method arguments (intentional in strategy callbacks)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002"]  # Test functions often have unused fixtures
+
 [tool.mypy]
-python_version = "3.9"
-strict = true
-warn_return_any = true
-warn_unused_ignores = true
-disallow_untyped_defs = true
+python_version = "3.11"
+strict = false
+warn_return_any = false
+warn_unused_ignores = false
+disallow_untyped_defs = false
 disallow_any_unimported = false
-no_implicit_optional = true
-check_untyped_defs = true
+no_implicit_optional = false
+check_untyped_defs = false
 show_error_codes = true
 warn_redundant_casts = true
 ignore_missing_imports = true

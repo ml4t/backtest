@@ -1,12 +1,13 @@
 """Unit tests for AccountState with short position tracking."""
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from src.ml4t.backtest.accounting import (
     AccountState,
     CashAccountPolicy,
     MarginAccountPolicy,
-    Position,
 )
 
 

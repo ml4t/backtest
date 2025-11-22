@@ -57,9 +57,21 @@ Both register a pandas `.vbt` accessor which collide. Running OSS imports before
 AttributeError: 'OHLCVDFAccessor' object has no attribute 'has_ohlc'
 ```
 
-**Solution**: Use separate virtual environments:
-- `.venv` - Main development with VectorBT OSS only (validation tests work here)
-- `.venv-pro` - VectorBT Pro only for Pro-specific tests (private, commercial license)
+**Solution**: Use separate virtual environments (ALL ALREADY EXIST):
+```
+.venv                 - Main development (VectorBT OSS)
+.venv-vectorbt-pro    - VectorBT Pro only (for Pro-specific tests)
+.venv-vectorbt        - VectorBT OSS only
+.venv-backtrader      - Backtrader only
+.venv-zipline         - Zipline only
+.venv-validation      - Combined validation (BROKEN - OSS/Pro conflict)
+```
+
+**To run tests with VectorBT Pro:**
+```bash
+source .venv-vectorbt-pro/bin/activate
+python -m pytest tests/validation/ -q
+```
 
 **Test conftest.py behavior**: Don't import VectorBT OSS if Pro is available to avoid accessor conflict.
 
@@ -111,72 +123,29 @@ When modifying execution logic:
 4. Check against VectorBT reference results
 5. Verify fill prices are within OHLC bounds
 
-## 🚨 CRITICAL: Framework Source Code Availability
+## Validation Strategy
 
-**ALL BENCHMARK FRAMEWORKS HAVE COMPLETE SOURCE CODE LOCALLY AVAILABLE**
+**Per-framework validation in isolated environments** (NOT unified pytest).
 
-**Locations**:
-- ✅ **Zipline-reloaded**: `resources/zipline-reloaded-main/src/zipline/`
-- ✅ **Backtrader**: `resources/backtrader-master/backtrader/`
-- ✅ **VectorBT OSS**: `resources/vectorbt/vectorbt/`
-- ✅ **VectorBT Pro**: `resources/vectorbt.pro-main/vectorbtpro/`
+See `validation/README.md` and `.claude/memory/validation_methodology.md` for details.
 
-### Zero Tolerance Policy for "I Don't Know"
+### Virtual Environments
 
-**NEVER ACCEPTABLE**:
-- ❌ "Unclear how VectorBT executes fills"
-- ❌ "Need to research Backtrader's order logic"
-- ❌ "Not sure why Zipline produces different results"
+| Environment | Purpose |
+|-------------|---------|
+| `.venv` | Main development |
+| `.venv-vectorbt-pro` | VectorBT Pro validation (internal) |
+| `.venv-backtrader` | Backtrader validation |
+| `.venv-zipline` | Zipline (excluded - bundle issues) |
 
-**ALWAYS REQUIRED**:
-1. Read the actual source code (`Read resources/framework/relevant_file.py`)
-2. Cite specific files and line numbers
-3. Explain the exact implementation difference with code evidence
-4. Document findings in validation report
+### Key Framework Behaviors
 
-### Investigation Protocol (Mandatory)
-
-When frameworks produce different results:
-
-```bash
-# 1. Search for relevant code
-grep -rn "fill.*price\|execution" resources/vectorbt/vectorbt/portfolio/
-grep -rn "fill.*price\|execution" resources/backtrader-master/backtrader/brokers/
-
-# 2. Read the implementation
-Read resources/vectorbt/vectorbt/portfolio/base.py
-Read resources/backtrader-master/backtrader/brokers/bbroker.py
-
-# 3. Compare and cite specific lines
-# Example: "VectorBT fills at close (base.py:3245),
-#           Backtrader fills at next open (bbroker.py:467)"
-
-# 4. Use Serena for semantic search (if available)
-mcp__serena__find_symbol("from_signals", "resources/vectorbt/")
-```
-
-**This is not optional. This is mandatory for all validation work.**
-
-### Key Framework Files
-
-**VectorBT OSS/Pro**:
-- Portfolio API: `portfolio/base.py` (from_signals, from_orders, from_holding)
-- Numba execution: `portfolio/nb/from_signals.py` (vectorized fill logic)
-- Orders: `portfolio/orders.py` (order types, execution)
-
-**Backtrader**:
-- Broker: `brokers/bbroker.py` (order execution, COO/COC, fills)
-- Orders: `order.py` (order types, status)
-- Cerebro: `cerebro.py` (engine orchestration)
-
-**Zipline**:
-- Execution: `finance/execution.py` (order placement, fills)
-- Commission: `finance/commission.py` (PerShare, PerTrade, PerDollar)
-- Slippage: `finance/slippage.py` (FixedSlippage, VolumeShareSlippage)
+**VectorBT Pro**: Vectorized, uses close price, `accumulate=False` for no re-entry
+**Backtrader**: Event-driven, COO/COC flags, integer shares
+**Zipline**: EXCLUDED - uses bundle data instead of test DataFrame
 
 ## References
 
 - Event-driven architecture patterns
-- VectorBT Pro fill model documentation
 - Position tracking best practices
-- Framework source code in `resources/` (see above)
+- See `.claude/memory/` for architectural decisions

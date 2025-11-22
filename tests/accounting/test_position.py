@@ -1,7 +1,9 @@
 """Unit tests for the Position class."""
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from src.ml4t.backtest.accounting.models import Position
 
 

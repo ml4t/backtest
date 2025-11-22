@@ -4,8 +4,13 @@ This module defines the AccountPolicy interface and implementations for cash
 and margin accounts, enabling flexible constraint enforcement based on account type.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .models import Position
 
 
 class AccountPolicy(ABC):
@@ -20,9 +25,7 @@ class AccountPolicy(ABC):
     """
 
     @abstractmethod
-    def calculate_buying_power(
-        self, cash: float, positions: Dict[str, "Position"]
-    ) -> float:
+    def calculate_buying_power(self, cash: float, positions: dict[str, Position]) -> float:
         """Calculate available buying power for new long positions.
 
         Args:
@@ -58,9 +61,9 @@ class AccountPolicy(ABC):
         asset: str,
         quantity: float,
         price: float,
-        current_positions: Dict[str, "Position"],
+        current_positions: dict[str, Position],
         cash: float,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate whether a new position can be opened.
 
         This is the core validation method called by the Gatekeeper before
@@ -101,9 +104,9 @@ class AccountPolicy(ABC):
         current_quantity: float,
         quantity_delta: float,
         price: float,
-        current_positions: Dict[str, "Position"],
+        current_positions: dict[str, Position],
         cash: float,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate a change to an existing position.
 
         This handles adding to or reducing existing positions, including
@@ -147,9 +150,7 @@ class CashAccountPolicy(AccountPolicy):
     - Conservative risk management
     """
 
-    def calculate_buying_power(
-        self, cash: float, positions: Dict[str, "Position"]
-    ) -> float:
+    def calculate_buying_power(self, cash: float, positions: dict[str, Position]) -> float:
         """Cash account buying power is simply positive cash balance.
 
         Args:
@@ -174,9 +175,9 @@ class CashAccountPolicy(AccountPolicy):
         asset: str,
         quantity: float,
         price: float,
-        current_positions: Dict[str, "Position"],
+        current_positions: dict[str, Position],
         cash: float,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate new position for cash account.
 
         Checks:
@@ -195,7 +196,7 @@ class CashAccountPolicy(AccountPolicy):
         """
         # Check 1: No short selling
         if quantity < 0:
-            return False, f"Short selling not allowed in cash account"
+            return False, "Short selling not allowed in cash account"
 
         # Check 2: Sufficient cash
         order_cost = quantity * price
@@ -213,9 +214,9 @@ class CashAccountPolicy(AccountPolicy):
         current_quantity: float,
         quantity_delta: float,
         price: float,
-        current_positions: Dict[str, "Position"],
+        current_positions: dict[str, Position],
         cash: float,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate position change for cash account.
 
         Checks:
@@ -261,12 +262,11 @@ class CashAccountPolicy(AccountPolicy):
                 )
 
         # Check 4: For decreases (selling), check position size
-        if quantity_delta < 0:
-            if abs(quantity_delta) > abs(current_quantity):
-                return (
-                    False,
-                    f"Cannot sell {abs(quantity_delta):.2f}, only have {abs(current_quantity):.2f}",
-                )
+        if quantity_delta < 0 and abs(quantity_delta) > abs(current_quantity):
+            return (
+                False,
+                f"Cannot sell {abs(quantity_delta):.2f}, only have {abs(current_quantity):.2f}",
+            )
 
         return True, ""
 
@@ -306,9 +306,7 @@ class MarginAccountPolicy(AccountPolicy):
         >>> policy = MarginAccountPolicy(initial_margin=0.25, maintenance_margin=0.15)
     """
 
-    def __init__(
-        self, initial_margin: float = 0.5, maintenance_margin: float = 0.25
-    ) -> None:
+    def __init__(self, initial_margin: float = 0.5, maintenance_margin: float = 0.25) -> None:
         """Initialize margin account policy.
 
         Args:
@@ -326,13 +324,9 @@ class MarginAccountPolicy(AccountPolicy):
             ValueError: If margin parameters are invalid
         """
         if not 0.0 < initial_margin <= 1.0:
-            raise ValueError(
-                f"Initial margin must be in (0.0, 1.0], got {initial_margin}"
-            )
+            raise ValueError(f"Initial margin must be in (0.0, 1.0], got {initial_margin}")
         if not 0.0 < maintenance_margin <= 1.0:
-            raise ValueError(
-                f"Maintenance margin must be in (0.0, 1.0], got {maintenance_margin}"
-            )
+            raise ValueError(f"Maintenance margin must be in (0.0, 1.0], got {maintenance_margin}")
         if maintenance_margin >= initial_margin:
             raise ValueError(
                 f"Maintenance margin ({maintenance_margin}) must be < "
@@ -342,9 +336,7 @@ class MarginAccountPolicy(AccountPolicy):
         self.initial_margin = initial_margin
         self.maintenance_margin = maintenance_margin
 
-    def calculate_buying_power(
-        self, cash: float, positions: Dict[str, "Position"]
-    ) -> float:
+    def calculate_buying_power(self, cash: float, positions: dict[str, Position]) -> float:
         """Calculate buying power for margin account.
 
         Formula:
@@ -396,8 +388,7 @@ class MarginAccountPolicy(AccountPolicy):
         # Calculate Maintenance Margin requirement (MM)
         # Use absolute value because short positions have negative market value
         maintenance_margin_requirement = sum(
-            abs(pos.market_value) * self.maintenance_margin
-            for pos in positions.values()
+            abs(pos.market_value) * self.maintenance_margin for pos in positions.values()
         )
 
         # Calculate Buying Power (BP)
@@ -419,9 +410,9 @@ class MarginAccountPolicy(AccountPolicy):
         asset: str,
         quantity: float,
         price: float,
-        current_positions: Dict[str, "Position"],
+        current_positions: dict[str, Position],
         cash: float,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate new position for margin account.
 
         Checks:
@@ -466,9 +457,9 @@ class MarginAccountPolicy(AccountPolicy):
         current_quantity: float,
         quantity_delta: float,
         price: float,
-        current_positions: Dict[str, "Position"],
+        current_positions: dict[str, Position],
         cash: float,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Validate position change for margin account.
 
         Margin accounts are more permissive than cash accounts:
@@ -501,10 +492,9 @@ class MarginAccountPolicy(AccountPolicy):
         )
 
         # For closing trades, check we're not over-closing
-        if is_closing:
-            if abs(new_quantity) < abs(current_quantity):
-                # Partial close - always allowed (reduces risk)
-                return True, ""
+        if is_closing and abs(new_quantity) < abs(current_quantity):
+            # Partial close - always allowed (reduces risk)
+            return True, ""
             # Position reversal or over-close - validate new portion
 
         # For opening or reversing, check buying power

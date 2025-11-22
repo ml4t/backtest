@@ -1,25 +1,25 @@
 """Test the minimal core backtesting engine."""
 
-import pytest
 from datetime import datetime, timedelta
+
 import polars as pl
+import pytest
 
 from ml4t.backtest import (
-    Engine,
-    DataFeed,
-    Strategy,
     Broker,
-    Order,
-    OrderType,
+    DataFeed,
+    Engine,
     OrderSide,
+    OrderType,
     PercentageCommission,
     PerShareCommission,
+    Strategy,
     VolumeShareSlippage,
     run_backtest,
 )
 
-
 # === Test Data Generators ===
+
 
 def generate_prices(
     assets: list[str],
@@ -29,7 +29,7 @@ def generate_prices(
 ) -> pl.DataFrame:
     """Generate synthetic OHLCV data."""
     if base_prices is None:
-        base_prices = {a: 100.0 for a in assets}
+        base_prices = dict.fromkeys(assets, 100.0)
 
     rows = []
     for i in range(periods):
@@ -38,15 +38,17 @@ def generate_prices(
             base = base_prices[asset]
             # Simple trend with noise
             price = base * (1 + 0.001 * i + 0.01 * (i % 5 - 2))
-            rows.append({
-                "timestamp": ts,
-                "asset": asset,
-                "open": price * 0.998,
-                "high": price * 1.01,
-                "low": price * 0.99,
-                "close": price,
-                "volume": 1000000.0,
-            })
+            rows.append(
+                {
+                    "timestamp": ts,
+                    "asset": asset,
+                    "open": price * 0.998,
+                    "high": price * 1.01,
+                    "low": price * 0.99,
+                    "close": price,
+                    "volume": 1000000.0,
+                }
+            )
 
     return pl.DataFrame(rows)
 
@@ -55,9 +57,11 @@ def generate_signals(
     assets: list[str],
     start: datetime,
     periods: int,
-    signal_names: list[str] = ["ml_score", "momentum"],
+    signal_names: list[str] = None,
 ) -> pl.DataFrame:
     """Generate synthetic signals."""
+    if signal_names is None:
+        signal_names = ["ml_score", "momentum"]
     rows = []
     for i in range(periods):
         ts = start + timedelta(days=i)
@@ -79,16 +83,19 @@ def generate_context(
     rows = []
     for i in range(periods):
         ts = start + timedelta(days=i)
-        rows.append({
-            "timestamp": ts,
-            "vix": 15 + 5 * (i % 7 - 3),  # Oscillating VIX
-            "spy": 450 + i * 0.5,
-        })
+        rows.append(
+            {
+                "timestamp": ts,
+                "vix": 15 + 5 * (i % 7 - 3),  # Oscillating VIX
+                "spy": 450 + i * 0.5,
+            }
+        )
 
     return pl.DataFrame(rows)
 
 
 # === Test Strategies ===
+
 
 class BuyAndHoldStrategy(Strategy):
     """Simple buy and hold for testing."""
@@ -200,8 +207,7 @@ class VolatilityAdjustedStopStrategy(Strategy):
 
             # Set initial stop at 2x volatility below entry
             stop = broker.submit_order(
-                self.asset, 100, OrderSide.SELL, OrderType.STOP,
-                stop_price=price - 2 * vol
+                self.asset, 100, OrderSide.SELL, OrderType.STOP, stop_price=price - 2 * vol
             )
             self.stop_order_id = stop.order_id
 
@@ -213,6 +219,7 @@ class VolatilityAdjustedStopStrategy(Strategy):
 
 # === Tests ===
 
+
 class TestDataFeed:
     """Test DataFeed functionality."""
 
@@ -221,7 +228,7 @@ class TestDataFeed:
         feed = DataFeed(prices_df=prices)
 
         count = 0
-        for ts, data, context in feed:
+        for ts, data, _context in feed:
             assert isinstance(ts, datetime)
             assert "AAPL" in data
             assert "GOOG" in data
@@ -235,7 +242,7 @@ class TestDataFeed:
         signals = generate_signals(["AAPL"], datetime(2024, 1, 1), 5, ["ml_score"])
         feed = DataFeed(prices_df=prices, signals_df=signals)
 
-        for ts, data, context in feed:
+        for _ts, data, _context in feed:
             assert "ml_score" in data["AAPL"]["signals"]
 
     def test_with_context(self):
@@ -243,7 +250,7 @@ class TestDataFeed:
         context_df = generate_context(datetime(2024, 1, 1), 5)
         feed = DataFeed(prices_df=prices, context_df=context_df)
 
-        for ts, data, context in feed:
+        for _ts, _data, context in feed:
             assert "vix" in context
             assert "spy" in context
 
@@ -350,15 +357,19 @@ class TestBroker:
         assert pos.bars_held == 0
 
         # Simulate next bar
-        broker._update_time(datetime(2024, 1, 2), {"AAPL": 101.0}, {"AAPL": 101.0}, {"AAPL": 1000000}, {})
+        broker._update_time(
+            datetime(2024, 1, 2), {"AAPL": 101.0}, {"AAPL": 101.0}, {"AAPL": 1000000}, {}
+        )
         assert pos.bars_held == 1
 
-        broker._update_time(datetime(2024, 1, 3), {"AAPL": 102.0}, {"AAPL": 102.0}, {"AAPL": 1000000}, {})
+        broker._update_time(
+            datetime(2024, 1, 3), {"AAPL": 102.0}, {"AAPL": 102.0}, {"AAPL": 1000000}, {}
+        )
         assert pos.bars_held == 2
 
     def test_order_rejection_insufficient_cash(self):
         """Test that orders are rejected when insufficient cash (Phase 2 validation)."""
-        broker = Broker(initial_cash=10000, account_type='cash')  # Only $10k
+        broker = Broker(initial_cash=10000, account_type="cash")  # Only $10k
         broker._current_time = datetime(2024, 1, 1)
         broker._current_prices = {"AAPL": 150.0}
         broker._current_volumes = {"AAPL": 1000000}
@@ -373,6 +384,7 @@ class TestBroker:
 
         # Order should be rejected
         from ml4t.backtest import OrderStatus
+
         assert order.status == OrderStatus.REJECTED
         assert len(broker.pending_orders) == 0  # Removed from pending
         assert len(broker.fills) == 0  # No fill
@@ -490,7 +502,7 @@ class TestMultiAsset:
 
         feed = DataFeed(prices_df=prices, signals_df=signals)
         engine = Engine(feed, MultiAssetStrategy(), initial_cash=100000)
-        results = engine.run()
+        engine.run()
 
         assert len(engine.broker.positions) == 4
         for asset in assets:

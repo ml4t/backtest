@@ -1,20 +1,19 @@
 """Unit tests for Gatekeeper order validation."""
 
-import pytest
+from datetime import datetime
+
+from ml4t.backtest import (
+    NoCommission,
+    Order,
+    OrderSide,
+    PercentageCommission,
+)
 from ml4t.backtest.accounting import (
     AccountState,
     CashAccountPolicy,
     Gatekeeper,
     Position,
 )
-from ml4t.backtest import (
-    Order,
-    OrderSide,
-    OrderType,
-    PercentageCommission,
-    NoCommission,
-)
-from datetime import datetime
 
 
 class TestGatekeeperInitialization:
@@ -65,11 +64,11 @@ class TestIsReversal:
 
         # No position, buy 100
         is_reversal = gatekeeper._is_reversal(0.0, 100.0)
-        assert is_reversal == False
+        assert not is_reversal
 
         # No position, sell 100 (shorting)
         is_reversal = gatekeeper._is_reversal(0.0, -100.0)
-        assert is_reversal == False
+        assert not is_reversal
 
     def test_long_to_short_is_reversal(self):
         """Selling more than long position creates reversal."""
@@ -79,7 +78,7 @@ class TestIsReversal:
 
         # Long 100, sell 150 (reverse to short 50)
         is_reversal = gatekeeper._is_reversal(100.0, -150.0)
-        assert is_reversal == True
+        assert is_reversal
 
     def test_short_to_long_is_reversal(self):
         """Buying more than short position creates reversal."""
@@ -89,7 +88,7 @@ class TestIsReversal:
 
         # Short 100, buy 150 (reverse to long 50)
         is_reversal = gatekeeper._is_reversal(-100.0, 150.0)
-        assert is_reversal == True
+        assert is_reversal
 
     def test_closing_position_is_not_reversal(self):
         """Closing a position completely is not a reversal."""
@@ -99,11 +98,11 @@ class TestIsReversal:
 
         # Long 100, sell 100 (close to flat)
         is_reversal = gatekeeper._is_reversal(100.0, -100.0)
-        assert is_reversal == False
+        assert not is_reversal
 
         # Short 100, buy 100 (close to flat)
         is_reversal = gatekeeper._is_reversal(-100.0, 100.0)
-        assert is_reversal == False
+        assert not is_reversal
 
     def test_reducing_position_is_not_reversal(self):
         """Partial close is not a reversal."""
@@ -113,11 +112,11 @@ class TestIsReversal:
 
         # Long 100, sell 50 (reduce to long 50)
         is_reversal = gatekeeper._is_reversal(100.0, -50.0)
-        assert is_reversal == False
+        assert not is_reversal
 
         # Short 100, buy 50 (reduce to short 50)
         is_reversal = gatekeeper._is_reversal(-100.0, 50.0)
-        assert is_reversal == False
+        assert not is_reversal
 
     def test_adding_to_position_is_not_reversal(self):
         """Adding to a position is not a reversal."""
@@ -127,11 +126,11 @@ class TestIsReversal:
 
         # Long 100, buy 50 (increase to long 150)
         is_reversal = gatekeeper._is_reversal(100.0, 50.0)
-        assert is_reversal == False
+        assert not is_reversal
 
         # Short 100, sell 50 (increase to short 150)
         is_reversal = gatekeeper._is_reversal(-100.0, -50.0)
-        assert is_reversal == False
+        assert not is_reversal
 
 
 class TestIsReducingOrder:
@@ -145,11 +144,11 @@ class TestIsReducingOrder:
 
         # No position, buy 100
         is_reducing = gatekeeper._is_reducing_order(0.0, 100.0)
-        assert is_reducing == False
+        assert not is_reducing
 
         # No position, sell 100 (shorting)
         is_reducing = gatekeeper._is_reducing_order(0.0, -100.0)
-        assert is_reducing == False
+        assert not is_reducing
 
     def test_long_position_sell_is_reducing(self):
         """Selling from long position is reducing."""
@@ -159,11 +158,11 @@ class TestIsReducingOrder:
 
         # Long 100, sell 50 (partial close)
         is_reducing = gatekeeper._is_reducing_order(100.0, -50.0)
-        assert is_reducing == True
+        assert is_reducing
 
         # Long 100, sell 100 (full close)
         is_reducing = gatekeeper._is_reducing_order(100.0, -100.0)
-        assert is_reducing == True
+        assert is_reducing
 
     def test_long_position_buy_is_not_reducing(self):
         """Buying more long is not reducing."""
@@ -173,7 +172,7 @@ class TestIsReducingOrder:
 
         # Long 100, buy 50 more (adding)
         is_reducing = gatekeeper._is_reducing_order(100.0, 50.0)
-        assert is_reducing == False
+        assert not is_reducing
 
     def test_short_position_buy_is_reducing(self):
         """Buying to cover short is reducing."""
@@ -183,11 +182,11 @@ class TestIsReducingOrder:
 
         # Short 100, buy 50 (partial cover)
         is_reducing = gatekeeper._is_reducing_order(-100.0, 50.0)
-        assert is_reducing == True
+        assert is_reducing
 
         # Short 100, buy 100 (full cover)
         is_reducing = gatekeeper._is_reducing_order(-100.0, 100.0)
-        assert is_reducing == True
+        assert is_reducing
 
     def test_short_position_sell_is_not_reducing(self):
         """Selling more short is not reducing."""
@@ -197,7 +196,7 @@ class TestIsReducingOrder:
 
         # Short 100, sell 50 more (adding)
         is_reducing = gatekeeper._is_reducing_order(-100.0, -50.0)
-        assert is_reducing == False
+        assert not is_reducing
 
     def test_position_reversal_is_not_reducing(self):
         """Position reversal (long->short or short->long) is not reducing."""
@@ -207,11 +206,11 @@ class TestIsReducingOrder:
 
         # Long 100, sell 150 (reverse to short 50)
         is_reducing = gatekeeper._is_reducing_order(100.0, -150.0)
-        assert is_reducing == False
+        assert not is_reducing
 
         # Short 100, buy 150 (reverse to long 50)
         is_reducing = gatekeeper._is_reducing_order(-100.0, 150.0)
-        assert is_reducing == False
+        assert not is_reducing
 
 
 class TestValidateOrderReducing:
@@ -237,7 +236,7 @@ class TestValidateOrderReducing:
         order = Order(asset="AAPL", side=OrderSide.SELL, quantity=50)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
     def test_closing_order_always_approved(self):
@@ -260,7 +259,7 @@ class TestValidateOrderReducing:
         order = Order(asset="AAPL", side=OrderSide.SELL, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
 
@@ -277,7 +276,7 @@ class TestValidateOrderOpening:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
     def test_new_long_position_rejected_insufficient_cash(self):
@@ -290,7 +289,7 @@ class TestValidateOrderOpening:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == False
+        assert not valid
         assert "Insufficient cash" in reason
 
     def test_new_short_position_rejected_cash_account(self):
@@ -303,7 +302,7 @@ class TestValidateOrderOpening:
         order = Order(asset="AAPL", side=OrderSide.SELL, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == False
+        assert not valid
         assert "Short selling not allowed" in reason
 
     def test_adding_to_long_position_approved(self):
@@ -326,7 +325,7 @@ class TestValidateOrderOpening:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=50)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
     def test_adding_to_long_position_rejected_insufficient_cash(self):
@@ -349,7 +348,7 @@ class TestValidateOrderOpening:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=50)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == False
+        assert not valid
         assert "Insufficient cash" in reason
 
 
@@ -376,7 +375,7 @@ class TestValidateOrderPositionReversal:
         order = Order(asset="AAPL", side=OrderSide.SELL, quantity=150)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == False
+        assert not valid
         assert "Position reversal not allowed" in reason
 
     def test_position_reversal_approved_margin_account(self):
@@ -404,7 +403,7 @@ class TestValidateOrderPositionReversal:
         order = Order(asset="AAPL", side=OrderSide.SELL, quantity=150)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
     def test_position_reversal_rejected_margin_account_insufficient_bp(self):
@@ -432,7 +431,7 @@ class TestValidateOrderPositionReversal:
         order = Order(asset="AAPL", side=OrderSide.SELL, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == False
+        assert not valid
         assert "Insufficient buying power" in reason
 
 
@@ -454,7 +453,7 @@ class TestValidateOrderWithCommission:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == False
+        assert not valid
         assert "Insufficient cash" in reason
 
     def test_order_approved_with_commission(self):
@@ -472,7 +471,7 @@ class TestValidateOrderWithCommission:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
 
@@ -488,7 +487,7 @@ class TestValidateOrderEdgeCases:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=1)
         valid, reason = gatekeeper.validate_order(order, price=1.0)
 
-        assert valid == False
+        assert not valid
         assert "Insufficient cash" in reason
 
     def test_exact_cash_amount_approved(self):
@@ -501,7 +500,7 @@ class TestValidateOrderEdgeCases:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=100)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""
 
     def test_fractional_quantities(self):
@@ -514,5 +513,5 @@ class TestValidateOrderEdgeCases:
         order = Order(asset="AAPL", side=OrderSide.BUY, quantity=0.5)
         valid, reason = gatekeeper.validate_order(order, price=150.0)
 
-        assert valid == True
+        assert valid
         assert reason == ""

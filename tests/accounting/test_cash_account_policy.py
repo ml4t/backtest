@@ -1,9 +1,9 @@
 """Unit tests for CashAccountPolicy."""
 
-import pytest
 from datetime import datetime
-from src.ml4t.backtest.accounting.policy import CashAccountPolicy
+
 from src.ml4t.backtest.accounting.models import Position
+from src.ml4t.backtest.accounting.policy import CashAccountPolicy
 
 
 class TestCashAccountPolicyBuyingPower:

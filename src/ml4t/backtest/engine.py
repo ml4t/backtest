@@ -1,14 +1,17 @@
 """Backtesting engine orchestration."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import TYPE_CHECKING
+
 import polars as pl
 
-from .types import ExecutionMode
-from .models import CommissionModel, SlippageModel, PercentageCommission, PercentageSlippage
-from .datafeed import DataFeed
 from .broker import Broker
+from .datafeed import DataFeed
+from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
 from .strategy import Strategy
+from .types import ExecutionMode
 
 if TYPE_CHECKING:
     from .config import BacktestConfig
@@ -28,7 +31,7 @@ class Engine:
         account_type: str = "cash",
         initial_margin: float = 0.5,
         maintenance_margin: float = 0.25,
-        config: "BacktestConfig | None" = None,
+        config: BacktestConfig | None = None,
     ):
         self.feed = feed
         self.strategy = strategy
@@ -118,8 +121,8 @@ class Engine:
         cls,
         feed: DataFeed,
         strategy: Strategy,
-        config: "BacktestConfig",
-    ) -> "Engine":
+        config: BacktestConfig,
+    ) -> Engine:
         """
         Create an Engine instance from a BacktestConfig.
 
@@ -142,7 +145,9 @@ class Engine:
         Returns:
             Configured Engine instance
         """
-        from .config import FillTiming, CommissionModel as CommModelEnum, SlippageModel as SlipModelEnum
+        from .config import CommissionModel as CommModelEnum
+        from .config import FillTiming
+        from .config import SlippageModel as SlipModelEnum
 
         # Map config fill timing to ExecutionMode
         if config.fill_timing == FillTiming.SAME_BAR:
@@ -156,16 +161,17 @@ class Engine:
         if config.commission_model == CommModelEnum.PERCENTAGE:
             commission_model = PercentageCommission(
                 rate=config.commission_rate,
-                min_commission=config.commission_minimum,
             )
         elif config.commission_model == CommModelEnum.PER_SHARE:
             from .models import PerShareCommission
+
             commission_model = PerShareCommission(
                 per_share=config.commission_per_share,
-                min_commission=config.commission_minimum,
+                minimum=config.commission_minimum,
             )
         elif config.commission_model == CommModelEnum.PER_TRADE:
             from .models import NoCommission
+
             # For per-trade, we'd need a new model, use NoCommission for now
             commission_model = NoCommission()
         # NONE or unrecognized -> None (will use NoCommission in Broker)
@@ -176,7 +182,8 @@ class Engine:
             slippage_model = PercentageSlippage(rate=config.slippage_rate)
         elif config.slippage_model == SlipModelEnum.FIXED:
             from .models import FixedSlippage
-            slippage_model = FixedSlippage(fixed=config.slippage_fixed)
+
+            slippage_model = FixedSlippage(amount=config.slippage_fixed)
         # NONE, VOLUME_BASED, or unrecognized -> None (will use NoSlippage)
 
         return cls(
@@ -195,12 +202,13 @@ class Engine:
 
 # === Convenience Function ===
 
+
 def run_backtest(
     prices: pl.DataFrame | str,
     strategy: Strategy,
     signals: pl.DataFrame | str | None = None,
     context: pl.DataFrame | str | None = None,
-    config: "BacktestConfig | str | None" = None,
+    config: BacktestConfig | str | None = None,
     # Legacy parameters (used if config is None)
     initial_cash: float = 100000.0,
     commission_model: CommissionModel | None = None,
@@ -245,13 +253,16 @@ def run_backtest(
     # Handle config parameter
     if config is not None:
         from .config import BacktestConfig as ConfigCls
+
         if isinstance(config, str):
             config = ConfigCls.from_preset(config)
         return Engine.from_config(feed, strategy, config).run()
 
     # Legacy path: use individual parameters
     engine = Engine(
-        feed, strategy, initial_cash,
+        feed,
+        strategy,
+        initial_cash,
         commission_model=commission_model,
         slippage_model=slippage_model,
         execution_mode=execution_mode,

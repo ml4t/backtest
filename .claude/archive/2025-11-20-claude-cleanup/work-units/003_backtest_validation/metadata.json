@@ -1,9 +1,0 @@
-{
-    "id": "003",
-    "name": "003_backtest_validation",
-    "created_at": "$(date -Iseconds)",
-    "requirement_type": "description",
-    "requirement_source": "validate backtest vs zipline-reloaded, vectorbt-pro, backtrader",
-    "phase": "exploring",
-    "status": "active"
-}

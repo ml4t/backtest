@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-
 # === Enums ===
+
 
 class OrderType(Enum):
     MARKET = "market"
@@ -29,11 +29,13 @@ class OrderStatus(Enum):
 
 class ExecutionMode(Enum):
     """Order execution timing mode."""
-    SAME_BAR = "same_bar"      # Orders fill at current bar's close (default)
-    NEXT_BAR = "next_bar"      # Orders fill at next bar's open (like Backtrader)
+
+    SAME_BAR = "same_bar"  # Orders fill at current bar's close (default)
+    NEXT_BAR = "next_bar"  # Orders fill at next bar's open (like Backtrader)
 
 
 # === Dataclasses ===
+
 
 @dataclass
 class Order:
@@ -85,6 +87,7 @@ class Fill:
 @dataclass
 class Trade:
     """Completed round-trip trade."""
+
     asset: str
     entry_time: datetime
     exit_time: datetime

@@ -4,7 +4,6 @@ This module provides the AccountState class that tracks cash, positions, and
 delegates validation to the appropriate AccountPolicy.
 """
 
-from typing import Dict
 from .models import Position
 from .policy import AccountPolicy
 
@@ -36,7 +35,7 @@ class AccountState:
             policy: AccountPolicy instance (CashAccountPolicy or MarginAccountPolicy)
         """
         self.cash = initial_cash
-        self.positions: Dict[str, Position] = {}
+        self.positions: dict[str, Position] = {}
         self.policy = policy
 
     @property
@@ -76,7 +75,7 @@ class AccountState:
         """
         return self.policy.allows_short_selling()
 
-    def mark_to_market(self, current_prices: Dict[str, float]) -> None:
+    def mark_to_market(self, current_prices: dict[str, float]) -> None:
         """Update positions with current market prices.
 
         This is called at the end of each bar to update unrealized P&L.
@@ -111,9 +110,7 @@ class AccountState:
         pos = self.positions.get(asset)
         return pos.quantity if pos else 0.0
 
-    def apply_fill(
-        self, asset: str, quantity_delta: float, fill_price: float, timestamp
-    ) -> float:
+    def apply_fill(self, asset: str, quantity_delta: float, fill_price: float, timestamp) -> float:
         """Apply a fill to the account, updating position and cash.
 
         This method handles both long and short positions correctly:
@@ -150,7 +147,6 @@ class AccountState:
             Commission should be handled separately by the caller.
             This method only handles the asset position and base cash flow.
         """
-        from datetime import datetime
 
         # Calculate cash flow: negative for buys, positive for sells/shorts
         # Formula: cash_change = -quantity_delta × fill_price

@@ -2,31 +2,38 @@
 
 from typing import Protocol, runtime_checkable
 
-
 # === Protocols ===
+
 
 @runtime_checkable
 class CommissionModel(Protocol):
     """Protocol for commission calculation."""
+
     def calculate(self, asset: str, quantity: float, price: float) -> float: ...
 
 
 @runtime_checkable
 class SlippageModel(Protocol):
     """Protocol for slippage/market impact calculation."""
-    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float: ...
+
+    def calculate(
+        self, asset: str, quantity: float, price: float, volume: float | None
+    ) -> float: ...
 
 
 # === Commission Models ===
 
+
 class NoCommission:
     """Zero commission."""
+
     def calculate(self, asset: str, quantity: float, price: float) -> float:
         return 0.0
 
 
 class PercentageCommission:
     """Commission as percentage of trade value."""
+
     def __init__(self, rate: float = 0.001):
         self.rate = rate
 
@@ -36,6 +43,7 @@ class PercentageCommission:
 
 class PerShareCommission:
     """Fixed commission per share with optional minimum."""
+
     def __init__(self, per_share: float = 0.005, minimum: float = 1.0):
         self.per_share = per_share
         self.minimum = minimum
@@ -46,6 +54,7 @@ class PerShareCommission:
 
 class TieredCommission:
     """Tiered commission based on trade value."""
+
     def __init__(self, tiers: list[tuple[float, float]]):
         # [(threshold, rate), ...] e.g. [(10000, 0.001), (50000, 0.0008), (inf, 0.0005)]
         self.tiers = sorted(tiers, key=lambda x: x[0])
@@ -60,6 +69,7 @@ class TieredCommission:
 
 class CombinedCommission:
     """Combined percentage + fixed commission per trade."""
+
     def __init__(self, percentage: float = 0.0, fixed: float = 0.0):
         self.percentage = percentage
         self.fixed = fixed
@@ -71,14 +81,17 @@ class CombinedCommission:
 
 # === Slippage Models ===
 
+
 class NoSlippage:
     """Zero slippage."""
+
     def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
         return 0.0
 
 
 class FixedSlippage:
     """Fixed slippage per share."""
+
     def __init__(self, amount: float = 0.01):
         self.amount = amount
 
@@ -88,6 +101,7 @@ class FixedSlippage:
 
 class PercentageSlippage:
     """Slippage as percentage of price (per-unit price adjustment)."""
+
     def __init__(self, rate: float = 0.001):
         self.rate = rate
 
@@ -99,6 +113,7 @@ class PercentageSlippage:
 
 class VolumeShareSlippage:
     """Slippage based on order size vs volume (market impact)."""
+
     def __init__(self, impact_factor: float = 0.1):
         self.impact_factor = impact_factor
 

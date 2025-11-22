@@ -1,9 +1,11 @@
 """Unit tests for MarginAccountPolicy."""
 
-import pytest
 from datetime import datetime
-from src.ml4t.backtest.accounting.policy import MarginAccountPolicy
+
+import pytest
+
 from src.ml4t.backtest.accounting.models import Position
+from src.ml4t.backtest.accounting.policy import MarginAccountPolicy
 
 
 class TestMarginAccountPolicyInitialization:

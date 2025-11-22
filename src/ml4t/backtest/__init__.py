@@ -11,43 +11,47 @@ A clean, extensible backtesting engine with:
 __version__ = "0.2.0"
 
 # Import from modules
-from .types import (
-    OrderType,
-    OrderSide,
-    OrderStatus,
-    ExecutionMode,
-    Order,
-    Position,
-    Fill,
-    Trade,
+from .broker import Broker
+from .config import (
+    PRESETS_DIR,
+    BacktestConfig,
+    ExecutionPrice,
+    FillTiming,
+    ShareType,
+    SignalProcessing,
+    SizingMethod,
 )
-from .models import (
-    CommissionModel,
-    SlippageModel,
-    NoCommission,
-    PercentageCommission,
-    PerShareCommission,
-    TieredCommission,
-    CombinedCommission,
-    NoSlippage,
-    FixedSlippage,
-    PercentageSlippage,
-    VolumeShareSlippage,
+from .config import (
+    CommissionModel as CommissionModelType,
+)
+from .config import (
+    SlippageModel as SlippageModelType,
 )
 from .datafeed import DataFeed
-from .broker import Broker
+from .engine import BacktestEngine, Engine, run_backtest
+from .models import (
+    CombinedCommission,
+    CommissionModel,
+    FixedSlippage,
+    NoCommission,
+    NoSlippage,
+    PercentageCommission,
+    PercentageSlippage,
+    PerShareCommission,
+    SlippageModel,
+    TieredCommission,
+    VolumeShareSlippage,
+)
 from .strategy import Strategy
-from .engine import Engine, run_backtest, BacktestEngine
-from .config import (
-    BacktestConfig,
-    FillTiming,
-    ExecutionPrice,
-    ShareType,
-    SizingMethod,
-    SignalProcessing,
-    CommissionModel as CommissionModelType,
-    SlippageModel as SlippageModelType,
-    PRESETS_DIR,
+from .types import (
+    ExecutionMode,
+    Fill,
+    Order,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    Position,
+    Trade,
 )
 
 __all__ = [

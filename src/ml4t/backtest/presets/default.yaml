@@ -1,0 +1,45 @@
+# Default Configuration
+#
+# Balanced settings for general use.
+# - Next-bar execution (realistic, no look-ahead)
+# - Fractional shares (flexible)
+# - Moderate costs
+# - Check position state (event-driven behavior)
+
+execution:
+  fill_timing: next_bar_open
+  execution_price: open
+
+position_sizing:
+  share_type: fractional
+  sizing_method: percent_of_portfolio
+  default_position_pct: 0.10
+
+signals:
+  signal_processing: check_position
+  accumulate_positions: false
+
+commission:
+  model: percentage
+  rate: 0.001  # 0.1%
+  per_share: 0.0
+  per_trade: 0.0
+  minimum: 0.0
+
+slippage:
+  model: percentage
+  rate: 0.001  # 0.1%
+  fixed: 0.0
+
+cash:
+  initial: 100000.0
+  allow_negative: false
+  buffer_pct: 0.0
+
+orders:
+  reject_on_insufficient_cash: true
+  partial_fills_allowed: false
+
+account:
+  type: cash
+  margin_requirement: 0.5

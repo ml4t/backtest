@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Any
+
 import polars as pl
 
 
@@ -17,14 +18,20 @@ class DataFeed:
         signals_df: pl.DataFrame | None = None,
         context_df: pl.DataFrame | None = None,
     ):
-        self.prices = prices_df if prices_df is not None else (
-            pl.scan_parquet(prices_path).collect() if prices_path else None
+        self.prices = (
+            prices_df
+            if prices_df is not None
+            else (pl.scan_parquet(prices_path).collect() if prices_path else None)
         )
-        self.signals = signals_df if signals_df is not None else (
-            pl.scan_parquet(signals_path).collect() if signals_path else None
+        self.signals = (
+            signals_df
+            if signals_df is not None
+            else (pl.scan_parquet(signals_path).collect() if signals_path else None)
         )
-        self.context = context_df if context_df is not None else (
-            pl.scan_parquet(context_path).collect() if context_path else None
+        self.context = (
+            context_df
+            if context_df is not None
+            else (pl.scan_parquet(context_path).collect() if context_path else None)
         )
 
         if self.prices is None:

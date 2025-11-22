@@ -4,10 +4,9 @@ This module provides the Gatekeeper class that validates orders before execution
 ensuring they meet account policy constraints and preventing invalid trades.
 """
 
-from typing import Tuple
-from .account import AccountState
-from ..types import Order, OrderSide
 from ..models import CommissionModel
+from ..types import Order, OrderSide
+from .account import AccountState
 
 
 class Gatekeeper:
@@ -47,7 +46,7 @@ class Gatekeeper:
         self.account = account
         self.commission_model = commission_model
 
-    def validate_order(self, order: Order, price: float) -> Tuple[bool, str]:
+    def validate_order(self, order: Order, price: float) -> tuple[bool, str]:
         """Validate order before execution.
 
         This is the main validation entry point called by the Broker before

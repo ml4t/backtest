@@ -19,10 +19,10 @@ class Strategy(ABC):
         """Called for each timestamp with all available data."""
         pass
 
-    def on_start(self, broker: Any) -> None:
+    def on_start(self, broker: Any) -> None:  # noqa: B027
         """Called before backtest starts."""
         pass
 
-    def on_end(self, broker: Any) -> None:
+    def on_end(self, broker: Any) -> None:  # noqa: B027
         """Called after backtest ends."""
         pass
