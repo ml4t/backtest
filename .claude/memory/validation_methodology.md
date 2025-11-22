@@ -5,113 +5,121 @@
 
 ## Core Principle
 
-ml4t.backtest should be able to replicate the behavior of established frameworks through configuration options, allowing users migrating from other frameworks to get comparable results.
+ml4t.backtest should be able to replicate the behavior of established frameworks through **configuration options**, not defaults. Users should be able to match any framework's exact behavior when needed.
 
-## Validation Strategy (Post-Cleanup)
+## Validation Strategy
 
-**Per-framework in isolated venvs** - NOT unified pytest.
+**Scenario-based, per-framework validation** in isolated virtual environments.
 
-This approach was adopted after two days of dependency conflicts between VectorBT Pro, Backtrader, and Zipline in a single environment.
+### Why This Approach
 
-### Virtual Environments
+1. **Dependency conflicts**: VectorBT OSS/Pro, Backtrader, and Zipline cannot coexist
+2. **Different semantics**: Each framework has unique execution models
+3. **Clear comparisons**: Isolated scripts show exact behavior matching
 
-| Environment | Purpose | Contents |
-|-------------|---------|----------|
-| `.venv` | Main development | Core dependencies only |
-| `.venv-vectorbt-pro` | VectorBT Pro validation | VectorBT Pro 2025.x |
-| `.venv-backtrader` | Backtrader validation | Backtrader only |
-| `.venv-zipline` | Zipline validation | Zipline-reloaded (low priority) |
-| `.venv-validation` | DEPRECATED | Has OSS/Pro conflict |
+### Virtual Environments (All Pre-Created)
+
+| Environment | Contents | Status |
+|-------------|----------|--------|
+| `.venv` | Main development | Active |
+| `.venv-vectorbt-pro` | VectorBT Pro 2025.x | **Installed** |
+| `.venv-backtrader` | Backtrader only | Available |
+| `.venv-zipline` | Zipline-reloaded | Low priority |
+| `.venv-validation` | DEPRECATED | OSS/Pro conflict |
 
 ### Critical: VectorBT OSS/Pro Conflict
 
-VectorBT OSS and Pro CANNOT coexist - both register pandas `.vbt` accessor which conflicts:
+VectorBT OSS and Pro CANNOT coexist - both register pandas `.vbt` accessor:
 ```
 AttributeError: 'OHLCVDFAccessor' object has no attribute 'has_ohlc'
 ```
 
-**Solution**: Separate venvs for OSS and Pro.
+## Validation Scenarios
+
+Each scenario tests a specific behavior dimension:
+
+| Scenario | Tests |
+|----------|-------|
+| `scenario_01_long_only` | Basic long entries and exits |
+| `scenario_02_long_short` | Position flipping, shorts |
+| `scenario_03_with_commission` | Commission impact on P&L |
+| `scenario_04_with_slippage` | Slippage impact on fills |
+| `scenario_05_stop_orders` | Stop-loss execution timing |
+| `scenario_06_multi_asset` | Cross-asset behavior |
 
 ## Validation Process
 
-### Step 1: Create Validation Script
-
-For each framework, create standalone Python script in `validation/<framework>/`:
+### Step 1: Create Scenario Script
 
 ```python
-# validation/vectorbt_pro/scenario_long_only.py
+# validation/vectorbt_pro/scenario_01_long_only.py
 """Compare single asset long-only behavior."""
 
 import vectorbtpro as vbt
 from ml4t.backtest import Engine, Strategy, DataFeed
 
-# Same test data and signals for both
-# Compare: trades, P&L, positions
+# Identical data and signals for both frameworks
+# Run both, compare trade-by-trade
 ```
 
 ### Step 2: Run in Isolated Environment
 
 ```bash
-# VectorBT Pro
 source .venv-vectorbt-pro/bin/activate
-cd validation/vectorbt_pro
-python scenario_long_only.py
-
-# Backtrader
-source .venv-backtrader/bin/activate
-cd validation/backtrader
-python scenario_long_only.py
+python validation/vectorbt_pro/scenario_01_long_only.py
 ```
 
 ### Step 3: Document Configuration
 
-When differences exist, document the ml4t.backtest configuration that replicates each framework's behavior.
+When ml4t.backtest differs from external framework, document:
+1. What configuration option matches the external behavior
+2. Why the default differs (if it does)
 
 ## Success Criteria
 
-For each framework comparison:
+For each scenario:
 - **Trade count**: Exact match
-- **Trade timestamps**: Match within 1 bar
-- **Final P&L**: < 0.1% variance
-- **Fill prices**: Within OHLC bounds
+- **Trade timestamps**: Exact match (within execution mode semantics)
+- **Fill prices**: Match (or within slippage model bounds)
+- **Final P&L**: Exact match (accounting for floating point)
 
-## Known Framework Behaviors
+## Framework Behaviors to Match
 
-### VectorBT
-- Vectorized execution (all signals processed)
-- `accumulate=False` prevents same-bar re-entry
-- Uses close price for fills by default
+### VectorBT Pro
+- Vectorized: processes all signals at once
+- Same-bar fills at close price (default)
+- Fractional shares allowed
+- `accumulate=False` prevents re-entry on same bar
 
 ### Backtrader
-- Event-driven, bar-by-bar
-- COO (Cheat-on-Open) / COC (Cheat-on-Close) flags
-- Integer shares by default
+- Event-driven: bar-by-bar processing
+- Next-bar fills at open (default)
+- Integer shares only
+- COO/COC flags modify execution timing
 
-### Zipline
-- **EXCLUDED** - uses bundle data, not test DataFrame
-- Known ~4.3x difference from other frameworks
-
-## Test Coverage Matrix
-
-| Scenario | VectorBT Pro | Backtrader | Zipline |
-|----------|--------------|------------|---------|
-| Long only | ⬜ TODO | ⬜ TODO | ❌ N/A |
-| Long/Short | ⬜ TODO | ⬜ TODO | ❌ N/A |
-| Commission | ⬜ TODO | ⬜ TODO | ❌ N/A |
-| Slippage | ⬜ TODO | ⬜ TODO | ❌ N/A |
-| Stop-loss | ⬜ TODO | ⬜ TODO | ❌ N/A |
+### Zipline (Excluded)
+- Uses bundle data system (incompatible with custom DataFrames)
+- Different price universe causes ~4.3x P&L difference
+- Not practical to validate against
 
 ## Files
 
-- `validation/README.md` - Validation strategy overview
-- `validation/vectorbt_pro/` - VectorBT Pro scripts (internal only)
-- `validation/backtrader/` - Backtrader scripts (open source)
+```
+validation/
+├── README.md                    # Validation overview
+├── vectorbt_pro/                # VectorBT Pro scenarios
+│   ├── scenario_01_long_only.py
+│   └── ...
+└── backtrader/                  # Backtrader scenarios
+    ├── scenario_01_long_only.py
+    └── ...
+```
 
 ## Historical Note
 
-The old `tests/validation/` with 32,643 lines was deleted in Nov 2025 cleanup due to:
-- Persistent dependency conflicts
-- Chaotic test organization
-- Unreliable test results
+The old `tests/validation/` (32,643 lines) was deleted due to:
+- Dependency conflicts making tests unreliable
+- Chaotic organization spanning 152 files
+- No clear framework isolation
 
-The new approach is simpler and more reliable.
+The new approach is simpler, isolated, and reproducible.

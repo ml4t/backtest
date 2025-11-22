@@ -1,24 +1,25 @@
 # ml4t.backtest - Event-Driven Backtesting Engine
 
-**Status**: Beta - Accounting System Complete
-**Current version**: 0.2.0
-**Performance**: 30x faster than Backtrader
-**Accounting**: Cash and margin accounts with proper constraints
+**Status**: Beta
+**Version**: 0.2.0
+**Tests**: 154 passing
 
 ---
 
 ## Overview
 
-ml4t.backtest is a high-performance, event-driven backtesting engine for quantitative trading strategies with institutional-grade accounting.
+ml4t.backtest is an event-driven backtesting engine for quantitative trading strategies. It supports single-asset and multi-asset strategies with realistic execution modeling.
 
 ### Key Features
 
-- ✅ **Realistic Accounting**: Cash and margin account support with proper constraints
-- ✅ **Performance**: 30x faster than Backtrader, 5x faster than VectorBT
-- ✅ **Point-in-Time Correctness**: No look-ahead bias
-- ✅ **Flexible Execution**: Same-bar and next-bar modes
-- ✅ **Comprehensive Testing**: 154 tests passing
-- ✅ **Type-Safe**: Full type hints
+- **Event-Driven Execution**: Bar-by-bar strategy execution with `on_data()` callbacks
+- **Multi-Asset Support**: Trade multiple assets simultaneously with unified portfolio tracking
+- **Polars-Based Data**: Efficient data handling with lazy evaluation support
+- **Realistic Accounting**: Cash accounts (no leverage) and margin accounts (with short selling)
+- **Framework Compatibility**: Configuration presets to match VectorBT, Backtrader, and Zipline behavior
+- **Pluggable Models**: Swappable commission and slippage models
+- **Order Types**: Market, limit, stop, stop-limit, trailing stop
+- **Exit-First Processing**: Exit orders processed before entries for capital efficiency
 
 ---
 
@@ -45,7 +46,7 @@ import polars as pl
 from datetime import datetime, timedelta
 from ml4t.backtest import Engine, Strategy, DataFeed, PerShareCommission
 
-# Create sample data
+# Create price data
 dates = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)]
 data = pl.DataFrame({
     "timestamp": dates,
@@ -58,7 +59,7 @@ data = pl.DataFrame({
 })
 
 # Define strategy
-class SimpleStrategy(Strategy):
+class MomentumStrategy(Strategy):
     def on_data(self, timestamp, data, context, broker):
         if "AAPL" not in data:
             return
@@ -66,21 +67,21 @@ class SimpleStrategy(Strategy):
         price = data["AAPL"]["close"]
         position = broker.get_position("AAPL")
 
-        # Buy on day 1, sell on day 50
-        if timestamp.day == 1 and (position is None or position.quantity == 0):
+        # Simple momentum: buy if no position, sell after 20 bars
+        if position is None or position.quantity == 0:
             broker.submit_order("AAPL", 100)  # Buy 100 shares
-        elif timestamp.day == 50 and position and position.quantity > 0:
-            broker.submit_order("AAPL", -position.quantity)  # Sell all
+        elif position.bars_held >= 20:
+            broker.close_position("AAPL")
 
 # Run backtest
 feed = DataFeed(prices_df=data)
-strategy = SimpleStrategy()
+strategy = MomentumStrategy()
 
 engine = Engine(
     feed,
     strategy,
     initial_cash=50_000.0,
-    account_type="cash",  # or "margin"
+    account_type="cash",
     commission_model=PerShareCommission(0.01),
 )
 
@@ -95,271 +96,88 @@ print(f"Total Trades: {results['num_trades']}")
 
 ## Account Types
 
-ml4t.backtest supports two account types with realistic constraints:
-
 ### Cash Account
 
-Cash accounts enforce strict constraints:
-- ✅ **No leverage**: Can only trade with available cash
-- ✅ **No short selling**: Cannot hold negative positions
-- ✅ **Buying power = cash**: Simple calculation
-- ✅ **Order rejection**: Orders rejected if insufficient cash
-
-**Example: Cash Account**
+Standard cash account with no leverage or short selling:
 
 ```python
-from ml4t.backtest import Engine, Strategy, DataFeed
-
-class BuyAndHoldStrategy(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        if "AAPL" not in data:
-            return
-
-        position = broker.get_position("AAPL")
-
-        # Try to buy on first day
-        if timestamp.day == 1 and (position is None or position.quantity == 0):
-            price = data["AAPL"]["close"]
-            # Try to buy $60,000 worth (will be rejected with $50k initial cash)
-            quantity = int(60_000 / price)
-            order = broker.submit_order("AAPL", quantity)
-
-            if order is None:
-                print(f"Order rejected: Insufficient cash")
-                # Adjust to affordable quantity
-                quantity = int(broker.account.cash / price)
-                broker.submit_order("AAPL", quantity)
-
-# Run with cash account
 engine = Engine(
-    feed,
-    strategy,
-    initial_cash=50_000.0,
-    account_type="cash",  # Cash account (default)
+    feed, strategy,
+    initial_cash=100_000.0,
+    account_type="cash",  # No leverage, no shorts
 )
-
-results = engine.run()
 ```
 
-**Constraints Enforced**:
-- Orders exceeding available cash are rejected
-- Short selling attempts are rejected
-- Exit orders always execute (closing positions)
+**Constraints**:
+- Orders rejected if insufficient cash
+- Short selling not allowed
+- Buying power equals available cash
 
 ### Margin Account
 
-Margin accounts allow leverage and short selling:
-- ✅ **Leverage enabled**: Can trade up to 2x cash (50% initial margin)
-- ✅ **Short selling allowed**: Can hold negative positions
-- ✅ **Margin requirements**: Initial and maintenance margin enforced
-- ✅ **Buying power formula**: `(NLV - MM) / IM`
-
-**Example: Margin Account**
+Margin account with leverage and short selling support:
 
 ```python
-from ml4t.backtest import Engine, Strategy, DataFeed
-
-class FlippingStrategy(Strategy):
-    """Strategy that flips between long and short positions."""
-
-    def __init__(self):
-        self.bar_count = 0
-
-    def on_data(self, timestamp, data, context, broker):
-        if "AAPL" not in data:
-            return
-
-        self.bar_count += 1
-        position = broker.get_position("AAPL")
-        current_qty = position.quantity if position else 0
-
-        # Odd bars: long, Even bars: short
-        target_qty = 100 if (self.bar_count % 2 == 1) else -100
-        order_qty = target_qty - current_qty
-
-        if order_qty != 0:
-            broker.submit_order("AAPL", order_qty)
-
-# Run with margin account
 engine = Engine(
-    feed,
-    strategy,
-    initial_cash=50_000.0,
-    account_type="margin",  # Margin account
-    initial_margin=0.5,     # 50% initial margin (2x leverage)
-    maintenance_margin=0.25,  # 25% maintenance margin
+    feed, strategy,
+    initial_cash=100_000.0,
+    account_type="margin",
+    initial_margin=0.5,      # 50% = 2x leverage (Reg T)
+    maintenance_margin=0.25,  # 25% maintenance requirement
 )
-
-results = engine.run()
 ```
 
-**Margin Calculations**:
-- **Net Liquidation Value (NLV)**: `cash + sum(position_values)`
-- **Maintenance Margin (MM)**: `sum(abs(position_values) × maintenance_margin)`
-- **Buying Power (BP)**: `(NLV - MM) / initial_margin`
-
-**Constraints Enforced**:
-- Orders exceeding buying power are rejected
-- Position reversals (long→short) are split into close + open
-- Short positions tracked with negative quantities
-- Margin calls enforced when equity falls below maintenance margin
+**Features**:
+- Short selling enabled
+- Buying power formula: `(NLV - MM) / initial_margin`
+- Position reversals allowed (long → short in single order)
+- Margin calls when equity falls below maintenance
 
 ---
 
-## Order Rejection Scenarios
-
-Understanding when orders are rejected helps design robust strategies.
-
-### Cash Account Rejections
+## Order Types
 
 ```python
-class CashAccountStrategy(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        price = data["AAPL"]["close"]
-        cash = broker.account.cash
+# Market order (default)
+broker.submit_order("AAPL", 100)
 
-        # Scenario 1: Insufficient cash
-        expensive_quantity = int(100_000 / price)  # Try to buy $100k worth
-        order = broker.submit_order("AAPL", expensive_quantity)
-        if order is None:
-            print(f"Rejected: Insufficient cash (have ${cash:.0f}, need $100,000)")
+# Limit order
+broker.submit_order("AAPL", 100, order_type=OrderType.LIMIT, limit_price=150.0)
 
-        # Scenario 2: Attempted short sale
-        order = broker.submit_order("AAPL", -100)  # Try to short 100 shares
-        if order is None:
-            print(f"Rejected: Cash accounts cannot short sell")
+# Stop order
+broker.submit_order("AAPL", -100, order_type=OrderType.STOP, stop_price=145.0)
 
-        # Scenario 3: Successful purchase
-        affordable_quantity = int(cash / price)
-        order = broker.submit_order("AAPL", affordable_quantity)
-        if order is not None:
-            print(f"Accepted: Bought {affordable_quantity} shares")
+# Trailing stop
+broker.submit_order("AAPL", -100, order_type=OrderType.TRAILING_STOP, trail_amount=5.0)
+
+# Bracket order (entry + take-profit + stop-loss)
+entry, tp, sl = broker.submit_bracket("AAPL", 100, take_profit=160.0, stop_loss=145.0)
 ```
 
-### Margin Account Rejections
-
+**Order Management**:
 ```python
-class MarginAccountStrategy(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        price = data["AAPL"]["close"]
-        position = broker.get_position("AAPL")
+# Update pending order (stop price, limit price, quantity)
+broker.update_order(order.order_id, stop_price=new_stop)
 
-        # Get buying power (includes leverage)
-        buying_power = broker.get_buying_power()
+# Cancel order
+broker.cancel_order(order.order_id)
 
-        # Scenario 1: Within buying power (accepted)
-        quantity = int(buying_power / price)
-        order = broker.submit_order("AAPL", quantity)
-        if order is not None:
-            print(f"Accepted: Bought {quantity} shares using leverage")
-
-        # Scenario 2: Exceeds buying power (rejected)
-        excessive_quantity = int((buying_power * 2) / price)
-        order = broker.submit_order("AAPL", excessive_quantity)
-        if order is None:
-            print(f"Rejected: Exceeds buying power")
-
-        # Scenario 3: Position reversal (split into close + open)
-        if position and position.quantity > 0:
-            # Going from long 100 to short 100 (reversal)
-            reversal_order = broker.submit_order("AAPL", -200)
-            # Internally split into: close 100, then open -100
-            # Both must satisfy margin requirements
+# Close entire position
+broker.close_position("AAPL")
 ```
 
 ---
 
-## API Reference
-
-### Engine
+## Execution Modes
 
 ```python
-Engine(
-    feed: DataFeed,
-    strategy: Strategy,
-    initial_cash: float = 100_000.0,
-    account_type: str = "cash",  # "cash" or "margin"
-    initial_margin: float = 0.5,  # For margin accounts only
-    maintenance_margin: float = 0.25,  # For margin accounts only
-    commission_model: Optional[CommissionModel] = None,
-    slippage_model: Optional[SlippageModel] = None,
-    execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
-)
-```
+from ml4t.backtest import ExecutionMode
 
-**Parameters**:
-- `feed`: DataFeed object containing price data
-- `strategy`: Strategy object implementing trading logic
-- `initial_cash`: Starting cash amount (default: $100,000)
-- `account_type`: `"cash"` (no leverage, no shorts) or `"margin"` (leverage + shorts)
-- `initial_margin`: Initial margin requirement (default: 0.5 = 50% = 2x leverage)
-- `maintenance_margin`: Maintenance margin requirement (default: 0.25 = 25%)
-- `commission_model`: Commission model (default: no commission)
-- `slippage_model`: Slippage model (default: no slippage)
-- `execution_mode`: When orders fill (default: SAME_BAR)
+# Same-bar execution (default) - orders fill at current bar's close
+engine = Engine(feed, strategy, execution_mode=ExecutionMode.SAME_BAR)
 
-**Returns**: Dictionary with results:
-```python
-{
-    "initial_cash": float,
-    "final_value": float,
-    "total_return": float,
-    "total_return_pct": float,
-    "max_drawdown": float,
-    "max_drawdown_pct": float,
-    "num_trades": int,
-    "winning_trades": int,
-    "losing_trades": int,
-    "win_rate": float,
-    "total_commission": float,
-    "total_slippage": float,
-    "trades": List[Trade],
-    "equity_curve": List[Tuple[datetime, float]],
-    "fills": List[Fill],
-}
-```
-
-### Strategy
-
-```python
-class Strategy:
-    def on_start(self, broker: Broker):
-        """Called once before backtest starts."""
-        pass
-
-    def on_data(self, timestamp: datetime, data: Dict[str, Dict[str, float]],
-                context: Any, broker: Broker):
-        """Called on each bar/tick.
-
-        Args:
-            timestamp: Current event timestamp
-            data: Dict[asset, Dict[field, value]] - e.g., {"AAPL": {"close": 150.0}}
-            context: Context object (reserved for future use)
-            broker: Broker interface for order submission
-        """
-        pass
-
-    def on_end(self, broker: Broker):
-        """Called once after backtest ends."""
-        pass
-```
-
-### Broker API
-
-```python
-# Submit orders
-order = broker.submit_order(asset: str, quantity: int) -> Optional[Order]
-# Returns None if order rejected, Order object if accepted
-
-# Get positions
-position = broker.get_position(asset: str) -> Optional[Position]
-# Returns None if no position, Position object otherwise
-
-# Query account
-cash = broker.account.cash  # Available cash
-equity = broker.account.equity  # Total account value
-positions = broker.account.positions  # Dict[asset, Position]
-buying_power = broker.get_buying_power()  # Available buying power
+# Next-bar execution - orders fill at next bar's open (like Backtrader)
+engine = Engine(feed, strategy, execution_mode=ExecutionMode.NEXT_BAR)
 ```
 
 ---
@@ -367,21 +185,26 @@ buying_power = broker.get_buying_power()  # Available buying power
 ## Commission Models
 
 ```python
-from ml4t.backtest import NoCommission, PerShareCommission, PercentageCommission, TieredCommission
+from ml4t.backtest import (
+    NoCommission,
+    PerShareCommission,
+    PercentageCommission,
+    TieredCommission,
+)
 
-# No commission (default)
+# No commission
 NoCommission()
 
-# Per-share commission (e.g., $0.01/share)
+# Per-share ($0.01/share)
 PerShareCommission(0.01)
 
-# Percentage commission (e.g., 0.1% = 10bps)
+# Percentage (0.1% = 10bps)
 PercentageCommission(0.001)
 
-# Tiered commission
+# Tiered by volume
 TieredCommission(tiers=[
-    (0, 10_000, 0.01),    # $0.01/share for 0-10k shares
-    (10_000, 100_000, 0.005),  # $0.005/share for 10k-100k
+    (0, 10_000, 0.01),       # $0.01/share for 0-10k shares
+    (10_000, 100_000, 0.005), # $0.005/share for 10k-100k
     (100_000, float('inf'), 0.001),  # $0.001/share for 100k+
 ])
 ```
@@ -391,18 +214,23 @@ TieredCommission(tiers=[
 ## Slippage Models
 
 ```python
-from ml4t.backtest import NoSlippage, FixedSlippage, PercentageSlippage, VolumeShareSlippage
+from ml4t.backtest import (
+    NoSlippage,
+    FixedSlippage,
+    PercentageSlippage,
+    VolumeShareSlippage,
+)
 
-# No slippage (default)
+# No slippage
 NoSlippage()
 
-# Fixed slippage (e.g., $0.05 per share)
+# Fixed ($0.05 per share)
 FixedSlippage(0.05)
 
-# Percentage slippage (e.g., 0.05% = 5bps)
+# Percentage (0.05% = 5bps)
 PercentageSlippage(0.0005)
 
-# Volume-based slippage
+# Volume-based
 VolumeShareSlippage(
     volume_limit=0.025,  # 2.5% of bar volume
     price_impact=0.1,    # 10% price impact if limit hit
@@ -411,34 +239,157 @@ VolumeShareSlippage(
 
 ---
 
-## Validation
+## Framework Compatibility
 
-ml4t.backtest validation uses **per-framework isolated environments** to avoid dependency conflicts:
+ml4t.backtest can be configured to match the behavior of other backtesting frameworks:
 
-- **VectorBT Pro**: Internal validation (commercial license)
-- **Backtrader**: Open source validation (can be CI-integrated)
-- **Zipline**: Excluded (bundle data issues)
+```python
+from ml4t.backtest import BacktestConfig
 
-See `validation/README.md` for the validation strategy.
+# Match VectorBT behavior
+config = BacktestConfig.from_preset("vectorbt")
+# - Same-bar fills at close
+# - Fractional shares
+# - Process all signals
+
+# Match Backtrader behavior
+config = BacktestConfig.from_preset("backtrader")
+# - Next-bar fills at open
+# - Integer shares only
+# - Check position before acting
+
+# Match Zipline behavior
+config = BacktestConfig.from_preset("zipline")
+# - Next-bar fills at open
+# - Integer shares
+# - Per-share commission
+# - Volume-based slippage
+```
 
 ---
 
-## Performance
+## Multi-Asset Strategies
 
-Benchmarks on 250 assets × 252 trading days:
+```python
+class MultiAssetStrategy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        # data contains all assets at this timestamp
+        for asset, bar in data.items():
+            price = bar["close"]
+            signals = bar.get("signals", {})
 
-| Framework | Runtime | vs ml4t.backtest |
-|-----------|---------|------------------|
-| **ml4t.backtest** | 0.6s | 1x |
-| **VectorBT** | 3.4s | 5.7x slower |
-| **Backtrader** | 18.7s | 31x slower |
+            position = broker.get_position(asset)
+            current_qty = position.quantity if position else 0
+
+            # Act on signals
+            if signals.get("buy") and current_qty == 0:
+                broker.submit_order(asset, 100)
+            elif signals.get("sell") and current_qty > 0:
+                broker.close_position(asset)
+```
+
+---
+
+## Data Feed
+
+The DataFeed accepts Polars DataFrames with prices, signals, and context:
+
+```python
+from ml4t.backtest import DataFeed
+
+# From DataFrames
+feed = DataFeed(
+    prices_df=prices,   # Required: timestamp, asset, open, high, low, close, volume
+    signals_df=signals, # Optional: timestamp, asset, signal_columns...
+    context_df=context, # Optional: timestamp, context_columns... (market-wide data)
+)
+
+# From Parquet files (uses lazy loading)
+feed = DataFeed(
+    prices_path="prices.parquet",
+    signals_path="signals.parquet",
+    context_path="context.parquet",
+)
+```
+
+---
+
+## Strategy Interface
+
+```python
+class Strategy:
+    def on_start(self, broker):
+        """Called once before backtest starts."""
+        pass
+
+    def on_data(self, timestamp, data, context, broker):
+        """Called on each bar.
+
+        Args:
+            timestamp: Current datetime
+            data: Dict[asset, Dict[field, value]]
+                  e.g., {"AAPL": {"close": 150.0, "signals": {"momentum": 0.5}}}
+            context: Dict of market-wide data (VIX, SPY, etc.)
+            broker: Broker interface for orders and positions
+        """
+        pass
+
+    def on_end(self, broker):
+        """Called once after backtest ends."""
+        pass
+```
+
+---
+
+## Results
+
+```python
+results = engine.run()
+
+# Portfolio metrics
+results["initial_cash"]      # Starting cash
+results["final_value"]       # Ending portfolio value
+results["total_return"]      # Dollar return
+results["total_return_pct"]  # Percent return
+results["max_drawdown"]      # Maximum drawdown (dollars)
+results["max_drawdown_pct"]  # Maximum drawdown (percent)
+
+# Trade metrics
+results["num_trades"]        # Total completed trades
+results["winning_trades"]    # Number of winners
+results["losing_trades"]     # Number of losers
+results["win_rate"]          # Win rate (0-1)
+
+# Costs
+results["total_commission"]  # Total commission paid
+results["total_slippage"]    # Total slippage cost
+
+# Detailed data
+results["trades"]            # List[Trade] - completed round-trips
+results["fills"]             # List[Fill] - all order fills
+results["equity_curve"]      # List[Tuple[datetime, float]] - equity over time
+```
+
+---
+
+## Validation
+
+ml4t.backtest is validated against established frameworks in isolated environments:
+
+| Framework | Environment | Status |
+|-----------|-------------|--------|
+| VectorBT Pro | `.venv-vectorbt-pro` | Scenario-based |
+| Backtrader | `.venv-backtrader` | Scenario-based |
+| Zipline | `.venv-zipline` | Excluded (bundle issues) |
+
+Validation uses per-framework isolated environments to avoid dependency conflicts.
 
 ---
 
 ## Testing
 
 ```bash
-# Run all tests (154 pass in ~1s)
+# Run all tests
 source .venv/bin/activate
 pytest tests/ -q
 
@@ -448,43 +399,11 @@ pytest tests/ --cov=src/ml4t/backtest --cov-report=html
 
 ---
 
-## Examples
-
-```python
-# Simple signal-based strategy
-from ml4t.backtest import Engine, Strategy, DataFeed
-
-class SignalStrategy(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        for asset, bar in data.items():
-            signals = bar.get("signals", {})
-            position = broker.get_position(asset)
-
-            if signals.get("buy") and (not position or position.quantity == 0):
-                broker.submit_order(asset, 100)  # Buy 100 shares
-            elif signals.get("sell") and position and position.quantity > 0:
-                broker.close_position(asset)  # Sell all
-```
-
----
-
 ## Documentation
 
-- **Project Map**: See `.claude/PROJECT_MAP.md` for codebase structure
-- **Architecture**: See `.claude/memory/accounting_architecture_adr.md` for design decisions
-- **Validation**: See `validation/README.md` for framework validation strategy
-
----
-
-## Contributing
-
-Contributions welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass (`pytest`)
-5. Submit a pull request
+- **Project Map**: `.claude/PROJECT_MAP.md`
+- **Architecture Decisions**: `.claude/memory/decisions.md`
+- **Validation Strategy**: `.claude/memory/validation_methodology.md`
 
 ---
 
@@ -497,19 +416,14 @@ MIT License - See LICENSE file
 ## Changelog
 
 ### v0.2.0 (2025-11-22)
-- ✅ Major repository cleanup (99.2% code reduction)
-- ✅ Complete accounting system (cash + margin accounts)
-- ✅ Exit-first order sequencing
-- ✅ 154 tests passing
-- ✅ Per-framework validation strategy
-- ✅ Clean flat module structure
+- Major repository cleanup (99.2% code reduction)
+- Complete accounting system (cash + margin accounts)
+- Exit-first order processing
+- Framework compatibility presets
+- Per-framework validation strategy
+- 154 tests passing
 
 ### v0.1.0 (2025-01-20)
 - Initial prototype
 - Event-driven architecture
 - Basic order execution
-
----
-
-**Status**: Beta - Post-cleanup, accounting complete
-**Last updated**: 2025-11-22

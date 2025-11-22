@@ -1,0 +1,50 @@
+{
+  "id": "007_framework_validation",
+  "title": "Framework Validation",
+  "status": "active",
+  "created": "2025-11-22",
+  "updated": "2025-11-22",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Create validation directory structure",
+      "status": "pending",
+      "description": "Set up validation/vectorbt_pro/ and validation/backtrader/ directories"
+    },
+    {
+      "id": "TASK-002",
+      "title": "VectorBT Pro scenario_01_long_only",
+      "status": "pending",
+      "description": "Validate long-only behavior against VectorBT Pro"
+    },
+    {
+      "id": "TASK-003",
+      "title": "VectorBT Pro scenario_02_long_short",
+      "status": "pending",
+      "description": "Validate long/short behavior against VectorBT Pro"
+    },
+    {
+      "id": "TASK-004",
+      "title": "Backtrader scenario_01_long_only",
+      "status": "pending",
+      "description": "Validate long-only behavior against Backtrader"
+    },
+    {
+      "id": "TASK-005",
+      "title": "Backtrader scenario_02_long_short",
+      "status": "pending",
+      "description": "Validate long/short behavior against Backtrader"
+    },
+    {
+      "id": "TASK-006",
+      "title": "Document configuration mapping",
+      "status": "pending",
+      "description": "Document which config options match each framework's behavior"
+    }
+  ],
+  "notes": [
+    "VectorBT Pro already installed in .venv-vectorbt-pro",
+    "Use isolated venvs - never import both OSS and Pro in same session",
+    "Zipline excluded per AD-001 (bundle data issues)"
+  ]
+}
