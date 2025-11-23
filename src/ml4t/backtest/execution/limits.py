@@ -53,7 +53,9 @@ class NoLimits(ExecutionLimits):
             remaining_quantity=0.0,
             adjusted_price=price,
             impact_cost=0.0,
-            participation_rate=0.0 if bar_volume is None or bar_volume == 0 else order_quantity / bar_volume,
+            participation_rate=0.0
+            if bar_volume is None or bar_volume == 0
+            else order_quantity / bar_volume,
         )
 
 

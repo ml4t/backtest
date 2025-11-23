@@ -268,7 +268,7 @@ def is_trading_day(calendar_id: str, check_date: date | datetime | str) -> bool:
     calendar = get_calendar(calendar_id)
 
     # Convert to pandas Timestamp for comparison
-    if isinstance(check_date, str) or isinstance(check_date, (date, datetime)):
+    if isinstance(check_date, (str, date, datetime)):
         check_date = pd.Timestamp(check_date)
 
     valid_days = calendar.valid_days(start_date=check_date, end_date=check_date)
@@ -516,9 +516,7 @@ def filter_to_trading_days(
     trading_days = pl.Series("trading_day", [d.date() for d in valid_days], dtype=pl.Date)
 
     # Filter to trading days
-    return df.filter(
-        pl.col(timestamp_col).cast(pl.Date).is_in(trading_days)
-    )
+    return df.filter(pl.col(timestamp_col).cast(pl.Date).is_in(trading_days))
 
 
 def filter_to_trading_sessions(
@@ -603,7 +601,11 @@ def filter_to_trading_sessions(
         market_open = row["market_open"]
         market_close = row["market_close"]
 
-        if not include_breaks and "break_start" in schedule_pd.columns and pd.notna(row.get("break_start")):
+        if (
+            not include_breaks
+            and "break_start" in schedule_pd.columns
+            and pd.notna(row.get("break_start"))
+        ):
             # Split into pre-break and post-break sessions
             break_start = row["break_start"]
             break_end = row["break_end"]
@@ -613,13 +615,19 @@ def filter_to_trading_sessions(
             sessions.append((market_open, market_close))
 
     # Create sessions DataFrame with proper UTC dtype
-    sessions_df = pl.DataFrame({
-        "session_open": [s[0].to_pydatetime() for s in sessions],
-        "session_close": [s[1].to_pydatetime() for s in sessions],
-    }).with_columns(
-        pl.col("session_open").cast(pl.Datetime("us", "UTC")),
-        pl.col("session_close").cast(pl.Datetime("us", "UTC")),
-    ).sort("session_open")
+    sessions_df = (
+        pl.DataFrame(
+            {
+                "session_open": [s[0].to_pydatetime() for s in sessions],
+                "session_close": [s[1].to_pydatetime() for s in sessions],
+            }
+        )
+        .with_columns(
+            pl.col("session_open").cast(pl.Datetime("us", "UTC")),
+            pl.col("session_close").cast(pl.Datetime("us", "UTC")),
+        )
+        .sort("session_open")
+    )
 
     # Use join_asof to find the session that starts at or before each timestamp
     # Then filter to rows where timestamp <= session_close

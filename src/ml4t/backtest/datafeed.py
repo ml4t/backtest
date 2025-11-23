@@ -45,9 +45,7 @@ class DataFeed:
         # Use to_dicts() for faster iteration (vs iter_rows)
         self._prices_by_ts = self._partition_by_timestamp_dicts(self.prices)
         self._signals_by_ts = (
-            self._partition_by_timestamp_dicts(self.signals)
-            if self.signals is not None
-            else {}
+            self._partition_by_timestamp_dicts(self.signals) if self.signals is not None else {}
         )
         self._context_by_ts = (
             self._partition_by_timestamp(self.context) if self.context is not None else {}

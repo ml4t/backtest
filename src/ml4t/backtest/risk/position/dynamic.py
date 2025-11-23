@@ -128,10 +128,9 @@ class ScaledExit:
     def evaluate(self, state: PositionState) -> PositionAction:
         """Check if any untriggered profit target is hit."""
         for threshold, exit_pct in self._targets:
-            if threshold not in self._triggered:
-                if state.unrealized_return >= threshold:
-                    self._triggered.add(threshold)
-                    return PositionAction.exit_partial(
-                        exit_pct, f"scale_out_{threshold:.0%}_{exit_pct:.0%}"
-                    )
+            if threshold not in self._triggered and state.unrealized_return >= threshold:
+                self._triggered.add(threshold)
+                return PositionAction.exit_partial(
+                    exit_pct, f"scale_out_{threshold:.0%}_{exit_pct:.0%}"
+                )
         return PositionAction.hold()

@@ -82,14 +82,10 @@ class VolatilityTrailingStop:
         if state.is_long:
             stop_price = state.high_water_mark - trail_distance
             if state.current_price <= stop_price:
-                return PositionAction.exit_full(
-                    f"vol_trail_{self.multiplier}x_{vol:.2f}"
-                )
+                return PositionAction.exit_full(f"vol_trail_{self.multiplier}x_{vol:.2f}")
         else:
             stop_price = state.low_water_mark + trail_distance
             if state.current_price >= stop_price:
-                return PositionAction.exit_full(
-                    f"vol_trail_{self.multiplier}x_{vol:.2f}"
-                )
+                return PositionAction.exit_full(f"vol_trail_{self.multiplier}x_{vol:.2f}")
 
         return PositionAction.hold()

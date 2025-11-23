@@ -134,7 +134,7 @@ def max_drawdown(values: Sequence[float]) -> tuple[float, int, int]:
     drawdowns = (arr - running_max) / running_max
 
     trough_idx = int(np.argmin(drawdowns))
-    peak_idx = int(np.argmax(arr[:trough_idx + 1])) if trough_idx > 0 else 0
+    peak_idx = int(np.argmax(arr[: trough_idx + 1])) if trough_idx > 0 else 0
 
     return float(drawdowns[trough_idx]), peak_idx, trough_idx
 

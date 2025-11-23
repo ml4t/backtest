@@ -3,7 +3,19 @@
 from datetime import datetime
 
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
-from .types import ContractSpec, ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, StopFillMode, StopLevelBasis, Trade
+from .types import (
+    ContractSpec,
+    ExecutionMode,
+    Fill,
+    Order,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    Position,
+    StopFillMode,
+    StopLevelBasis,
+    Trade,
+)
 
 
 class Broker:
@@ -160,7 +172,9 @@ class Broker:
             entry_price=pos.entry_price,
             current_price=current_price,
             quantity=abs(int(pos.quantity)),
-            initial_quantity=abs(int(pos.initial_quantity)) if pos.initial_quantity else abs(int(pos.quantity)),
+            initial_quantity=abs(int(pos.initial_quantity))
+            if pos.initial_quantity
+            else abs(int(pos.quantity)),
             unrealized_pnl=pos.unrealized_pnl(current_price),
             unrealized_return=pos.pnl_percent(current_price),
             bars_held=pos.bars_held,
@@ -211,7 +225,6 @@ class Broker:
                     }
                 else:
                     # Generate full exit order immediately
-                    side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
                     order = self.submit_order(asset, -pos.quantity, order_type=OrderType.MARKET)
                     if order:
                         order._risk_exit_reason = action.reason
@@ -584,7 +597,12 @@ class Broker:
         elif order.order_type == OrderType.LIMIT:
             # Limit buy fills if Low <= limit_price (price dipped to our level)
             # Limit sell fills if High >= limit_price (price rose to our level)
-            if order.side == OrderSide.BUY and low <= order.limit_price or order.side == OrderSide.SELL and high >= order.limit_price:
+            if (
+                order.side == OrderSide.BUY
+                and low <= order.limit_price
+                or order.side == OrderSide.SELL
+                and high >= order.limit_price
+            ):
                 return order.limit_price
 
         elif order.order_type == OrderType.STOP:

@@ -18,6 +18,7 @@
     "system@local": true,
     "workflow@local": true,
     "memory@local": true,
-    "development@local": true
+    "development@local": true,
+    "transition@local": true
   }
 }

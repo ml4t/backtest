@@ -179,7 +179,7 @@ class PowerLawImpact(MarketImpactModel):
         participation = quantity / volume
 
         # Power law impact
-        impact = self.coefficient * (participation ** self.exponent) * price
+        impact = self.coefficient * (participation**self.exponent) * price
         impact = max(impact, self.min_impact)
 
         return impact if is_buy else -impact

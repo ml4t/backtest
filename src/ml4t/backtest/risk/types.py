@@ -55,10 +55,14 @@ class PositionAction:
             fill_price: Price at which to fill (stop/limit price), slippage applied on top
             defer_fill: If True, defer exit to next bar and fill at open price
         """
-        return cls(ActionType.EXIT_FULL, reason=reason, fill_price=fill_price, defer_fill=defer_fill)
+        return cls(
+            ActionType.EXIT_FULL, reason=reason, fill_price=fill_price, defer_fill=defer_fill
+        )
 
     @classmethod
-    def exit_partial(cls, pct: float, reason: str = "", fill_price: float | None = None) -> "PositionAction":
+    def exit_partial(
+        cls, pct: float, reason: str = "", fill_price: float | None = None
+    ) -> "PositionAction":
         """Convenience: return EXIT_PARTIAL action."""
         return cls(ActionType.EXIT_PARTIAL, pct=pct, reason=reason, fill_price=fill_price)
 
