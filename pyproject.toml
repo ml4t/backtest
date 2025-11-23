@@ -180,6 +180,12 @@ filterwarnings = [
 line-length = 100
 target-version = "py311"
 fix = true
+exclude = [
+    "validation/*",  # Standalone scripts run in isolated venvs
+    "docs/*",        # Documentation artifacts
+    ".claude/*",     # Claude workspace files
+    ".serena/*",     # Serena workspace files
+]
 
 [tool.ruff.lint]
 select = [

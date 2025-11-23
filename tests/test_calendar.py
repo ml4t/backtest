@@ -1,6 +1,6 @@
 """Tests for calendar module (pandas_market_calendars integration)."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import polars as pl
 import pytest
@@ -11,7 +11,6 @@ from ml4t.backtest.calendar import (
     filter_to_trading_sessions,
     generate_trading_minutes,
     get_calendar,
-    get_early_closes,
     get_holidays,
     get_schedule,
     get_trading_days,
@@ -50,7 +49,7 @@ class TestGetCalendar:
 
     def test_get_calendar_invalid(self):
         """Test invalid calendar raises error."""
-        with pytest.raises(Exception):
+        with pytest.raises(RuntimeError):
             get_calendar("INVALID_EXCHANGE_123")
 
 
@@ -154,24 +153,24 @@ class TestIsMarketOpen:
     def test_is_market_open_during_hours(self):
         """Test market is open during trading hours."""
         # 3 PM UTC = 11 AM ET (NYSE is open 9:30 AM - 4 PM ET)
-        dt = datetime(2024, 6, 3, 15, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 6, 3, 15, 0, tzinfo=UTC)
         assert is_market_open("NYSE", dt) is True
 
     def test_is_market_open_before_hours(self):
         """Test market is closed before trading hours."""
         # 10 AM UTC = 6 AM ET (before market open)
-        dt = datetime(2024, 6, 3, 10, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 6, 3, 10, 0, tzinfo=UTC)
         assert is_market_open("NYSE", dt) is False
 
     def test_is_market_open_after_hours(self):
         """Test market is closed after trading hours."""
         # 10 PM UTC = 6 PM ET (after market close)
-        dt = datetime(2024, 6, 3, 22, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 6, 3, 22, 0, tzinfo=UTC)
         assert is_market_open("NYSE", dt) is False
 
     def test_is_market_open_weekend(self):
         """Test market is closed on weekends."""
-        dt = datetime(2024, 6, 1, 15, 0, tzinfo=timezone.utc)  # Saturday
+        dt = datetime(2024, 6, 1, 15, 0, tzinfo=UTC)  # Saturday
         assert is_market_open("NYSE", dt) is False
 
 
@@ -307,17 +306,19 @@ class TestFilterToTradingDays:
     def test_filter_to_trading_days_basic(self):
         """Test basic filtering to trading days."""
         # Create test data with trading and non-trading days
-        df = pl.DataFrame({
-            "timestamp": [
-                datetime(2024, 1, 1),  # New Year's (holiday)
-                datetime(2024, 1, 2),  # Trading day
-                datetime(2024, 1, 3),  # Trading day
-                datetime(2024, 1, 6),  # Saturday
-                datetime(2024, 1, 7),  # Sunday
-                datetime(2024, 1, 8),  # Trading day
-            ],
-            "price": [100, 101, 102, 103, 104, 105],
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 1, 1),  # New Year's (holiday)
+                    datetime(2024, 1, 2),  # Trading day
+                    datetime(2024, 1, 3),  # Trading day
+                    datetime(2024, 1, 6),  # Saturday
+                    datetime(2024, 1, 7),  # Sunday
+                    datetime(2024, 1, 8),  # Trading day
+                ],
+                "price": [100, 101, 102, 103, 104, 105],
+            }
+        )
 
         filtered = filter_to_trading_days(df, "NYSE")
 
@@ -333,13 +334,15 @@ class TestFilterToTradingDays:
 
     def test_filter_to_trading_days_custom_column(self):
         """Test filtering with custom timestamp column name."""
-        df = pl.DataFrame({
-            "date": [
-                datetime(2024, 1, 1),  # Holiday
-                datetime(2024, 1, 2),  # Trading day
-            ],
-            "value": [1, 2],
-        })
+        df = pl.DataFrame(
+            {
+                "date": [
+                    datetime(2024, 1, 1),  # Holiday
+                    datetime(2024, 1, 2),  # Trading day
+                ],
+                "value": [1, 2],
+            }
+        )
 
         filtered = filter_to_trading_days(df, "NYSE", timestamp_col="date")
         assert len(filtered) == 1
@@ -352,60 +355,68 @@ class TestFilterToTradingSessions:
         """Test basic filtering to trading sessions."""
         # Create test data with trading and non-trading times
         # NYSE opens 9:30 AM ET = 13:30 UTC (summer), closes 4:00 PM ET = 20:00 UTC
-        df = pl.DataFrame({
-            "timestamp": [
-                datetime(2024, 6, 3, 10, 0, tzinfo=timezone.utc),  # 6 AM ET - pre-market
-                datetime(2024, 6, 3, 13, 30, tzinfo=timezone.utc),  # 9:30 AM ET - market open
-                datetime(2024, 6, 3, 17, 0, tzinfo=timezone.utc),  # 1 PM ET - during hours
-                datetime(2024, 6, 3, 19, 59, tzinfo=timezone.utc),  # 3:59 PM ET - just before close
-                datetime(2024, 6, 3, 21, 0, tzinfo=timezone.utc),  # 5 PM ET - after hours
-            ],
-            "price": [100, 101, 102, 103, 104],
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 6, 3, 10, 0, tzinfo=UTC),  # 6 AM ET - pre-market
+                    datetime(2024, 6, 3, 13, 30, tzinfo=UTC),  # 9:30 AM ET - market open
+                    datetime(2024, 6, 3, 17, 0, tzinfo=UTC),  # 1 PM ET - during hours
+                    datetime(2024, 6, 3, 19, 59, tzinfo=UTC),  # 3:59 PM ET - just before close
+                    datetime(2024, 6, 3, 21, 0, tzinfo=UTC),  # 5 PM ET - after hours
+                ],
+                "price": [100, 101, 102, 103, 104],
+            }
+        )
 
         filtered = filter_to_trading_sessions(df, "NYSE")
 
         # Should only have times during trading sessions (9:30 AM - 4:00 PM ET)
         assert len(filtered) == 3  # 13:30, 17:00, 19:59 UTC
         timestamps = filtered["timestamp"].to_list()
-        assert datetime(2024, 6, 3, 10, 0, tzinfo=timezone.utc) not in timestamps  # Pre-market
-        assert datetime(2024, 6, 3, 13, 30, tzinfo=timezone.utc) in timestamps  # Open
-        assert datetime(2024, 6, 3, 17, 0, tzinfo=timezone.utc) in timestamps  # During
-        assert datetime(2024, 6, 3, 19, 59, tzinfo=timezone.utc) in timestamps  # Just before close
-        assert datetime(2024, 6, 3, 21, 0, tzinfo=timezone.utc) not in timestamps  # After hours
+        assert datetime(2024, 6, 3, 10, 0, tzinfo=UTC) not in timestamps  # Pre-market
+        assert datetime(2024, 6, 3, 13, 30, tzinfo=UTC) in timestamps  # Open
+        assert datetime(2024, 6, 3, 17, 0, tzinfo=UTC) in timestamps  # During
+        assert datetime(2024, 6, 3, 19, 59, tzinfo=UTC) in timestamps  # Just before close
+        assert datetime(2024, 6, 3, 21, 0, tzinfo=UTC) not in timestamps  # After hours
 
     def test_filter_to_trading_sessions_weekend(self):
         """Test that weekend data is filtered out."""
-        df = pl.DataFrame({
-            "timestamp": [
-                datetime(2024, 6, 1, 17, 0, tzinfo=timezone.utc),  # Saturday
-                datetime(2024, 6, 3, 17, 0, tzinfo=timezone.utc),  # Monday during hours (1 PM ET)
-            ],
-            "price": [100, 101],
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 6, 1, 17, 0, tzinfo=UTC),  # Saturday
+                    datetime(2024, 6, 3, 17, 0, tzinfo=UTC),  # Monday during hours (1 PM ET)
+                ],
+                "price": [100, 101],
+            }
+        )
 
         filtered = filter_to_trading_sessions(df, "NYSE")
         assert len(filtered) == 1
 
     def test_filter_to_trading_sessions_empty_df(self):
         """Test with empty DataFrame."""
-        df = pl.DataFrame({
-            "timestamp": [],
-            "price": [],
-        }).cast({"timestamp": pl.Datetime("us", "UTC"), "price": pl.Float64})
+        df = pl.DataFrame(
+            {
+                "timestamp": [],
+                "price": [],
+            }
+        ).cast({"timestamp": pl.Datetime("us", "UTC"), "price": pl.Float64})
 
         filtered = filter_to_trading_sessions(df, "NYSE")
         assert filtered.is_empty()
 
     def test_filter_to_trading_sessions_naive_datetime(self):
         """Test with timezone-naive datetime (assumed UTC)."""
-        df = pl.DataFrame({
-            "timestamp": [
-                datetime(2024, 6, 3, 10, 0),  # Pre-market (naive)
-                datetime(2024, 6, 3, 17, 0),  # During hours (naive)
-            ],
-            "price": [100, 101],
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 6, 3, 10, 0),  # Pre-market (naive)
+                    datetime(2024, 6, 3, 17, 0),  # During hours (naive)
+                ],
+                "price": [100, 101],
+            }
+        )
 
         filtered = filter_to_trading_sessions(df, "NYSE")
         assert len(filtered) == 1  # Only 17:00 is during trading
@@ -413,16 +424,18 @@ class TestFilterToTradingSessions:
     def test_filter_to_trading_sessions_irregular_timestamps(self):
         """Test with irregular timestamps (trade bars)."""
         # Simulate irregular trade bar timestamps
-        df = pl.DataFrame({
-            "timestamp": [
-                datetime(2024, 6, 3, 13, 30, 15, tzinfo=timezone.utc),  # 15 sec after open
-                datetime(2024, 6, 3, 13, 31, 42, tzinfo=timezone.utc),  # Irregular
-                datetime(2024, 6, 3, 14, 15, 33, tzinfo=timezone.utc),  # Mid-morning
-                datetime(2024, 6, 3, 19, 59, 58, tzinfo=timezone.utc),  # 2 sec before close
-                datetime(2024, 6, 3, 20, 0, 1, tzinfo=timezone.utc),   # 1 sec after close
-            ],
-            "price": [100.1, 100.2, 100.5, 101.0, 101.1],
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 6, 3, 13, 30, 15, tzinfo=UTC),  # 15 sec after open
+                    datetime(2024, 6, 3, 13, 31, 42, tzinfo=UTC),  # Irregular
+                    datetime(2024, 6, 3, 14, 15, 33, tzinfo=UTC),  # Mid-morning
+                    datetime(2024, 6, 3, 19, 59, 58, tzinfo=UTC),  # 2 sec before close
+                    datetime(2024, 6, 3, 20, 0, 1, tzinfo=UTC),  # 1 sec after close
+                ],
+                "price": [100.1, 100.2, 100.5, 101.0, 101.1],
+            }
+        )
 
         filtered = filter_to_trading_sessions(df, "NYSE")
         assert len(filtered) == 4  # All except the one after close

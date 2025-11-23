@@ -1,0 +1,51 @@
+# Pre-commit hooks for ml4t.backtest
+# See https://pre-commit.com for more information
+
+# Exclude non-critical directories
+exclude: |
+  (?x)^(
+    validation/|
+    docs/sphinx/build/|
+    \.claude/|
+    \.serena/
+  )
+
+repos:
+  # Ruff - fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^validation/
+      - id: ruff-format
+        exclude: ^validation/
+
+  # Mypy - static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        args: [--config-file=pyproject.toml]
+        additional_dependencies:
+          - polars>=0.20.0
+          - pandas>=2.0.0
+          - numpy>=1.24.0
+          - pydantic>=2.0.0
+          - types-PyYAML
+          - types-python-dateutil
+        pass_filenames: false
+        entry: mypy src/
+
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: check-toml
