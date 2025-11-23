@@ -154,15 +154,20 @@ mypy = "^1.13.0"          # Note: relaxed config, 16 errors remain
 
 ## Virtual Environments
 
-**CRITICAL - Use the right venv for each task:**
+**Only 3 venvs needed:**
 
 ```
 .venv               # Main development (Python 3.12)
-.venv-backtrader    # Backtrader validation only
-.venv-vectorbt      # VectorBT OSS only
-.venv-vectorbt-pro  # VectorBT Pro (internal, commercial)
-.venv-zipline       # Zipline (low priority)
-.venv-validation    # DEPRECATED - has dependency conflicts
+.venv-validation    # VBT OSS + Backtrader + Zipline (all open-source together)
+.venv-vectorbt-pro  # VectorBT Pro only (commercial, cannot coexist with OSS)
+```
+
+**Setup validation venv:**
+```bash
+uv venv .venv-validation --python 3.12
+source .venv-validation/bin/activate
+uv pip install vectorbt backtrader zipline-reloaded exchange_calendars
+uv pip install -e .  # Install ml4t.backtest
 ```
 
 ## Entry Points & Common Tasks
@@ -209,22 +214,25 @@ python run_scenarios.py
 
 ### Known Issues
 - ⚠️ Mypy: 16 errors remain (relaxed config, not blocking)
-- ⚠️ VectorBT OSS/Pro conflict in same env
-- ⚠️ Zipline bundle issues (excluded from validation)
+- ⚠️ VectorBT OSS/Pro conflict in same env (use separate venvs)
+
+### Completed Validation
+- ✅ VectorBT Pro: All scenarios pass (EXACT MATCH)
+- ✅ VectorBT OSS: All scenarios pass (EXACT MATCH)
+- ✅ Backtrader: All scenarios pass (EXACT MATCH)
+- ✅ Zipline: All scenarios pass (within tolerance - strategy-level stops)
 
 ### Next Steps
-1. Create VectorBT Pro validation scripts
-2. Create Backtrader validation scripts
-3. Fix remaining mypy errors
-4. Document configuration presets
+1. Fix remaining mypy errors
+2. Document configuration presets
 
 ## Architecture Decisions
 
-### AD-004: Per-Framework Validation (Nov 2025)
-**Status**: Accepted
-**Context**: Two days wasted on dependency conflicts in unified pytest suite
-**Decision**: Validate each framework in isolated venv with standalone scripts
-**Consequence**: No unified test runner, but no dependency hell
+### AD-004: Validation Environment Strategy (Nov 2025)
+**Status**: Accepted (refined)
+**Context**: VectorBT OSS/Pro cannot coexist (pandas .vbt accessor conflict)
+**Decision**: Use 2 validation venvs: .venv-validation (OSS+BT+ZL), .venv-vectorbt-pro
+**Consequence**: All open-source frameworks share one consolidated venv
 
 ### AD-005: Python 3.11+ Target (Nov 2025)
 **Status**: Accepted

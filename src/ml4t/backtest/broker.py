@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
-from .types import ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, Trade
+from .types import ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, StopFillMode, StopLevelBasis, Trade
 
 
 class Broker:
@@ -15,6 +15,8 @@ class Broker:
         commission_model: CommissionModel | None = None,
         slippage_model: SlippageModel | None = None,
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+        stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
+        stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         account_type: str = "cash",
         initial_margin: float = 0.5,
         maintenance_margin: float = 0.25,
@@ -34,6 +36,8 @@ class Broker:
         self.commission_model = commission_model or NoCommission()
         self.slippage_model = slippage_model or NoSlippage()
         self.execution_mode = execution_mode
+        self.stop_fill_mode = stop_fill_mode
+        self.stop_level_basis = stop_level_basis
 
         # Create AccountState with appropriate policy
         if account_type == "cash":
@@ -71,6 +75,7 @@ class Broker:
         # Risk management
         self._position_rules = None  # Global position rules
         self._position_rules_by_asset: dict[str, any] = {}  # Per-asset rules
+        self._pending_exits: dict[str, dict] = {}  # asset -> {reason, pct} for NEXT_BAR_OPEN mode
 
         # Execution model (volume limits and market impact)
         self.execution_limits = execution_limits  # ExecutionLimits instance
@@ -125,8 +130,17 @@ class Broker:
         # Import here to avoid circular imports
         from .risk.types import PositionState
 
+        asset = pos.asset
+
+        # Merge stop configuration into context for rules to access
+        context = {
+            **pos.context,
+            "stop_fill_mode": self.stop_fill_mode,
+            "stop_level_basis": self.stop_level_basis,
+        }
+
         return PositionState(
-            asset=pos.asset,
+            asset=asset,
             side=pos.side,
             entry_price=pos.entry_price,
             current_price=current_price,
@@ -137,17 +151,22 @@ class Broker:
             bars_held=pos.bars_held,
             high_water_mark=pos.high_water_mark,
             low_water_mark=pos.low_water_mark,
+            # Bar OHLC for intrabar stop/limit detection
+            bar_open=self._current_opens.get(asset),
+            bar_high=self._current_highs.get(asset),
+            bar_low=self._current_lows.get(asset),
             max_favorable_excursion=pos.max_favorable_excursion,
             max_adverse_excursion=pos.max_adverse_excursion,
             entry_time=pos.entry_time,
             current_time=self._current_time,
-            context=pos.context,
+            context=context,
         )
 
     def evaluate_position_rules(self) -> list[Order]:
         """Evaluate position rules for all open positions.
 
         Called by Engine before processing orders. Returns list of exit orders.
+        Handles defer_fill=True by storing pending exits for next bar.
         """
         from .risk.types import ActionType
 
@@ -167,22 +186,45 @@ class Broker:
             action = rules.evaluate(state)
 
             if action.action == ActionType.EXIT_FULL:
-                # Generate full exit order
-                side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
-                order = self.submit_order(asset, -pos.quantity, order_type=OrderType.MARKET)
-                if order:
-                    order._risk_exit_reason = action.reason
-                    exit_orders.append(order)
-
-            elif action.action == ActionType.EXIT_PARTIAL:
-                # Generate partial exit order
-                exit_qty = int(abs(pos.quantity) * action.pct)
-                if exit_qty > 0:
-                    actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
-                    order = self.submit_order(asset, actual_qty, order_type=OrderType.MARKET)
+                if action.defer_fill:
+                    # NEXT_BAR_OPEN mode: defer exit to next bar
+                    # Store pending exit info (will be processed at next bar's open)
+                    self._pending_exits[asset] = {
+                        "reason": action.reason,
+                        "pct": 1.0,
+                        "quantity": pos.quantity,
+                    }
+                else:
+                    # Generate full exit order immediately
+                    side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
+                    order = self.submit_order(asset, -pos.quantity, order_type=OrderType.MARKET)
                     if order:
                         order._risk_exit_reason = action.reason
+                        # Store fill price for stop/limit triggered exits
+                        # This is the price at which the stop/limit was triggered
+                        order._risk_fill_price = action.fill_price
                         exit_orders.append(order)
+
+            elif action.action == ActionType.EXIT_PARTIAL:
+                if action.defer_fill:
+                    # NEXT_BAR_OPEN mode: defer partial exit to next bar
+                    exit_qty = int(abs(pos.quantity) * action.pct)
+                    if exit_qty > 0:
+                        self._pending_exits[asset] = {
+                            "reason": action.reason,
+                            "pct": action.pct,
+                            "quantity": exit_qty if pos.quantity > 0 else -exit_qty,
+                        }
+                else:
+                    # Generate partial exit order immediately
+                    exit_qty = int(abs(pos.quantity) * action.pct)
+                    if exit_qty > 0:
+                        actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
+                        order = self.submit_order(asset, actual_qty, order_type=OrderType.MARKET)
+                        if order:
+                            order._risk_exit_reason = action.reason
+                            order._risk_fill_price = action.fill_price
+                            exit_orders.append(order)
 
         return exit_orders
 
@@ -212,6 +254,11 @@ class Broker:
             order_id=f"ORD-{self._order_counter}",
             created_at=self._current_time,
         )
+
+        # Capture signal price (close at order time) for stop level calculation
+        # This is used when stop_level_basis is SIGNAL_PRICE (Backtrader behavior)
+        order._signal_price = self._current_prices.get(asset)
+
         self.orders.append(order)
         self.pending_orders.append(order)
 
@@ -316,6 +363,40 @@ class Broker:
         else:
             # Same sign - adding to position, not exiting
             return False
+
+    def _process_pending_exits(self) -> list[Order]:
+        """Process pending exits from NEXT_BAR_OPEN mode.
+
+        Called at the start of a new bar to fill deferred exits at open price.
+        Returns list of exit orders that were created and will be filled at open.
+        """
+        exit_orders = []
+
+        for asset, pending in list(self._pending_exits.items()):
+            pos = self.positions.get(asset)
+            if pos is None:
+                # Position no longer exists (shouldn't happen normally)
+                del self._pending_exits[asset]
+                continue
+
+            open_price = self._current_opens.get(asset)
+            if open_price is None:
+                # No open price available, skip this bar
+                continue
+
+            # Create exit order with fill price = open price
+            exit_qty = pending["quantity"]
+            order = self.submit_order(asset, -exit_qty, order_type=OrderType.MARKET)
+            if order:
+                order._risk_exit_reason = pending["reason"]
+                # Fill at current bar's open (this is the "next bar" from when stop triggered)
+                order._risk_fill_price = open_price
+                exit_orders.append(order)
+
+            # Remove from pending
+            del self._pending_exits[asset]
+
+        return exit_orders
 
     def _update_time(
         self,
@@ -470,11 +551,19 @@ class Broker:
         Uses High/Low data to properly check if limit/stop prices were traded through.
         For limit orders: fill at limit price if bar's range touched it
         For stop orders: fill at stop price (or worse) if bar's range triggered it
+        For risk-triggered market orders: fill at the stop/target price (intrabar execution)
         """
         high = self._current_highs.get(order.asset, price)
         low = self._current_lows.get(order.asset, price)
 
         if order.order_type == OrderType.MARKET:
+            # Check if this is a risk-triggered exit with a specific fill price
+            # (e.g., stop-loss or take-profit that was triggered intrabar)
+            risk_fill_price = getattr(order, "_risk_fill_price", None)
+            if risk_fill_price is not None:
+                # Use the stop/target price as the base fill price
+                # Slippage will be applied on top by the caller
+                return risk_fill_price
             return price
 
         elif order.order_type == OrderType.LIMIT:
@@ -583,11 +672,15 @@ class Broker:
 
         if pos is None:
             if signed_qty != 0:
+                # Create new position with signal_price in context for stop level calculation
+                signal_price = getattr(order, "_signal_price", None)
+                context = {"signal_price": signal_price} if signal_price is not None else {}
                 self.positions[order.asset] = Position(
                     asset=order.asset,
                     quantity=signed_qty,
                     entry_price=fill_price,
                     entry_time=self._current_time,
+                    context=context,
                 )
         else:
             old_qty = pos.quantity
@@ -635,11 +728,15 @@ class Broker:
                         slippage=slippage,
                     )
                 )
+                # Create new position with signal_price in context
+                signal_price = getattr(order, "_signal_price", None)
+                context = {"signal_price": signal_price} if signal_price is not None else {}
                 self.positions[order.asset] = Position(
                     asset=order.asset,
                     quantity=new_qty,
                     entry_price=fill_price,
                     entry_time=self._current_time,
+                    context=context,
                 )
             else:
                 # Position scaled

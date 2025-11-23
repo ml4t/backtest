@@ -23,13 +23,18 @@ class PositionAction:
         action: Type of action to take
         pct: Percentage to exit (for EXIT_PARTIAL), 0-1
         stop_price: New stop price (for ADJUST_STOP)
+        fill_price: Price at which to fill exit order (for stop/limit triggers)
         reason: Human-readable reason for action (for logging)
+        defer_fill: If True, defer exit to next bar and fill at open price
+                   (used for NEXT_BAR_OPEN mode to match Zipline behavior)
     """
 
     action: ActionType
     pct: float = 1.0
     stop_price: float | None = None
+    fill_price: float | None = None  # Exit at this price (before slippage)
     reason: str = ""
+    defer_fill: bool = False  # Defer exit to next bar's open
 
     @classmethod
     def hold(cls) -> "PositionAction":
@@ -37,14 +42,25 @@ class PositionAction:
         return cls(ActionType.HOLD)
 
     @classmethod
-    def exit_full(cls, reason: str = "") -> "PositionAction":
-        """Convenience: return EXIT_FULL action."""
-        return cls(ActionType.EXIT_FULL, reason=reason)
+    def exit_full(
+        cls,
+        reason: str = "",
+        fill_price: float | None = None,
+        defer_fill: bool = False,
+    ) -> "PositionAction":
+        """Convenience: return EXIT_FULL action.
+
+        Args:
+            reason: Human-readable reason for exit
+            fill_price: Price at which to fill (stop/limit price), slippage applied on top
+            defer_fill: If True, defer exit to next bar and fill at open price
+        """
+        return cls(ActionType.EXIT_FULL, reason=reason, fill_price=fill_price, defer_fill=defer_fill)
 
     @classmethod
-    def exit_partial(cls, pct: float, reason: str = "") -> "PositionAction":
+    def exit_partial(cls, pct: float, reason: str = "", fill_price: float | None = None) -> "PositionAction":
         """Convenience: return EXIT_PARTIAL action."""
-        return cls(ActionType.EXIT_PARTIAL, pct=pct, reason=reason)
+        return cls(ActionType.EXIT_PARTIAL, pct=pct, reason=reason, fill_price=fill_price)
 
     @classmethod
     def adjust_stop(cls, price: float, reason: str = "") -> "PositionAction":
@@ -63,7 +79,10 @@ class PositionState:
         asset: Asset symbol
         side: "long" or "short"
         entry_price: Average entry price
-        current_price: Current market price
+        current_price: Current market price (close)
+        bar_open: Current bar's open price (for intrabar detection)
+        bar_high: Current bar's high price (for intrabar detection)
+        bar_low: Current bar's low price (for intrabar detection)
         quantity: Current position size (absolute)
         initial_quantity: Original position size when opened
         unrealized_pnl: Current unrealized P&L in currency
@@ -89,6 +108,10 @@ class PositionState:
     bars_held: int
     high_water_mark: float
     low_water_mark: float
+    # Bar OHLC for intrabar stop/limit detection
+    bar_open: float | None = None
+    bar_high: float | None = None
+    bar_low: float | None = None
     max_favorable_excursion: float = 0.0
     max_adverse_excursion: float = 0.0
     entry_time: datetime | None = None

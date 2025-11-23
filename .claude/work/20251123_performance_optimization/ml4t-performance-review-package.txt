@@ -1,0 +1,2106 @@
+# Performance Optimization Code Review Request
+
+## Overview
+
+I'm seeking an expert review of my Python backtesting framework (`ml4t.backtest`) to identify performance optimization opportunities. The goal is to achieve **3-10x speedup** while maintaining correctness, flexibility, and a clean API.
+
+## Current Performance Profile
+
+**Benchmark: 500 assets × 2,520 daily bars (10 years), ~119,000 trades**
+
+| Framework | Runtime | Memory | Architecture |
+|-----------|---------|--------|--------------|
+| VectorBT Pro | 0.9s | 98 MB | Fully vectorized NumPy |
+| **ml4t.backtest** | **31.8s** | **171 MB** | **Event-driven Python** |
+| Zipline | 196s | 461 MB | Event-driven Python |
+| Backtrader | 298s | 1,635 MB | Event-driven Python |
+
+ml4t is already **6-9x faster** than other event-driven frameworks, but I want to close the gap with VectorBT Pro while keeping event-driven flexibility.
+
+## Architecture Summary
+
+### Core Event Loop (`engine.py`)
+```python
+for timestamp, assets_data, context in feed:
+    broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
+    broker._process_pending_exits()      # Deferred stop exits
+    broker.evaluate_position_rules()     # StopLoss/TakeProfit checks
+    broker._process_orders(use_open=True)
+    strategy.on_data(timestamp, assets_data, context, broker)
+```
+
+### Key Components
+1. **DataFeed** (`datafeed.py`): Iterates Polars DataFrames bar-by-bar, yielding `(timestamp, {asset: {ohlcv}}, context)`
+2. **Broker** (`broker.py`): Order execution, position tracking, fill simulation
+3. **Position Rules** (`risk/position/static.py`): StopLoss, TakeProfit evaluation per position per bar
+4. **Types** (`types.py`): Order, Position, Fill, Trade dataclasses
+
+### Data Structures
+- `broker.positions: dict[str, Position]` - String-keyed position objects
+- `broker._current_prices: dict[str, float]` - Current close prices
+- `broker._current_opens/highs/lows: dict[str, float]` - OHLC data
+- `broker._pending_orders: list[Order]` - Orders awaiting execution
+
+## Suspected Bottlenecks
+
+1. **DataFeed iteration**: Converting Polars→Python dicts bar-by-bar
+2. **Dictionary lookups**: O(1) but constant overhead per lookup, millions of lookups
+3. **Position rule evaluation**: Per-position per-bar price comparisons
+4. **Object creation**: Creating Order/Fill objects for each trade
+5. **Python loop overhead**: Pure Python iteration over 2,520 bars × 500 assets
+
+## Optimization Ideas I've Considered
+
+| Strategy | Estimated Effort | Estimated Speedup | Notes |
+|----------|------------------|-------------------|-------|
+| Pre-materialize DataFeed iteration | Low | 2-4x | Build list of dicts upfront |
+| NumPy arrays for positions | Medium | 2-5x | Replace dict[str, Position] with arrays |
+| Numba JIT for hot paths | Medium | 2-5x | JIT-compile numerical code |
+| Vectorized stop/TP pre-compute | Medium | 1.5-3x | Pre-compute trigger bars |
+| Cython/Rust extensions | High | 5-15x | Port hot paths to C/Rust |
+
+## Constraints
+
+1. **Must maintain event-driven flexibility**: Strategies need bar-by-bar control flow
+2. **Must maintain correctness**: No look-ahead bias, proper order sequencing
+3. **Must maintain clean API**: `broker.submit_order()`, `broker.get_position()`, etc.
+4. **Python 3.11+ only**: Can use modern Python features
+5. **Dependencies available**: NumPy, Polars, Numba already in stack
+
+## What I'm Asking For
+
+Please review the attached code and provide:
+
+1. **Profile-informed analysis**: Where do you expect the actual bottlenecks to be?
+
+2. **Concrete optimization recommendations** ranked by:
+   - Impact (expected speedup)
+   - Effort (implementation complexity)
+   - Risk (chance of introducing bugs)
+
+3. **Code-level suggestions**: Specific changes to data structures, algorithms, or patterns
+
+4. **Architecture considerations**: Would a hybrid approach (vectorized preprocessing + event-driven execution) work?
+
+5. **What NOT to do**: Anti-patterns or optimizations that seem appealing but won't help
+
+## Specific Questions
+
+1. **DataFeed**: Should I pre-build all bar data as a list[tuple] instead of iterating Polars? Or use NumPy arrays directly?
+
+2. **Position tracking**: Is there a better data structure than `dict[str, Position]`? Would parallel arrays (`qty[i]`, `entry_price[i]`) with integer asset IDs be faster?
+
+3. **Numba applicability**: Can Numba JIT the `_process_orders()` or `evaluate_position_rules()` methods, or do they have too many Python objects?
+
+4. **Memory layout**: Should OHLCV data be stored as struct-of-arrays `(opens[], highs[], lows[], closes[])` or array-of-structs `[{o,h,l,c}, ...]`?
+
+5. **Batching**: Instead of processing orders one-by-one, could I batch all orders for a bar and process them vectorially?
+
+## Code Files
+
+The following files are included in `ml4t-performance-review.txt`:
+- `engine.py` - Main event loop
+- `broker.py` - Order execution and position management (~480 lines)
+- `datafeed.py` - Data iteration
+- `types.py` - Core dataclasses (Order, Position, Fill, Trade)
+- `strategy.py` - Strategy base class
+- `models.py` - Commission/slippage models
+- `risk/types.py` - PositionAction, ActionType
+- `risk/position/static.py` - StopLoss, TakeProfit rules
+
+## Expected Deliverable
+
+A prioritized list of optimization recommendations with:
+- What to change
+- Why it will help
+- Estimated speedup
+- Implementation sketch or pseudocode
+- Any caveats or risks
+
+Thank you for your expert analysis!
+# ML4T Backtest Performance Review Package
+
+## Context
+
+This is an event-driven backtesting framework for quantitative trading.
+
+### Current Performance (500 assets × 10 years, 119K trades)
+- ml4t.backtest: 31.8s, 171 MB
+- VectorBT Pro: 0.9s, 98 MB (vectorized, 35x faster)
+- Zipline: 196s, 461 MB (event-driven, 6x slower)
+- Backtrader: 298s, 1635 MB (event-driven, 9x slower)
+
+### Goal
+Identify performance optimization opportunities to achieve 3-10x speedup while maintaining:
+- Event-driven architecture flexibility
+- Correctness (no look-ahead bias)
+- Clean API for strategy developers
+
+## Files Included
+
+
+========================================
+FILE: src/ml4t/backtest/engine.py
+========================================
+"""Backtesting engine orchestration."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+import polars as pl
+
+from .analytics import EquityCurve, TradeAnalyzer
+from .broker import Broker
+from .datafeed import DataFeed
+from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
+from .strategy import Strategy
+from .types import ExecutionMode, StopFillMode, StopLevelBasis
+
+if TYPE_CHECKING:
+    from .config import BacktestConfig
+
+
+class Engine:
+    """Backtesting engine."""
+
+    def __init__(
+        self,
+        feed: DataFeed,
+        strategy: Strategy,
+        initial_cash: float = 100000.0,
+        commission_model: CommissionModel | None = None,
+        slippage_model: SlippageModel | None = None,
+        execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+        stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
+        stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
+        account_type: str = "cash",
+        initial_margin: float = 0.5,
+        maintenance_margin: float = 0.25,
+        config: BacktestConfig | None = None,
+        execution_limits=None,
+        market_impact_model=None,
+    ):
+        self.feed = feed
+        self.strategy = strategy
+        self.execution_mode = execution_mode
+        self.stop_fill_mode = stop_fill_mode
+        self.stop_level_basis = stop_level_basis
+        self.config = config  # Store config for strategy access
+        self.broker = Broker(
+            initial_cash=initial_cash,
+            commission_model=commission_model,
+            slippage_model=slippage_model,
+            execution_mode=execution_mode,
+            stop_fill_mode=stop_fill_mode,
+            stop_level_basis=stop_level_basis,
+            account_type=account_type,
+            initial_margin=initial_margin,
+            maintenance_margin=maintenance_margin,
+            execution_limits=execution_limits,
+            market_impact_model=market_impact_model,
+        )
+        self.equity_curve: list[tuple[datetime, float]] = []
+
+    def run(self) -> dict:
+        """Run backtest and return results."""
+        self.strategy.on_start(self.broker)
+
+        for timestamp, assets_data, context in self.feed:
+            prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
+            opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
+            highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
+            lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
+            volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
+            signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
+
+            self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
+
+            # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
+            # This must happen BEFORE evaluate_position_rules() to clear deferred exits
+            self.broker._process_pending_exits()
+
+            # Evaluate position rules (stops, trails, etc.) - generates exit orders
+            self.broker.evaluate_position_rules()
+
+            if self.execution_mode == ExecutionMode.NEXT_BAR:
+                # Next-bar mode: process pending orders at open price
+                self.broker._process_orders(use_open=True)
+                # Strategy generates new orders
+                self.strategy.on_data(timestamp, assets_data, context, self.broker)
+                # New orders will be processed next bar
+            else:
+                # Same-bar mode: process before and after strategy
+                self.broker._process_orders()
+                self.strategy.on_data(timestamp, assets_data, context, self.broker)
+                self.broker._process_orders()
+
+            self.equity_curve.append((timestamp, self.broker.get_account_value()))
+
+        self.strategy.on_end(self.broker)
+        return self._generate_results()
+
+    def _generate_results(self) -> dict:
+        """Generate backtest results with full analytics."""
+        if not self.equity_curve:
+            return {}
+
+        # Build EquityCurve from raw data
+        equity = EquityCurve()
+        for ts, value in self.equity_curve:
+            equity.append(ts, value)
+
+        # Build TradeAnalyzer
+        trade_analyzer = TradeAnalyzer(self.broker.trades)
+
+        # Combine into results (backward compatible + new metrics)
+        return {
+            # Core metrics (backward compatible)
+            "initial_cash": equity.initial_value,
+            "final_value": equity.final_value,
+            "total_return": equity.total_return,
+            "total_return_pct": equity.total_return * 100,
+            "max_drawdown": abs(equity.max_dd),  # Keep as positive for backward compat
+            "max_drawdown_pct": abs(equity.max_dd) * 100,
+            "num_trades": trade_analyzer.num_trades,
+            "winning_trades": trade_analyzer.num_winners,
+            "losing_trades": trade_analyzer.num_losers,
+            "win_rate": trade_analyzer.win_rate,
+            # Commission/slippage from fills (includes open positions)
+            "total_commission": sum(f.commission for f in self.broker.fills),
+            "total_slippage": sum(f.slippage for f in self.broker.fills),
+            # Raw data
+            "trades": self.broker.trades,
+            "equity_curve": self.equity_curve,
+            "fills": self.broker.fills,
+            # NEW: Analytics objects for detailed analysis
+            "equity": equity,
+            "trade_analyzer": trade_analyzer,
+            # NEW: Additional metrics
+            "sharpe": equity.sharpe(),
+            "sortino": equity.sortino(),
+            "calmar": equity.calmar,
+            "cagr": equity.cagr,
+            "volatility": equity.volatility,
+            "profit_factor": trade_analyzer.profit_factor,
+            "expectancy": trade_analyzer.expectancy,
+            "avg_trade": trade_analyzer.avg_trade,
+            "avg_win": trade_analyzer.avg_win,
+            "avg_loss": trade_analyzer.avg_loss,
+            "largest_win": trade_analyzer.largest_win,
+            "largest_loss": trade_analyzer.largest_loss,
+        }
+
+    @classmethod
+    def from_config(
+        cls,
+        feed: DataFeed,
+        strategy: Strategy,
+        config: BacktestConfig,
+    ) -> Engine:
+        """
+        Create an Engine instance from a BacktestConfig.
+
+        This is the recommended way to create an engine when you want
+        to replicate specific framework behavior (Backtrader, VectorBT, etc.).
+
+        Example:
+            from ml4t.backtest import Engine, BacktestConfig, DataFeed, Strategy
+
+            # Use Backtrader-compatible settings
+            config = BacktestConfig.from_preset("backtrader")
+            engine = Engine.from_config(feed, strategy, config)
+            results = engine.run()
+
+        Args:
+            feed: DataFeed with price data
+            strategy: Strategy to execute
+            config: BacktestConfig with all behavioral settings
+
+        Returns:
+            Configured Engine instance
+        """
+        from .config import CommissionModel as CommModelEnum
+        from .config import FillTiming
+        from .config import SlippageModel as SlipModelEnum
+
+        # Map config fill timing to ExecutionMode
+        if config.fill_timing == FillTiming.SAME_BAR:
+            execution_mode = ExecutionMode.SAME_BAR
+        else:
+            # NEXT_BAR_OPEN or NEXT_BAR_CLOSE both use NEXT_BAR mode
+            execution_mode = ExecutionMode.NEXT_BAR
+
+        # Build commission model from config
+        commission_model: CommissionModel | None = None
+        if config.commission_model == CommModelEnum.PERCENTAGE:
+            commission_model = PercentageCommission(
+                rate=config.commission_rate,
+            )
+        elif config.commission_model == CommModelEnum.PER_SHARE:
+            from .models import PerShareCommission
+
+            commission_model = PerShareCommission(
+                per_share=config.commission_per_share,
+                minimum=config.commission_minimum,
+            )
+        elif config.commission_model == CommModelEnum.PER_TRADE:
+            from .models import NoCommission
+
+            # For per-trade, we'd need a new model, use NoCommission for now
+            commission_model = NoCommission()
+        # NONE or unrecognized -> None (will use NoCommission in Broker)
+
+        # Build slippage model from config
+        slippage_model: SlippageModel | None = None
+        if config.slippage_model == SlipModelEnum.PERCENTAGE:
+            slippage_model = PercentageSlippage(rate=config.slippage_rate)
+        elif config.slippage_model == SlipModelEnum.FIXED:
+            from .models import FixedSlippage
+
+            slippage_model = FixedSlippage(amount=config.slippage_fixed)
+        # NONE, VOLUME_BASED, or unrecognized -> None (will use NoSlippage)
+
+        return cls(
+            feed=feed,
+            strategy=strategy,
+            initial_cash=config.initial_cash,
+            commission_model=commission_model,
+            slippage_model=slippage_model,
+            execution_mode=execution_mode,
+            account_type=config.account_type,
+            initial_margin=config.margin_requirement,
+            maintenance_margin=config.margin_requirement * 0.5,  # Standard ratio
+            config=config,  # Store config for strategy access
+        )
+
+
+# === Convenience Function ===
+
+
+def run_backtest(
+    prices: pl.DataFrame | str,
+    strategy: Strategy,
+    signals: pl.DataFrame | str | None = None,
+    context: pl.DataFrame | str | None = None,
+    config: BacktestConfig | str | None = None,
+    # Legacy parameters (used if config is None)
+    initial_cash: float = 100000.0,
+    commission_model: CommissionModel | None = None,
+    slippage_model: SlippageModel | None = None,
+    execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+) -> dict:
+    """
+    Run a backtest with minimal setup.
+
+    Args:
+        prices: Price DataFrame or path to parquet file
+        strategy: Strategy instance to execute
+        signals: Optional signals DataFrame or path
+        context: Optional context DataFrame or path
+        config: BacktestConfig instance, preset name (str), or None for legacy params
+        initial_cash: Starting cash (legacy, ignored if config provided)
+        commission_model: Commission model (legacy, ignored if config provided)
+        slippage_model: Slippage model (legacy, ignored if config provided)
+        execution_mode: Execution mode (legacy, ignored if config provided)
+
+    Returns:
+        Results dictionary with metrics, trades, equity curve
+
+    Example:
+        # Using config preset
+        results = run_backtest(prices_df, strategy, config="backtrader")
+
+        # Using custom config
+        config = BacktestConfig.from_preset("backtrader")
+        config.commission_rate = 0.002  # Higher commission
+        results = run_backtest(prices_df, strategy, config=config)
+    """
+    feed = DataFeed(
+        prices_path=prices if isinstance(prices, str) else None,
+        signals_path=signals if isinstance(signals, str) else None,
+        context_path=context if isinstance(context, str) else None,
+        prices_df=prices if isinstance(prices, pl.DataFrame) else None,
+        signals_df=signals if isinstance(signals, pl.DataFrame) else None,
+        context_df=context if isinstance(context, pl.DataFrame) else None,
+    )
+
+    # Handle config parameter
+    if config is not None:
+        from .config import BacktestConfig as ConfigCls
+
+        if isinstance(config, str):
+            config = ConfigCls.from_preset(config)
+        return Engine.from_config(feed, strategy, config).run()
+
+    # Legacy path: use individual parameters
+    engine = Engine(
+        feed,
+        strategy,
+        initial_cash,
+        commission_model=commission_model,
+        slippage_model=slippage_model,
+        execution_mode=execution_mode,
+    )
+    return engine.run()
+
+
+# Backward compatibility: BacktestEngine was renamed to Engine in v0.2.0
+BacktestEngine = Engine
+
+========================================
+FILE: src/ml4t/backtest/broker.py
+========================================
+"""Broker for order execution and position management."""
+
+from datetime import datetime
+
+from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
+from .types import ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, StopFillMode, StopLevelBasis, Trade
+
+
+class Broker:
+    """Broker interface - same for backtest and live trading."""
+
+    def __init__(
+        self,
+        initial_cash: float = 100000.0,
+        commission_model: CommissionModel | None = None,
+        slippage_model: SlippageModel | None = None,
+        execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+        stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
+        stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
+        account_type: str = "cash",
+        initial_margin: float = 0.5,
+        maintenance_margin: float = 0.25,
+        execution_limits=None,
+        market_impact_model=None,
+    ):
+        # Import accounting classes here to avoid circular imports
+        from .accounting import (
+            AccountState,
+            CashAccountPolicy,
+            Gatekeeper,
+            MarginAccountPolicy,
+        )
+
+        self.initial_cash = initial_cash
+        self.cash = initial_cash
+        self.commission_model = commission_model or NoCommission()
+        self.slippage_model = slippage_model or NoSlippage()
+        self.execution_mode = execution_mode
+        self.stop_fill_mode = stop_fill_mode
+        self.stop_level_basis = stop_level_basis
+
+        # Create AccountState with appropriate policy
+        if account_type == "cash":
+            policy = CashAccountPolicy()
+        elif account_type == "margin":
+            policy = MarginAccountPolicy(
+                initial_margin=initial_margin, maintenance_margin=maintenance_margin
+            )
+        else:
+            raise ValueError(f"Unknown account_type: '{account_type}'. Must be 'cash' or 'margin'")
+
+        self.account = AccountState(initial_cash=initial_cash, policy=policy)
+        self.account_type = account_type
+        self.initial_margin = initial_margin
+        self.maintenance_margin = maintenance_margin
+
+        # Create Gatekeeper for order validation
+        self.gatekeeper = Gatekeeper(self.account, self.commission_model)
+
+        self.positions: dict[str, Position] = {}
+        self.orders: list[Order] = []
+        self.pending_orders: list[Order] = []
+        self.fills: list[Fill] = []
+        self.trades: list[Trade] = []
+        self._order_counter = 0
+        self._current_time: datetime | None = None
+        self._current_prices: dict[str, float] = {}  # close prices
+        self._current_opens: dict[str, float] = {}  # open prices for next-bar execution
+        self._current_highs: dict[str, float] = {}  # high prices for limit/stop checks
+        self._current_lows: dict[str, float] = {}  # low prices for limit/stop checks
+        self._current_volumes: dict[str, float] = {}
+        self._current_signals: dict[str, dict[str, float]] = {}
+        self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
+
+        # Risk management
+        self._position_rules = None  # Global position rules
+        self._position_rules_by_asset: dict[str, any] = {}  # Per-asset rules
+        self._pending_exits: dict[str, dict] = {}  # asset -> {reason, pct} for NEXT_BAR_OPEN mode
+
+        # Execution model (volume limits and market impact)
+        self.execution_limits = execution_limits  # ExecutionLimits instance
+        self.market_impact_model = market_impact_model  # MarketImpactModel instance
+        self._partial_orders: dict[str, float] = {}  # order_id -> remaining quantity
+        self._filled_this_bar: set[str] = set()  # order_ids that had fills this bar
+
+    def get_position(self, asset: str) -> Position | None:
+        return self.positions.get(asset)
+
+    def get_cash(self) -> float:
+        return self.cash
+
+    def get_account_value(self) -> float:
+        value = self.cash
+        for asset, pos in self.positions.items():
+            price = self._current_prices.get(asset, pos.entry_price)
+            value += pos.quantity * price
+        return value
+
+    # === Risk Management ===
+
+    def set_position_rules(self, rules, asset: str | None = None) -> None:
+        """Set position rules globally or per-asset.
+
+        Args:
+            rules: PositionRule or RuleChain to apply
+            asset: If provided, apply only to this asset; otherwise global
+        """
+        if asset:
+            self._position_rules_by_asset[asset] = rules
+        else:
+            self._position_rules = rules
+
+    def update_position_context(self, asset: str, context: dict) -> None:
+        """Update context data for a position (used by signal-based rules).
+
+        Args:
+            asset: Asset symbol
+            context: Dict of signal/indicator values (e.g., {'exit_signal': -0.5, 'atr': 2.5})
+        """
+        pos = self.positions.get(asset)
+        if pos:
+            pos.context.update(context)
+
+    def _get_position_rules(self, asset: str):
+        """Get applicable rules for an asset (per-asset or global)."""
+        return self._position_rules_by_asset.get(asset) or self._position_rules
+
+    def _build_position_state(self, pos: Position, current_price: float):
+        """Build PositionState from Position for rule evaluation."""
+        # Import here to avoid circular imports
+        from .risk.types import PositionState
+
+        asset = pos.asset
+
+        # Merge stop configuration into context for rules to access
+        context = {
+            **pos.context,
+            "stop_fill_mode": self.stop_fill_mode,
+            "stop_level_basis": self.stop_level_basis,
+        }
+
+        return PositionState(
+            asset=asset,
+            side=pos.side,
+            entry_price=pos.entry_price,
+            current_price=current_price,
+            quantity=abs(int(pos.quantity)),
+            initial_quantity=abs(int(pos.initial_quantity)) if pos.initial_quantity else abs(int(pos.quantity)),
+            unrealized_pnl=pos.unrealized_pnl(current_price),
+            unrealized_return=pos.pnl_percent(current_price),
+            bars_held=pos.bars_held,
+            high_water_mark=pos.high_water_mark,
+            low_water_mark=pos.low_water_mark,
+            # Bar OHLC for intrabar stop/limit detection
+            bar_open=self._current_opens.get(asset),
+            bar_high=self._current_highs.get(asset),
+            bar_low=self._current_lows.get(asset),
+            max_favorable_excursion=pos.max_favorable_excursion,
+            max_adverse_excursion=pos.max_adverse_excursion,
+            entry_time=pos.entry_time,
+            current_time=self._current_time,
+            context=context,
+        )
+
+    def evaluate_position_rules(self) -> list[Order]:
+        """Evaluate position rules for all open positions.
+
+        Called by Engine before processing orders. Returns list of exit orders.
+        Handles defer_fill=True by storing pending exits for next bar.
+        """
+        from .risk.types import ActionType
+
+        exit_orders = []
+
+        for asset, pos in list(self.positions.items()):
+            rules = self._get_position_rules(asset)
+            if rules is None:
+                continue
+
+            price = self._current_prices.get(asset)
+            if price is None:
+                continue
+
+            # Build state and evaluate
+            state = self._build_position_state(pos, price)
+            action = rules.evaluate(state)
+
+            if action.action == ActionType.EXIT_FULL:
+                if action.defer_fill:
+                    # NEXT_BAR_OPEN mode: defer exit to next bar
+                    # Store pending exit info (will be processed at next bar's open)
+                    self._pending_exits[asset] = {
+                        "reason": action.reason,
+                        "pct": 1.0,
+                        "quantity": pos.quantity,
+                    }
+                else:
+                    # Generate full exit order immediately
+                    side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
+                    order = self.submit_order(asset, -pos.quantity, order_type=OrderType.MARKET)
+                    if order:
+                        order._risk_exit_reason = action.reason
+                        # Store fill price for stop/limit triggered exits
+                        # This is the price at which the stop/limit was triggered
+                        order._risk_fill_price = action.fill_price
+                        exit_orders.append(order)
+
+            elif action.action == ActionType.EXIT_PARTIAL:
+                if action.defer_fill:
+                    # NEXT_BAR_OPEN mode: defer partial exit to next bar
+                    exit_qty = int(abs(pos.quantity) * action.pct)
+                    if exit_qty > 0:
+                        self._pending_exits[asset] = {
+                            "reason": action.reason,
+                            "pct": action.pct,
+                            "quantity": exit_qty if pos.quantity > 0 else -exit_qty,
+                        }
+                else:
+                    # Generate partial exit order immediately
+                    exit_qty = int(abs(pos.quantity) * action.pct)
+                    if exit_qty > 0:
+                        actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
+                        order = self.submit_order(asset, actual_qty, order_type=OrderType.MARKET)
+                        if order:
+                            order._risk_exit_reason = action.reason
+                            order._risk_fill_price = action.fill_price
+                            exit_orders.append(order)
+
+        return exit_orders
+
+    def submit_order(
+        self,
+        asset: str,
+        quantity: float,
+        side: OrderSide | None = None,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        trail_amount: float | None = None,
+    ) -> Order:
+        if side is None:
+            side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
+            quantity = abs(quantity)
+
+        self._order_counter += 1
+        order = Order(
+            asset=asset,
+            side=side,
+            quantity=quantity,
+            order_type=order_type,
+            limit_price=limit_price,
+            stop_price=stop_price,
+            trail_amount=trail_amount,
+            order_id=f"ORD-{self._order_counter}",
+            created_at=self._current_time,
+        )
+
+        # Capture signal price (close at order time) for stop level calculation
+        # This is used when stop_level_basis is SIGNAL_PRICE (Backtrader behavior)
+        order._signal_price = self._current_prices.get(asset)
+
+        self.orders.append(order)
+        self.pending_orders.append(order)
+
+        # Track orders placed this bar for next-bar execution mode
+        if self.execution_mode == ExecutionMode.NEXT_BAR:
+            self._orders_this_bar.append(order)
+
+        return order
+
+    def submit_bracket(
+        self,
+        asset: str,
+        quantity: float,
+        take_profit: float,
+        stop_loss: float,
+        entry_type: OrderType = OrderType.MARKET,
+        entry_limit: float | None = None,
+    ) -> tuple[Order, Order, Order]:
+        """Submit entry with take-profit and stop-loss."""
+        entry = self.submit_order(asset, quantity, order_type=entry_type, limit_price=entry_limit)
+
+        tp = self.submit_order(
+            asset, quantity, OrderSide.SELL, OrderType.LIMIT, limit_price=take_profit
+        )
+        tp.parent_id = entry.order_id
+
+        sl = self.submit_order(
+            asset, quantity, OrderSide.SELL, OrderType.STOP, stop_price=stop_loss
+        )
+        sl.parent_id = entry.order_id
+
+        return entry, tp, sl
+
+    def update_order(self, order_id: str, **kwargs) -> bool:
+        """Update pending order parameters (stop_price, limit_price, quantity, trail_amount)."""
+        for order in self.pending_orders:
+            if order.order_id == order_id:
+                for key, value in kwargs.items():
+                    if hasattr(order, key):
+                        setattr(order, key, value)
+                return True
+        return False
+
+    def cancel_order(self, order_id: str) -> bool:
+        for order in self.pending_orders:
+            if order.order_id == order_id:
+                order.status = OrderStatus.CANCELLED
+                self.pending_orders.remove(order)
+                return True
+        return False
+
+    def close_position(self, asset: str) -> Order | None:
+        pos = self.positions.get(asset)
+        if pos and pos.quantity != 0:
+            side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
+            return self.submit_order(asset, abs(pos.quantity), side)
+        return None
+
+    def get_order(self, order_id: str) -> Order | None:
+        """Get order by ID."""
+        for order in self.orders:
+            if order.order_id == order_id:
+                return order
+        return None
+
+    def get_pending_orders(self, asset: str | None = None) -> list[Order]:
+        """Get pending orders, optionally filtered by asset."""
+        if asset is None:
+            return list(self.pending_orders)
+        return [o for o in self.pending_orders if o.asset == asset]
+
+    def _is_exit_order(self, order: Order) -> bool:
+        """Check if order is an exit (reducing existing position).
+
+        Exit orders are:
+        - SELL when we have a long position (reducing long)
+        - BUY when we have a short position (covering short)
+        - Does NOT reverse the position
+
+        Args:
+            order: Order to check
+
+        Returns:
+            True if order is reducing an existing position, False otherwise
+        """
+        pos = self.positions.get(order.asset)
+        if pos is None or pos.quantity == 0:
+            return False  # No position, so this is entry, not exit
+
+        # Calculate signed quantity delta
+        signed_qty = order.quantity if order.side == OrderSide.BUY else -order.quantity
+
+        # Check if opposite sign (reducing) and doesn't reverse
+        if pos.quantity > 0 and signed_qty < 0:
+            # Long position, sell order
+            new_qty = pos.quantity + signed_qty
+            return new_qty >= 0  # Exit if still long or flat, not reversal
+        elif pos.quantity < 0 and signed_qty > 0:
+            # Short position, buy order
+            new_qty = pos.quantity + signed_qty
+            return new_qty <= 0  # Exit if still short or flat, not reversal
+        else:
+            # Same sign - adding to position, not exiting
+            return False
+
+    def _process_pending_exits(self) -> list[Order]:
+        """Process pending exits from NEXT_BAR_OPEN mode.
+
+        Called at the start of a new bar to fill deferred exits at open price.
+        Returns list of exit orders that were created and will be filled at open.
+        """
+        exit_orders = []
+
+        for asset, pending in list(self._pending_exits.items()):
+            pos = self.positions.get(asset)
+            if pos is None:
+                # Position no longer exists (shouldn't happen normally)
+                del self._pending_exits[asset]
+                continue
+
+            open_price = self._current_opens.get(asset)
+            if open_price is None:
+                # No open price available, skip this bar
+                continue
+
+            # Create exit order with fill price = open price
+            exit_qty = pending["quantity"]
+            order = self.submit_order(asset, -exit_qty, order_type=OrderType.MARKET)
+            if order:
+                order._risk_exit_reason = pending["reason"]
+                # Fill at current bar's open (this is the "next bar" from when stop triggered)
+                order._risk_fill_price = open_price
+                exit_orders.append(order)
+
+            # Remove from pending
+            del self._pending_exits[asset]
+
+        return exit_orders
+
+    def _update_time(
+        self,
+        timestamp: datetime,
+        prices: dict[str, float],
+        opens: dict[str, float],
+        highs: dict[str, float],
+        lows: dict[str, float],
+        volumes: dict[str, float],
+        signals: dict[str, dict],
+    ):
+        self._current_time = timestamp
+        self._current_prices = prices
+        self._current_opens = opens
+        self._current_highs = highs
+        self._current_lows = lows
+        self._current_volumes = volumes
+        self._current_signals = signals
+
+        # Clear per-bar tracking at start of new bar
+        self._filled_this_bar.clear()
+
+        # In next-bar mode, move orders from this bar to pending for next bar
+        if self.execution_mode == ExecutionMode.NEXT_BAR:
+            # Orders placed last bar are now eligible for execution
+            pass  # They're already in pending_orders
+            # Clear orders placed this bar (will be processed next bar)
+            self._orders_this_bar = []
+
+        for asset, pos in self.positions.items():
+            pos.bars_held += 1
+            # Update water marks for risk tracking
+            if asset in prices:
+                pos.update_water_marks(prices[asset])
+
+    def _process_orders(self, use_open: bool = False):
+        """Process pending orders against current prices with exit-first sequencing.
+
+        Exit-first sequencing ensures capital efficiency:
+        1. Process all exit orders first (closing positions frees capital)
+        2. Update account equity after exits
+        3. Process all entry orders with updated buying power
+
+        This prevents rejecting entry orders when we have pending exits that
+        would free up capital.
+
+        Args:
+            use_open: If True, use open prices (for next-bar mode at bar start)
+        """
+        # Split orders into exits and entries
+        exit_orders = []
+        entry_orders = []
+
+        for order in self.pending_orders[:]:
+            # In next-bar mode, skip orders placed this bar
+            if self.execution_mode == ExecutionMode.NEXT_BAR and order in self._orders_this_bar:
+                continue
+
+            if self._is_exit_order(order):
+                exit_orders.append(order)
+            else:
+                entry_orders.append(order)
+
+        filled_orders = []
+
+        # Phase 1: Process exit orders (always allowed - frees capital)
+        for order in exit_orders:
+            # Get execution price based on mode
+            if use_open and self.execution_mode == ExecutionMode.NEXT_BAR:
+                price = self._current_opens.get(order.asset)
+            else:
+                price = self._current_prices.get(order.asset)
+
+            if price is None:
+                continue
+
+            fill_price = self._check_fill(order, price)
+            if fill_price is not None:
+                fully_filled = self._execute_fill(order, fill_price)
+                if fully_filled:
+                    filled_orders.append(order)
+                    # Clean up partial tracking
+                    self._partial_orders.pop(order.order_id, None)
+                else:
+                    # Update order quantity to remaining
+                    self._update_partial_order(order)
+
+        # Phase 2: Update account equity after exits
+        self.account.mark_to_market(self._current_prices)
+
+        # Phase 3: Process entry orders (validated via Gatekeeper)
+        for order in entry_orders:
+            # Get execution price based on mode
+            if use_open and self.execution_mode == ExecutionMode.NEXT_BAR:
+                price = self._current_opens.get(order.asset)
+            else:
+                price = self._current_prices.get(order.asset)
+
+            if price is None:
+                continue
+
+            fill_price = self._check_fill(order, price)
+            if fill_price is not None:
+                # CRITICAL: Validate order before executing
+                valid, rejection_reason = self.gatekeeper.validate_order(order, fill_price)
+
+                if valid:
+                    fully_filled = self._execute_fill(order, fill_price)
+                    if fully_filled:
+                        filled_orders.append(order)
+                        # Clean up partial tracking
+                        self._partial_orders.pop(order.order_id, None)
+                    else:
+                        # Update order quantity to remaining
+                        self._update_partial_order(order)
+                else:
+                    # Reject order
+                    order.status = OrderStatus.REJECTED
+                    # Note: rejection_reason could be logged here if needed
+
+        # Remove filled/rejected orders from pending (only fully filled ones)
+        for order in filled_orders:
+            if order in self.pending_orders:
+                self.pending_orders.remove(order)
+            if order in self._orders_this_bar:
+                self._orders_this_bar.remove(order)
+
+        # Also remove rejected orders
+        for order in self.pending_orders[:]:
+            if order.status == OrderStatus.REJECTED:
+                self.pending_orders.remove(order)
+
+    def _get_effective_quantity(self, order: Order) -> float:
+        """Get effective order quantity (considering partial fills).
+
+        For orders with partial fills in progress, returns the remaining quantity.
+        """
+        remaining = self._partial_orders.get(order.order_id)
+        if remaining is not None:
+            return remaining
+        return order.quantity
+
+    def _update_partial_order(self, order: Order) -> None:
+        """Update order quantity after partial fill for next bar."""
+        remaining = self._partial_orders.get(order.order_id)
+        if remaining is not None:
+            order.quantity = remaining
+
+    def _check_fill(self, order: Order, price: float) -> float | None:
+        """Check if order should fill, return fill price or None.
+
+        Uses High/Low data to properly check if limit/stop prices were traded through.
+        For limit orders: fill at limit price if bar's range touched it
+        For stop orders: fill at stop price (or worse) if bar's range triggered it
+        For risk-triggered market orders: fill at the stop/target price (intrabar execution)
+        """
+        high = self._current_highs.get(order.asset, price)
+        low = self._current_lows.get(order.asset, price)
+
+        if order.order_type == OrderType.MARKET:
+            # Check if this is a risk-triggered exit with a specific fill price
+            # (e.g., stop-loss or take-profit that was triggered intrabar)
+            risk_fill_price = getattr(order, "_risk_fill_price", None)
+            if risk_fill_price is not None:
+                # Use the stop/target price as the base fill price
+                # Slippage will be applied on top by the caller
+                return risk_fill_price
+            return price
+
+        elif order.order_type == OrderType.LIMIT:
+            # Limit buy fills if Low <= limit_price (price dipped to our level)
+            # Limit sell fills if High >= limit_price (price rose to our level)
+            if order.side == OrderSide.BUY and low <= order.limit_price or order.side == OrderSide.SELL and high >= order.limit_price:
+                return order.limit_price
+
+        elif order.order_type == OrderType.STOP:
+            # Stop buy triggers if High >= stop_price (price rose to trigger)
+            # Stop sell triggers if Low <= stop_price (price fell to trigger)
+            if order.side == OrderSide.BUY and high >= order.stop_price:
+                # Fill at stop price or worse (could gap through)
+                return max(order.stop_price, low)  # At least stop price
+            elif order.side == OrderSide.SELL and low <= order.stop_price:
+                # Fill at stop price or worse (could gap through)
+                return min(order.stop_price, high)  # At most stop price
+
+        elif order.order_type == OrderType.TRAILING_STOP and order.side == OrderSide.SELL:
+            # Update trailing stop based on high water mark
+            new_stop = high - order.trail_amount
+            if order.stop_price is None or new_stop > order.stop_price:
+                order.stop_price = new_stop
+            # Check if triggered
+            if low <= order.stop_price:
+                return min(order.stop_price, high)
+
+        return None
+
+    def _execute_fill(self, order: Order, base_price: float) -> bool:
+        """Execute a fill and update positions.
+
+        Returns:
+            True if order is fully filled, False if partially filled (remainder pending)
+        """
+        volume = self._current_volumes.get(order.asset)
+
+        # Get effective quantity (considering partial fills from previous bars)
+        effective_quantity = self._get_effective_quantity(order)
+        fill_quantity = effective_quantity
+
+        # Apply execution limits (volume participation)
+        if self.execution_limits is not None:
+            # Skip if already filled this bar (for volume limits)
+            if order.order_id in self._filled_this_bar:
+                return False
+
+            exec_result = self.execution_limits.calculate(effective_quantity, volume, base_price)
+            fill_quantity = exec_result.fillable_quantity
+
+            if fill_quantity <= 0:
+                # Can't fill any this bar - keep order pending
+                return False
+
+            # Mark as filled this bar (to prevent double fills in same_bar mode)
+            self._filled_this_bar.add(order.order_id)
+
+            if exec_result.remaining_quantity > 0:
+                # Partial fill - track remaining for future bars
+                self._partial_orders[order.order_id] = exec_result.remaining_quantity
+            else:
+                # Fully filled - remove from partial tracking
+                self._partial_orders.pop(order.order_id, None)
+
+        # Apply market impact
+        impact = 0.0
+        if self.market_impact_model is not None:
+            is_buy = order.side == OrderSide.BUY
+            impact = self.market_impact_model.calculate(fill_quantity, base_price, volume, is_buy)
+            base_price = base_price + impact  # Impact adjusts the base price
+
+        # Calculate slippage (on top of market impact)
+        slippage = self.slippage_model.calculate(order.asset, fill_quantity, base_price, volume)
+        fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
+
+        # Calculate commission
+        commission = self.commission_model.calculate(order.asset, fill_quantity, fill_price)
+
+        fill = Fill(
+            order_id=order.order_id,
+            asset=order.asset,
+            side=order.side,
+            quantity=fill_quantity,
+            price=fill_price,
+            timestamp=self._current_time,
+            commission=commission,
+            slippage=slippage,
+        )
+        self.fills.append(fill)
+
+        # Determine if order is fully filled or partial
+        is_partial = order.order_id in self._partial_orders
+        if is_partial:
+            # Update order for partial fill (will continue next bar)
+            order.filled_quantity = (order.filled_quantity or 0) + fill_quantity
+            # Don't change status - still pending for remainder
+        else:
+            order.status = OrderStatus.FILLED
+            order.filled_at = self._current_time
+            order.filled_price = fill_price
+            order.filled_quantity = fill_quantity
+
+        # Update position
+        pos = self.positions.get(order.asset)
+        signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
+
+        if pos is None:
+            if signed_qty != 0:
+                # Create new position with signal_price in context for stop level calculation
+                signal_price = getattr(order, "_signal_price", None)
+                context = {"signal_price": signal_price} if signal_price is not None else {}
+                self.positions[order.asset] = Position(
+                    asset=order.asset,
+                    quantity=signed_qty,
+                    entry_price=fill_price,
+                    entry_time=self._current_time,
+                    context=context,
+                )
+        else:
+            old_qty = pos.quantity
+            new_qty = old_qty + signed_qty
+
+            if new_qty == 0:
+                # Position closed
+                pnl = (fill_price - pos.entry_price) * old_qty - commission
+                trade = Trade(
+                    asset=order.asset,
+                    entry_time=pos.entry_time,
+                    exit_time=self._current_time,
+                    entry_price=pos.entry_price,
+                    exit_price=fill_price,
+                    quantity=old_qty,  # Preserve sign: positive=long, negative=short
+                    pnl=pnl,
+                    pnl_percent=(fill_price - pos.entry_price) / pos.entry_price
+                    if pos.entry_price
+                    else 0,
+                    bars_held=pos.bars_held,
+                    commission=commission,
+                    slippage=slippage,
+                    entry_signals=self._current_signals.get(order.asset, {}),
+                    exit_signals=self._current_signals.get(order.asset, {}),
+                )
+                self.trades.append(trade)
+                del self.positions[order.asset]
+            elif (old_qty > 0) != (new_qty > 0):
+                # Position flipped
+                pnl = (fill_price - pos.entry_price) * old_qty - commission
+                self.trades.append(
+                    Trade(
+                        asset=order.asset,
+                        entry_time=pos.entry_time,
+                        exit_time=self._current_time,
+                        entry_price=pos.entry_price,
+                        exit_price=fill_price,
+                        quantity=old_qty,  # Preserve sign: positive=long, negative=short
+                        pnl=pnl,
+                        pnl_percent=(fill_price - pos.entry_price) / pos.entry_price
+                        if pos.entry_price
+                        else 0,
+                        bars_held=pos.bars_held,
+                        commission=commission,
+                        slippage=slippage,
+                    )
+                )
+                # Create new position with signal_price in context
+                signal_price = getattr(order, "_signal_price", None)
+                context = {"signal_price": signal_price} if signal_price is not None else {}
+                self.positions[order.asset] = Position(
+                    asset=order.asset,
+                    quantity=new_qty,
+                    entry_price=fill_price,
+                    entry_time=self._current_time,
+                    context=context,
+                )
+            else:
+                # Position scaled
+                if abs(new_qty) > abs(old_qty):
+                    total_cost = pos.entry_price * abs(old_qty) + fill_price * abs(signed_qty)
+                    pos.entry_price = total_cost / abs(new_qty)
+                pos.quantity = new_qty
+
+        # Update cash
+        cash_change = -signed_qty * fill_price - commission
+        self.cash += cash_change
+
+        # Update AccountState (import Position from accounting)
+        from .accounting import Position as AcctPosition
+
+        # Sync position to AccountState
+        broker_pos = self.positions.get(order.asset)
+        if broker_pos is None:
+            # Position was closed, remove from account
+            if order.asset in self.account.positions:
+                del self.account.positions[order.asset]
+        else:
+            # Update or create position in account
+            self.account.positions[order.asset] = AcctPosition(
+                asset=broker_pos.asset,
+                quantity=broker_pos.quantity,
+                avg_entry_price=broker_pos.entry_price,
+                current_price=self._current_prices.get(order.asset, broker_pos.entry_price),
+                entry_time=broker_pos.entry_time,
+                bars_held=broker_pos.bars_held,
+            )
+
+        # Update account cash
+        self.account.cash = self.cash
+
+        # Cancel sibling bracket orders on fill (only for full fills)
+        if order.parent_id and not is_partial:
+            for o in self.pending_orders[:]:
+                if o.parent_id == order.parent_id and o.order_id != order.order_id:
+                    o.status = OrderStatus.CANCELLED
+                    self.pending_orders.remove(o)
+
+        # Return True for full fill, False for partial (order stays pending)
+        return not is_partial
+
+========================================
+FILE: src/ml4t/backtest/datafeed.py
+========================================
+"""Polars-based multi-asset data feed with O(1) timestamp lookups."""
+
+from datetime import datetime
+from typing import Any
+
+import polars as pl
+
+
+class DataFeed:
+    """Polars-based multi-asset data feed with signals and context.
+
+    Pre-partitions data by timestamp at initialization for O(1) lookups
+    during iteration (vs O(N) filter per bar).
+    """
+
+    def __init__(
+        self,
+        prices_path: str | None = None,
+        signals_path: str | None = None,
+        context_path: str | None = None,
+        prices_df: pl.DataFrame | None = None,
+        signals_df: pl.DataFrame | None = None,
+        context_df: pl.DataFrame | None = None,
+    ):
+        self.prices = (
+            prices_df
+            if prices_df is not None
+            else (pl.scan_parquet(prices_path).collect() if prices_path else None)
+        )
+        self.signals = (
+            signals_df
+            if signals_df is not None
+            else (pl.scan_parquet(signals_path).collect() if signals_path else None)
+        )
+        self.context = (
+            context_df
+            if context_df is not None
+            else (pl.scan_parquet(context_path).collect() if context_path else None)
+        )
+
+        if self.prices is None:
+            raise ValueError("prices_path or prices_df required")
+
+        # Pre-partition data by timestamp for O(1) lookups
+        self._prices_by_ts = self._partition_by_timestamp(self.prices)
+        self._signals_by_ts = (
+            self._partition_by_timestamp(self.signals) if self.signals is not None else {}
+        )
+        self._context_by_ts = (
+            self._partition_by_timestamp(self.context) if self.context is not None else {}
+        )
+
+        self._timestamps = self._get_timestamps()
+        self._idx = 0
+
+    def _partition_by_timestamp(self, df: pl.DataFrame) -> dict[datetime, pl.DataFrame]:
+        """Partition DataFrame into dict keyed by timestamp for O(1) access."""
+        result = {}
+        for ts_df in df.partition_by("timestamp", maintain_order=True):
+            ts = ts_df["timestamp"][0]
+            result[ts] = ts_df
+        return result
+
+    def _get_timestamps(self) -> list[datetime]:
+        # Combine timestamps from all sources
+        all_ts = set(self._prices_by_ts.keys())
+        all_ts.update(self._signals_by_ts.keys())
+        all_ts.update(self._context_by_ts.keys())
+        return sorted(all_ts)
+
+    def __iter__(self):
+        self._idx = 0
+        return self
+
+    def __len__(self) -> int:
+        return len(self._timestamps)
+
+    def __next__(self) -> tuple[datetime, dict[str, dict], dict[str, Any]]:
+        if self._idx >= len(self._timestamps):
+            raise StopIteration
+
+        ts = self._timestamps[self._idx]
+        self._idx += 1
+
+        # O(1) lookup - no filtering needed
+        assets_data = {}
+        prices_df = self._prices_by_ts.get(ts)
+        if prices_df is not None:
+            for row in prices_df.iter_rows(named=True):
+                asset = row["asset"]
+                assets_data[asset] = {
+                    "open": row.get("open"),
+                    "high": row.get("high"),
+                    "low": row.get("low"),
+                    "close": row.get("close"),
+                    "volume": row.get("volume"),
+                    "signals": {},
+                }
+
+        # Add signals for each asset - O(1) lookup
+        signals_df = self._signals_by_ts.get(ts)
+        if signals_df is not None:
+            for row in signals_df.iter_rows(named=True):
+                asset = row["asset"]
+                if asset in assets_data:
+                    for k, v in row.items():
+                        if k not in ("timestamp", "asset"):
+                            assets_data[asset]["signals"][k] = v
+
+        # Get context at this timestamp - O(1) lookup
+        context_data = {}
+        ctx_df = self._context_by_ts.get(ts)
+        if ctx_df is not None and len(ctx_df) > 0:
+            row = ctx_df.row(0, named=True)
+            for k, v in row.items():
+                if k != "timestamp":
+                    context_data[k] = v
+
+        return ts, assets_data, context_data
+
+========================================
+FILE: src/ml4t/backtest/types.py
+========================================
+"""Core types for backtesting engine."""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+
+# === Enums ===
+
+
+class OrderType(Enum):
+    MARKET = "market"
+    LIMIT = "limit"
+    STOP = "stop"
+    STOP_LIMIT = "stop_limit"
+    TRAILING_STOP = "trailing_stop"
+
+
+class OrderSide(Enum):
+    BUY = "buy"
+    SELL = "sell"
+
+
+class OrderStatus(Enum):
+    PENDING = "pending"
+    FILLED = "filled"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
+
+
+class ExecutionMode(Enum):
+    """Order execution timing mode."""
+
+    SAME_BAR = "same_bar"  # Orders fill at current bar's close (default)
+    NEXT_BAR = "next_bar"  # Orders fill at next bar's open (like Backtrader)
+
+
+class StopFillMode(Enum):
+    """Stop/take-profit fill price mode.
+
+    Different frameworks handle stop order fills differently:
+    - STOP_PRICE: Fill at exact stop/target price (standard model, default)
+                  Matches VectorBT Pro with OHLC and Backtrader behavior
+    - CLOSE_PRICE: Fill at bar's close price when stop triggers
+                   Matches VectorBT Pro with close-only data
+    - BAR_EXTREME: Fill at bar's low (stop-loss) or high (take-profit)
+                   Worst/best case model (conservative/optimistic)
+    - NEXT_BAR_OPEN: Fill at next bar's open price when stop triggers
+                     Matches Zipline behavior (strategy-level stops)
+    """
+
+    STOP_PRICE = "stop_price"  # Fill at exact stop/target price (default, VBT Pro OHLC, Backtrader)
+    CLOSE_PRICE = "close_price"  # Fill at close price (VBT Pro close-only)
+    BAR_EXTREME = "bar_extreme"  # Fill at bar's low/high (conservative/optimistic)
+    NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open (Zipline)
+
+
+class StopLevelBasis(Enum):
+    """Basis for calculating stop/take-profit levels.
+
+    Different frameworks calculate stop levels from different reference prices:
+    - FILL_PRICE: Calculate from actual entry fill price (ml4t default)
+                  stop_level = fill_price * (1 - pct)
+    - SIGNAL_PRICE: Calculate from signal close price at order time (Backtrader)
+                    stop_level = signal_close * (1 - pct)
+
+    In NEXT_BAR mode, fill_price is next bar's open while signal_price is
+    current bar's close. This creates a small difference in stop levels.
+    """
+
+    FILL_PRICE = "fill_price"  # Use actual entry fill price (default)
+    SIGNAL_PRICE = "signal_price"  # Use signal close price at order time (Backtrader)
+
+
+# === Dataclasses ===
+
+
+@dataclass
+class Order:
+    asset: str
+    side: OrderSide
+    quantity: float
+    order_type: OrderType = OrderType.MARKET
+    limit_price: float | None = None
+    stop_price: float | None = None
+    trail_amount: float | None = None
+    parent_id: str | None = None
+    order_id: str = ""
+    status: OrderStatus = OrderStatus.PENDING
+    created_at: datetime | None = None
+    filled_at: datetime | None = None
+    filled_price: float | None = None
+    filled_quantity: float = 0.0
+
+
+@dataclass
+class Position:
+    asset: str
+    quantity: float
+    entry_price: float
+    entry_time: datetime
+    bars_held: int = 0
+    # Risk tracking fields
+    high_water_mark: float | None = None  # Highest price since entry (for longs)
+    low_water_mark: float | None = None  # Lowest price since entry (for shorts)
+    max_favorable_excursion: float = 0.0  # Best unrealized return seen
+    max_adverse_excursion: float = 0.0  # Worst unrealized return seen
+    initial_quantity: float | None = None  # Original size when opened
+    context: dict = field(default_factory=dict)  # Strategy-provided context
+
+    def __post_init__(self):
+        # Initialize water marks to entry price
+        if self.high_water_mark is None:
+            self.high_water_mark = self.entry_price
+        if self.low_water_mark is None:
+            self.low_water_mark = self.entry_price
+        if self.initial_quantity is None:
+            self.initial_quantity = self.quantity
+
+    def unrealized_pnl(self, current_price: float) -> float:
+        return (current_price - self.entry_price) * self.quantity
+
+    def pnl_percent(self, current_price: float) -> float:
+        if self.entry_price == 0:
+            return 0.0
+        return (current_price - self.entry_price) / self.entry_price
+
+    def update_water_marks(self, current_price: float) -> None:
+        """Update high/low water marks and excursion tracking."""
+        # Update water marks
+        if current_price > self.high_water_mark:
+            self.high_water_mark = current_price
+        if current_price < self.low_water_mark:
+            self.low_water_mark = current_price
+
+        # Update MFE/MAE
+        current_return = self.pnl_percent(current_price)
+        if current_return > self.max_favorable_excursion:
+            self.max_favorable_excursion = current_return
+        if current_return < self.max_adverse_excursion:
+            self.max_adverse_excursion = current_return
+
+    @property
+    def side(self) -> str:
+        """Return 'long' or 'short' based on quantity sign."""
+        return "long" if self.quantity > 0 else "short"
+
+
+@dataclass
+class Fill:
+    order_id: str
+    asset: str
+    side: OrderSide
+    quantity: float
+    price: float
+    timestamp: datetime
+    commission: float = 0.0
+    slippage: float = 0.0
+
+
+@dataclass
+class Trade:
+    """Completed round-trip trade."""
+
+    asset: str
+    entry_time: datetime
+    exit_time: datetime
+    entry_price: float
+    exit_price: float
+    quantity: float
+    pnl: float
+    pnl_percent: float
+    bars_held: int
+    commission: float = 0.0
+    slippage: float = 0.0
+    entry_signals: dict[str, float] = field(default_factory=dict)
+    exit_signals: dict[str, float] = field(default_factory=dict)
+
+========================================
+FILE: src/ml4t/backtest/strategy.py
+========================================
+"""Base strategy class for backtesting."""
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Any
+
+
+class Strategy(ABC):
+    """Base strategy class."""
+
+    @abstractmethod
+    def on_data(
+        self,
+        timestamp: datetime,
+        data: dict[str, dict],
+        context: dict[str, Any],
+        broker: Any,  # Avoid circular import, use Any for broker type
+    ) -> None:
+        """Called for each timestamp with all available data."""
+        pass
+
+    def on_start(self, broker: Any) -> None:  # noqa: B027
+        """Called before backtest starts."""
+        pass
+
+    def on_end(self, broker: Any) -> None:  # noqa: B027
+        """Called after backtest ends."""
+        pass
+
+========================================
+FILE: src/ml4t/backtest/models.py
+========================================
+"""Pluggable commission and slippage models."""
+
+from typing import Protocol, runtime_checkable
+
+# === Protocols ===
+
+
+@runtime_checkable
+class CommissionModel(Protocol):
+    """Protocol for commission calculation."""
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float: ...
+
+
+@runtime_checkable
+class SlippageModel(Protocol):
+    """Protocol for slippage/market impact calculation."""
+
+    def calculate(
+        self, asset: str, quantity: float, price: float, volume: float | None
+    ) -> float: ...
+
+
+# === Commission Models ===
+
+
+class NoCommission:
+    """Zero commission."""
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        return 0.0
+
+
+class PercentageCommission:
+    """Commission as percentage of trade value."""
+
+    def __init__(self, rate: float = 0.001):
+        self.rate = rate
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        return abs(quantity * price * self.rate)
+
+
+class PerShareCommission:
+    """Fixed commission per share with optional minimum."""
+
+    def __init__(self, per_share: float = 0.005, minimum: float = 1.0):
+        self.per_share = per_share
+        self.minimum = minimum
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        return max(abs(quantity) * self.per_share, self.minimum)
+
+
+class TieredCommission:
+    """Tiered commission based on trade value."""
+
+    def __init__(self, tiers: list[tuple[float, float]]):
+        # [(threshold, rate), ...] e.g. [(10000, 0.001), (50000, 0.0008), (inf, 0.0005)]
+        self.tiers = sorted(tiers, key=lambda x: x[0])
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        value = abs(quantity * price)
+        for threshold, rate in self.tiers:
+            if value <= threshold:
+                return value * rate
+        return value * self.tiers[-1][1]
+
+
+class CombinedCommission:
+    """Combined percentage + fixed commission per trade."""
+
+    def __init__(self, percentage: float = 0.0, fixed: float = 0.0):
+        self.percentage = percentage
+        self.fixed = fixed
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        value = abs(quantity * price)
+        return value * self.percentage + self.fixed
+
+
+# === Slippage Models ===
+
+
+class NoSlippage:
+    """Zero slippage."""
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        return 0.0
+
+
+class FixedSlippage:
+    """Fixed slippage per share."""
+
+    def __init__(self, amount: float = 0.01):
+        self.amount = amount
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        return abs(quantity) * self.amount
+
+
+class PercentageSlippage:
+    """Slippage as percentage of price (per-unit price adjustment)."""
+
+    def __init__(self, rate: float = 0.001):
+        self.rate = rate
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        # Return per-unit price adjustment (not total dollars)
+        # Broker adds this to fill price: fill = base_price ± slippage
+        return price * self.rate
+
+
+class VolumeShareSlippage:
+    """Slippage based on order size vs volume (market impact)."""
+
+    def __init__(self, impact_factor: float = 0.1):
+        self.impact_factor = impact_factor
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        if volume is None or volume == 0:
+            return 0.0
+        volume_fraction = abs(quantity) / volume
+        impact = volume_fraction * self.impact_factor
+        # Return per-unit price adjustment (not total dollars)
+        return price * impact
+
+========================================
+FILE: src/ml4t/backtest/risk/types.py
+========================================
+"""Core types for risk management."""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum, auto
+from typing import Any
+
+
+class ActionType(Enum):
+    """Types of actions a position rule can return."""
+
+    HOLD = auto()  # Do nothing
+    EXIT_FULL = auto()  # Close entire position
+    EXIT_PARTIAL = auto()  # Close portion of position
+    ADJUST_STOP = auto()  # Move stop price
+
+
+@dataclass
+class PositionAction:
+    """Action returned by a position rule.
+
+    Attributes:
+        action: Type of action to take
+        pct: Percentage to exit (for EXIT_PARTIAL), 0-1
+        stop_price: New stop price (for ADJUST_STOP)
+        fill_price: Price at which to fill exit order (for stop/limit triggers)
+        reason: Human-readable reason for action (for logging)
+        defer_fill: If True, defer exit to next bar and fill at open price
+                   (used for NEXT_BAR_OPEN mode to match Zipline behavior)
+    """
+
+    action: ActionType
+    pct: float = 1.0
+    stop_price: float | None = None
+    fill_price: float | None = None  # Exit at this price (before slippage)
+    reason: str = ""
+    defer_fill: bool = False  # Defer exit to next bar's open
+
+    @classmethod
+    def hold(cls) -> "PositionAction":
+        """Convenience: return HOLD action."""
+        return cls(ActionType.HOLD)
+
+    @classmethod
+    def exit_full(
+        cls,
+        reason: str = "",
+        fill_price: float | None = None,
+        defer_fill: bool = False,
+    ) -> "PositionAction":
+        """Convenience: return EXIT_FULL action.
+
+        Args:
+            reason: Human-readable reason for exit
+            fill_price: Price at which to fill (stop/limit price), slippage applied on top
+            defer_fill: If True, defer exit to next bar and fill at open price
+        """
+        return cls(ActionType.EXIT_FULL, reason=reason, fill_price=fill_price, defer_fill=defer_fill)
+
+    @classmethod
+    def exit_partial(cls, pct: float, reason: str = "", fill_price: float | None = None) -> "PositionAction":
+        """Convenience: return EXIT_PARTIAL action."""
+        return cls(ActionType.EXIT_PARTIAL, pct=pct, reason=reason, fill_price=fill_price)
+
+    @classmethod
+    def adjust_stop(cls, price: float, reason: str = "") -> "PositionAction":
+        """Convenience: return ADJUST_STOP action."""
+        return cls(ActionType.ADJUST_STOP, stop_price=price, reason=reason)
+
+
+@dataclass
+class PositionState:
+    """Current state of a position for rule evaluation.
+
+    This dataclass provides all the information rules need to make decisions.
+    All monetary values are in the position's currency.
+
+    Attributes:
+        asset: Asset symbol
+        side: "long" or "short"
+        entry_price: Average entry price
+        current_price: Current market price (close)
+        bar_open: Current bar's open price (for intrabar detection)
+        bar_high: Current bar's high price (for intrabar detection)
+        bar_low: Current bar's low price (for intrabar detection)
+        quantity: Current position size (absolute)
+        initial_quantity: Original position size when opened
+        unrealized_pnl: Current unrealized P&L in currency
+        unrealized_return: Current unrealized return as decimal (0.05 = 5%)
+        bars_held: Number of bars since position opened
+        high_water_mark: Highest price since entry (for longs)
+        low_water_mark: Lowest price since entry (for shorts)
+        max_favorable_excursion: Best unrealized return seen
+        max_adverse_excursion: Worst unrealized return seen
+        entry_time: When position was opened
+        current_time: Current timestamp
+        context: Optional strategy-provided context (signals, indicators, etc.)
+    """
+
+    asset: str
+    side: str  # "long" or "short"
+    entry_price: float
+    current_price: float
+    quantity: int
+    initial_quantity: int
+    unrealized_pnl: float
+    unrealized_return: float
+    bars_held: int
+    high_water_mark: float
+    low_water_mark: float
+    # Bar OHLC for intrabar stop/limit detection
+    bar_open: float | None = None
+    bar_high: float | None = None
+    bar_low: float | None = None
+    max_favorable_excursion: float = 0.0
+    max_adverse_excursion: float = 0.0
+    entry_time: datetime | None = None
+    current_time: datetime | None = None
+    context: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_long(self) -> bool:
+        """True if long position."""
+        return self.side == "long"
+
+    @property
+    def is_short(self) -> bool:
+        """True if short position."""
+        return self.side == "short"
+
+    @property
+    def is_profitable(self) -> bool:
+        """True if position is currently profitable."""
+        return self.unrealized_return > 0
+
+    @property
+    def drawdown_from_peak(self) -> float:
+        """Current drawdown from max favorable excursion."""
+        if self.max_favorable_excursion <= 0:
+            return 0.0
+        return (self.max_favorable_excursion - self.unrealized_return) / (
+            1 + self.max_favorable_excursion
+        )
+
+========================================
+FILE: src/ml4t/backtest/risk/position/static.py
+========================================
+"""Static exit rules - fixed thresholds that don't change."""
+
+from dataclasses import dataclass
+
+from ..types import PositionAction, PositionState
+
+
+def _get_stop_fill_mode(context: dict):
+    """Get StopFillMode from context, defaulting to STOP_PRICE."""
+    from ml4t.backtest.types import StopFillMode
+
+    return context.get("stop_fill_mode", StopFillMode.STOP_PRICE)
+
+
+def _get_stop_base_price(state, context: dict) -> float:
+    """Get the base price for stop level calculation.
+
+    If stop_level_basis is SIGNAL_PRICE and signal_price is available,
+    use signal_price (Backtrader behavior). Otherwise use entry_price.
+    """
+    from ml4t.backtest.types import StopLevelBasis
+
+    basis = context.get("stop_level_basis", StopLevelBasis.FILL_PRICE)
+    if basis == StopLevelBasis.SIGNAL_PRICE:
+        signal_price = context.get("signal_price")
+        if signal_price is not None:
+            return signal_price
+    return state.entry_price
+
+
+@dataclass
+class StopLoss:
+    """Exit when stop price is breached during the bar.
+
+    Stop orders trigger when the bar's price range touches the stop level.
+    Fill price depends on StopFillMode configuration:
+    - STOP_PRICE: Fill at exact stop price (standard model, default)
+    - BAR_EXTREME: Fill at bar's low (matches VectorBT Pro behavior)
+
+    For long positions: stop triggers if bar_low <= stop_price
+    For short positions: stop triggers if bar_high >= stop_price
+
+    Args:
+        pct: Maximum loss as decimal (0.05 = 5% loss triggers exit)
+
+    Example:
+        rule = StopLoss(pct=0.05)  # Exit at -5%
+    """
+
+    pct: float
+
+    def evaluate(self, state: PositionState) -> PositionAction:
+        """Exit if stop price was breached during the bar."""
+        from ml4t.backtest.types import StopFillMode
+
+        # Get base price for stop level calculation (entry_price or signal_price)
+        base_price = _get_stop_base_price(state, state.context)
+
+        # Calculate stop price from base
+        if state.is_long:
+            stop_price = base_price * (1 - self.pct)
+            # Check if stop was triggered during bar (low touched stop level)
+            triggered = (
+                state.bar_low is not None and state.bar_low <= stop_price
+            ) or state.current_price <= stop_price
+        else:  # short
+            stop_price = base_price * (1 + self.pct)
+            # Check if stop was triggered during bar (high touched stop level)
+            triggered = (
+                state.bar_high is not None and state.bar_high >= stop_price
+            ) or state.current_price >= stop_price
+
+        if triggered:
+            # Determine fill price based on mode
+            fill_mode = _get_stop_fill_mode(state.context)
+            if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                # Zipline model: defer exit to next bar, fill at open
+                return PositionAction.exit_full(
+                    reason=f"stop_loss_{self.pct:.1%}",
+                    defer_fill=True,  # Broker will fill at next bar's open
+                )
+            elif fill_mode == StopFillMode.CLOSE_PRICE:
+                # VectorBT Pro close-only model: always fill at close price
+                fill_price = state.current_price
+            elif fill_mode == StopFillMode.BAR_EXTREME:
+                # Conservative model: fill at bar's extreme (worst case)
+                if state.is_long:
+                    fill_price = state.bar_low if state.bar_low is not None else stop_price
+                else:
+                    fill_price = state.bar_high if state.bar_high is not None else stop_price
+            else:
+                # Standard model (STOP_PRICE): fill at exact stop price if within bar range
+                # If bar gaps through stop, fill at open (gap behavior)
+                if state.is_long:
+                    # For long stops: check if bar opened below stop (gap down)
+                    # or if stop is within bar range
+                    if state.bar_open is not None and state.bar_open <= stop_price:
+                        # Bar opened below stop - fill at open (Backtrader gap behavior)
+                        fill_price = state.bar_open
+                    elif (
+                        state.bar_low is not None
+                        and state.bar_high is not None
+                        and state.bar_low <= stop_price <= state.bar_high
+                    ):
+                        # Stop within bar range - fill at exact stop
+                        fill_price = stop_price
+                    else:
+                        # Gap through (VBT behavior) - fill at close
+                        fill_price = state.current_price
+                else:
+                    # For short stops: check if bar opened above stop (gap up)
+                    if state.bar_open is not None and state.bar_open >= stop_price:
+                        # Bar opened above stop - fill at open (gap behavior)
+                        fill_price = state.bar_open
+                    elif (
+                        state.bar_low is not None
+                        and state.bar_high is not None
+                        and state.bar_low <= stop_price <= state.bar_high
+                    ):
+                        # Stop within bar range - fill at exact stop
+                        fill_price = stop_price
+                    else:
+                        # Gap through (VBT behavior) - fill at close
+                        fill_price = state.current_price
+
+            return PositionAction.exit_full(
+                reason=f"stop_loss_{self.pct:.1%}",
+                fill_price=fill_price,
+            )
+        return PositionAction.hold()
+
+
+@dataclass
+class TakeProfit:
+    """Exit when target price is reached during the bar.
+
+    Take-profit orders trigger when the bar's price range touches the target.
+    Fill price depends on StopFillMode configuration:
+    - STOP_PRICE: Fill at exact target price (standard model, default)
+    - BAR_EXTREME: Fill at bar's high (matches VectorBT Pro behavior)
+
+    For long positions: triggers if bar_high >= target_price
+    For short positions: triggers if bar_low <= target_price
+
+    Args:
+        pct: Target profit as decimal (0.10 = 10% profit triggers exit)
+
+    Example:
+        rule = TakeProfit(pct=0.10)  # Exit at +10%
+    """
+
+    pct: float
+
+    def evaluate(self, state: PositionState) -> PositionAction:
+        """Exit if target price was reached during the bar."""
+        from ml4t.backtest.types import StopFillMode
+
+        # Get base price for target level calculation (entry_price or signal_price)
+        base_price = _get_stop_base_price(state, state.context)
+
+        # Calculate target price from base
+        if state.is_long:
+            target_price = base_price * (1 + self.pct)
+            # Check if target was reached during bar (high touched target)
+            triggered = (
+                state.bar_high is not None and state.bar_high >= target_price
+            ) or state.current_price >= target_price
+        else:  # short
+            target_price = base_price * (1 - self.pct)
+            # Check if target was reached during bar (low touched target)
+            triggered = (
+                state.bar_low is not None and state.bar_low <= target_price
+            ) or state.current_price <= target_price
+
+        if triggered:
+            # Determine fill price based on mode
+            fill_mode = _get_stop_fill_mode(state.context)
+            if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                # Zipline model: defer exit to next bar, fill at open
+                return PositionAction.exit_full(
+                    reason=f"take_profit_{self.pct:.1%}",
+                    defer_fill=True,  # Broker will fill at next bar's open
+                )
+            elif fill_mode == StopFillMode.CLOSE_PRICE:
+                # VectorBT Pro close-only model: always fill at close price
+                fill_price = state.current_price
+            elif fill_mode == StopFillMode.BAR_EXTREME:
+                # Optimistic model: fill at bar's extreme (best case for profits)
+                if state.is_long:
+                    fill_price = state.bar_high if state.bar_high is not None else target_price
+                else:
+                    fill_price = state.bar_low if state.bar_low is not None else target_price
+            else:
+                # Standard model (STOP_PRICE): fill at exact target price if within bar range
+                # If bar gaps through target, fill at open/close (gap behavior)
+                if state.is_long:
+                    # For long targets: check if bar opened above target (price improvement)
+                    # or if target is within bar range
+                    if state.bar_open is not None and state.bar_open >= target_price:
+                        # Bar opened above target - fill at open (Backtrader behavior)
+                        fill_price = state.bar_open
+                    elif (
+                        state.bar_low is not None
+                        and state.bar_high is not None
+                        and state.bar_low <= target_price <= state.bar_high
+                    ):
+                        # Target within bar range - fill at exact target
+                        fill_price = target_price
+                    else:
+                        # Gap through - fill at close
+                        fill_price = state.current_price
+                else:
+                    # For short targets: check if bar opened below target (price improvement)
+                    if state.bar_open is not None and state.bar_open <= target_price:
+                        # Bar opened below target - fill at open (price improvement)
+                        fill_price = state.bar_open
+                    elif (
+                        state.bar_low is not None
+                        and state.bar_high is not None
+                        and state.bar_low <= target_price <= state.bar_high
+                    ):
+                        # Target within bar range - fill at exact target
+                        fill_price = target_price
+                    else:
+                        # Gap through - fill at close
+                        fill_price = state.current_price
+
+            return PositionAction.exit_full(
+                reason=f"take_profit_{self.pct:.1%}",
+                fill_price=fill_price,
+            )
+        return PositionAction.hold()
+
+
+@dataclass
+class TimeExit:
+    """Exit after holding for a specified number of bars.
+
+    Args:
+        max_bars: Maximum bars to hold position
+
+    Example:
+        rule = TimeExit(max_bars=20)  # Exit after 20 bars
+    """
+
+    max_bars: int
+
+    def evaluate(self, state: PositionState) -> PositionAction:
+        """Exit if held too long."""
+        if state.bars_held >= self.max_bars:
+            # Time exits fill at current close price
+            return PositionAction.exit_full(f"time_exit_{self.max_bars}bars")
+        return PositionAction.hold()

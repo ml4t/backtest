@@ -93,6 +93,8 @@ from .types import (
     OrderStatus,
     OrderType,
     Position,
+    StopFillMode,
+    StopLevelBasis,
     Trade,
 )
 
@@ -102,6 +104,8 @@ __all__ = [
     "OrderSide",
     "OrderStatus",
     "ExecutionMode",
+    "StopFillMode",
+    "StopLevelBasis",
     "Order",
     "Position",
     "Fill",

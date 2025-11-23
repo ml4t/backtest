@@ -34,6 +34,43 @@ class ExecutionMode(Enum):
     NEXT_BAR = "next_bar"  # Orders fill at next bar's open (like Backtrader)
 
 
+class StopFillMode(Enum):
+    """Stop/take-profit fill price mode.
+
+    Different frameworks handle stop order fills differently:
+    - STOP_PRICE: Fill at exact stop/target price (standard model, default)
+                  Matches VectorBT Pro with OHLC and Backtrader behavior
+    - CLOSE_PRICE: Fill at bar's close price when stop triggers
+                   Matches VectorBT Pro with close-only data
+    - BAR_EXTREME: Fill at bar's low (stop-loss) or high (take-profit)
+                   Worst/best case model (conservative/optimistic)
+    - NEXT_BAR_OPEN: Fill at next bar's open price when stop triggers
+                     Matches Zipline behavior (strategy-level stops)
+    """
+
+    STOP_PRICE = "stop_price"  # Fill at exact stop/target price (default, VBT Pro OHLC, Backtrader)
+    CLOSE_PRICE = "close_price"  # Fill at close price (VBT Pro close-only)
+    BAR_EXTREME = "bar_extreme"  # Fill at bar's low/high (conservative/optimistic)
+    NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open (Zipline)
+
+
+class StopLevelBasis(Enum):
+    """Basis for calculating stop/take-profit levels.
+
+    Different frameworks calculate stop levels from different reference prices:
+    - FILL_PRICE: Calculate from actual entry fill price (ml4t default)
+                  stop_level = fill_price * (1 - pct)
+    - SIGNAL_PRICE: Calculate from signal close price at order time (Backtrader)
+                    stop_level = signal_close * (1 - pct)
+
+    In NEXT_BAR mode, fill_price is next bar's open while signal_price is
+    current bar's close. This creates a small difference in stop levels.
+    """
+
+    FILL_PRICE = "fill_price"  # Use actual entry fill price (default)
+    SIGNAL_PRICE = "signal_price"  # Use signal close price at order time (Backtrader)
+
+
 # === Dataclasses ===
 
 

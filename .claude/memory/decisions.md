@@ -2,15 +2,17 @@
 
 *Updated: 2025-11-22*
 
-## AD-001: Exclude Zipline from Validation (2025-11-14)
+## AD-001: Zipline Validation with Custom Bundle (2025-11-14, Updated 2025-11-23)
 
-**Status**: Accepted
+**Status**: Superseded - Zipline validation now works
 
-**Context**: Zipline's `run_algorithm(bundle='quandl')` fetches its own price data (~4.3x different from test DataFrame).
+**Original Context**: Zipline's `run_algorithm(bundle='quandl')` fetches its own price data.
 
-**Decision**: Exclude Zipline from validation, use VectorBT Pro and Backtrader only.
+**Solution Found**: Create custom bundle with test data using `register()` and `ingest()`.
+See `validation/benchmark_suite.py` lines 778-857 for bundle creation pattern.
 
-**Consequence**: Can't validate against Zipline with custom data; acceptable trade-off.
+**Current Status**: Zipline validation achieves 100% match with custom bundles.
+Run with: `.venv-validation/bin/python3 validation/zipline/scenario_01_long_only.py`
 
 ---
 
@@ -38,15 +40,26 @@
 
 ---
 
-## AD-004: Per-Framework Validation (2025-11-22)
+## AD-004: Validation Environment Strategy (2025-11-22, Updated 2025-11-23)
 
-**Status**: Accepted
+**Status**: Accepted (refined)
 
-**Context**: Two days wasted on dependency conflicts (VectorBT OSS/Pro, Backtrader, Zipline) in unified pytest.
+**Context**: VectorBT OSS and Pro cannot coexist (pandas .vbt accessor conflict).
 
-**Decision**: Validate each framework in isolated venv with standalone scripts.
+**Decision**: Use TWO validation environments:
+- `.venv-validation` - VBT OSS + Backtrader + Zipline-Reloaded (can coexist)
+- `.venv-vectorbt-pro` - VBT Pro only (commercial, separate)
 
-**Consequence**: No unified test runner, but no dependency conflicts.
+**Setup**:
+```bash
+# Create consolidated validation venv
+uv venv .venv-validation --python 3.12
+source .venv-validation/bin/activate
+uv pip install vectorbt backtrader zipline-reloaded exchange_calendars
+uv pip install -e .  # Install ml4t.backtest
+```
+
+**Consequence**: Only 2 validation venvs instead of 8. All open-source frameworks share one env.
 
 ---
 

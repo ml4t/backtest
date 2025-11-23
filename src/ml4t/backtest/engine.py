@@ -12,7 +12,7 @@ from .broker import Broker
 from .datafeed import DataFeed
 from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
 from .strategy import Strategy
-from .types import ExecutionMode
+from .types import ExecutionMode, StopFillMode, StopLevelBasis
 
 if TYPE_CHECKING:
     from .config import BacktestConfig
@@ -29,6 +29,8 @@ class Engine:
         commission_model: CommissionModel | None = None,
         slippage_model: SlippageModel | None = None,
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+        stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
+        stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         account_type: str = "cash",
         initial_margin: float = 0.5,
         maintenance_margin: float = 0.25,
@@ -39,12 +41,16 @@ class Engine:
         self.feed = feed
         self.strategy = strategy
         self.execution_mode = execution_mode
+        self.stop_fill_mode = stop_fill_mode
+        self.stop_level_basis = stop_level_basis
         self.config = config  # Store config for strategy access
         self.broker = Broker(
             initial_cash=initial_cash,
             commission_model=commission_model,
             slippage_model=slippage_model,
             execution_mode=execution_mode,
+            stop_fill_mode=stop_fill_mode,
+            stop_level_basis=stop_level_basis,
             account_type=account_type,
             initial_margin=initial_margin,
             maintenance_margin=maintenance_margin,
@@ -66,6 +72,10 @@ class Engine:
             signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
 
             self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
+
+            # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
+            # This must happen BEFORE evaluate_position_rules() to clear deferred exits
+            self.broker._process_pending_exits()
 
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
             self.broker.evaluate_position_rules()
