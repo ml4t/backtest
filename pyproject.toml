@@ -206,12 +206,12 @@ ignore = [
 [tool.mypy]
 python_version = "3.11"
 strict = false
-warn_return_any = false
-warn_unused_ignores = false
+warn_return_any = false  # numpy/pandas return Any, too many false positives
+warn_unused_ignores = true
 disallow_untyped_defs = false
 disallow_any_unimported = false
-no_implicit_optional = false
-check_untyped_defs = false
+no_implicit_optional = true
+check_untyped_defs = true
 show_error_codes = true
 warn_redundant_casts = true
 ignore_missing_imports = true
