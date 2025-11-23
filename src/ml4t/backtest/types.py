@@ -54,6 +54,50 @@ class StopFillMode(Enum):
     NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open (Zipline)
 
 
+class AssetClass(Enum):
+    """Asset class for contract specification."""
+
+    EQUITY = "equity"  # Stocks, ETFs (multiplier=1)
+    FUTURE = "future"  # Futures contracts (multiplier varies)
+    FOREX = "forex"  # FX pairs (pip value varies)
+
+
+@dataclass
+class ContractSpec:
+    """Contract specification for an asset.
+
+    Defines the characteristics that affect P&L calculation and margin:
+    - Equities: multiplier=1, tick_size=0.01
+    - Futures: multiplier varies (ES=$50, CL=$1000, etc.)
+    - Forex: pip value varies by pair and account currency
+
+    Example:
+        # E-mini S&P 500 futures
+        es_spec = ContractSpec(
+            symbol="ES",
+            asset_class=AssetClass.FUTURE,
+            multiplier=50.0,      # $50 per point
+            tick_size=0.25,       # Minimum move
+            margin=15000.0,       # Initial margin per contract
+        )
+
+        # Apple stock
+        aapl_spec = ContractSpec(
+            symbol="AAPL",
+            asset_class=AssetClass.EQUITY,
+            # multiplier=1.0 (default)
+            # tick_size=0.01 (default)
+        )
+    """
+
+    symbol: str
+    asset_class: AssetClass = AssetClass.EQUITY
+    multiplier: float = 1.0  # Point value ($ per point move)
+    tick_size: float = 0.01  # Minimum price increment
+    margin: float | None = None  # Initial margin per contract (overrides account default)
+    currency: str = "USD"
+
+
 class StopLevelBasis(Enum):
     """Basis for calculating stop/take-profit levels.
 
@@ -106,6 +150,7 @@ class Position:
     max_adverse_excursion: float = 0.0  # Worst unrealized return seen
     initial_quantity: float | None = None  # Original size when opened
     context: dict = field(default_factory=dict)  # Strategy-provided context
+    multiplier: float = 1.0  # Contract multiplier (for futures)
 
     def __post_init__(self):
         # Initialize water marks to entry price
@@ -117,12 +162,17 @@ class Position:
             self.initial_quantity = self.quantity
 
     def unrealized_pnl(self, current_price: float) -> float:
-        return (current_price - self.entry_price) * self.quantity
+        """Calculate unrealized P&L including contract multiplier."""
+        return (current_price - self.entry_price) * self.quantity * self.multiplier
 
     def pnl_percent(self, current_price: float) -> float:
         if self.entry_price == 0:
             return 0.0
         return (current_price - self.entry_price) / self.entry_price
+
+    def notional_value(self, current_price: float) -> float:
+        """Calculate notional value of position."""
+        return abs(self.quantity) * current_price * self.multiplier
 
     def update_water_marks(self, current_price: float) -> None:
         """Update high/low water marks and excursion tracking."""

@@ -12,7 +12,7 @@ from .broker import Broker
 from .datafeed import DataFeed
 from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
 from .strategy import Strategy
-from .types import ExecutionMode, StopFillMode, StopLevelBasis
+from .types import ContractSpec, ExecutionMode, StopFillMode, StopLevelBasis
 
 if TYPE_CHECKING:
     from .config import BacktestConfig
@@ -37,6 +37,7 @@ class Engine:
         config: BacktestConfig | None = None,
         execution_limits=None,
         market_impact_model=None,
+        contract_specs: dict[str, ContractSpec] | None = None,
     ):
         self.feed = feed
         self.strategy = strategy
@@ -56,19 +57,15 @@ class Engine:
             maintenance_margin=maintenance_margin,
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,
+            contract_specs=contract_specs,
         )
         self.equity_curve: list[tuple[datetime, float]] = []
 
     def run(self) -> dict:
         """Run backtest and return results."""
-        # TASK-003: Set feed reference in broker for array access
-        self.broker._feed = self.feed
-        # TASK-004: Initialize position arrays
-        self.broker._ensure_position_arrays()
-
         self.strategy.on_start(self.broker)
 
-        for t_idx, (timestamp, assets_data, context) in enumerate(self.feed):
+        for timestamp, assets_data, context in self.feed:
             prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
             opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
             highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
@@ -76,8 +73,7 @@ class Engine:
             volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
             signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
 
-            # TASK-003: Pass t_idx for array access in broker
-            self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals, t_idx=t_idx)
+            self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
 
             # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits

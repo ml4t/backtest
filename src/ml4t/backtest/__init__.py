@@ -86,6 +86,8 @@ from .models import (
 )
 from .strategy import Strategy
 from .types import (
+    AssetClass,
+    ContractSpec,
     ExecutionMode,
     Fill,
     Order,
@@ -100,6 +102,8 @@ from .types import (
 
 __all__ = [
     # Types
+    "AssetClass",
+    "ContractSpec",
     "OrderType",
     "OrderSide",
     "OrderStatus",

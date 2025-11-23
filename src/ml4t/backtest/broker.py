@@ -2,10 +2,8 @@
 
 from datetime import datetime
 
-import numpy as np
-
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
-from .types import ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, StopFillMode, StopLevelBasis, Trade
+from .types import ContractSpec, ExecutionMode, Fill, Order, OrderSide, OrderStatus, OrderType, Position, StopFillMode, StopLevelBasis, Trade
 
 
 class Broker:
@@ -24,6 +22,7 @@ class Broker:
         maintenance_margin: float = 0.25,
         execution_limits=None,
         market_impact_model=None,
+        contract_specs: dict[str, ContractSpec] | None = None,
     ):
         # Import accounting classes here to avoid circular imports
         from .accounting import (
@@ -85,60 +84,17 @@ class Broker:
         self._partial_orders: dict[str, float] = {}  # order_id -> remaining quantity
         self._filled_this_bar: set[str] = set()  # order_ids that had fills this bar
 
-        # Array-based access (TASK-003) - populated by engine
-        self._feed = None  # Reference to DataFeed for array access
-        self._t_idx: int = -1  # Current time index into arrays
+        # Contract specifications (for futures and other derivatives)
+        self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
 
-        # Position arrays (TASK-004) - SOA for vectorized risk evaluation
-        # These are lazily initialized when feed is set (in engine.run)
-        self._pos_quantities: np.ndarray | None = None  # (n_assets,)
-        self._pos_entry_prices: np.ndarray | None = None  # (n_assets,)
-        self._pos_entry_times: np.ndarray | None = None  # (n_assets,) int bar indices
-        self._pos_high_water: np.ndarray | None = None  # (n_assets,) high since entry
-        self._pos_low_water: np.ndarray | None = None  # (n_assets,) low since entry
+    def get_contract_spec(self, asset: str) -> ContractSpec | None:
+        """Get contract specification for an asset."""
+        return self._contract_specs.get(asset)
 
-    def _init_position_arrays(self, n_assets: int) -> None:
-        """Initialize position arrays for vectorized operations (TASK-004)."""
-        self._pos_quantities = np.zeros(n_assets, dtype=np.float64)
-        self._pos_entry_prices = np.zeros(n_assets, dtype=np.float64)
-        self._pos_entry_times = np.full(n_assets, -1, dtype=np.int64)
-        self._pos_high_water = np.zeros(n_assets, dtype=np.float64)
-        self._pos_low_water = np.zeros(n_assets, dtype=np.float64)
-
-    def _ensure_position_arrays(self) -> None:
-        """Ensure position arrays are initialized (lazy initialization)."""
-        if self._pos_quantities is None and self._feed is not None:
-            self._init_position_arrays(self._feed.n_assets)
-
-    def _sync_position_arrays(self, asset: str) -> None:
-        """Sync position arrays with Position dict for a single asset (TASK-004).
-
-        Called after fills to keep arrays in sync with the Position objects.
-        """
-        # Skip if arrays not initialized or no feed reference
-        if self._pos_quantities is None or self._feed is None:
-            return
-
-        # Get asset index
-        asset_idx = self._feed.asset_to_idx.get(asset)
-        if asset_idx is None:
-            return  # Asset not in feed
-
-        pos = self.positions.get(asset)
-        if pos is None:
-            # Position closed - zero out arrays
-            self._pos_quantities[asset_idx] = 0.0
-            self._pos_entry_prices[asset_idx] = 0.0
-            self._pos_entry_times[asset_idx] = -1
-            self._pos_high_water[asset_idx] = 0.0
-            self._pos_low_water[asset_idx] = 0.0
-        else:
-            # Position exists - sync from Position object
-            self._pos_quantities[asset_idx] = pos.quantity
-            self._pos_entry_prices[asset_idx] = pos.entry_price
-            self._pos_entry_times[asset_idx] = self._t_idx  # Current bar index
-            self._pos_high_water[asset_idx] = pos.high_water_mark
-            self._pos_low_water[asset_idx] = pos.low_water_mark
+    def get_multiplier(self, asset: str) -> float:
+        """Get contract multiplier for an asset (1.0 for equities)."""
+        spec = self._contract_specs.get(asset)
+        return spec.multiplier if spec else 1.0
 
     def get_position(self, asset: str) -> Position | None:
         return self.positions.get(asset)
@@ -147,10 +103,12 @@ class Broker:
         return self.cash
 
     def get_account_value(self) -> float:
+        """Calculate total account value (cash + position values)."""
         value = self.cash
         for asset, pos in self.positions.items():
             price = self._current_prices.get(asset, pos.entry_price)
-            value += pos.quantity * price
+            multiplier = self.get_multiplier(asset)
+            value += pos.quantity * price * multiplier
         return value
 
     # === Risk Management ===
@@ -464,8 +422,6 @@ class Broker:
         lows: dict[str, float],
         volumes: dict[str, float],
         signals: dict[str, dict],
-        *,
-        t_idx: int = -1,  # TASK-003: Time index for array access
     ):
         self._current_time = timestamp
         self._current_prices = prices
@@ -474,7 +430,6 @@ class Broker:
         self._current_lows = lows
         self._current_volumes = volumes
         self._current_signals = signals
-        self._t_idx = t_idx  # TASK-003: Store time index
 
         # Clear per-bar tracking at start of new bar
         self._filled_this_bar.clear()
@@ -741,6 +696,7 @@ class Broker:
                     entry_price=fill_price,
                     entry_time=self._current_time,
                     context=context,
+                    multiplier=self.get_multiplier(order.asset),
                 )
         else:
             old_qty = pos.quantity
@@ -797,6 +753,7 @@ class Broker:
                     entry_price=fill_price,
                     entry_time=self._current_time,
                     context=context,
+                    multiplier=self.get_multiplier(order.asset),
                 )
             else:
                 # Position scaled
@@ -838,9 +795,6 @@ class Broker:
                 if o.parent_id == order.parent_id and o.order_id != order.order_id:
                     o.status = OrderStatus.CANCELLED
                     self.pending_orders.remove(o)
-
-        # TASK-004: Sync position arrays for vectorized risk evaluation
-        self._sync_position_arrays(order.asset)
 
         # Return True for full fill, False for partial (order stays pending)
         return not is_partial
