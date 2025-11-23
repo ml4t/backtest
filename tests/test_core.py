@@ -356,14 +356,26 @@ class TestBroker:
         pos = broker.get_position("AAPL")
         assert pos.bars_held == 0
 
-        # Simulate next bar
+        # Simulate next bar (prices, opens, highs, lows, volumes, signals)
         broker._update_time(
-            datetime(2024, 1, 2), {"AAPL": 101.0}, {"AAPL": 101.0}, {"AAPL": 1000000}, {}
+            datetime(2024, 1, 2),
+            {"AAPL": 101.0},  # prices (close)
+            {"AAPL": 101.0},  # opens
+            {"AAPL": 102.0},  # highs
+            {"AAPL": 100.0},  # lows
+            {"AAPL": 1000000},  # volumes
+            {},  # signals
         )
         assert pos.bars_held == 1
 
         broker._update_time(
-            datetime(2024, 1, 3), {"AAPL": 102.0}, {"AAPL": 102.0}, {"AAPL": 1000000}, {}
+            datetime(2024, 1, 3),
+            {"AAPL": 102.0},  # prices (close)
+            {"AAPL": 102.0},  # opens
+            {"AAPL": 103.0},  # highs
+            {"AAPL": 101.0},  # lows
+            {"AAPL": 1000000},  # volumes
+            {},  # signals
         )
         assert pos.bars_held == 2
 

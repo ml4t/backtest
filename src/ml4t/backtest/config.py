@@ -88,6 +88,18 @@ class SlippageModel(str, Enum):
     VOLUME_BASED = "volume_based"  # Based on trade size vs volume
 
 
+class DataFrequency(str, Enum):
+    """Data frequency for the backtest."""
+
+    DAILY = "daily"  # Daily bars (EOD)
+    MINUTE_1 = "1m"  # 1-minute bars
+    MINUTE_5 = "5m"  # 5-minute bars
+    MINUTE_15 = "15m"  # 15-minute bars
+    MINUTE_30 = "30m"  # 30-minute bars
+    HOURLY = "1h"  # Hourly bars
+    IRREGULAR = "irregular"  # Trade bars, tick aggregations (no fixed frequency)
+
+
 @dataclass
 class BacktestConfig:
     """
@@ -134,6 +146,11 @@ class BacktestConfig:
     # === Account Type ===
     account_type: str = "cash"  # "cash" or "margin"
     margin_requirement: float = 0.5  # 50% margin requirement
+
+    # === Calendar & Timezone ===
+    calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
+    timezone: str = "UTC"  # Default timezone for naive datetimes
+    data_frequency: DataFrequency = DataFrequency.DAILY  # Data frequency
 
     # === Metadata ===
     preset_name: str | None = None  # Name of preset this was loaded from

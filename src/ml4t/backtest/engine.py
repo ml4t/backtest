@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
+from .analytics import EquityCurve, TradeAnalyzer
 from .broker import Broker
 from .datafeed import DataFeed
 from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
@@ -32,6 +33,8 @@ class Engine:
         initial_margin: float = 0.5,
         maintenance_margin: float = 0.25,
         config: BacktestConfig | None = None,
+        execution_limits=None,
+        market_impact_model=None,
     ):
         self.feed = feed
         self.strategy = strategy
@@ -45,6 +48,8 @@ class Engine:
             account_type=account_type,
             initial_margin=initial_margin,
             maintenance_margin=maintenance_margin,
+            execution_limits=execution_limits,
+            market_impact_model=market_impact_model,
         )
         self.equity_curve: list[tuple[datetime, float]] = []
 
@@ -55,10 +60,15 @@ class Engine:
         for timestamp, assets_data, context in self.feed:
             prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
             opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
+            highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
+            lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
             volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
             signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
 
-            self.broker._update_time(timestamp, prices, opens, volumes, signals)
+            self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
+
+            # Evaluate position rules (stops, trails, etc.) - generates exit orders
+            self.broker.evaluate_position_rules()
 
             if self.execution_mode == ExecutionMode.NEXT_BAR:
                 # Next-bar mode: process pending orders at open price
@@ -78,42 +88,54 @@ class Engine:
         return self._generate_results()
 
     def _generate_results(self) -> dict:
-        """Generate backtest results."""
+        """Generate backtest results with full analytics."""
         if not self.equity_curve:
             return {}
 
-        initial = self.broker.initial_cash
-        final = self.equity_curve[-1][1]
-        total_return = (final - initial) / initial
+        # Build EquityCurve from raw data
+        equity = EquityCurve()
+        for ts, value in self.equity_curve:
+            equity.append(ts, value)
 
-        peak = initial
-        max_dd = 0.0
-        for _, value in self.equity_curve:
-            if value > peak:
-                peak = value
-            dd = (peak - value) / peak
-            if dd > max_dd:
-                max_dd = dd
+        # Build TradeAnalyzer
+        trade_analyzer = TradeAnalyzer(self.broker.trades)
 
-        winning = [t for t in self.broker.trades if t.pnl > 0]
-        losing = [t for t in self.broker.trades if t.pnl <= 0]
-
+        # Combine into results (backward compatible + new metrics)
         return {
-            "initial_cash": initial,
-            "final_value": final,
-            "total_return": total_return,
-            "total_return_pct": total_return * 100,
-            "max_drawdown": max_dd,
-            "max_drawdown_pct": max_dd * 100,
-            "num_trades": len(self.broker.trades),
-            "winning_trades": len(winning),
-            "losing_trades": len(losing),
-            "win_rate": len(winning) / len(self.broker.trades) if self.broker.trades else 0,
+            # Core metrics (backward compatible)
+            "initial_cash": equity.initial_value,
+            "final_value": equity.final_value,
+            "total_return": equity.total_return,
+            "total_return_pct": equity.total_return * 100,
+            "max_drawdown": abs(equity.max_dd),  # Keep as positive for backward compat
+            "max_drawdown_pct": abs(equity.max_dd) * 100,
+            "num_trades": trade_analyzer.num_trades,
+            "winning_trades": trade_analyzer.num_winners,
+            "losing_trades": trade_analyzer.num_losers,
+            "win_rate": trade_analyzer.win_rate,
+            # Commission/slippage from fills (includes open positions)
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(f.slippage for f in self.broker.fills),
+            # Raw data
             "trades": self.broker.trades,
             "equity_curve": self.equity_curve,
             "fills": self.broker.fills,
+            # NEW: Analytics objects for detailed analysis
+            "equity": equity,
+            "trade_analyzer": trade_analyzer,
+            # NEW: Additional metrics
+            "sharpe": equity.sharpe(),
+            "sortino": equity.sortino(),
+            "calmar": equity.calmar,
+            "cagr": equity.cagr,
+            "volatility": equity.volatility,
+            "profit_factor": trade_analyzer.profit_factor,
+            "expectancy": trade_analyzer.expectancy,
+            "avg_trade": trade_analyzer.avg_trade,
+            "avg_win": trade_analyzer.avg_win,
+            "avg_loss": trade_analyzer.avg_loss,
+            "largest_win": trade_analyzer.largest_win,
+            "largest_loss": trade_analyzer.largest_loss,
         }
 
     @classmethod

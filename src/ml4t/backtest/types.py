@@ -62,6 +62,22 @@ class Position:
     entry_price: float
     entry_time: datetime
     bars_held: int = 0
+    # Risk tracking fields
+    high_water_mark: float | None = None  # Highest price since entry (for longs)
+    low_water_mark: float | None = None  # Lowest price since entry (for shorts)
+    max_favorable_excursion: float = 0.0  # Best unrealized return seen
+    max_adverse_excursion: float = 0.0  # Worst unrealized return seen
+    initial_quantity: float | None = None  # Original size when opened
+    context: dict = field(default_factory=dict)  # Strategy-provided context
+
+    def __post_init__(self):
+        # Initialize water marks to entry price
+        if self.high_water_mark is None:
+            self.high_water_mark = self.entry_price
+        if self.low_water_mark is None:
+            self.low_water_mark = self.entry_price
+        if self.initial_quantity is None:
+            self.initial_quantity = self.quantity
 
     def unrealized_pnl(self, current_price: float) -> float:
         return (current_price - self.entry_price) * self.quantity
@@ -70,6 +86,26 @@ class Position:
         if self.entry_price == 0:
             return 0.0
         return (current_price - self.entry_price) / self.entry_price
+
+    def update_water_marks(self, current_price: float) -> None:
+        """Update high/low water marks and excursion tracking."""
+        # Update water marks
+        if current_price > self.high_water_mark:
+            self.high_water_mark = current_price
+        if current_price < self.low_water_mark:
+            self.low_water_mark = current_price
+
+        # Update MFE/MAE
+        current_return = self.pnl_percent(current_price)
+        if current_return > self.max_favorable_excursion:
+            self.max_favorable_excursion = current_return
+        if current_return < self.max_adverse_excursion:
+            self.max_adverse_excursion = current_return
+
+    @property
+    def side(self) -> str:
+        """Return 'long' or 'short' based on quantity sign."""
+        return "long" if self.quantity > 0 else "short"
 
 
 @dataclass
