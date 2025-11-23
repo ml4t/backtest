@@ -1,0 +1,201 @@
+{
+  "project": {
+    "name": "ml4t.backtest Performance Optimization",
+    "description": "Optimize event-driven backtester from 90s to <12s for 500 assets x 10yr daily",
+    "created_at": "2025-11-23T16:00:00Z",
+    "updated_at": "2025-11-23T16:00:00Z"
+  },
+  "status": "planning_complete",
+  "current_task": null,
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Add asset ID mapping to DataFeed",
+      "description": "Create asset_to_idx dict and idx_to_asset list at DataFeed initialization. Foundation for array-based access.",
+      "type": "foundation",
+      "status": "pending",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "DataFeed has asset_to_idx: dict[str, int]",
+        "DataFeed has assets: list[str] (ordered)",
+        "All existing tests pass unchanged"
+      ],
+      "estimated_hours": 1,
+      "priority": "high",
+      "files": ["src/ml4t/backtest/datafeed.py"]
+    },
+    {
+      "id": "TASK-002",
+      "title": "Pre-materialize OHLCV as NumPy arrays",
+      "description": "Convert Polars DataFrames to (n_bars, n_assets) NumPy arrays at DataFeed init. Keep existing iteration for backward compat.",
+      "type": "foundation",
+      "status": "pending",
+      "dependencies": ["TASK-001"],
+      "acceptance_criteria": [
+        "DataFeed has opens, highs, lows, closes, volumes as np.ndarray",
+        "Arrays are shape (n_bars, n_assets)",
+        "DataFeed has timestamps array",
+        "Existing iteration still works",
+        "All tests pass"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "files": ["src/ml4t/backtest/datafeed.py"]
+    },
+    {
+      "id": "TASK-003",
+      "title": "Refactor Engine to use array slicing",
+      "description": "Replace per-bar dict creation with array views. Pass t_idx to broker. Most invasive change.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": ["TASK-002"],
+      "acceptance_criteria": [
+        "Engine.run() passes t_idx to broker._update_time()",
+        "No dict creation in main loop for prices",
+        "Broker receives array views instead of dicts",
+        "All tests pass",
+        "Benchmark shows improvement"
+      ],
+      "estimated_hours": 3,
+      "priority": "high",
+      "files": ["src/ml4t/backtest/engine.py", "src/ml4t/backtest/broker.py"]
+    },
+    {
+      "id": "TASK-004",
+      "title": "Add parallel arrays for position state in Broker",
+      "description": "Add pos_quantities and pos_entry_prices as NumPy arrays. Dual-write to both arrays and Position dict during transition.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": ["TASK-001"],
+      "acceptance_criteria": [
+        "Broker has pos_quantities: np.ndarray (n_assets,)",
+        "Broker has pos_entry_prices: np.ndarray (n_assets,)",
+        "Both updated on every fill",
+        "All tests pass"
+      ],
+      "estimated_hours": 2,
+      "priority": "high",
+      "files": ["src/ml4t/backtest/broker.py"]
+    },
+    {
+      "id": "TASK-005",
+      "title": "Migrate get_position() to read from arrays",
+      "description": "Reconstruct Position object on-demand from arrays. Remove Position dict dependency.",
+      "type": "feature",
+      "status": "pending",
+      "dependencies": ["TASK-004"],
+      "acceptance_criteria": [
+        "get_position() reads from arrays",
+        "Position object constructed on-demand",
+        "Position dict removed or deprecated",
+        "All tests pass"
+      ],
+      "estimated_hours": 1,
+      "priority": "medium",
+      "files": ["src/ml4t/backtest/broker.py"]
+    },
+    {
+      "id": "TASK-006",
+      "title": "Vectorize stop-loss evaluation",
+      "description": "Replace per-position iteration with NumPy masking. hit_stops = (lows < entry_prices * stop_pct) & (quantities != 0)",
+      "type": "optimization",
+      "status": "pending",
+      "dependencies": ["TASK-003", "TASK-004"],
+      "acceptance_criteria": [
+        "Stop-loss uses vectorized NumPy operations",
+        "Only iterates triggered indices",
+        "All validation scenarios pass EXACT MATCH",
+        "Benchmark shows improvement"
+      ],
+      "estimated_hours": 2,
+      "priority": "medium",
+      "files": ["src/ml4t/backtest/risk/position/static.py", "src/ml4t/backtest/broker.py"]
+    },
+    {
+      "id": "TASK-007",
+      "title": "Vectorize take-profit evaluation",
+      "description": "Same pattern as stop-loss: NumPy mask then iterate hits only.",
+      "type": "optimization",
+      "status": "pending",
+      "dependencies": ["TASK-006"],
+      "acceptance_criteria": [
+        "Take-profit uses vectorized NumPy operations",
+        "Pattern matches stop-loss implementation",
+        "All validation scenarios pass EXACT MATCH"
+      ],
+      "estimated_hours": 1,
+      "priority": "medium",
+      "files": ["src/ml4t/backtest/risk/position/static.py"]
+    },
+    {
+      "id": "TASK-008",
+      "title": "Replace Enum comparisons with int flags",
+      "description": "Define ORDER_SIDE_BUY=1, ORDER_SIDE_SELL=-1. Use int in hot paths, keep Enum for public API.",
+      "type": "optimization",
+      "status": "pending",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Int constants defined for OrderSide",
+        "Hot paths use int comparison",
+        "Public API still accepts Enum",
+        "All tests pass"
+      ],
+      "estimated_hours": 1,
+      "priority": "low",
+      "files": ["src/ml4t/backtest/types.py", "src/ml4t/backtest/broker.py"]
+    },
+    {
+      "id": "TASK-009",
+      "title": "Add __slots__ to hot-path dataclasses",
+      "description": "Add __slots__ to Order, Fill, PositionAction for reduced memory and faster access.",
+      "type": "optimization",
+      "status": "pending",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Order, Fill, PositionAction have __slots__",
+        "Memory usage unchanged or reduced",
+        "All tests pass"
+      ],
+      "estimated_hours": 0.5,
+      "priority": "low",
+      "files": ["src/ml4t/backtest/types.py", "src/ml4t/backtest/risk/types.py"]
+    },
+    {
+      "id": "TASK-010",
+      "title": "Run full validation suite",
+      "description": "Validate all 206 unit tests and 4 framework validations pass. Benchmark must show <12s runtime.",
+      "type": "testing",
+      "status": "pending",
+      "dependencies": ["TASK-003", "TASK-005", "TASK-007"],
+      "acceptance_criteria": [
+        "All 206 unit tests pass",
+        "VectorBT Pro: EXACT MATCH",
+        "VectorBT OSS: EXACT MATCH",
+        "Backtrader: EXACT MATCH",
+        "Zipline: EXACT MATCH",
+        "Benchmark runtime < 12s for daily_baseline"
+      ],
+      "estimated_hours": 1,
+      "priority": "high",
+      "files": []
+    },
+    {
+      "id": "TASK-011",
+      "title": "Update documentation",
+      "description": "Document SOA pattern, update PROJECT_MAP.md with new architecture.",
+      "type": "documentation",
+      "status": "pending",
+      "dependencies": ["TASK-010"],
+      "acceptance_criteria": [
+        "SOA pattern documented in code comments",
+        "PROJECT_MAP.md updated",
+        "Architecture decisions recorded"
+      ],
+      "estimated_hours": 0.5,
+      "priority": "low",
+      "files": [".claude/PROJECT_MAP.md", ".claude/memory/decisions.md"]
+    }
+  ],
+  "completed_tasks": [],
+  "next_available": ["TASK-001", "TASK-008", "TASK-009"]
+}

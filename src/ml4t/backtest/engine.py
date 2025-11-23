@@ -61,9 +61,14 @@ class Engine:
 
     def run(self) -> dict:
         """Run backtest and return results."""
+        # TASK-003: Set feed reference in broker for array access
+        self.broker._feed = self.feed
+        # TASK-004: Initialize position arrays
+        self.broker._ensure_position_arrays()
+
         self.strategy.on_start(self.broker)
 
-        for timestamp, assets_data, context in self.feed:
+        for t_idx, (timestamp, assets_data, context) in enumerate(self.feed):
             prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
             opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
             highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
@@ -71,7 +76,8 @@ class Engine:
             volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
             signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
 
-            self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
+            # TASK-003: Pass t_idx for array access in broker
+            self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals, t_idx=t_idx)
 
             # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits
