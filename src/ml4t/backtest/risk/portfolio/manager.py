@@ -1,7 +1,7 @@
 """RiskManager for portfolio-level risk management."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
 from .limits import LimitResult, PortfolioLimit, PortfolioState
 
@@ -37,7 +37,7 @@ class RiskManager:
     _initial_equity: float = 0.0
     _high_water_mark: float = 0.0
     _daily_start_equity: float = 0.0
-    _last_date: datetime | None = None
+    _last_date: date | None = None
     _halted: bool = False
     _halt_reason: str = ""
     _warnings: list[str] = field(default_factory=list)
@@ -110,7 +110,7 @@ class RiskManager:
         self,
         equity: float,
         positions: dict[str, float],
-        timestamp: datetime | None,
+        timestamp: date | datetime | None,
     ) -> PortfolioState:
         """Build PortfolioState from current data."""
         # Calculate drawdown

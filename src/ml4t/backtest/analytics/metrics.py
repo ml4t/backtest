@@ -5,6 +5,9 @@ from collections.abc import Sequence
 
 import numpy as np
 
+# Type for arrays that can be returns/values
+ReturnsLike = Sequence[float] | np.ndarray
+
 # Annualization factors
 TRADING_DAYS_PER_YEAR = 252
 
@@ -15,7 +18,7 @@ def returns_from_values(values: Sequence[float]) -> np.ndarray:
     return np.diff(arr) / arr[:-1]
 
 
-def volatility(returns: Sequence[float], annualize: bool = True) -> float:
+def volatility(returns: ReturnsLike, annualize: bool = True) -> float:
     """Calculate volatility (standard deviation of returns).
 
     Args:
@@ -35,7 +38,7 @@ def volatility(returns: Sequence[float], annualize: bool = True) -> float:
 
 
 def sharpe_ratio(
-    returns: Sequence[float],
+    returns: ReturnsLike,
     risk_free_rate: float = 0.0,
     annualize: bool = True,
 ) -> float:
@@ -73,7 +76,7 @@ def sharpe_ratio(
 
 
 def sortino_ratio(
-    returns: Sequence[float],
+    returns: ReturnsLike,
     risk_free_rate: float = 0.0,
     annualize: bool = True,
 ) -> float:

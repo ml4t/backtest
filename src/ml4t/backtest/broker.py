@@ -1,6 +1,7 @@
 """Broker for order execution and position management."""
 
 from datetime import datetime
+from typing import Any
 
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
@@ -53,6 +54,9 @@ class Broker:
         self.stop_level_basis = stop_level_basis
 
         # Create AccountState with appropriate policy
+        from .accounting.policy import AccountPolicy
+
+        policy: AccountPolicy
         if account_type == "cash":
             policy = CashAccountPolicy()
         elif account_type == "margin":
@@ -86,8 +90,8 @@ class Broker:
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
 
         # Risk management
-        self._position_rules = None  # Global position rules
-        self._position_rules_by_asset: dict[str, any] = {}  # Per-asset rules
+        self._position_rules: Any = None  # Global position rules
+        self._position_rules_by_asset: dict[str, Any] = {}  # Per-asset rules
         self._pending_exits: dict[str, dict] = {}  # asset -> {reason, pct} for NEXT_BAR_OPEN mode
 
         # Execution model (volume limits and market impact)
@@ -178,8 +182,12 @@ class Broker:
             unrealized_pnl=pos.unrealized_pnl(current_price),
             unrealized_return=pos.pnl_percent(current_price),
             bars_held=pos.bars_held,
-            high_water_mark=pos.high_water_mark,
-            low_water_mark=pos.low_water_mark,
+            high_water_mark=pos.high_water_mark
+            if pos.high_water_mark is not None
+            else pos.entry_price,
+            low_water_mark=pos.low_water_mark
+            if pos.low_water_mark is not None
+            else pos.entry_price,
             # Bar OHLC for intrabar stop/limit detection
             bar_open=self._current_opens.get(asset),
             bar_high=self._current_highs.get(asset),
@@ -594,7 +602,7 @@ class Broker:
                 return risk_fill_price
             return price
 
-        elif order.order_type == OrderType.LIMIT:
+        elif order.order_type == OrderType.LIMIT and order.limit_price is not None:
             # Limit buy fills if Low <= limit_price (price dipped to our level)
             # Limit sell fills if High >= limit_price (price rose to our level)
             if (
@@ -605,7 +613,7 @@ class Broker:
             ):
                 return order.limit_price
 
-        elif order.order_type == OrderType.STOP:
+        elif order.order_type == OrderType.STOP and order.stop_price is not None:
             # Stop buy triggers if High >= stop_price (price rose to trigger)
             # Stop sell triggers if Low <= stop_price (price fell to trigger)
             if order.side == OrderSide.BUY and high >= order.stop_price:
@@ -617,11 +625,12 @@ class Broker:
 
         elif order.order_type == OrderType.TRAILING_STOP and order.side == OrderSide.SELL:
             # Update trailing stop based on high water mark
-            new_stop = high - order.trail_amount
-            if order.stop_price is None or new_stop > order.stop_price:
-                order.stop_price = new_stop
+            if order.trail_amount is not None:
+                new_stop = high - order.trail_amount
+                if order.stop_price is None or new_stop > order.stop_price:
+                    order.stop_price = new_stop
             # Check if triggered
-            if low <= order.stop_price:
+            if order.stop_price is not None and low <= order.stop_price:
                 return min(order.stop_price, high)
 
         return None
@@ -632,6 +641,10 @@ class Broker:
         Returns:
             True if order is fully filled, False if partially filled (remainder pending)
         """
+        # Ensure we have a current time (should always be set during backtest)
+        assert self._current_time is not None, "Cannot execute fill without current time"
+        current_time = self._current_time
+
         volume = self._current_volumes.get(order.asset)
 
         # Get effective quantity (considering partial fills from previous bars)
@@ -681,7 +694,7 @@ class Broker:
             side=order.side,
             quantity=fill_quantity,
             price=fill_price,
-            timestamp=self._current_time,
+            timestamp=current_time,
             commission=commission,
             slippage=slippage,
         )
@@ -695,7 +708,7 @@ class Broker:
             # Don't change status - still pending for remainder
         else:
             order.status = OrderStatus.FILLED
-            order.filled_at = self._current_time
+            order.filled_at = current_time
             order.filled_price = fill_price
             order.filled_quantity = fill_quantity
 
@@ -712,7 +725,7 @@ class Broker:
                     asset=order.asset,
                     quantity=signed_qty,
                     entry_price=fill_price,
-                    entry_time=self._current_time,
+                    entry_time=current_time,
                     context=context,
                     multiplier=self.get_multiplier(order.asset),
                 )
@@ -726,7 +739,7 @@ class Broker:
                 trade = Trade(
                     asset=order.asset,
                     entry_time=pos.entry_time,
-                    exit_time=self._current_time,
+                    exit_time=current_time,
                     entry_price=pos.entry_price,
                     exit_price=fill_price,
                     quantity=old_qty,  # Preserve sign: positive=long, negative=short
@@ -749,7 +762,7 @@ class Broker:
                     Trade(
                         asset=order.asset,
                         entry_time=pos.entry_time,
-                        exit_time=self._current_time,
+                        exit_time=current_time,
                         entry_price=pos.entry_price,
                         exit_price=fill_price,
                         quantity=old_qty,  # Preserve sign: positive=long, negative=short
@@ -769,7 +782,7 @@ class Broker:
                     asset=order.asset,
                     quantity=new_qty,
                     entry_price=fill_price,
-                    entry_time=self._current_time,
+                    entry_time=current_time,
                     context=context,
                     multiplier=self.get_multiplier(order.asset),
                 )

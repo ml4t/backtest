@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 
 class PortfolioLimit(ABC):
@@ -80,7 +80,7 @@ class PortfolioState:
     daily_pnl: float
     gross_exposure: float
     net_exposure: float
-    timestamp: datetime | None = None
+    timestamp: date | datetime | None = None
 
 
 @dataclass

@@ -134,6 +134,10 @@ class Order:
     filled_at: datetime | None = None
     filled_price: float | None = None
     filled_quantity: float = 0.0
+    # Internal risk management fields (set by broker)
+    _signal_price: float | None = None  # Close price at order creation time
+    _risk_exit_reason: str | None = None  # Reason for risk-triggered exit
+    _risk_fill_price: float | None = None  # Stop/target price for risk exits
 
 
 @dataclass
@@ -176,10 +180,10 @@ class Position:
 
     def update_water_marks(self, current_price: float) -> None:
         """Update high/low water marks and excursion tracking."""
-        # Update water marks
-        if current_price > self.high_water_mark:
+        # Update water marks (guaranteed non-None after __post_init__)
+        if self.high_water_mark is None or current_price > self.high_water_mark:
             self.high_water_mark = current_price
-        if current_price < self.low_water_mark:
+        if self.low_water_mark is None or current_price < self.low_water_mark:
             self.low_water_mark = current_price
 
         # Update MFE/MAE
@@ -224,3 +228,8 @@ class Trade:
     slippage: float = 0.0
     entry_signals: dict[str, float] = field(default_factory=dict)
     exit_signals: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def side(self) -> str:
+        """Return 'long' or 'short' based on quantity sign."""
+        return "long" if self.quantity > 0 else "short"

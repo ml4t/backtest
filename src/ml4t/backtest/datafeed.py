@@ -101,7 +101,7 @@ class DataFeed:
         self._idx += 1
 
         # O(1) lookup - using pre-converted dicts (faster than iter_rows)
-        assets_data = {}
+        assets_data: dict[str, dict] = {}
         price_rows = self._prices_by_ts.get(ts)
         if price_rows is not None:
             for row in price_rows:
