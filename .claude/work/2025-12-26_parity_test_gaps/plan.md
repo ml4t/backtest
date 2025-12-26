@@ -49,10 +49,17 @@
 - Backtrader: Uses `StopTrail` order type
 - Zipline: No built-in support - manual implementation in strategy
 
-### Task 3.2: Bracket Orders (OCO) - DEFERRED
-- Research shows limited/inconsistent OCO support across frameworks
-- ml4t.backtest has composite risk rules that can achieve similar results
-- Deferred to future work unit if needed
+### Task 3.2: Bracket Orders (OCO) ✅
+- [x] Create `vectorbt_pro/scenario_10_bracket_order.py`
+- [x] Create `vectorbt_oss/scenario_10_bracket_order.py`
+- [x] Create `backtrader/scenario_10_bracket_order.py`
+- [x] All three pass validation
+
+**Implementation Notes**:
+- VectorBT OSS/Pro: Use `sl_stop` + `tp_stop` together
+- Backtrader: Use `buy_bracket()` method
+- ml4t.backtest: Use `RuleChain([StopLoss(), TakeProfit()])`
+- Zipline: Skipped (no native OCO support)
 
 ## Key Bug Fix
 
@@ -87,10 +94,10 @@ deactivate
 
 ## Summary
 
-Created 20 new validation scenarios:
-- 4 frameworks × 5 scenarios = 20 scripts
-- All commission and slippage scenarios passing
-- Trailing stop scenarios created (may need tolerance due to timing)
+Created 23 new validation scenarios:
+- Scenarios 05-09: 4 frameworks × 5 scenarios = 20 scripts
+- Scenario 10 (Bracket): 3 frameworks × 1 scenario = 3 scripts
+- All commission, slippage, trailing stop, and bracket order scenarios passing
 - One critical bug found and fixed in FixedSlippage model
 
 ## Files Created
@@ -102,19 +109,22 @@ validation/
 │   ├── scenario_06_commission_per_share.py
 │   ├── scenario_07_slippage_fixed.py
 │   ├── scenario_08_slippage_pct.py
-│   └── scenario_09_trailing_stop.py
+│   ├── scenario_09_trailing_stop.py
+│   └── scenario_10_bracket_order.py
 ├── vectorbt_oss/
 │   ├── scenario_05_commission_pct.py
 │   ├── scenario_06_commission_per_share.py
 │   ├── scenario_07_slippage_fixed.py
 │   ├── scenario_08_slippage_pct.py
-│   └── scenario_09_trailing_stop.py
+│   ├── scenario_09_trailing_stop.py
+│   └── scenario_10_bracket_order.py
 ├── backtrader/
 │   ├── scenario_05_commission_pct.py
 │   ├── scenario_06_commission_per_share.py
 │   ├── scenario_07_slippage_fixed.py
 │   ├── scenario_08_slippage_pct.py
-│   └── scenario_09_trailing_stop.py
+│   ├── scenario_09_trailing_stop.py
+│   └── scenario_10_bracket_order.py
 └── zipline/
     ├── scenario_05_commission_pct.py
     ├── scenario_06_commission_per_share.py
