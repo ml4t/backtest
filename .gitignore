@@ -36,6 +36,7 @@ build/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+!notebooks/*.ipynb
 
 # Validation artifacts
 validation/trade_logs/
