@@ -90,13 +90,21 @@ class NoSlippage:
 
 
 class FixedSlippage:
-    """Fixed slippage per share."""
+    """Fixed slippage per share (per-unit price adjustment).
+
+    The amount is added to the fill price for buys and subtracted for sells.
+    For example, with amount=0.01:
+    - Buy at $100.00 fills at $100.01
+    - Sell at $100.00 fills at $99.99
+    """
 
     def __init__(self, amount: float = 0.01):
         self.amount = amount
 
     def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
-        return abs(quantity) * self.amount
+        # Return per-unit price adjustment (same as PercentageSlippage contract)
+        # Broker adds this to fill price: fill = base_price ± slippage
+        return self.amount
 
 
 class PercentageSlippage:
