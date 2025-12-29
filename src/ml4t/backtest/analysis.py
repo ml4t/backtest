@@ -433,7 +433,8 @@ class BacktestAnalyzer:
             return [value for _, value in self.engine.equity_curve]
         # Fallback for older broker interface
         if hasattr(self.broker, "equity_history"):
-            return self.broker.equity_history
+            equity: list[float] = getattr(self.broker, "equity_history", [])
+            return equity
         return []
 
     def trade_statistics(self) -> TradeStatistics:
