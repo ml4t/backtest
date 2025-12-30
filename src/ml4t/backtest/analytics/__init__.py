@@ -9,11 +9,12 @@ from .metrics import (
     sortino_ratio,
     volatility,
 )
-from .trades import TradeAnalyzer
+from .trades import MAEMFEAnalyzer, TradeAnalyzer
 
 __all__ = [
     "EquityCurve",
     "TradeAnalyzer",
+    "MAEMFEAnalyzer",
     "sharpe_ratio",
     "sortino_ratio",
     "calmar_ratio",

@@ -158,8 +158,8 @@ Phase 6 (Documentation)
 
 ```python
 from ml4t.backtest.execution.risk import (
-    RiskManager, 
-    VolatilityScaledStopLoss, 
+    RiskManager,
+    VolatilityScaledStopLoss,
     TimeBasedExit,
 )
 
@@ -172,7 +172,7 @@ class MyStrategy(Strategy):
         self.risk_manager.register_rule(
             TimeBasedExit(max_bars=20)
         )
-    
+
     def on_market_event(self, event):
         # Strategy just generates entries
         # Exits handled by RiskManager
@@ -187,7 +187,7 @@ class MyStrategy(Strategy):
 class TimeBasedExit(RiskRule):
     def __init__(self, max_bars: int):
         self.max_bars = max_bars
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         if context.entry_bars_ago >= self.max_bars:
             return RiskDecision(
@@ -308,7 +308,7 @@ See **INDEX.md** for cross-references or **exploration.md** table of contents.
 
 ---
 
-**Generated**: 2025-11-17  
-**Work Unit**: 009_risk_management_exploration  
-**Status**: COMPLETED ✓  
+**Generated**: 2025-11-17
+**Work Unit**: 009_risk_management_exploration
+**Status**: COMPLETED ✓
 **Next**: Phase 1 Implementation

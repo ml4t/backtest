@@ -10,23 +10,21 @@ import polars as pl
 from ml4t.backtest import (
     DataFeed,
     Engine,
+    LinearImpact,
     Strategy,
     VolumeParticipationLimit,
-    LinearImpact,
 )
 from ml4t.backtest.risk import (
-    # Position rules
+    DailyLossLimit,
+    MaxDrawdownLimit,
+    MaxPositionsLimit,
+    # Portfolio risk
+    RiskManager,
+    RuleChain,
     StopLoss,
     TakeProfit,
     TimeExit,
     TrailingStop,
-    ScaledExit,
-    RuleChain,
-    # Portfolio risk
-    RiskManager,
-    MaxDrawdownLimit,
-    MaxPositionsLimit,
-    DailyLossLimit,
 )
 
 
@@ -47,18 +45,21 @@ def create_price_data(
     else:
         closes = [start_price] * n_bars
 
-    return pl.DataFrame({
-        "timestamp": dates,
-        "asset": ["AAPL"] * n_bars,
-        "open": closes,
-        "high": [c * 1.01 for c in closes],
-        "low": [c * 0.99 for c in closes],
-        "close": closes,
-        "volume": [volume] * n_bars,
-    })
+    return pl.DataFrame(
+        {
+            "timestamp": dates,
+            "asset": ["AAPL"] * n_bars,
+            "open": closes,
+            "high": [c * 1.01 for c in closes],
+            "low": [c * 0.99 for c in closes],
+            "close": closes,
+            "volume": [volume] * n_bars,
+        }
+    )
 
 
 # === TEST 1: Stop-Loss ===
+
 
 def test_stop_loss():
     """Test stop-loss triggers at correct level."""
@@ -86,12 +87,12 @@ def test_stop_loss():
     engine = Engine(feed=feed, strategy=StopLossStrategy(), initial_cash=100000.0)
     results = engine.run()
 
-    print(f"Initial price: $100.00")
-    print(f"Stop level: 5%")
+    print("Initial price: $100.00")
+    print("Stop level: 5%")
     print(f"Trades: {len(results['trades'])}")
 
-    if results['trades']:
-        trade = results['trades'][0]
+    if results["trades"]:
+        trade = results["trades"][0]
         print(f"Entry: ${trade.entry_price:.2f}")
         print(f"Exit: ${trade.exit_price:.2f}")
         pnl_pct = (trade.exit_price - trade.entry_price) / trade.entry_price
@@ -107,6 +108,7 @@ def test_stop_loss():
 
 
 # === TEST 2: Take-Profit ===
+
 
 def test_take_profit():
     """Test take-profit triggers at correct level."""
@@ -134,12 +136,12 @@ def test_take_profit():
     engine = Engine(feed=feed, strategy=TakeProfitStrategy(), initial_cash=100000.0)
     results = engine.run()
 
-    print(f"Initial price: $100.00")
-    print(f"Take-profit level: 10%")
+    print("Initial price: $100.00")
+    print("Take-profit level: 10%")
     print(f"Trades: {len(results['trades'])}")
 
-    if results['trades']:
-        trade = results['trades'][0]
+    if results["trades"]:
+        trade = results["trades"][0]
         print(f"Entry: ${trade.entry_price:.2f}")
         print(f"Exit: ${trade.exit_price:.2f}")
         pnl_pct = (trade.exit_price - trade.entry_price) / trade.entry_price
@@ -155,6 +157,7 @@ def test_take_profit():
 
 
 # === TEST 3: Time Exit ===
+
 
 def test_time_exit():
     """Test time-based exit after N bars."""
@@ -180,11 +183,11 @@ def test_time_exit():
     engine = Engine(feed=feed, strategy=TimeExitStrategy(), initial_cash=100000.0)
     results = engine.run()
 
-    print(f"Max bars: 3")
+    print("Max bars: 3")
     print(f"Trades: {len(results['trades'])}")
 
-    if results['trades']:
-        trade = results['trades'][0]
+    if results["trades"]:
+        trade = results["trades"][0]
         print(f"Bars held: {trade.bars_held}")
 
         assert trade.bars_held <= 3, f"Should exit after 3 bars, held {trade.bars_held}"
@@ -196,6 +199,7 @@ def test_time_exit():
 
 
 # === TEST 4: Trailing Stop ===
+
 
 def test_trailing_stop():
     """Test trailing stop follows price up then triggers on reversal."""
@@ -223,12 +227,12 @@ def test_trailing_stop():
     engine = Engine(feed=feed, strategy=TrailingStopStrategy(), initial_cash=100000.0)
     results = engine.run()
 
-    print(f"Trail: 5%")
-    print(f"Peak price: ~$110")
+    print("Trail: 5%")
+    print("Peak price: ~$110")
     print(f"Trades: {len(results['trades'])}")
 
-    if results['trades']:
-        trade = results['trades'][0]
+    if results["trades"]:
+        trade = results["trades"][0]
         print(f"Entry: ${trade.entry_price:.2f}")
         print(f"Exit: ${trade.exit_price:.2f}")
         pnl_pct = (trade.exit_price - trade.entry_price) / trade.entry_price
@@ -246,6 +250,7 @@ def test_trailing_stop():
 
 # === TEST 5: Rule Chain (Stop-Loss + Take-Profit) ===
 
+
 def test_rule_chain():
     """Test combined stop-loss and take-profit rules."""
     print("\n" + "=" * 60)
@@ -261,10 +266,12 @@ def test_rule_chain():
             self.entered = False
 
         def on_start(self, broker):
-            rules = RuleChain([
-                StopLoss(pct=0.05),
-                TakeProfit(pct=0.10),
-            ])
+            rules = RuleChain(
+                [
+                    StopLoss(pct=0.05),
+                    TakeProfit(pct=0.10),
+                ]
+            )
             broker.set_position_rules(rules)
 
         def on_data(self, timestamp, data, context, broker):
@@ -276,11 +283,11 @@ def test_rule_chain():
     engine = Engine(feed=feed, strategy=RuleChainStrategy(), initial_cash=100000.0)
     results = engine.run()
 
-    print(f"Rules: Stop-Loss 5%, Take-Profit 10%")
+    print("Rules: Stop-Loss 5%, Take-Profit 10%")
     print(f"Trades: {len(results['trades'])}")
 
-    if results['trades']:
-        trade = results['trades'][0]
+    if results["trades"]:
+        trade = results["trades"][0]
         pnl_pct = (trade.exit_price - trade.entry_price) / trade.entry_price
         print(f"Exit at: ${trade.exit_price:.2f} ({pnl_pct:.1%})")
 
@@ -294,6 +301,7 @@ def test_rule_chain():
 
 
 # === TEST 6: Volume Participation Limit ===
+
 
 def test_volume_limit():
     """Test volume participation limits for partial fills."""
@@ -324,11 +332,11 @@ def test_volume_limit():
     )
     results = engine.run()
 
-    total_filled = sum(f.quantity for f in results['fills'])
-    num_fills = len(results['fills'])
+    total_filled = sum(f.quantity for f in results["fills"])
+    num_fills = len(results["fills"])
 
-    print(f"Order: 500 shares")
-    print(f"Volume limit: 10% of 1000 = 100 shares/bar")
+    print("Order: 500 shares")
+    print("Volume limit: 10% of 1000 = 100 shares/bar")
     print(f"Fills: {num_fills}")
     print(f"Total filled: {total_filled}")
 
@@ -339,6 +347,7 @@ def test_volume_limit():
 
 
 # === TEST 7: Market Impact ===
+
 
 def test_market_impact():
     """Test market impact increases execution cost."""
@@ -361,7 +370,7 @@ def test_market_impact():
     feed1 = DataFeed(prices_df=prices)
     engine1 = Engine(feed=feed1, strategy=BuyStrategy(), initial_cash=100000.0)
     results1 = engine1.run()
-    price_no_impact = results1['fills'][0].price
+    price_no_impact = results1["fills"][0].price
 
     # With impact
     feed2 = DataFeed(prices_df=prices)
@@ -373,7 +382,7 @@ def test_market_impact():
         market_impact_model=impact,
     )
     results2 = engine2.run()
-    price_with_impact = results2['fills'][0].price
+    price_with_impact = results2["fills"][0].price
 
     print(f"Price without impact: ${price_no_impact:.4f}")
     print(f"Price with impact: ${price_with_impact:.4f}")
@@ -385,6 +394,7 @@ def test_market_impact():
 
 
 # === TEST 8: Portfolio Max Drawdown Limit ===
+
 
 def test_max_drawdown_limit():
     """Test portfolio drawdown limit halts trading."""
@@ -408,7 +418,7 @@ def test_max_drawdown_limit():
             # Update risk manager
             positions = {}
             for asset, pos in broker.positions.items():
-                price = data.get(asset, {}).get('close', pos.entry_price)
+                price = data.get(asset, {}).get("close", pos.entry_price)
                 positions[asset] = pos.quantity * price
 
             self.risk_manager.update(broker.get_account_value(), positions, timestamp)
@@ -418,9 +428,11 @@ def test_max_drawdown_limit():
                 broker.submit_order("AAPL", 1000)
                 self.entered = True
 
-    risk_manager = RiskManager(limits=[
-        MaxDrawdownLimit(max_drawdown=0.20, warn_threshold=0.10),
-    ])
+    risk_manager = RiskManager(
+        limits=[
+            MaxDrawdownLimit(max_drawdown=0.20, warn_threshold=0.10),
+        ]
+    )
 
     feed = DataFeed(prices_df=prices)
     engine = Engine(
@@ -430,7 +442,7 @@ def test_max_drawdown_limit():
     )
     results = engine.run()
 
-    print(f"Max drawdown limit: 20%")
+    print("Max drawdown limit: 20%")
     print(f"Final equity: ${results['final_value']:,.2f}")
     print(f"Max drawdown: {results['max_drawdown']:.1%}")
     print(f"Risk halted: {risk_manager.is_halted}")
@@ -442,6 +454,7 @@ def test_max_drawdown_limit():
 
 
 # === TEST 9: Max Positions Limit ===
+
 
 def test_max_positions_limit():
     """Test portfolio position count limit."""
@@ -457,7 +470,7 @@ def test_max_positions_limit():
         high_water_mark=100000,
         current_drawdown=0.0,
         num_positions=5,
-        positions={'AAPL': 20000, 'MSFT': 20000, 'GOOG': 20000, 'AMZN': 20000, 'META': 20000},
+        positions={"AAPL": 20000, "MSFT": 20000, "GOOG": 20000, "AMZN": 20000, "META": 20000},
         daily_pnl=0,
         gross_exposure=100000,
         net_exposure=100000,
@@ -466,8 +479,8 @@ def test_max_positions_limit():
     limit = MaxPositionsLimit(max_positions=3)
     result = limit.check(state)
 
-    print(f"Max positions: 3")
-    print(f"Current positions: 5")
+    print("Max positions: 3")
+    print("Current positions: 5")
     print(f"Breached: {result.breached}")
     print(f"Action: {result.action}")
 
@@ -477,6 +490,7 @@ def test_max_positions_limit():
 
 
 # === TEST 10: Daily Loss Limit ===
+
 
 def test_daily_loss_limit():
     """Test daily loss limit halts trading."""
@@ -492,7 +506,7 @@ def test_daily_loss_limit():
         high_water_mark=100000,
         current_drawdown=0.03,
         num_positions=1,
-        positions={'AAPL': 50000},
+        positions={"AAPL": 50000},
         daily_pnl=-3000,  # Lost 3% today
         gross_exposure=50000,
         net_exposure=50000,
@@ -501,8 +515,8 @@ def test_daily_loss_limit():
     limit = DailyLossLimit(max_daily_loss_pct=0.02)  # 2% daily limit
     result = limit.check(state)
 
-    print(f"Max daily loss: 2%")
-    print(f"Actual daily loss: 3%")
+    print("Max daily loss: 2%")
+    print("Actual daily loss: 3%")
     print(f"Breached: {result.breached}")
     print(f"Action: {result.action}")
 

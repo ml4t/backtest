@@ -33,7 +33,9 @@ class Engine:
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         account_type: str = "cash",
         initial_margin: float = 0.5,
-        maintenance_margin: float = 0.25,
+        long_maintenance_margin: float = 0.25,
+        short_maintenance_margin: float = 0.30,
+        fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
         config: BacktestConfig | None = None,
         execution_limits=None,
         market_impact_model=None,
@@ -54,7 +56,9 @@ class Engine:
             stop_level_basis=stop_level_basis,
             account_type=account_type,
             initial_margin=initial_margin,
-            maintenance_margin=maintenance_margin,
+            long_maintenance_margin=long_maintenance_margin,
+            short_maintenance_margin=short_maintenance_margin,
+            fixed_margin_schedule=fixed_margin_schedule,
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,
             contract_specs=contract_specs,
@@ -229,7 +233,9 @@ class Engine:
             execution_mode=execution_mode,
             account_type=config.account_type,
             initial_margin=config.margin_requirement,
-            maintenance_margin=config.margin_requirement * 0.5,  # Standard ratio
+            long_maintenance_margin=config.margin_requirement * 0.5,  # 50% of initial
+            short_maintenance_margin=config.margin_requirement
+            * 0.6,  # 60% of initial (higher for shorts)
             config=config,  # Store config for strategy access
         )
 

@@ -4,6 +4,7 @@ This module provides:
 - Volume participation limits (max % of bar volume)
 - Partial fills (fill what's possible, queue remainder)
 - Market impact modeling (price impact based on size vs volume)
+- Portfolio rebalancing utilities (target weight → orders)
 """
 
 from .impact import (
@@ -17,6 +18,10 @@ from .limits import (
     NoLimits,
     VolumeParticipationLimit,
 )
+from .rebalancer import (
+    RebalanceConfig,
+    TargetWeightExecutor,
+)
 from .result import ExecutionResult
 
 __all__ = [
@@ -29,6 +34,9 @@ __all__ = [
     "NoImpact",
     "LinearImpact",
     "SquareRootImpact",
+    # Rebalancing
+    "RebalanceConfig",
+    "TargetWeightExecutor",
     # Result
     "ExecutionResult",
 ]

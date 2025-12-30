@@ -39,28 +39,30 @@ def generate_take_profit_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]
 
     # Price path: 100 -> gradual rise to trigger 10% take-profit
     n_bars = 20
-    prices = np.array([
-        100.0,   # Bar 0: Entry
-        101.0,   # Bar 1: +1%
-        103.0,   # Bar 2: +3%
-        105.0,   # Bar 3: +5%
-        107.0,   # Bar 4: +7%
-        109.0,   # Bar 5: +9%
-        111.0,   # Bar 6: +11% -> TAKE-PROFIT TRIGGERED
-        113.0,   # Bar 7: +13%
-        115.0,   # Bar 8: +15%
-        117.0,   # Bar 9: +17%
-        119.0,   # Bar 10
-        121.0,   # Bar 11
-        123.0,   # Bar 12
-        125.0,   # Bar 13
-        127.0,   # Bar 14
-        129.0,   # Bar 15
-        131.0,   # Bar 16
-        133.0,   # Bar 17
-        135.0,   # Bar 18
-        137.0,   # Bar 19
-    ])
+    prices = np.array(
+        [
+            100.0,  # Bar 0: Entry
+            101.0,  # Bar 1: +1%
+            103.0,  # Bar 2: +3%
+            105.0,  # Bar 3: +5%
+            107.0,  # Bar 4: +7%
+            109.0,  # Bar 5: +9%
+            111.0,  # Bar 6: +11% -> TAKE-PROFIT TRIGGERED
+            113.0,  # Bar 7: +13%
+            115.0,  # Bar 8: +15%
+            117.0,  # Bar 9: +17%
+            119.0,  # Bar 10
+            121.0,  # Bar 11
+            123.0,  # Bar 12
+            125.0,  # Bar 13
+            127.0,  # Bar 14
+            129.0,  # Bar 15
+            131.0,  # Bar 16
+            133.0,  # Bar 17
+            135.0,  # Bar 18
+            137.0,  # Bar 19
+        ]
+    )
 
     # Use NYSE calendar
     nyse = xcals.get_calendar("XNYS")
@@ -69,13 +71,16 @@ def generate_take_profit_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]
     dates = pd.DatetimeIndex(all_sessions[:n_bars]).tz_localize("UTC")
 
     # Generate OHLCV with open = close for simplicity
-    df = pd.DataFrame({
-        "open": prices,
-        "high": prices * 1.005,
-        "low": prices * 0.995,
-        "close": prices,
-        "volume": np.full(n_bars, 100000.0),
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices,
+            "high": prices * 1.005,
+            "low": prices * 0.995,
+            "close": prices,
+            "volume": np.full(n_bars, 100000.0),
+        },
+        index=dates,
+    )
 
     # Entry on bar 0 only
     entries = np.zeros(n_bars, dtype=bool)
@@ -86,12 +91,22 @@ def generate_take_profit_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]
 
 def setup_zipline_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_tp"):
     """Register and ingest a custom bundle with test data."""
-    from zipline.data.bundles import register, ingest
+    from zipline.data.bundles import ingest, register
 
     def make_ingest_func(df):
-        def ingest_func(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
-                       adjustment_writer, calendar, start_session, end_session, cache,
-                       show_progress, output_dir):
+        def ingest_func(
+            environ,
+            asset_db_writer,
+            minute_bar_writer,
+            daily_bar_writer,
+            adjustment_writer,
+            calendar,
+            start_session,
+            end_session,
+            cache,
+            show_progress,
+            output_dir,
+        ):
             sessions = calendar.sessions_in_range(start_session, end_session)
 
             df_naive = df.copy()
@@ -104,15 +119,19 @@ def setup_zipline_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_tp"):
             if len(trading_df) == 0:
                 raise ValueError("No trading days found")
 
-            asset_db_writer.write(equities=pd.DataFrame({
-                'symbol': ['TEST'],
-                'asset_name': ['Test Asset'],
-                'exchange': ['NYSE'],
-            }))
+            asset_db_writer.write(
+                equities=pd.DataFrame(
+                    {
+                        "symbol": ["TEST"],
+                        "asset_name": ["Test Asset"],
+                        "exchange": ["NYSE"],
+                    }
+                )
+            )
 
             daily_bar_writer.write(
-                [(0, trading_df[['open', 'high', 'low', 'close', 'volume']])],
-                show_progress=show_progress
+                [(0, trading_df[["open", "high", "low", "close", "volume"]])],
+                show_progress=show_progress,
             )
             adjustment_writer.write()
 
@@ -127,7 +146,7 @@ def setup_zipline_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_tp"):
     register(
         bundle_name,
         make_ingest_func(prices_df),
-        calendar_name='XNYS',
+        calendar_name="XNYS",
         start_session=start_session,
         end_session=end_session,
     )
@@ -139,16 +158,16 @@ def run_zipline(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> 
     """Run backtest using Zipline with take-profit logic in strategy."""
     try:
         from zipline import run_algorithm
-        from zipline.api import order, symbol, order_target, set_slippage, set_commission
-        from zipline.finance.slippage import SlippageModel
+        from zipline.api import order, order_target, set_commission, set_slippage, symbol
         from zipline.finance.commission import NoCommission
+        from zipline.finance.slippage import SlippageModel
     except ImportError:
         raise ImportError("Zipline not installed. Run in .venv-validation environment.")
 
     signal_data = {
-        'entries': entries,
-        'dates': prices_df.index,
-        'tp_pct': tp_pct,
+        "entries": entries,
+        "dates": prices_df.index,
+        "tp_pct": tp_pct,
     }
 
     # Custom slippage to fill at open price (matching ml4t.backtest NEXT_BAR)
@@ -158,7 +177,7 @@ def run_zipline(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> 
             return (data.current(order.asset, "open"), order.amount)
 
     def initialize(context):
-        context.asset = symbol('TEST')
+        context.asset = symbol("TEST")
         context.signal_data = signal_data
         context.bar_count = 0
         context.entry_price = None
@@ -168,10 +187,10 @@ def run_zipline(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> 
 
     def handle_data(context, data):
         idx = context.bar_count
-        if idx >= len(context.signal_data['entries']):
+        if idx >= len(context.signal_data["entries"]):
             return
 
-        entry = context.signal_data['entries'][idx]
+        entry = context.signal_data["entries"][idx]
         current_pos = context.portfolio.positions[context.asset].amount
         current_price = data.current(context.asset, "close")
 
@@ -208,11 +227,11 @@ def run_zipline(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> 
         analyze=analyze,
         capital_base=100_000.0,
         bundle=bundle_name,
-        data_frequency='daily',
+        data_frequency="daily",
     )
 
-    final_value = results['portfolio_value'].iloc[-1]
-    transactions = results['transactions']
+    final_value = results["portfolio_value"].iloc[-1]
+    transactions = results["transactions"]
     num_trades = sum(1 for txn_list in transactions if txn_list) // 2
 
     return {
@@ -226,24 +245,38 @@ def run_zipline(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> 
 def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> dict:
     """Run backtest using ml4t.backtest with take-profit."""
     import polars as pl
-    from ml4t.backtest import Engine, Strategy, DataFeed, ExecutionMode, StopFillMode, StopLevelBasis, NoCommission, NoSlippage
+
+    from ml4t.backtest import (
+        DataFeed,
+        Engine,
+        ExecutionMode,
+        NoCommission,
+        NoSlippage,
+        StopFillMode,
+        StopLevelBasis,
+        Strategy,
+    )
     from ml4t.backtest.risk import TakeProfit
 
-    prices_pl = pl.DataFrame({
-        "timestamp": [ts.to_pydatetime().replace(tzinfo=None) for ts in prices_df.index],
-        "asset": ["TEST"] * len(prices_df),
-        "open": prices_df["open"].tolist(),
-        "high": prices_df["high"].tolist(),
-        "low": prices_df["low"].tolist(),
-        "close": prices_df["close"].tolist(),
-        "volume": prices_df["volume"].tolist(),
-    })
+    prices_pl = pl.DataFrame(
+        {
+            "timestamp": [ts.to_pydatetime().replace(tzinfo=None) for ts in prices_df.index],
+            "asset": ["TEST"] * len(prices_df),
+            "open": prices_df["open"].tolist(),
+            "high": prices_df["high"].tolist(),
+            "low": prices_df["low"].tolist(),
+            "close": prices_df["close"].tolist(),
+            "volume": prices_df["volume"].tolist(),
+        }
+    )
 
-    signals_pl = pl.DataFrame({
-        "timestamp": [ts.to_pydatetime().replace(tzinfo=None) for ts in prices_df.index],
-        "asset": ["TEST"] * len(prices_df),
-        "entry": entries.tolist(),
-    })
+    signals_pl = pl.DataFrame(
+        {
+            "timestamp": [ts.to_pydatetime().replace(tzinfo=None) for ts in prices_df.index],
+            "asset": ["TEST"] * len(prices_df),
+            "entry": entries.tolist(),
+        }
+    )
 
     class TakeProfitStrategy(Strategy):
         def __init__(self, tp_pct: float):
@@ -301,7 +334,9 @@ def compare_results(zipline_results: dict, ml4t_results: dict, tp_pct: float) ->
     zl_trades = zipline_results["num_trades"]
     ml4t_trades = ml4t_results["num_trades"]
     trades_match = zl_trades == ml4t_trades
-    print(f"\nTrade Count: ZL={zl_trades}, ML4T={ml4t_trades} {'EXACT MATCH' if trades_match else 'FAIL'}")
+    print(
+        f"\nTrade Count: ZL={zl_trades}, ML4T={ml4t_trades} {'EXACT MATCH' if trades_match else 'FAIL'}"
+    )
     all_match &= trades_match
 
     # Final value - require EXACT MATCH (using NEXT_BAR_OPEN mode)
@@ -309,7 +344,9 @@ def compare_results(zipline_results: dict, ml4t_results: dict, tp_pct: float) ->
     ml4t_value = ml4t_results["final_value"]
     value_diff = abs(zl_value - ml4t_value)
     values_match = value_diff < 0.01  # Within 1 cent (floating point tolerance)
-    print(f"Final Value: ZL=${zl_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff=${value_diff:.2f}) {'EXACT MATCH' if values_match else 'FAIL'}")
+    print(
+        f"Final Value: ZL=${zl_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff=${value_diff:.2f}) {'EXACT MATCH' if values_match else 'FAIL'}"
+    )
     all_match &= values_match
 
     # Total P&L - require EXACT MATCH
@@ -317,7 +354,9 @@ def compare_results(zipline_results: dict, ml4t_results: dict, tp_pct: float) ->
     ml4t_pnl = ml4t_results["total_pnl"]
     pnl_diff = abs(zl_pnl - ml4t_pnl)
     pnl_match = pnl_diff < 0.01  # Within 1 cent (floating point tolerance)
-    print(f"Total P&L: ZL=${zl_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff=${pnl_diff:.2f}) {'EXACT MATCH' if pnl_match else 'FAIL'}")
+    print(
+        f"Total P&L: ZL=${zl_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff=${pnl_diff:.2f}) {'EXACT MATCH' if pnl_match else 'FAIL'}"
+    )
     all_match &= pnl_match
 
     print("\n" + "=" * 70)
@@ -359,6 +398,7 @@ def main():
     except Exception as e:
         print(f"   ❌ {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -372,6 +412,7 @@ def main():
     except Exception as e:
         print(f"   ❌ {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

@@ -12,6 +12,15 @@ __version__ = "0.2.0"
 
 # Import from modules
 # Analytics
+# Analysis (diagnostic integration)
+from .analysis import (
+    BacktestAnalyzer,
+    TradeStatistics,
+    to_equity_dataframe,
+    to_returns_series,
+    to_trade_record,
+    to_trade_records,
+)
 from .analytics import (
     EquityCurve,
     TradeAnalyzer,
@@ -60,7 +69,7 @@ from .config import (
 from .datafeed import DataFeed
 from .engine import BacktestEngine, Engine, run_backtest
 
-# Execution model (volume limits, market impact)
+# Execution model (volume limits, market impact, rebalancing)
 from .execution import (
     ExecutionLimits,
     ExecutionResult,
@@ -68,7 +77,9 @@ from .execution import (
     MarketImpactModel,
     NoImpact,
     NoLimits,
+    RebalanceConfig,
     SquareRootImpact,
+    TargetWeightExecutor,
     VolumeParticipationLimit,
 )
 from .models import (
@@ -153,6 +164,13 @@ __all__ = [
     "max_drawdown",
     "cagr",
     "volatility",
+    # Analysis (diagnostic integration)
+    "BacktestAnalyzer",
+    "TradeStatistics",
+    "to_trade_record",
+    "to_trade_records",
+    "to_returns_series",
+    "to_equity_dataframe",
     # Calendar functions
     "CALENDAR_ALIASES",
     "get_calendar",
@@ -177,4 +195,7 @@ __all__ = [
     "LinearImpact",
     "SquareRootImpact",
     "ExecutionResult",
+    # Rebalancing
+    "RebalanceConfig",
+    "TargetWeightExecutor",
 ]

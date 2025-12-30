@@ -302,7 +302,7 @@ class SignalTiming:
 
     computed\_at: pd.Timestamp
 
-    valid\_until: pd.Timestamp  
+    valid\_until: pd.Timestamp
 
     execution\_delay: pd.Timedelta \= pd.Timedelta(seconds=0)
 
@@ -361,7 +361,7 @@ class Strategy(ABC):
 
         self.state \= {}  \# User-defined state
 
-        
+
 
     @abstractmethod
 
@@ -369,7 +369,7 @@ class Strategy(ABC):
 
         """Initialize strategy state"""
 
-        
+
 
     @abstractmethod
 
@@ -377,21 +377,21 @@ class Strategy(ABC):
 
         """Process market data"""
 
-        
+
 
     def on\_event(self, event: Event) \-\> None:
 
         """Handle generic events"""
 
-        
+
 
     def get\_historical(
 
-        self, 
+        self,
 
-        symbols: list\[str\], 
+        symbols: list\[str\],
 
-        fields: list\[str\], 
+        fields: list\[str\],
 
         bars: int
 
@@ -401,7 +401,7 @@ class Strategy(ABC):
 
         return self.context.get\_historical(symbols, fields, bars)
 
-        
+
 
     def order(
 
@@ -443,13 +443,13 @@ rules:
 
     \- condition: momentum\_score \> 0.05
 
-      action: 
+      action:
 
         type: order\_target\_percent
 
         weight: 0.1
 
-    \- condition: momentum\_score \< \-0.05  
+    \- condition: momentum\_score \< \-0.05
 
       action:
 
@@ -471,7 +471,7 @@ class MLStrategy(Strategy):
 
         self.feature\_window \= 60
 
-        
+
 
     def on\_bar(self, bar: MarketBar) \-\> None:
 
@@ -491,7 +491,7 @@ class MLStrategy(Strategy):
 
         )
 
-        
+
 
         \# Model prediction with anti-leakage guarantee
 
@@ -499,7 +499,7 @@ class MLStrategy(Strategy):
 
             prediction \= self.model.predict(features)
 
-            
+
 
         if prediction \> self.threshold:
 
@@ -543,7 +543,7 @@ class OrderType(Enum):
 
     MARKET \= "market"
 
-    LIMIT \= "limit"  
+    LIMIT \= "limit"
 
     STOP \= "stop"
 
@@ -609,7 +609,7 @@ class FixedSlippage(SlippageModel):
 
         self.spread\_bps \= spread\_bps
 
-        
+
 
     def apply(self, order: Order, fill\_price: float, volume: float) \-\> float:
 
@@ -623,7 +623,7 @@ class VolumeSlippage(SlippageModel):
 
         self.impact \= impact
 
-        
+
 
     def apply(self, order: Order, fill\_price: float, volume: float) \-\> float:
 
@@ -709,7 +709,7 @@ class CurrencyConverter:
 
         self.rates \= {}  \# Time series of FX rates
 
-        
+
 
     def convert(self, amount: float, from\_ccy: str, to\_ccy: str, timestamp: pd.Timestamp) \-\> float:
 
@@ -769,7 +769,7 @@ class DrawdownMonitor:
 
         self.high\_water\_mark \= 0
 
-        
+
 
     def check(self, portfolio\_value: float) \-\> tuple\[bool, float\]:
 
@@ -789,7 +789,7 @@ class BacktestConfig(BaseModel):
 
     """Complete backtest configuration"""
 
-    
+
 
     class DataConfig(BaseModel):
 
@@ -801,7 +801,7 @@ class BacktestConfig(BaseModel):
 
         calendar: str \= "NYSE"
 
-        
+
 
     class StrategyConfig(BaseModel):
 
@@ -813,7 +813,7 @@ class BacktestConfig(BaseModel):
 
         universe: Optional\[list\[str\]\] \= None
 
-        
+
 
     class BrokerConfig(BaseModel):
 
@@ -827,7 +827,7 @@ class BacktestConfig(BaseModel):
 
         slippage\_params: dict \= {"spread\_bps": 10}
 
-        
+
 
     class RiskConfig(BaseModel):
 
@@ -839,7 +839,7 @@ class BacktestConfig(BaseModel):
 
         max\_drawdown: Optional\[float\] \= 0.3
 
-        
+
 
     data: DataConfig
 
@@ -849,7 +849,7 @@ class BacktestConfig(BaseModel):
 
     risk: RiskConfig \= RiskConfig()
 
-    
+
 
     \# Reproducibility
 
@@ -859,7 +859,7 @@ class BacktestConfig(BaseModel):
 
     end\_date: Optional\[str\] \= None
 
-    
+
 
     \# Output
 
@@ -891,7 +891,7 @@ class RunManifest:
 
     random\_seeds: dict  \# All PRNG seeds used
 
-    
+
 
     def save(self, path: Path) \-\> None:
 
@@ -917,7 +917,7 @@ class BacktestResult:
 
     positions: pl.DataFrame  \# timestamp, symbol, quantity, value
 
-    
+
 
     \# Transactions
 
@@ -925,31 +925,31 @@ class BacktestResult:
 
     orders: pl.DataFrame  \# All orders with status
 
-    
 
-    \# Summary metrics  
+
+    \# Summary metrics
 
     metrics: dict\[str, float\]  \# CAGR, Sharpe, max\_dd, etc.
 
-    
+
 
     \# Metadata
 
     manifest: RunManifest
 
-    
+
 
     def to\_parquet(self, path: Path) \-\> None:
 
         """Save all dataframes to parquet files"""
 
-        
+
 
     def to\_json(self) \-\> dict:
 
         """Export summary for API consumption"""
 
-        
+
 
     @property
 
@@ -957,9 +957,9 @@ class BacktestResult:
 
         return self.metrics\["sharpe\_ratio"\]
 
-        
 
-    @property  
+
+    @property
 
     def max\_drawdown(self) \-\> float:
 
@@ -1114,7 +1114,7 @@ class Strategy(ABC):
 
     """Base strategy interface"""
 
-    
+
 
     def \_\_init\_\_(self, context: 'StrategyContext'):
 
@@ -1122,7 +1122,7 @@ class Strategy(ABC):
 
         self.state \= {}
 
-        
+
 
     @abstractmethod
 
@@ -1132,7 +1132,7 @@ class Strategy(ABC):
 
         pass
 
-        
+
 
     @abstractmethod
 
@@ -1142,7 +1142,7 @@ class Strategy(ABC):
 
         pass
 
-        
+
 
     def on\_signal(self, signal: SignalEvent) \-\> None:
 
@@ -1150,7 +1150,7 @@ class Strategy(ABC):
 
         pass
 
-        
+
 
     def on\_fill(self, fill: FillEvent) \-\> None:
 
@@ -1158,7 +1158,7 @@ class Strategy(ABC):
 
         pass
 
-        
+
 
     def get\_history(
 
@@ -1166,7 +1166,7 @@ class Strategy(ABC):
 
         symbols: list\[str\],
 
-        fields: list\[str\], 
+        fields: list\[str\],
 
         bars: int
 
@@ -1176,7 +1176,7 @@ class Strategy(ABC):
 
         return self.context.get\_history(symbols, fields, bars)
 
-        
+
 
     def order(
 
@@ -1198,7 +1198,7 @@ class Strategy(ABC):
 
             symbol=symbol,
 
-            quantity=quantity, 
+            quantity=quantity,
 
             order\_type=order\_type,
 
@@ -1206,7 +1206,7 @@ class Strategy(ABC):
 
         )
 
-        
+
 
     def order\_target\_percent(
 
@@ -1330,7 +1330,7 @@ class SimulationClock:
 
     """Master clock maintaining simulation time"""
 
-    
+
 
     def \_\_init\_\_(self, start: pd.Timestamp, end: pd.Timestamp, frequency: str):
 
@@ -1342,7 +1342,7 @@ class SimulationClock:
 
         self.tick\_count \= 0
 
-        
+
 
     def tick(self) \-\> pd.Timestamp:
 
@@ -1354,7 +1354,7 @@ class SimulationClock:
 
         return self.current
 
-        
+
 
     def align\_timestamp(self, ts: pd.Timestamp, policy: str \= "floor") \-\> pd.Timestamp:
 
@@ -1389,7 +1389,7 @@ class BarSemantics:
 
     """Define how bars are interpreted"""
 
-    
+
 
     \# Interval endpoints
 
@@ -1397,19 +1397,19 @@ class BarSemantics:
 
     right\_inclusive: bool \= False
 
-    
+
 
     \# When bar "occurs" for execution
 
     execution\_time: Literal\["open", "close"\] \= "close"
 
-    
+
 
     \# Can orders placed during bar fill in same bar?
 
     same\_bar\_execution: bool \= True
 
-    
+
 
     \# How to handle gaps
 
@@ -1423,7 +1423,7 @@ def fill\_market\_order(order: Order, bar: MarketDataEvent, policy: FillPolicy) 
 
     """Determine fill price for market order"""
 
-    
+
 
     if policy.market\_order\_fill \== "open":
 
@@ -1449,7 +1449,7 @@ def fill\_limit\_order(order: Order, bar: MarketDataEvent, policy: FillPolicy) \
 
     """Determine if and at what price limit order fills"""
 
-    
+
 
     if order.quantity \> 0:  \# Buy limit
 
@@ -1483,7 +1483,7 @@ def fill\_limit\_order(order: Order, bar: MarketDataEvent, policy: FillPolicy) \
 
                 return (bar.high \+ order.limit\_price) / 2
 
-                
+
 
     return None  \# No fill
 
@@ -1493,7 +1493,7 @@ def check\_stop\_trigger(order: Order, bar: MarketDataEvent, policy: FillPolicy)
 
     """Check if stop order should trigger"""
 
-    
+
 
     if policy.stop\_trigger \== "close":
 
@@ -1515,7 +1515,7 @@ def check\_stop\_trigger(order: Order, bar: MarketDataEvent, policy: FillPolicy)
 
             return bar.low \<= order.stop\_price
 
-            
+
 
     if order.quantity \> 0:
 
@@ -1537,7 +1537,7 @@ class SlippageModel(ABC):
 
     """Base class for slippage models"""
 
-    
+
 
     @abstractmethod
 
@@ -1563,13 +1563,13 @@ class FixedBasisPointsSlippage(SlippageModel):
 
     """Fixed slippage in basis points"""
 
-    
+
 
     def \_\_init\_\_(self, basis\_points: float \= 10):
 
         self.bps \= basis\_points / 10000
 
-        
+
 
     def calculate(self, order: Order, fill\_price: float, volume: float, volatility: float) \-\> float:
 
@@ -1581,7 +1581,7 @@ class VolumeImpactSlippage(SlippageModel):
 
     """Square-root market impact model"""
 
-    
+
 
     def \_\_init\_\_(self, impact: float \= 0.1, gamma: float \= 0.5):
 
@@ -1589,7 +1589,7 @@ class VolumeImpactSlippage(SlippageModel):
 
         self.gamma \= gamma
 
-        
+
 
     def calculate(self, order: Order, fill\_price: float, volume: float, volatility: float) \-\> float:
 
@@ -1603,17 +1603,17 @@ class AlmgrenChrissModel(SlippageModel):
 
     """Almgren-Chriss optimal execution model"""
 
-    
+
 
     def \_\_init\_\_(self, eta: float \= 2.5e-7, gamma: float \= 2.5e-6, alpha: float \= 0.95):
 
         self.eta \= eta  \# Temporary impact
 
-        self.gamma \= gamma  \# Permanent impact  
+        self.gamma \= gamma  \# Permanent impact
 
         self.alpha \= alpha  \# Exponent
 
-        
+
 
     def calculate(self, order: Order, fill\_price: float, volume: float, volatility: float) \-\> float:
 
@@ -1633,7 +1633,7 @@ class CommissionModel(ABC):
 
     """Base commission model"""
 
-    
+
 
     @abstractmethod
 
@@ -1645,7 +1645,7 @@ class PerShareCommission(CommissionModel):
 
     """Fixed commission per share"""
 
-    
+
 
     def \_\_init\_\_(self, cost\_per\_share: float \= 0.001, minimum: float \= 1.0):
 
@@ -1653,7 +1653,7 @@ class PerShareCommission(CommissionModel):
 
         self.minimum \= minimum
 
-        
+
 
     def calculate(self, order: Order, fill\_price: float) \-\> float:
 
@@ -1665,13 +1665,13 @@ class TieredCommission(CommissionModel):
 
     """Tiered commission based on volume"""
 
-    
+
 
     def \_\_init\_\_(self, tiers: list\[tuple\[float, float\]\]):
 
         self.tiers \= tiers  \# \[(threshold, rate), ...\]
 
-        
+
 
     def calculate(self, order: Order, fill\_price: float) \-\> float:
 
@@ -1697,7 +1697,7 @@ class PositionSizer(ABC):
 
     """Base class for position sizing"""
 
-    
+
 
     @abstractmethod
 
@@ -1723,13 +1723,13 @@ class FixedSizer(PositionSizer):
 
     """Fixed dollar amount per position"""
 
-    
+
 
     def \_\_init\_\_(self, position\_size: float \= 10000):
 
         self.position\_size \= position\_size
 
-        
+
 
     def size(self, signal: float, symbol: str, portfolio: PortfolioState, market\_data: dict) \-\> float:
 
@@ -1741,7 +1741,7 @@ class KellySizer(PositionSizer):
 
     """Kelly criterion sizing"""
 
-    
+
 
     def \_\_init\_\_(self, lookback: int \= 252, cap: float \= 0.25):
 
@@ -1749,13 +1749,13 @@ class KellySizer(PositionSizer):
 
         self.cap \= cap  \# Cap at 25% of portfolio
 
-        
+
 
     def size(self, signal: float, symbol: str, portfolio: PortfolioState, market\_data: dict) \-\> float:
 
         returns \= self.get\_historical\_returns(symbol)
 
-        
+
 
         \# Estimate win probability and profit/loss ratio
 
@@ -1763,19 +1763,19 @@ class KellySizer(PositionSizer):
 
         losses \= returns\[returns \< 0\]
 
-        
+
 
         if len(wins) \== 0 or len(losses) \== 0:
 
             return 0
 
-            
+
 
         p \= len(wins) / len(returns)  \# Win probability
 
         b \= wins.mean() / abs(losses.mean())  \# Profit/loss ratio
 
-        
+
 
         \# Kelly formula: f \= (p\*b \- q) / b where q \= 1-p
 
@@ -1783,7 +1783,7 @@ class KellySizer(PositionSizer):
 
         kelly\_fraction \= np.clip(kelly\_fraction, 0, self.cap)
 
-        
+
 
         return kelly\_fraction \* portfolio.total\_value / market\_data\[symbol\].close
 
@@ -1793,7 +1793,7 @@ class PortfolioOptimizer(ABC):
 
     """Base portfolio optimizer"""
 
-    
+
 
     @abstractmethod
 
@@ -1819,13 +1819,13 @@ class MeanVarianceOptimizer(PortfolioOptimizer):
 
     """Markowitz mean-variance optimization"""
 
-    
+
 
     def \_\_init\_\_(self, risk\_aversion: float \= 1.0):
 
         self.risk\_aversion \= risk\_aversion
 
-        
+
 
     def optimize(
 
@@ -1849,7 +1849,7 @@ class RiskParityOptimizer(PortfolioOptimizer):
 
     """Equal risk contribution"""
 
-    
+
 
     def optimize(
 
@@ -1879,7 +1879,7 @@ class EquitySpecifics:
 
     """Equity-specific parameters"""
 
-    
+
 
     \# Shorting
 
@@ -1887,19 +1887,19 @@ class EquitySpecifics:
 
     short\_fee\_rate: float \= 0.02  \# Annual borrow rate
 
-    
+
 
     \# Settlement
 
     settlement\_days: int \= 2  \# T+2
 
-    
+
 
     \# Corporate actions
 
     dividend\_reinvestment: bool \= False
 
-    
+
 
     \# Lot sizes
 
@@ -1915,7 +1915,7 @@ class FutureSpecifics:
 
     """Futures-specific parameters"""
 
-    
+
 
     \# Contract specs
 
@@ -1925,7 +1925,7 @@ class FutureSpecifics:
 
     expiry: pd.Timestamp
 
-    
+
 
     \# Margin
 
@@ -1933,7 +1933,7 @@ class FutureSpecifics:
 
     maintenance\_margin: float
 
-    
+
 
     \# Rolling
 
@@ -1941,7 +1941,7 @@ class FutureSpecifics:
 
     roll\_days\_before: int \= 5
 
-    
+
 
     \# P\&L
 
@@ -1955,7 +1955,7 @@ class CryptoSpecifics:
 
     """Crypto-specific parameters"""
 
-    
+
 
     \# Trading
 
@@ -1965,7 +1965,7 @@ class CryptoSpecifics:
 
     taker\_fee: float \= 0.0015
 
-    
+
 
     \# Funding
 
@@ -1973,7 +1973,7 @@ class CryptoSpecifics:
 
     funding\_interval: pd.Timedelta \= pd.Timedelta(hours=8)
 
-    
+
 
     \# Decimals
 
@@ -1996,7 +1996,7 @@ class UniverseManager:
 
     """Manages dynamic universe of tradeable assets"""
 
-    
+
 
     def \_\_init\_\_(self, static\_universe: Optional\[list\[str\]\] \= None):
 
@@ -2006,7 +2006,7 @@ class UniverseManager:
 
         self.universe\_history \= {}
 
-        
+
 
     def add\_filter(self, filter\_func: Callable) \-\> None:
 
@@ -2014,19 +2014,19 @@ class UniverseManager:
 
         self.dynamic\_filters.append(filter\_func)
 
-        
+
 
     def get\_universe(self, date: pd.Timestamp, market\_data: pl.DataFrame) \-\> set\[str\]:
 
         """Get universe for given date"""
 
-        
+
 
         \# Start with static universe
 
         universe \= self.static\_universe.copy()
 
-        
+
 
         \# Apply dynamic filters
 
@@ -2034,23 +2034,23 @@ class UniverseManager:
 
             universe \= filter\_func(universe, date, market\_data)
 
-            
+
 
         \# Handle delistings
 
         universe \= self.remove\_delisted(universe, date)
 
-        
+
 
         \# Record for history
 
         self.universe\_history\[date\] \= universe
 
-        
+
 
         return universe
 
-        
+
 
     def remove\_delisted(self, universe: set\[str\], date: pd.Timestamp) \-\> set\[str\]:
 
@@ -2066,7 +2066,7 @@ class CorporateActionsProcessor:
 
     """Handles corporate actions"""
 
-    
+
 
     def \_\_init\_\_(self, adjustment\_method: str \= "backwards"):
 
@@ -2074,7 +2074,7 @@ class CorporateActionsProcessor:
 
         self.actions\_log \= \[\]
 
-        
+
 
     def process\_split(
 
@@ -2094,7 +2094,7 @@ class CorporateActionsProcessor:
 
         """Process stock split"""
 
-        
+
 
         if self.adjustment\_method \== "backwards":
 
@@ -2106,7 +2106,7 @@ class CorporateActionsProcessor:
 
             prices\[mask, "volume"\] \= prices\[mask, "volume"\] \* ratio
 
-            
+
 
         \# Adjust positions
 
@@ -2116,7 +2116,7 @@ class CorporateActionsProcessor:
 
             positions\[symbol\].cost\_basis /= ratio
 
-            
+
 
         self.actions\_log.append({
 
@@ -2130,11 +2130,11 @@ class CorporateActionsProcessor:
 
         })
 
-        
+
 
         return prices, positions
 
-        
+
 
     def process\_dividend(
 
@@ -2154,7 +2154,7 @@ class CorporateActionsProcessor:
 
         """Process cash dividend"""
 
-        
+
 
         if symbol in positions:
 
@@ -2162,7 +2162,7 @@ class CorporateActionsProcessor:
 
             cash \+= dividend
 
-            
+
 
             self.actions\_log.append({
 
@@ -2178,7 +2178,7 @@ class CorporateActionsProcessor:
 
             })
 
-            
+
 
         return cash
 
@@ -2202,13 +2202,13 @@ def test\_deterministic\_ordering():
 
     \]
 
-    
+
 
     queue1 \= EventQueue(seed=42)
 
     queue2 \= EventQueue(seed=42)
 
-    
+
 
     for event in events:
 
@@ -2216,7 +2216,7 @@ def test\_deterministic\_ordering():
 
         queue2.put(event)
 
-        
+
 
     assert \[queue1.get() for \_ in range(3)\] \== \[queue2.get() for \_ in range(3)\]
 
@@ -2248,7 +2248,7 @@ def test\_portfolio\_value\_conservation(trades):
 
     portfolio \= Portfolio(initial\_cash=100000)
 
-    
+
 
     for quantity, price in trades:
 
@@ -2258,7 +2258,7 @@ def test\_portfolio\_value\_conservation(trades):
 
             portfolio.execute\_trade("TEST", quantity, price)
 
-            
+
 
     \# Value should equal cash \+ position values
 
@@ -2288,17 +2288,17 @@ def test\_simple\_buy\_and\_hold():
 
     )
 
-    
+
 
     result \= run\_backtest(config)
 
-    
+
 
     \# Load golden results
 
     golden \= pd.read\_csv("golden/buy\_and\_hold\_results.csv")
 
-    
+
 
     assert result.final\_value \== pytest.approx(golden\["final\_value"\].iloc\[0\], rel=1e-6)
 
@@ -2312,11 +2312,11 @@ def benchmark\_event\_throughput():
 
     """Measure event processing throughput"""
 
-    
+
 
     events \= generate\_events(n\_symbols=1000, n\_days=252 \* 10, frequency="1min")
 
-    
+
 
     start \= time.perf\_counter()
 
@@ -2326,7 +2326,7 @@ def benchmark\_event\_throughput():
 
     elapsed \= time.perf\_counter() \- start
 
-    
+
 
     throughput \= len(events) / elapsed
 
@@ -2340,13 +2340,13 @@ class EventTimeline:
 
     """Interactive event timeline for debugging"""
 
-    
+
 
     def \_\_init\_\_(self, events: list\[Event\]):
 
         self.events \= sorted(events, key=lambda e: (e.timestamp, e.event\_type))
 
-        
+
 
     def print\_range(self, start: pd.Timestamp, end: pd.Timestamp):
 
@@ -2358,7 +2358,7 @@ class EventTimeline:
 
                 print(f"{event.timestamp}: {event.event\_type} \- {event}")
 
-                
+
 
     def trace\_order(self, order\_id: str):
 
@@ -2376,7 +2376,7 @@ class BacktestError(Exception):
 
     """Base exception with helpful context"""
 
-    
+
 
     def \_\_init\_\_(self, message: str, context: dict, suggestion: str \= None):
 
@@ -2386,7 +2386,7 @@ class BacktestError(Exception):
 
         self.suggestion \= suggestion
 
-        
+
 
         full\_message \= f"{message}\\n"
 
@@ -2396,7 +2396,7 @@ class BacktestError(Exception):
 
             full\_message \+= f"Suggestion: {suggestion}"
 
-            
+
 
         super().\_\_init\_\_(full\_message)
 
@@ -2444,7 +2444,7 @@ class SimpleMomentum(Strategy):
 
         self.last\_rebalance \= None
 
-        
+
 
     def on\_bar(self, bar: MarketDataEvent) \-\> None:
 
@@ -2454,7 +2454,7 @@ class SimpleMomentum(Strategy):
 
             return
 
-            
+
 
         \# Calculate momentum for all symbols
 
@@ -2468,7 +2468,7 @@ class SimpleMomentum(Strategy):
 
                 momentum\[symbol\] \= (hist\["close"\].iloc\[-1\] / hist\["close"\].iloc\[0\]) \- 1
 
-                
+
 
         \# Select top N
 
@@ -2476,7 +2476,7 @@ class SimpleMomentum(Strategy):
 
         selected \= \[symbol for symbol, \_ in ranked\[:self.n\_positions\]\]
 
-        
+
 
         \# Rebalance portfolio
 
@@ -2486,13 +2486,13 @@ class SimpleMomentum(Strategy):
 
                 self.order\_target\_percent(symbol, 0\)
 
-                
+
 
         for symbol in selected:
 
             self.order\_target\_percent(symbol, 1.0 / self.n\_positions)
 
-            
+
 
         self.last\_rebalance \= bar.timestamp
 
@@ -2506,7 +2506,7 @@ class CompleteManifest:
 
     """Complete record for reproducibility"""
 
-    
+
 
     \# Identifiers
 
@@ -2514,7 +2514,7 @@ class CompleteManifest:
 
     timestamp: pd.Timestamp
 
-    
+
 
     \# Configuration
 
@@ -2522,7 +2522,7 @@ class CompleteManifest:
 
     config\_hash: str  \# SHA256 of config
 
-    
+
 
     \# Data
 
@@ -2530,7 +2530,7 @@ class CompleteManifest:
 
     data\_hashes: dict\[str, str\]  \# SHA256 per file
 
-    
+
 
     \# Code
 
@@ -2538,7 +2538,7 @@ class CompleteManifest:
 
     strategy\_hash: str  \# Hash of strategy code
 
-    
+
 
     \# Environment
 
@@ -2548,13 +2548,13 @@ class CompleteManifest:
 
     system: dict  \# OS, CPU, memory
 
-    
+
 
     \# Seeds
 
     random\_seeds: dict\[str, int\]  \# All PRNG seeds
 
-    
+
 
     def verify\_reproducibility(self, other: 'CompleteManifest') \-\> bool:
 
@@ -2578,11 +2578,11 @@ class SchemaVersion:
 
     """Semantic versioning for output schemas"""
 
-    
+
 
     CURRENT\_VERSION \= "1.0.0"
 
-    
+
 
     \# Column schemas with versions
 
@@ -2608,7 +2608,7 @@ class SchemaVersion:
 
     }
 
-    
+
 
     @classmethod
 
@@ -2726,7 +2726,7 @@ columns:
 
     high: "high"
 
-    low: "low"  
+    low: "low"
 
     close: "close"
 
@@ -2900,7 +2900,7 @@ class Strategy:
 
     """Base strategy class for event-driven backtesting
 
-    
+
 
     All strategies should inherit from this class and implement
 
@@ -2908,13 +2908,13 @@ class Strategy:
 
     """
 
-    
+
 
     def \_\_init\_\_(self, context: 'StrategyContext'):
 
         """Initialize strategy with backtesting context
 
-        
+
 
         Args:
 
@@ -2926,13 +2926,13 @@ class Strategy:
 
         self.state: Dict\[str, Any\] \= {}
 
-        
+
 
     def on\_start(self) \-\> None:
 
         """Called once before backtesting begins
 
-        
+
 
         Use this to initialize strategy state, precompute features,
 
@@ -2942,13 +2942,13 @@ class Strategy:
 
         pass
 
-        
+
 
     def on\_bar(self, bar: 'MarketBar') \-\> None:
 
         """Process new market data bar
 
-        
+
 
         Args:
 
@@ -2958,13 +2958,13 @@ class Strategy:
 
         pass
 
-        
+
 
     def on\_fill(self, fill: 'Fill') \-\> None:
 
         """Notification of order fill
 
-        
+
 
         Args:
 
@@ -2982,7 +2982,7 @@ class Order:
 
     """Order representation
 
-    
+
 
     Attributes:
 
@@ -3022,7 +3022,7 @@ class Fill:
 
     """Execution fill details
 
-    
+
 
     Attributes:
 
@@ -3066,25 +3066,25 @@ class Broker:
 
     """Broker simulation interface
 
-    
+
 
     Handles order matching, fill generation, and commission calculation.
 
     """
 
-    
+
 
     def submit\_order(self, order: Order) \-\> str:
 
         """Submit order for execution
 
-        
+
 
         Args:
 
             order: Order to submit
 
-            
+
 
         Returns:
 
@@ -3094,19 +3094,19 @@ class Broker:
 
         pass
 
-        
+
 
     def cancel\_order(self, order\_id: str) \-\> bool:
 
         """Cancel pending order
 
-        
+
 
         Args:
 
             order\_id: Order to cancel
 
-            
+
 
         Returns:
 
@@ -3124,7 +3124,7 @@ class BacktestResult:
 
     """Container for backtest results
 
-    
+
 
     Provides access to performance metrics, trade history,
 
@@ -3132,7 +3132,7 @@ class BacktestResult:
 
     """
 
-    
+
 
     \# Time series data
 
@@ -3142,7 +3142,7 @@ class BacktestResult:
 
     positions: pl.DataFrame
 
-    
+
 
     \# Transaction records
 
@@ -3150,7 +3150,7 @@ class BacktestResult:
 
     orders: pl.DataFrame
 
-    
+
 
     \# Summary statistics
 
@@ -3164,7 +3164,7 @@ class BacktestResult:
 
     win\_rate: float
 
-    
+
 
     def to\_parquet(self, path: str) \-\> None:
 
@@ -3172,7 +3172,7 @@ class BacktestResult:
 
         pass
 
-        
+
 
     def plot\_equity\_curve(self) \-\> None:
 

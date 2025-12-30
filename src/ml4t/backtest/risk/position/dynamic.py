@@ -134,3 +134,122 @@ class ScaledExit:
                     exit_pct, f"scale_out_{threshold:.0%}_{exit_pct:.0%}"
                 )
         return PositionAction.hold()
+
+
+@dataclass
+class VolatilityStop:
+    """Exit when price moves beyond ATR-based stop distance.
+
+    Uses Average True Range (ATR) from context to set adaptive stop distance.
+    Stop tightens/widens automatically based on market volatility.
+
+    Args:
+        multiplier: ATR multiplier for stop distance (e.g., 2.0 = 2×ATR)
+        atr_key: Key to look up ATR value in state.context (default: "atr")
+        use_entry_atr: If True, use ATR at entry (from context). If False,
+                       recalculate stop each bar using current ATR.
+
+    Example:
+        # 2x ATR stop using ATR from context
+        rule = VolatilityStop(multiplier=2.0)
+
+        # Strategy must provide ATR in context:
+        broker.set_context({"atr": current_atr_value})
+
+    Note:
+        Requires strategy to compute ATR and pass via context dict.
+        If ATR not found in context, rule does nothing (returns HOLD).
+    """
+
+    multiplier: float = 2.0
+    atr_key: str = "atr"
+    use_entry_atr: bool = True
+    _entry_atr: float | None = field(default=None, repr=False)
+
+    def reset(self):
+        """Reset entry ATR (call when position closes)."""
+        self._entry_atr = None
+
+    def evaluate(self, state: PositionState) -> PositionAction:
+        """Exit if price moves beyond ATR-based stop."""
+        # Get ATR from context
+        atr = state.context.get(self.atr_key)
+        if atr is None or atr <= 0:
+            # No ATR available, cannot evaluate
+            return PositionAction.hold()
+
+        # Capture entry ATR on first evaluation
+        if self.use_entry_atr:
+            if self._entry_atr is None:
+                self._entry_atr = atr
+            atr = self._entry_atr
+
+        stop_distance = atr * self.multiplier
+
+        if state.is_long:
+            # Long: stop is entry - (ATR × multiplier)
+            stop_price = state.entry_price - stop_distance
+            if state.current_price <= stop_price:
+                return PositionAction.exit_full(
+                    f"volatility_stop_{self.multiplier:.1f}x_atr",
+                    fill_price=stop_price,
+                )
+        else:
+            # Short: stop is entry + (ATR × multiplier)
+            stop_price = state.entry_price + stop_distance
+            if state.current_price >= stop_price:
+                return PositionAction.exit_full(
+                    f"volatility_stop_{self.multiplier:.1f}x_atr",
+                    fill_price=stop_price,
+                )
+
+        return PositionAction.hold()
+
+
+@dataclass
+class VolatilityTrailingStop:
+    """Trailing stop with ATR-based distance.
+
+    Combines trailing stop behavior with volatility-adjusted distance.
+    The trail distance adapts to market volatility via ATR.
+
+    Args:
+        multiplier: ATR multiplier for trail distance (e.g., 3.0 = 3×ATR)
+        atr_key: Key to look up ATR value in state.context
+
+    Example:
+        rule = VolatilityTrailingStop(multiplier=3.0)
+
+    Note:
+        Trail distance uses current ATR, so adapts to changing volatility.
+    """
+
+    multiplier: float = 3.0
+    atr_key: str = "atr"
+
+    def evaluate(self, state: PositionState) -> PositionAction:
+        """Exit if price retraces beyond ATR-based trail."""
+        atr = state.context.get(self.atr_key)
+        if atr is None or atr <= 0:
+            return PositionAction.hold()
+
+        trail_distance = atr * self.multiplier
+
+        if state.is_long:
+            # Long: trail from high water mark
+            stop_price = state.high_water_mark - trail_distance
+            if state.current_price <= stop_price:
+                return PositionAction.exit_full(
+                    f"vol_trailing_stop_{self.multiplier:.1f}x_atr",
+                    fill_price=stop_price,
+                )
+        else:
+            # Short: trail from low water mark
+            stop_price = state.low_water_mark + trail_distance
+            if state.current_price >= stop_price:
+                return PositionAction.exit_full(
+                    f"vol_trailing_stop_{self.multiplier:.1f}x_atr",
+                    fill_price=stop_price,
+                )
+
+        return PositionAction.hold()

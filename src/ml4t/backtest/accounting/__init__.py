@@ -4,7 +4,7 @@ Provides proper accounting constraints for both cash accounts (no leverage, no s
 and margin accounts (leverage enabled, shorts allowed).
 
 Key Components:
-- Position: Unified position tracking with cost basis
+- Position: Unified position tracking (from types module)
 - AccountPolicy: Interface for account type constraints
 - CashAccountPolicy: Cash account constraints (cash >= 0, no shorts)
 - MarginAccountPolicy: Margin account constraints (NLV/BP/MM calculations)
@@ -12,9 +12,9 @@ Key Components:
 - Gatekeeper: Order validation before execution
 """
 
+from ..types import Position
 from .account import AccountState
 from .gatekeeper import Gatekeeper
-from .models import Position
 from .policy import AccountPolicy, CashAccountPolicy, MarginAccountPolicy
 
 __all__ = [

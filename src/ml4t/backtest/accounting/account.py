@@ -4,7 +4,7 @@ This module provides the AccountState class that tracks cash, positions, and
 delegates validation to the appropriate AccountPolicy.
 """
 
-from .models import Position
+from ..types import Position
 from .policy import AccountPolicy
 
 
@@ -166,7 +166,7 @@ class AccountState:
                 self.positions[asset] = Position(
                     asset=asset,
                     quantity=quantity_delta,
-                    avg_entry_price=fill_price,
+                    entry_price=fill_price,
                     current_price=fill_price,
                     entry_time=timestamp,
                     bars_held=0,
@@ -186,7 +186,7 @@ class AccountState:
                 self.positions[asset] = Position(
                     asset=asset,
                     quantity=new_qty,
-                    avg_entry_price=fill_price,
+                    entry_price=fill_price,
                     current_price=fill_price,
                     entry_time=timestamp,
                     bars_held=0,
@@ -194,10 +194,10 @@ class AccountState:
             elif abs(new_qty) > abs(old_qty):
                 # Adding to existing position (same direction)
                 # Update weighted average entry price
-                old_cost = abs(old_qty) * pos.avg_entry_price
+                old_cost = abs(old_qty) * pos.entry_price
                 new_cost = abs(quantity_delta) * fill_price
                 total_cost = old_cost + new_cost
-                pos.avg_entry_price = total_cost / abs(new_qty)
+                pos.entry_price = total_cost / abs(new_qty)
                 pos.quantity = new_qty
             else:
                 # Partial close (reducing position size)

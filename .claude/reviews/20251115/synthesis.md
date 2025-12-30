@@ -1,6 +1,6 @@
 # Architectural Review Synthesis
-**Date**: 2025-11-15  
-**Reviewers**: Gemini Experimental 01 (gem-01), Claude Opus 4  
+**Date**: 2025-11-15
+**Reviewers**: Gemini Experimental 01 (gem-01), Claude Opus 4
 **Subject**: ML4T.Backtest ML Signal Integration Architecture
 
 ---
@@ -11,13 +11,13 @@ Both reviewers **strongly converge on the same recommendations** across all 6 ar
 
 ### Top 3 Takeaways
 
-1. **Start Simple, Add Complexity Only Where Necessary**  
+1. **Start Simple, Add Complexity Only Where Necessary**
    Both reviewers recommend **Option 1A** (event callbacks), **Option 2A** (embedded signals), and **Option 4C** (delay optimization). The message is clear: avoid premature abstraction and performance optimization.
 
-2. **Context Object is Worth the Complexity**  
+2. **Context Object is Worth the Complexity**
    Despite advocating simplicity elsewhere, both reviewers agree **Option 3B** (separate Context object) is justified due to the 50x memory savings for multi-asset backtests.
 
-3. **Profile Before Optimizing**  
+3. **Profile Before Optimizing**
    No performance data exists, so any Numba optimization or declarative API would be premature. Implement core features, measure actual performance, then optimize if needed.
 
 ### Critical Insights
@@ -145,7 +145,7 @@ def _run_loop(self):
     while event := self.clock.get_next_event():
         # Engine resolves context *for* the user
         bar_context = self.context.at(event.timestamp) if self.context else {}
-        
+
         # Strategy API remains simple
         self.strategy.on_market_data(event, bar_context)
 
@@ -241,14 +241,14 @@ class SignalBuffer:
     def __init__(self, max_age_seconds=5):
         self._signals = {}
         self._timestamps = {}
-    
+
     async def update(self, asset_id: str, signals: dict):
         # Thread-safe update from WebSocket/API
 
 class LiveStrategy(Strategy):
     def __init__(self):
         self.signal_buffer = SignalBuffer()
-    
+
     def on_market_data(self, event):
         # Merge buffered signals with event
         live_signals = self.signal_buffer.get_latest(event.asset_id)
@@ -383,17 +383,17 @@ class Strategy(ABC):
     @abstractmethod
     def on_market_data(self, event: MarketEvent, context: dict):
         """React to new market data."""
-    
+
     # Helper methods (implement these in base class)
     def get_position(self, asset_id: AssetId) -> Quantity:
         """Get current position."""
-    
+
     def buy_percent(self, asset_id: AssetId, percent: float):
         """Buy using percent of portfolio."""
-    
+
     def size_by_confidence(self, asset_id: AssetId, confidence: float, max_percent: float):
         """Size position by ML confidence."""
-    
+
     def rebalance_to_weights(self, weights: dict[AssetId, float]):
         """Rebalance portfolio to target weights."""
 ```
@@ -453,12 +453,12 @@ class Context:
         self._sources = sources
         self._cache: dict[str, float] = {}
         self._cache_timestamp: datetime | None = None
-    
+
     def at(self, timestamp: datetime) -> dict[str, float]:
         """Get context at timestamp (cached)."""
         if timestamp == self._cache_timestamp:
             return self._cache  # Hit cache!
-        
+
         # Update cache (happens once per timestamp, not per asset)
         self._cache = {
             key: series.at(timestamp)
@@ -537,7 +537,7 @@ class DataFeed(ABC):
 # Live implementations (Week 4+)
 class AlpacaBroker(Broker):
     # Handles async API calls internally
-    
+
 class AlpacaStreamFeed(DataFeed):
     # Buffers WebSocket data, emits MarketEvent when complete
 ```
@@ -549,12 +549,12 @@ class SignalBuffer:
     def __init__(self, max_age_seconds=5):
         self._signals: dict[AssetId, dict] = {}
         self._timestamps: dict[AssetId, datetime] = {}
-    
+
     async def update(self, asset_id: AssetId, signals: dict):
         """Thread-safe update from WebSocket/API."""
         self._signals[asset_id] = signals
         self._timestamps[asset_id] = datetime.now()
-    
+
     def get_latest(self, asset_id: AssetId) -> dict:
         """Get latest signals, checking staleness."""
         if asset_id not in self._signals:
@@ -610,7 +610,7 @@ class SimpleMLStrategy(Strategy):
     def on_market_data(self, event):
         pred = event.signals.get('ml_pred', 0)
         position = self.get_position(event.asset_id)
-        
+
         if pred > 0.8 and position == 0:
             self.buy_percent(event.asset_id, 0.95)
         elif position > 0 and pred < 0.4:
@@ -653,11 +653,11 @@ class ContextAwareStrategy(Strategy):
     def on_market_data(self, event, context):
         pred = event.signals.get('ml_pred', 0)
         vix = context.get('VIX', 30)
-        
+
         # Don't trade in high volatility
         if vix > 30:
             return
-        
+
         if pred > 0.8:
             self.buy_percent(event.asset_id, 0.95)
 ```
@@ -1060,7 +1060,6 @@ Both reviewers provide **strong, aligned endorsement** of the proposed architect
 
 ---
 
-**Confidence Level**: High (unanimous expert agreement)  
-**Risk Level**: Low (no fundamental flaws identified)  
+**Confidence Level**: High (unanimous expert agreement)
+**Risk Level**: Low (no fundamental flaws identified)
 **Implementation Clarity**: Excellent (concrete roadmap with priorities)
-

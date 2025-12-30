@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .models import Position
+    from ..types import Position
 
 
 class AccountPolicy(ABC):
@@ -274,39 +274,51 @@ class CashAccountPolicy(AccountPolicy):
 class MarginAccountPolicy(AccountPolicy):
     """Account policy for margin accounts (leverage enabled, shorts allowed).
 
-    Margin accounts enable more sophisticated trading strategies:
-    - Can use leverage (borrow cash to increase buying power)
-    - Can short sell (borrow shares to sell)
-    - Buying power calculated from Net Liquidation Value and margin requirements
-    - Subject to initial margin (IM) and maintenance margin (MM) requirements
+    Supports both percentage-based margin (equities) and fixed-dollar margin (futures).
+
+    **Equities (Reg T style):**
+    - Initial margin: 50% for both longs and shorts
+    - Maintenance margin: 25% for longs, 30% for shorts (asymmetric!)
+    - Buying power = excess equity / initial margin rate
+
+    **Futures (SPAN style):**
+    - Fixed dollar margin per contract (not percentage of notional)
+    - Specify via fixed_margin_schedule: {"ES": (12000, 6000)}
+    - First value = initial margin, second = maintenance margin
 
     Key Formulas:
         NLV = cash + sum(position.market_value)
-        MM = sum(abs(position.market_value) × maintenance_margin_rate)
-        BP = (NLV - MM) / initial_margin_rate
-
-    This is appropriate for:
-    - Experienced traders with margin approval
-    - Hedge funds and institutional accounts
-    - Strategies requiring leverage or short selling
-    - Market-neutral and pairs trading strategies
-
-    Args:
-        initial_margin: Initial margin requirement (default 0.5 = 50% = Reg T)
-        maintenance_margin: Maintenance margin requirement (default 0.25 = 25%)
+        Required IM = sum(get_margin_requirement(pos, for_initial=True))
+        Excess Equity = NLV - Required IM
+        BP = Excess Equity / initial_margin_rate
 
     Examples:
-        >>> # Standard Reg T margin (50% initial, 25% maintenance)
-        >>> policy = MarginAccountPolicy(initial_margin=0.5, maintenance_margin=0.25)
+        >>> # Standard Reg T margin (realistic asymmetric maintenance)
+        >>> policy = MarginAccountPolicy()  # Uses defaults: 50% IM, 25%/30% MM
         >>>
-        >>> # Conservative margin (100% initial = no leverage)
-        >>> policy = MarginAccountPolicy(initial_margin=1.0, maintenance_margin=0.5)
+        >>> # With futures margin schedule
+        >>> policy = MarginAccountPolicy(
+        ...     fixed_margin_schedule={
+        ...         "ES": (12_000, 6_000),   # $12k initial, $6k maintenance per contract
+        ...         "NQ": (15_000, 7_500),   # $15k initial, $7.5k maintenance
+        ...     }
+        ... )
         >>>
-        >>> # Aggressive margin (lower requirements)
-        >>> policy = MarginAccountPolicy(initial_margin=0.25, maintenance_margin=0.15)
+        >>> # Custom margin requirements
+        >>> policy = MarginAccountPolicy(
+        ...     initial_margin=0.25,           # 4x leverage
+        ...     long_maintenance_margin=0.15,
+        ...     short_maintenance_margin=0.20,
+        ... )
     """
 
-    def __init__(self, initial_margin: float = 0.5, maintenance_margin: float = 0.25) -> None:
+    def __init__(
+        self,
+        initial_margin: float = 0.5,
+        long_maintenance_margin: float = 0.25,
+        short_maintenance_margin: float = 0.30,
+        fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
+    ) -> None:
         """Initialize margin account policy.
 
         Args:
@@ -315,85 +327,193 @@ class MarginAccountPolicy(AccountPolicy):
                 - 1.0 = 100% = no leverage
                 - Lower values = more leverage (higher risk)
 
-            maintenance_margin: Maintenance margin requirement (0.0-1.0)
-                - 0.25 = 25% = Reg T standard
-                - Must be < initial_margin
+            long_maintenance_margin: Maintenance margin for long positions
+                - 0.25 = 25% = Reg T standard for longs
                 - Below this triggers margin call
+
+            short_maintenance_margin: Maintenance margin for short positions
+                - 0.30 = 30% = Reg T standard for shorts (higher than longs!)
+                - Below this triggers margin call
+
+            fixed_margin_schedule: Per-asset fixed dollar margin for futures
+                - Dict mapping asset symbol to (initial, maintenance) tuple
+                - Example: {"ES": (12000, 6000)} = $12k initial, $6k maintenance
+                - Assets in this dict use fixed margin, others use percentage
 
         Raises:
             ValueError: If margin parameters are invalid
         """
+        # Validate parameters
         if not 0.0 < initial_margin <= 1.0:
             raise ValueError(f"Initial margin must be in (0.0, 1.0], got {initial_margin}")
-        if not 0.0 < maintenance_margin <= 1.0:
-            raise ValueError(f"Maintenance margin must be in (0.0, 1.0], got {maintenance_margin}")
-        if maintenance_margin >= initial_margin:
+        if not 0.0 < long_maintenance_margin <= 1.0:
             raise ValueError(
-                f"Maintenance margin ({maintenance_margin}) must be < "
+                f"Long maintenance margin must be in (0.0, 1.0], got {long_maintenance_margin}"
+            )
+        if not 0.0 < short_maintenance_margin <= 1.0:
+            raise ValueError(
+                f"Short maintenance margin must be in (0.0, 1.0], got {short_maintenance_margin}"
+            )
+        if long_maintenance_margin >= initial_margin:
+            raise ValueError(
+                f"Long maintenance margin ({long_maintenance_margin}) must be < "
+                f"initial margin ({initial_margin})"
+            )
+        if short_maintenance_margin >= initial_margin:
+            raise ValueError(
+                f"Short maintenance margin ({short_maintenance_margin}) must be < "
                 f"initial margin ({initial_margin})"
             )
 
         self.initial_margin = initial_margin
-        self.maintenance_margin = maintenance_margin
+        self.long_maintenance_margin = long_maintenance_margin
+        self.short_maintenance_margin = short_maintenance_margin
+        self.fixed_margin_schedule = fixed_margin_schedule or {}
+
+    def get_margin_requirement(
+        self,
+        asset: str,
+        quantity: float,
+        price: float,
+        for_initial: bool = True,
+    ) -> float:
+        """Calculate margin requirement for a position.
+
+        Automatically selects the appropriate margin model:
+        - Fixed dollar margin for assets in fixed_margin_schedule (futures)
+        - Percentage margin for all other assets (equities)
+
+        Args:
+            asset: Asset symbol
+            quantity: Position quantity (signed: positive=long, negative=short)
+            price: Current price per unit
+            for_initial: True for initial margin, False for maintenance
+
+        Returns:
+            Margin required in dollars
+
+        Examples:
+            >>> policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12000, 6000)})
+            >>> # Equity: 100 shares @ $150 = $15,000 market value
+            >>> policy.get_margin_requirement("AAPL", 100, 150.0, for_initial=True)
+            7500.0  # 50% of $15,000
+            >>> # Futures: 2 ES contracts
+            >>> policy.get_margin_requirement("ES", 2, 5000.0, for_initial=True)
+            24000.0  # 2 × $12,000 per contract
+        """
+        # Check for fixed margin (futures)
+        if asset in self.fixed_margin_schedule:
+            initial, maintenance = self.fixed_margin_schedule[asset]
+            margin_per_contract = initial if for_initial else maintenance
+            return abs(quantity) * margin_per_contract
+
+        # Percentage-based margin (equities)
+        market_value = abs(quantity * price)
+        if for_initial:
+            return market_value * self.initial_margin
+        else:
+            # Maintenance margin depends on position direction
+            if quantity > 0:
+                return market_value * self.long_maintenance_margin
+            else:
+                return market_value * self.short_maintenance_margin
+
+    def is_margin_call(self, cash: float, positions: dict[str, Position]) -> bool:
+        """Check if account is in margin call territory.
+
+        A margin call occurs when equity falls below the maintenance margin
+        requirement for current positions.
+
+        Args:
+            cash: Current cash balance
+            positions: Current positions
+
+        Returns:
+            True if account equity is below maintenance requirement
+        """
+        if not positions:
+            return False
+
+        # Calculate NLV
+        total_market_value = sum(pos.market_value for pos in positions.values())
+        nlv = cash + total_market_value
+
+        # Calculate total maintenance margin required
+        required_maintenance = 0.0
+        for pos in positions.values():
+            price = pos.current_price if pos.current_price is not None else pos.entry_price
+            required_maintenance += self.get_margin_requirement(
+                pos.asset, pos.quantity, price, for_initial=False
+            )
+
+        return nlv < required_maintenance
 
     def calculate_buying_power(self, cash: float, positions: dict[str, Position]) -> float:
         """Calculate buying power for margin account.
 
+        Handles both percentage-based margin (equities) and fixed-dollar margin
+        (futures) via get_margin_requirement().
+
         Formula:
-            NLV = cash + sum(position.market_value for all positions)
-            MM = sum(abs(position.market_value) × maintenance_margin for all positions)
-            BP = (NLV - MM) / initial_margin
+            NLV = cash + sum(position.market_value)
+            Required IM = sum(get_margin_requirement(pos, for_initial=True))
+            Excess Equity = NLV - Required IM
+            BP = Excess Equity / initial_margin_rate
 
         Args:
             cash: Current cash balance (can be negative)
             positions: Dictionary of current positions {asset: Position}
 
         Returns:
-            Available buying power in dollars. Can be negative if account is
-            underwater (below maintenance margin).
+            Available buying power in dollars. Returns 0 if account is
+            underwater (below initial margin requirement).
 
         Examples:
             Cash only account (no positions):
                 cash=$100k, positions={}
-                NLV = $100k, MM = $0
-                BP = ($100k - $0) / 0.5 = $200k (2x leverage)
+                NLV = $100k, Required IM = $0
+                BP = $100k / 0.5 = $200k (2x leverage)
 
-            Long position:
-                cash=$50k, long 1000 shares @ $100 = $100k market value
-                NLV = $50k + $100k = $150k
-                MM = $100k × 0.25 = $25k
-                BP = ($150k - $25k) / 0.5 = $250k
+            Long equity position (Reg T 50%):
+                cash=$0, long 1000 shares @ $100 = $100k market value
+                NLV = $0 + $100k = $100k
+                Required IM = $100k × 0.5 = $50k
+                Excess Equity = $100k - $50k = $50k
+                BP = $50k / 0.5 = $100k (can buy $100k more)
 
-            Short position:
-                cash=$150k, short 1000 shares @ $100 = -$100k market value
-                NLV = $150k + (-$100k) = $50k
-                MM = |-$100k| × 0.25 = $25k
-                BP = ($50k - $25k) / 0.5 = $50k
-
-            Underwater account (margin call):
-                cash=-$10k, long 1000 shares @ $50 = $50k market value
-                NLV = -$10k + $50k = $40k
-                MM = $50k × 0.25 = $12.5k
-                BP = ($40k - $12.5k) / 0.5 = $55k
-                (Still has buying power, but NLV < initial investment)
+            Futures position (fixed margin):
+                cash=$50k, long 2 ES contracts @ 5000 (notional $500k)
+                NLV = $50k + $0 = $50k (futures have no market_value impact)
+                Required IM = 2 × $12,000 = $24k
+                Excess Equity = $50k - $24k = $26k
+                BP = $26k / 0.5 = $52k
 
         Note:
-            Buying power can be negative if the account is severely underwater,
-            indicating that positions must be liquidated to meet margin requirements.
+            For mixed portfolios (equities + futures), buying power is calculated
+            using the percentage-based initial margin rate for the excess equity
+            conversion. This assumes new positions are equities; for futures,
+            check excess_equity directly against the fixed margin requirement.
         """
         # Calculate Net Liquidation Value (NLV)
         total_market_value = sum(pos.market_value for pos in positions.values())
         nlv = cash + total_market_value
 
-        # Calculate Maintenance Margin requirement (MM)
-        # Use absolute value because short positions have negative market value
-        maintenance_margin_requirement = sum(
-            abs(pos.market_value) * self.maintenance_margin for pos in positions.values()
-        )
+        # Calculate required initial margin for all existing positions
+        # Uses get_margin_requirement() to handle both equities and futures
+        required_initial_margin = 0.0
+        for pos in positions.values():
+            price = pos.current_price if pos.current_price is not None else pos.entry_price
+            required_initial_margin += self.get_margin_requirement(
+                pos.asset, pos.quantity, price, for_initial=True
+            )
 
-        # Calculate Buying Power (BP)
-        # Available equity above maintenance margin, leveraged by initial margin
-        buying_power = (nlv - maintenance_margin_requirement) / self.initial_margin
+        # Calculate excess equity (equity above required margin)
+        excess_equity = nlv - required_initial_margin
+
+        # Calculate buying power (excess equity leveraged by initial margin)
+        # Note: This assumes buying equities. For futures, the user should
+        # check: excess_equity >= fixed_margin_schedule[asset][0] * contracts
+        buying_power = max(0.0, excess_equity / self.initial_margin)
 
         return buying_power
 

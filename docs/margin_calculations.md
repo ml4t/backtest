@@ -58,14 +58,14 @@ MM = Σ(|Position Market Value| × maintenance_margin_rate)
 - Long positions: 25% (0.25)
 - Short positions: 30% (0.30)
 
-**ml4t.backtest Default**: 25% (0.25) for both long and short
+**ml4t.backtest Default**: 25% (0.25) for longs, 30% (0.30) for shorts
 
 **Example**:
 ```
 Long AAPL:    |+100 × $150| = $15,000 → MM = $15,000 × 0.25 = $3,750
-Short TSLA:   |-50 × $200|  = $10,000 → MM = $10,000 × 0.25 = $2,500
+Short TSLA:   |-50 × $200|  = $10,000 → MM = $10,000 × 0.30 = $3,000
 
-Total MM = $3,750 + $2,500 = $6,250
+Total MM = $3,750 + $3,000 = $6,750
 ```
 
 **Notes**:
@@ -422,25 +422,59 @@ Result: APPROVED ($20,000 < $122,500)
 
 **Defaults**:
 ```python
-initial_margin = 0.50        # 50% (RegT standard)
-maintenance_margin = 0.25    # 25% (RegT minimum)
+initial_margin = 0.50                # 50% (RegT standard)
+long_maintenance_margin = 0.25       # 25% (RegT minimum for longs)
+short_maintenance_margin = 0.30      # 30% (RegT standard for shorts)
 ```
 
-**Configurable**:
+**Equities (Percentage-based Margin)**:
 ```python
 engine = Engine(
     feed,
     strategy,
     initial_cash=100_000.0,
     account_type="margin",
-    initial_margin=0.60,         # 60% (more conservative)
-    maintenance_margin=0.30,     # 30% (higher than RegT)
+    initial_margin=0.60,                  # 60% (more conservative)
+    long_maintenance_margin=0.30,         # 30% for longs
+    short_maintenance_margin=0.35,        # 35% for shorts
+)
+```
+
+**Futures (Fixed-Dollar Margin)**:
+```python
+engine = Engine(
+    feed,
+    strategy,
+    initial_cash=100_000.0,
+    account_type="margin",
+    fixed_margin_schedule={
+        "ES": (15_400.0, 14_000.0),       # S&P 500 E-mini: $15.4k initial, $14k maintenance
+        "NQ": (20_900.0, 19_000.0),       # Nasdaq 100 E-mini: $20.9k initial, $19k maintenance
+        "CL": (8_200.0, 7_500.0),         # Crude Oil: $8.2k initial, $7.5k maintenance
+    },
+)
+```
+
+**Mixed Portfolio (Equities + Futures)**:
+```python
+engine = Engine(
+    feed,
+    strategy,
+    initial_cash=100_000.0,
+    account_type="margin",
+    initial_margin=0.50,                  # 50% for equities
+    long_maintenance_margin=0.25,
+    short_maintenance_margin=0.30,
+    fixed_margin_schedule={               # Fixed margin for futures
+        "ES": (15_400.0, 14_000.0),
+    },
 )
 ```
 
 **Notes**:
-- ml4t.backtest uses simplified margin calculation (same rate for long and short)
-- Real brokers may use different rates for shorts (typically 30% maintenance)
+- ml4t.backtest now supports asymmetric maintenance margins (different for longs vs shorts)
+- Futures use fixed-dollar margin per contract (SPAN-style), not percentage of notional
+- Assets in `fixed_margin_schedule` use fixed margin; others use percentage
 - Pattern Day Trader rules NOT enforced in backtesting
 - No distinction between "Reg T excess" and "SMA" (Simplified)
 
@@ -675,6 +709,10 @@ Order Approved: Order Value ≤ BP
 
 ---
 
-**Last Updated**: 2025-11-20
-**Version**: 1.0
+**Last Updated**: 2025-11-24
+**Version**: 1.1
 **Author**: ml4t.backtest documentation team
+
+**Changelog**:
+- v1.1 (2025-11-24): Added asymmetric maintenance margins and futures fixed-dollar margin support
+- v1.0 (2025-11-20): Initial version

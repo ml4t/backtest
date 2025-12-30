@@ -40,15 +40,15 @@ class MLStrategy(Strategy):
         # Access signals from event
         ml_pred = event.data.signals.get('ml_pred', 0)
         confidence = event.data.signals.get('confidence', 0)
-        
+
         # Rich helper methods
         position = self.get_position(event.asset_id)
         pnl_pct = self.get_unrealized_pnl_pct(event.asset_id)
-        
+
         # Entry logic
         if ml_pred > 0.8 and confidence > 0.7 and position == 0:
             self.buy_percent(event.asset_id, 0.95)
-        
+
         # Exit logic
         elif position > 0 and (pnl_pct < -0.05 or ml_pred < 0.4):
             self.close_position(event.asset_id)
@@ -62,20 +62,20 @@ class Strategy(ABC):
     def get_position(self, asset_id: AssetId) -> float:
         """Get current position quantity."""
         return self.broker.get_position(asset_id)
-    
+
     def get_position_value(self, asset_id: AssetId) -> float:
         """Get current position market value."""
         pos = self.broker.get_position(asset_id)
         price = self.broker._last_prices.get(asset_id, 0)
         return pos * price
-    
+
     def get_unrealized_pnl_pct(self, asset_id: AssetId) -> float:
         """Get unrealized PnL as percentage."""
         portfolio_pos = self.broker._internal_portfolio.get_position(asset_id)
         if not portfolio_pos or portfolio_pos.quantity == 0:
             return 0.0
         return (portfolio_pos.last_price / portfolio_pos.average_price) - 1.0
-    
+
     # Order helpers
     def buy_percent(self, asset_id: AssetId, pct: float):
         """Buy using percentage of available cash."""
@@ -85,7 +85,7 @@ class Strategy(ABC):
             return
         value = cash * pct
         quantity = value / price
-        
+
         order = Order(
             asset_id=asset_id,
             order_type=OrderType.MARKET,
@@ -93,7 +93,7 @@ class Strategy(ABC):
             quantity=quantity,
         )
         self.broker.submit_order(order, timestamp=self.current_time)
-    
+
     def close_position(self, asset_id: AssetId):
         """Close entire position."""
         position = self.get_position(asset_id)
@@ -149,11 +149,11 @@ strategy = SignalStrategy(
 @dataclass
 class Rule:
     """Declarative rule that can be Numba-compiled."""
-    
+
     @staticmethod
     def signal_above(key: str, threshold: float):
         return SignalAboveRule(key, threshold)
-    
+
     @staticmethod
     def stop_loss(pct: float):
         return StopLossRule(pct)
@@ -171,7 +171,7 @@ def evaluate_rules(
     if position == 0:
         if signals[0] > thresholds[0] and signals[1] > thresholds[1]:
             return 1
-    
+
     # Exit: ml_pred < 0.4 OR stop loss OR take profit
     if position > 0:
         if signals[0] < thresholds[2]:
@@ -180,7 +180,7 @@ def evaluate_rules(
             return -1
         if pnl_pct > thresholds[4]:
             return -1
-    
+
     return 0
 ```
 
@@ -213,12 +213,12 @@ class HybridStrategy(Strategy):
         if ml_pred > 0.8 and confidence > 0.7 and momentum > 0:
             return 1
         return 0
-    
+
     def on_market_data(self, event: MarketEvent):
         # Gather state (Python)
         position = self.get_position(event.asset_id)
         pnl_pct = self.get_unrealized_pnl_pct(event.asset_id)
-        
+
         # Evaluate using compiled function
         signal = self.evaluate_entry(
             event.data.signals['ml_pred'],
@@ -226,7 +226,7 @@ class HybridStrategy(Strategy):
             event.data.signals['momentum'],
             position
         )
-        
+
         # Execute (Python)
         if signal == 1:
             self.buy_percent(event.asset_id, 0.95)
@@ -296,7 +296,7 @@ class MarketData:
     signals: dict[str, float] = field(default_factory=dict)  # NEW
 
 class MarketEvent(Event):
-    def __init__(self, timestamp, asset_id, data_type, 
+    def __init__(self, timestamp, asset_id, data_type,
                  open, high, low, close, volume,
                  signals=None, ...):
         super().__init__(timestamp, EventType.MARKET)
@@ -318,11 +318,11 @@ class ParquetDataFeed(DataFeed):
     ):
         self.signal_columns = signal_columns or []
         ...
-    
+
     def _create_market_event(self, row: dict) -> MarketEvent:
         # Extract signals from row
         signals = {col: float(row[col]) for col in self.signal_columns}
-        
+
         return MarketEvent(
             timestamp=row['timestamp'],
             asset_id=self.asset_id,
@@ -400,10 +400,10 @@ class SignalEvent(Event):
 class Clock:
     def add_data_feed(self, feed: DataFeed):
         ...
-    
+
     def add_signal_source(self, source: SignalSource):  # NEW
         ...
-    
+
     def get_next_event(self) -> Event:
         # Returns market OR signal events in chronological order
         ...
@@ -428,11 +428,11 @@ class MLStrategy(Strategy):
             self.on_market_event(event)
         elif isinstance(event, SignalEvent):
             self.on_signal_event(event)
-    
+
     def on_signal_event(self, event: SignalEvent):
         # Cache signal for later use
         self._latest_signals[event.asset_id][event.model_id] = event.signal_value
-    
+
     def on_market_event(self, event: MarketEvent):
         # Retrieve cached signal
         ml_pred = self._latest_signals.get(event.asset_id, {}).get('model_5d', 0)
@@ -501,7 +501,7 @@ feed = ParquetDataFeed(
 def on_market_data(self, event):
     ml_pred = event.signals['ml_pred']
     vix = event.signals['VIX']
-    
+
     if vix > 30:
         return  # Don't trade in high volatility
 ```
@@ -554,17 +554,17 @@ def on_market_data(self, event, context):
 # New file: core/context.py
 class Context:
     """Market-wide context data shared across assets."""
-    
+
     def __init__(self, sources: dict[str, pl.Series]):
         self._sources = sources
         self._cache: dict[str, float] = {}
         self._cache_timestamp: datetime | None = None
-    
+
     def at(self, timestamp: datetime) -> dict[str, float]:
         """Get context at timestamp (forward-fill, cached)."""
         if timestamp == self._cache_timestamp:
             return self._cache  # Cache hit!
-        
+
         # Cache miss - compute once per timestamp
         self._cache = {}
         for key, series in self._sources.items():
@@ -574,10 +574,10 @@ class Context:
                 self._cache[key] = series['value'][idx-1]
             else:
                 self._cache[key] = None
-        
+
         self._cache_timestamp = timestamp
         return self._cache
-    
+
     def get(self, key: str) -> float | None:
         """Get specific context value (uses current cache)."""
         return self._cache.get(key)
@@ -627,10 +627,10 @@ while True:
     event = self.clock.get_next_event()
     if event is None:
         break
-    
+
     # Dispatch to subscribers (Python method calls)
     self.clock.dispatch_event(event)
-    
+
     # Process corporate actions (Python dict ops)
     if event.event_type == EventType.MARKET:
         pending_actions = self.corporate_action_processor.get_pending_actions(...)
@@ -670,28 +670,28 @@ def evaluate_strategy_vectorized(
 ) -> np.ndarray:              # Returns [N_bars] actions (-1/0/1)
     """Numba-compiled strategy evaluation (10-100x faster)."""
     actions = np.zeros(len(signals), dtype=np.int8)
-    
+
     for i in range(len(signals)):
         ml_pred = signals[i, 0]
         confidence = signals[i, 1]
         position = positions[i]
-        
+
         # Entry logic
         if position == 0 and ml_pred > thresholds[0] and confidence > thresholds[1]:
             actions[i] = 1  # Buy
-        
+
         # Exit logic
         elif position > 0:
             if ml_pred < thresholds[2]:
                 actions[i] = -1  # Sell
-    
+
     return actions
 
 # Hybrid execution (Python event loop + compiled strategy)
 for event in clock:
     # Compiled path (fast)
     action = evaluate_strategy_vectorized(...)
-    
+
     # Python path (flexible)
     if action == 1:
         self.broker.submit_order(...)
@@ -795,11 +795,11 @@ class Broker(ABC):
     @abstractmethod
     def submit_order(self, order: Order) -> OrderId:
         """Submit an order for execution."""
-    
+
     @abstractmethod
     def get_position(self, asset_id: AssetId) -> Quantity:
         """Get current position."""
-    
+
     @abstractmethod
     def get_cash(self) -> float:
         """Get current cash balance."""
@@ -818,7 +818,7 @@ class DataFeed(ABC):
     @abstractmethod
     def get_next_event(self) -> Event | None:
         """Get next event (market data or signal)."""
-    
+
     @abstractmethod
     def is_exhausted(self) -> bool:
         """Check if feed is done."""
@@ -1126,30 +1126,30 @@ def test_signals_propagate_to_strategy():
         'close': [...],
         'ml_pred': [0.9, 0.85, 0.3],
     })
-    
+
     feed = ParquetDataFeed(df, signals=['ml_pred'])
-    
+
     received_signals = []
     class RecordingStrategy(Strategy):
         def on_market_data(self, event, context):
             received_signals.append(event.signals['ml_pred'])
-    
+
     engine = BacktestEngine(feed, RecordingStrategy())
     engine.run()
-    
+
     assert received_signals == [0.9, 0.85, 0.3]
 
 # Test helper methods
 def test_buy_percent_calculates_quantity():
     broker = SimulationBroker(initial_cash=100000)
     broker._last_prices['AAPL'] = 150.0
-    
+
     strategy = MyStrategy()
     strategy.broker = broker
     strategy.current_time = datetime.now()
-    
+
     strategy.buy_percent('AAPL', 0.95)
-    
+
     orders = broker.get_open_orders('AAPL')
     assert len(orders) == 1
     assert orders[0].quantity == pytest.approx(633.33, rel=0.01)
@@ -1160,15 +1160,15 @@ def test_context_synchronized_to_events():
         'timestamp': pd.date_range('2023-01-01', periods=100, freq='H'),
         'value': range(100),
     })
-    
+
     aapl_df = pl.DataFrame({
         'timestamp': pd.date_range('2023-01-01', periods=10, freq='D'),
         'close': [100] * 10,
     })
-    
+
     context = Context({'VIX': vix_series})
     feed = ParquetDataFeed(aapl_df)
-    
+
     # Day 0: VIX should be 0
     # Day 1: VIX should be 24 (24 hours later)
     ...
@@ -1181,20 +1181,20 @@ def test_context_synchronized_to_events():
 def test_ml_strategy_end_to_end():
     # Create data with ML signals
     df = create_test_data_with_signals()
-    
+
     # Define strategy
     class SimpleMLStrategy(Strategy):
         def on_market_data(self, event, context):
             if event.signals['ml_pred'] > 0.8:
                 self.buy_percent(event.asset_id, 0.95)
-    
+
     # Run backtest
     engine = BacktestEngine(
         feed=ParquetDataFeed(df, signals=['ml_pred']),
         strategy=SimpleMLStrategy(),
     )
     results = engine.run()
-    
+
     # Verify trades
     assert len(results['trades']) > 0
     assert results['metrics']['sharpe_ratio'] > 0
@@ -1266,11 +1266,11 @@ class SimpleMLStrategy(Strategy):
         pred = event.signals.get('ml_pred', 0)
         conf = event.signals.get('confidence', 0)
         position = self.get_position(event.asset_id)
-        
+
         # Entry
         if pred > 0.8 and conf > 0.7 and position == 0:
             self.buy_percent(event.asset_id, 0.95)
-        
+
         # Exit
         elif position > 0:
             pnl = self.get_unrealized_pnl_pct(event.asset_id)
@@ -1278,7 +1278,7 @@ class SimpleMLStrategy(Strategy):
                 self.close_position(event.asset_id)
 
 # Run backtest
-feed = ParquetDataFeed('aapl_with_signals.parquet', 
+feed = ParquetDataFeed('aapl_with_signals.parquet',
                        asset_id='AAPL',
                        signal_columns=['ml_pred', 'confidence'])
 broker = SimulationBroker(initial_cash=100000)
@@ -1300,13 +1300,13 @@ class VIXFilteredStrategy(Strategy):
         pred = event.signals['ml_pred']
         vix = event.signals['VIX']
         position = self.get_position(event.asset_id)
-        
+
         # VIX filter
         if vix > 30:
             if position > 0:
                 self.close_position(event.asset_id)
             return  # Don't enter in high volatility
-        
+
         # Normal ML logic
         if pred > 0.8 and position == 0:
             self.buy_percent(event.asset_id, 0.95)
@@ -1329,7 +1329,7 @@ from ml4t.backtest.core import Context
 assets = {}
 for symbol in ['AAPL', 'MSFT', 'GOOGL', 'AMZN']:
     df = pl.read_parquet(f'{symbol}_with_signals.parquet')
-    assets[symbol] = ParquetDataFeed(df, asset_id=symbol, 
+    assets[symbol] = ParquetDataFeed(df, asset_id=symbol,
                                       signals=['ml_pred'])
 
 # Load context (NOT duplicated)
@@ -1347,17 +1347,17 @@ class MultiAssetMLStrategy(Strategy):
         # Asset-specific
         pred = event.signals['ml_pred']
         position = self.get_position(event.asset_id)
-        
+
         # Market context (shared)
         vix = context.get('VIX')
         spy_trend = context.get('SPY_trend')
-        
+
         # Regime-dependent logic
         if vix > 30:
             if position > 0:
                 self.reduce_position(event.asset_id, 0.5)
             return
-        
+
         # ML logic
         if pred > 0.8 and position == 0:
             size = 0.02 if vix < 20 else 0.01

@@ -30,14 +30,14 @@
   ```python
   def calculate_returns(prices: np.ndarray, method: str = "simple") -> np.ndarray:
       """Calculate returns from price series.
-      
+
       Args:
           prices: Array of prices
           method: Calculation method ('simple' or 'log')
-      
+
       Returns:
           Array of returns
-      
+
       Raises:
           ValueError: If prices array is empty
       """

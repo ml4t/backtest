@@ -34,6 +34,8 @@ from .position import (
     TighteningTrailingStop,
     TimeExit,
     TrailingStop,
+    VolatilityStop,
+    VolatilityTrailingStop,
 )
 from .types import ActionType, PositionAction, PositionState
 
@@ -52,6 +54,8 @@ __all__ = [
     "TrailingStop",
     "TighteningTrailingStop",
     "ScaledExit",
+    "VolatilityStop",
+    "VolatilityTrailingStop",
     # Signal rules
     "SignalExit",
     # Composition

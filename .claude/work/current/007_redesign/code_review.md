@@ -138,15 +138,15 @@ This plan prioritizes fixing the critical architectural flaws first, then aligni
       def run(self, ...):
           # ... (initialization) ...
           # Priming is handled by clock.add_data_feed()
-          
+
           while True:
               # 1. Get the next event from the *single* priority queue
               event_tuple = self.clock.get_next_event()
               if event_tuple is None:
                   break # All feeds are exhausted
-              
+
               # 2. Extract event (Clock's get_next_event should return the event)
-              event = event_tuple 
+              event = event_tuple
 
               # 3. Log progress (optional)
               self.events_processed += 1
@@ -157,7 +157,7 @@ This plan prioritizes fixing the critical architectural flaws first, then aligni
               handlers = self.clock._subscribers.get(event.event_type, [])
               for handler in handlers:
                   handler(event) # e.g., strategy.on_event(event), broker.on_event(event)
-          
+
           # ... (finalization) ...
       ```
     * **Note:** The `Clock`'s `get_next_event` method (which you've already written) correctly uses `heapq.heappop` and

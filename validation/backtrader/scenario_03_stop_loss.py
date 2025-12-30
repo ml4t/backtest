@@ -49,28 +49,30 @@ def generate_stop_loss_data(seed: int = 42) -> pd.DataFrame:
 
     # Price path: 100 -> gradual decline to trigger 5% stop
     n_bars = 20
-    closes = np.array([
-        100.0,  # Bar 0: Entry
-        99.0,   # Bar 1: -1%
-        98.0,   # Bar 2: -2%
-        97.0,   # Bar 3: -3%
-        96.0,   # Bar 4: -4%
-        94.5,   # Bar 5: -5.5% -> STOP TRIGGERED
-        93.0,   # Bar 6: -7%
-        92.0,   # Bar 7: -8%
-        91.0,   # Bar 8: -9%
-        90.0,   # Bar 9: -10%
-        89.0,   # Bar 10
-        88.0,   # Bar 11
-        87.0,   # Bar 12
-        86.0,   # Bar 13
-        85.0,   # Bar 14
-        84.0,   # Bar 15
-        83.0,   # Bar 16
-        82.0,   # Bar 17
-        81.0,   # Bar 18
-        80.0,   # Bar 19
-    ])
+    closes = np.array(
+        [
+            100.0,  # Bar 0: Entry
+            99.0,  # Bar 1: -1%
+            98.0,  # Bar 2: -2%
+            97.0,  # Bar 3: -3%
+            96.0,  # Bar 4: -4%
+            94.5,  # Bar 5: -5.5% -> STOP TRIGGERED
+            93.0,  # Bar 6: -7%
+            92.0,  # Bar 7: -8%
+            91.0,  # Bar 8: -9%
+            90.0,  # Bar 9: -10%
+            89.0,  # Bar 10
+            88.0,  # Bar 11
+            87.0,  # Bar 12
+            86.0,  # Bar 13
+            85.0,  # Bar 14
+            84.0,  # Bar 15
+            83.0,  # Bar 16
+            82.0,  # Bar 17
+            81.0,  # Bar 18
+            80.0,  # Bar 19
+        ]
+    )
 
     dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
 
@@ -79,13 +81,16 @@ def generate_stop_loss_data(seed: int = 42) -> pd.DataFrame:
     highs = opens + 0.5
     lows = closes - 0.5
 
-    df = pd.DataFrame({
-        "open": opens,
-        "high": highs,
-        "low": lows,
-        "close": closes,
-        "volume": np.full(n_bars, 100000),
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "volume": np.full(n_bars, 100000),
+        },
+        index=dates,
+    )
 
     return df
 
@@ -115,9 +120,7 @@ def run_backtrader(prices_df: pd.DataFrame, sl_pct: float) -> dict:
         )
 
     class StopLossStrategy(bt.Strategy):
-        params = (
-            ("sl_pct", 0.05),
-        )
+        params = (("sl_pct", 0.05),)
 
         def __init__(self):
             self.trade_log = []
@@ -140,13 +143,15 @@ def run_backtrader(prices_df: pd.DataFrame, sl_pct: float) -> dict:
 
         def notify_trade(self, trade):
             if trade.isclosed:
-                self.trade_log.append({
-                    "entry_time": bt.num2date(trade.dtopen),
-                    "exit_time": bt.num2date(trade.dtclose),
-                    "entry_price": trade.price,
-                    "pnl": trade.pnl,
-                    "pnlcomm": trade.pnlcomm,
-                })
+                self.trade_log.append(
+                    {
+                        "entry_time": bt.num2date(trade.dtopen),
+                        "exit_time": bt.num2date(trade.dtclose),
+                        "entry_price": trade.price,
+                        "pnl": trade.pnl,
+                        "pnlcomm": trade.pnlcomm,
+                    }
+                )
 
         def notify_order(self, order):
             if order.status == order.Completed:
@@ -199,19 +204,31 @@ def run_backtrader(prices_df: pd.DataFrame, sl_pct: float) -> dict:
 def run_ml4t_backtest(prices_df: pd.DataFrame, sl_pct: float) -> dict:
     """Run backtest using ml4t.backtest with stop-loss (next-bar mode)."""
     import polars as pl
-    from ml4t.backtest import Engine, Strategy, DataFeed, ExecutionMode, StopFillMode, StopLevelBasis, NoCommission, NoSlippage
+
+    from ml4t.backtest import (
+        DataFeed,
+        Engine,
+        ExecutionMode,
+        NoCommission,
+        NoSlippage,
+        StopFillMode,
+        StopLevelBasis,
+        Strategy,
+    )
     from ml4t.backtest.risk import StopLoss
 
     # Convert to polars format
-    prices_pl = pl.DataFrame({
-        "timestamp": prices_df.index.to_pydatetime().tolist(),
-        "asset": ["AAPL"] * len(prices_df),
-        "open": prices_df["open"].tolist(),
-        "high": prices_df["high"].tolist(),
-        "low": prices_df["low"].tolist(),
-        "close": prices_df["close"].tolist(),
-        "volume": prices_df["volume"].astype(float).tolist(),
-    })
+    prices_pl = pl.DataFrame(
+        {
+            "timestamp": prices_df.index.to_pydatetime().tolist(),
+            "asset": ["AAPL"] * len(prices_df),
+            "open": prices_df["open"].tolist(),
+            "high": prices_df["high"].tolist(),
+            "low": prices_df["low"].tolist(),
+            "close": prices_df["close"].tolist(),
+            "volume": prices_df["volume"].astype(float).tolist(),
+        }
+    )
 
     class StopLossStrategy(Strategy):
         def __init__(self, sl_pct: float):
@@ -299,7 +316,9 @@ def compare_results(bt_results: dict, ml4t_results: dict, sl_pct: float) -> bool
     value_diff = abs(bt_value - ml4t_value)
     value_pct_diff = value_diff / bt_value * 100 if bt_value != 0 else 0
     values_match = value_pct_diff < 0.01  # Near-exact match
-    print(f"Final Value: BT=${bt_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff={value_pct_diff:.4f}%) {'PASS' if values_match else 'FAIL'}")
+    print(
+        f"Final Value: BT=${bt_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff={value_pct_diff:.4f}%) {'PASS' if values_match else 'FAIL'}"
+    )
     all_match &= values_match
 
     # Total P&L - expect exact match
@@ -308,7 +327,9 @@ def compare_results(bt_results: dict, ml4t_results: dict, sl_pct: float) -> bool
     pnl_diff = abs(bt_pnl - ml4t_pnl)
     pnl_pct_diff = pnl_diff / abs(bt_pnl) * 100 if bt_pnl != 0 else 0
     pnl_match = pnl_pct_diff < 1.0  # Near-exact match
-    print(f"Total P&L: BT=${bt_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff={pnl_pct_diff:.1f}%) {'PASS' if pnl_match else 'FAIL'}")
+    print(
+        f"Total P&L: BT=${bt_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff={pnl_pct_diff:.1f}%) {'PASS' if pnl_match else 'FAIL'}"
+    )
     all_match &= pnl_match
 
     # Exit price comparison - expect exact match
@@ -317,7 +338,9 @@ def compare_results(bt_results: dict, ml4t_results: dict, sl_pct: float) -> bool
     if bt_exit and ml4t_exit:
         exit_diff = abs(bt_exit - ml4t_exit)
         exit_match = exit_diff < 0.01
-        print(f"Exit Price: BT=${bt_exit:.2f}, ML4T=${ml4t_exit:.2f} (diff=${exit_diff:.2f}) {'PASS' if exit_match else 'FAIL'}")
+        print(
+            f"Exit Price: BT=${bt_exit:.2f}, ML4T=${ml4t_exit:.2f} (diff=${exit_diff:.2f}) {'PASS' if exit_match else 'FAIL'}"
+        )
         all_match &= exit_match
 
     print("\n" + "=" * 70)
@@ -377,6 +400,7 @@ def main():
     except Exception as e:
         print(f"   ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

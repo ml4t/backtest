@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from src.ml4t.backtest.accounting.models import Position
+from ml4t.backtest import Position
 from src.ml4t.backtest.accounting.policy import CashAccountPolicy
 
 
@@ -34,7 +34,7 @@ class TestCashAccountPolicyBuyingPower:
             "AAPL": Position(
                 asset="AAPL",
                 quantity=100.0,
-                avg_entry_price=150.0,
+                entry_price=150.0,
                 current_price=160.0,
                 entry_time=datetime.now(),
             )

@@ -51,40 +51,45 @@ def generate_take_profit_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]
 
     # Price path: 100 -> gradual rise to trigger 10% take-profit
     n_bars = 20
-    prices = np.array([
-        100.0,   # Bar 0: Entry
-        101.0,   # Bar 1: +1%
-        103.0,   # Bar 2: +3%
-        105.0,   # Bar 3: +5%
-        107.0,   # Bar 4: +7%
-        109.0,   # Bar 5: +9%
-        111.0,   # Bar 6: +11% -> TAKE-PROFIT TRIGGERED
-        113.0,   # Bar 7: +13%
-        115.0,   # Bar 8: +15%
-        117.0,   # Bar 9: +17%
-        119.0,   # Bar 10
-        121.0,   # Bar 11
-        123.0,   # Bar 12
-        125.0,   # Bar 13
-        127.0,   # Bar 14
-        129.0,   # Bar 15
-        131.0,   # Bar 16
-        133.0,   # Bar 17
-        135.0,   # Bar 18
-        137.0,   # Bar 19
-    ])
+    prices = np.array(
+        [
+            100.0,  # Bar 0: Entry
+            101.0,  # Bar 1: +1%
+            103.0,  # Bar 2: +3%
+            105.0,  # Bar 3: +5%
+            107.0,  # Bar 4: +7%
+            109.0,  # Bar 5: +9%
+            111.0,  # Bar 6: +11% -> TAKE-PROFIT TRIGGERED
+            113.0,  # Bar 7: +13%
+            115.0,  # Bar 8: +15%
+            117.0,  # Bar 9: +17%
+            119.0,  # Bar 10
+            121.0,  # Bar 11
+            123.0,  # Bar 12
+            125.0,  # Bar 13
+            127.0,  # Bar 14
+            129.0,  # Bar 15
+            131.0,  # Bar 16
+            133.0,  # Bar 17
+            135.0,  # Bar 18
+            137.0,  # Bar 19
+        ]
+    )
 
     dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
 
     # Generate deterministic OHLCV with close = prices
     # Use fixed OHLC ratios for reproducibility across frameworks
-    df = pd.DataFrame({
-        "open": prices,  # Open = Close for simplicity
-        "high": prices * 1.005,  # High = 0.5% above close
-        "low": prices * 0.995,  # Low = 0.5% below close
-        "close": prices,
-        "volume": np.full(n_bars, 100000),
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices,  # Open = Close for simplicity
+            "high": prices * 1.005,  # High = 0.5% above close
+            "low": prices * 0.995,  # Low = 0.5% below close
+            "close": prices,
+            "volume": np.full(n_bars, 100000),
+        },
+        index=dates,
+    )
 
     # Entry on bar 0 only
     entries = np.zeros(n_bars, dtype=bool)
@@ -131,14 +136,16 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float
     trade_list = []
     if len(trades) > 0:
         for _, row in trades.iterrows():
-            trade_list.append({
-                "entry_time": row.get("Entry Timestamp", row.get("entry_idx")),
-                "exit_time": row.get("Exit Timestamp", row.get("exit_idx")),
-                "entry_price": row["Avg Entry Price"],
-                "exit_price": row["Avg Exit Price"],
-                "pnl": row["PnL"],
-                "return_pct": row["Return"],
-            })
+            trade_list.append(
+                {
+                    "entry_time": row.get("Entry Timestamp", row.get("entry_idx")),
+                    "exit_time": row.get("Exit Timestamp", row.get("exit_idx")),
+                    "entry_price": row["Avg Entry Price"],
+                    "exit_price": row["Avg Exit Price"],
+                    "pnl": row["PnL"],
+                    "return_pct": row["Return"],
+                }
+            )
 
     return {
         "framework": "VectorBT Pro",
@@ -157,26 +164,40 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float
 def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, tp_pct: float) -> dict:
     """Run backtest using ml4t.backtest with take-profit."""
     import polars as pl
-    from ml4t.backtest import Engine, Strategy, DataFeed, ExecutionMode, StopFillMode, StopLevelBasis, NoCommission, NoSlippage
+
+    from ml4t.backtest import (
+        DataFeed,
+        Engine,
+        ExecutionMode,
+        NoCommission,
+        NoSlippage,
+        StopFillMode,
+        StopLevelBasis,
+        Strategy,
+    )
     from ml4t.backtest.risk import TakeProfit
 
     # Convert to polars format
-    prices_pl = pl.DataFrame({
-        "timestamp": prices_df.index.to_pydatetime().tolist(),
-        "asset": ["AAPL"] * len(prices_df),
-        "open": prices_df["open"].tolist(),
-        "high": prices_df["high"].tolist(),
-        "low": prices_df["low"].tolist(),
-        "close": prices_df["close"].tolist(),
-        "volume": prices_df["volume"].astype(float).tolist(),
-    })
+    prices_pl = pl.DataFrame(
+        {
+            "timestamp": prices_df.index.to_pydatetime().tolist(),
+            "asset": ["AAPL"] * len(prices_df),
+            "open": prices_df["open"].tolist(),
+            "high": prices_df["high"].tolist(),
+            "low": prices_df["low"].tolist(),
+            "close": prices_df["close"].tolist(),
+            "volume": prices_df["volume"].astype(float).tolist(),
+        }
+    )
 
     # Create signals DataFrame
-    signals_pl = pl.DataFrame({
-        "timestamp": prices_df.index.to_pydatetime().tolist(),
-        "asset": ["AAPL"] * len(prices_df),
-        "entry": entries.tolist(),
-    })
+    signals_pl = pl.DataFrame(
+        {
+            "timestamp": prices_df.index.to_pydatetime().tolist(),
+            "asset": ["AAPL"] * len(prices_df),
+            "entry": entries.tolist(),
+        }
+    )
 
     class TakeProfitStrategy(Strategy):
         def __init__(self, tp_pct: float):
@@ -251,7 +272,9 @@ def compare_results(vbt_results: dict, ml4t_results: dict, tp_pct: float) -> boo
     vbt_trades = vbt_results["num_trades"]
     ml4t_trades = ml4t_results["num_trades"]
     trades_match = vbt_trades == ml4t_trades
-    print(f"\nTrade Count: VBT={vbt_trades}, ML4T={ml4t_trades} {'PASS' if trades_match else 'FAIL'}")
+    print(
+        f"\nTrade Count: VBT={vbt_trades}, ML4T={ml4t_trades} {'PASS' if trades_match else 'FAIL'}"
+    )
     all_match &= trades_match
 
     # Final value - expect exact match with BAR_EXTREME fill mode
@@ -260,7 +283,9 @@ def compare_results(vbt_results: dict, ml4t_results: dict, tp_pct: float) -> boo
     value_diff = abs(vbt_value - ml4t_value)
     value_pct_diff = value_diff / vbt_value * 100 if vbt_value != 0 else 0
     values_match = value_pct_diff < 0.01  # Within 0.01% (near-exact)
-    print(f"Final Value: VBT=${vbt_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff={value_pct_diff:.4f}%) {'PASS' if values_match else 'FAIL'}")
+    print(
+        f"Final Value: VBT=${vbt_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff={value_pct_diff:.4f}%) {'PASS' if values_match else 'FAIL'}"
+    )
     all_match &= values_match
 
     # Total P&L - expect exact match with BAR_EXTREME fill mode
@@ -269,12 +294,14 @@ def compare_results(vbt_results: dict, ml4t_results: dict, tp_pct: float) -> boo
     pnl_diff = abs(vbt_pnl - ml4t_pnl)
     pnl_pct_diff = pnl_diff / abs(vbt_pnl) * 100 if vbt_pnl != 0 else 0
     pnl_match = pnl_pct_diff < 1.0  # Within 1% (near-exact)
-    print(f"Total P&L: VBT=${vbt_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff={pnl_pct_diff:.1f}%) {'PASS' if pnl_match else 'FAIL'}")
+    print(
+        f"Total P&L: VBT=${vbt_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff={pnl_pct_diff:.1f}%) {'PASS' if pnl_match else 'FAIL'}"
+    )
     all_match &= pnl_match
 
     # Trade-by-trade comparison
     if trades_match and len(vbt_results["trades"]) > 0:
-        print(f"\nTrade-by-Trade Comparison:")
+        print("\nTrade-by-Trade Comparison:")
         print("-" * 70)
         vbt_trades_list = vbt_results["trades"]
         ml4t_trades_list = ml4t_results["trades"]
@@ -286,9 +313,15 @@ def compare_results(vbt_results: dict, ml4t_results: dict, tp_pct: float) -> boo
             exit_match = abs(vbt_t["exit_price"] - ml4t_t["exit_price"]) < 0.01
 
             print(f"  Trade {i+1}:")
-            print(f"    VBT:  entry=${vbt_t['entry_price']:.2f}, exit=${vbt_t['exit_price']:.2f}, return={vbt_ret:.2%}")
-            print(f"    ML4T: entry=${ml4t_t['entry_price']:.2f}, exit=${ml4t_t['exit_price']:.2f}, return={ml4t_ret:.2%}")
-            print(f"    Match: entry={'PASS' if entry_match else 'FAIL'}, exit={'PASS' if exit_match else 'FAIL'}")
+            print(
+                f"    VBT:  entry=${vbt_t['entry_price']:.2f}, exit=${vbt_t['exit_price']:.2f}, return={vbt_ret:.2%}"
+            )
+            print(
+                f"    ML4T: entry=${ml4t_t['entry_price']:.2f}, exit=${ml4t_t['exit_price']:.2f}, return={ml4t_ret:.2%}"
+            )
+            print(
+                f"    Match: entry={'PASS' if entry_match else 'FAIL'}, exit={'PASS' if exit_match else 'FAIL'}"
+            )
 
             all_match &= entry_match
             all_match &= exit_match
@@ -352,6 +385,7 @@ def main():
     except Exception as e:
         print(f"   ❌ {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

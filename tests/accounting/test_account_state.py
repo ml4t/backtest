@@ -194,17 +194,17 @@ class TestAccountStateApplyFillShortPositions:
 
         # Market value should be negative (it's a liability)
         assert pos.market_value == -15_000.0  # quantity × current_price
-        assert pos.unrealized_pnl == 0.0  # No price change yet
+        assert pos.unrealized_pnl() == 0.0  # No price change yet
 
         # Simulate price increase to $160 (bad for shorts)
         pos.current_price = 160.0
         assert pos.market_value == -16_000.0  # More liability
-        assert pos.unrealized_pnl == -1_000.0  # Loss (160-150)×(-100)
+        assert pos.unrealized_pnl() == -1_000.0  # Loss (160-150)×(-100)
 
         # Simulate price decrease to $140 (good for shorts)
         pos.current_price = 140.0
         assert pos.market_value == -14_000.0  # Less liability
-        assert pos.unrealized_pnl == 1_000.0  # Profit (140-150)×(-100)
+        assert pos.unrealized_pnl() == 1_000.0  # Profit (140-150)×(-100)
 
 
 class TestAccountStateApplyFillPositionReversals:

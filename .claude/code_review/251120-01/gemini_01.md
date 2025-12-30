@@ -3,11 +3,11 @@ DESIGN\_QUESTIONS.md) and the code context.
 
 ### **Executive Summary**
 
-Verdict: Build (Refactor).  
+Verdict: Build (Refactor).
 Do not abandon your engine. A 32x speed advantage over Backtrader is a massive competitive advantage for optimization
 and walk-forward analysis. Adopting Backtrader returns you to a performance bottleneck, and VectorBT, while fast, lacks
 the granular event-driven flexibility needed for institutional complexity (e.g., complex order types, conditional
-rebalancing).  
+rebalancing).
 However, your current "unlimited debt" model is fatal. You must decouple the **Execution Engine** from the **Accounting
 Logic**. The accounting must be a strict gatekeeper.
 
@@ -26,7 +26,7 @@ Liquidating Value (NLV)**, but it fails to model **Buying Power**, which is what
 
 Shutterstock
 
-Recommended Model:  
+Recommended Model:
 You need to track three distinct states:
 
 1. Total Equity (NLV):
@@ -45,8 +45,8 @@ You need to track three distinct states:
 
 ### **1.2 Handling Shorts & Proceeds**
 
-Question: Is short sale cash available for longs?  
-Answer: Yes, but it doesn't increase Equity.  
+Question: Is short sale cash available for longs?
+Answer: Yes, but it doesn't increase Equity.
 When you short $10k of stock:
 
 1. **Cash** increases by $10k.
@@ -54,8 +54,8 @@ When you short $10k of stock:
 3. **Equity** remains unchanged (ignoring fees).
 4. **Buying Power** decreases because the short position consumes margin.
 
-Fix for your Engine:  
-Do not simply check if total\_cost \> cash. You must check:  
+Fix for your Engine:
+Do not simply check if total\_cost \> cash. You must check:
 if new\_trade\_margin\_impact \> current\_available\_margin.
 
 ---
@@ -77,13 +77,13 @@ To resolve the "Exit before Entry" dilemma, the standard institutional backtesti
 
 ### **2.2 Position Reversals (The "Flip")**
 
-Question: How to handle Long 100 $\\to$ Short 100?  
+Question: How to handle Long 100 $\\to$ Short 100?
 Recommendation: Treat this as an atomic transaction sequence within the same timestamp:
 
 1. Generate logical order: Sell 200\.
 2. **Engine internals:**
     * Split into: Sell 100 (Close) \+ Sell 100 (Open Short).
-    * Execute Close $\\to$ Update Margin $\\to$ Execute Open Short.  
+    * Execute Close $\\to$ Update Margin $\\to$ Execute Open Short.
       If you try to execute "Sell 200" as a single block against a "Long 100" position without splitting, simple
       accounting engines often crash or miscalculate margin.
 
@@ -103,12 +103,12 @@ Recommendation: Treat this as an atomic transaction sequence within the same tim
 
 ### **3.2 Partial Fills vs. Rejection**
 
-Question: Scale down or reject?  
-Recommendation: Partial Fill (Scale Down).  
+Question: Scale down or reject?
+Recommendation: Partial Fill (Scale Down).
 If a strategy signals a buy of 10,000 shares but available volume is 5,000 (or cash supports only 5,000):
 
 1. Fill 5,000.
-2. Cancel the remainder (or leave pending, depending on order type TIF).  
+2. Cancel the remainder (or leave pending, depending on order type TIF).
    Rejecting the whole order creates discontinuous cliff-edges in optimization landscapes.
 
 ---
@@ -123,29 +123,29 @@ Your Broker class currently acts as a passive recorder. It must become an active
 
 Python
 
-def \_execute\_fill(self, order, fill\_price):  
-\# 1\. Calculate Costs  
-commission \= self.commission\_model.calculate(order, fill\_price)  
+def \_execute\_fill(self, order, fill\_price):
+\# 1\. Calculate Costs
+commission \= self.commission\_model.calculate(order, fill\_price)
 gross\_value \= order.quantity \* fill\_price
 
-    \# 2\. Determine Margin Impact (Simplified)  
-    \# Assume 1.0 for cash, 0.5 for RegT, etc.  
-    margin\_required \= abs(gross\_value) \* self.leverage\_ratio   
-      
-    \# 3\. CHECK CONSTRAINTS (The missing piece)  
-    \# If closing a position, margin releases, so always allow.  
-    \# If opening/increasing, check capability.  
-    is\_reducing\_exposure \= self.\_is\_reducing\_position(order)  
-      
-    if not is\_reducing\_exposure:  
-        if margin\_required \> self.get\_available\_buying\_power():  
-            \# Option A: Reject  
-            return RejectedFill("Insufficient Buying Power")  
-            \# Option B: Scale (Better)  
-            \# order.quantity \= ...  
-              
-    \# 4\. Update State  
-    self.cash \-= (gross\_value \+ commission) \# Note: gross\_value is negative for Sells  
+    \# 2\. Determine Margin Impact (Simplified)
+    \# Assume 1.0 for cash, 0.5 for RegT, etc.
+    margin\_required \= abs(gross\_value) \* self.leverage\_ratio
+
+    \# 3\. CHECK CONSTRAINTS (The missing piece)
+    \# If closing a position, margin releases, so always allow.
+    \# If opening/increasing, check capability.
+    is\_reducing\_exposure \= self.\_is\_reducing\_position(order)
+
+    if not is\_reducing\_exposure:
+        if margin\_required \> self.get\_available\_buying\_power():
+            \# Option A: Reject
+            return RejectedFill("Insufficient Buying Power")
+            \# Option B: Scale (Better)
+            \# order.quantity \= ...
+
+    \# 4\. Update State
+    self.cash \-= (gross\_value \+ commission) \# Note: gross\_value is negative for Sells
     self.\_update\_position(order)
 
 ### **4.2 Implementation Roadmap (Build Plan)**
@@ -207,8 +207,8 @@ I have generated three files/blocks for you:
 
 We need a robust Position class that tracks cost basis separately from current market value.
 
-src/ml4t/backtest/models.py  
-Nov 20, 9:36 AM  
+src/ml4t/backtest/models.py
+Nov 20, 9:36 AM
 Open
 
 ### **2\. The Ledger (accounting.py)**
@@ -221,42 +221,42 @@ This is the heart of the fix. AccountState calculates **Equity**, not just Cash.
 * **Equity (NLV):** The true liquidation value. Cash \+ Market Value of Positions.
 * **Buying Power:** The derived value that limits new trades.
 
-src/ml4t/backtest/accounting.pyNov 20, 9:36 AM  
+src/ml4t/backtest/accounting.pyNov 20, 9:36 AM
 Open
 
 ### **3\. The Enforcer (gatekeeper.py)**
 
 This replaces the logic inside your Broker.submit\_order. It decides if a trade is legal.
 
-src/ml4t/backtest/gatekeeper.py  
-Nov 20, 9:36 AM  
+src/ml4t/backtest/gatekeeper.py
+Nov 20, 9:36 AM
 Open
 
 ### **How to integrate this into your Engine**
 
-1. **Initialize:**  
-   Python  
-   margin\_model \= MarginModel(initial\_margin=0.5) \# 2x leverage  
-   account \= AccountState(initial\_cash=100\_000, margin\_model=margin\_model)  
+1. **Initialize:**
+   Python
+   margin\_model \= MarginModel(initial\_margin=0.5) \# 2x leverage
+   account \= AccountState(initial\_cash=100\_000, margin\_model=margin\_model)
    gatekeeper \= Gatekeeper(account)
 
-2. **In your Loop (Processing Orders):**  
-   Python  
-   \# 1\. Update prices first\!  
+2. **In your Loop (Processing Orders):**
+   Python
+   \# 1\. Update prices first\!
    account.mark\_to\_market(current\_bar\_prices)
 
-   \# 2\. Process Exits (Release margin)  
-   for order in exit\_orders:  
+   \# 2\. Process Exits (Release margin)
+   for order in exit\_orders:
    account.apply\_fill(...)
 
-   \# 3\. Process Entries (Check Gatekeeper)  
-   for order in entry\_orders:  
-   is\_valid, reason \= gatekeeper.validate\_order(order)  
-   if is\_valid:  
-   \# Execute  
-   account.apply\_fill(asset, qty, price, comm)  
-   else:  
-   \# Log rejection  
+   \# 3\. Process Entries (Check Gatekeeper)
+   for order in entry\_orders:
+   is\_valid, reason \= gatekeeper.validate\_order(order)
+   if is\_valid:
+   \# Execute
+   account.apply\_fill(asset, qty, price, comm)
+   else:
+   \# Log rejection
    print(f"Order Rejected: {reason}")
 
 This structure specifically solves your "Unlimited Debt" problem by calculating buying\_power based on total\_equity

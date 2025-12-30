@@ -93,11 +93,11 @@ Here is the prioritized fix list to get you from **Broken** to **Superior**.
   # Pseudo-code for fixed Engine
   for timestamp, event_batch in data_feed.stream_by_timestamp():
       # 1. Update Portfolio (Mark to Market)
-      broker.process_fills(timestamp, event_batch) 
-      
+      broker.process_fills(timestamp, event_batch)
+
       # 2. Strategy Logic (Batch)
       strategy.on_data_batch(timestamp, event_batch)
-      
+
       # 3. Risk/Housekeeping
       portfolio.record_history()
   ```
@@ -168,9 +168,9 @@ you *want* and what you *have*.
 def order_target_percent(self, asset_id: str, target_pct: float):
     """
     Place an order to adjust a position to a target percent of portfolio equity.
-    
-    Fixes Critical Issue #1: 
-    Instead of blindly adding to a position, this calculates the delta 
+
+    Fixes Critical Issue #1:
+    Instead of blindly adding to a position, this calculates the delta
     required to reach the target.
     """
     # 1. Get current portfolio state
@@ -213,7 +213,7 @@ def order_target_percent(self, asset_id: str, target_pct: float):
 
 def get_current_price(self, asset_id: str) -> float:
     """Helper to look up price from the current batch context."""
-    # This assumes the strategy maintains a cache of the current 
+    # This assumes the strategy maintains a cache of the current
     # timestamp's data, updated by the Engine before calling on_bar
     if asset_id in self._current_market_data:
         return self._current_market_data[asset_id].close
@@ -237,7 +237,7 @@ class BacktestEngine:
     def run(self):
         """
         Execute the backtest using Batch Time-Slice Processing.
-        
+
         Fixes Critical Issues #2 & #3:
         1. Groups events by timestamp (Batching).
         2. Processes Fills FIRST (simulating Market Open/Close mechanics).
@@ -344,4 +344,3 @@ def process_batch_fills(self, timestamp, market_data_map):
    then asks the strategy for *today's* decisions.
 3. **Performance:** This loop runs 252 times (days) instead of 126,000 times (events). While the inner loops still
    iterate over assets, the overhead of function calls and context switching is reduced by orders of magnitude.
-

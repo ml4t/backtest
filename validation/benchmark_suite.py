@@ -37,7 +37,6 @@ import tracemalloc
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -205,10 +204,11 @@ def generate_benchmark_data(config: BenchmarkConfig, seed: int = 42) -> tuple:
         # This ensures data matches Zipline's calendar and respects US holidays
         try:
             import exchange_calendars as xcals
+
             nyse = xcals.get_calendar("XNYS")
             # Get NYSE sessions starting from 2013-01-02
             all_sessions = nyse.sessions_in_range("2013-01-02", "2025-12-31")
-            dates = all_sessions[:config.n_bars]
+            dates = all_sessions[: config.n_bars]
         except ImportError:
             # Fallback to business days if exchange_calendars not available
             dates = pd.date_range(start="2013-01-02", periods=config.n_bars, freq="B")
@@ -363,7 +363,9 @@ def benchmark_ml4t(
 
     # Select execution mode
     exec_mode = ExecutionMode.NEXT_BAR if execution_mode == "next_bar" else ExecutionMode.SAME_BAR
-    framework_name = "ml4t.backtest" if execution_mode == "same_bar" else "ml4t.backtest (backtrader-mode)"
+    framework_name = (
+        "ml4t.backtest" if execution_mode == "same_bar" else "ml4t.backtest (backtrader-mode)"
+    )
 
     # Convert price data to Polars format
     price_rows = []
@@ -394,7 +396,9 @@ def benchmark_ml4t(
     class TopBottomStrategy(Strategy):
         """Long top N, short bottom N based on score signals."""
 
-        def __init__(self, top_n: int, bottom_n: int, stop_loss: float | None, take_profit: float | None):
+        def __init__(
+            self, top_n: int, bottom_n: int, stop_loss: float | None, take_profit: float | None
+        ):
             self.top_n = top_n
             self.bottom_n = bottom_n
             self.stop_loss = stop_loss
@@ -403,7 +407,7 @@ def benchmark_ml4t(
 
         def on_start(self, broker):
             """Set up position rules for stop-loss and take-profit."""
-            from ml4t.backtest.risk import StopLoss, TakeProfit, RuleChain
+            from ml4t.backtest.risk import RuleChain, StopLoss, TakeProfit
 
             rules = []
             if self.stop_loss is not None:
@@ -426,7 +430,9 @@ def benchmark_ml4t(
             # Rank assets by score
             sorted_assets = sorted(self.current_signals.items(), key=lambda x: x[1], reverse=True)
             top_assets = set(a for a, _ in sorted_assets[: self.top_n])
-            bottom_assets = set(a for a, _ in sorted_assets[-self.bottom_n :]) if self.bottom_n > 0 else set()
+            bottom_assets = (
+                set(a for a, _ in sorted_assets[-self.bottom_n :]) if self.bottom_n > 0 else set()
+            )
 
             # Rebalance: close positions not in target, open new positions
             for asset_name in data.keys():
@@ -476,7 +482,9 @@ def benchmark_ml4t(
     start_time = time.perf_counter()
 
     feed = DataFeed(prices_df=prices_pl, signals_df=signals_pl)
-    strategy = TopBottomStrategy(config.top_n, config.bottom_n, config.stop_loss, config.take_profit)
+    strategy = TopBottomStrategy(
+        config.top_n, config.bottom_n, config.stop_loss, config.take_profit
+    )
 
     engine = Engine(
         feed,
@@ -499,16 +507,18 @@ def benchmark_ml4t(
     if results.get("trades"):
         trade_records = []
         for t in results["trades"]:
-            trade_records.append({
-                "timestamp": t.entry_time,
-                "exit_time": t.exit_time,
-                "asset": t.asset,
-                "side": "long" if t.quantity > 0 else "short",
-                "quantity": abs(t.quantity),
-                "entry_price": t.entry_price,
-                "exit_price": t.exit_price,
-                "pnl": t.pnl,
-            })
+            trade_records.append(
+                {
+                    "timestamp": t.entry_time,
+                    "exit_time": t.exit_time,
+                    "asset": t.asset,
+                    "side": "long" if t.quantity > 0 else "short",
+                    "quantity": abs(t.quantity),
+                    "entry_price": t.entry_price,
+                    "exit_price": t.exit_price,
+                    "pnl": t.pnl,
+                }
+            )
         trades_df = pd.DataFrame(trade_records)
 
     return BenchmarkResult(
@@ -555,7 +565,11 @@ def benchmark_vectorbt_pro(
 
     # Long top N, short bottom N
     long_mask = ranks <= config.top_n
-    short_mask = ranks > (config.n_assets - config.bottom_n) if config.bottom_n > 0 else pd.DataFrame(False, index=ranks.index, columns=ranks.columns)
+    short_mask = (
+        ranks > (config.n_assets - config.bottom_n)
+        if config.bottom_n > 0
+        else pd.DataFrame(False, index=ranks.index, columns=ranks.columns)
+    )
 
     # Convert to target shares: +100 for long, -100 for short, 0 otherwise
     target_shares = pd.DataFrame(0, index=close_df.index, columns=close_df.columns)
@@ -582,7 +596,9 @@ def benchmark_vectorbt_pro(
     )
 
     # Force computation
-    final_value = pf.value.iloc[-1].sum() if hasattr(pf.value.iloc[-1], "sum") else pf.value.iloc[-1]
+    final_value = (
+        pf.value.iloc[-1].sum() if hasattr(pf.value.iloc[-1], "sum") else pf.value.iloc[-1]
+    )
     trades_readable = pf.trades.records_readable
     num_trades = len(trades_readable)
 
@@ -599,15 +615,19 @@ def benchmark_vectorbt_pro(
         for _, row in trades_readable.iterrows():
             # VectorBT Pro's Entry Index is already a Timestamp
             entry_ts = row.get("Entry Index")
-            trade_records.append({
-                "timestamp": entry_ts,
-                "asset": row.get("Column", "unknown"),
-                "side": "long" if str(row.get("Direction", "Long")).lower() == "long" else "short",
-                "quantity": abs(row.get("Size", 0)),
-                "entry_price": row.get("Avg Entry Price", 0),
-                "exit_price": row.get("Avg Exit Price", 0),
-                "pnl": row.get("PnL", 0),
-            })
+            trade_records.append(
+                {
+                    "timestamp": entry_ts,
+                    "asset": row.get("Column", "unknown"),
+                    "side": "long"
+                    if str(row.get("Direction", "Long")).lower() == "long"
+                    else "short",
+                    "quantity": abs(row.get("Size", 0)),
+                    "entry_price": row.get("Avg Entry Price", 0),
+                    "exit_price": row.get("Avg Exit Price", 0),
+                    "pnl": row.get("PnL", 0),
+                }
+            )
         trades_df = pd.DataFrame(trade_records)
 
     return BenchmarkResult(
@@ -650,7 +670,11 @@ def benchmark_vectorbt_oss(
 
     # Long top N, short bottom N
     long_mask = ranks <= config.top_n
-    short_mask = ranks > (config.n_assets - config.bottom_n) if config.bottom_n > 0 else pd.DataFrame(False, index=ranks.index, columns=ranks.columns)
+    short_mask = (
+        ranks > (config.n_assets - config.bottom_n)
+        if config.bottom_n > 0
+        else pd.DataFrame(False, index=ranks.index, columns=ranks.columns)
+    )
 
     # Convert to target shares: +100 for long, -100 for short, 0 otherwise
     target_shares = pd.DataFrame(0, index=close_df.index, columns=close_df.columns)
@@ -677,7 +701,9 @@ def benchmark_vectorbt_oss(
     )
 
     # Force computation
-    final_value = pf.value().iloc[-1].sum() if hasattr(pf.value().iloc[-1], "sum") else pf.value().iloc[-1]
+    final_value = (
+        pf.value().iloc[-1].sum() if hasattr(pf.value().iloc[-1], "sum") else pf.value().iloc[-1]
+    )
     trades_readable = pf.trades.records_readable
     num_trades = len(trades_readable)
 
@@ -689,19 +715,23 @@ def benchmark_vectorbt_oss(
     trades_df = None
     if num_trades > 0:
         # Sort by entry date for proper comparison (VBT returns sorted by column/asset)
-        entry_col = "Entry Timestamp" if "Entry Timestamp" in trades_readable.columns else "Entry Index"
+        entry_col = (
+            "Entry Timestamp" if "Entry Timestamp" in trades_readable.columns else "Entry Index"
+        )
         trades_readable = trades_readable.sort_values(entry_col)
         trade_records = []
         for _, row in trades_readable.iterrows():
-            trade_records.append({
-                "timestamp": row.get("Entry Timestamp", row.get("Entry Index")),
-                "asset": row.get("Column", "unknown"),
-                "side": "long" if row.get("Direction", "Long") == "Long" else "short",
-                "quantity": abs(row.get("Size", 0)),
-                "entry_price": row.get("Avg Entry Price", row.get("Entry Price", 0)),
-                "exit_price": row.get("Avg Exit Price", row.get("Exit Price", 0)),
-                "pnl": row.get("PnL", 0),
-            })
+            trade_records.append(
+                {
+                    "timestamp": row.get("Entry Timestamp", row.get("Entry Index")),
+                    "asset": row.get("Column", "unknown"),
+                    "side": "long" if row.get("Direction", "Long") == "Long" else "short",
+                    "quantity": abs(row.get("Size", 0)),
+                    "entry_price": row.get("Avg Entry Price", row.get("Entry Price", 0)),
+                    "exit_price": row.get("Avg Exit Price", row.get("Exit Price", 0)),
+                    "pnl": row.get("PnL", 0),
+                }
+            )
         trades_df = pd.DataFrame(trade_records)
 
     return BenchmarkResult(
@@ -724,11 +754,11 @@ def benchmark_zipline(
     top-N/bottom-N ranking strategy.
     """
     try:
-        from zipline import run_algorithm
-        from zipline.api import order_target, symbol, symbols, set_slippage, get_datetime, sid
-        from zipline.data.bundles import register, ingest
-        from zipline.finance.slippage import SlippageModel
         import exchange_calendars as xcals
+        from zipline import run_algorithm
+        from zipline.api import get_datetime, order_target, set_slippage, sid, symbol, symbols
+        from zipline.data.bundles import ingest, register
+        from zipline.finance.slippage import SlippageModel
     except ImportError as e:
         return BenchmarkResult(
             framework="Zipline",
@@ -768,7 +798,7 @@ def benchmark_zipline(
     # Get actual NYSE sessions
     nyse_sessions = nyse.sessions_in_range(
         pd.Timestamp(start_date).tz_localize(None) if pd.Timestamp(start_date).tz else start_date,
-        pd.Timestamp(end_date).tz_localize(None) if pd.Timestamp(end_date).tz else end_date
+        pd.Timestamp(end_date).tz_localize(None) if pd.Timestamp(end_date).tz else end_date,
     )
 
     # Custom slippage model for open-price fills (matching ml4t NEXT_BAR mode)
@@ -782,7 +812,7 @@ def benchmark_zipline(
     for _, row in signals.iterrows():
         ts = row["timestamp"]
         # Normalize to tz-naive for comparison
-        if hasattr(ts, 'tz') and ts.tz is not None:
+        if hasattr(ts, "tz") and ts.tz is not None:
             ts = ts.tz_convert(None)
         if ts not in signal_lookup:
             signal_lookup[ts] = {}
@@ -790,17 +820,29 @@ def benchmark_zipline(
 
     # Bundle ingest function for multi-asset
     def make_multi_asset_ingest(price_data_dict, asset_list):
-        def ingest_func(environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
-                       adjustment_writer, calendar, start_session, end_session, cache,
-                       show_progress, output_dir):
+        def ingest_func(
+            environ,
+            asset_db_writer,
+            minute_bar_writer,
+            daily_bar_writer,
+            adjustment_writer,
+            calendar,
+            start_session,
+            end_session,
+            cache,
+            show_progress,
+            output_dir,
+        ):
             sessions = calendar.sessions_in_range(start_session, end_session)
 
             # Write equity metadata for all assets
-            equities_df = pd.DataFrame({
-                'symbol': asset_list,
-                'asset_name': [f'Asset {name}' for name in asset_list],
-                'exchange': ['NYSE'] * len(asset_list),
-            })
+            equities_df = pd.DataFrame(
+                {
+                    "symbol": asset_list,
+                    "asset_name": [f"Asset {name}" for name in asset_list],
+                    "exchange": ["NYSE"] * len(asset_list),
+                }
+            )
             asset_db_writer.write(equities=equities_df)
 
             # Write daily bars for each asset
@@ -812,7 +854,7 @@ def benchmark_zipline(
                     df.index = df.index.tz_convert(None)
                 # Filter to valid sessions
                 valid_mask = df.index.isin(sessions)
-                trading_df = df[valid_mask][['open', 'high', 'low', 'close', 'volume']]
+                trading_df = df[valid_mask][["open", "high", "low", "close", "volume"]]
                 if len(trading_df) > 0:
                     bar_data.append((sid, trading_df))
 
@@ -824,15 +866,22 @@ def benchmark_zipline(
     # Register and ingest bundle (cached - only created once per config)
     bundle_name = f"bench_multi_{n_assets}_{config.n_bars}"
     start_session = nyse_sessions[0]
-    end_session = nyse_sessions[-1] if len(nyse_sessions) <= config.n_bars else nyse_sessions[config.n_bars - 1]
+    end_session = (
+        nyse_sessions[-1]
+        if len(nyse_sessions) <= config.n_bars
+        else nyse_sessions[config.n_bars - 1]
+    )
 
     # Check if bundle already exists ON DISK to avoid re-ingestion
     # The in-memory `bundles` registry resets each process - check filesystem instead
     import os
     from pathlib import Path
-    zipline_root = Path(os.environ.get('ZIPLINE_ROOT', Path.home() / '.zipline'))
-    bundle_dir = zipline_root / 'data' / bundle_name  # Zipline stores in data/, not bundles/
-    bundle_exists = bundle_dir.exists() and any(bundle_dir.iterdir()) if bundle_dir.exists() else False
+
+    zipline_root = Path(os.environ.get("ZIPLINE_ROOT", Path.home() / ".zipline"))
+    bundle_dir = zipline_root / "data" / bundle_name  # Zipline stores in data/, not bundles/
+    bundle_exists = (
+        bundle_dir.exists() and any(bundle_dir.iterdir()) if bundle_dir.exists() else False
+    )
 
     bundle_time = 0.0
     if not bundle_exists:
@@ -841,7 +890,7 @@ def benchmark_zipline(
             register(
                 bundle_name,
                 make_multi_asset_ingest(price_data, asset_names),
-                calendar_name='XNYS',
+                calendar_name="XNYS",
                 start_session=start_session,
                 end_session=end_session,
             )
@@ -864,7 +913,7 @@ def benchmark_zipline(
         register(
             bundle_name,
             make_multi_asset_ingest(price_data, asset_names),
-            calendar_name='XNYS',
+            calendar_name="XNYS",
             start_session=start_session,
             end_session=end_session,
         )
@@ -882,7 +931,9 @@ def benchmark_zipline(
         context.state = algo_state
         # Get all asset objects by sid
         context.assets = [sid(i) for i in range(len(context.state["asset_names"]))]
-        context.asset_map = {name: context.assets[i] for i, name in enumerate(context.state["asset_names"])}
+        context.asset_map = {
+            name: context.assets[i] for i, name in enumerate(context.state["asset_names"])
+        }
         set_slippage(OpenPriceSlippage())
 
     def handle_data(context, data):
@@ -936,10 +987,10 @@ def benchmark_zipline(
             handle_data=handle_data,
             capital_base=1_000_000.0,
             bundle=bundle_name,
-            data_frequency='daily',
+            data_frequency="daily",
         )
 
-        final_value = results['portfolio_value'].iloc[-1]
+        final_value = results["portfolio_value"].iloc[-1]
 
         end_time = time.perf_counter()
         _, peak = tracemalloc.get_traced_memory()
@@ -947,6 +998,7 @@ def benchmark_zipline(
 
         # Extract positions and transactions using pyfolio utilities
         import pyfolio as pf
+
         returns, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(results)
 
         # Convert transactions to completed trades by tracking position changes
@@ -956,7 +1008,13 @@ def benchmark_zipline(
         trade_records = []
 
         # Get symbol column name (may be 'symbol' or 'sid')
-        symbol_col = "symbol" if "symbol" in transactions.columns else "sid" if "sid" in transactions.columns else None
+        symbol_col = (
+            "symbol"
+            if "symbol" in transactions.columns
+            else "sid"
+            if "sid" in transactions.columns
+            else None
+        )
 
         if len(transactions) > 0 and symbol_col:
             for symbol in transactions[symbol_col].unique():
@@ -984,16 +1042,18 @@ def benchmark_zipline(
                         # Position closed completely
                         exit_price = price
                         pnl = (exit_price - entry_price) * entry_size
-                        trade_records.append({
-                            "entry_date": entry_time,
-                            "exit_date": dt,
-                            "asset": str(symbol),
-                            "side": "long" if entry_size > 0 else "short",
-                            "quantity": abs(entry_size),
-                            "entry_price": entry_price,
-                            "exit_price": exit_price,
-                            "pnl": pnl,
-                        })
+                        trade_records.append(
+                            {
+                                "entry_date": entry_time,
+                                "exit_date": dt,
+                                "asset": str(symbol),
+                                "side": "long" if entry_size > 0 else "short",
+                                "quantity": abs(entry_size),
+                                "entry_price": entry_price,
+                                "exit_price": exit_price,
+                                "pnl": pnl,
+                            }
+                        )
                         entry_time = None
 
                     # Handle position flip (e.g., long -> short or short -> long)
@@ -1001,16 +1061,18 @@ def benchmark_zipline(
                         # Close old position first
                         exit_price = price
                         pnl = (exit_price - entry_price) * entry_size
-                        trade_records.append({
-                            "entry_date": entry_time,
-                            "exit_date": dt,
-                            "asset": str(symbol),
-                            "side": "long" if entry_size > 0 else "short",
-                            "quantity": abs(entry_size),
-                            "entry_price": entry_price,
-                            "exit_price": exit_price,
-                            "pnl": pnl,
-                        })
+                        trade_records.append(
+                            {
+                                "entry_date": entry_time,
+                                "exit_date": dt,
+                                "asset": str(symbol),
+                                "side": "long" if entry_size > 0 else "short",
+                                "quantity": abs(entry_size),
+                                "entry_price": entry_price,
+                                "exit_price": exit_price,
+                                "pnl": pnl,
+                            }
+                        )
                         # Open new position
                         entry_time = dt
                         entry_price = price
@@ -1035,6 +1097,7 @@ def benchmark_zipline(
     except Exception as e:
         tracemalloc.stop()
         import traceback
+
         return BenchmarkResult(
             framework="Zipline",
             scenario=config.name,
@@ -1185,16 +1248,18 @@ def benchmark_backtrader(
                     # Position closed completely
                     exit_price = price
                     pnl = (exit_price - entry_price) * entry_size
-                    trade_records.append({
-                        "entry_date": entry_time,
-                        "exit_date": dt,
-                        "asset": str(symbol),
-                        "side": "long" if entry_size > 0 else "short",
-                        "quantity": abs(entry_size),
-                        "entry_price": entry_price,
-                        "exit_price": exit_price,
-                        "pnl": pnl,
-                    })
+                    trade_records.append(
+                        {
+                            "entry_date": entry_time,
+                            "exit_date": dt,
+                            "asset": str(symbol),
+                            "side": "long" if entry_size > 0 else "short",
+                            "quantity": abs(entry_size),
+                            "entry_price": entry_price,
+                            "exit_price": exit_price,
+                            "pnl": pnl,
+                        }
+                    )
                     entry_time = None
 
                 # Handle position flip (e.g., long -> short or short -> long)
@@ -1202,16 +1267,18 @@ def benchmark_backtrader(
                     # Close old position first
                     exit_price = price
                     pnl = (exit_price - entry_price) * entry_size
-                    trade_records.append({
-                        "entry_date": entry_time,
-                        "exit_date": dt,
-                        "asset": str(symbol),
-                        "side": "long" if entry_size > 0 else "short",
-                        "quantity": abs(entry_size),
-                        "entry_price": entry_price,
-                        "exit_price": exit_price,
-                        "pnl": pnl,
-                    })
+                    trade_records.append(
+                        {
+                            "entry_date": entry_time,
+                            "exit_date": dt,
+                            "asset": str(symbol),
+                            "side": "long" if entry_size > 0 else "short",
+                            "quantity": abs(entry_size),
+                            "entry_price": entry_price,
+                            "exit_price": exit_price,
+                            "pnl": pnl,
+                        }
+                    )
                     # Open new position
                     entry_time = dt
                     entry_price = price
@@ -1262,10 +1329,14 @@ def run_scenario(scenario_name: str, frameworks: list[str]) -> list[BenchmarkRes
         print(f"\nRunning {framework}...")
         try:
             if framework == "ml4t":
-                result = benchmark_ml4t(config, price_data, signals, dates, execution_mode="same_bar")
+                result = benchmark_ml4t(
+                    config, price_data, signals, dates, execution_mode="same_bar"
+                )
             elif framework == "ml4t-backtrader":
                 # ML4T with Backtrader-compatible settings (next-bar execution)
-                result = benchmark_ml4t(config, price_data, signals, dates, execution_mode="next_bar")
+                result = benchmark_ml4t(
+                    config, price_data, signals, dates, execution_mode="next_bar"
+                )
             elif framework == "vbt-pro":
                 result = benchmark_vectorbt_pro(config, price_data, signals, dates)
             elif framework == "vbt-oss":
@@ -1417,8 +1488,12 @@ def main():
             print("-" * 60)
             for framework, comp in comparisons.items():
                 print(f"{framework}:")
-                print(f"  Trade count diff: {comp['trade_count_diff']:,} ({comp['trade_count_pct']:.2f}%)")
-                print(f"  Final value diff: ${comp['final_value_diff']:,.2f} ({comp['final_value_pct']:.2f}%)")
+                print(
+                    f"  Trade count diff: {comp['trade_count_diff']:,} ({comp['trade_count_pct']:.2f}%)"
+                )
+                print(
+                    f"  Final value diff: ${comp['final_value_diff']:,.2f} ({comp['final_value_pct']:.2f}%)"
+                )
 
     return 0
 

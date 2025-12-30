@@ -226,7 +226,7 @@ class TestValidateOrderReducing:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=100.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,
@@ -249,7 +249,7 @@ class TestValidateOrderReducing:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=100.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,
@@ -315,7 +315,7 @@ class TestValidateOrderOpening:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=100.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,
@@ -338,7 +338,7 @@ class TestValidateOrderOpening:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=100.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,
@@ -365,7 +365,7 @@ class TestValidateOrderPositionReversal:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=100.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,
@@ -382,7 +382,7 @@ class TestValidateOrderPositionReversal:
         """Margin account approves position reversals with sufficient buying power."""
         from ml4t.backtest.accounting import MarginAccountPolicy
 
-        policy = MarginAccountPolicy(initial_margin=0.5, maintenance_margin=0.25)
+        policy = MarginAccountPolicy(initial_margin=0.5)
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -390,7 +390,7 @@ class TestValidateOrderPositionReversal:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=100.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,
@@ -410,7 +410,7 @@ class TestValidateOrderPositionReversal:
         """Margin account rejects reversals with insufficient buying power."""
         from ml4t.backtest.accounting import MarginAccountPolicy
 
-        policy = MarginAccountPolicy(initial_margin=0.5, maintenance_margin=0.25)
+        policy = MarginAccountPolicy(initial_margin=0.5)
         account = AccountState(initial_cash=1000.0, policy=policy)  # Low cash
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -418,7 +418,7 @@ class TestValidateOrderPositionReversal:
         account.positions["AAPL"] = Position(
             asset="AAPL",
             quantity=10.0,
-            avg_entry_price=150.0,
+            entry_price=150.0,
             current_price=150.0,
             entry_time=datetime.now(),
             bars_held=0,

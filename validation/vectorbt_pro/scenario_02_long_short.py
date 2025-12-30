@@ -18,7 +18,6 @@ Success criteria:
 """
 
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -32,7 +31,10 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 # Test Data Generation
 # ============================================================================
 
-def generate_test_data(n_bars: int = 100, seed: int = 42) -> tuple[pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+
+def generate_test_data(
+    n_bars: int = 100, seed: int = 42
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate test data for long/short strategy.
 
     Returns:
@@ -52,13 +54,16 @@ def generate_test_data(n_bars: int = 100, seed: int = 42) -> tuple[pd.DataFrame,
     # Generate OHLCV
     dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
 
-    df = pd.DataFrame({
-        "open": prices * (1 + np.random.randn(n_bars) * 0.005),
-        "high": prices * (1 + np.abs(np.random.randn(n_bars)) * 0.01),
-        "low": prices * (1 - np.abs(np.random.randn(n_bars)) * 0.01),
-        "close": prices,
-        "volume": np.random.randint(100000, 1000000, n_bars),
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices * (1 + np.random.randn(n_bars) * 0.005),
+            "high": prices * (1 + np.abs(np.random.randn(n_bars)) * 0.01),
+            "low": prices * (1 - np.abs(np.random.randn(n_bars)) * 0.01),
+            "close": prices,
+            "volume": np.random.randint(100000, 1000000, n_bars),
+        },
+        index=dates,
+    )
 
     # Ensure high >= open, close, low and low <= open, close, high
     df["high"] = df[["open", "high", "close"]].max(axis=1) * 1.001
@@ -96,8 +101,14 @@ def generate_test_data(n_bars: int = 100, seed: int = 42) -> tuple[pd.DataFrame,
 # VectorBT Pro Execution
 # ============================================================================
 
-def run_vectorbt_pro(prices_df: pd.DataFrame, long_entries: np.ndarray, long_exits: np.ndarray,
-                     short_entries: np.ndarray, short_exits: np.ndarray) -> dict:
+
+def run_vectorbt_pro(
+    prices_df: pd.DataFrame,
+    long_entries: np.ndarray,
+    long_exits: np.ndarray,
+    short_entries: np.ndarray,
+    short_exits: np.ndarray,
+) -> dict:
     """Run backtest using VectorBT Pro."""
     try:
         import vectorbtpro as vbt
@@ -136,32 +147,43 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, long_entries: np.ndarray, long_exi
 # ml4t.backtest Execution
 # ============================================================================
 
-def run_ml4t_backtest(prices_df: pd.DataFrame, long_entries: np.ndarray, long_exits: np.ndarray,
-                      short_entries: np.ndarray, short_exits: np.ndarray) -> dict:
+
+def run_ml4t_backtest(
+    prices_df: pd.DataFrame,
+    long_entries: np.ndarray,
+    long_exits: np.ndarray,
+    short_entries: np.ndarray,
+    short_exits: np.ndarray,
+) -> dict:
     """Run backtest using ml4t.backtest."""
     import polars as pl
-    from ml4t.backtest import Engine, Strategy, DataFeed, ExecutionMode, NoCommission, NoSlippage
+
+    from ml4t.backtest import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
 
     # Convert to polars format
-    prices_pl = pl.DataFrame({
-        "timestamp": prices_df.index.to_pydatetime().tolist(),
-        "asset": ["AAPL"] * len(prices_df),
-        "open": prices_df["open"].tolist(),
-        "high": prices_df["high"].tolist(),
-        "low": prices_df["low"].tolist(),
-        "close": prices_df["close"].tolist(),
-        "volume": prices_df["volume"].astype(float).tolist(),
-    })
+    prices_pl = pl.DataFrame(
+        {
+            "timestamp": prices_df.index.to_pydatetime().tolist(),
+            "asset": ["AAPL"] * len(prices_df),
+            "open": prices_df["open"].tolist(),
+            "high": prices_df["high"].tolist(),
+            "low": prices_df["low"].tolist(),
+            "close": prices_df["close"].tolist(),
+            "volume": prices_df["volume"].astype(float).tolist(),
+        }
+    )
 
     # Create signals DataFrame with long/short signals
-    signals_pl = pl.DataFrame({
-        "timestamp": prices_df.index.to_pydatetime().tolist(),
-        "asset": ["AAPL"] * len(prices_df),
-        "long_entry": long_entries.tolist(),
-        "long_exit": long_exits.tolist(),
-        "short_entry": short_entries.tolist(),
-        "short_exit": short_exits.tolist(),
-    })
+    signals_pl = pl.DataFrame(
+        {
+            "timestamp": prices_df.index.to_pydatetime().tolist(),
+            "asset": ["AAPL"] * len(prices_df),
+            "long_entry": long_entries.tolist(),
+            "long_exit": long_exits.tolist(),
+            "short_entry": short_entries.tolist(),
+            "short_exit": short_exits.tolist(),
+        }
+    )
 
     class LongShortStrategy(Strategy):
         def on_data(self, timestamp, data, context, broker):
@@ -173,9 +195,12 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, long_entries: np.ndarray, long_ex
             current_qty = position.quantity if position else 0
 
             # Check exits first
-            if signals.get("long_exit") and current_qty > 0:
-                broker.close_position("AAPL")
-            elif signals.get("short_exit") and current_qty < 0:
+            if (
+                signals.get("long_exit")
+                and current_qty > 0
+                or signals.get("short_exit")
+                and current_qty < 0
+            ):
                 broker.close_position("AAPL")
 
             # Then check entries (only if flat)
@@ -226,6 +251,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, long_entries: np.ndarray, long_ex
 # Comparison
 # ============================================================================
 
+
 def compare_results(vbt_results: dict, ml4t_results: dict) -> bool:
     """Compare results and report differences."""
     print("\n" + "=" * 70)
@@ -238,7 +264,9 @@ def compare_results(vbt_results: dict, ml4t_results: dict) -> bool:
     vbt_trades = vbt_results["num_trades"]
     ml4t_trades = ml4t_results["num_trades"]
     trades_match = vbt_trades == ml4t_trades
-    print(f"\nTrade Count: VBT={vbt_trades}, ML4T={ml4t_trades} {'OK' if trades_match else 'MISMATCH'}")
+    print(
+        f"\nTrade Count: VBT={vbt_trades}, ML4T={ml4t_trades} {'OK' if trades_match else 'MISMATCH'}"
+    )
     all_match &= trades_match
 
     # Final value
@@ -247,7 +275,9 @@ def compare_results(vbt_results: dict, ml4t_results: dict) -> bool:
     value_diff = abs(vbt_value - ml4t_value)
     value_pct_diff = value_diff / vbt_value * 100 if vbt_value != 0 else 0
     values_match = value_pct_diff < 0.01
-    print(f"Final Value: VBT=${vbt_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff={value_pct_diff:.4f}%) {'OK' if values_match else 'MISMATCH'}")
+    print(
+        f"Final Value: VBT=${vbt_value:,.2f}, ML4T=${ml4t_value:,.2f} (diff={value_pct_diff:.4f}%) {'OK' if values_match else 'MISMATCH'}"
+    )
     all_match &= values_match
 
     # Total P&L
@@ -255,21 +285,25 @@ def compare_results(vbt_results: dict, ml4t_results: dict) -> bool:
     ml4t_pnl = ml4t_results["total_pnl"]
     pnl_diff = abs(vbt_pnl - ml4t_pnl)
     pnl_match = pnl_diff < 1.0
-    print(f"Total P&L: VBT=${vbt_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff=${pnl_diff:.2f}) {'OK' if pnl_match else 'MISMATCH'}")
+    print(
+        f"Total P&L: VBT=${vbt_pnl:,.2f}, ML4T=${ml4t_pnl:,.2f} (diff=${pnl_diff:.2f}) {'OK' if pnl_match else 'MISMATCH'}"
+    )
     all_match &= pnl_match
 
     # Trade-by-trade comparison
     if trades_match and len(vbt_results["trades"]) > 0:
-        print(f"\nTrade-by-Trade Comparison:")
+        print("\nTrade-by-Trade Comparison:")
         print("-" * 70)
         vbt_trades_list = vbt_results["trades"]
         ml4t_trades_list = ml4t_results["trades"]
 
         for i, (vbt_t, ml4t_t) in enumerate(zip(vbt_trades_list[:5], ml4t_trades_list[:5])):
-            vbt_entry = vbt_t.get('Avg Entry Price', 'N/A')
-            vbt_dir = vbt_t.get('Direction', 'Unknown')
-            ml4t_dir = ml4t_t.get('direction', 'Unknown')
-            print(f"  Trade {i+1}: VBT {vbt_dir} entry={vbt_entry:.2f} | ML4T {ml4t_dir} entry={ml4t_t['entry_price']:.2f}")
+            vbt_entry = vbt_t.get("Avg Entry Price", "N/A")
+            vbt_dir = vbt_t.get("Direction", "Unknown")
+            ml4t_dir = ml4t_t.get("direction", "Unknown")
+            print(
+                f"  Trade {i+1}: VBT {vbt_dir} entry={vbt_entry:.2f} | ML4T {ml4t_dir} entry={ml4t_t['entry_price']:.2f}"
+            )
 
     print("\n" + "=" * 70)
     if all_match:
@@ -284,6 +318,7 @@ def compare_results(vbt_results: dict, ml4t_results: dict) -> bool:
 # ============================================================================
 # Main
 # ============================================================================
+
 
 def main():
     print("=" * 70)
@@ -302,7 +337,9 @@ def main():
     # Run VectorBT Pro
     print("\nRunning VectorBT Pro...")
     try:
-        vbt_results = run_vectorbt_pro(prices_df, long_entries, long_exits, short_entries, short_exits)
+        vbt_results = run_vectorbt_pro(
+            prices_df, long_entries, long_exits, short_entries, short_exits
+        )
         print(f"   Trades: {vbt_results['num_trades']}")
         print(f"   Final Value: ${vbt_results['final_value']:,.2f}")
     except ImportError as e:
@@ -312,12 +349,15 @@ def main():
     # Run ml4t.backtest
     print("\nRunning ml4t.backtest...")
     try:
-        ml4t_results = run_ml4t_backtest(prices_df, long_entries, long_exits, short_entries, short_exits)
+        ml4t_results = run_ml4t_backtest(
+            prices_df, long_entries, long_exits, short_entries, short_exits
+        )
         print(f"   Trades: {ml4t_results['num_trades']}")
         print(f"   Final Value: ${ml4t_results['final_value']:,.2f}")
     except Exception as e:
         print(f"   ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

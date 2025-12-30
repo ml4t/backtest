@@ -5,7 +5,7 @@ ml4t.backtest is a state-of-the-art event-driven backtesting engine designed for
 
 ## Tech Stack
 - **Language**: Python 3.12+
-- **Core Libraries**: 
+- **Core Libraries**:
   - Polars (DataFrames, 10-100x faster than Pandas)
   - NumPy (numerical computations)
   - Numba (JIT compilation for hot paths)

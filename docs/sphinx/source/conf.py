@@ -11,36 +11,36 @@ project_root = Path(__file__).parents[3]
 sys.path.insert(0, str(project_root / "src"))
 
 # -- Project information -----------------------------------------------------
-project = 'ml4t.backtest'
-copyright = '2024, ML4T'
-author = 'ML4T'
-release = '0.1.0'
+project = "ml4t.backtest"
+copyright = "2024, ML4T"
+author = "ML4T"
+release = "0.1.0"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.intersphinx',
-    'sphinx_autodoc_typehints',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinx_autodoc_typehints",
 ]
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
-html_theme = 'sphinx_rtd_theme'
+html_theme = "sphinx_rtd_theme"
 html_static_path = []  # No custom static files yet
 
 # -- Extension configuration -------------------------------------------------
 
 # autodoc settings
 autodoc_default_options = {
-    'members': True,
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
-    'exclude-members': '__weakref__'
+    "members": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "exclude-members": "__weakref__",
 }
 
 # Napoleon settings (for Google/NumPy style docstrings)
@@ -63,12 +63,12 @@ napoleon_attr_annotations = True
 typehints_use_signature = True
 typehints_use_signature_return = True
 always_document_param_types = True
-typehints_defaults = 'comma'
+typehints_defaults = "comma"
 
 # Intersphinx mapping (link to external docs)
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'numpy': ('https://numpy.org/doc/stable/', None),
-    'pandas': ('https://pandas.pydata.org/docs/', None),
-    'polars': ('https://pola-rs.github.io/polars/py-polars/html/', None),
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "polars": ("https://pola-rs.github.io/polars/py-polars/html/", None),
 }

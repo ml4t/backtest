@@ -32,7 +32,9 @@ class Broker:
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         account_type: str = "cash",
         initial_margin: float = 0.5,
-        maintenance_margin: float = 0.25,
+        long_maintenance_margin: float = 0.25,
+        short_maintenance_margin: float = 0.30,
+        fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
         execution_limits=None,
         market_impact_model=None,
         contract_specs: dict[str, ContractSpec] | None = None,
@@ -61,7 +63,10 @@ class Broker:
             policy = CashAccountPolicy()
         elif account_type == "margin":
             policy = MarginAccountPolicy(
-                initial_margin=initial_margin, maintenance_margin=maintenance_margin
+                initial_margin=initial_margin,
+                long_maintenance_margin=long_maintenance_margin,
+                short_maintenance_margin=short_maintenance_margin,
+                fixed_margin_schedule=fixed_margin_schedule,
             )
         else:
             raise ValueError(f"Unknown account_type: '{account_type}'. Must be 'cash' or 'margin'")
@@ -69,7 +74,9 @@ class Broker:
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
         self.account_type = account_type
         self.initial_margin = initial_margin
-        self.maintenance_margin = maintenance_margin
+        self.long_maintenance_margin = long_maintenance_margin
+        self.short_maintenance_margin = short_maintenance_margin
+        self.fixed_margin_schedule = fixed_margin_schedule or {}
 
         # Create Gatekeeper for order validation
         self.gatekeeper = Gatekeeper(self.account, self.commission_model)
@@ -617,11 +624,23 @@ class Broker:
             # Stop buy triggers if High >= stop_price (price rose to trigger)
             # Stop sell triggers if Low <= stop_price (price fell to trigger)
             if order.side == OrderSide.BUY and high >= order.stop_price:
-                # Fill at stop price or worse (could gap through)
-                return max(order.stop_price, low)  # At least stop price
+                # Check if we gapped through the stop
+                bar_open = self._current_opens.get(order.asset, price)
+                if bar_open >= order.stop_price:
+                    # Gapped through - fill at open (slippage)
+                    return bar_open
+                else:
+                    # Normal trigger - fill at stop price
+                    return order.stop_price
             elif order.side == OrderSide.SELL and low <= order.stop_price:
-                # Fill at stop price or worse (could gap through)
-                return min(order.stop_price, high)  # At most stop price
+                # Check if we gapped through the stop
+                bar_open = self._current_opens.get(order.asset, price)
+                if bar_open <= order.stop_price:
+                    # Gapped through - fill at open (slippage)
+                    return bar_open
+                else:
+                    # Normal trigger - fill at stop price
+                    return order.stop_price
 
         elif order.order_type == OrderType.TRAILING_STOP and order.side == OrderSide.SELL:
             # Update trailing stop based on high water mark
@@ -631,7 +650,14 @@ class Broker:
                     order.stop_price = new_stop
             # Check if triggered
             if order.stop_price is not None and low <= order.stop_price:
-                return min(order.stop_price, high)
+                # Check if we gapped through the stop
+                bar_open = self._current_opens.get(order.asset, price)
+                if bar_open <= order.stop_price:
+                    # Gapped through - fill at open (slippage)
+                    return bar_open
+                else:
+                    # Normal trigger - fill at stop price
+                    return order.stop_price
 
         return None
 
@@ -752,12 +778,28 @@ class Broker:
                     slippage=slippage,
                     entry_signals=self._current_signals.get(order.asset, {}),
                     exit_signals=self._current_signals.get(order.asset, {}),
+                    max_favorable_excursion=pos.max_favorable_excursion,
+                    max_adverse_excursion=pos.max_adverse_excursion,
                 )
                 self.trades.append(trade)
                 del self.positions[order.asset]
             elif (old_qty > 0) != (new_qty > 0):
-                # Position flipped
-                pnl = (fill_price - pos.entry_price) * old_qty - commission
+                # Position flipped - split commission between close and open
+                close_qty = abs(old_qty)
+                open_qty = abs(new_qty)
+
+                # Calculate separate commissions for close and open portions
+                close_commission = self.commission_model.calculate(
+                    order.asset, close_qty, fill_price
+                )
+                open_commission = self.commission_model.calculate(order.asset, open_qty, fill_price)
+
+                # Override the commission variable for cash change calculation
+                # (both close and open commissions will be deducted from cash)
+                commission = close_commission + open_commission
+
+                # Close the old position with appropriate commission
+                pnl = (fill_price - pos.entry_price) * old_qty - close_commission
                 self.trades.append(
                     Trade(
                         asset=order.asset,
@@ -771,11 +813,14 @@ class Broker:
                         if pos.entry_price
                         else 0,
                         bars_held=pos.bars_held,
-                        commission=commission,
-                        slippage=slippage,
+                        commission=close_commission,
+                        slippage=slippage * (close_qty / fill_quantity),  # Proportional slippage
+                        max_favorable_excursion=pos.max_favorable_excursion,
+                        max_adverse_excursion=pos.max_adverse_excursion,
                     )
                 )
                 # Create new position with signal_price in context
+                # Note: open_commission is included in cash change (line 832)
                 signal_price = getattr(order, "_signal_price", None)
                 context = {"signal_price": signal_price} if signal_price is not None else {}
                 self.positions[order.asset] = Position(
@@ -786,6 +831,16 @@ class Broker:
                     context=context,
                     multiplier=self.get_multiplier(order.asset),
                 )
+
+                # Cancel all other pending orders for this asset (e.g., old bracket orders)
+                # They're now invalid since the position flipped
+                for pending_order in list(self.pending_orders):
+                    if (
+                        pending_order.asset == order.asset
+                        and pending_order.order_id != order.order_id
+                    ):
+                        pending_order.status = OrderStatus.CANCELLED
+                        self.pending_orders.remove(pending_order)
             else:
                 # Position scaled
                 if abs(new_qty) > abs(old_qty):
@@ -797,10 +852,7 @@ class Broker:
         cash_change = -signed_qty * fill_price - commission
         self.cash += cash_change
 
-        # Update AccountState (import Position from accounting)
-        from .accounting import Position as AcctPosition
-
-        # Sync position to AccountState
+        # Sync position to AccountState (uses unified Position from types)
         broker_pos = self.positions.get(order.asset)
         if broker_pos is None:
             # Position was closed, remove from account
@@ -808,10 +860,10 @@ class Broker:
                 del self.account.positions[order.asset]
         else:
             # Update or create position in account
-            self.account.positions[order.asset] = AcctPosition(
+            self.account.positions[order.asset] = Position(
                 asset=broker_pos.asset,
                 quantity=broker_pos.quantity,
-                avg_entry_price=broker_pos.entry_price,
+                entry_price=broker_pos.entry_price,
                 current_price=self._current_prices.get(order.asset, broker_pos.entry_price),
                 entry_time=broker_pos.entry_time,
                 bars_held=broker_pos.bars_held,

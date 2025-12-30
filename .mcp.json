@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "/home/stefan/.nvm/versions/node/v22.21.0/bin/npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-sequential-thinking"]
+    },
+    "chrome-devtools": {
+      "command": "/home/stefan/.nvm/versions/node/v22.21.0/bin/npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "serena": {
+      "command": "/home/stefan/.nvm/versions/node/v22.21.0/bin/npx",
+      "args": ["-y", "serena-mcp@latest"],
+      "env": {
+        "SERENA_PROJECT_ROOT": "/home/stefan/ml4t/software/backtest"
+      }
+    },
+    "context7": {
+      "command": "/home/stefan/.nvm/versions/node/v22.21.0/bin/npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    }
+  }
+}

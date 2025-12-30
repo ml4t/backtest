@@ -1,4 +1,4 @@
-"""Unit tests for dynamic exit rules (TrailingStop, TighteningTrailingStop, ScaledExit)."""
+"""Unit tests for dynamic exit rules (TrailingStop, TighteningTrailingStop, ScaledExit, etc)."""
 
 from datetime import datetime
 
@@ -6,6 +6,8 @@ from ml4t.backtest.risk.position.dynamic import (
     ScaledExit,
     TighteningTrailingStop,
     TrailingStop,
+    VolatilityStop,
+    VolatilityTrailingStop,
 )
 from ml4t.backtest.risk.types import ActionType, PositionState
 
@@ -340,3 +342,226 @@ class TestScaledExit:
         action = rule.evaluate(state)
         assert action.action == ActionType.EXIT_PARTIAL
         assert action.pct == 0.25  # First untriggered target
+
+
+class TestVolatilityStop:
+    """Tests for VolatilityStop (ATR-based)."""
+
+    def test_no_trigger_above_stop_long(self):
+        """No trigger when price is above ATR stop level for long."""
+        rule = VolatilityStop(multiplier=2.0)
+        # Entry at 100, ATR=5, stop at 90 (100 - 2*5)
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=95.0,  # Above 90
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.HOLD
+
+    def test_trigger_at_stop_level_long(self):
+        """Trigger when price equals ATR stop level for long."""
+        rule = VolatilityStop(multiplier=2.0)
+        # Entry at 100, ATR=5, stop at 90
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=90.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.EXIT_FULL
+        assert "volatility_stop" in action.reason
+        assert action.fill_price == 90.0
+
+    def test_trigger_below_stop_level_long(self):
+        """Trigger when price drops below ATR stop level for long."""
+        rule = VolatilityStop(multiplier=2.0)
+        # Entry at 100, ATR=5, stop at 90
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=85.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.EXIT_FULL
+
+    def test_no_trigger_below_stop_short(self):
+        """No trigger when price is below ATR stop level for short."""
+        rule = VolatilityStop(multiplier=2.0)
+        # Entry at 100, ATR=5, stop at 110 (100 + 2*5)
+        state = make_position_state(
+            side="short",
+            entry_price=100.0,
+            current_price=105.0,  # Below 110
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.HOLD
+
+    def test_trigger_at_stop_level_short(self):
+        """Trigger when price equals ATR stop level for short."""
+        rule = VolatilityStop(multiplier=2.0)
+        # Entry at 100, ATR=5, stop at 110
+        state = make_position_state(
+            side="short",
+            entry_price=100.0,
+            current_price=110.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.EXIT_FULL
+        assert action.fill_price == 110.0
+
+    def test_no_atr_holds(self):
+        """No action when ATR is not in context."""
+        rule = VolatilityStop(multiplier=2.0)
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=50.0,  # Would trigger if ATR present
+            context={},  # No ATR
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.HOLD
+
+    def test_custom_atr_key(self):
+        """Uses custom ATR key from context."""
+        rule = VolatilityStop(multiplier=2.0, atr_key="atr_14")
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=88.0,
+            context={"atr_14": 5.0, "atr": 1.0},  # Should use atr_14
+        )
+        action = rule.evaluate(state)
+        # With atr_14=5, stop at 90 - price 88 triggers
+        assert action.action == ActionType.EXIT_FULL
+
+    def test_uses_entry_atr(self):
+        """Uses ATR at entry, not current ATR."""
+        rule = VolatilityStop(multiplier=2.0, use_entry_atr=True)
+
+        # First bar: ATR = 5, stop at 90
+        state1 = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=95.0,
+            context={"atr": 5.0},
+        )
+        action1 = rule.evaluate(state1)
+        assert action1.action == ActionType.HOLD
+
+        # Second bar: ATR dropped to 1, but entry ATR (5) should be used
+        # Stop still at 90, not 98
+        state2 = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=89.0,
+            context={"atr": 1.0},  # Lower ATR shouldn't matter
+        )
+        action2 = rule.evaluate(state2)
+        assert action2.action == ActionType.EXIT_FULL
+
+
+class TestVolatilityTrailingStop:
+    """Tests for VolatilityTrailingStop (ATR-based trailing)."""
+
+    def test_no_trigger_above_trail_long(self):
+        """No trigger when price is above ATR trail for long."""
+        rule = VolatilityTrailingStop(multiplier=3.0)
+        # HWM at 120, ATR=5, trail at 105 (120 - 3*5)
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=110.0,
+            high_water_mark=120.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.HOLD
+
+    def test_trigger_at_trail_level_long(self):
+        """Trigger when price equals ATR trail level for long."""
+        rule = VolatilityTrailingStop(multiplier=3.0)
+        # HWM at 120, ATR=5, trail at 105
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=105.0,
+            high_water_mark=120.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.EXIT_FULL
+        assert "vol_trailing_stop" in action.reason
+        assert action.fill_price == 105.0
+
+    def test_no_trigger_below_trail_short(self):
+        """No trigger when price is below ATR trail for short."""
+        rule = VolatilityTrailingStop(multiplier=3.0)
+        # LWM at 80, ATR=5, trail at 95 (80 + 3*5)
+        state = make_position_state(
+            side="short",
+            entry_price=100.0,
+            current_price=90.0,
+            low_water_mark=80.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.HOLD
+
+    def test_trigger_at_trail_level_short(self):
+        """Trigger when price equals ATR trail level for short."""
+        rule = VolatilityTrailingStop(multiplier=3.0)
+        # LWM at 80, ATR=5, trail at 95
+        state = make_position_state(
+            side="short",
+            entry_price=100.0,
+            current_price=95.0,
+            low_water_mark=80.0,
+            context={"atr": 5.0},
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.EXIT_FULL
+
+    def test_uses_current_atr(self):
+        """Trail distance adapts to current ATR."""
+        rule = VolatilityTrailingStop(multiplier=2.0)
+
+        # First eval: ATR=10, HWM=120, trail at 100
+        state1 = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=105.0,
+            high_water_mark=120.0,
+            context={"atr": 10.0},
+        )
+        action1 = rule.evaluate(state1)
+        assert action1.action == ActionType.HOLD  # 105 > 100
+
+        # Second eval: ATR=10 still, HWM=120, trail at 100, price at 100
+        state2 = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=100.0,
+            high_water_mark=120.0,
+            context={"atr": 10.0},
+        )
+        action2 = rule.evaluate(state2)
+        assert action2.action == ActionType.EXIT_FULL
+
+    def test_no_atr_holds(self):
+        """No action when ATR is not in context."""
+        rule = VolatilityTrailingStop(multiplier=3.0)
+        state = make_position_state(
+            side="long",
+            entry_price=100.0,
+            current_price=50.0,
+            high_water_mark=120.0,
+            context={},  # No ATR
+        )
+        action = rule.evaluate(state)
+        assert action.action == ActionType.HOLD

@@ -17,7 +17,6 @@ import gc
 import sys
 import time
 import tracemalloc
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -41,13 +40,16 @@ def generate_benchmark_data(n_bars: int, n_assets: int, seed: int = 42) -> tuple
         returns = np.random.randn(n_bars) * 0.02
         prices = base_price * np.exp(np.cumsum(returns))
 
-        asset_data[f"ASSET_{i:03d}"] = pd.DataFrame({
-            "open": prices * (1 + np.random.randn(n_bars) * 0.005),
-            "high": prices * (1 + np.abs(np.random.randn(n_bars)) * 0.01),
-            "low": prices * (1 - np.abs(np.random.randn(n_bars)) * 0.01),
-            "close": prices,
-            "volume": np.random.randint(100000, 1000000, n_bars).astype(float),
-        }, index=dates)
+        asset_data[f"ASSET_{i:03d}"] = pd.DataFrame(
+            {
+                "open": prices * (1 + np.random.randn(n_bars) * 0.005),
+                "high": prices * (1 + np.abs(np.random.randn(n_bars)) * 0.01),
+                "low": prices * (1 - np.abs(np.random.randn(n_bars)) * 0.01),
+                "close": prices,
+                "volume": np.random.randint(100000, 1000000, n_bars).astype(float),
+            },
+            index=dates,
+        )
 
     # Generate signals - entry every 20 bars, exit 10 bars later
     entries = np.zeros(n_bars, dtype=bool)
@@ -129,37 +131,44 @@ def benchmark_backtrader(asset_data: dict, entries: np.ndarray, exits: np.ndarra
     }
 
 
-def benchmark_ml4t_backtest(asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates) -> dict:
+def benchmark_ml4t_backtest(
+    asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates
+) -> dict:
     """Benchmark ml4t.backtest."""
     import polars as pl
-    from ml4t.backtest import Engine, Strategy, DataFeed, ExecutionMode, NoCommission, NoSlippage
+
+    from ml4t.backtest import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
 
     # Prepare data in polars format
     rows = []
     for asset_name, df in asset_data.items():
         for i, (ts, row) in enumerate(df.iterrows()):
-            rows.append({
-                "timestamp": ts.to_pydatetime(),
-                "asset": asset_name,
-                "open": row["open"],
-                "high": row["high"],
-                "low": row["low"],
-                "close": row["close"],
-                "volume": row["volume"],
-            })
+            rows.append(
+                {
+                    "timestamp": ts.to_pydatetime(),
+                    "asset": asset_name,
+                    "open": row["open"],
+                    "high": row["high"],
+                    "low": row["low"],
+                    "close": row["close"],
+                    "volume": row["volume"],
+                }
+            )
 
     prices_pl = pl.DataFrame(rows)
 
     # Prepare signals
     signal_rows = []
-    for asset_name in asset_data.keys():
+    for asset_name in asset_data:
         for i, ts in enumerate(dates):
-            signal_rows.append({
-                "timestamp": ts.to_pydatetime(),
-                "asset": asset_name,
-                "entry": bool(entries[i]),
-                "exit": bool(exits[i]),
-            })
+            signal_rows.append(
+                {
+                    "timestamp": ts.to_pydatetime(),
+                    "asset": asset_name,
+                    "entry": bool(entries[i]),
+                    "exit": bool(exits[i]),
+                }
+            )
 
     signals_pl = pl.DataFrame(signal_rows)
 
@@ -212,14 +221,18 @@ def run_benchmark(n_bars: int, n_assets: int) -> dict:
     print(f"\n  Generating data: {n_bars} bars x {n_assets} assets...")
     asset_data, entries, exits, dates = generate_benchmark_data(n_bars, n_assets)
 
-    print(f"  Running Backtrader...")
+    print("  Running Backtrader...")
     bt_results = benchmark_backtrader(asset_data, entries, exits)
 
-    print(f"  Running ml4t.backtest...")
+    print("  Running ml4t.backtest...")
     ml4t_results = benchmark_ml4t_backtest(asset_data, entries, exits, dates)
 
     # Calculate speedup (>1 means Backtrader is faster)
-    speedup = bt_results["runtime_sec"] / ml4t_results["runtime_sec"] if ml4t_results["runtime_sec"] > 0 else 0
+    speedup = (
+        bt_results["runtime_sec"] / ml4t_results["runtime_sec"]
+        if ml4t_results["runtime_sec"] > 0
+        else 0
+    )
 
     return {
         "n_bars": n_bars,
@@ -256,12 +269,19 @@ def main():
             result = run_benchmark(n_bars, n_assets)
             results.append(result)
 
-            print(f"  BT: {result['bt_runtime']:.3f}s, {result['bt_trades']} trades, {result['bt_memory']:.1f} MB")
-            print(f"  ML4T: {result['ml4t_runtime']:.3f}s, {result['ml4t_trades']} trades, {result['ml4t_memory']:.1f} MB")
-            print(f"  Speedup: {result['speedup']:.2f}x {'(BT faster)' if result['speedup'] > 1 else '(ML4T faster)'}")
+            print(
+                f"  BT: {result['bt_runtime']:.3f}s, {result['bt_trades']} trades, {result['bt_memory']:.1f} MB"
+            )
+            print(
+                f"  ML4T: {result['ml4t_runtime']:.3f}s, {result['ml4t_trades']} trades, {result['ml4t_memory']:.1f} MB"
+            )
+            print(
+                f"  Speedup: {result['speedup']:.2f}x {'(BT faster)' if result['speedup'] > 1 else '(ML4T faster)'}"
+            )
         except Exception as e:
             print(f"  ERROR: {e}")
             import traceback
+
             traceback.print_exc()
 
     # Summary table
@@ -273,9 +293,11 @@ def main():
 
     for r in results:
         config = f"{r['n_bars']}x{r['n_assets']}"
-        winner = "BT" if r['speedup'] > 1 else "ML4T"
-        speedup_str = f"{r['speedup']:.2f}x" if r['speedup'] > 1 else f"{1/r['speedup']:.2f}x"
-        print(f"{config:<20} {r['bt_runtime']:<12.3f} {r['ml4t_runtime']:<12.3f} {speedup_str:<12} {winner}")
+        winner = "BT" if r["speedup"] > 1 else "ML4T"
+        speedup_str = f"{r['speedup']:.2f}x" if r["speedup"] > 1 else f"{1/r['speedup']:.2f}x"
+        print(
+            f"{config:<20} {r['bt_runtime']:<12.3f} {r['ml4t_runtime']:<12.3f} {speedup_str:<12} {winner}"
+        )
 
     print("=" * 70)
 

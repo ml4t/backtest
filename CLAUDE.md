@@ -1,5 +1,11 @@
 # CLAUDE.md - ml4t.backtest Development Guidelines
 
+## IRONCLAD RULES
+
+**NEVER REMOVE ANY DATA OR OTHER FILES THAT HAVE NOT BEEN PREVIOUSLY GIT COMMITTED WITHOUT EXPRESS PERMISSION.**
+
+This includes downloaded data, generated files, caches, or any user content. Data costs money and cannot be recovered.
+
 ## Project Understanding
 @.claude/PROJECT_MAP.md
 

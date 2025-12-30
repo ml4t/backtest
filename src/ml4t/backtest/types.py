@@ -142,10 +142,37 @@ class Order:
 
 @dataclass
 class Position:
+    """Unified position tracking for strategy and accounting.
+
+    Supports both long and short positions with:
+    - Weighted average cost basis tracking
+    - Mark-to-market price tracking
+    - Risk metrics (MFE/MAE, water marks)
+    - Contract multipliers for futures
+
+    Attributes:
+        asset: Asset identifier (e.g., "AAPL", "ES")
+        quantity: Position size (positive=long, negative=short)
+        entry_price: Weighted average entry price (cost basis)
+        entry_time: Timestamp when position was first opened
+        current_price: Latest mark-to-market price (updated each bar)
+        bars_held: Number of bars this position has been held
+
+    Examples:
+        Long position:
+            Position("AAPL", 100, 150.0, datetime.now())
+            -> quantity=100, unrealized_pnl depends on current_price
+
+        Short position:
+            Position("AAPL", -100, 150.0, datetime.now())
+            -> quantity=-100, profit if price drops
+    """
+
     asset: str
-    quantity: float
-    entry_price: float
+    quantity: float  # Positive for long, negative for short
+    entry_price: float  # Weighted average cost basis
     entry_time: datetime
+    current_price: float | None = None  # Mark-to-market price (set each bar)
     bars_held: int = 0
     # Risk tracking fields
     high_water_mark: float | None = None  # Highest price since entry (for longs)
@@ -164,22 +191,70 @@ class Position:
             self.low_water_mark = self.entry_price
         if self.initial_quantity is None:
             self.initial_quantity = self.quantity
+        if self.current_price is None:
+            self.current_price = self.entry_price
 
-    def unrealized_pnl(self, current_price: float) -> float:
-        """Calculate unrealized P&L including contract multiplier."""
-        return (current_price - self.entry_price) * self.quantity * self.multiplier
+    @property
+    def avg_entry_price(self) -> float:
+        """Alias for entry_price (accounting compatibility)."""
+        return self.entry_price
 
-    def pnl_percent(self, current_price: float) -> float:
+    @property
+    def market_value(self) -> float:
+        """Current market value of the position.
+
+        For long positions: positive value (asset on balance sheet)
+        For short positions: negative value (liability on balance sheet)
+
+        Returns:
+            Market value = quantity × current_price
+        """
+        price = self.current_price if self.current_price is not None else self.entry_price
+        return self.quantity * price * self.multiplier
+
+    def unrealized_pnl(self, current_price: float | None = None) -> float:
+        """Calculate unrealized P&L including contract multiplier.
+
+        Args:
+            current_price: Price to calculate P&L at. If None, uses self.current_price.
+
+        Returns:
+            Unrealized P&L = (current_price - entry_price) × quantity × multiplier
+        """
+        price = current_price if current_price is not None else self.current_price
+        if price is None:
+            price = self.entry_price
+        return (price - self.entry_price) * self.quantity * self.multiplier
+
+    def pnl_percent(self, current_price: float | None = None) -> float:
+        """Calculate percentage return on position.
+
+        Args:
+            current_price: Price to calculate return at. If None, uses self.current_price.
+        """
+        price = current_price if current_price is not None else self.current_price
+        if price is None:
+            price = self.entry_price
         if self.entry_price == 0:
             return 0.0
-        return (current_price - self.entry_price) / self.entry_price
+        return (price - self.entry_price) / self.entry_price
 
-    def notional_value(self, current_price: float) -> float:
-        """Calculate notional value of position."""
-        return abs(self.quantity) * current_price * self.multiplier
+    def notional_value(self, current_price: float | None = None) -> float:
+        """Calculate notional value of position.
+
+        Args:
+            current_price: Price to calculate value at. If None, uses self.current_price.
+        """
+        price = current_price if current_price is not None else self.current_price
+        if price is None:
+            price = self.entry_price
+        return abs(self.quantity) * price * self.multiplier
 
     def update_water_marks(self, current_price: float) -> None:
         """Update high/low water marks and excursion tracking."""
+        # Update current price
+        self.current_price = current_price
+
         # Update water marks (guaranteed non-None after __post_init__)
         if self.high_water_mark is None or current_price > self.high_water_mark:
             self.high_water_mark = current_price
@@ -197,6 +272,18 @@ class Position:
     def side(self) -> str:
         """Return 'long' or 'short' based on quantity sign."""
         return "long" if self.quantity > 0 else "short"
+
+    def __repr__(self) -> str:
+        """String representation for debugging."""
+        direction = "LONG" if self.quantity > 0 else "SHORT"
+        price = self.current_price if self.current_price is not None else self.entry_price
+        pnl = self.unrealized_pnl()
+        return (
+            f"Position({direction} {abs(self.quantity):.2f} {self.asset} "
+            f"@ ${self.entry_price:.2f}, "
+            f"current ${price:.2f}, "
+            f"PnL ${pnl:+.2f})"
+        )
 
 
 @dataclass
@@ -228,6 +315,9 @@ class Trade:
     slippage: float = 0.0
     entry_signals: dict[str, float] = field(default_factory=dict)
     exit_signals: dict[str, float] = field(default_factory=dict)
+    # MFE/MAE preserved from Position for trade analysis
+    max_favorable_excursion: float = 0.0  # Best unrealized return during trade
+    max_adverse_excursion: float = 0.0  # Worst unrealized return during trade
 
     @property
     def side(self) -> str:

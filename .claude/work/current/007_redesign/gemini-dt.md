@@ -27,7 +27,7 @@ clarity**.
 
 ---
 
-##   
+##
 
 ## **1\) Context & Goals**
 
@@ -382,81 +382,81 @@ The engine operates as a discrete-event simulation built around a central, time-
 
 Python
 
-import polars as pl  
-from dataclasses import dataclass  
+import polars as pl
+from dataclasses import dataclass
 from datetime import datetime
 
-@dataclass(frozen=True)  
-class ClockEvent:  
-"""Event indicating a new simulation time step."""  
-timestamp: datetime  
-session\_open: bool  
+@dataclass(frozen=True)
+class ClockEvent:
+"""Event indicating a new simulation time step."""
+timestamp: datetime
+session\_open: bool
 session\_close: bool
 
-@dataclass(frozen=True)  
-class MarketDataEvent:  
-"""Event carrying new market data for a single asset."""  
-timestamp: datetime  
-asset\_id: int  
+@dataclass(frozen=True)
+class MarketDataEvent:
+"""Event carrying new market data for a single asset."""
+timestamp: datetime
+asset\_id: int
 bar: pl.Struct \# e.g., {'open': 100.0, 'high': 101.0, ...}
 
-@dataclass(frozen=True)  
-class OrderRequestEvent:  
-"""Event emitted by a Strategy to request a new order."""  
-strategy\_id: str  
+@dataclass(frozen=True)
+class OrderRequestEvent:
+"""Event emitted by a Strategy to request a new order."""
+strategy\_id: str
 order: "Order"  \# See sketch below
 
-@dataclass(frozen=True)  
-class FillEvent:  
-"""Event emitted by the Broker indicating a trade execution."""  
-timestamp: datetime  
-order\_id: str  
-fill\_id: str  
-asset\_id: int  
-qty: float  
-price: float  
-commission: float  
+@dataclass(frozen=True)
+class FillEvent:
+"""Event emitted by the Broker indicating a trade execution."""
+timestamp: datetime
+order\_id: str
+fill\_id: str
+asset\_id: int
+qty: float
+price: float
+commission: float
 exchange\_fee: float
 
 ### **2\. Strategy API**
 
 Python
 
-from helios.engine import StrategyBase, DataContext  
-from helios.events import ClockEvent, MarketDataEvent  
+from helios.engine import StrategyBase, DataContext
+from helios.events import ClockEvent, MarketDataEvent
 from helios.orders import Order
 
-class MyStrategy(StrategyBase):  
+class MyStrategy(StrategyBase):
 """User-defined strategy class."""
 
-    def on\_init(self, data\_context: DataContext, state: dict):  
-        """Called once at the start, before the warm-up period."""  
-        self.data \= data\_context  
-        self.state \= state  \# Persistent state dict  
+    def on\_init(self, data\_context: DataContext, state: dict):
+        """Called once at the start, before the warm-up period."""
+        self.data \= data\_context
+        self.state \= state  \# Persistent state dict
         self.state.setdefault("sma\_50", {})
 
-    def on\_clock(self, event: ClockEvent):  
-        """Called on every master clock tick."""  
-        if event.session\_close:  
-            \# End of day logic  
+    def on\_clock(self, event: ClockEvent):
+        """Called on every master clock tick."""
+        if event.session\_close:
+            \# End of day logic
             return
 
-        \# Get 50-day rolling data for all assets in our universe  
-        \# This access is point-in-time correct.  
-        history \= self.data.history(  
-            assets=self.data.universe,  
-            fields=\["close"\],  
-            lookback=50  
+        \# Get 50-day rolling data for all assets in our universe
+        \# This access is point-in-time correct.
+        history \= self.data.history(
+            assets=self.data.universe,
+            fields=\["close"\],
+            lookback=50
         )
 
-        \# \`history\` is a Polars DataFrame: \[asset, time, close\]  
-        for asset, data in history.group\_by("asset\_id"):  
-            sma \= data\["close"\].mean()  
-            last\_close \= data\["close"\].last()  
-              
-            if last\_close \> sma and self.portfolio.get\_position(asset) \== 0:  
-                self.order\_target\_percent(asset, 0.05, comment="Buy signal")  
-            elif last\_close \< sma and self.portfolio.get\_position(asset) \> 0:  
+        \# \`history\` is a Polars DataFrame: \[asset, time, close\]
+        for asset, data in history.group\_by("asset\_id"):
+            sma \= data\["close"\].mean()
+            last\_close \= data\["close"\].last()
+
+            if last\_close \> sma and self.portfolio.get\_position(asset) \== 0:
+                self.order\_target\_percent(asset, 0.05, comment="Buy signal")
+            elif last\_close \< sma and self.portfolio.get\_position(asset) \> 0:
                 self.close\_position(asset, comment="Sell signal")
 
 ### **3\. Order/Execution Objects**
@@ -465,71 +465,71 @@ Python
 
 from enum import Enum
 
-class OrderStatus(Enum):  
-PENDING \= 0  
-OPEN \= 1  
-FILLED \= 2  
-PARTIALLY\_FILLED \= 3  
-CANCELED \= 4  
+class OrderStatus(Enum):
+PENDING \= 0
+OPEN \= 1
+FILLED \= 2
+PARTIALLY\_FILLED \= 3
+CANCELED \= 4
 REJECTED \= 5
 
-@dataclass  
-class Order:  
-"""Internal representation of an order."""  
-asset\_id: int  
-qty: float \# Positive for buy, negative for sell  
-limit\_price: float | None \= None  
-stop\_price: float | None \= None  
-tif: str \= "DAY"  
+@dataclass
+class Order:
+"""Internal representation of an order."""
+asset\_id: int
+qty: float \# Positive for buy, negative for sell
+limit\_price: float | None \= None
+stop\_price: float | None \= None
+tif: str \= "DAY"
 reduce\_only: bool \= False
 
-    \# Internal state  
-    order\_id: str \= "ord\_..."  
-    status: OrderStatus \= OrderStatus.PENDING  
+    \# Internal state
+    order\_id: str \= "ord\_..."
+    status: OrderStatus \= OrderStatus.PENDING
     filled\_qty: float \= 0.0
 
 ### **4\. Config Schemas (Pydantic \+ YAML)**
 
 Python
 
-from pydantic import BaseModel, FilePath, field\_validator  
+from pydantic import BaseModel, FilePath, field\_validator
 from typing import Literal
 
-class DataConfig(BaseModel):  
-provider: Literal\["parquet"\]  
-path: FilePath  
-calendar: str \# e.g., "NYSE"  
-asset\_class: Literal\["equity", "future", "crypto"\]  
+class DataConfig(BaseModel):
+provider: Literal\["parquet"\]
+path: FilePath
+calendar: str \# e.g., "NYSE"
+asset\_class: Literal\["equity", "future", "crypto"\]
 adjustments: Literal\["raw", "split\_adjusted", "full\_adjusted"\] \= "full\_adjusted"
 
-class BrokerConfig(BaseModel):  
-slippage\_model: dict \= {"type": "BpsSlippage", "bps": 5}  
-cost\_model: dict \= {"type": "PerTradeCost", "cost": 0.50}  
-shorting: bool \= True  
+class BrokerConfig(BaseModel):
+slippage\_model: dict \= {"type": "BpsSlippage", "bps": 5}
+cost\_model: dict \= {"type": "PerTradeCost", "cost": 0.50}
+shorting: bool \= True
 borrow\_fee\_bps: float \= 0.0
 
-class StrategyConfig(BaseModel):  
-module: str \# e.g., "my\_strategies.sma"  
-class\_name: str \# e.g., "MyStrategy"  
-warmup\_periods: int \= 50  
+class StrategyConfig(BaseModel):
+module: str \# e.g., "my\_strategies.sma"
+class\_name: str \# e.g., "MyStrategy"
+warmup\_periods: int \= 50
 params: dict \= {}
 
-class Config(BaseModel):  
-"""Top-level configuration schema."""  
-run\_id: str  
-start\_date: datetime  
-end\_date: datetime  
-base\_currency: str \= "USD"  
+class Config(BaseModel):
+"""Top-level configuration schema."""
+run\_id: str
+start\_date: datetime
+end\_date: datetime
+base\_currency: str \= "USD"
 seed: int \= 42
 
-    data: DataConfig  
-    strategy: StrategyConfig  
-    broker: BrokerConfig  
-      
-    @field\_validator("end\_date")  
-    def dates\_must\_be\_ordered(cls, v, info):  
-        if v \<= info.data\["start\_date"\]:  
-            raise ValueError("end\_date must be after start\_date")  
+    data: DataConfig
+    strategy: StrategyConfig
+    broker: BrokerConfig
+
+    @field\_validator("end\_date")
+    def dates\_must\_be\_ordered(cls, v, info):
+        if v \<= info.data\["start\_date"\]:
+            raise ValueError("end\_date must be after start\_date")
         return v
 
 \# \--- Corresponding YAML example (see Appendix A) \---
@@ -540,26 +540,26 @@ Python
 
 import polars as pl
 
-class BacktestResult:  
-"""Standardized output object."""  
-def \_\_init\_\_(self, manifest: dict, metrics: dict, artifacts: dict\[str, pl.DataFrame\]):  
-self.manifest: dict \= manifest \# The RunManifest.json  
+class BacktestResult:
+"""Standardized output object."""
+def \_\_init\_\_(self, manifest: dict, metrics: dict, artifacts: dict\[str, pl.DataFrame\]):
+self.manifest: dict \= manifest \# The RunManifest.json
 self.metrics: dict \= metrics \# Summary: {'sharpe': 1.5, ...}
 
-        \# Core data artifacts  
-        self.trades: pl.DataFrame \= artifacts\["trades"\]  
-        self.positions: pl.DataFrame \= artifacts\["positions"\]  
-        self.equity\_curve: pl.DataFrame \= artifacts\["equity\_curve"\]  
-        self.returns: pl.DataFrame \= artifacts\["returns"\]  
+        \# Core data artifacts
+        self.trades: pl.DataFrame \= artifacts\["trades"\]
+        self.positions: pl.DataFrame \= artifacts\["positions"\]
+        self.equity\_curve: pl.DataFrame \= artifacts\["equity\_curve"\]
+        self.returns: pl.DataFrame \= artifacts\["returns"\]
         self.orders: pl.DataFrame \= artifacts\["orders"\]
 
-    def save(self, path: str):  
-        """Saves the result as a directory of Parquet files \+ JSON."""  
-        ...  
-      
-    @staticmethod  
-    def load(path: str) \-\> "BacktestResult":  
-        """Loads a previously saved result."""  
+    def save(self, path: str):
+        """Saves the result as a directory of Parquet files \+ JSON."""
+        ...
+
+    @staticmethod
+    def load(path: str) \-\> "BacktestResult":
+        """Loads a previously saved result."""
         ...
 
 ---
@@ -771,80 +771,80 @@ The engine will be asset-class-aware via the DataConfig and InstrumentRegistry.
 
 YAML
 
-version: "1.0"  
-run\_id: "sma\_crossover\_v0\_run\_001"  
-seed: 42  
+version: "1.0"
+run\_id: "sma\_crossover\_v0\_run\_001"
+seed: 42
 base\_currency: "USD"
 
-run\_window:  
-start\_date: "2020-01-01T00:00:00Z"  
-end\_date: "2024-12-31T23:59:00Z"  
+run\_window:
+start\_date: "2020-01-01T00:00:00Z"
+end\_date: "2024-12-31T23:59:00Z"
 warmup\_periods: 50 \# Based on strategy's 'slow\_ma'
 
-data:  
-provider: "parquet"  
-calendar: "NYSE"  
-asset\_class: "equity"  
-path\_template: "/data/equity/minute\_bars/{asset\_id}.parquet"  
-assets: \["AAPL", "MSFT"\]  
+data:
+provider: "parquet"
+calendar: "NYSE"
+asset\_class: "equity"
+path\_template: "/data/equity/minute\_bars/{asset\_id}.parquet"
+assets: \["AAPL", "MSFT"\]
 adjustments: "full\_adjusted" \# Handle splits/dividends
 
-strategy:  
-module: "strategies.sma\_cross"  
-class\_name: "SmaCrossoverStrategy"  
-\# These params are passed to the strategy's \_\_init\_\_  
-params:  
-fast\_ma: 20  
-slow\_ma: 50  
+strategy:
+module: "strategies.sma\_cross"
+class\_name: "SmaCrossoverStrategy"
+\# These params are passed to the strategy's \_\_init\_\_
+params:
+fast\_ma: 20
+slow\_ma: 50
 sizing\_pct: 0.10 \# 10% of equity per position
 
-broker:  
-execution:  
-\# Orders placed on bar 't' are matched against bar 't+1'  
-execute\_on\_same\_bar: false  
+broker:
+execution:
+\# Orders placed on bar 't' are matched against bar 't+1'
+execute\_on\_same\_bar: false
 fill\_policy: "at\_open" \# Market orders fill at 'open'
 
-cost\_model:  
-\# IBKR-style tiered model  
-type: "TieredCommission"  
-per\_share\_tiers:  
-\- \[0, 200000, 0.0035\]  
-\- \[200001, 1000000, 0.0020\]  
-min\_per\_order: 0.35  
+cost\_model:
+\# IBKR-style tiered model
+type: "TieredCommission"
+per\_share\_tiers:
+\- \[0, 200000, 0.0035\]
+\- \[200001, 1000000, 0.0020\]
+min\_per\_order: 0.35
 max\_per\_order\_pct: 0.005 \# 0.5% of trade value
 
-slippage\_model:  
-\# 2.5 bps slippage \+ 1% of bar volume impact  
-type: "VolumeParticipationSlippage"  
-base\_bps: 2.5  
+slippage\_model:
+\# 2.5 bps slippage \+ 1% of bar volume impact
+type: "VolumeParticipationSlippage"
+base\_bps: 2.5
 pct\_volume\_impact: 0.01
 
-risk:  
-\# Pre-trade checks  
-max\_order\_notional: 1\_000\_000  
+risk:
+\# Pre-trade checks
+max\_order\_notional: 1\_000\_000
 banned\_assets: \["META"\]
 
-\# Post-trade checks  
-max\_drawdown\_pct: 0.25 \# Halts trading if hit  
+\# Post-trade checks
+max\_drawdown\_pct: 0.25 \# Halts trading if hit
 max\_leverage: 2.0
 
-outputs:  
-path: "./results/{run\_id}"  
-artifacts:  
-\- "trades"  
-\- "positions"  
-\- "equity\_curve"  
-\- "summary\_metrics"  
+outputs:
+path: "./results/{run\_id}"
+artifacts:
+\- "trades"
+\- "positions"
+\- "equity\_curve"
+\- "summary\_metrics"
 debug\_trace: false \# Set to true to log every event
 
-\# Example of a parameter sweep  
-sweep:  
-\# Run 4 backtests in parallel  
-enabled: true  
-parallel\_jobs: 4  
-search\_type: "grid"  
-parameters:  
-strategy.params.fast\_ma: \[10, 20\]  
+\# Example of a parameter sweep
+sweep:
+\# Run 4 backtests in parallel
+enabled: true
+parallel\_jobs: 4
+search\_type: "grid"
+parameters:
+strategy.params.fast\_ma: \[10, 20\]
 strategy.params.slow\_ma: \[40, 50\]
 
 ---
@@ -853,114 +853,114 @@ strategy.params.slow\_ma: \[40, 50\]
 
 Python
 
-from abc import ABC, abstractmethod  
-from datetime import datetime  
-import polars as pl  
-from helios.events import OrderRequestEvent, FillEvent, MarketDataEvent  
+from abc import ABC, abstractmethod
+from datetime import datetime
+import polars as pl
+from helios.events import OrderRequestEvent, FillEvent, MarketDataEvent
 from helios.orders import Order
 
-class DataContext(ABC):  
+class DataContext(ABC):
 """Interface provided to the strategy for data access."""
 
-    @property  
-    @abstractmethod  
-    def universe(self) \-\> list\[int\]:  
-        """Gets the current list of asset IDs for this timestamp."""  
+    @property
+    @abstractmethod
+    def universe(self) \-\> list\[int\]:
+        """Gets the current list of asset IDs for this timestamp."""
         ...
 
-    @abstractmethod  
-    def history(self, assets: list\[int\], fields: list\[str\], lookback: int) \-\> pl.DataFrame:  
-        """  
-        Gets point-in-time historical data.  
-        Returns DataFrame \[asset\_id, timestamp, field1, field2, ...\]  
-        """  
-        ...  
-      
-    @abstractmethod  
-    def get\_last\_bar(self, asset: int) \-\> pl.Struct:  
-        """Gets the most recent bar data for an asset."""  
+    @abstractmethod
+    def history(self, assets: list\[int\], fields: list\[str\], lookback: int) \-\> pl.DataFrame:
+        """
+        Gets point-in-time historical data.
+        Returns DataFrame \[asset\_id, timestamp, field1, field2, ...\]
+        """
         ...
 
-class PortfolioContext(ABC):  
+    @abstractmethod
+    def get\_last\_bar(self, asset: int) \-\> pl.Struct:
+        """Gets the most recent bar data for an asset."""
+        ...
+
+class PortfolioContext(ABC):
 """Interface provided to the strategy for portfolio access."""
 
-    @property  
-    @abstractmethod  
-    def current\_cash(self) \-\> float:  
-        ...  
-          
-    @property  
-    @abstractmethod  
-    def current\_equity(self) \-\> float:  
-        ...  
-          
-    @abstractmethod  
-    def get\_position(self, asset: int) \-\> float:  
-        """Returns current holding in shares."""  
+    @property
+    @abstractmethod
+    def current\_cash(self) \-\> float:
         ...
 
-class StrategyBase(ABC):  
+    @property
+    @abstractmethod
+    def current\_equity(self) \-\> float:
+        ...
+
+    @abstractmethod
+    def get\_position(self, asset: int) \-\> float:
+        """Returns current holding in shares."""
+        ...
+
+class StrategyBase(ABC):
 """Base class all user strategies must inherit from."""
 
-    def \_\_init\_\_(self):  
-        \# These are injected by the engine  
-        self.data: DataContext \= None  
-        self.portfolio: PortfolioContext \= None  
-        self.\_event\_bus \= None \# Internal bus interface  
+    def \_\_init\_\_(self):
+        \# These are injected by the engine
+        self.data: DataContext \= None
+        self.portfolio: PortfolioContext \= None
+        self.\_event\_bus \= None \# Internal bus interface
         self.state: dict \= {} \# User-managed state
 
-    @abstractkey  
-    def on\_init(self, data\_context: DataContext, portfolio\_context: PortfolioContext, state: dict):  
-        """Called once at the start of the simulation."""  
-        self.data \= data\_context  
-        self.portfolio \= portfolio\_context  
+    @abstractkey
+    def on\_init(self, data\_context: DataContext, portfolio\_context: PortfolioContext, state: dict):
+        """Called once at the start of the simulation."""
+        self.data \= data\_context
+        self.portfolio \= portfolio\_context
         self.state \= state
 
-    def on\_clock(self, event: ClockEvent):  
-        """(Optional) Called on every master clock tick."""  
-        pass  
-          
-    def on\_bar(self, event: MarketDataEvent):  
-        """(Optional) Called on every market data event for subscribed assets."""  
-        pass  
-          
-    \# \--- Helper methods \---  
-      
-    def order(self, asset: int, qty: float, \*\*kwargs) \-\> str:  
-        """Places a new order. Returns order\_id."""  
-        order\_obj \= Order(asset\_id=asset, qty=qty, \*\*kwargs)  
-        self.\_event\_bus.put(OrderRequestEvent(strategy\_id=self.id, order=order\_obj))  
-        return order\_obj.order\_id  
-          
-    def order\_target\_percent(self, asset: int, pct: float, \*\*kwargs):  
-        """Calculates size for a target portfolio percentage."""  
-        target\_notional \= self.portfolio.current\_equity \* pct  
-        last\_price \= self.data.get\_last\_bar(asset)\["close"\]  
-        target\_shares \= target\_notional / last\_price  
-        current\_shares \= self.portfolio.get\_position(asset)  
-          
+    def on\_clock(self, event: ClockEvent):
+        """(Optional) Called on every master clock tick."""
+        pass
+
+    def on\_bar(self, event: MarketDataEvent):
+        """(Optional) Called on every market data event for subscribed assets."""
+        pass
+
+    \# \--- Helper methods \---
+
+    def order(self, asset: int, qty: float, \*\*kwargs) \-\> str:
+        """Places a new order. Returns order\_id."""
+        order\_obj \= Order(asset\_id=asset, qty=qty, \*\*kwargs)
+        self.\_event\_bus.put(OrderRequestEvent(strategy\_id=self.id, order=order\_obj))
+        return order\_obj.order\_id
+
+    def order\_target\_percent(self, asset: int, pct: float, \*\*kwargs):
+        """Calculates size for a target portfolio percentage."""
+        target\_notional \= self.portfolio.current\_equity \* pct
+        last\_price \= self.data.get\_last\_bar(asset)\["close"\]
+        target\_shares \= target\_notional / last\_price
+        current\_shares \= self.portfolio.get\_position(asset)
+
         self.order(asset, qty=target\_shares \- current\_shares, \*\*kwargs)
 
-    def close\_position(self, asset: int, \*\*kwargs):  
-        """Closes any open position for an asset."""  
-        qty \= self.portfolio.get\_position(asset)  
-        if qty \!= 0:  
+    def close\_position(self, asset: int, \*\*kwargs):
+        """Closes any open position for an asset."""
+        qty \= self.portfolio.get\_position(asset)
+        if qty \!= 0:
             self.order(asset, qty=-qty, \*\*kwargs)
 
-class BrokerBase(ABC):  
+class BrokerBase(ABC):
 """Interface for a pluggable Broker."""
 
-    @abstractmethod  
-    def submit\_order(self, event: OrderRequestEvent):  
-        """Adds an order to the internal book."""  
-        ...  
-          
-    @abstractmethod  
-    def match(self, event: MarketDataEvent):  
-        """  
-        Called on market data to check for fills.  
-        Must emit FillEvent(s) to the event bus.  
-        """  
+    @abstractmethod
+    def submit\_order(self, event: OrderRequestEvent):
+        """Adds an order to the internal book."""
+        ...
+
+    @abstractmethod
+    def match(self, event: MarketDataEvent):
+        """
+        Called on market data to check for fills.
+        Must emit FillEvent(s) to the event bus.
+        """
         ...
 
 \# \--- Order, Fill, and Result objects are sketched in Section 7 \---
@@ -1029,29 +1029,29 @@ All DataFrames will be stored in Parquet format with Arrow types.
 
 JSON
 
-{  
-"run\_id": "sma\_crossover\_v0\_run\_001",  
-"engine\_version": "0.1.0",  
-"schema\_version": "1.0",  
-"run\_timestamp\_utc": "2025-11-10T11:43:00Z",  
-"seed": 42,  
-"data\_hashes": {  
-"/data/equity/minute\_bars/AAPL.parquet": "sha256:abc...",  
-"/data/equity/minute\_bars/MSFT.parquet": "sha256:def..."  
-},  
-"code\_version": {  
-"git\_commit\_hash": "a1b2c3d4e5f6...",  
-"strategy\_file\_hash": "sha256:789..."  
-},  
-"environment": {  
-"python\_version": "3.12.1",  
-"helios\_version": "0.1.0",  
-"polars\_version": "0.20.10",  
-"numba\_version": "0.59.1"  
-},  
-"full\_config": {  
-"...": "The complete, resolved YAML config from Appendix A"  
-}  
+{
+"run\_id": "sma\_crossover\_v0\_run\_001",
+"engine\_version": "0.1.0",
+"schema\_version": "1.0",
+"run\_timestamp\_utc": "2025-11-10T11:43:00Z",
+"seed": 42,
+"data\_hashes": {
+"/data/equity/minute\_bars/AAPL.parquet": "sha256:abc...",
+"/data/equity/minute\_bars/MSFT.parquet": "sha256:def..."
+},
+"code\_version": {
+"git\_commit\_hash": "a1b2c3d4e5f6...",
+"strategy\_file\_hash": "sha256:789..."
+},
+"environment": {
+"python\_version": "3.12.1",
+"helios\_version": "0.1.0",
+"polars\_version": "0.20.10",
+"numba\_version": "0.59.1"
+},
+"full\_config": {
+"...": "The complete, resolved YAML config from Appendix A"
+}
 }
 
 ---

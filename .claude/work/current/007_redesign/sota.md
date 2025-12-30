@@ -91,7 +91,7 @@ data-parallel tools within a high-fidelity, event-driven framework.
 * **Zipline Reloaded:** As the direct predecessor in the *Machine Learning for Trading* book, Zipline holds a
   significant legacy. Zipline Reloaded is a community-led effort to keep the original Quantopian engine alive and
   compatible with modern Python versions.6 Its strengths lie in its event-driven nature and its "batteries-included"
-  approach, particularly its robust data  
+  approach, particularly its robust data
   bundle system for managing point-in-time correct historical data, including corporate actions.19 However, the codebase
   is large, heavily reliant on Cython, and notoriously difficult to install and maintain.6 The effort to modernize its
   core architecture to leverage new technologies like Polars or Arrow would be tantamount to a complete rewrite, making
@@ -100,7 +100,7 @@ data-parallel tools within a high-fidelity, event-driven framework.
   backtester in the open-source domain. Written primarily in C\#, it is extremely fast and features a highly modular,
   pluggable architecture.21 It provides first-class support for a vast array of asset classes (equities, futures,
   options, crypto, forex), realistic margin modeling, multi-currency accounting, and rigorous handling of corporate
-  actions and point-in-time data.7  
+  actions and point-in-time data.7
   Lean serves as the feature-parity benchmark for ml4t.backtest. Its primary strategic weakness, from the perspective of our
   target audience, is its non-native integration with Python. While it offers a Python wrapper, strategies are
   ultimately executed within the C\#/.NET runtime, creating a disconnect from the native Python data science ecosystem
@@ -109,7 +109,7 @@ data-parallel tools within a high-fidelity, event-driven framework.
 * **Nautilus Trader:** Nautilus Trader is a modern, high-performance entrant that validates the architectural direction
   proposed for ml4t.backtest.8 Its core is written in Rust for maximum speed and safety, with a Python API for strategy
   definition.8 It is event-driven, supports tick-level data with nanosecond precision, and is designed for a seamless
-  transition from backtesting to live trading.25 Its modular design, with concepts like a central  
+  transition from backtesting to live trading.25 Its modular design, with concepts like a central
   MessageBus and pluggable adapters, is a strong architectural pattern. As a relatively new project, its community and
   third-party ecosystem are still developing, but its technical foundation is exceptionally strong and serves as a key
   competitor and reference design.
@@ -252,40 +252,40 @@ The following diagram illustrates the flow of data and events through the system
 
 Code snippet
 
-graph TD  
-subgraph Input Layer  
-A \--\> B{EventBus};  
-C \--\> B;  
+graph TD
+subgraph Input Layer
+A \--\> B{EventBus};
+C \--\> B;
 end
 
-    subgraph Core Engine  
-        B \-- Events \--\> D\[Clock & Calendar\];  
-        D \-- Tick \--\> E;  
-        E \-- SignalEvent \--\> B;  
-        B \-- SignalEvent \--\> F\[PortfolioConstruction\];  
-        F \-- TargetPortfolio \--\> G;  
-        G \-- AdjustedTargets \--\> H;  
+    subgraph Core Engine
+        B \-- Events \--\> D\[Clock & Calendar\];
+        D \-- Tick \--\> E;
+        E \-- SignalEvent \--\> B;
+        B \-- SignalEvent \--\> F\[PortfolioConstruction\];
+        F \-- TargetPortfolio \--\> G;
+        G \-- AdjustedTargets \--\> H;
     end
 
-    subgraph Simulation & State  
-        H \-- OrderEvent \--\> I;  
-        I \-- FillEvent \--\> J\[PortfolioAccounting\];  
-        J \-- StateUpdate \--\> E;  
-        H \-- FillEvent \--\> B;  
+    subgraph Simulation & State
+        H \-- OrderEvent \--\> I;
+        I \-- FillEvent \--\> J\[PortfolioAccounting\];
+        J \-- StateUpdate \--\> E;
+        H \-- FillEvent \--\> B;
     end
 
-    subgraph Output Layer  
-        B \-- All Events \--\> K;  
-        K \--\> L;  
+    subgraph Output Layer
+        B \-- All Events \--\> K;
+        K \--\> L;
     end
 
-    subgraph Pluggable Modules  
-        M \--\> H;  
-        N\[FeeModels\] \--\> H;  
-        O\[PortfolioOptimizers\] \--\> F;  
+    subgraph Pluggable Modules
+        M \--\> H;
+        N\[FeeModels\] \--\> H;
+        O\[PortfolioOptimizers\] \--\> F;
     end
 
-    style E fill:\#f9f,stroke:\#333,stroke-width:2px  
+    style E fill:\#f9f,stroke:\#333,stroke-width:2px
     style J fill:\#ccf,stroke:\#333,stroke-width:2px
 
 #### **Modules & Interfaces**
@@ -302,29 +302,29 @@ Each component is defined by a Python Abstract Base Class (ABC), ensuring a clea
       find the chronologically next event, advances the simulation time to that event's timestamp, and places the event
       on the EventBus. This mechanism is fundamental to handling asynchronous data streams and guaranteeing
       point-in-time correctness.30
-    * DataFeed(ABC): The interface for all market data sources.  
-      Python  
-      from abc import ABC, abstractmethod  
+    * DataFeed(ABC): The interface for all market data sources.
+      Python
+      from abc import ABC, abstractmethod
       from typing import Optional, Generator
 
-      class DataFeed(ABC):  
-      @abstractmethod  
-      def get\_next\_event(self) \-\> Optional\[Event\]:  
-      """Returns the next event from this feed, or None if exhausted."""  
+      class DataFeed(ABC):
+      @abstractmethod
+      def get\_next\_event(self) \-\> Optional\[Event\]:
+      """Returns the next event from this feed, or None if exhausted."""
       pass
 
     * SignalSource(ABC): A similar interface for ingesting external ML predictions.
 * **Strategy & Logic:**
     * Strategy(ABC): The user-defined class containing the trading logic. It subscribes to events and reacts by
-      generating SignalEvents.  
-      Python  
-      class Strategy(ABC):  
-      def \_\_init\_\_(self, broker: 'Broker', data: 'PITData'):  
-      self.broker \= broker  
+      generating SignalEvents.
+      Python
+      class Strategy(ABC):
+      def \_\_init\_\_(self, broker: 'Broker', data: 'PITData'):
+      self.broker \= broker
       self.data \= data
 
-          def on\_start(self): pass  
-          def on\_event(self, event: Event): pass  
+          def on\_start(self): pass
+          def on\_event(self, event: Event): pass
           def on\_stop(self): pass
 
 * **Execution & Simulation:**
@@ -438,51 +438,51 @@ via instance attributes.
 
 **Example Strategy Skeletons:**
 
-1. **Simple Indicator-Based Strategy:**  
-   Python  
-   from ml4t.backtest import Strategy, Event, MarketEvent  
+1. **Simple Indicator-Based Strategy:**
+   Python
+   from ml4t.backtest import Strategy, Event, MarketEvent
    from ml4t.backtest.indicators import SMA
 
-   class MovingAverageCross(Strategy):  
-   def on\_start(self):  
-   \# Subscribe to daily bars for SPY  
-   self.subscribe(asset="SPY", event\_type="BAR", frequency="1D")  
-   \# Initialize indicators  
-   self.slow\_ma \= SMA(period=200)  
+   class MovingAverageCross(Strategy):
+   def on\_start(self):
+   \# Subscribe to daily bars for SPY
+   self.subscribe(asset="SPY", event\_type="BAR", frequency="1D")
+   \# Initialize indicators
+   self.slow\_ma \= SMA(period=200)
    self.fast\_ma \= SMA(period=50)
 
-       def on\_event(self, event: Event):  
-           if isinstance(event, MarketEvent) and event.asset \== "SPY":  
-               \# Update indicators with the latest close price  
-               slow\_val \= self.slow\_ma.update(event.bar\['close'\])  
+       def on\_event(self, event: Event):
+           if isinstance(event, MarketEvent) and event.asset \== "SPY":
+               \# Update indicators with the latest close price
+               slow\_val \= self.slow\_ma.update(event.bar\['close'\])
                fast\_val \= self.fast\_ma.update(event.bar\['close'\])
 
-               if fast\_val \> slow\_val:  
-                   \# Target 100% allocation to SPY  
-                   self.broker.order\_target\_percent(asset="SPY", percent=1.0)  
-               else:  
-                   \# Exit position  
+               if fast\_val \> slow\_val:
+                   \# Target 100% allocation to SPY
+                   self.broker.order\_target\_percent(asset="SPY", percent=1.0)
+               else:
+                   \# Exit position
                    self.broker.order\_target\_percent(asset="SPY", percent=0.0)
 
-2. **ML Signal-Based Strategy:**  
-   Python  
+2. **ML Signal-Based Strategy:**
+   Python
    from ml4t.backtest import Strategy, Event, SignalEvent
 
-   class MLSignalStrategy(Strategy):  
-   def on\_start(self):  
-   \# Subscribe to signals from a specific model  
+   class MLSignalStrategy(Strategy):
+   def on\_start(self):
+   \# Subscribe to signals from a specific model
    self.subscribe(event\_type="SIGNAL", model\_id="my\_xgboost\_v2")
 
-       def on\_event(self, event: Event):  
-           if isinstance(event, SignalEvent):  
-               \# Access point-in-time data for the asset  
+       def on\_event(self, event: Event):
+           if isinstance(event, SignalEvent):
+               \# Access point-in-time data for the asset
                last\_price \= self.data.get\_latest\_price(event.asset)
 
-               if event.score \> 0.75 and last\_price:  
-                   \# Buy if signal is strong and we have a recent price  
-                   self.broker.order\_target\_value(asset=event.asset, value=10000)  
-               elif event.score \< 0.25:  
-                   \# Liquidate position on a weak signal  
+               if event.score \> 0.75 and last\_price:
+                   \# Buy if signal is strong and we have a recent price
+                   self.broker.order\_target\_value(asset=event.asset, value=10000)
+               elif event.score \< 0.25:
+                   \# Liquidate position on a weak signal
                    self.broker.order\_target\_value(asset=event.asset, value=0)
 
 #### **Declarative Configuration (TOML/YAML)**
@@ -495,36 +495,36 @@ altering Python code and ensures that every backtest run is fully specified by i
 
 Ini, TOML
 
-\[backtest\]  
-start\_date \= "2020-01-01"  
-end\_date \= "2024-12-31"  
-base\_currency \= "USD"  
+\[backtest\]
+start\_date \= "2020-01-01"
+end\_date \= "2024-12-31"
+base\_currency \= "USD"
 run\_manifest \= "run\_manifest.json"
 
-\[broker\]  
-initial\_cash \= 100000.0  
-commission\_model \= { type \= "FixedPerShare", fee \= 0.005 }  
+\[broker\]
+initial\_cash \= 100000.0
+commission\_model \= { type \= "FixedPerShare", fee \= 0.005 }
 slippage\_model \= { type \= "VolumeShare", volume\_limit \= 0.025, price\_impact \= 0.1 }
 
-\[\[data\_feeds\]\]  
-name \= "us\_equity\_daily"  
-type \= "ParquetFeed"  
+\[\[data\_feeds\]\]
+name \= "us\_equity\_daily"
+type \= "ParquetFeed"
 path \= "/data/us\_equity\_daily.parquet"
 
-\[\[signal\_sources\]\]  
-name \= "ml\_signals"  
-type \= "ParquetSignalSource"  
+\[\[signal\_sources\]\]
+name \= "ml\_signals"
+type \= "ParquetSignalSource"
 path \= "/data/signals\_v2.parquet"
 
-\# A simple strategy can be defined directly in the config  
-\[\[strategies\]\]  
-name \= "SimpleSignalFollower"  
-type \= "DeclarativeStrategy"  
-rules \= \[  
+\# A simple strategy can be defined directly in the config
+\[\[strategies\]\]
+name \= "SimpleSignalFollower"
+type \= "DeclarativeStrategy"
+rules \= \[
 { signal\_source \= "ml\_signals", condition \= "score \> 0.7", action \= "target\_percent", asset \= "signal.asset",
-percent \= 1.0 },  
+percent \= 1.0 },
 { signal\_source \= "ml\_signals", condition \= "score \< 0.3", action \= "target\_percent", asset \= "signal.asset",
-percent \= 0.0 }  
+percent \= 0.0 }
 \]
 
 **Guidelines for Use:**
@@ -586,7 +586,7 @@ models.
   calculate and deduct borrow costs from the cash balance on a daily basis, using either a fixed rate or a dynamic feed
   of borrow rates.
 * **Margin and Leverage:** A MarginModel, inspired by QuantConnect's implementation 34, will continuously monitor the
-  portfolio's maintenance margin. If the portfolio value drops below the required margin, it will trigger a  
+  portfolio's maintenance margin. If the portfolio value drops below the required margin, it will trigger a
   MarginCallEvent, and a ForcedLiquidationModel will automatically liquidate positions to bring the account back into
   compliance.
 * **Cryptocurrency Perpetuals Funding:** For crypto assets, a FundingRateModel will be supported. This model will apply
@@ -739,7 +739,7 @@ Ensuring that a backtest can be perfectly reproduced is a non-negotiable require
     * The full configuration used for the run.
     * The master seed for the PRNG.
     * Cryptographic hashes (e.g., SHA-256) of all input data files (prices, signals, features).
-    * Version information for ml4t.backtest and key dependencies (polars, numba, etc.).  
+    * Version information for ml4t.backtest and key dependencies (polars, numba, etc.).
       This manifest provides a complete "fingerprint" of the backtest, allowing anyone to replicate the results exactly.
 
 #### **Benchmarks and Targets**
@@ -771,7 +771,7 @@ ml4t.backtest.
     * A set of input data files (prices, corporate actions, signals).
     * A strategy file and configuration.
     * A pre-computed set of "golden" output artifacts (trade logs, portfolio NAV series) that represent the known
-      correct result.  
+      correct result.
       The CI pipeline will run these backtests and perform a bit-for-bit comparison of the generated artifacts against
       the golden files. Any discrepancy indicates a regression. These scenarios will cover complex edge cases,
       including:

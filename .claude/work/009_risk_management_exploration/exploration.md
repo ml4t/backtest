@@ -192,7 +192,7 @@ class RiskManager:
     ) -> Order | None:
         """
         Validate and potentially modify order before submission.
-        
+
         Returns:
             - Modified order if valid
             - None if order rejected
@@ -215,10 +215,10 @@ for market_event in clock:
         broker,
         portfolio
     )
-    
+
     for exit_order in exit_orders:
         broker.submit_order(exit_order)
-    
+
     # Strategy continues with signal generation
     strategy.on_market_event(market_event)
 ```
@@ -238,7 +238,7 @@ class RiskManager:
     ) -> list[Order]:
         """
         Check all open positions against exit rules.
-        
+
         Returns:
             List of exit orders for positions that violate rules
         """
@@ -277,37 +277,37 @@ Integrate all three hooks (B, C, D) in event loop:
 for market_event in self.clock:
     # Hook C: Check position exits FIRST
     exit_orders = self.risk_manager.check_position_exits(
-        market_event, 
-        self.broker, 
+        market_event,
+        self.broker,
         self.portfolio
     )
     for exit_order in exit_orders:
         self.broker.submit_order(exit_order)
-    
+
     # Strategy generates signal
     if self.strategy:
         self.strategy.on_market_event(market_event, context)
-    
+
     # Hook B: Validate strategy orders
     for pending_order in self.broker.get_pending_orders():
         validated = self.risk_manager.validate_order(
-            pending_order, 
+            pending_order,
             self._build_context(market_event)
         )
         if not validated:
             self.broker.cancel_order(pending_order.order_id)
-    
+
     # Broker executes orders and generates fills
     fills = self.broker.on_market_event(market_event)
-    
+
     # Hook D: Record fills for rule state tracking
     for fill in fills:
         self.risk_manager.record_fill(fill, market_event)
-    
+
     # Propagate events to portfolio and reporter
     for fill in fills:
         self.portfolio.on_fill_event(fill)
-    
+
     # Update position prices
     self.portfolio.on_market_event(market_event)
 ```
@@ -336,7 +336,7 @@ class RiskContext:
     # Identifiers
     timestamp: datetime
     asset_id: AssetId
-    
+
     # Market state (read-only snapshot)
     market_price: float
     high: float | None
@@ -345,7 +345,7 @@ class RiskContext:
     volume: float | None
     bid: float | None
     ask: float | None
-    
+
     # Position state (aggregated from broker.position_tracker)
     position_quantity: float
     entry_price: float
@@ -354,18 +354,18 @@ class RiskContext:
     unrealized_pnl: float
     max_favorable_excursion: float
     max_adverse_excursion: float
-    
+
     # Trade history
     realized_pnl: float
     trades_today: int
     daily_pnl: float
     daily_max_loss: float
-    
+
     # Portfolio state
     portfolio_equity: float
     portfolio_cash: float
     current_leverage: float
-    
+
     # Features/indicators (user-provided)
     features: dict[str, float]
 ```
@@ -400,16 +400,16 @@ class RiskManager:
     def __init__(self):
         self._rules: list[RiskRule] = []
         self._position_state: dict[AssetId, PositionTradeState] = {}
-    
+
     def register_rule(self, rule: RiskRule) -> None:
         """Register a risk rule."""
-    
+
     def check_position_exits(self, market_event, broker, portfolio) -> list[Order]:
         """Check if any rules trigger exit orders."""
-    
+
     def validate_order(self, order, context) -> Order | None:
         """Validate order against rules."""
-    
+
     def record_fill(self, fill_event, market_event) -> None:
         """Update rule state after fill."""
 ```
@@ -708,10 +708,10 @@ class PositionTradeState:
 
 class RiskManager:
     """Manages risk rules and position monitoring."""
-    
+
     def register_rule(self, rule: RiskRule) -> None:
         """Register a risk rule to be evaluated."""
-    
+
     def check_position_exits(
         self,
         market_event: MarketEvent,
@@ -719,22 +719,22 @@ class RiskManager:
         portfolio: Portfolio,
     ) -> list[Order]:
         """Check all open positions against rules.
-        
+
         Returns:
             List of exit orders for positions violating rules.
         """
-    
+
     def validate_order(
         self,
         order: Order,
         context: RiskContext,
     ) -> Order | None:
         """Validate and potentially modify order.
-        
+
         Returns:
             Modified order if valid, None if rejected.
         """
-    
+
     def record_fill(
         self,
         fill_event: FillEvent,
@@ -747,14 +747,14 @@ class RiskManager:
 
 class RiskRule(ABC):
     """Abstract base for risk rules."""
-    
+
     @abstractmethod
     def evaluate(self, context: RiskContext) -> RiskDecision:
         """Evaluate rule against context.
-        
+
         Args:
             context: Immutable snapshot of current state
-        
+
         Returns:
             RiskDecision with actions (exit, TP/SL updates, etc.)
         """
@@ -764,10 +764,10 @@ class RiskRule(ABC):
 
 class TimeBasedExit(RiskRule):
     """Exit position after max holding period."""
-    
+
     def __init__(self, max_bars: int):
         self.max_bars = max_bars
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         if context.entry_bars_ago >= self.max_bars:
             return RiskDecision(
@@ -780,18 +780,18 @@ class TimeBasedExit(RiskRule):
 
 class VolatilityScaledStopLoss(RiskRule):
     """Stop loss scaled to current volatility."""
-    
+
     def __init__(self, atr_multiplier: float = 2.0):
         self.atr_multiplier = atr_multiplier
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         atr = context.features.get('atr', 0)
         if atr == 0:
             return RiskDecision()
-        
+
         # SL is N ATRs below entry
         sl_price = context.entry_price - self.atr_multiplier * atr
-        
+
         return RiskDecision(
             update_sl=sl_price,
             reason=f"Volatility-scaled SL: {self.atr_multiplier}x ATR"
@@ -800,23 +800,23 @@ class VolatilityScaledStopLoss(RiskRule):
 
 class RegimeDependentRule(RiskRule):
     """Different rules based on market regime."""
-    
+
     def __init__(self):
         self.high_vol_params = {'sl_multiplier': 1.5, 'tp_multiplier': 0.75}
         self.low_vol_params = {'sl_multiplier': 3.0, 'tp_multiplier': 1.5}
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         regime = context.features.get('regime', 'neutral')
         atr = context.features.get('atr', 0)
-        
+
         if regime == 'high_vol':
             params = self.high_vol_params
         else:
             params = self.low_vol_params
-        
+
         sl = context.entry_price - params['sl_multiplier'] * atr
         tp = context.entry_price + params['tp_multiplier'] * atr
-        
+
         return RiskDecision(
             update_sl=sl,
             update_tp=tp,
@@ -826,13 +826,13 @@ class RegimeDependentRule(RiskRule):
 
 class MaxDailyLossRule(RiskRule):
     """Prevent trading if daily loss exceeds threshold."""
-    
+
     def __init__(self, max_loss_pct: float = 0.02):
         self.max_loss_pct = max_loss_pct
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         max_loss_amount = context.portfolio_equity * self.max_loss_pct
-        
+
         if context.daily_max_loss >= max_loss_amount:
             return RiskDecision(
                 should_exit=True,
@@ -844,20 +844,20 @@ class MaxDailyLossRule(RiskRule):
 
 class DynamicTrailingStop(RiskRule):
     """Trailing stop that tightens over time."""
-    
+
     def __init__(self, initial_trail: float, tighten_per_bar: float = 0.001):
         self.initial_trail = initial_trail
         self.tighten_per_bar = tighten_per_bar
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         # Trail amount decreases as position ages
         bars_held = context.entry_bars_ago
         trail = self.initial_trail - (bars_held * self.tighten_per_bar)
         trail = max(trail, 0.01)  # Minimum 1 bp
-        
+
         mfe = context.max_favorable_excursion
         sl = mfe - (mfe * trail)
-        
+
         return RiskDecision(
             update_sl=sl,
             reason=f"Dynamic trailing stop (trail={trail:.4f})"
@@ -872,7 +872,7 @@ from ml4t.backtest.execution.order import Order, OrderSide, OrderType
 
 class SimpleStrategy(Strategy):
     """Basic strategy using bracket orders (no RiskManager needed)."""
-    
+
     def on_market_event(self, event):
         if self.should_trade(event):
             # Existing bracket order API still works
@@ -904,14 +904,14 @@ from ml4t.backtest.core.event import MarketEvent
 
 class VolatilityStrategy(Strategy):
     """Strategy using volatility-scaled stops via RiskManager."""
-    
+
     def on_start(self, **kwargs):
         # Create and configure risk manager
         self.risk_manager = RiskManager()
         self.risk_manager.register_rule(
             VolatilityScaledStopLoss(atr_multiplier=2.0)
         )
-    
+
     def on_market_event(self, event: MarketEvent):
         # Strategy just generates entry signals
         # Exit rules are handled by RiskManager
@@ -923,7 +923,7 @@ class VolatilityStrategy(Strategy):
                 order_type=OrderType.MARKET,
             )
             self.broker.submit_order(order)
-    
+
     def should_trade(self, event):
         # Simplified logic
         return event.close > event.open
@@ -955,7 +955,7 @@ from ml4t.backtest.execution.risk import (
 
 class CustomExitRule(RiskRule):
     """Custom rule: exit if price touches upper band."""
-    
+
     def evaluate(self, context: RiskContext) -> RiskDecision:
         upper_band = context.features.get('upper_band')
         if upper_band and context.market_price >= upper_band:
@@ -967,10 +967,10 @@ class CustomExitRule(RiskRule):
 
 class AdvancedStrategy(Strategy):
     """Strategy with stacked rules and custom logic."""
-    
+
     def on_start(self, **kwargs):
         self.risk_manager = RiskManager()
-        
+
         # Stack multiple rules
         self.risk_manager.register_rule(
             VolatilityScaledStopLoss(atr_multiplier=2.0)
@@ -987,14 +987,14 @@ class AdvancedStrategy(Strategy):
         self.risk_manager.register_rule(
             CustomExitRule()  # User-defined
         )
-    
+
     def on_market_event(self, event):
         # Entry logic unaware of exit rules
         if self._ml_signal_strong(event):
             # Feeds events with features (ATR, regime, bands)
             order = Order(...)
             self.broker.submit_order(order)
-    
+
     def _ml_signal_strong(self, event):
         # User's ML logic
         confidence = event.signals.get('ml_confidence', 0)
@@ -1019,11 +1019,11 @@ risk_rules:
     name: vol_stops
     atr_multiplier: 2.0
     asset_filter: [AAPL, MSFT]
-  
+
   - type: time_based_exit
     name: max_holding
     max_bars: 20
-  
+
   - type: regime_dependent
     name: regime_rules
     high_vol_config:
@@ -1032,7 +1032,7 @@ risk_rules:
     low_vol_config:
       sl_multiplier: 3.0
       tp_multiplier: 1.5
-  
+
   - type: max_daily_loss
     name: daily_limit
     max_loss_pct: 0.05
@@ -1183,15 +1183,15 @@ from ml4t.backtest.core.types import AssetId
 @dataclass(frozen=True)
 class RiskContext:
     """Immutable snapshot of strategy and market state.
-    
+
     Passed to RiskRule.evaluate() for decision-making.
     All rules operate on this read-only context.
     """
-    
+
     # ===== Identifiers =====
     timestamp: datetime
     asset_id: AssetId
-    
+
     # ===== Market State (Current Bar) =====
     market_price: float  # Latest price
     high: Optional[float]  # Bar high
@@ -1200,29 +1200,29 @@ class RiskContext:
     volume: Optional[float]  # Bar volume
     bid: Optional[float]  # Best bid
     ask: Optional[float]  # Best ask
-    
+
     # ===== Position State (Current) =====
     position_quantity: float  # Signed quantity (+ long, - short)
     entry_price: float  # Average entry price
     entry_time: datetime  # When position opened
     entry_bars_ago: int  # Bars since entry (0 = current bar)
     unrealized_pnl: float  # Current P&L
-    
+
     # ===== Price Extremes Since Entry =====
     max_favorable_excursion: float  # Best price since entry
     max_adverse_excursion: float  # Worst price since entry
-    
+
     # ===== Trade History (Day-Level) =====
     realized_pnl: float  # P&L from closed positions today
     trades_today: int  # Number of closed trades today
     daily_pnl: float  # Total P&L (realized + unrealized) today
     daily_max_loss: float  # Largest single-trade loss today
-    
+
     # ===== Portfolio State =====
     portfolio_equity: float  # Total portfolio value
     portfolio_cash: float  # Available cash
     current_leverage: float  # Current leverage (gross notional / equity)
-    
+
     # ===== External Features (User-Provided) =====
     features: dict[str, float]  # {atr, volatility, regime, upper_band, ...}
 ```
@@ -1236,25 +1236,25 @@ from typing import Optional
 
 class RiskRule(ABC):
     """Abstract base class for risk rules.
-    
+
     Rules are pure functions that evaluate context
     and return decisions (exit, TP/SL updates, etc.).
-    
+
     Rules CANNOT modify system state.
     Rules CANNOT access broker/portfolio directly.
     Rules CANNOT generate random behavior (must be deterministic).
     """
-    
+
     @abstractmethod
     def evaluate(self, context: RiskContext) -> "RiskDecision":
         """Evaluate this rule against current context.
-        
+
         Args:
             context: Immutable snapshot of current state
-        
+
         Returns:
             RiskDecision with recommended actions
-        
+
         Raises:
             ValueError: If context is invalid
         """
@@ -1262,27 +1262,27 @@ class RiskRule(ABC):
 @dataclass
 class RiskDecision:
     """Output of rule evaluation.
-    
+
     Contains recommended actions:
     - Exit position
     - Update take-profit price
     - Update stop-loss price
     - Custom metadata
     """
-    
+
     # ===== Exit Decision =====
     should_exit: bool = False
     exit_type: Optional[str] = None  # "immediate", "limit", "stop", "flatten_all"
     exit_price: Optional[float] = None  # If exit_type="limit"
-    
+
     # ===== Price Adjustments =====
     update_tp: Optional[float] = None  # New take-profit price
     update_sl: Optional[float] = None  # New stop-loss price
-    
+
     # ===== Metadata =====
     reason: str = ""  # Human-readable explanation
     metadata: dict = field(default_factory=dict)  # Custom data
-    
+
     # ===== Priority (for composition) =====
     priority: int = 0  # Higher = evaluated first
 ```
@@ -1292,22 +1292,22 @@ class RiskDecision:
 ```python
 class RiskManager:
     """Orchestrates risk rule evaluation and position monitoring.
-    
+
     Responsibilities:
     1. Register/manage risk rules
     2. Monitor open positions against rules
     3. Validate strategy orders
     4. Track position state for rule evaluation
     """
-    
+
     def register_rule(self, rule: RiskRule, priority: int = 0) -> None:
         """Register a risk rule.
-        
+
         Args:
             rule: RiskRule instance to evaluate
             priority: Evaluation priority (higher first)
         """
-    
+
     def check_position_exits(
         self,
         market_event: MarketEvent,
@@ -1315,50 +1315,50 @@ class RiskManager:
         portfolio: Portfolio,
     ) -> list[Order]:
         """Check all open positions against registered rules.
-        
+
         Called every market event to monitor position exits.
-        
+
         Args:
             market_event: Current market event with OHLCV data
             broker: Broker for position access
             portfolio: Portfolio for state access
-        
+
         Returns:
             List of exit orders for positions violating rules
         """
-    
+
     def validate_order(
         self,
         order: Order,
         context: RiskContext,
     ) -> Optional[Order]:
         """Validate and potentially modify order before submission.
-        
+
         Called before broker.submit_order() to apply risk constraints.
-        
+
         Args:
             order: Order to validate
             context: Current market/portfolio context
-        
+
         Returns:
             - Modified order if valid
             - None if order should be rejected
         """
-    
+
     def record_fill(
         self,
         fill_event: FillEvent,
         market_event: MarketEvent,
     ) -> None:
         """Update position state after fill.
-        
+
         Called when position is filled to maintain rule state.
-        
+
         Args:
             fill_event: Fill event from broker
             market_event: Associated market event
         """
-    
+
     # Private methods (implementation details)
     def _build_context(
         self,
@@ -1368,7 +1368,7 @@ class RiskManager:
         position_state: "PositionTradeState",
     ) -> RiskContext:
         """Build immutable context snapshot."""
-    
+
     def _create_exit_order(
         self,
         asset_id: AssetId,
@@ -1385,24 +1385,24 @@ class RiskManager:
 @dataclass
 class PositionTradeState:
     """Internal state for tracking open positions (RiskManager use only)."""
-    
+
     asset_id: AssetId
     entry_time: datetime
     entry_price: float
     entry_quantity: float
     entry_bars: int = 0
-    
+
     max_favorable_excursion: float = 0.0
     max_adverse_excursion: float = 0.0
-    
+
     daily_pnl: float = 0.0
     daily_max_loss: float = 0.0
     trades_today: int = 0
-    
+
     def update_on_market_event(self, context: RiskContext) -> None:
         """Update MFE/MAE and bar count."""
         self.entry_bars += 1
-        
+
         price = context.market_price
         if (entry_direction := 1 if context.position_quantity > 0 else -1) > 0:
             # Long position
@@ -1597,7 +1597,7 @@ assert decision.update_sl == pytest.approx(sl)
 
 The recommended approach combines:
 1. **Separate RiskManager component** for clean architecture
-2. **Composable RiskRule implementations** for extensibility  
+2. **Composable RiskRule implementations** for extensibility
 3. **Immutable RiskContext snapshots** for safety and testability
 4. **Three strategic hook points** in the event loop
 5. **Full backward compatibility** with existing code

@@ -1,11 +1,7 @@
 {
-  "project": "qengine",
-  "parent": "quantlab",
-  "framework_version": "2.0",
-  "workflow": {
-    "enabled": true,
-    "inherit_from_parent": true
-  },
+  "project": "ml4t-backtest",
+  "description": "Event-driven backtesting engine for quantitative trading strategies",
+  "framework_version": "3.1",
   "extraKnownMarketplaces": {
     "local": {
       "source": {
@@ -19,6 +15,45 @@
     "workflow@local": true,
     "memory@local": true,
     "development@local": true,
+    "quant@local": true,
     "transition@local": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(pytest:*)",
+      "Bash(python:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(git:*)",
+      "Bash(uv:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(diff:*)",
+      "Bash(source:*)",
+      "WebSearch",
+      "WebFetch(domain:vectorbt.pro)",
+      "WebFetch(domain:vectorbt.dev)",
+      "WebFetch(domain:zipline.ml4trading.io)",
+      "WebFetch(domain:www.backtrader.com)",
+      "WebFetch(domain:pandas.pydata.org)",
+      "WebFetch(domain:pola.rs)",
+      "WebFetch(domain:docs.pola.rs)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "mcp__serena__*",
+      "SlashCommand"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)"
+    ],
+    "additionalDirectories": [
+      "/home/stefan/ml2t/"
+    ]
   }
 }
