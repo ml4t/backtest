@@ -1,8 +1,11 @@
 """Portfolio-level risk limits."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
+from typing import Any
+
+import numpy as np
 
 
 class PortfolioLimit(ABC):
@@ -69,6 +72,7 @@ class PortfolioState:
         gross_exposure: Sum of absolute position values
         net_exposure: Sum of signed position values
         timestamp: Current time
+        context: Optional strategy-provided context (e.g., historical returns for VaR)
     """
 
     equity: float
@@ -81,6 +85,7 @@ class PortfolioState:
     gross_exposure: float
     net_exposure: float
     timestamp: date | datetime | None = None
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -265,4 +270,138 @@ class NetExposureLimit(PortfolioLimit):
                     action=self.action,
                     reason=f"net exposure {net_ratio:.1%} < min {self.min_net_exposure:.1%}",
                 )
+        return LimitResult.ok()
+
+
+@dataclass
+class VaRLimit(PortfolioLimit):
+    """Limit portfolio exposure based on Value at Risk.
+
+    VaR estimates the maximum loss at a given confidence level over a period.
+    This limit triggers when the portfolio's VaR exceeds a threshold.
+
+    Uses historical returns from state.context["historical_returns"] to compute
+    VaR using the historical simulation method (percentile-based).
+
+    Args:
+        threshold: Maximum acceptable VaR as decimal (0.05 = 5% max loss)
+        confidence_level: Confidence level for VaR (0.95 = 95% confidence)
+        lookback_days: Minimum days of history required (default: 20)
+        action: Action when breached ("warn", "reduce", "halt")
+        returns_key: Key in context for historical returns array
+
+    Example:
+        limit = VaRLimit(threshold=0.05, confidence_level=0.95, lookback_days=20)
+        # Strategy must provide historical returns in context:
+        state.context["historical_returns"] = daily_returns_array
+
+    Note:
+        If historical_returns not found or insufficient data, limit does not
+        trigger (returns LimitResult.ok()). This allows graceful degradation
+        during backtest warmup period.
+    """
+
+    threshold: float = 0.05  # 5% default VaR threshold
+    confidence_level: float = 0.95  # 95% confidence
+    lookback_days: int = 20
+    action: str = "warn"
+    returns_key: str = "historical_returns"
+
+    def check(self, state: PortfolioState) -> LimitResult:
+        """Check if portfolio VaR exceeds threshold."""
+        # Get historical returns from context
+        returns = state.context.get(self.returns_key)
+
+        if returns is None:
+            return LimitResult.ok()  # No data, cannot evaluate
+
+        returns_arr = np.asarray(returns)
+
+        if len(returns_arr) < self.lookback_days:
+            return LimitResult.ok()  # Insufficient history
+
+        # Use most recent lookback_days for VaR calculation
+        recent_returns = returns_arr[-self.lookback_days :]
+
+        # Historical VaR: percentile of returns at (1 - confidence) level
+        # For 95% confidence, we want the 5th percentile (worst 5% of returns)
+        var = -np.percentile(recent_returns, (1 - self.confidence_level) * 100)
+
+        if var > self.threshold:
+            return LimitResult(
+                breached=True,
+                action=self.action,
+                reason=f"VaR {var:.2%} > threshold {self.threshold:.2%} "
+                f"at {self.confidence_level:.0%} confidence",
+            )
+
+        return LimitResult.ok()
+
+
+@dataclass
+class CVaRLimit(PortfolioLimit):
+    """Limit portfolio exposure based on Conditional Value at Risk (CVaR).
+
+    CVaR (Expected Shortfall) is the expected loss given that VaR is exceeded.
+    It captures tail risk better than VaR by considering the average of all
+    losses beyond the VaR threshold.
+
+    Uses historical returns from state.context["historical_returns"] to compute
+    CVaR using the historical simulation method.
+
+    Args:
+        threshold: Maximum acceptable CVaR as decimal (0.08 = 8% expected shortfall)
+        confidence_level: Confidence level for CVaR (0.95 = 95% confidence)
+        lookback_days: Minimum days of history required (default: 20)
+        action: Action when breached ("warn", "reduce", "halt")
+        returns_key: Key in context for historical returns array
+
+    Example:
+        limit = CVaRLimit(threshold=0.08, confidence_level=0.95, action="halt")
+        # CVaR is always >= VaR at the same confidence level
+
+    Note:
+        CVaR is generally preferred over VaR for tail risk management
+        as it considers the severity of losses beyond the VaR threshold.
+    """
+
+    threshold: float = 0.08  # 8% default CVaR threshold
+    confidence_level: float = 0.95
+    lookback_days: int = 20
+    action: str = "warn"
+    returns_key: str = "historical_returns"
+
+    def check(self, state: PortfolioState) -> LimitResult:
+        """Check if portfolio CVaR exceeds threshold."""
+        # Get historical returns from context
+        returns = state.context.get(self.returns_key)
+
+        if returns is None:
+            return LimitResult.ok()  # No data, cannot evaluate
+
+        returns_arr = np.asarray(returns)
+
+        if len(returns_arr) < self.lookback_days:
+            return LimitResult.ok()  # Insufficient history
+
+        # Use most recent lookback_days
+        recent_returns = returns_arr[-self.lookback_days :]
+
+        # CVaR: mean of returns below VaR threshold
+        var_threshold = np.percentile(recent_returns, (1 - self.confidence_level) * 100)
+        tail_returns = recent_returns[recent_returns <= var_threshold]
+
+        if len(tail_returns) == 0:
+            return LimitResult.ok()  # Edge case: no tail returns
+
+        cvar = -np.mean(tail_returns)
+
+        if cvar > self.threshold:
+            return LimitResult(
+                breached=True,
+                action=self.action,
+                reason=f"CVaR {cvar:.2%} > threshold {self.threshold:.2%} "
+                f"at {self.confidence_level:.0%} confidence",
+            )
+
         return LimitResult.ok()

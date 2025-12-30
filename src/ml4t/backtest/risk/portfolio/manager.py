@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from typing import Any
 
 from .limits import LimitResult, PortfolioLimit, PortfolioState
 
@@ -62,6 +63,7 @@ class RiskManager:
         equity: float,
         positions: dict[str, float],
         timestamp: datetime | None = None,
+        context: dict[str, Any] | None = None,
     ) -> list[LimitResult]:
         """Update risk state and check all limits.
 
@@ -69,6 +71,7 @@ class RiskManager:
             equity: Current portfolio equity
             positions: Dict of asset -> position market value
             timestamp: Current timestamp
+            context: Optional context dict with historical data (e.g., returns for VaR)
 
         Returns:
             List of LimitResult for any breached limits
@@ -87,7 +90,7 @@ class RiskManager:
             self._last_date = current_date
 
         # Build portfolio state
-        state = self._build_state(equity, positions, timestamp)
+        state = self._build_state(equity, positions, timestamp, context or {})
 
         # Check all limits
         results = []
@@ -111,6 +114,7 @@ class RiskManager:
         equity: float,
         positions: dict[str, float],
         timestamp: date | datetime | None,
+        context: dict[str, Any] | None = None,
     ) -> PortfolioState:
         """Build PortfolioState from current data."""
         # Calculate drawdown
@@ -137,6 +141,7 @@ class RiskManager:
             gross_exposure=gross_exposure,
             net_exposure=net_exposure,
             timestamp=timestamp,
+            context=context or {},
         )
 
     def can_open_position(self) -> bool:
@@ -189,14 +194,20 @@ class RiskManager:
         self._halted = False
         self._halt_reason = ""
 
-    def get_state(self, equity: float, positions: dict[str, float]) -> PortfolioState:
+    def get_state(
+        self,
+        equity: float,
+        positions: dict[str, float],
+        context: dict[str, Any] | None = None,
+    ) -> PortfolioState:
         """Get current portfolio state for external inspection.
 
         Args:
             equity: Current portfolio equity
             positions: Dict of asset -> position market value
+            context: Optional context dict with historical data
 
         Returns:
             PortfolioState with all calculated metrics
         """
-        return self._build_state(equity, positions, self._last_date)
+        return self._build_state(equity, positions, self._last_date, context)

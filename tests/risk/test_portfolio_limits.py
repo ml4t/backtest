@@ -1,6 +1,9 @@
 """Tests for portfolio-level risk limits."""
 
+import numpy as np
+
 from ml4t.backtest.risk.portfolio.limits import (
+    CVaRLimit,
     DailyLossLimit,
     GrossExposureLimit,
     LimitResult,
@@ -9,6 +12,7 @@ from ml4t.backtest.risk.portfolio.limits import (
     MaxPositionsLimit,
     NetExposureLimit,
     PortfolioState,
+    VaRLimit,
 )
 
 
@@ -423,3 +427,252 @@ class TestNetExposureLimit:
         )
         result = limit.check(state)
         assert not result.breached  # No error
+
+
+class TestVaRLimit:
+    """Test VaRLimit (Value at Risk)."""
+
+    def _make_state(self, returns: list | np.ndarray | None = None) -> PortfolioState:
+        """Helper to create PortfolioState with returns in context."""
+        context = {}
+        if returns is not None:
+            context["historical_returns"] = returns
+        return PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"A": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=50000.0,
+            net_exposure=50000.0,
+            context=context,
+        )
+
+    def test_no_breach_low_volatility(self):
+        """Test no breach when VaR is below threshold."""
+        limit = VaRLimit(threshold=0.05, confidence_level=0.95, lookback_days=20)
+        # Generate low-volatility returns (std ~1% daily)
+        np.random.seed(42)
+        returns = np.random.normal(0.0005, 0.01, 30)  # 30 days of 1% daily vol
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_breach_high_volatility(self):
+        """Test breach when VaR exceeds threshold."""
+        limit = VaRLimit(threshold=0.02, confidence_level=0.95, lookback_days=20, action="halt")
+        # Generate high-volatility returns with large losses
+        np.random.seed(42)
+        returns = np.random.normal(0.0, 0.03, 30)  # 3% daily vol
+        returns[5] = -0.08  # Add a big loss day
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "halt"
+        assert "VaR" in result.reason
+
+    def test_no_data_graceful(self):
+        """Test graceful handling when no historical returns available."""
+        limit = VaRLimit(threshold=0.05, confidence_level=0.95, lookback_days=20)
+        state = self._make_state(None)  # No returns data
+        result = limit.check(state)
+        assert not result.breached  # Graceful: no data = ok
+
+    def test_insufficient_history(self):
+        """Test graceful handling when insufficient history."""
+        limit = VaRLimit(threshold=0.05, confidence_level=0.95, lookback_days=20)
+        returns = [0.01, 0.02, -0.01]  # Only 3 days
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert not result.breached  # Graceful: insufficient data = ok
+
+    def test_warn_action(self):
+        """Test warn action when VaR breached."""
+        limit = VaRLimit(threshold=0.02, confidence_level=0.95, lookback_days=20, action="warn")
+        np.random.seed(42)
+        returns = np.random.normal(0.0, 0.05, 30)  # High vol
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "warn"
+
+    def test_custom_returns_key(self):
+        """Test using custom key for returns."""
+        limit = VaRLimit(threshold=0.05, returns_key="my_returns", lookback_days=20)
+        np.random.seed(42)
+        returns = np.random.normal(0.0, 0.01, 30)
+
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"A": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=50000.0,
+            net_exposure=50000.0,
+            context={"my_returns": returns},  # Custom key
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_different_confidence_levels(self):
+        """Test VaR at different confidence levels."""
+        np.random.seed(42)
+        # Returns with some negative tail
+        returns = np.random.normal(0.0, 0.02, 100)
+        returns[0:5] = [-0.06, -0.05, -0.055, -0.048, -0.052]  # Fat tail
+
+        state = self._make_state(returns)
+
+        # 99% confidence should give higher VaR than 95%
+        # Use very low threshold to ensure both breach
+        limit_95_check = VaRLimit(threshold=0.001, confidence_level=0.95, lookback_days=50)
+        limit_99_check = VaRLimit(threshold=0.001, confidence_level=0.99, lookback_days=50)
+
+        result_95 = limit_95_check.check(state)
+        result_99 = limit_99_check.check(state)
+
+        # Both should breach at 0.1% threshold with this data
+        assert result_95.breached
+        assert result_99.breached
+
+
+class TestCVaRLimit:
+    """Test CVaRLimit (Conditional VaR / Expected Shortfall)."""
+
+    def _make_state(self, returns: list | np.ndarray | None = None) -> PortfolioState:
+        """Helper to create PortfolioState with returns in context."""
+        context = {}
+        if returns is not None:
+            context["historical_returns"] = returns
+        return PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"A": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=50000.0,
+            net_exposure=50000.0,
+            context=context,
+        )
+
+    def test_no_breach_low_cvar(self):
+        """Test no breach when CVaR is below threshold."""
+        limit = CVaRLimit(threshold=0.08, confidence_level=0.95, lookback_days=20)
+        np.random.seed(42)
+        returns = np.random.normal(0.0005, 0.01, 30)  # Low vol
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_breach_fat_tail(self):
+        """Test breach when CVaR exceeds threshold."""
+        limit = CVaRLimit(threshold=0.03, confidence_level=0.95, lookback_days=20, action="halt")
+        # Generate returns with fat left tail
+        np.random.seed(42)
+        returns = np.random.normal(0.0, 0.02, 30)
+        returns[0:3] = [-0.10, -0.08, -0.09]  # Add several large losses
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "halt"
+        assert "CVaR" in result.reason
+
+    def test_no_data_graceful(self):
+        """Test graceful handling when no historical returns available."""
+        limit = CVaRLimit(threshold=0.08, confidence_level=0.95, lookback_days=20)
+        state = self._make_state(None)
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_insufficient_history(self):
+        """Test graceful handling when insufficient history."""
+        limit = CVaRLimit(threshold=0.08, confidence_level=0.95, lookback_days=20)
+        returns = [0.01, -0.02, 0.005]  # Only 3 days
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_cvar_greater_than_var(self):
+        """Test that CVaR >= VaR for same returns (mathematical property)."""
+        np.random.seed(42)
+        # Create returns with a fat tail
+        returns = np.random.normal(0.0, 0.02, 100)
+        returns[0:5] = [-0.15, -0.12, -0.10, -0.11, -0.13]
+
+        # Calculate VaR and CVaR manually
+        recent = np.asarray(returns)[-30:]
+        var = -np.percentile(recent, 5)  # 95% VaR
+        var_threshold = np.percentile(recent, 5)
+        tail_returns = recent[recent <= var_threshold]
+        cvar = -np.mean(tail_returns)
+
+        # CVaR should be >= VaR
+        assert cvar >= var
+
+    def test_reduce_action(self):
+        """Test reduce action."""
+        limit = CVaRLimit(threshold=0.02, confidence_level=0.95, lookback_days=20, action="reduce")
+        np.random.seed(42)
+        returns = np.random.normal(0.0, 0.05, 30)  # High vol
+        returns[0:3] = [-0.15, -0.12, -0.14]
+
+        state = self._make_state(returns)
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "reduce"
+
+
+class TestPortfolioStateContext:
+    """Test PortfolioState context field."""
+
+    def test_context_default_empty(self):
+        """Test context defaults to empty dict."""
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=0,
+            positions={},
+            daily_pnl=0.0,
+            gross_exposure=0.0,
+            net_exposure=0.0,
+        )
+        assert state.context == {}
+
+    def test_context_with_data(self):
+        """Test context can hold arbitrary data."""
+        context = {
+            "historical_returns": [0.01, -0.02, 0.015],
+            "current_volatility": 0.02,
+            "regime": "high_vol",
+        }
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=0,
+            positions={},
+            daily_pnl=0.0,
+            gross_exposure=0.0,
+            net_exposure=0.0,
+            context=context,
+        )
+        assert state.context["historical_returns"] == [0.01, -0.02, 0.015]
+        assert state.context["current_volatility"] == 0.02
+        assert state.context["regime"] == "high_vol"
