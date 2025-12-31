@@ -8,8 +8,10 @@ This module provides portfolio-wide risk constraints and limits:
 """
 
 from .limits import (
+    BetaLimit,
     CVaRLimit,
     DailyLossLimit,
+    FactorExposureLimit,
     GrossExposureLimit,
     LimitResult,
     MaxDrawdownLimit,
@@ -18,6 +20,7 @@ from .limits import (
     NetExposureLimit,
     PortfolioLimit,
     PortfolioState,
+    SectorExposureLimit,
     VaRLimit,
 )
 from .manager import RiskManager
@@ -35,4 +38,7 @@ __all__ = [
     "NetExposureLimit",
     "VaRLimit",
     "CVaRLimit",
+    "BetaLimit",
+    "SectorExposureLimit",
+    "FactorExposureLimit",
 ]

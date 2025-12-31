@@ -3,8 +3,10 @@
 import numpy as np
 
 from ml4t.backtest.risk.portfolio.limits import (
+    BetaLimit,
     CVaRLimit,
     DailyLossLimit,
+    FactorExposureLimit,
     GrossExposureLimit,
     LimitResult,
     MaxDrawdownLimit,
@@ -12,6 +14,7 @@ from ml4t.backtest.risk.portfolio.limits import (
     MaxPositionsLimit,
     NetExposureLimit,
     PortfolioState,
+    SectorExposureLimit,
     VaRLimit,
 )
 
@@ -676,3 +679,328 @@ class TestPortfolioStateContext:
         assert state.context["historical_returns"] == [0.01, -0.02, 0.015]
         assert state.context["current_volatility"] == 0.02
         assert state.context["regime"] == "high_vol"
+
+
+class TestBetaLimit:
+    """Test BetaLimit portfolio limit."""
+
+    def test_no_breach_within_limits(self):
+        """Test no breach when portfolio beta is within bounds."""
+        limit = BetaLimit(max_beta=1.5, min_beta=-0.5)
+        # Portfolio: 50% AAPL (beta=1.2), 50% MSFT (beta=1.0) = 1.1 beta
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=2,
+            positions={"AAPL": 50000.0, "MSFT": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"asset_betas": {"AAPL": 1.2, "MSFT": 1.0}},
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_breach_max_beta(self):
+        """Test breach when portfolio beta exceeds max."""
+        limit = BetaLimit(max_beta=1.2, min_beta=0.0, action="halt")
+        # Portfolio: 100% high-beta stock (beta=1.5)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"TSLA": 100000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"asset_betas": {"TSLA": 1.5}},
+        )
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "halt"
+        assert "1.50" in result.reason
+        assert "1.20" in result.reason
+
+    def test_breach_min_beta(self):
+        """Test breach when portfolio beta below min."""
+        limit = BetaLimit(max_beta=1.5, min_beta=0.5, action="warn")
+        # Portfolio: 100% low-beta/inverse stock (beta=0.2)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"UTIL": 100000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"asset_betas": {"UTIL": 0.2}},
+        )
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "warn"
+        assert "0.20" in result.reason
+        assert "0.50" in result.reason
+
+    def test_no_breach_no_positions(self):
+        """Test no breach when no positions (zero beta)."""
+        limit = BetaLimit(max_beta=1.5, min_beta=-0.5)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=0,
+            positions={},
+            daily_pnl=0.0,
+            gross_exposure=0.0,
+            net_exposure=0.0,
+            context={"asset_betas": {}},
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_graceful_no_beta_data(self):
+        """Test graceful handling when beta data not in context."""
+        limit = BetaLimit(max_beta=1.5, min_beta=-0.5)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=2,
+            positions={"AAPL": 50000.0, "MSFT": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={},  # No beta data
+        )
+        result = limit.check(state)
+        assert not result.breached  # Graceful degradation
+
+
+class TestSectorExposureLimit:
+    """Test SectorExposureLimit portfolio limit."""
+
+    def test_no_breach_diversified(self):
+        """Test no breach when sectors are diversified."""
+        limit = SectorExposureLimit(max_sector_exposure=0.40)
+        # 33% each sector
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=3,
+            positions={"AAPL": 33333.0, "XOM": 33333.0, "JPM": 33333.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={
+                "asset_sectors": {
+                    "AAPL": "Technology",
+                    "XOM": "Energy",
+                    "JPM": "Financials",
+                }
+            },
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_breach_concentrated_sector(self):
+        """Test breach when one sector is too concentrated."""
+        limit = SectorExposureLimit(max_sector_exposure=0.30, action="halt")
+        # 60% Tech, 40% Energy
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=3,
+            positions={"AAPL": 30000.0, "MSFT": 30000.0, "XOM": 40000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={
+                "asset_sectors": {
+                    "AAPL": "Technology",
+                    "MSFT": "Technology",
+                    "XOM": "Energy",
+                }
+            },
+        )
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "halt"
+        assert "Technology" in result.reason
+        assert "60.0" in result.reason
+
+    def test_no_breach_no_positions(self):
+        """Test no breach when no positions."""
+        limit = SectorExposureLimit(max_sector_exposure=0.30)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=0,
+            positions={},
+            daily_pnl=0.0,
+            gross_exposure=0.0,
+            net_exposure=0.0,
+            context={"asset_sectors": {}},
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_graceful_no_sector_data(self):
+        """Test graceful handling when sector data not in context."""
+        limit = SectorExposureLimit(max_sector_exposure=0.30)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=2,
+            positions={"AAPL": 50000.0, "MSFT": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={},  # No sector data
+        )
+        result = limit.check(state)
+        assert not result.breached  # Graceful degradation
+
+
+class TestFactorExposureLimit:
+    """Test FactorExposureLimit portfolio limit."""
+
+    def test_no_breach_within_limits(self):
+        """Test no breach when factor exposure within bounds."""
+        limit = FactorExposureLimit(factor_name="momentum", max_exposure=0.5, min_exposure=-0.5)
+        # Portfolio: 50% stock with 0.3 loading, 50% with -0.1 loading = 0.1
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=2,
+            positions={"AAPL": 50000.0, "MSFT": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"factor_loadings": {"AAPL": 0.3, "MSFT": -0.1}},
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_breach_max_exposure(self):
+        """Test breach when factor exposure exceeds max."""
+        limit = FactorExposureLimit(
+            factor_name="value", max_exposure=0.3, min_exposure=-0.3, action="halt"
+        )
+        # Portfolio: 100% high value loading (0.8)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"VALUE_ETF": 100000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"factor_loadings": {"VALUE_ETF": 0.8}},
+        )
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "halt"
+        assert "value" in result.reason
+        assert "0.80" in result.reason
+
+    def test_breach_min_exposure(self):
+        """Test breach when factor exposure below min."""
+        limit = FactorExposureLimit(
+            factor_name="size", max_exposure=0.5, min_exposure=-0.3, action="warn"
+        )
+        # Portfolio: 100% negative size exposure (small caps = -0.6)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"SMALL_CAP": 100000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"factor_loadings": {"SMALL_CAP": -0.6}},
+        )
+        result = limit.check(state)
+        assert result.breached
+        assert result.action == "warn"
+        assert "size" in result.reason
+
+    def test_no_breach_no_positions(self):
+        """Test no breach when no positions (zero factor exposure)."""
+        limit = FactorExposureLimit(factor_name="momentum", max_exposure=0.5, min_exposure=-0.5)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=0,
+            positions={},
+            daily_pnl=0.0,
+            gross_exposure=0.0,
+            net_exposure=0.0,
+            context={"factor_loadings": {}},
+        )
+        result = limit.check(state)
+        assert not result.breached
+
+    def test_graceful_no_factor_data(self):
+        """Test graceful handling when factor data not in context."""
+        limit = FactorExposureLimit(factor_name="momentum", max_exposure=0.5, min_exposure=-0.5)
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=2,
+            positions={"AAPL": 50000.0, "MSFT": 50000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={},  # No factor data
+        )
+        result = limit.check(state)
+        assert not result.breached  # Graceful degradation
+
+    def test_custom_factor_key(self):
+        """Test using custom key for factor loadings."""
+        limit = FactorExposureLimit(
+            factor_name="momentum",
+            max_exposure=0.5,
+            min_exposure=-0.5,
+            factor_key="momentum_loadings",  # Custom key
+        )
+        state = PortfolioState(
+            equity=100000.0,
+            initial_equity=100000.0,
+            high_water_mark=100000.0,
+            current_drawdown=0.0,
+            num_positions=1,
+            positions={"AAPL": 100000.0},
+            daily_pnl=0.0,
+            gross_exposure=100000.0,
+            net_exposure=100000.0,
+            context={"momentum_loadings": {"AAPL": 0.2}},
+        )
+        result = limit.check(state)
+        assert not result.breached

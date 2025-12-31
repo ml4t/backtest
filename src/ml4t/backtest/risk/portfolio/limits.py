@@ -405,3 +405,197 @@ class CVaRLimit(PortfolioLimit):
             )
 
         return LimitResult.ok()
+
+
+@dataclass
+class BetaLimit(PortfolioLimit):
+    """Limit portfolio beta exposure to market.
+
+    Controls directional market exposure by limiting the portfolio's
+    beta to a benchmark (typically the market portfolio).
+
+    Requires beta values in state.context["asset_betas"] as a dict mapping
+    asset -> beta value.
+
+    Args:
+        max_beta: Maximum allowed portfolio beta (default 1.5)
+        min_beta: Minimum allowed portfolio beta (default -0.5)
+        action: Action when breached ("warn", "reduce", "halt")
+        betas_key: Key in context for asset beta dict
+
+    Example:
+        limit = BetaLimit(max_beta=1.2, min_beta=0.5)
+        # Strategy must provide betas in context:
+        state.context["asset_betas"] = {"AAPL": 1.2, "JNJ": 0.6, "SPY": 1.0}
+
+    Note:
+        Portfolio beta = sum(weight_i * beta_i) where weights are
+        position values / equity.
+    """
+
+    max_beta: float = 1.5
+    min_beta: float = -0.5
+    action: str = "warn"
+    betas_key: str = "asset_betas"
+
+    def check(self, state: PortfolioState) -> LimitResult:
+        """Check if portfolio beta is within limits."""
+        asset_betas = state.context.get(self.betas_key)
+
+        if asset_betas is None or not state.positions:
+            return LimitResult.ok()  # No data or no positions
+
+        if state.equity <= 0:
+            return LimitResult.ok()
+
+        # Calculate portfolio beta
+        portfolio_beta = 0.0
+        for asset, value in state.positions.items():
+            beta = asset_betas.get(asset, 1.0)  # Default to market beta
+            weight = value / state.equity
+            portfolio_beta += weight * beta
+
+        if portfolio_beta > self.max_beta:
+            return LimitResult(
+                breached=True,
+                action=self.action,
+                reason=f"portfolio beta {portfolio_beta:.2f} > max {self.max_beta:.2f}",
+            )
+
+        if portfolio_beta < self.min_beta:
+            return LimitResult(
+                breached=True,
+                action=self.action,
+                reason=f"portfolio beta {portfolio_beta:.2f} < min {self.min_beta:.2f}",
+            )
+
+        return LimitResult.ok()
+
+
+@dataclass
+class SectorExposureLimit(PortfolioLimit):
+    """Limit exposure to any single sector.
+
+    Ensures diversification by limiting concentration in any one sector.
+
+    Requires sector mappings in state.context["asset_sectors"] as a dict
+    mapping asset -> sector name.
+
+    Args:
+        max_sector_exposure: Maximum exposure to any sector as % of equity (0.0-1.0)
+                            Default 0.30 = 30% max per sector
+        action: Action when breached
+        sectors_key: Key in context for asset sector dict
+
+    Example:
+        limit = SectorExposureLimit(max_sector_exposure=0.25)
+        # Strategy must provide sectors in context:
+        state.context["asset_sectors"] = {
+            "AAPL": "Technology", "MSFT": "Technology",
+            "JNJ": "Healthcare", "XOM": "Energy"
+        }
+    """
+
+    max_sector_exposure: float = 0.30
+    action: str = "warn"
+    sectors_key: str = "asset_sectors"
+
+    def check(self, state: PortfolioState) -> LimitResult:
+        """Check if any sector exceeds exposure limit."""
+        asset_sectors = state.context.get(self.sectors_key)
+
+        if asset_sectors is None or not state.positions:
+            return LimitResult.ok()
+
+        if state.equity <= 0:
+            return LimitResult.ok()
+
+        # Calculate sector exposures
+        sector_exposure: dict[str, float] = {}
+        for asset, value in state.positions.items():
+            sector = asset_sectors.get(asset, "Unknown")
+            weight = abs(value) / state.equity
+            sector_exposure[sector] = sector_exposure.get(sector, 0.0) + weight
+
+        # Check for breaches
+        for sector, exposure in sector_exposure.items():
+            if exposure > self.max_sector_exposure:
+                return LimitResult(
+                    breached=True,
+                    action=self.action,
+                    reason=f"{sector} exposure {exposure:.1%} > max {self.max_sector_exposure:.1%}",
+                )
+
+        return LimitResult.ok()
+
+
+@dataclass
+class FactorExposureLimit(PortfolioLimit):
+    """Limit portfolio exposure to a specific risk factor.
+
+    Generic factor exposure limit that can be used for any factor
+    (momentum, value, size, volatility, etc.).
+
+    Requires factor loadings in state.context[factor_key] as a dict
+    mapping asset -> factor loading.
+
+    Args:
+        factor_name: Name of the factor (for error messages)
+        max_exposure: Maximum allowed factor exposure
+        min_exposure: Minimum allowed factor exposure
+        action: Action when breached
+        factor_key: Key in context for factor loadings dict
+
+    Example:
+        # Momentum factor limit
+        limit = FactorExposureLimit(
+            factor_name="momentum",
+            max_exposure=0.5,
+            min_exposure=-0.5,
+            factor_key="momentum_loadings"
+        )
+        state.context["momentum_loadings"] = {"AAPL": 0.8, "JNJ": -0.2}
+
+    Note:
+        Factor exposure = sum(weight_i * loading_i) where weights are
+        position values / equity (signed, so shorts contribute negatively).
+    """
+
+    factor_name: str = "factor"
+    max_exposure: float = 1.0
+    min_exposure: float = -1.0
+    action: str = "warn"
+    factor_key: str = "factor_loadings"
+
+    def check(self, state: PortfolioState) -> LimitResult:
+        """Check if factor exposure is within limits."""
+        factor_loadings = state.context.get(self.factor_key)
+
+        if factor_loadings is None or not state.positions:
+            return LimitResult.ok()
+
+        if state.equity <= 0:
+            return LimitResult.ok()
+
+        # Calculate factor exposure
+        factor_exposure = 0.0
+        for asset, value in state.positions.items():
+            loading = factor_loadings.get(asset, 0.0)  # Default to neutral
+            weight = value / state.equity  # Signed weight
+            factor_exposure += weight * loading
+
+        if factor_exposure > self.max_exposure:
+            return LimitResult(
+                breached=True,
+                action=self.action,
+                reason=f"{self.factor_name} exposure {factor_exposure:.2f} > max {self.max_exposure:.2f}",
+            )
+
+        if factor_exposure < self.min_exposure:
+            return LimitResult(
+                breached=True,
+                action=self.action,
+                reason=f"{self.factor_name} exposure {factor_exposure:.2f} < min {self.min_exposure:.2f}",
+            )
+
+        return LimitResult.ok()
