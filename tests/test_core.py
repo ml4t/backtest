@@ -9,6 +9,7 @@ from ml4t.backtest import (
     Broker,
     DataFeed,
     Engine,
+    ExecutionMode,
     OrderSide,
     OrderType,
     PercentageCommission,
@@ -16,6 +17,12 @@ from ml4t.backtest import (
     Strategy,
     VolumeShareSlippage,
     run_backtest,
+)
+from ml4t.backtest.config import (
+    BacktestConfig,
+    CommissionModel,
+    FillTiming,
+    SlippageModel,
 )
 
 # === Test Data Generators ===
@@ -519,6 +526,211 @@ class TestMultiAsset:
         assert len(engine.broker.positions) == 4
         for asset in assets:
             assert engine.broker.get_position(asset) is not None
+
+
+class TestEngineFromConfig:
+    """Tests for Engine.from_config() factory method."""
+
+    def test_from_config_percentage_commission(self):
+        """Test from_config with percentage commission."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            commission_model=CommissionModel.PERCENTAGE,
+            commission_rate=0.001,  # 0.1%
+        )
+        engine = Engine.from_config(feed, strategy, config)
+        results = engine.run()
+
+        # Verify commission was applied
+        assert results["total_commission"] > 0
+
+    def test_from_config_per_share_commission(self):
+        """Test from_config with per-share commission."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            commission_model=CommissionModel.PER_SHARE,
+            commission_per_share=0.01,
+            commission_minimum=1.0,
+        )
+        engine = Engine.from_config(feed, strategy, config)
+        results = engine.run()
+
+        # Should have minimum commission applied
+        assert results["total_commission"] >= 1.0
+
+    def test_from_config_no_commission(self):
+        """Test from_config with no commission."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(commission_model=CommissionModel.NONE)
+        engine = Engine.from_config(feed, strategy, config)
+        results = engine.run()
+
+        assert results["total_commission"] == 0.0
+
+    def test_from_config_percentage_slippage(self):
+        """Test from_config with percentage slippage."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            slippage_model=SlippageModel.PERCENTAGE,
+            slippage_rate=0.001,  # 0.1%
+        )
+        engine = Engine.from_config(feed, strategy, config)
+        results = engine.run()
+
+        assert results["total_slippage"] > 0
+
+    def test_from_config_fixed_slippage(self):
+        """Test from_config with fixed slippage."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            slippage_model=SlippageModel.FIXED,
+            slippage_fixed=0.05,  # $0.05 per share
+        )
+        engine = Engine.from_config(feed, strategy, config)
+        results = engine.run()
+
+        assert results["total_slippage"] > 0
+
+    def test_from_config_fill_timing_same_bar(self):
+        """Test from_config with SAME_BAR fill timing."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(fill_timing=FillTiming.SAME_BAR)
+        engine = Engine.from_config(feed, strategy, config)
+
+        assert engine.execution_mode == ExecutionMode.SAME_BAR
+
+    def test_from_config_fill_timing_next_bar(self):
+        """Test from_config with NEXT_BAR_OPEN fill timing."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(fill_timing=FillTiming.NEXT_BAR_OPEN)
+        engine = Engine.from_config(feed, strategy, config)
+
+        assert engine.execution_mode == ExecutionMode.NEXT_BAR
+
+    def test_from_config_margin_account(self):
+        """Test from_config with margin account."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            account_type="margin",
+            margin_requirement=0.4,
+        )
+        engine = Engine.from_config(feed, strategy, config)
+        results = engine.run()
+
+        assert results["final_value"] > 0
+
+
+class TestNextBarExecutionMode:
+    """Tests for NEXT_BAR execution mode."""
+
+    def test_next_bar_mode_order_delayed(self):
+        """Test that orders submitted in NEXT_BAR mode fill next bar."""
+
+        class TrackingStrategy(Strategy):
+            def __init__(self):
+                self.bar_count = 0
+                self.order_bar = None
+                self.fill_bar = None
+
+            def on_data(self, timestamp, data, context, broker):
+                self.bar_count += 1
+                if self.bar_count == 2:
+                    broker.submit_order("AAPL", 100)
+                    self.order_bar = self.bar_count
+
+                # Check if position exists (order filled)
+                pos = broker.get_position("AAPL")
+                if pos is not None and self.fill_bar is None:
+                    self.fill_bar = self.bar_count
+
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = TrackingStrategy()
+
+        engine = Engine(feed, strategy, initial_cash=100000, execution_mode=ExecutionMode.NEXT_BAR)
+        engine.run()
+
+        # Order placed on bar 2, should fill on bar 3
+        assert strategy.order_bar == 2
+        assert strategy.fill_bar == 3
+
+
+class TestRunBacktestWithConfig:
+    """Tests for run_backtest() convenience function with config."""
+
+    def test_run_backtest_with_config_object(self):
+        """Test run_backtest with BacktestConfig object."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            initial_cash=50000,
+            commission_model=CommissionModel.NONE,
+        )
+        results = run_backtest(prices=prices, strategy=strategy, config=config)
+
+        assert results["initial_cash"] == 50000
+
+    def test_run_backtest_with_string_preset(self):
+        """Test run_backtest with string preset name."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        results = run_backtest(prices=prices, strategy=strategy, config="default")
+
+        assert "equity_curve" in results
+        assert len(results["equity_curve"]) == 10
+
+
+class TestEmptyDataFeed:
+    """Tests for edge cases with empty or minimal data."""
+
+    def test_empty_data_returns_empty_results(self):
+        """Test engine with no data bars."""
+        # Create empty price DataFrame with correct schema
+        empty_prices = pl.DataFrame(
+            schema={
+                "timestamp": pl.Datetime,
+                "asset": pl.Utf8,
+                "open": pl.Float64,
+                "high": pl.Float64,
+                "low": pl.Float64,
+                "close": pl.Float64,
+                "volume": pl.Float64,
+            }
+        )
+
+        feed = DataFeed(prices_df=empty_prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+        engine = Engine(feed, strategy, initial_cash=100000)
+        results = engine.run()
+
+        # Should return empty or minimal results without error
+        assert results.get("num_trades", 0) == 0
 
 
 if __name__ == "__main__":

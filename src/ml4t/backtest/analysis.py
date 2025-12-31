@@ -160,7 +160,7 @@ def to_equity_dataframe(
     returns[1:] = np.diff(values) / values[:-1]
 
     data = {
-        "equity": equity_history,
+        "equity": [float(x) for x in equity_history],  # Ensure consistent float type
         "returns": returns.tolist(),
     }
 

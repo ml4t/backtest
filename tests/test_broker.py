@@ -698,3 +698,419 @@ class TestPositionFlipValidation:
         assert (
             abs(broker.cash - expected_cash) < 0.01
         ), f"Expected cash ${expected_cash:.2f}, got ${broker.cash:.2f}"
+
+
+class TestBrokerEdgeCases:
+    """Test edge cases and error handling."""
+
+    def test_invalid_account_type(self):
+        """Test that invalid account_type raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown account_type"):
+            Broker(initial_cash=100000.0, account_type="invalid")
+
+    def test_position_scaling_up(self):
+        """Test adding to an existing position (scaling up)."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        # Open initial long position: 100 shares @ $150
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 152.0},
+            lows={"AAPL": 148.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos.quantity == 100
+        assert pos.entry_price == 150.0
+
+        # Scale up: buy 50 more @ $160
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 160.0},
+            opens={"AAPL": 160.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 162.0},
+            lows={"AAPL": 158.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 50.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Verify position was scaled up
+        pos = broker.get_position("AAPL")
+        assert pos.quantity == 150
+
+        # Entry price should be weighted average: (100*150 + 50*160) / 150 = 153.33
+        expected_entry = (100 * 150.0 + 50 * 160.0) / 150
+        assert abs(pos.entry_price - expected_entry) < 0.01
+
+    def test_position_scaling_down_short(self):
+        """Test adding to short position (scaling down)."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            account_type="margin",
+        )
+
+        # Open initial short position: -100 shares @ $150
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 152.0},
+            lows={"AAPL": 148.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.SELL)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos.quantity == -100
+        assert pos.entry_price == 150.0
+
+        # Scale short: sell 50 more @ $140 (lower price, more profit potential)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 140.0},
+            opens={"AAPL": 140.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 142.0},
+            lows={"AAPL": 138.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 50.0, OrderSide.SELL)
+        broker._process_orders()
+
+        # Verify position was scaled
+        pos = broker.get_position("AAPL")
+        assert pos.quantity == -150
+
+        # Entry price should be weighted average: (100*150 + 50*140) / 150 = 146.67
+        expected_entry = (100 * 150.0 + 50 * 140.0) / 150
+        assert abs(pos.entry_price - expected_entry) < 0.01
+
+    def test_limit_order_exact_price_fill(self):
+        """Test limit order fills at exact limit price when touched."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        # Set up price data where low exactly touches limit price
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 152.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 155.0},
+            lows={"AAPL": 145.0},  # Low touches our limit
+            signals={},
+        )
+
+        # Submit limit buy at 145 (which is the exact low)
+        order = broker.submit_order(
+            "AAPL", 100.0, OrderSide.BUY, OrderType.LIMIT, limit_price=145.0
+        )
+        broker._process_orders()
+
+        # Order should be filled at limit price
+        assert order.status == OrderStatus.FILLED
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.entry_price == 145.0
+
+    def test_buy_stop_order(self):
+        """Test buy stop order triggers above price."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        # Submit a buy stop at $155 (breakout entry)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 148.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 152.0},
+            lows={"AAPL": 147.0},
+            signals={},
+        )
+        order = broker.submit_order("AAPL", 100.0, OrderSide.BUY, OrderType.STOP, stop_price=155.0)
+        broker._process_orders()
+
+        # Stop not triggered yet
+        assert order.status == OrderStatus.PENDING
+
+        # Price breaks above stop
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 158.0},
+            opens={"AAPL": 154.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 160.0},
+            lows={"AAPL": 153.0},
+            signals={},
+        )
+        broker._process_orders()
+
+        # Order should be filled at stop price
+        assert order.status == OrderStatus.FILLED
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.entry_price == 155.0
+
+
+class TestCommissionSlippageModels:
+    """Test commission and slippage model calculations."""
+
+    def test_tiered_commission_low_tier(self):
+        """Test tiered commission in lowest tier."""
+        from ml4t.backtest.models import TieredCommission
+
+        model = TieredCommission(tiers=[(10000, 0.002), (50000, 0.001), (float("inf"), 0.0005)])
+        # Trade value = 100 * 50 = 5000, should hit first tier (< 10000)
+        commission = model.calculate("AAPL", 100, 50.0)
+        assert commission == 5000 * 0.002  # 10.0
+
+    def test_tiered_commission_mid_tier(self):
+        """Test tiered commission in middle tier."""
+        from ml4t.backtest.models import TieredCommission
+
+        model = TieredCommission(tiers=[(10000, 0.002), (50000, 0.001), (float("inf"), 0.0005)])
+        # Trade value = 200 * 100 = 20000, should hit second tier (> 10000, < 50000)
+        commission = model.calculate("AAPL", 200, 100.0)
+        assert commission == 20000 * 0.001  # 20.0
+
+    def test_tiered_commission_top_tier(self):
+        """Test tiered commission falls through to top tier."""
+        from ml4t.backtest.models import TieredCommission
+
+        model = TieredCommission(tiers=[(10000, 0.002), (50000, 0.001), (float("inf"), 0.0005)])
+        # Trade value = 1000 * 100 = 100000, should hit final tier (> 50000)
+        commission = model.calculate("AAPL", 1000, 100.0)
+        assert commission == 100000 * 0.0005  # 50.0
+
+    def test_combined_commission(self):
+        """Test combined percentage + fixed commission."""
+        from ml4t.backtest.models import CombinedCommission
+
+        model = CombinedCommission(percentage=0.001, fixed=5.0)
+        # Trade value = 100 * 150 = 15000
+        commission = model.calculate("AAPL", 100, 150.0)
+        assert commission == 15000 * 0.001 + 5.0  # 20.0
+
+    def test_volume_share_slippage_no_volume(self):
+        """Test volume share slippage with no volume returns zero."""
+        from ml4t.backtest.models import VolumeShareSlippage
+
+        model = VolumeShareSlippage(impact_factor=0.1)
+        # No volume should return 0 slippage
+        assert model.calculate("AAPL", 100, 150.0, None) == 0.0
+        assert model.calculate("AAPL", 100, 150.0, 0) == 0.0
+
+
+class TestEquityCurve:
+    """Test EquityCurve class."""
+
+    def test_append_and_len(self):
+        """Test append and __len__."""
+        from ml4t.backtest.analytics.equity import EquityCurve
+
+        ec = EquityCurve()
+        assert len(ec) == 0
+        ec.append(datetime(2024, 1, 1), 100000.0)
+        ec.append(datetime(2024, 1, 2), 101000.0)
+        assert len(ec) == 2
+
+    def test_returns_insufficient_data(self):
+        """Test returns with insufficient data."""
+        from ml4t.backtest.analytics.equity import EquityCurve
+
+        ec = EquityCurve()
+        assert len(ec.returns) == 0
+        ec.append(datetime(2024, 1, 1), 100000.0)
+        assert len(ec.returns) == 0  # Need at least 2 values
+
+    def test_cumulative_returns(self):
+        """Test cumulative returns calculation."""
+        from ml4t.backtest.analytics.equity import EquityCurve
+
+        ec = EquityCurve()
+        ec.values = [100, 110, 115, 120]
+        cr = ec.cumulative_returns
+        assert len(cr) == 4
+        assert cr[0] == 0.0  # First value is 0
+        assert abs(cr[-1] - 0.2) < 0.001  # 20% cumulative return
+
+    def test_total_return_zero_initial(self):
+        """Test total return with zero initial value."""
+        from ml4t.backtest.analytics.equity import EquityCurve
+
+        ec = EquityCurve()
+        ec.values = [0.0, 100.0]
+        assert ec.total_return == 0.0  # Avoid division by zero
+
+    def test_drawdown_series(self):
+        """Test drawdown series calculation."""
+        from ml4t.backtest.analytics.equity import EquityCurve
+
+        ec = EquityCurve()
+        ec.values = [100, 110, 105, 90, 100]
+        dd = ec.drawdown_series()
+        assert len(dd) == 5
+        assert dd[0] == 0.0  # No drawdown at start
+        assert dd[3] < 0  # Drawdown when value drops
+
+    def test_to_dict(self):
+        """Test to_dict export."""
+        from ml4t.backtest.analytics.equity import EquityCurve
+
+        ec = EquityCurve()
+        ec.values = [100, 105, 110, 108]
+        result = ec.to_dict()
+        assert "initial_value" in result
+        assert "final_value" in result
+        assert "total_return" in result
+        assert "sharpe" in result
+        assert "sortino" in result
+        assert "max_drawdown" in result
+        assert result["initial_value"] == 100
+        assert result["final_value"] == 108
+
+
+class TestMetricsEdgeCases:
+    """Test edge cases in metrics calculations."""
+
+    def test_volatility_insufficient_data(self):
+        """Test volatility with insufficient data returns 0."""
+        from ml4t.backtest.analytics.metrics import volatility
+
+        assert volatility([]) == 0.0
+        assert volatility([0.01]) == 0.0
+
+    def test_sharpe_insufficient_data(self):
+        """Test Sharpe ratio with insufficient data returns 0."""
+        from ml4t.backtest.analytics.metrics import sharpe_ratio
+
+        assert sharpe_ratio([]) == 0.0
+        assert sharpe_ratio([0.01]) == 0.0
+
+    def test_sharpe_no_annualize(self):
+        """Test Sharpe ratio without annualization."""
+        from ml4t.backtest.analytics.metrics import sharpe_ratio
+
+        returns = [0.01, 0.02, -0.01, 0.03, 0.01]
+        result = sharpe_ratio(returns, annualize=False)
+        assert result != 0.0  # Should compute non-zero value
+
+    def test_sharpe_zero_volatility(self):
+        """Test Sharpe ratio with zero volatility."""
+        from ml4t.backtest.analytics.metrics import sharpe_ratio
+
+        # All same returns = zero std
+        returns = [0.01, 0.01, 0.01, 0.01]
+        assert sharpe_ratio(returns) == 0.0
+
+    def test_sortino_insufficient_data(self):
+        """Test Sortino ratio with insufficient data."""
+        from ml4t.backtest.analytics.metrics import sortino_ratio
+
+        assert sortino_ratio([]) == 0.0
+        assert sortino_ratio([0.01]) == 0.0
+
+    def test_sortino_no_annualize(self):
+        """Test Sortino ratio without annualization."""
+        from ml4t.backtest.analytics.metrics import sortino_ratio
+
+        returns = [0.01, 0.02, -0.01, 0.03, -0.02]
+        result = sortino_ratio(returns, annualize=False)
+        assert result != 0.0
+
+    def test_sortino_no_downside(self):
+        """Test Sortino ratio with no negative returns."""
+        from ml4t.backtest.analytics.metrics import sortino_ratio
+
+        # All positive returns - no downside
+        returns = [0.01, 0.02, 0.03, 0.01]
+        result = sortino_ratio(returns)
+        assert result == float("inf")
+
+    def test_max_drawdown_insufficient_data(self):
+        """Test max drawdown with insufficient data."""
+        from ml4t.backtest.analytics.metrics import max_drawdown
+
+        dd, peak, trough = max_drawdown([])
+        assert dd == 0.0
+        dd, peak, trough = max_drawdown([100.0])
+        assert dd == 0.0
+
+    def test_cagr_edge_cases(self):
+        """Test CAGR edge cases."""
+        from ml4t.backtest.analytics.metrics import cagr
+
+        # Zero initial value
+        assert cagr(0, 100, 1.0) == 0.0
+        # Zero years
+        assert cagr(100, 200, 0.0) == 0.0
+        # Negative initial value
+        assert cagr(-100, 100, 1.0) == 0.0
+        # Zero final value (total loss)
+        assert cagr(100, 0, 1.0) == -1.0
+
+
+class TestBacktestConfigMethods:
+    """Test BacktestConfig methods for serialization."""
+
+    def test_to_dict(self):
+        """Test config to_dict serialization."""
+        from ml4t.backtest.config import BacktestConfig
+
+        config = BacktestConfig()
+        result = config.to_dict()
+        assert "execution" in result
+        assert "commission" in result
+        assert "slippage" in result
+        assert "cash" in result
+
+    def test_from_dict_round_trip(self):
+        """Test from_dict restores config."""
+        from ml4t.backtest.config import BacktestConfig
+
+        original = BacktestConfig(initial_cash=50000.0, commission_rate=0.002)
+        data = original.to_dict()
+        restored = BacktestConfig.from_dict(data)
+        assert restored.initial_cash == 50000.0
+        assert restored.commission_rate == 0.002
+
+    def test_to_yaml_from_yaml(self, tmp_path):
+        """Test YAML serialization round trip."""
+        from ml4t.backtest.config import BacktestConfig
+
+        config = BacktestConfig(initial_cash=75000.0)
+        yaml_path = tmp_path / "config.yaml"
+        config.to_yaml(yaml_path)
+
+        loaded = BacktestConfig.from_yaml(yaml_path)
+        assert loaded.initial_cash == 75000.0
+
+    def test_from_preset_invalid(self):
+        """Test from_preset with invalid preset name."""
+        from ml4t.backtest.config import BacktestConfig
+
+        with pytest.raises(ValueError, match="Unknown preset"):
+            BacktestConfig.from_preset("nonexistent_preset")
