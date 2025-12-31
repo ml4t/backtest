@@ -1114,3 +1114,157 @@ class TestBacktestConfigMethods:
 
         with pytest.raises(ValueError, match="Unknown preset"):
             BacktestConfig.from_preset("nonexistent_preset")
+
+
+class TestBrokerPositionRules:
+    """Test broker position rule functionality."""
+
+    def test_set_position_rules_per_asset(self):
+        """Test setting position rules for specific asset."""
+        from ml4t.backtest.risk.position.static import StopLoss
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        stop_rule = StopLoss(pct=0.05)
+
+        # Set rules for specific asset
+        broker.set_position_rules(stop_rule, asset="AAPL")
+
+        # Verify it's stored per-asset
+        assert "AAPL" in broker._position_rules_by_asset
+        assert broker._get_position_rules("AAPL") == stop_rule
+        # Global rules should be None
+        assert broker._position_rules is None
+
+    def test_set_position_rules_global(self):
+        """Test setting global position rules."""
+        from ml4t.backtest.risk.position.static import TakeProfit
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        tp_rule = TakeProfit(pct=0.10)
+
+        # Set global rules
+        broker.set_position_rules(tp_rule)
+
+        # Verify it's stored globally
+        assert broker._position_rules == tp_rule
+        # Should apply to any asset
+        assert broker._get_position_rules("AAPL") == tp_rule
+
+    def test_update_position_context(self):
+        """Test updating position context."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Create a position first
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 149.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 148.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Update context for the position
+        broker.update_position_context("AAPL", {"exit_signal": -0.5, "atr": 2.5})
+
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.context.get("exit_signal") == -0.5
+        assert pos.context.get("atr") == 2.5
+
+    def test_update_position_context_no_position(self):
+        """Test updating context for non-existent position."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Should not raise error
+        broker.update_position_context("AAPL", {"signal": 1.0})
+
+
+class TestBrokerTrailingStopSell:
+    """Test trailing stop for sell (protecting long position)."""
+
+    def test_trailing_stop_sell_with_trail_amount(self):
+        """Test trailing stop sell using trail_amount."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Enter long position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 149.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 148.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Submit trailing stop sell to protect position
+        order = broker.submit_order(
+            "AAPL",
+            -100.0,
+            OrderSide.SELL,
+            OrderType.TRAILING_STOP,
+            trail_amount=5.0,  # Trail $5 below high
+        )
+        assert order.status == OrderStatus.PENDING
+
+        # Price goes up - stop should adjust
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 160.0},
+            opens={"AAPL": 158.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 162.0},  # New high
+            lows={"AAPL": 159.0},  # Low stays above stop
+            signals={},
+        )
+        broker._process_orders()
+
+        # Stop should have moved up: 162 - 5 = 157
+        assert order.stop_price == 157.0
+        assert order.status == OrderStatus.PENDING  # Not triggered (low 159 > 157)
+
+        # Price drops through stop
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3, 9, 30),
+            prices={"AAPL": 155.0},
+            opens={"AAPL": 156.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 158.0},
+            lows={"AAPL": 154.0},  # Drops below 157 stop
+            signals={},
+        )
+        broker._process_orders()
+
+        # Stop should be triggered
+        assert order.status == OrderStatus.FILLED
+
+
+class TestBrokerMissingPriceHandling:
+    """Test broker handling when price data is missing."""
+
+    def test_order_skipped_when_no_price(self):
+        """Test order is skipped when asset has no price data."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},  # Only AAPL has price
+            opens={"AAPL": 149.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 148.0},
+            signals={},
+        )
+
+        # Submit order for asset without price
+        order = broker.submit_order("MSFT", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Order should remain pending (no price data)
+        assert order.status == OrderStatus.PENDING
