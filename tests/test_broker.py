@@ -1268,3 +1268,778 @@ class TestBrokerMissingPriceHandling:
 
         # Order should remain pending (no price data)
         assert order.status == OrderStatus.PENDING
+
+
+class TestEvaluatePositionRules:
+    """Test evaluate_position_rules and _build_position_state."""
+
+    def test_evaluate_position_rules_exit_full_immediate(self):
+        """Test EXIT_FULL action without defer_fill."""
+        from ml4t.backtest.risk.position.static import StopLoss
+        from ml4t.backtest.types import StopFillMode
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.stop_fill_mode = StopFillMode.STOP_PRICE
+
+        # Set up position rules
+        stop_rule = StopLoss(pct=0.05)  # 5% stop
+        broker.set_position_rules(stop_rule)
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+
+        # Price drops to trigger stop (5% down = $95)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 94.0},
+            opens={"AAPL": 96.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 97.0},
+            lows={"AAPL": 93.0},  # Touches stop at $95
+            signals={},
+        )
+
+        # Evaluate rules - should generate exit order
+        exit_orders = broker.evaluate_position_rules()
+        assert len(exit_orders) == 1
+        assert exit_orders[0].quantity == 100.0
+        assert exit_orders[0]._risk_exit_reason == "stop_loss_5.0%"
+
+    def test_evaluate_position_rules_exit_full_deferred(self):
+        """Test EXIT_FULL action with defer_fill=True (NEXT_BAR_OPEN mode)."""
+        from ml4t.backtest.risk.position.static import StopLoss
+        from ml4t.backtest.types import StopFillMode
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.stop_fill_mode = StopFillMode.NEXT_BAR_OPEN  # Defer exits
+
+        # Set up position rules
+        stop_rule = StopLoss(pct=0.05)
+        broker.set_position_rules(stop_rule)
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Price triggers stop
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 94.0},
+            opens={"AAPL": 96.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 97.0},
+            lows={"AAPL": 93.0},
+            signals={},
+        )
+
+        # Evaluate rules - should defer exit
+        exit_orders = broker.evaluate_position_rules()
+        assert len(exit_orders) == 0  # No immediate exit
+
+        # Should be stored in _pending_exits
+        assert "AAPL" in broker._pending_exits
+        assert broker._pending_exits["AAPL"]["reason"] == "stop_loss_5.0%"
+        assert broker._pending_exits["AAPL"]["pct"] == 1.0
+
+    def test_evaluate_position_rules_no_rules(self):
+        """Test evaluate_position_rules with no rules set."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Enter position without any rules
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Evaluate - should return empty list
+        exit_orders = broker.evaluate_position_rules()
+        assert exit_orders == []
+
+    def test_evaluate_position_rules_no_price(self):
+        """Test evaluate_position_rules skips when no price available."""
+        from ml4t.backtest.risk.position.static import StopLoss
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.set_position_rules(StopLoss(pct=0.05))
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Update time with no price for AAPL
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={},  # No prices
+            opens={},
+            volumes={},
+            highs={},
+            lows={},
+            signals={},
+        )
+
+        # Evaluate - should return empty (no price to evaluate)
+        exit_orders = broker.evaluate_position_rules()
+        assert exit_orders == []
+
+    def test_build_position_state_populated(self):
+        """Test _build_position_state creates correct PositionState."""
+        from ml4t.backtest.types import StopFillMode, StopLevelBasis
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.stop_fill_mode = StopFillMode.STOP_PRICE
+        broker.stop_level_basis = StopLevelBasis.FILL_PRICE
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 99.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 102.0},
+            lows={"AAPL": 98.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+
+        # Update to new bar
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 105.0},
+            opens={"AAPL": 101.0},
+            volumes={"AAPL": 500_000},
+            highs={"AAPL": 106.0},
+            lows={"AAPL": 100.0},
+            signals={},
+        )
+
+        # Build state
+        state = broker._build_position_state(pos, 105.0)
+
+        assert state.asset == "AAPL"
+        assert state.side == "long"
+        assert state.entry_price == 100.0
+        assert state.current_price == 105.0
+        assert state.quantity == 100
+        assert state.bar_open == 101.0
+        assert state.bar_high == 106.0
+        assert state.bar_low == 100.0
+        assert state.context["stop_fill_mode"] == StopFillMode.STOP_PRICE
+        assert state.context["stop_level_basis"] == StopLevelBasis.FILL_PRICE
+
+
+class TestProcessPendingExits:
+    """Test _process_pending_exits for NEXT_BAR_OPEN mode."""
+
+    def test_process_pending_exits_basic(self):
+        """Test pending exits are processed at next bar's open."""
+        from ml4t.backtest.risk.position.static import StopLoss
+        from ml4t.backtest.types import StopFillMode
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.stop_fill_mode = StopFillMode.NEXT_BAR_OPEN
+
+        # Set up position with stop rule
+        broker.set_position_rules(StopLoss(pct=0.05))
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Trigger stop
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 94.0},
+            opens={"AAPL": 96.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 97.0},
+            lows={"AAPL": 93.0},
+            signals={},
+        )
+        broker.evaluate_position_rules()
+
+        # Should have pending exit
+        assert "AAPL" in broker._pending_exits
+
+        # Next bar - process pending exits
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3, 9, 30),
+            prices={"AAPL": 92.0},
+            opens={"AAPL": 93.0},  # Open price for fill
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 94.0},
+            lows={"AAPL": 91.0},
+            signals={},
+        )
+
+        exit_orders = broker._process_pending_exits()
+        assert len(exit_orders) == 1
+        assert exit_orders[0]._risk_fill_price == 93.0  # Filled at open
+        assert exit_orders[0]._risk_exit_reason == "stop_loss_5.0%"
+
+        # Pending exits should be cleared
+        assert "AAPL" not in broker._pending_exits
+
+    def test_process_pending_exits_position_gone(self):
+        """Test pending exit is cleaned up if position no longer exists."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Manually add a pending exit for non-existent position
+        broker._pending_exits["AAPL"] = {
+            "reason": "test_exit",
+            "pct": 1.0,
+            "quantity": 100,
+        }
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        exit_orders = broker._process_pending_exits()
+
+        # Should return no orders and clean up
+        assert len(exit_orders) == 0
+        assert "AAPL" not in broker._pending_exits
+
+    def test_process_pending_exits_no_open_price(self):
+        """Test pending exit skipped when no open price available."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Create position first
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Add pending exit
+        broker._pending_exits["AAPL"] = {
+            "reason": "test_exit",
+            "pct": 1.0,
+            "quantity": 100,
+        }
+
+        # Update with no open price for AAPL
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 95.0},
+            opens={},  # No open price
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 96.0},
+            lows={"AAPL": 94.0},
+            signals={},
+        )
+
+        exit_orders = broker._process_pending_exits()
+
+        # Should skip this bar (no open price)
+        assert len(exit_orders) == 0
+        # Pending exit should remain for next bar
+        assert "AAPL" in broker._pending_exits
+
+
+class TestExecutionLimitsIntegration:
+    """Test broker with execution_limits (volume participation)."""
+
+    def test_volume_participation_partial_fill(self):
+        """Test order partially fills due to volume limit."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            execution_limits=VolumeParticipationLimit(max_participation=0.10),
+        )
+
+        # Bar with 1000 volume - can fill max 100 shares (10%)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        # Order for 250 shares (can only fill 100)
+        order = broker.submit_order("AAPL", 250.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Should partially fill
+        assert len(broker.fills) == 1
+        assert broker.fills[0].quantity == 100.0  # Max 10% of 1000
+
+        # Order should still be pending (150 remaining)
+        assert order in broker.pending_orders
+        assert order.order_id in broker._partial_orders
+        assert broker._partial_orders[order.order_id] == 150.0
+
+    def test_volume_participation_full_fill(self):
+        """Test order fully fills when within volume limit."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            execution_limits=VolumeParticipationLimit(max_participation=0.10),
+        )
+
+        # Bar with 10000 volume - can fill max 1000 shares
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        # Order for 100 shares (well within limit)
+        order = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Should fully fill
+        assert order.status == OrderStatus.FILLED
+        assert len(broker.fills) == 1
+        assert broker.fills[0].quantity == 100.0
+
+        # Should be removed from partial tracking
+        assert order.order_id not in broker._partial_orders
+
+    def test_volume_participation_zero_fill(self):
+        """Test order doesn't fill when volume too low."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            execution_limits=VolumeParticipationLimit(max_participation=0.10, min_volume=1000),
+        )
+
+        # Bar with insufficient volume
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 500.0},  # Below min_volume of 1000
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        order = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Should not fill
+        assert len(broker.fills) == 0
+        assert order.status == OrderStatus.PENDING
+
+    def test_execution_limits_no_double_fill(self):
+        """Test order not filled twice in same bar."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            execution_limits=VolumeParticipationLimit(max_participation=0.50),
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        order = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+
+        # Process twice in same bar
+        broker._process_orders()
+        broker._process_orders()
+
+        # Should only fill once
+        assert len(broker.fills) == 1
+        assert order.order_id in broker._filled_this_bar
+
+
+class TestMarketImpactIntegration:
+    """Test broker with market_impact_model."""
+
+    def test_linear_impact_applied(self):
+        """Test linear market impact affects fill price."""
+        from ml4t.backtest.execution.impact import LinearImpact
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            market_impact_model=LinearImpact(coefficient=0.1),
+        )
+
+        # 10% participation at $100 = $1.00 impact
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1000.0},  # 100 / 1000 = 10% participation
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Fill price should include impact
+        fill = broker.fills[0]
+        # Impact = 0.1 * (100/1000) * 100 = $1.00
+        assert fill.price == 101.0  # $100 + $1 impact
+
+    def test_sqrt_impact_applied(self):
+        """Test square root market impact affects fill price."""
+        import math
+
+        from ml4t.backtest.execution.impact import SquareRootImpact
+
+        # SquareRootImpact formula: coefficient * volatility * sqrt(participation) * price
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            market_impact_model=SquareRootImpact(coefficient=0.5, volatility=0.02),
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        fill = broker.fills[0]
+        # Impact = 0.5 * 0.02 * sqrt(100/10000) * 100 = 0.5 * 0.02 * 0.1 * 100 = $0.10
+        expected_impact = 0.5 * 0.02 * math.sqrt(100 / 10000) * 100.0
+        assert abs(fill.price - (100.0 + expected_impact)) < 0.01
+
+    def test_market_impact_sell_order(self):
+        """Test market impact on sell order (price decreases).
+
+        For sell orders, market impact is negative (selling pressure drives price down).
+        The LinearImpact model correctly returns -impact for sells.
+        """
+        from ml4t.backtest.execution.impact import LinearImpact
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            market_impact_model=LinearImpact(coefficient=0.1),
+            account_type="margin",
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        broker.submit_order("AAPL", 100.0, OrderSide.SELL)  # Short
+        broker._process_orders()
+
+        fill = broker.fills[0]
+        # For sell orders:
+        # Impact = 0.1 * (100/1000) * 100 = $1.00
+        # But the model returns -impact for sells: -$1.00
+        # base_price = 100 + (-1) = 99
+        # fill_price = base_price - slippage = 99 - 0 = 99
+        assert fill.price == 99.0  # Sell at lower price due to impact
+
+
+class TestNextBarExecutionMode:
+    """Test NEXT_BAR execution mode paths."""
+
+    def test_next_bar_mode_orders_skip_same_bar(self):
+        """Test orders placed in current bar are skipped in NEXT_BAR mode."""
+        from ml4t.backtest.types import ExecutionMode
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.execution_mode = ExecutionMode.NEXT_BAR
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        # Submit order
+        order = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        assert order in broker._orders_this_bar
+
+        # Process - should be skipped (same bar)
+        broker._process_orders()
+        assert order.status == OrderStatus.PENDING
+        assert len(broker.fills) == 0
+
+        # Next bar - should fill at open
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 102.0},
+            opens={"AAPL": 101.0},  # Fill at this price
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 103.0},
+            lows={"AAPL": 100.0},
+            signals={},
+        )
+
+        broker._process_orders(use_open=True)
+        assert order.status == OrderStatus.FILLED
+        assert broker.fills[0].price == 101.0
+
+    def test_next_bar_exit_uses_open_price(self):
+        """Test exit orders in NEXT_BAR mode use open price."""
+        from ml4t.backtest.types import ExecutionMode
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.execution_mode = ExecutionMode.NEXT_BAR
+
+        # Enter position (bar 1)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        entry = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+
+        # Bar 2 - entry fills at open
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 105.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 106.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker._orders_this_bar.clear()  # Clear to allow fill
+        broker._process_orders(use_open=True)
+
+        assert entry.status == OrderStatus.FILLED
+
+        # Submit exit order
+        exit_order = broker.submit_order("AAPL", 100.0, OrderSide.SELL)
+
+        # Bar 3 - exit fills at open
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3, 9, 30),
+            prices={"AAPL": 108.0},
+            opens={"AAPL": 107.0},  # Exit at this price
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 109.0},
+            lows={"AAPL": 106.0},
+            signals={},
+        )
+        broker._orders_this_bar.clear()
+        broker._process_orders(use_open=True)
+
+        assert exit_order.status == OrderStatus.FILLED
+        # Find exit fill (second fill)
+        exit_fill = [f for f in broker.fills if f.order_id == exit_order.order_id][0]
+        assert exit_fill.price == 107.0
+
+
+class TestBracketOrderParentCancellation:
+    """Test bracket order cancellation via parent_id."""
+
+    def test_bracket_orders_cancelled_on_fill(self):
+        """Test sibling bracket orders are cancelled when one fills."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Create bracket orders with shared parent_id
+        parent_id = "bracket-123"
+        stop_loss = broker.submit_order(
+            "AAPL", 100.0, OrderSide.SELL, OrderType.STOP, stop_price=95.0
+        )
+        stop_loss.parent_id = parent_id
+
+        take_profit = broker.submit_order(
+            "AAPL", 100.0, OrderSide.SELL, OrderType.LIMIT, limit_price=110.0
+        )
+        take_profit.parent_id = parent_id
+
+        assert len(broker.pending_orders) == 2
+
+        # Price hits stop loss
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 94.0},
+            opens={"AAPL": 96.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 97.0},
+            lows={"AAPL": 93.0},  # Triggers stop
+            signals={},
+        )
+        broker._process_orders()
+
+        # Stop loss should fill
+        assert stop_loss.status == OrderStatus.FILLED
+
+        # Take profit should be cancelled (sibling)
+        assert take_profit.status == OrderStatus.CANCELLED
+        assert take_profit not in broker.pending_orders
+
+    def test_partial_fill_does_not_cancel_siblings(self):
+        """Test sibling orders NOT cancelled on partial fill."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            execution_limits=VolumeParticipationLimit(max_participation=0.10),
+        )
+
+        # Enter position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        # Create bracket orders
+        parent_id = "bracket-456"
+        stop_loss = broker.submit_order(
+            "AAPL", 100.0, OrderSide.SELL, OrderType.STOP, stop_price=95.0
+        )
+        stop_loss.parent_id = parent_id
+
+        take_profit = broker.submit_order(
+            "AAPL", 100.0, OrderSide.SELL, OrderType.LIMIT, limit_price=110.0
+        )
+        take_profit.parent_id = parent_id
+
+        # Price triggers stop, but with limited volume (partial fill)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 94.0},
+            opens={"AAPL": 96.0},
+            volumes={"AAPL": 500.0},  # Can only fill 50 shares (10% of 500)
+            highs={"AAPL": 97.0},
+            lows={"AAPL": 93.0},
+            signals={},
+        )
+        broker._process_orders()
+
+        # Stop loss partially filled
+        assert stop_loss.status == OrderStatus.PENDING  # Still pending (partial)
+
+        # Take profit should NOT be cancelled (sibling still active)
+        assert take_profit.status == OrderStatus.PENDING
+        assert take_profit in broker.pending_orders
