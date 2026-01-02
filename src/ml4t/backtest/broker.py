@@ -8,6 +8,7 @@ from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
     ContractSpec,
     ExecutionMode,
+    ExitReason,
     Fill,
     Order,
     OrderSide,
@@ -18,6 +19,38 @@ from .types import (
     StopLevelBasis,
     Trade,
 )
+
+
+def _parse_exit_reason(order: Order) -> str:
+    """Parse exit reason from order's internal risk exit reason.
+
+    Maps the detailed _risk_exit_reason string (e.g., "stop_loss_5.0%")
+    to a standardized ExitReason enum value.
+
+    Args:
+        order: The filled exit order
+
+    Returns:
+        ExitReason value as string
+    """
+    reason = order._risk_exit_reason
+    if reason is None:
+        return ExitReason.SIGNAL.value
+
+    reason_lower = reason.lower()
+    if "stop_loss" in reason_lower:
+        return ExitReason.STOP_LOSS.value
+    elif "take_profit" in reason_lower:
+        return ExitReason.TAKE_PROFIT.value
+    elif "trailing" in reason_lower:
+        return ExitReason.TRAILING_STOP.value
+    elif "time" in reason_lower:
+        return ExitReason.TIME_STOP.value
+    elif "end_of_data" in reason_lower:
+        return ExitReason.END_OF_DATA.value
+    else:
+        # Default to signal for unknown reasons
+        return ExitReason.SIGNAL.value
 
 
 class Broker:
@@ -859,6 +892,7 @@ class Broker:
                     bars_held=pos.bars_held,
                     commission=total_commission,  # Both entry and exit commission
                     slippage=slippage,
+                    exit_reason=_parse_exit_reason(order),
                     entry_signals=self._current_signals.get(order.asset, {}),
                     exit_signals=self._current_signals.get(order.asset, {}),
                     max_favorable_excursion=pos.max_favorable_excursion,
@@ -899,6 +933,9 @@ class Broker:
                         bars_held=pos.bars_held,
                         commission=total_close_commission,
                         slippage=slippage * (close_qty / fill_quantity),  # Proportional slippage
+                        exit_reason=_parse_exit_reason(order),
+                        entry_signals=self._current_signals.get(order.asset, {}),
+                        exit_signals=self._current_signals.get(order.asset, {}),
                         max_favorable_excursion=pos.max_favorable_excursion,
                         max_adverse_excursion=pos.max_adverse_excursion,
                     )

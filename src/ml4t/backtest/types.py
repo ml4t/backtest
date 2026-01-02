@@ -98,6 +98,21 @@ class ContractSpec:
     currency: str = "USD"
 
 
+class ExitReason(str, Enum):
+    """Reason for trade exit - used for analysis and debugging.
+
+    This enum is part of the cross-library API specification, designed to be
+    identical across Python, Numba, and Rust implementations.
+    """
+
+    SIGNAL = "signal"  # Normal signal-based exit
+    STOP_LOSS = "stop_loss"  # Stop-loss triggered
+    TAKE_PROFIT = "take_profit"  # Take-profit triggered
+    TRAILING_STOP = "trailing_stop"  # Trailing stop triggered
+    TIME_STOP = "time_stop"  # Max hold time exceeded
+    END_OF_DATA = "end_of_data"  # Backtest ended with open position
+
+
 class StopLevelBasis(Enum):
     """Basis for calculating stop/take-profit levels.
 
@@ -327,7 +342,11 @@ class Fill:
 
 @dataclass
 class Trade:
-    """Completed round-trip trade."""
+    """Completed round-trip trade.
+
+    This dataclass is part of the cross-library API specification, designed to
+    produce identical Parquet output across Python, Numba, and Rust implementations.
+    """
 
     asset: str
     entry_time: datetime
@@ -340,6 +359,10 @@ class Trade:
     bars_held: int
     commission: float = 0.0
     slippage: float = 0.0
+    # Exit reason for trade analysis (cross-library API field)
+    exit_reason: str = "signal"  # ExitReason enum value as string
+    # Deprecated: signals now handled via post-process join (enrich_trades_with_signals)
+    # Kept for backward compatibility but not exported to DataFrame
     entry_signals: dict[str, float] = field(default_factory=dict)
     exit_signals: dict[str, float] = field(default_factory=dict)
     # MFE/MAE preserved from Position for trade analysis

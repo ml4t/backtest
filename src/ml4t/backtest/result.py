@@ -103,6 +103,7 @@ class BacktestResult:
                     "slippage": t.slippage,
                     "mfe": t.max_favorable_excursion,
                     "mae": t.max_adverse_excursion,
+                    "exit_reason": t.exit_reason,
                 }
             )
 
@@ -393,6 +394,7 @@ class BacktestResult:
                         bars_held=row["bars_held"],
                         commission=row["commission"],
                         slippage=row["slippage"],
+                        exit_reason=row.get("exit_reason", "signal"),
                         max_favorable_excursion=row["mfe"],
                         max_adverse_excursion=row["mae"],
                     )
@@ -423,7 +425,11 @@ class BacktestResult:
 
     @staticmethod
     def _trades_schema() -> dict[str, pl.DataType]:
-        """Schema for trades DataFrame."""
+        """Schema for trades DataFrame.
+
+        This schema is part of the cross-library API specification, designed to
+        produce identical Parquet output across Python, Numba, and Rust implementations.
+        """
         return {
             "asset": pl.String(),
             "entry_time": pl.Datetime(),
@@ -439,6 +445,7 @@ class BacktestResult:
             "slippage": pl.Float64(),
             "mfe": pl.Float64(),
             "mae": pl.Float64(),
+            "exit_reason": pl.String(),
         }
 
     @staticmethod
@@ -498,3 +505,124 @@ class BacktestResult:
             f"BacktestResult(trades={n_trades}, bars={n_bars}, "
             f"final_value=${final_value:,.2f}, return={total_return:+.2f}%)"
         )
+
+
+def enrich_trades_with_signals(
+    trades_df: pl.DataFrame,
+    signals_df: pl.DataFrame,
+    signal_columns: list[str] | None = None,
+    timestamp_col: str = "timestamp",
+    asset_col: str | None = None,
+) -> pl.DataFrame:
+    """Enrich trades DataFrame with signal values at entry/exit times via as-of join.
+
+    This function performs a backward as-of join to add signal values from the
+    signals DataFrame to each trade at both entry and exit times. This is the
+    recommended way to add ML features/signals to trades for analysis, rather
+    than storing signals during backtest execution.
+
+    This function is part of the cross-library API specification and should
+    produce identical results across Python, Numba, and Rust implementations.
+
+    Args:
+        trades_df: Trades DataFrame with entry_time, exit_time columns.
+            Typically from BacktestResult.to_trades_dataframe().
+        signals_df: Signals DataFrame with timestamp and signal columns.
+            Should have the same timestamps as the backtest data.
+        signal_columns: Signal columns to include. If None, uses all columns
+            except timestamp_col and asset_col.
+        timestamp_col: Name of timestamp column in signals_df.
+        asset_col: Name of asset column in signals_df for multi-asset signals.
+            If None, assumes single-asset or already filtered.
+
+    Returns:
+        Trades DataFrame with added columns:
+        - entry_{signal_name} for each signal
+        - exit_{signal_name} for each signal
+
+    Example:
+        >>> from ml4t.backtest import Engine, enrich_trades_with_signals
+        >>>
+        >>> # Run backtest
+        >>> result = engine.run()
+        >>> trades_df = result.to_trades_dataframe()
+        >>>
+        >>> # Load signals used in backtest
+        >>> signals = pl.read_parquet("ml_signals.parquet")
+        >>>
+        >>> # Enrich trades with signal values at entry/exit
+        >>> enriched = enrich_trades_with_signals(
+        ...     trades_df,
+        ...     signals,
+        ...     signal_columns=["momentum", "rsi", "ml_score"]
+        ... )
+        >>>
+        >>> # Analyze: What was the ML score when we exited via stop-loss?
+        >>> stop_loss_trades = enriched.filter(pl.col("exit_reason") == "stop_loss")
+        >>> print(stop_loss_trades.select(["exit_ml_score", "pnl"]).describe())
+    """
+    # Determine signal columns if not specified
+    exclude_cols = {timestamp_col}
+    if asset_col:
+        exclude_cols.add(asset_col)
+
+    if signal_columns is None:
+        signal_columns = [c for c in signals_df.columns if c not in exclude_cols]
+
+    if not signal_columns:
+        return trades_df
+
+    # Ensure signals are sorted by timestamp for join_asof
+    signals_sorted = signals_df.sort(timestamp_col)
+
+    # Join for entry signals
+    entry_cols = [timestamp_col] + signal_columns
+    if asset_col and asset_col in signals_df.columns:
+        entry_cols = [timestamp_col, asset_col] + signal_columns
+
+    entry_signals = signals_sorted.select(entry_cols)
+    entry_rename = {c: f"entry_{c}" for c in signal_columns}
+    entry_signals = entry_signals.rename(entry_rename)
+
+    if asset_col and asset_col in signals_df.columns:
+        # Multi-asset: join on both timestamp and asset
+        result = trades_df.join_asof(
+            entry_signals,
+            left_on="entry_time",
+            right_on=timestamp_col,
+            by_left="asset",
+            by_right=asset_col,
+            strategy="backward",
+        )
+    else:
+        # Single-asset: join on timestamp only
+        result = trades_df.join_asof(
+            entry_signals,
+            left_on="entry_time",
+            right_on=timestamp_col,
+            strategy="backward",
+        )
+
+    # Join for exit signals
+    exit_signals = signals_sorted.select(entry_cols)
+    exit_rename = {c: f"exit_{c}" for c in signal_columns}
+    exit_signals = exit_signals.rename(exit_rename)
+
+    if asset_col and asset_col in signals_df.columns:
+        result = result.join_asof(
+            exit_signals,
+            left_on="exit_time",
+            right_on=timestamp_col,
+            by_left="asset",
+            by_right=asset_col,
+            strategy="backward",
+        )
+    else:
+        result = result.join_asof(
+            exit_signals,
+            left_on="exit_time",
+            right_on=timestamp_col,
+            strategy="backward",
+        )
+
+    return result

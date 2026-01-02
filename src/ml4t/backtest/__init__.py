@@ -102,7 +102,7 @@ from .models import (
 )
 
 # Structured result
-from .result import BacktestResult
+from .result import BacktestResult, enrich_trades_with_signals
 
 # Session alignment
 from .sessions import SessionConfig, align_to_sessions, compute_session_pnl
@@ -111,6 +111,7 @@ from .types import (
     AssetClass,
     ContractSpec,
     ExecutionMode,
+    ExitReason,
     Fill,
     Order,
     OrderSide,
@@ -130,6 +131,7 @@ __all__ = [
     "OrderSide",
     "OrderStatus",
     "ExecutionMode",
+    "ExitReason",
     "StopFillMode",
     "StopLevelBasis",
     "Order",
@@ -157,6 +159,7 @@ __all__ = [
     "run_backtest",
     "BacktestResult",
     "BacktestExporter",
+    "enrich_trades_with_signals",
     # Session alignment
     "SessionConfig",
     "compute_session_pnl",
