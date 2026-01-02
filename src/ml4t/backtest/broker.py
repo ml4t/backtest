@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any
 
+from .config import InitialHwmSource, TrailHwmSource
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
     ContractSpec,
@@ -30,6 +31,8 @@ class Broker:
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
+        trail_hwm_source: TrailHwmSource = TrailHwmSource.CLOSE,
+        initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE,
         account_type: str = "cash",
         initial_margin: float = 0.5,
         long_maintenance_margin: float = 0.25,
@@ -54,6 +57,8 @@ class Broker:
         self.execution_mode = execution_mode
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
+        self.trail_hwm_source = trail_hwm_source
+        self.initial_hwm_source = initial_hwm_source
 
         # Create AccountState with appropriate policy
         from .accounting.policy import AccountPolicy
@@ -106,6 +111,14 @@ class Broker:
         self.market_impact_model = market_impact_model  # MarketImpactModel instance
         self._partial_orders: dict[str, float] = {}  # order_id -> remaining quantity
         self._filled_this_bar: set[str] = set()  # order_ids that had fills this bar
+
+        # VBT Pro compatibility: prevent same-bar re-entry after stop exit
+        self._stop_exits_this_bar: set[str] = set()  # assets that had stop exits this bar
+
+        # VBT Pro compatibility: track positions created this bar
+        # New positions should NOT have HWM updated from entry bar's high
+        # VBT Pro uses CLOSE for initial HWM on entry bar, then updates from HIGH next bar
+        self._positions_created_this_bar: set[str] = set()
 
         # Contract specifications (for futures and other derivatives)
         self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
@@ -247,6 +260,8 @@ class Broker:
                         # This is the price at which the stop/limit was triggered
                         order._risk_fill_price = action.fill_price
                         exit_orders.append(order)
+                        # VBT Pro compatibility: prevent same-bar re-entry
+                        self._stop_exits_this_bar.add(asset)
 
             elif action.action == ActionType.EXIT_PARTIAL:
                 if action.defer_fill:
@@ -280,10 +295,15 @@ class Broker:
         limit_price: float | None = None,
         stop_price: float | None = None,
         trail_amount: float | None = None,
-    ) -> Order:
+    ) -> Order | None:
         if side is None:
             side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
             quantity = abs(quantity)
+
+        # VBT Pro compatibility: prevent same-bar re-entry after stop exit
+        # When a stop/trail exit occurs, don't allow new entry until next bar
+        if side == OrderSide.BUY and asset in self._stop_exits_this_bar:
+            return None  # Silently reject entry on same bar as stop exit
 
         self._order_counter += 1
         order = Order(
@@ -319,18 +339,28 @@ class Broker:
         stop_loss: float,
         entry_type: OrderType = OrderType.MARKET,
         entry_limit: float | None = None,
-    ) -> tuple[Order, Order, Order]:
-        """Submit entry with take-profit and stop-loss."""
+    ) -> tuple[Order, Order, Order] | None:
+        """Submit entry with take-profit and stop-loss.
+
+        Returns:
+            Tuple of (entry_order, take_profit_order, stop_loss_order) or None if any fails.
+        """
         entry = self.submit_order(asset, quantity, order_type=entry_type, limit_price=entry_limit)
+        if entry is None:
+            return None
 
         tp = self.submit_order(
             asset, quantity, OrderSide.SELL, OrderType.LIMIT, limit_price=take_profit
         )
+        if tp is None:
+            return None
         tp.parent_id = entry.order_id
 
         sl = self.submit_order(
             asset, quantity, OrderSide.SELL, OrderType.STOP, stop_price=stop_loss
         )
+        if sl is None:
+            return None
         sl.parent_id = entry.order_id
 
         return entry, tp, sl
@@ -461,6 +491,8 @@ class Broker:
 
         # Clear per-bar tracking at start of new bar
         self._filled_this_bar.clear()
+        self._stop_exits_this_bar.clear()  # VBT Pro: allow re-entry on next bar
+        self._positions_created_this_bar.clear()  # VBT Pro: update HWM from next bar
 
         # In next-bar mode, move orders from this bar to pending for next bar
         if self.execution_mode == ExecutionMode.NEXT_BAR:
@@ -469,11 +501,36 @@ class Broker:
             # Clear orders placed this bar (will be processed next bar)
             self._orders_this_bar = []
 
-        for asset, pos in self.positions.items():
+        for _asset, pos in self.positions.items():
             pos.bars_held += 1
-            # Update water marks for risk tracking
-            if asset in prices:
-                pos.update_water_marks(prices[asset])
+            # NOTE: Water marks are updated AFTER position rules are evaluated
+            # via _update_water_marks(). VBT Pro evaluates trailing stops using
+            # HWM from PREVIOUS bar, then updates HWM with current bar's high.
+
+    def _update_water_marks(self):
+        """Update water marks for all positions after position rules are evaluated.
+
+        This must be called AFTER evaluate_position_rules() to match VBT Pro behavior:
+        VBT Pro calculates trailing stop using HWM from previous bar, then updates HWM.
+
+        CRITICAL VBT Pro behavior: For new positions, the entry bar's HIGH is NOT used
+        to update HWM. VBT Pro uses CLOSE for initial HWM, then only starts updating
+        from bar HIGHs on the NEXT bar after entry. This is because VBT Pro's vectorized
+        calculation computes HWM as max(highs[entry_bar+1:current_bar+1]).
+        """
+        for asset, pos in self.positions.items():
+            if asset in self._current_prices:
+                # For new positions (created this bar), skip updating from entry bar's HIGH
+                # VBT Pro only updates HWM from HIGHs starting on the bar AFTER entry
+                is_new_position = asset in self._positions_created_this_bar
+                pos.update_water_marks(
+                    current_price=self._current_prices[asset],
+                    bar_high=self._current_highs.get(asset),
+                    bar_low=self._current_lows.get(asset),
+                    use_high_for_hwm=(
+                        self.trail_hwm_source == TrailHwmSource.HIGH and not is_new_position
+                    ),
+                )
 
     def _process_orders(self, use_open: bool = False):
         """Process pending orders against current prices with exit-first sequencing.
@@ -604,9 +661,18 @@ class Broker:
             # (e.g., stop-loss or take-profit that was triggered intrabar)
             risk_fill_price = getattr(order, "_risk_fill_price", None)
             if risk_fill_price is not None:
-                # Use the stop/target price as the base fill price
-                # Slippage will be applied on top by the caller
-                return risk_fill_price
+                # Check for gap-through: if bar opened beyond our stop level,
+                # we can't fill at stop - must fill at open (worse price)
+                bar_open = self._current_opens.get(order.asset, price)
+                if order.side == OrderSide.SELL and bar_open < risk_fill_price:
+                    # Gapped down through stop - fill at open (worse than stop)
+                    return bar_open
+                elif order.side == OrderSide.BUY and bar_open > risk_fill_price:
+                    # Gapped up through stop - fill at open (worse than stop)
+                    return bar_open
+                else:
+                    # Normal case - fill at stop/target price
+                    return risk_fill_price
             return price
 
         elif order.order_type == OrderType.LIMIT and order.limit_price is not None:
@@ -747,21 +813,38 @@ class Broker:
                 # Create new position with signal_price in context for stop level calculation
                 signal_price = getattr(order, "_signal_price", None)
                 context = {"signal_price": signal_price} if signal_price is not None else {}
-                self.positions[order.asset] = Position(
+                # Initial HWM/LWM depends on configuration:
+                # - FILL_PRICE: Use actual fill price (default, most frameworks)
+                # - BAR_CLOSE: Use bar's close
+                # - BAR_HIGH: Use bar's high (VBT Pro with OHLC data)
+                if self.initial_hwm_source == InitialHwmSource.BAR_HIGH:
+                    initial_hwm = self._current_highs.get(order.asset, fill_price)
+                elif self.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
+                    initial_hwm = self._current_prices.get(order.asset, fill_price)
+                else:
+                    initial_hwm = fill_price
+                pos = Position(
                     asset=order.asset,
                     quantity=signed_qty,
                     entry_price=fill_price,
                     entry_time=current_time,
                     context=context,
                     multiplier=self.get_multiplier(order.asset),
+                    entry_commission=commission,  # Track for Trade PnL calculation
+                    high_water_mark=initial_hwm,
+                    low_water_mark=initial_hwm,
                 )
+                self.positions[order.asset] = pos
+                # Track new position - VBT Pro: don't update HWM from entry bar's high
+                self._positions_created_this_bar.add(order.asset)
         else:
             old_qty = pos.quantity
             new_qty = old_qty + signed_qty
 
             if new_qty == 0:
-                # Position closed
-                pnl = (fill_price - pos.entry_price) * old_qty - commission
+                # Position closed - PnL includes both entry and exit commission
+                total_commission = pos.entry_commission + commission  # entry + exit
+                pnl = (fill_price - pos.entry_price) * old_qty - total_commission
                 trade = Trade(
                     asset=order.asset,
                     entry_time=pos.entry_time,
@@ -774,7 +857,7 @@ class Broker:
                     if pos.entry_price
                     else 0,
                     bars_held=pos.bars_held,
-                    commission=commission,
+                    commission=total_commission,  # Both entry and exit commission
                     slippage=slippage,
                     entry_signals=self._current_signals.get(order.asset, {}),
                     exit_signals=self._current_signals.get(order.asset, {}),
@@ -798,8 +881,9 @@ class Broker:
                 # (both close and open commissions will be deducted from cash)
                 commission = close_commission + open_commission
 
-                # Close the old position with appropriate commission
-                pnl = (fill_price - pos.entry_price) * old_qty - close_commission
+                # Close the old position with entry + exit commission
+                total_close_commission = pos.entry_commission + close_commission
+                pnl = (fill_price - pos.entry_price) * old_qty - total_close_commission
                 self.trades.append(
                     Trade(
                         asset=order.asset,
@@ -813,16 +897,22 @@ class Broker:
                         if pos.entry_price
                         else 0,
                         bars_held=pos.bars_held,
-                        commission=close_commission,
+                        commission=total_close_commission,
                         slippage=slippage * (close_qty / fill_quantity),  # Proportional slippage
                         max_favorable_excursion=pos.max_favorable_excursion,
                         max_adverse_excursion=pos.max_adverse_excursion,
                     )
                 )
                 # Create new position with signal_price in context
-                # Note: open_commission is included in cash change (line 832)
                 signal_price = getattr(order, "_signal_price", None)
                 context = {"signal_price": signal_price} if signal_price is not None else {}
+                # Initial HWM depends on configuration (same as new position logic)
+                if self.initial_hwm_source == InitialHwmSource.BAR_HIGH:
+                    initial_hwm = self._current_highs.get(order.asset, fill_price)
+                elif self.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
+                    initial_hwm = self._current_prices.get(order.asset, fill_price)
+                else:
+                    initial_hwm = fill_price
                 self.positions[order.asset] = Position(
                     asset=order.asset,
                     quantity=new_qty,
@@ -830,7 +920,12 @@ class Broker:
                     entry_time=current_time,
                     context=context,
                     multiplier=self.get_multiplier(order.asset),
+                    entry_commission=open_commission,  # Track for Trade PnL
+                    high_water_mark=initial_hwm,
+                    low_water_mark=initial_hwm,
                 )
+                # Track new position - VBT Pro: don't update HWM from entry bar's high
+                self._positions_created_this_bar.add(order.asset)
 
                 # Cancel all other pending orders for this asset (e.g., old bracket orders)
                 # They're now invalid since the position flipped

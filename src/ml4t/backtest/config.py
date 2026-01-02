@@ -100,6 +100,38 @@ class DataFrequency(str, Enum):
     IRREGULAR = "irregular"  # Trade bars, tick aggregations (no fixed frequency)
 
 
+class TrailHwmSource(str, Enum):
+    """Source for trailing stop high-water mark UPDATE calculation.
+
+    Controls which price is used to update HWM on each bar AFTER entry:
+    - CLOSE: Use close prices for HWM updates (default, matches backtest-nb/rs)
+    - HIGH: Use high prices for HWM updates (VBT Pro with OHLC data)
+
+    Note: Initial HWM on entry bar is controlled by InitialHwmSource.
+    """
+
+    CLOSE = "close"  # Use close prices for HWM updates (default)
+    HIGH = "high"  # Use high prices for HWM updates (VBT Pro with OHLC)
+
+
+class InitialHwmSource(str, Enum):
+    """Source for initial high-water mark on position entry.
+
+    Controls what price is used for HWM when a new position is created:
+    - FILL_PRICE: Use the actual fill price including slippage (default)
+    - BAR_CLOSE: Use the bar's close price
+    - BAR_HIGH: Use the bar's high price (VBT Pro with OHLC data)
+
+    VBT Pro with OHLC data uses BAR_HIGH for initial HWM. This is because
+    VBT Pro updates HWM from bar highs vectorially, including the entry bar.
+    Most event-driven frameworks use the actual fill price.
+    """
+
+    FILL_PRICE = "fill_price"  # Use fill price (default, most frameworks)
+    BAR_CLOSE = "bar_close"  # Use bar's close
+    BAR_HIGH = "bar_high"  # Use bar's high (VBT Pro with OHLC)
+
+
 @dataclass
 class BacktestConfig:
     """
@@ -151,6 +183,10 @@ class BacktestConfig:
     calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
     timezone: str = "UTC"  # Default timezone for naive datetimes
     data_frequency: DataFrequency = DataFrequency.DAILY  # Data frequency
+    enforce_sessions: bool = False  # Skip bars outside trading sessions (requires calendar)
+
+    # === Trailing Stop Configuration ===
+    trail_hwm_source: TrailHwmSource = TrailHwmSource.CLOSE  # HWM source for trailing stop
 
     # === Metadata ===
     preset_name: str | None = None  # Name of preset this was loaded from

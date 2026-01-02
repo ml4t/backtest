@@ -62,6 +62,11 @@ class BenchmarkConfig:
     commission_pct: float = 0.0
     slippage_pct: float = 0.0
 
+    @property
+    def data_points(self) -> int:
+        """Total data points (n_bars × n_assets)."""
+        return self.n_bars * self.n_assets
+
 
 # Benchmark scenarios - progressive scaling
 SCENARIOS = {
@@ -165,6 +170,65 @@ SCENARIOS = {
         top_n=25,
         bottom_n=0,  # No shorts
         rebalance_freq=390,
+    ),
+    # === Single-asset scale tests ===
+    "single_10yr": BenchmarkConfig(
+        name="Single-asset (1×10yr daily)",
+        n_bars=2_520,  # 10 years of daily data
+        n_assets=1,
+        frequency="D",
+        top_n=1,
+        bottom_n=0,
+        rebalance_freq=1,
+    ),
+    "single_20yr": BenchmarkConfig(
+        name="Single-asset (1×20yr daily)",
+        n_bars=5_040,  # 20 years of daily data
+        n_assets=1,
+        frequency="D",
+        top_n=1,
+        bottom_n=0,
+        rebalance_freq=1,
+    ),
+    "single_50yr": BenchmarkConfig(
+        name="Single-asset (1×50yr daily)",
+        n_bars=12_600,  # 50 years of daily data
+        n_assets=1,
+        frequency="D",
+        top_n=1,
+        bottom_n=0,
+        rebalance_freq=1,
+    ),
+    # === Multi-asset scale tests ===
+    "multi_500_10yr": BenchmarkConfig(
+        name="Multi-asset (500×10yr daily)",
+        n_bars=2_520,
+        n_assets=500,
+        frequency="D",
+        top_n=25,
+        bottom_n=25,
+        rebalance_freq=1,
+    ),
+    "multi_1000_10yr": BenchmarkConfig(
+        name="Multi-asset (1000×10yr daily)",
+        n_bars=2_520,
+        n_assets=1000,
+        frequency="D",
+        top_n=50,
+        bottom_n=50,
+        rebalance_freq=1,
+    ),
+    # === Parameter sweep simulation ===
+    "param_sweep_base": BenchmarkConfig(
+        name="Param sweep base (100×1yr)",
+        n_bars=252,
+        n_assets=100,
+        frequency="D",
+        top_n=10,
+        bottom_n=10,
+        rebalance_freq=1,
+        stop_loss=0.02,
+        take_profit=0.05,
     ),
 }
 
@@ -287,6 +351,39 @@ class BenchmarkResult:
     trades_df: pd.DataFrame | None = None  # Trade log for validation
     positions_df: pd.DataFrame | None = None  # PyFolio positions (Backtrader/Zipline)
     transactions_df: pd.DataFrame | None = None  # PyFolio transactions (Backtrader/Zipline)
+    # Enhanced metrics
+    setup_time_sec: float = 0.0  # Time for data prep, bundle creation, etc.
+    data_points: int = 0  # n_bars × n_assets
+
+    @property
+    def bars_per_second(self) -> float:
+        """Processing speed in bars per second."""
+        if self.runtime_sec > 0 and self.data_points > 0:
+            return self.data_points / self.runtime_sec
+        return 0.0
+
+    @property
+    def trades_per_second(self) -> float:
+        """Trade generation speed."""
+        if self.runtime_sec > 0 and self.num_trades > 0:
+            return self.num_trades / self.runtime_sec
+        return 0.0
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON export."""
+        return {
+            "framework": self.framework,
+            "scenario": self.scenario,
+            "runtime_sec": self.runtime_sec,
+            "setup_time_sec": self.setup_time_sec,
+            "num_trades": self.num_trades,
+            "final_value": self.final_value,
+            "memory_mb": self.memory_mb,
+            "data_points": self.data_points,
+            "bars_per_second": self.bars_per_second,
+            "trades_per_second": self.trades_per_second,
+            "error": self.error,
+        }
 
 
 def save_trades(result: BenchmarkResult, output_dir: Path):
@@ -297,6 +394,126 @@ def save_trades(result: BenchmarkResult, output_dir: Path):
         filepath = output_dir / filename
         result.trades_df.to_csv(filepath, index=False)
         print(f"  Saved trades to: {filepath}")
+
+
+def generate_json_report(
+    results: list[BenchmarkResult], output_path: Path, metadata: dict | None = None
+):
+    """Generate JSON report for CI/CD integration.
+
+    Args:
+        results: List of BenchmarkResult objects
+        output_path: Path to write JSON file
+        metadata: Optional metadata (e.g., git hash, version)
+    """
+    import json as json_lib
+
+    report = {
+        "meta": {
+            "timestamp": datetime.now().isoformat(),
+            "python_version": sys.version.split()[0],
+            "num_results": len(results),
+            **(metadata or {}),
+        },
+        "results": [r.to_dict() for r in results],
+        "summary": {
+            "total_scenarios": len(set(r.scenario for r in results)),
+            "total_frameworks": len(set(r.framework for r in results)),
+            "errors": sum(1 for r in results if r.error),
+        },
+    }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json_lib.dump(report, f, indent=2)
+    print(f"JSON report written to: {output_path}")
+
+
+def generate_markdown_report(
+    results: list[BenchmarkResult], output_path: Path, title: str = "Benchmark Results"
+):
+    """Generate Markdown report for human review.
+
+    Args:
+        results: List of BenchmarkResult objects
+        output_path: Path to write Markdown file
+        title: Report title
+    """
+    lines = [
+        f"# {title}",
+        "",
+        f"Generated: {datetime.now().isoformat()}",
+        "",
+        "## Summary",
+        "",
+        f"- Total scenarios: {len(set(r.scenario for r in results))}",
+        f"- Frameworks tested: {', '.join(sorted(set(r.framework for r in results)))}",
+        f"- Errors: {sum(1 for r in results if r.error)}",
+        "",
+        "## Results by Scenario",
+        "",
+    ]
+
+    # Group by scenario
+    scenarios: dict[str, list[BenchmarkResult]] = {}
+    for r in results:
+        if r.scenario not in scenarios:
+            scenarios[r.scenario] = []
+        scenarios[r.scenario].append(r)
+
+    for scenario, scenario_results in scenarios.items():
+        lines.extend(
+            [
+                f"### {scenario}",
+                "",
+                "| Framework | Runtime | Trades | Final Value | Memory | Bars/sec |",
+                "|-----------|---------|--------|-------------|--------|----------|",
+            ]
+        )
+
+        for r in scenario_results:
+            if r.error:
+                lines.append(f"| {r.framework} | ERROR | - | - | - | - |")
+            else:
+                runtime = (
+                    f"{r.runtime_sec:.3f}s" if r.runtime_sec < 60 else f"{r.runtime_sec / 60:.1f}m"
+                )
+                bars_sec = f"{r.bars_per_second:,.0f}" if r.bars_per_second > 0 else "-"
+                lines.append(
+                    f"| {r.framework} | {runtime} | {r.num_trades:,} | "
+                    f"${r.final_value:,.2f} | {r.memory_mb:.0f}MB | {bars_sec} |"
+                )
+
+        lines.append("")
+
+    # Performance comparison if multiple frameworks
+    frameworks = sorted(set(r.framework for r in results if not r.error))
+    if len(frameworks) > 1:
+        lines.extend(
+            [
+                "## Performance Comparison",
+                "",
+                "| Scenario | " + " | ".join(frameworks) + " |",
+                "|----------|" + "|".join(["---"] * len(frameworks)) + "|",
+            ]
+        )
+
+        for scenario, scenario_results in scenarios.items():
+            row = [scenario]
+            for fw in frameworks:
+                fw_result = next((r for r in scenario_results if r.framework == fw), None)
+                if fw_result and not fw_result.error:
+                    row.append(f"{fw_result.runtime_sec:.3f}s")
+                else:
+                    row.append("-")
+            lines.append("| " + " | ".join(row) + " |")
+
+        lines.append("")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines))
+    print(f"Markdown report written to: {output_path}")
 
 
 def compare_trades(results: list[BenchmarkResult]) -> dict:
@@ -1305,19 +1522,19 @@ def benchmark_backtrader(
 def run_scenario(scenario_name: str, frameworks: list[str]) -> list[BenchmarkResult]:
     """Run a benchmark scenario across specified frameworks."""
     config = SCENARIOS[scenario_name]
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Scenario: {config.name}")
     print(f"  Bars: {config.n_bars:,} | Assets: {config.n_assets} | Freq: {config.frequency}")
     print(f"  Long top {config.top_n}, Short bottom {config.bottom_n}")
     if config.stop_loss:
-        print(f"  Stop-loss: {config.stop_loss*100:.1f}%")
+        print(f"  Stop-loss: {config.stop_loss * 100:.1f}%")
     if config.take_profit:
-        print(f"  Take-profit: {config.take_profit*100:.1f}%")
+        print(f"  Take-profit: {config.take_profit * 100:.1f}%")
     if config.commission_pct > 0:
-        print(f"  Commission: {config.commission_pct*100:.2f}%")
+        print(f"  Commission: {config.commission_pct * 100:.2f}%")
     if config.slippage_pct > 0:
-        print(f"  Slippage: {config.slippage_pct*100:.2f}%")
-    print(f"{'='*70}")
+        print(f"  Slippage: {config.slippage_pct * 100:.2f}%")
+    print(f"{'=' * 70}")
 
     print("\nGenerating data...")
     price_data, signals, dates = generate_benchmark_data(config)
@@ -1356,6 +1573,8 @@ def run_scenario(scenario_name: str, frameworks: list[str]) -> list[BenchmarkRes
                     error=f"Unknown framework: {framework}",
                 )
 
+            # Add data_points to result for metrics
+            result.data_points = config.data_points
             results.append(result)
 
             if result.error:
@@ -1365,6 +1584,8 @@ def run_scenario(scenario_name: str, frameworks: list[str]) -> list[BenchmarkRes
                 print(f"  Trades: {result.num_trades:,}")
                 print(f"  Final value: ${result.final_value:,.2f}")
                 print(f"  Memory: {result.memory_mb:.1f} MB")
+                if result.bars_per_second > 0:
+                    print(f"  Speed: {result.bars_per_second:,.0f} bars/sec")
 
         except Exception as e:
             print(f"  EXCEPTION: {e}")
@@ -1413,7 +1634,7 @@ def print_summary(all_results: list[BenchmarkResult]):
             else:
                 runtime_str = f"{result.runtime_sec:.3f}s"
                 if result.runtime_sec > 60:
-                    runtime_str = f"{result.runtime_sec/60:.1f}m"
+                    runtime_str = f"{result.runtime_sec / 60:.1f}m"
                 print(
                     f"{scenario_col:<30} {framework:<15} {runtime_str:<12} "
                     f"{result.num_trades:<10} {result.memory_mb:.0f} MB"
@@ -1445,6 +1666,18 @@ def main():
         "--save-trades",
         action="store_true",
         help="Save trade logs to CSV for validation",
+    )
+    parser.add_argument(
+        "--output-json",
+        type=str,
+        metavar="PATH",
+        help="Write JSON report to specified path",
+    )
+    parser.add_argument(
+        "--output-markdown",
+        type=str,
+        metavar="PATH",
+        help="Write Markdown report to specified path",
     )
     args = parser.parse_args()
 
@@ -1494,6 +1727,13 @@ def main():
                 print(
                     f"  Final value diff: ${comp['final_value_diff']:,.2f} ({comp['final_value_pct']:.2f}%)"
                 )
+
+    # Generate reports if requested
+    if args.output_json:
+        generate_json_report(all_results, Path(args.output_json))
+
+    if args.output_markdown:
+        generate_markdown_report(all_results, Path(args.output_markdown))
 
     return 0
 

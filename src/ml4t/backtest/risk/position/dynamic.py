@@ -5,12 +5,23 @@ from dataclasses import dataclass, field
 from ..types import PositionAction, PositionState
 
 
+def _get_stop_fill_mode_for_trail(context: dict):
+    """Get StopFillMode from context, defaulting to STOP_PRICE."""
+    from ml4t.backtest.types import StopFillMode
+
+    return context.get("stop_fill_mode", StopFillMode.STOP_PRICE)
+
+
 @dataclass
 class TrailingStop:
     """Exit when price retraces from high water mark.
 
     For longs: Exit if price drops X% from highest price since entry
     For shorts: Exit if price rises X% from lowest price since entry
+
+    Fill price depends on StopFillMode configuration:
+    - STOP_PRICE: Fill at exact trail level (default)
+    - CLOSE_PRICE: Fill at bar's close price (VBT Pro behavior)
 
     Args:
         pct: Trail percentage as decimal (0.05 = 5% trail)
@@ -22,19 +33,98 @@ class TrailingStop:
     pct: float
 
     def evaluate(self, state: PositionState) -> PositionAction:
-        """Exit if price retraces beyond trail."""
+        """Exit if price retraces beyond trail.
+
+        Uses bar_low/bar_high for intrabar trigger detection.
+        Handles gap-through: if bar opens beyond stop level, fill at open.
+
+        Fill price depends on StopFillMode configuration:
+        - STOP_PRICE: Fill at exact trail level (default, VBT Pro behavior)
+        - CLOSE_PRICE: Fill at bar's close price
+        - BAR_EXTREME: Fill at bar's low (long) or high (short)
+
+        Gap-through handling: When bar opens beyond the stop level (gap down for
+        longs, gap up for shorts), the fill is at the open price regardless of
+        StopFillMode. This matches VBT Pro behavior.
+        """
+        fill_mode = _get_stop_fill_mode_for_trail(state.context)
+
         if state.is_long:
-            # Long: stop triggers when price drops below (high - trail%)
+            # Long: stop triggers when bar's low drops below (hwm - trail%)
+            # Also triggers on gap-through: when bar opens below trail level
             stop_price = state.high_water_mark * (1 - self.pct)
-            if state.current_price <= stop_price:
-                return PositionAction.exit_full(f"trailing_stop_{self.pct:.1%}")
+            bar_low = state.bar_low if state.bar_low is not None else state.current_price
+            bar_open = state.bar_open if state.bar_open is not None else state.current_price
+            # Check both low touch AND gap-through (open below trail)
+            if bar_low <= stop_price or bar_open < stop_price:
+                # Determine fill price based on StopFillMode and gap-through
+                fill_price = self._get_fill_price_long(
+                    stop_price, state.current_price, bar_low, bar_open, fill_mode
+                )
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}",
+                    fill_price=fill_price,
+                )
         else:
-            # Short: stop triggers when price rises above (low + trail%)
+            # Short: stop triggers when bar's high rises above (lwm + trail%)
+            # Also triggers on gap-through: when bar opens above trail level
             stop_price = state.low_water_mark * (1 + self.pct)
-            if state.current_price >= stop_price:
-                return PositionAction.exit_full(f"trailing_stop_{self.pct:.1%}")
+            bar_high = state.bar_high if state.bar_high is not None else state.current_price
+            bar_open = state.bar_open if state.bar_open is not None else state.current_price
+            # Check both high touch AND gap-through (open above trail)
+            if bar_high >= stop_price or bar_open > stop_price:
+                # Determine fill price based on StopFillMode and gap-through
+                fill_price = self._get_fill_price_short(
+                    stop_price, state.current_price, bar_high, bar_open, fill_mode
+                )
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}",
+                    fill_price=fill_price,
+                )
 
         return PositionAction.hold()
+
+    def _get_fill_price_long(
+        self, stop_price: float, close: float, bar_low: float, bar_open: float, fill_mode
+    ) -> float:
+        """Get fill price for long position exit based on StopFillMode.
+
+        Handles gap-through: if bar opens below stop level, fill at open.
+        This matches VBT Pro behavior for gap downs through the stop.
+        """
+        from ml4t.backtest.types import StopFillMode
+
+        # Gap-through: if bar opens below stop, fill at open (worse price)
+        if bar_open < stop_price:
+            return bar_open
+
+        if fill_mode == StopFillMode.CLOSE_PRICE:
+            return close
+        elif fill_mode == StopFillMode.BAR_EXTREME:
+            return bar_low
+        else:  # STOP_PRICE (default) or NEXT_BAR_OPEN
+            return stop_price
+
+    def _get_fill_price_short(
+        self, stop_price: float, close: float, bar_high: float, bar_open: float, fill_mode
+    ) -> float:
+        """Get fill price for short position exit based on StopFillMode.
+
+        Handles gap-through: if bar opens above stop level, fill at open.
+        This matches VBT Pro behavior for gap ups through the stop.
+        """
+        from ml4t.backtest.types import StopFillMode
+
+        # Gap-through: if bar opens above stop, fill at open (worse price)
+        if bar_open > stop_price:
+            return bar_open
+
+        if fill_mode == StopFillMode.CLOSE_PRICE:
+            return close
+        elif fill_mode == StopFillMode.BAR_EXTREME:
+            return bar_high
+        else:  # STOP_PRICE (default) or NEXT_BAR_OPEN
+            return stop_price
 
 
 @dataclass

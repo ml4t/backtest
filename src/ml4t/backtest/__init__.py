@@ -56,9 +56,11 @@ from .config import (
     DataFrequency,
     ExecutionPrice,
     FillTiming,
+    InitialHwmSource,
     ShareType,
     SignalProcessing,
     SizingMethod,
+    TrailHwmSource,
 )
 from .config import (
     CommissionModel as CommissionModelType,
@@ -82,6 +84,9 @@ from .execution import (
     TargetWeightExecutor,
     VolumeParticipationLimit,
 )
+
+# Export utilities
+from .export import BacktestExporter
 from .models import (
     CombinedCommission,
     CommissionModel,
@@ -95,6 +100,12 @@ from .models import (
     TieredCommission,
     VolumeShareSlippage,
 )
+
+# Structured result
+from .result import BacktestResult
+
+# Session alignment
+from .sessions import SessionConfig, align_to_sessions, compute_session_pnl
 from .strategy import Strategy
 from .types import (
     AssetClass,
@@ -144,6 +155,12 @@ __all__ = [
     "Engine",
     "BacktestEngine",  # Backward compatibility alias
     "run_backtest",
+    "BacktestResult",
+    "BacktestExporter",
+    # Session alignment
+    "SessionConfig",
+    "compute_session_pnl",
+    "align_to_sessions",
     # Configuration
     "BacktestConfig",
     "DataFrequency",
@@ -152,6 +169,8 @@ __all__ = [
     "ShareType",
     "SizingMethod",
     "SignalProcessing",
+    "TrailHwmSource",
+    "InitialHwmSource",
     "CommissionModelType",
     "SlippageModelType",
     "PRESETS_DIR",

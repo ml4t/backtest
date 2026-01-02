@@ -182,6 +182,7 @@ class Position:
     initial_quantity: float | None = None  # Original size when opened
     context: dict = field(default_factory=dict)  # Strategy-provided context
     multiplier: float = 1.0  # Contract multiplier (for futures)
+    entry_commission: float = 0.0  # Commission paid on entry (for Trade PnL)
 
     def __post_init__(self):
         # Initialize water marks to entry price
@@ -250,23 +251,49 @@ class Position:
             price = self.entry_price
         return abs(self.quantity) * price * self.multiplier
 
-    def update_water_marks(self, current_price: float) -> None:
-        """Update high/low water marks and excursion tracking."""
+    def update_water_marks(
+        self,
+        current_price: float,
+        bar_high: float | None = None,
+        bar_low: float | None = None,
+        use_high_for_hwm: bool = False,
+    ) -> None:
+        """Update high/low water marks and excursion tracking.
+
+        Args:
+            current_price: Current bar's close price
+            bar_high: Bar's high price (used for HWM if use_high_for_hwm=True)
+            bar_low: Bar's low price (used for LWM tracking if provided)
+            use_high_for_hwm: If True, use bar_high for HWM (VBT Pro mode).
+                              If False, use current_price (close) for HWM (default).
+        """
         # Update current price
         self.current_price = current_price
 
-        # Update water marks (guaranteed non-None after __post_init__)
-        if self.high_water_mark is None or current_price > self.high_water_mark:
-            self.high_water_mark = current_price
-        if self.low_water_mark is None or current_price < self.low_water_mark:
-            self.low_water_mark = current_price
+        # Select HWM source based on configuration
+        high_for_hwm = bar_high if use_high_for_hwm and bar_high is not None else current_price
+        low_for_lwm = bar_low if bar_low is not None else current_price
 
-        # Update MFE/MAE
-        current_return = self.pnl_percent(current_price)
-        if current_return > self.max_favorable_excursion:
-            self.max_favorable_excursion = current_return
-        if current_return < self.max_adverse_excursion:
-            self.max_adverse_excursion = current_return
+        # Update water marks (guaranteed non-None after __post_init__)
+        if self.high_water_mark is None or high_for_hwm > self.high_water_mark:
+            self.high_water_mark = high_for_hwm
+        if self.low_water_mark is None or low_for_lwm < self.low_water_mark:
+            self.low_water_mark = low_for_lwm
+
+        # Update MFE/MAE using bar extremes (more accurate than close only)
+        # For longs: MFE from high, MAE from low
+        # For shorts: MFE from low, MAE from high
+        if self.quantity > 0:  # Long position
+            mfe_return = self.pnl_percent(high_for_hwm)
+            mae_return = self.pnl_percent(low_for_lwm)
+        else:  # Short position
+            mfe_return = self.pnl_percent(low_for_lwm)
+            mae_return = self.pnl_percent(high_for_hwm)
+
+        if mfe_return > self.max_favorable_excursion:
+            self.max_favorable_excursion = mfe_return
+        if mae_return < self.max_adverse_excursion:
+            self.max_adverse_excursion = mae_return
 
     @property
     def side(self) -> str:

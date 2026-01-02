@@ -92,12 +92,15 @@ except RuntimeError:
     result.errors.append(f"Exception type: {type(e).__name__}")
 ```
 
-### Zipline Bundle/Symbol Resolution (Excluded)
-**Problem**: Zipline `run_algorithm()` has environment-specific bundle/symbol issues.
-The bundle may have AAPL registered but `symbol('AAPL')` fails at runtime.
+### Zipline Custom Bundle Pattern (Working)
+**Original Problem**: Zipline `run_algorithm()` requires bundle data, not DataFrame input.
 
-**Decision**: Zipline excluded from cross-framework validation (see AD-001 in docs).
-Test file `test_zipline_adapter.py` is fully skipped.
+**Solution**: Custom bundle registration pattern implemented in `validation/zipline/`:
+- Uses `zipline.data.bundles.register()` and `ingest()` for test data
+- Requires NYSE calendar from `exchange_calendars` for exact date matching
+- Custom `OpenPriceSlippage` class matches `ExecutionMode.NEXT_BAR`
+
+**Status**: 10/10 scenarios pass with 100% match (119,577 trades at scale).
 
 ## Development Standards
 
@@ -141,14 +144,13 @@ See `validation/README.md` and `.claude/memory/validation_methodology.md` for de
 |-------------|---------|
 | `.venv` | Main development |
 | `.venv-vectorbt-pro` | VectorBT Pro validation (internal) |
-| `.venv-backtrader` | Backtrader validation |
-| `.venv-zipline` | Zipline (excluded - bundle issues) |
+| `.venv-validation` | VBT OSS + Backtrader + Zipline combined |
 
 ### Key Framework Behaviors
 
 **VectorBT Pro**: Vectorized, uses close price, `accumulate=False` for no re-entry
 **Backtrader**: Event-driven, COO/COC flags, integer shares
-**Zipline**: EXCLUDED - uses bundle data instead of test DataFrame
+**Zipline**: Event-driven, custom bundle pattern, NYSE calendar, next-bar execution
 
 ## References
 

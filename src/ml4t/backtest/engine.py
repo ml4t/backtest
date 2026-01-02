@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING
+from datetime import date, datetime
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
 from .analytics import EquityCurve, TradeAnalyzer
 from .broker import Broker
+from .config import InitialHwmSource, TrailHwmSource
 from .datafeed import DataFeed
 from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
 from .strategy import Strategy
@@ -16,6 +17,7 @@ from .types import ContractSpec, ExecutionMode, StopFillMode, StopLevelBasis
 
 if TYPE_CHECKING:
     from .config import BacktestConfig
+    from .result import BacktestResult
 
 
 class Engine:
@@ -31,6 +33,8 @@ class Engine:
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
+        trail_hwm_source: TrailHwmSource = TrailHwmSource.CLOSE,
+        initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE,
         account_type: str = "cash",
         initial_margin: float = 0.5,
         long_maintenance_margin: float = 0.25,
@@ -54,6 +58,8 @@ class Engine:
             execution_mode=execution_mode,
             stop_fill_mode=stop_fill_mode,
             stop_level_basis=stop_level_basis,
+            trail_hwm_source=trail_hwm_source,
+            initial_hwm_source=initial_hwm_source,
             account_type=account_type,
             initial_margin=initial_margin,
             long_maintenance_margin=long_maintenance_margin,
@@ -65,11 +71,49 @@ class Engine:
         )
         self.equity_curve: list[tuple[datetime, float]] = []
 
-    def run(self) -> dict:
-        """Run backtest and return results."""
+        # Calendar session enforcement (lazy initialized in run())
+        self._calendar = None
+        self._skipped_bars = 0
+
+    def run(self) -> BacktestResult:
+        """Run backtest and return structured results.
+
+        Returns:
+            BacktestResult with trades, equity curve, metrics, and export methods.
+            Call .to_dict() for backward-compatible dictionary output.
+        """
+        # Lazy calendar initialization (zero cost if unused)
+        is_trading_day_fn = None
+        if self.config and self.config.calendar:
+            from .calendar import get_calendar, is_trading_day
+
+            self._calendar = get_calendar(self.config.calendar)
+            is_trading_day_fn = is_trading_day
+
         self.strategy.on_start(self.broker)
 
+        # Date-level cache for trading day checks (significant speedup for intraday data)
+        trading_day_cache: dict[date, bool] = {}
+
         for timestamp, assets_data, context in self.feed:
+            # Calendar session enforcement
+            if self._calendar and self.config and self.config.enforce_sessions:
+                # For daily data, check trading day; for intraday, check market hours
+                if self.config.data_frequency.value == "daily":
+                    if not is_trading_day_fn(self.config.calendar, timestamp.date()):
+                        self._skipped_bars += 1
+                        continue
+                else:
+                    # Intraday: use cached trading day check (avoid expensive calendar.valid_days per bar)
+                    bar_date = timestamp.date()
+                    if bar_date not in trading_day_cache:
+                        trading_day_cache[bar_date] = is_trading_day_fn(
+                            self.config.calendar, bar_date
+                        )
+                    if not trading_day_cache[bar_date]:
+                        self._skipped_bars += 1
+                        continue
+
             prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
             opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
             highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
@@ -98,15 +142,40 @@ class Engine:
                 self.strategy.on_data(timestamp, assets_data, context, self.broker)
                 self.broker._process_orders()
 
+            # Update water marks at END of bar, AFTER all orders processed
+            # This ensures new positions get their HWM updated from entry bar's high
+            # VBT Pro behavior: HWM updated at bar end, used in NEXT bar's trail evaluation
+            self.broker._update_water_marks()
+
             self.equity_curve.append((timestamp, self.broker.get_account_value()))
 
         self.strategy.on_end(self.broker)
         return self._generate_results()
 
-    def _generate_results(self) -> dict:
+    def run_dict(self) -> dict[str, Any]:
+        """Run backtest and return dictionary (backward compatible).
+
+        This is equivalent to run().to_dict() but more explicit for code
+        that requires dictionary output.
+
+        Returns:
+            Dictionary with metrics, trades, and equity curve.
+        """
+        return self.run().to_dict()
+
+    def _generate_results(self) -> BacktestResult:
         """Generate backtest results with full analytics."""
+        from .result import BacktestResult
+
         if not self.equity_curve:
-            return {}
+            # Return empty result for no-data case
+            return BacktestResult(
+                trades=[],
+                equity_curve=[],
+                fills=[],
+                metrics={"skipped_bars": self._skipped_bars},
+                config=self.config,
+            )
 
         # Build EquityCurve from raw data
         equity = EquityCurve()
@@ -116,8 +185,8 @@ class Engine:
         # Build TradeAnalyzer
         trade_analyzer = TradeAnalyzer(self.broker.trades)
 
-        # Combine into results (backward compatible + new metrics)
-        return {
+        # Build metrics dictionary (backward compatible)
+        metrics = {
             # Core metrics (backward compatible)
             "initial_cash": equity.initial_value,
             "final_value": equity.final_value,
@@ -132,14 +201,7 @@ class Engine:
             # Commission/slippage from fills (includes open positions)
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(f.slippage for f in self.broker.fills),
-            # Raw data
-            "trades": self.broker.trades,
-            "equity_curve": self.equity_curve,
-            "fills": self.broker.fills,
-            # NEW: Analytics objects for detailed analysis
-            "equity": equity,
-            "trade_analyzer": trade_analyzer,
-            # NEW: Additional metrics
+            # Additional metrics
             "sharpe": equity.sharpe(),
             "sortino": equity.sortino(),
             "calmar": equity.calmar,
@@ -152,7 +214,19 @@ class Engine:
             "avg_loss": trade_analyzer.avg_loss,
             "largest_win": trade_analyzer.largest_win,
             "largest_loss": trade_analyzer.largest_loss,
+            # Calendar enforcement
+            "skipped_bars": self._skipped_bars,
         }
+
+        return BacktestResult(
+            trades=self.broker.trades,
+            equity_curve=self.equity_curve,
+            fills=self.broker.fills,
+            metrics=metrics,
+            config=self.config,
+            equity=equity,
+            trade_analyzer=trade_analyzer,
+        )
 
     @classmethod
     def from_config(
@@ -254,7 +328,7 @@ def run_backtest(
     commission_model: CommissionModel | None = None,
     slippage_model: SlippageModel | None = None,
     execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
-) -> dict:
+) -> BacktestResult:
     """
     Run a backtest with minimal setup.
 
@@ -270,16 +344,21 @@ def run_backtest(
         execution_mode: Execution mode (legacy, ignored if config provided)
 
     Returns:
-        Results dictionary with metrics, trades, equity curve
+        BacktestResult with metrics, trades, equity curve, and export methods.
+        Call .to_dict() for backward-compatible dictionary output.
 
     Example:
         # Using config preset
-        results = run_backtest(prices_df, strategy, config="backtrader")
+        result = run_backtest(prices_df, strategy, config="backtrader")
+        print(result.metrics["sharpe"])
+
+        # Export to Parquet
+        result.to_parquet("./results")
 
         # Using custom config
         config = BacktestConfig.from_preset("backtrader")
         config.commission_rate = 0.002  # Higher commission
-        results = run_backtest(prices_df, strategy, config=config)
+        result = run_backtest(prices_df, strategy, config=config)
     """
     feed = DataFeed(
         prices_path=prices if isinstance(prices, str) else None,

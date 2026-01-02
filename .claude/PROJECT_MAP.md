@@ -1,7 +1,7 @@
 # Project Map: ml4t.backtest Backtesting Library
 
 *Generated: 2025-11-15T07:00:00Z*
-*Last Updated: 2025-12-26T10:50:00Z*
+*Last Updated: 2026-01-02T12:00:00Z*
 
 ## Quick Overview
 - **Type**: Python library for event-driven backtesting (part of ml4t namespace)
@@ -11,7 +11,7 @@
 - **Frameworks**: Polars (data), Pydantic (validation), Numba (performance)
 - **Purpose**: Institutional-grade event-driven backtesting engine for quantitative trading
 - **Location**: `/home/stefan/ml4t/software/backtest/`
-- **Status**: Beta (474 tests, 73% coverage, all validation scenarios passing)
+- **Status**: Production Ready (645 tests, 82% coverage, 100% exact match with VBT Pro + Backtrader)
 
 ## Architecture Overview
 
@@ -193,7 +193,7 @@ class Strategy(ABC):
 - **Python**: 3.11+ (modern type hints, no `from __future__ import annotations` needed)
 - **Type hints**: Mandatory
 - **Line length**: 100 characters (ruff enforced)
-- **Testing**: pytest with 474 tests (73% coverage)
+- **Testing**: pytest with 635 tests (82% coverage)
 
 ## Dependencies
 
@@ -237,7 +237,7 @@ cd /home/stefan/ml4t/software/backtest
 source .venv/bin/activate
 
 # Run tests
-pytest tests/ -q                    # All tests (474 pass)
+pytest tests/ -q                    # All tests (635 pass)
 
 # Code quality
 ruff check src/                     # Lint
@@ -261,7 +261,7 @@ cd validation/backtrader
 python scenario_01_long_only.py
 ```
 
-## Recent Work & Current State (Dec 2025)
+## Recent Work & Current State (Jan 2026)
 
 ### Completed
 - ✅ Major repository cleanup (739K → 7.7K lines)
@@ -271,13 +271,32 @@ python scenario_01_long_only.py
 - ✅ Risk management system (position + portfolio rules)
 - ✅ Execution model (volume limits, market impact)
 - ✅ Portfolio rebalancing (TargetWeightExecutor)
-- ✅ Ruff passing, 474 tests passing
+- ✅ Ruff passing, 645 tests passing, 82% coverage
+
+### Jan 2026 Production Readiness
+- ✅ Calendar session enforcement with `enforce_sessions` config
+- ✅ Lazy calendar initialization (zero overhead when unused)
+- ✅ Date-level caching for 52x performance improvement
+- ✅ 10 calendar integration tests covering weekends, holidays, intraday
+- ✅ Short selling validation (4 tests, PnL correctness verified)
+- ✅ Rebalancing scale tests (100-200 assets × 5-10 years)
+- ✅ Comprehensive validation runner (`validation/run_full_validation.py`)
 
 ### Completed Validation
-- ✅ VectorBT Pro: All scenarios pass (EXACT MATCH)
-- ✅ VectorBT OSS: All scenarios pass (EXACT MATCH)
-- ✅ Backtrader: All scenarios pass (EXACT MATCH)
-- ✅ Zipline: All scenarios pass (within tolerance)
+- ✅ VectorBT Pro: 11/11 scenarios pass, 100% exact match
+  - Long-only, long-short, stops, trailing stops: 1,022 trades
+  - **Short-only: 1,227 trades (100% exact match)**
+- ✅ Backtrader: 100% trade-level exact match (12,600 trades at 100 assets × 10 years)
+- ✅ ml4t is 16.6x faster than Backtrader
+- ✅ Zipline: 10/10 scenarios pass, 100% exact match (119,577 trades at 500 assets × 10 years)
+  - Uses custom bundle registration pattern
+  - Requires NYSE calendar from `exchange_calendars`
+
+### Validation Documentation
+See `.claude/memory/` for detailed validation reports:
+- `VALIDATION_STATUS_REPORT.md` - Current validation status
+- `FRAMEWORK_BEHAVIOR_CATALOG.md` - Framework behavior reference
+- `CONFIG_MAPPING.md` - Configuration mapping guide
 
 ## Architecture Decisions
 
@@ -332,4 +351,4 @@ from ml4t.backtest import (
 
 ---
 
-*This project map reflects the current state as of Dec 2025.*
+*This project map reflects the current state as of Jan 2026.*
