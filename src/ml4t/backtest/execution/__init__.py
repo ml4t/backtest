@@ -7,6 +7,7 @@ This module provides:
 - Portfolio rebalancing utilities (target weight → orders)
 """
 
+from .fill_executor import FillContext, FillExecutor
 from .impact import (
     LinearImpact,
     MarketImpactModel,
@@ -25,6 +26,9 @@ from .rebalancer import (
 from .result import ExecutionResult
 
 __all__ = [
+    # Fill Execution
+    "FillExecutor",
+    "FillContext",
     # Limits
     "ExecutionLimits",
     "NoLimits",

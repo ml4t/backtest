@@ -4,11 +4,11 @@ from datetime import datetime
 from typing import Any
 
 from .config import InitialHwmSource, TrailHwmSource
+from .execution.fill_executor import FillExecutor
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
     ContractSpec,
     ExecutionMode,
-    ExitReason,
     Fill,
     Order,
     OrderSide,
@@ -19,38 +19,6 @@ from .types import (
     StopLevelBasis,
     Trade,
 )
-
-
-def _parse_exit_reason(order: Order) -> str:
-    """Parse exit reason from order's internal risk exit reason.
-
-    Maps the detailed _risk_exit_reason string (e.g., "stop_loss_5.0%")
-    to a standardized ExitReason enum value.
-
-    Args:
-        order: The filled exit order
-
-    Returns:
-        ExitReason value as string
-    """
-    reason = order._risk_exit_reason
-    if reason is None:
-        return ExitReason.SIGNAL.value
-
-    reason_lower = reason.lower()
-    if "stop_loss" in reason_lower:
-        return ExitReason.STOP_LOSS.value
-    elif "take_profit" in reason_lower:
-        return ExitReason.TAKE_PROFIT.value
-    elif "trailing" in reason_lower:
-        return ExitReason.TRAILING_STOP.value
-    elif "time" in reason_lower:
-        return ExitReason.TIME_STOP.value
-    elif "end_of_data" in reason_lower:
-        return ExitReason.END_OF_DATA.value
-    else:
-        # Default to signal for unknown reasons
-        return ExitReason.SIGNAL.value
 
 
 class Broker:
@@ -155,6 +123,9 @@ class Broker:
 
         # Contract specifications (for futures and other derivatives)
         self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
+
+        # Fill execution (extracted from _execute_fill)
+        self._fill_executor = FillExecutor(self)
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Get contract specification for an asset."""
@@ -985,253 +956,14 @@ class Broker:
     def _execute_fill(self, order: Order, base_price: float) -> bool:
         """Execute a fill and update positions.
 
+        This method delegates to FillExecutor for the actual implementation.
+        See execution/fill_executor.py for the detailed logic.
+
+        Args:
+            order: Order to fill
+            base_price: Base fill price before adjustments
+
         Returns:
             True if order is fully filled, False if partially filled (remainder pending)
         """
-        # Ensure we have a current time (should always be set during backtest)
-        assert self._current_time is not None, "Cannot execute fill without current time"
-        current_time = self._current_time
-
-        volume = self._current_volumes.get(order.asset)
-
-        # Get effective quantity (considering partial fills from previous bars)
-        effective_quantity = self._get_effective_quantity(order)
-        fill_quantity = effective_quantity
-
-        # Apply execution limits (volume participation)
-        if self.execution_limits is not None:
-            # Skip if already filled this bar (for volume limits)
-            if order.order_id in self._filled_this_bar:
-                return False
-
-            exec_result = self.execution_limits.calculate(effective_quantity, volume, base_price)
-            fill_quantity = exec_result.fillable_quantity
-
-            if fill_quantity <= 0:
-                # Can't fill any this bar - keep order pending
-                return False
-
-            # Mark as filled this bar (to prevent double fills in same_bar mode)
-            self._filled_this_bar.add(order.order_id)
-
-            if exec_result.remaining_quantity > 0:
-                # Partial fill - track remaining for future bars
-                self._partial_orders[order.order_id] = exec_result.remaining_quantity
-            else:
-                # Fully filled - remove from partial tracking
-                self._partial_orders.pop(order.order_id, None)
-
-        # Apply market impact
-        impact = 0.0
-        if self.market_impact_model is not None:
-            is_buy = order.side == OrderSide.BUY
-            impact = self.market_impact_model.calculate(fill_quantity, base_price, volume, is_buy)
-            base_price = base_price + impact  # Impact adjusts the base price
-
-        # Calculate slippage (on top of market impact)
-        slippage = self.slippage_model.calculate(order.asset, fill_quantity, base_price, volume)
-        fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
-
-        # Calculate commission
-        commission = self.commission_model.calculate(order.asset, fill_quantity, fill_price)
-
-        fill = Fill(
-            order_id=order.order_id,
-            asset=order.asset,
-            side=order.side,
-            quantity=fill_quantity,
-            price=fill_price,
-            timestamp=current_time,
-            commission=commission,
-            slippage=slippage,
-        )
-        self.fills.append(fill)
-
-        # Determine if order is fully filled or partial
-        is_partial = order.order_id in self._partial_orders
-        if is_partial:
-            # Update order for partial fill (will continue next bar)
-            order.filled_quantity = (order.filled_quantity or 0) + fill_quantity
-            # Don't change status - still pending for remainder
-        else:
-            order.status = OrderStatus.FILLED
-            order.filled_at = current_time
-            order.filled_price = fill_price
-            order.filled_quantity = fill_quantity
-
-        # Update position
-        pos = self.positions.get(order.asset)
-        signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
-
-        if pos is None:
-            if signed_qty != 0:
-                # Create new position with signal_price in context for stop level calculation
-                signal_price = getattr(order, "_signal_price", None)
-                context = {"signal_price": signal_price} if signal_price is not None else {}
-                # Initial HWM/LWM depends on configuration:
-                # - FILL_PRICE: Use actual fill price (default, most frameworks)
-                # - BAR_CLOSE: Use bar's close
-                # - BAR_HIGH: Use bar's high (VBT Pro with OHLC data)
-                if self.initial_hwm_source == InitialHwmSource.BAR_HIGH:
-                    initial_hwm = self._current_highs.get(order.asset, fill_price)
-                elif self.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
-                    initial_hwm = self._current_prices.get(order.asset, fill_price)
-                else:
-                    initial_hwm = fill_price
-                pos = Position(
-                    asset=order.asset,
-                    quantity=signed_qty,
-                    entry_price=fill_price,
-                    entry_time=current_time,
-                    context=context,
-                    multiplier=self.get_multiplier(order.asset),
-                    entry_commission=commission,  # Track for Trade PnL calculation
-                    high_water_mark=initial_hwm,
-                    low_water_mark=initial_hwm,
-                )
-                self.positions[order.asset] = pos
-                # Track new position - VBT Pro: don't update HWM from entry bar's high
-                self._positions_created_this_bar.add(order.asset)
-        else:
-            old_qty = pos.quantity
-            new_qty = old_qty + signed_qty
-
-            if new_qty == 0:
-                # Position closed - PnL includes both entry and exit commission
-                total_commission = pos.entry_commission + commission  # entry + exit
-                pnl = (fill_price - pos.entry_price) * old_qty - total_commission
-                trade = Trade(
-                    asset=order.asset,
-                    entry_time=pos.entry_time,
-                    exit_time=current_time,
-                    entry_price=pos.entry_price,
-                    exit_price=fill_price,
-                    quantity=old_qty,  # Preserve sign: positive=long, negative=short
-                    pnl=pnl,
-                    pnl_percent=(fill_price - pos.entry_price) / pos.entry_price
-                    if pos.entry_price
-                    else 0,
-                    bars_held=pos.bars_held,
-                    commission=total_commission,  # Both entry and exit commission
-                    slippage=slippage,
-                    exit_reason=_parse_exit_reason(order),
-                    entry_signals=self._current_signals.get(order.asset, {}),
-                    exit_signals=self._current_signals.get(order.asset, {}),
-                    max_favorable_excursion=pos.max_favorable_excursion,
-                    max_adverse_excursion=pos.max_adverse_excursion,
-                )
-                self.trades.append(trade)
-                del self.positions[order.asset]
-            elif (old_qty > 0) != (new_qty > 0):
-                # Position flipped - split commission between close and open
-                close_qty = abs(old_qty)
-                open_qty = abs(new_qty)
-
-                # Calculate separate commissions for close and open portions
-                close_commission = self.commission_model.calculate(
-                    order.asset, close_qty, fill_price
-                )
-                open_commission = self.commission_model.calculate(order.asset, open_qty, fill_price)
-
-                # Override the commission variable for cash change calculation
-                # (both close and open commissions will be deducted from cash)
-                commission = close_commission + open_commission
-
-                # Close the old position with entry + exit commission
-                total_close_commission = pos.entry_commission + close_commission
-                pnl = (fill_price - pos.entry_price) * old_qty - total_close_commission
-                self.trades.append(
-                    Trade(
-                        asset=order.asset,
-                        entry_time=pos.entry_time,
-                        exit_time=current_time,
-                        entry_price=pos.entry_price,
-                        exit_price=fill_price,
-                        quantity=old_qty,  # Preserve sign: positive=long, negative=short
-                        pnl=pnl,
-                        pnl_percent=(fill_price - pos.entry_price) / pos.entry_price
-                        if pos.entry_price
-                        else 0,
-                        bars_held=pos.bars_held,
-                        commission=total_close_commission,
-                        slippage=slippage * (close_qty / fill_quantity),  # Proportional slippage
-                        exit_reason=_parse_exit_reason(order),
-                        entry_signals=self._current_signals.get(order.asset, {}),
-                        exit_signals=self._current_signals.get(order.asset, {}),
-                        max_favorable_excursion=pos.max_favorable_excursion,
-                        max_adverse_excursion=pos.max_adverse_excursion,
-                    )
-                )
-                # Create new position with signal_price in context
-                signal_price = getattr(order, "_signal_price", None)
-                context = {"signal_price": signal_price} if signal_price is not None else {}
-                # Initial HWM depends on configuration (same as new position logic)
-                if self.initial_hwm_source == InitialHwmSource.BAR_HIGH:
-                    initial_hwm = self._current_highs.get(order.asset, fill_price)
-                elif self.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
-                    initial_hwm = self._current_prices.get(order.asset, fill_price)
-                else:
-                    initial_hwm = fill_price
-                self.positions[order.asset] = Position(
-                    asset=order.asset,
-                    quantity=new_qty,
-                    entry_price=fill_price,
-                    entry_time=current_time,
-                    context=context,
-                    multiplier=self.get_multiplier(order.asset),
-                    entry_commission=open_commission,  # Track for Trade PnL
-                    high_water_mark=initial_hwm,
-                    low_water_mark=initial_hwm,
-                )
-                # Track new position - VBT Pro: don't update HWM from entry bar's high
-                self._positions_created_this_bar.add(order.asset)
-
-                # Cancel all other pending orders for this asset (e.g., old bracket orders)
-                # They're now invalid since the position flipped
-                for pending_order in list(self.pending_orders):
-                    if (
-                        pending_order.asset == order.asset
-                        and pending_order.order_id != order.order_id
-                    ):
-                        pending_order.status = OrderStatus.CANCELLED
-                        self.pending_orders.remove(pending_order)
-            else:
-                # Position scaled
-                if abs(new_qty) > abs(old_qty):
-                    total_cost = pos.entry_price * abs(old_qty) + fill_price * abs(signed_qty)
-                    pos.entry_price = total_cost / abs(new_qty)
-                pos.quantity = new_qty
-
-        # Update cash
-        cash_change = -signed_qty * fill_price - commission
-        self.cash += cash_change
-
-        # Sync position to AccountState (uses unified Position from types)
-        broker_pos = self.positions.get(order.asset)
-        if broker_pos is None:
-            # Position was closed, remove from account
-            if order.asset in self.account.positions:
-                del self.account.positions[order.asset]
-        else:
-            # Update or create position in account
-            self.account.positions[order.asset] = Position(
-                asset=broker_pos.asset,
-                quantity=broker_pos.quantity,
-                entry_price=broker_pos.entry_price,
-                current_price=self._current_prices.get(order.asset, broker_pos.entry_price),
-                entry_time=broker_pos.entry_time,
-                bars_held=broker_pos.bars_held,
-            )
-
-        # Update account cash
-        self.account.cash = self.cash
-
-        # Cancel sibling bracket orders on fill (only for full fills)
-        if order.parent_id and not is_partial:
-            for o in self.pending_orders[:]:
-                if o.parent_id == order.parent_id and o.order_id != order.order_id:
-                    o.status = OrderStatus.CANCELLED
-                    self.pending_orders.remove(o)
-
-        # Return True for full fill, False for partial (order stays pending)
-        return not is_partial
+        return self._fill_executor.execute(order, base_price)
