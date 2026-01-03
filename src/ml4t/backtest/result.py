@@ -22,6 +22,7 @@ Example:
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -465,10 +466,22 @@ class BacktestResult:
     def __getitem__(self, key: str) -> Any:
         """Allow dictionary-style access for backward compatibility.
 
+        .. deprecated:: 0.3.0
+            Dict-style access (result["key"]) is deprecated and will be removed
+            in a future version. Use direct attribute access instead:
+            - result.trades instead of result["trades"]
+            - result.metrics["sharpe"] instead of result["sharpe"]
+
         Example:
             result["sharpe"]  # Same as result.metrics["sharpe"]
             result["trades"]  # Same as result.trades
         """
+        warnings.warn(
+            "Dict-style access (result['key']) is deprecated. "
+            "Use result.trades, result.metrics['sharpe'], etc. instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Special keys that map to attributes
         attr_map = {
             "trades": self.trades,
@@ -483,17 +496,42 @@ class BacktestResult:
         return self.metrics[key]
 
     def __contains__(self, key: str) -> bool:
-        """Support 'key in result' checks."""
+        """Support 'key in result' checks.
+
+        .. deprecated:: 0.3.0
+            Use hasattr() or check result.metrics directly.
+        """
+        warnings.warn(
+            "'key in result' is deprecated. Use hasattr() or check result.metrics.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if key in ("trades", "equity_curve", "fills", "equity", "trade_analyzer"):
             return True
         return key in self.metrics
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Dict-like get() for backward compatibility."""
-        try:
-            return self[key]
-        except KeyError:
-            return default
+        """Dict-like get() for backward compatibility.
+
+        .. deprecated:: 0.3.0
+            Use direct attribute access or result.metrics.get().
+        """
+        warnings.warn(
+            "result.get() is deprecated. Use result.metrics.get() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # Direct lookup to avoid double deprecation warning from __getitem__
+        attr_map = {
+            "trades": self.trades,
+            "equity_curve": self.equity_curve,
+            "fills": self.fills,
+            "equity": self.equity,
+            "trade_analyzer": self.trade_analyzer,
+        }
+        if key in attr_map:
+            return attr_map[key]
+        return self.metrics.get(key, default)
 
     def to_tearsheet(
         self,

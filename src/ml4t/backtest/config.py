@@ -502,3 +502,45 @@ class BacktestConfig:
 
 # Export presets directory path for users who want to load custom YAML files
 PRESETS_DIR = Path(__file__).parent / "presets"
+
+
+class Mode(str, Enum):
+    """Simplified mode selection for Engine initialization.
+
+    A Mode is a convenient shorthand for BacktestConfig presets.
+    Use this when you want sensible defaults without configuring every detail.
+
+    Example:
+        >>> from ml4t.backtest import Engine, Mode
+        >>> engine = Engine.from_mode(feed, strategy, mode=Mode.REALISTIC)
+
+    Available modes:
+        DEFAULT: Balanced defaults (fractional shares, 0.1% costs)
+        REALISTIC: Conservative for production use (integer shares, 0.2% costs)
+        FAST: Minimal friction for quick prototyping (no costs)
+        BACKTRADER: Match Backtrader behavior exactly
+        VECTORBT: Match VectorBT behavior exactly
+        ZIPLINE: Match Zipline behavior exactly
+    """
+
+    DEFAULT = "default"
+    REALISTIC = "realistic"
+    FAST = "fast"
+    BACKTRADER = "backtrader"
+    VECTORBT = "vectorbt"
+    ZIPLINE = "zipline"
+
+    def to_config(self) -> BacktestConfig:
+        """Convert mode to a BacktestConfig instance."""
+        if self == Mode.FAST:
+            # Special case: fast mode minimizes friction
+            return BacktestConfig(
+                fill_timing=FillTiming.SAME_BAR,
+                execution_price=ExecutionPrice.CLOSE,
+                share_type=ShareType.FRACTIONAL,
+                commission_model=CommissionModel.NONE,
+                slippage_model=SlippageModel.NONE,
+                preset_name="fast",
+            )
+        # All other modes map directly to presets
+        return BacktestConfig.from_preset(self.value)

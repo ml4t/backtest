@@ -63,6 +63,7 @@ from .config import (
     ExecutionPrice,
     FillTiming,
     InitialHwmSource,
+    Mode,
     ShareType,
     SignalProcessing,
     SizingMethod,
@@ -184,6 +185,7 @@ __all__ = [
     "align_to_sessions",
     # Configuration
     "BacktestConfig",
+    "Mode",
     "DataFrequency",
     "FillTiming",
     "ExecutionPrice",

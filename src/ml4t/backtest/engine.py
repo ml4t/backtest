@@ -9,7 +9,7 @@ import polars as pl
 
 from .analytics import EquityCurve, TradeAnalyzer
 from .broker import Broker
-from .config import InitialHwmSource, TrailHwmSource
+from .config import InitialHwmSource, Mode, TrailHwmSource
 from .datafeed import DataFeed
 from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
 from .strategy import Strategy
@@ -351,6 +351,42 @@ class Engine:
             * 0.6,  # 60% of initial (higher for shorts)
             config=config,  # Store config for strategy access
         )
+
+    @classmethod
+    def from_mode(
+        cls,
+        feed: DataFeed,
+        strategy: Strategy,
+        mode: Mode,
+    ) -> Engine:
+        """
+        Create an Engine instance from a Mode enum.
+
+        This is the simplest way to create an engine when you want sensible
+        defaults without configuring every detail.
+
+        Example:
+            from ml4t.backtest import Engine, Mode, DataFeed
+
+            # Quick prototype with no transaction costs
+            engine = Engine.from_mode(feed, strategy, Mode.FAST)
+
+            # Production-ready conservative settings
+            engine = Engine.from_mode(feed, strategy, Mode.REALISTIC)
+
+            # Match VectorBT behavior exactly
+            engine = Engine.from_mode(feed, strategy, Mode.VECTORBT)
+
+        Args:
+            feed: DataFeed with price data
+            strategy: Strategy to execute
+            mode: Mode enum specifying desired behavior
+
+        Returns:
+            Configured Engine instance
+        """
+        config = mode.to_config()
+        return cls.from_config(feed, strategy, config)
 
 
 # === Convenience Function ===
