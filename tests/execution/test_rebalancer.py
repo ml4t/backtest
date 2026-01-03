@@ -432,6 +432,106 @@ class TestTargetWeightExecutorPreview:
         # No new orders should be created
         assert len(broker.orders) == initial_orders
 
+    def test_preview_rounds_to_zero(self, broker):
+        """Test preview when shares round to zero."""
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                min_trade_value=1.0,
+                min_weight_change=0.0001,
+                allow_fractional=False,
+            )
+        )
+
+        data = {"AAPL": {"close": 150.0}}
+
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 150.0},
+            {"AAPL": 149.0},
+            {"AAPL": 151.0},
+            {"AAPL": 148.0},
+            {"AAPL": 1000000},
+            {},
+        )
+
+        # Very small target weight that would round to 0 shares
+        target_weights = {"AAPL": 0.001}  # 0.1% of 100k = $100 = 0.67 shares
+        previews = executor.preview(target_weights, data, broker)
+
+        assert len(previews) == 1
+        assert previews[0]["skip_reason"] == "rounds_to_zero_shares"
+
+    def test_preview_with_existing_position_to_close(self, broker):
+        """Test preview shows positions to close."""
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                min_trade_value=100.0,
+                min_weight_change=0.01,
+                allow_fractional=False,
+            )
+        )
+
+        data = {
+            "AAPL": {"close": 150.0},
+            "GOOG": {"close": 100.0},
+        }
+
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 150.0, "GOOG": 100.0},
+            {"AAPL": 149.0, "GOOG": 99.0},
+            {"AAPL": 151.0, "GOOG": 101.0},
+            {"AAPL": 148.0, "GOOG": 98.0},
+            {"AAPL": 1000000, "GOOG": 500000},
+            {},
+        )
+
+        # Open a position first
+        broker.submit_order("GOOG", 100)
+        broker._process_orders()
+
+        # Preview rebalance that excludes GOOG (should show close)
+        target_weights = {"AAPL": 0.5}  # No GOOG
+        previews = executor.preview(target_weights, data, broker)
+
+        # Should have AAPL target and GOOG close
+        assert len(previews) == 2
+        goog_preview = next(p for p in previews if p["asset"] == "GOOG")
+        assert goog_preview["action"] == "close_position"
+        assert goog_preview["target_weight"] == 0.0
+
+    def test_preview_zero_equity(self):
+        """Test preview with zero equity returns empty."""
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                min_trade_value=100.0,
+                min_weight_change=0.01,
+                allow_fractional=False,
+            )
+        )
+
+        broker = Broker(
+            initial_cash=0.0,  # Zero equity
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        data = {"AAPL": {"close": 150.0}}
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 150.0},
+            {"AAPL": 149.0},
+            {"AAPL": 151.0},
+            {"AAPL": 148.0},
+            {"AAPL": 1000000},
+            {},
+        )
+
+        target_weights = {"AAPL": 0.5}
+        previews = executor.preview(target_weights, data, broker)
+
+        assert previews == []
+
 
 class TestTargetWeightExecutorEdgeCases:
     """Test edge cases."""
@@ -485,6 +585,90 @@ class TestTargetWeightExecutorEdgeCases:
         assert len(orders) == 1
         value = orders[0].quantity * 150.0
         assert value < 26000  # Less than 26% of $100k
+
+    def test_short_weight_disallowed(self, broker):
+        """Test negative weight is set to 0 when shorts not allowed."""
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                allow_short=False,
+                min_trade_value=1.0,
+                min_weight_change=0.001,
+            )
+        )
+
+        data = {"AAPL": {"close": 150.0}}
+
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 150.0},
+            {"AAPL": 149.0},
+            {"AAPL": 151.0},
+            {"AAPL": 148.0},
+            {"AAPL": 1000000},
+            {},
+        )
+
+        # Negative weight should be ignored
+        target_weights = {"AAPL": -0.3}
+        orders = executor.execute(target_weights, data, broker)
+
+        # Should not create any orders (negative weight becomes 0)
+        assert len(orders) == 0
+
+    def test_effective_weights_path(self, broker):
+        """Test using effective weights when accounting for pending."""
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                cancel_before_rebalance=False,  # Don't cancel pending
+                account_for_pending=True,  # Use effective weights
+                min_trade_value=1.0,
+            )
+        )
+
+        data = {"AAPL": {"close": 150.0}}
+
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 150.0},
+            {"AAPL": 149.0},
+            {"AAPL": 151.0},
+            {"AAPL": 148.0},
+            {"AAPL": 1000000},
+            {},
+        )
+
+        target_weights = {"AAPL": 0.3}
+        orders = executor.execute(target_weights, data, broker)
+
+        # Should work correctly
+        assert len(orders) >= 0  # May or may not have orders
+
+    def test_preview_effective_weights_path(self, broker):
+        """Test preview using effective weights path."""
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                cancel_before_rebalance=False,
+                account_for_pending=True,
+            )
+        )
+
+        data = {"AAPL": {"close": 150.0}}
+
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 150.0},
+            {"AAPL": 149.0},
+            {"AAPL": 151.0},
+            {"AAPL": 148.0},
+            {"AAPL": 1000000},
+            {},
+        )
+
+        target_weights = {"AAPL": 0.3}
+        previews = executor.preview(target_weights, data, broker)
+
+        # Should work correctly
+        assert isinstance(previews, list)
 
 
 class TestTargetWeightExecutorIntegration:

@@ -435,22 +435,22 @@ For advanced statistical analysis with ml4t.diagnostic:
     Strategy vs Benchmark ({START_DATE} to {END_DATE})
 
     Benchmark (Buy & Hold):
-      - Total Return: {benchmark_result['total_return']:.2%}
-      - Sharpe Ratio: {benchmark_result['sharpe']:.2f}
+      - Total Return: {benchmark_result["total_return"]:.2%}
+      - Sharpe Ratio: {benchmark_result["sharpe"]:.2f}
 
     Strategy (Dual MA 20/50):
-      - Total Return: {strategy_result['total_return']:.2%}
-      - Sharpe Ratio: {strategy_result['sharpe']:.2f}
+      - Total Return: {strategy_result["total_return"]:.2%}
+      - Sharpe Ratio: {strategy_result["sharpe"]:.2f}
       - Win Rate:     {stats.win_rate:.2%}
       - Trades:       {stats.n_trades}
 
     Statistical Significance:
-      - Sharpe Difference: {test_result['sharpe_difference']:+.3f}
-      - p-value:           {test_result['p_value']:.4f}
-      - Significant (5%):  {'YES' if test_result['significant_5pct'] else 'NO'}
+      - Sharpe Difference: {test_result["sharpe_difference"]:+.3f}
+      - p-value:           {test_result["p_value"]:.4f}
+      - Significant (5%):  {"YES" if test_result["significant_5pct"] else "NO"}
 
-    Verdict: {'Strategy outperforms' if strategy_result['total_return'] > benchmark_result['total_return'] else 'Benchmark outperforms'}
-             {'(statistically significant)' if test_result['significant_5pct'] else '(not statistically significant)'}
+    Verdict: {"Strategy outperforms" if strategy_result["total_return"] > benchmark_result["total_return"] else "Benchmark outperforms"}
+             {"(statistically significant)" if test_result["significant_5pct"] else "(not statistically significant)"}
 """)
 
 

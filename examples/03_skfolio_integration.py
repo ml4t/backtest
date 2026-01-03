@@ -227,7 +227,7 @@ def main():
     models = ["mean_risk", "hrp", "equal"]
 
     for model in models:
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Testing model: {model.upper()}")
         print("=" * 50)
 
