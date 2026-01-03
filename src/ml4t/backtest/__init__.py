@@ -125,6 +125,14 @@ from .risk.position.static import StopLoss, TimeExit
 
 # Session alignment
 from .sessions import SessionConfig, align_to_sessions, compute_session_pnl
+
+# Strategy templates
+from .strategies import (
+    LongShortStrategy,
+    MeanReversionStrategy,
+    MomentumStrategy,
+    SignalFollowingStrategy,
+)
 from .strategy import Strategy
 from .types import (
     AssetClass,
@@ -179,6 +187,11 @@ __all__ = [
     "BacktestResult",
     "BacktestExporter",
     "enrich_trades_with_signals",
+    # Strategy templates
+    "SignalFollowingStrategy",
+    "MomentumStrategy",
+    "MeanReversionStrategy",
+    "LongShortStrategy",
     # Session alignment
     "SessionConfig",
     "compute_session_pnl",
