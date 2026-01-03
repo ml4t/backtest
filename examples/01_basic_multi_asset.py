@@ -140,7 +140,7 @@ def main():
 
     # Show final positions
     print("\n=== Final Positions ===")
-    for asset, pos in engine.broker.positions.items():
+    for asset, pos in engine.broker.get_positions().items():
         print(f"  {asset}: {pos.quantity:.2f} shares @ ${pos.entry_price:.2f}")
 
 

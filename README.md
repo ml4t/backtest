@@ -52,6 +52,19 @@ ml4t.backtest is a **minimal, high-fidelity event-driven backtesting engine** fo
 18. [Cross-Library API](#cross-library-api)
 19. [Validation](#validation)
 20. [API Reference](#api-reference)
+21. [Documentation](#documentation)
+
+---
+
+## Documentation
+
+For comprehensive documentation, see the **[Documentation Index](docs/INDEX.md)**.
+
+Key sections:
+- [Quick Start Guide](docs/guides/QUICKSTART.md)
+- [Architecture Overview](docs/architecture/ARCHITECTURE.md)
+- [Risk Management Guide](docs/guides/risk_management_quickstart.md)
+- [Complete API Reference](docs/api/complete_reference.md)
 
 ---
 

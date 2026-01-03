@@ -152,7 +152,8 @@ class Order:
     rejection_reason: str | None = None  # Reason if order was rejected
     # Internal risk management fields (set by broker)
     _signal_price: float | None = None  # Close price at order creation time
-    _risk_exit_reason: str | None = None  # Reason for risk-triggered exit
+    _risk_exit_reason: str | None = None  # Human-readable reason (legacy, for logging)
+    _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
 
 

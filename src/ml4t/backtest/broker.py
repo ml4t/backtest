@@ -1,14 +1,20 @@
 """Broker for order execution and position management."""
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .config import InitialHwmSource, TrailHwmSource
+
+if TYPE_CHECKING:
+    from .accounting.policy import AccountPolicy
+    from .execution import ExecutionLimits, MarketImpactModel
+
 from .execution.fill_executor import FillExecutor
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
     ContractSpec,
     ExecutionMode,
+    ExitReason,
     Fill,
     Order,
     OrderSide,
@@ -19,6 +25,32 @@ from .types import (
     StopLevelBasis,
     Trade,
 )
+
+
+def _reason_to_exit_reason(reason: str) -> ExitReason:
+    """Map reason string to ExitReason enum.
+
+    Used when setting order._exit_reason from risk rule action.reason.
+
+    Args:
+        reason: Human-readable reason string (e.g., "stop_loss_5.0%")
+
+    Returns:
+        Corresponding ExitReason enum value
+    """
+    reason_lower = reason.lower()
+    if "stop_loss" in reason_lower:
+        return ExitReason.STOP_LOSS
+    elif "take_profit" in reason_lower:
+        return ExitReason.TAKE_PROFIT
+    elif "trailing" in reason_lower:
+        return ExitReason.TRAILING_STOP
+    elif "time" in reason_lower:
+        return ExitReason.TIME_STOP
+    elif "end_of_data" in reason_lower:
+        return ExitReason.END_OF_DATA
+    else:
+        return ExitReason.SIGNAL
 
 
 class Broker:
@@ -39,11 +71,15 @@ class Broker:
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
-        execution_limits=None,
-        market_impact_model=None,
+        execution_limits: "ExecutionLimits | None" = None,
+        market_impact_model: "MarketImpactModel | None" = None,
         contract_specs: dict[str, ContractSpec] | None = None,
     ):
-        # Import accounting classes here to avoid circular imports
+        # Runtime imports for accounting classes.
+        # These are imported here rather than at module level because:
+        # 1. The package __init__.py imports Broker, creating a potential import order issue
+        # 2. TYPE_CHECKING block above provides type hints for static analysis
+        # 3. This pattern allows mypy/pyright to validate types without runtime circular import
         from .accounting import (
             AccountState,
             CashAccountPolicy,
@@ -62,8 +98,6 @@ class Broker:
         self.initial_hwm_source = initial_hwm_source
 
         # Create AccountState with appropriate policy
-        from .accounting.policy import AccountPolicy
-
         policy: AccountPolicy
         if account_type == "cash":
             policy = CashAccountPolicy()
@@ -137,9 +171,30 @@ class Broker:
         return spec.multiplier if spec else 1.0
 
     def get_position(self, asset: str) -> Position | None:
+        """Get the current position for an asset.
+
+        Args:
+            asset: Asset symbol
+
+        Returns:
+            Position object if position exists, None otherwise
+        """
         return self.positions.get(asset)
 
+    def get_positions(self) -> dict[str, Position]:
+        """Get all current positions.
+
+        Returns:
+            Dictionary mapping asset symbols to Position objects
+        """
+        return self.positions
+
     def get_cash(self) -> float:
+        """Get current cash balance.
+
+        Returns:
+            Current cash balance (can be negative for margin accounts)
+        """
         return self.cash
 
     def get_account_value(self) -> float:
@@ -284,6 +339,7 @@ class Broker:
                     order = self.submit_order(asset, -pos.quantity, order_type=OrderType.MARKET)
                     if order:
                         order._risk_exit_reason = action.reason
+                        order._exit_reason = _reason_to_exit_reason(action.reason)
                         # Store fill price for stop/limit triggered exits
                         # This is the price at which the stop/limit was triggered
                         order._risk_fill_price = action.fill_price
@@ -309,6 +365,7 @@ class Broker:
                         order = self.submit_order(asset, actual_qty, order_type=OrderType.MARKET)
                         if order:
                             order._risk_exit_reason = action.reason
+                            order._exit_reason = _reason_to_exit_reason(action.reason)
                             order._risk_fill_price = action.fill_price
                             exit_orders.append(order)
 
@@ -324,6 +381,40 @@ class Broker:
         stop_price: float | None = None,
         trail_amount: float | None = None,
     ) -> Order | None:
+        """Submit a new order to the broker.
+
+        Creates and queues an order for execution. Orders are validated by the
+        Gatekeeper before fills to ensure account constraints are met.
+
+        Args:
+            asset: Asset symbol (e.g., "AAPL", "BTC-USD")
+            quantity: Number of shares/units. Positive = buy, negative = sell
+                     (if side is not specified)
+            side: OrderSide.BUY or OrderSide.SELL. If None, inferred from quantity sign
+            order_type: Order type (MARKET, LIMIT, STOP, TRAILING_STOP)
+            limit_price: Limit price for LIMIT orders
+            stop_price: Stop/trigger price for STOP orders
+            trail_amount: Trail distance for TRAILING_STOP orders
+
+        Returns:
+            Order object if submitted successfully, None if rejected
+            (e.g., same-bar re-entry after stop exit in VBT Pro mode)
+
+        Examples:
+            # Market buy
+            order = broker.submit_order("AAPL", 100)
+
+            # Market sell (using negative quantity)
+            order = broker.submit_order("AAPL", -100)
+
+            # Limit buy
+            order = broker.submit_order("AAPL", 100, order_type=OrderType.LIMIT,
+                                        limit_price=150.0)
+
+            # Stop sell (stop-loss)
+            order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
+                                        stop_price=145.0)
+        """
         if side is None:
             side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
             quantity = abs(quantity)
@@ -412,6 +503,20 @@ class Broker:
         return False
 
     def close_position(self, asset: str) -> Order | None:
+        """Close an open position for the given asset.
+
+        Submits a market order to fully close the position.
+
+        Args:
+            asset: Asset symbol to close
+
+        Returns:
+            Order object if position exists and order submitted, None otherwise
+
+        Example:
+            # Close AAPL position
+            order = broker.close_position("AAPL")
+        """
         pos = self.positions.get(asset)
         if pos and pos.quantity != 0:
             side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
@@ -688,6 +793,7 @@ class Broker:
             order = self.submit_order(asset, -exit_qty, order_type=OrderType.MARKET)
             if order:
                 order._risk_exit_reason = pending["reason"]
+                order._exit_reason = _reason_to_exit_reason(pending["reason"])
                 # Fill at current bar's open (this is the "next bar" from when stop triggered)
                 order._risk_fill_price = open_price
                 exit_orders.append(order)
@@ -871,85 +977,175 @@ class Broker:
         if remaining is not None:
             order.quantity = remaining
 
+    def _check_gap_through(
+        self, side: OrderSide, stop_price: float, bar_open: float
+    ) -> float | None:
+        """Check if bar gapped through stop level.
+
+        If the bar opened beyond our stop level, we must fill at the open price
+        (worse execution due to gap).
+
+        Args:
+            side: Order side (BUY or SELL)
+            stop_price: The stop price level
+            bar_open: The bar's opening price
+
+        Returns:
+            bar_open if gapped through, None if normal trigger
+        """
+        if side == OrderSide.SELL and bar_open <= stop_price:
+            return bar_open  # Gapped down through stop
+        elif side == OrderSide.BUY and bar_open >= stop_price:
+            return bar_open  # Gapped up through stop
+        return None
+
+    def _check_market_fill(self, order: Order, price: float) -> float:
+        """Check fill price for market order.
+
+        For risk-triggered exits (stop-loss, take-profit), checks for gap-through
+        scenarios where we must fill at worse price than the stop level.
+
+        Args:
+            order: Market order to check
+            price: Current market price (close)
+
+        Returns:
+            Fill price for the market order
+        """
+        risk_fill_price = getattr(order, "_risk_fill_price", None)
+        if risk_fill_price is None:
+            return price
+
+        bar_open = self._current_opens.get(order.asset, price)
+        gap_price = self._check_gap_through(order.side, risk_fill_price, bar_open)
+        return gap_price if gap_price is not None else risk_fill_price
+
+    def _check_limit_fill(self, order: Order, high: float, low: float) -> float | None:
+        """Check if limit order should fill.
+
+        Limit buy fills if price dipped to our level (Low <= limit).
+        Limit sell fills if price rose to our level (High >= limit).
+
+        Args:
+            order: Limit order to check
+            high: Bar high price
+            low: Bar low price
+
+        Returns:
+            Limit price if order should fill, None otherwise
+        """
+        if order.limit_price is None:
+            return None
+
+        if (
+            order.side == OrderSide.BUY
+            and low <= order.limit_price
+            or order.side == OrderSide.SELL
+            and high >= order.limit_price
+        ):
+            return order.limit_price
+        return None
+
+    def _check_stop_fill(
+        self, order: Order, high: float, low: float, bar_open: float
+    ) -> float | None:
+        """Check if stop order should fill.
+
+        Stop buy triggers if price rose to trigger (High >= stop).
+        Stop sell triggers if price fell to trigger (Low <= stop).
+        Handles gap-through scenarios.
+
+        Args:
+            order: Stop order to check
+            high: Bar high price
+            low: Bar low price
+            bar_open: Bar open price
+
+        Returns:
+            Fill price if triggered, None otherwise
+        """
+        if order.stop_price is None:
+            return None
+
+        triggered = False
+        if (
+            order.side == OrderSide.BUY
+            and high >= order.stop_price
+            or order.side == OrderSide.SELL
+            and low <= order.stop_price
+        ):
+            triggered = True
+
+        if not triggered:
+            return None
+
+        gap_price = self._check_gap_through(order.side, order.stop_price, bar_open)
+        return gap_price if gap_price is not None else order.stop_price
+
+    def _update_and_check_trailing_stop(
+        self, order: Order, high: float, low: float, bar_open: float
+    ) -> float | None:
+        """Update trailing stop level and check if triggered.
+
+        Updates the stop price based on the high water mark, then checks
+        if the stop has been triggered.
+
+        Note: This method mutates order.stop_price as trailing stops
+        must track the high water mark.
+
+        Args:
+            order: Trailing stop order (must be SELL side)
+            high: Bar high price
+            low: Bar low price
+            bar_open: Bar open price
+
+        Returns:
+            Fill price if triggered, None otherwise
+        """
+        if order.side != OrderSide.SELL:
+            return None  # Only SELL trailing stops supported currently
+
+        # Update trailing stop based on high water mark
+        if order.trail_amount is not None:
+            new_stop = high - order.trail_amount
+            if order.stop_price is None or new_stop > order.stop_price:
+                order.stop_price = new_stop
+
+        # Check if triggered
+        if order.stop_price is None or low > order.stop_price:
+            return None
+
+        gap_price = self._check_gap_through(order.side, order.stop_price, bar_open)
+        return gap_price if gap_price is not None else order.stop_price
+
     def _check_fill(self, order: Order, price: float) -> float | None:
         """Check if order should fill, return fill price or None.
 
-        Uses High/Low data to properly check if limit/stop prices were traded through.
-        For limit orders: fill at limit price if bar's range touched it
-        For stop orders: fill at stop price (or worse) if bar's range triggered it
-        For risk-triggered market orders: fill at the stop/target price (intrabar execution)
+        Delegates to specialized methods based on order type:
+        - Market orders: immediate fill, with gap-through handling for risk exits
+        - Limit orders: fill if bar range touched limit price
+        - Stop orders: fill at stop price (or worse) if bar triggered it
+        - Trailing stops: update stop level, then check for trigger
+
+        Args:
+            order: Order to check
+            price: Current market price (close)
+
+        Returns:
+            Fill price if order should fill, None otherwise
         """
         high = self._current_highs.get(order.asset, price)
         low = self._current_lows.get(order.asset, price)
+        bar_open = self._current_opens.get(order.asset, price)
 
         if order.order_type == OrderType.MARKET:
-            # Check if this is a risk-triggered exit with a specific fill price
-            # (e.g., stop-loss or take-profit that was triggered intrabar)
-            risk_fill_price = getattr(order, "_risk_fill_price", None)
-            if risk_fill_price is not None:
-                # Check for gap-through: if bar opened beyond our stop level,
-                # we can't fill at stop - must fill at open (worse price)
-                bar_open = self._current_opens.get(order.asset, price)
-                if order.side == OrderSide.SELL and bar_open < risk_fill_price:
-                    # Gapped down through stop - fill at open (worse than stop)
-                    return bar_open
-                elif order.side == OrderSide.BUY and bar_open > risk_fill_price:
-                    # Gapped up through stop - fill at open (worse than stop)
-                    return bar_open
-                else:
-                    # Normal case - fill at stop/target price
-                    return risk_fill_price
-            return price
-
-        elif order.order_type == OrderType.LIMIT and order.limit_price is not None:
-            # Limit buy fills if Low <= limit_price (price dipped to our level)
-            # Limit sell fills if High >= limit_price (price rose to our level)
-            if (
-                order.side == OrderSide.BUY
-                and low <= order.limit_price
-                or order.side == OrderSide.SELL
-                and high >= order.limit_price
-            ):
-                return order.limit_price
-
-        elif order.order_type == OrderType.STOP and order.stop_price is not None:
-            # Stop buy triggers if High >= stop_price (price rose to trigger)
-            # Stop sell triggers if Low <= stop_price (price fell to trigger)
-            if order.side == OrderSide.BUY and high >= order.stop_price:
-                # Check if we gapped through the stop
-                bar_open = self._current_opens.get(order.asset, price)
-                if bar_open >= order.stop_price:
-                    # Gapped through - fill at open (slippage)
-                    return bar_open
-                else:
-                    # Normal trigger - fill at stop price
-                    return order.stop_price
-            elif order.side == OrderSide.SELL and low <= order.stop_price:
-                # Check if we gapped through the stop
-                bar_open = self._current_opens.get(order.asset, price)
-                if bar_open <= order.stop_price:
-                    # Gapped through - fill at open (slippage)
-                    return bar_open
-                else:
-                    # Normal trigger - fill at stop price
-                    return order.stop_price
-
-        elif order.order_type == OrderType.TRAILING_STOP and order.side == OrderSide.SELL:
-            # Update trailing stop based on high water mark
-            if order.trail_amount is not None:
-                new_stop = high - order.trail_amount
-                if order.stop_price is None or new_stop > order.stop_price:
-                    order.stop_price = new_stop
-            # Check if triggered
-            if order.stop_price is not None and low <= order.stop_price:
-                # Check if we gapped through the stop
-                bar_open = self._current_opens.get(order.asset, price)
-                if bar_open <= order.stop_price:
-                    # Gapped through - fill at open (slippage)
-                    return bar_open
-                else:
-                    # Normal trigger - fill at stop price
-                    return order.stop_price
+            return self._check_market_fill(order, price)
+        elif order.order_type == OrderType.LIMIT:
+            return self._check_limit_fill(order, high, low)
+        elif order.order_type == OrderType.STOP:
+            return self._check_stop_fill(order, high, low, bar_open)
+        elif order.order_type == OrderType.TRAILING_STOP:
+            return self._update_and_check_trailing_stop(order, high, low, bar_open)
 
         return None
 

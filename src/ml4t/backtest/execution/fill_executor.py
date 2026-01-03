@@ -26,12 +26,25 @@ if TYPE_CHECKING:
     from ..broker import Broker
 
 
-def _parse_exit_reason(order: Order) -> str:
-    """Parse exit reason from order's internal risk exit reason.
+def _get_exit_reason(order: Order) -> str:
+    """Get exit reason from order, preferring typed enum over string parsing.
 
-    Maps the detailed _risk_exit_reason string (e.g., "stop_loss_5.0%")
-    to a standardized ExitReason enum value.
+    Priority:
+    1. order._exit_reason (ExitReason enum) - preferred, set by broker
+    2. order._risk_exit_reason (str) - legacy, parsed for backward compatibility
+    3. ExitReason.SIGNAL - default for strategy-initiated exits
+
+    Args:
+        order: Order with exit reason metadata
+
+    Returns:
+        ExitReason enum value as string
     """
+    # Prefer typed enum if available
+    if order._exit_reason is not None:
+        return order._exit_reason.value
+
+    # Fall back to string parsing for backward compatibility
     reason = order._risk_exit_reason
     if reason is None:
         return ExitReason.SIGNAL.value
@@ -322,7 +335,7 @@ class FillExecutor:
             bars_held=pos.bars_held,
             commission=total_commission,
             slippage=ctx.slippage,
-            exit_reason=_parse_exit_reason(order),
+            exit_reason=_get_exit_reason(order),
             entry_signals=broker._current_signals.get(order.asset, {}),
             exit_signals=broker._current_signals.get(order.asset, {}),
             max_favorable_excursion=pos.max_favorable_excursion,
@@ -373,7 +386,7 @@ class FillExecutor:
             bars_held=pos.bars_held,
             commission=total_close_commission,
             slippage=ctx.slippage * (close_qty / ctx.fill_quantity),
-            exit_reason=_parse_exit_reason(order),
+            exit_reason=_get_exit_reason(order),
             entry_signals=broker._current_signals.get(order.asset, {}),
             exit_signals=broker._current_signals.get(order.asset, {}),
             max_favorable_excursion=pos.max_favorable_excursion,

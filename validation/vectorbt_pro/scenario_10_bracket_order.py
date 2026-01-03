@@ -87,7 +87,11 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     except ImportError:
         raise ImportError("VectorBT Pro not installed.")
 
+    # CRITICAL: Must provide full OHLC for proper stop behavior
     pf = vbt.Portfolio.from_signals(
+        open=prices_df["open"],
+        high=prices_df["high"],
+        low=prices_df["low"],
         close=prices_df["close"],
         entries=entries,
         exits=np.zeros_like(entries),
@@ -96,14 +100,14 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
         size_type="amount",
         fees=0.0,
         slippage=0.0,
-        sl_th=STOP_LOSS_PCT,    # Stop-loss threshold
-        tp_th=TAKE_PROFIT_PCT,  # Take-profit threshold
+        sl_stop=STOP_LOSS_PCT,   # Stop-loss (not sl_th)
+        tp_stop=TAKE_PROFIT_PCT, # Take-profit (not tp_th)
         accumulate=False,
         freq="D",
     )
 
     trades = pf.trades.records_readable
-    exit_types = trades["Exit Type"].value_counts().to_dict() if len(trades) > 0 else {}
+    exit_types = trades["Status"].value_counts().to_dict() if len(trades) > 0 else {}
 
     return {
         "framework": "VectorBT Pro",

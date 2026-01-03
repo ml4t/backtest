@@ -74,14 +74,19 @@ def generate_test_data(
 
 
 def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
-    """VectorBT Pro trailing stop via ts_stop parameter."""
+    """VectorBT Pro trailing stop via tsl_stop parameter with full OHLC."""
     try:
         import vectorbtpro as vbt
     except ImportError:
         raise ImportError("VectorBT Pro not installed.")
 
     # VectorBT from_signals with trailing stop
+    # CRITICAL: Must provide full OHLC for proper trailing stop behavior
+    # tsl_stop (not tsl_th) is the correct parameter
     pf = vbt.Portfolio.from_signals(
+        open=prices_df["open"],
+        high=prices_df["high"],
+        low=prices_df["low"],
         close=prices_df["close"],
         entries=entries,
         exits=np.zeros_like(entries),  # No manual exits, only trailing stop
@@ -90,13 +95,13 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
         size_type="amount",
         fees=0.0,
         slippage=0.0,
-        tsl_th=TRAIL_PCT,  # Trailing stop loss threshold
+        tsl_stop=TRAIL_PCT,  # Trailing stop loss threshold (not tsl_th)
         accumulate=False,
         freq="D",
     )
 
     trades = pf.trades.records_readable
-    exit_reasons = trades["Exit Type"].value_counts().to_dict() if len(trades) > 0 else {}
+    exit_reasons = trades["Status"].value_counts().to_dict() if len(trades) > 0 else {}
 
     return {
         "framework": "VectorBT Pro",
@@ -117,6 +122,9 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
         NoCommission,
         NoSlippage,
         Strategy,
+        TrailHwmSource,
+        StopFillMode,
+        InitialHwmSource,
     )
     from ml4t.backtest.risk.position import TrailingStop
 
@@ -157,6 +165,10 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
                 broker.submit_order("TEST", SHARES_PER_TRADE)
 
     feed = DataFeed(prices_df=prices_pl, signals_df=signals_pl)
+    # VBT Pro compatible settings:
+    # - trail_hwm_source: HIGH (VBT Pro updates HWM from bar highs)
+    # - initial_hwm_source: BAR_CLOSE (VBT Pro uses bar close, not fill price)
+    # - stop_fill_mode: STOP_PRICE (VBT Pro fills at trail level)
     engine = Engine(
         feed,
         TrailingStopStrategy(),
@@ -165,6 +177,9 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.SAME_BAR,
+        trail_hwm_source=TrailHwmSource.HIGH,
+        initial_hwm_source=InitialHwmSource.BAR_CLOSE,
+        stop_fill_mode=StopFillMode.STOP_PRICE,
     )
 
     results = engine.run()

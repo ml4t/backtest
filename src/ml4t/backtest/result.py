@@ -495,6 +495,104 @@ class BacktestResult:
         except KeyError:
             return default
 
+    def to_tearsheet(
+        self,
+        template: Literal["quant_trader", "hedge_fund", "risk_manager", "full"] = "full",
+        theme: Literal["default", "dark", "print", "presentation"] = "default",
+        title: str | None = None,
+        output_path: str | Path | None = None,
+        include_statistical: bool = True,
+    ) -> str:
+        """Generate an interactive HTML tearsheet for the backtest results.
+
+        This method integrates with ml4t.diagnostic to create comprehensive
+        backtest visualizations including:
+        - Executive summary with KPI cards and traffic lights
+        - Trade analysis (MFE/MAE, exit reasons, waterfall)
+        - Cost attribution (commission, slippage breakdown)
+        - Statistical validity (DSR, confidence intervals, RAS)
+
+        Parameters
+        ----------
+        template : {"quant_trader", "hedge_fund", "risk_manager", "full"}
+            Report template persona:
+            - "quant_trader": Trade-level focus (MFE/MAE, exit reasons)
+            - "hedge_fund": Risk-adjusted focus (drawdowns, costs)
+            - "risk_manager": Statistical focus (DSR, CI, MinTRL)
+            - "full": All sections enabled
+        theme : {"default", "dark", "print", "presentation"}
+            Visual theme for the report
+        title : str, optional
+            Report title. Defaults to "Backtest Tearsheet"
+        output_path : str or Path, optional
+            If provided, saves HTML to this path
+        include_statistical : bool
+            Whether to include statistical validity analysis (DSR, RAS).
+            Requires sufficient trades for meaningful statistics.
+
+        Returns
+        -------
+        str
+            HTML content of the tearsheet
+
+        Raises
+        ------
+        ImportError
+            If ml4t-diagnostic is not installed
+
+        Examples
+        --------
+        >>> result = engine.run()
+        >>> html = result.to_tearsheet(template="quant_trader", theme="dark")
+        >>> # Or save directly to file
+        >>> result.to_tearsheet(output_path="backtest_report.html")
+        """
+        try:
+            from ml4t.diagnostic.visualization.backtest import generate_backtest_tearsheet
+        except ImportError as e:
+            raise ImportError(
+                "ml4t-diagnostic is required for tearsheet generation. "
+                "Install it with: pip install ml4t-diagnostic[viz]"
+            ) from e
+
+        # Extract data for tearsheet
+        trades_df = self.to_trades_dataframe()
+        returns = self.to_returns_series().to_numpy()
+
+        # Build metrics dict with all available metrics
+        tearsheet_metrics = dict(self.metrics)
+
+        # Ensure common metrics are present
+        if "n_trades" not in tearsheet_metrics:
+            tearsheet_metrics["n_trades"] = len(self.trades)
+        if "total_pnl" not in tearsheet_metrics and self.trades:
+            tearsheet_metrics["total_pnl"] = sum(t.pnl for t in self.trades)
+        if "win_rate" not in tearsheet_metrics and self.trades:
+            winners = sum(1 for t in self.trades if t.pnl > 0)
+            tearsheet_metrics["win_rate"] = winners / len(self.trades) if self.trades else 0
+        if "total_commission" not in tearsheet_metrics and self.trades:
+            tearsheet_metrics["total_commission"] = sum(t.commission for t in self.trades)
+        if "total_slippage" not in tearsheet_metrics and self.trades:
+            tearsheet_metrics["total_slippage"] = sum(t.slippage for t in self.trades)
+
+        # Generate tearsheet
+        html = generate_backtest_tearsheet(
+            metrics=tearsheet_metrics,
+            trades=trades_df if len(trades_df) > 0 else None,
+            returns=returns if len(returns) > 0 else None,
+            template=template,
+            theme=theme,
+            title=title or "Backtest Tearsheet",
+        )
+
+        # Save to file if path provided
+        if output_path is not None:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(html)
+
+        return html
+
     def __repr__(self) -> str:
         """String representation."""
         n_trades = len(self.trades)

@@ -21,7 +21,46 @@ if TYPE_CHECKING:
 
 
 class Engine:
-    """Backtesting engine."""
+    """Event-driven backtesting engine.
+
+    The Engine orchestrates the backtest by iterating through market data,
+    managing the broker, and calling the strategy on each bar.
+
+    Execution Flow:
+        1. Initialize strategy (on_start)
+        2. For each bar:
+           a. Update broker with current prices
+           b. Process pending exits (NEXT_BAR_OPEN mode)
+           c. Evaluate position rules (stops, trails)
+           d. Process pending orders
+           e. Call strategy.on_data()
+           f. Process new orders (SAME_BAR mode)
+           g. Update water marks
+           h. Record equity
+        3. Close open positions
+        4. Finalize strategy (on_end)
+
+    Attributes:
+        feed: DataFeed providing price and signal data
+        strategy: Strategy implementing trading logic
+        broker: Broker handling order execution and positions
+        execution_mode: Order execution timing (SAME_BAR or NEXT_BAR)
+        equity_curve: List of (timestamp, equity) tuples
+
+    Example:
+        >>> from ml4t.backtest import Engine, DataFeed, Strategy
+        >>>
+        >>> class MyStrategy(Strategy):
+        ...     def on_data(self, timestamp, data, context, broker):
+        ...         for asset, bar in data.items():
+        ...             if bar.get('signal', 0) > 0.5:
+        ...                 broker.submit_order(asset, 100)
+        >>>
+        >>> feed = DataFeed(prices_df=df)
+        >>> engine = Engine(feed=feed, strategy=MyStrategy())
+        >>> result = engine.run()
+        >>> print(result['total_return'])
+    """
 
     def __init__(
         self,
