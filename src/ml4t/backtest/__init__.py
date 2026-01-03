@@ -12,16 +12,12 @@ __version__ = "0.2.0"
 
 # Import from modules
 # Analytics
-# Analysis (diagnostic integration)
-from .analysis import (
-    BacktestAnalyzer,
-    TradeStatistics,
-    to_equity_dataframe,
-    to_returns_series,
-    to_trade_record,
-    to_trade_records,
-)
+# Deprecated: Import from analysis for backward compatibility
+# These emit deprecation warnings when imported
+import warnings as _warnings
+
 from .analytics import (
+    # Analytics classes
     EquityCurve,
     TradeAnalyzer,
     cagr,
@@ -29,8 +25,18 @@ from .analytics import (
     max_drawdown,
     sharpe_ratio,
     sortino_ratio,
+    # Bridge functions (diagnostic integration)
+    to_equity_dataframe,
+    to_returns_series,
+    to_trade_record,
+    to_trade_records,
     volatility,
 )
+
+with _warnings.catch_warnings():
+    _warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from .analysis import BacktestAnalyzer, TradeStatistics
+
 from .broker import Broker
 
 # Calendar functions (pandas_market_calendars integration)
@@ -103,6 +109,18 @@ from .models import (
 
 # Structured result
 from .result import BacktestResult, enrich_trades_with_signals
+
+# Risk management rules (position-level)
+from .risk.position.composite import RuleChain
+from .risk.position.dynamic import (
+    ScaledExit,
+    TighteningTrailingStop,
+    TrailingStop,
+    VolatilityStop,
+    VolatilityTrailingStop,
+)
+from .risk.position.signal import SignalExit
+from .risk.position.static import StopLoss, TimeExit
 
 # Session alignment
 from .sessions import SessionConfig, align_to_sessions, compute_session_pnl
@@ -220,4 +238,14 @@ __all__ = [
     # Rebalancing
     "RebalanceConfig",
     "TargetWeightExecutor",
+    # Risk management rules (position-level)
+    "StopLoss",
+    "TimeExit",
+    "TrailingStop",
+    "TighteningTrailingStop",
+    "VolatilityStop",
+    "VolatilityTrailingStop",
+    "ScaledExit",
+    "SignalExit",
+    "RuleChain",
 ]

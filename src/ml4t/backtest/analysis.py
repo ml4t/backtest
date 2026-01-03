@@ -1,176 +1,60 @@
 """Bridge ml4t.backtest results to ml4t.diagnostic for comprehensive analysis.
 
-This module provides the integration layer between ml4t.backtest (execution)
-and ml4t.diagnostic (analysis), enabling:
+.. deprecated:: 0.3.0
+    This module is deprecated. Import from ml4t.backtest.analytics instead:
+    - to_trade_record, to_trade_records -> from ml4t.backtest.analytics.bridge
+    - TradeStatistics -> use ml4t.backtest.analytics.TradeAnalyzer
+    - BacktestAnalyzer -> use BacktestResult directly
 
-1. Trade-level statistics (win rate, profit factor, etc.)
-2. SHAP-based error analysis for ML strategies
-3. Benchmark comparison and statistical significance
-4. Comprehensive backtest reports
+This module is kept for backward compatibility and re-exports from analytics.
 
-The key insight: Backtest focuses on execution fidelity, Diagnostic focuses on
-analytics. This adapter bridges them cleanly.
+Example - New recommended approach:
+    >>> from ml4t.backtest import BacktestResult
+    >>> result = engine.run()  # Returns BacktestResult
+    >>> trades_df = result.to_trades_dataframe()
+    >>> metrics = result.metrics
 
-Example - Basic trade analysis:
-    >>> from ml4t.backtest import Engine
-    >>> from ml4t.backtest.analysis import BacktestAnalyzer
-    >>>
-    >>> # Run backtest
-    >>> result = engine.run()
-    >>>
-    >>> # Analyze with diagnostic
-    >>> analyzer = BacktestAnalyzer(engine)
-    >>> stats = analyzer.trade_statistics()
-    >>> print(f"Win rate: {stats.win_rate:.2%}")
-    >>> print(f"Profit factor: {stats.profit_factor:.2f}")
-
-Example - Full diagnostic integration:
-    >>> from ml4t.backtest.analysis import to_trade_records, to_returns_series
-    >>> from ml4t.diagnostic.evaluation import TradeAnalysis
-    >>>
-    >>> # Convert trades
-    >>> trades = to_trade_records(engine.broker.trades)
-    >>>
-    >>> # Use diagnostic library directly
-    >>> analyzer = TradeAnalysis(trades)
-    >>> worst = analyzer.worst_trades(n=20)
+Example - For diagnostic integration:
+    >>> from ml4t.backtest.analytics import to_trade_records, TradeAnalyzer
+    >>> records = to_trade_records(engine.broker.trades)
+    >>> analyzer = TradeAnalyzer(engine.broker.trades)
 """
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import polars as pl
 
+# Re-export from analytics.bridge for backward compatibility
+from ml4t.backtest.analytics.bridge import (
+    to_equity_dataframe,
+    to_returns_series,
+    to_trade_record,
+    to_trade_records,
+)
 from ml4t.backtest.types import Trade
 
 if TYPE_CHECKING:
     from ml4t.backtest.engine import Engine
 
+# Emit deprecation warning on import
+warnings.warn(
+    "ml4t.backtest.analysis is deprecated. Use ml4t.backtest.analytics instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-def to_trade_record(trade: Trade) -> dict[str, Any]:
-    """Convert a backtest Trade to diagnostic TradeRecord format.
-
-    This creates a dictionary compatible with ml4t.diagnostic.integration.TradeRecord.
-    We use a dict to avoid hard dependency on diagnostic library.
-
-    Args:
-        trade: A completed Trade from backtest
-
-    Returns:
-        Dictionary matching TradeRecord schema
-
-    Example:
-        >>> from ml4t.backtest.analysis import to_trade_record
-        >>> record = to_trade_record(trade)
-        >>> # Use with diagnostic
-        >>> from ml4t.diagnostic.integration import TradeRecord
-        >>> tr = TradeRecord(**record)
-    """
-    return {
-        "timestamp": trade.exit_time,
-        "symbol": trade.asset,
-        "entry_price": trade.entry_price,
-        "exit_price": trade.exit_price,
-        "pnl": trade.pnl,
-        "duration": trade.exit_time - trade.entry_time,
-        "direction": "long" if trade.quantity > 0 else "short",
-        "quantity": abs(trade.quantity),
-        "entry_timestamp": trade.entry_time,
-        "fees": trade.commission,
-        "slippage": trade.slippage,
-        "metadata": {
-            "entry_signals": trade.entry_signals,
-            "exit_signals": trade.exit_signals,
-            "bars_held": trade.bars_held,
-            "pnl_percent": trade.pnl_percent,
-            "mfe": trade.max_favorable_excursion,
-            "mae": trade.max_adverse_excursion,
-        },
-    }
-
-
-def to_trade_records(trades: list[Trade]) -> list[dict[str, Any]]:
-    """Convert list of backtest trades to diagnostic format.
-
-    Args:
-        trades: List of Trade objects from broker.trades
-
-    Returns:
-        List of dictionaries matching TradeRecord schema
-
-    Example:
-        >>> trades = engine.broker.trades
-        >>> records = to_trade_records(trades)
-        >>>
-        >>> # Use with diagnostic TradeAnalysis
-        >>> from ml4t.diagnostic.integration import TradeRecord
-        >>> from ml4t.diagnostic.evaluation import TradeAnalysis
-        >>> trade_records = [TradeRecord(**r) for r in records]
-        >>> analyzer = TradeAnalysis(trade_records)
-    """
-    return [to_trade_record(t) for t in trades]
-
-
-def to_returns_series(equity_curve: list[float] | np.ndarray) -> pl.Series:
-    """Convert equity curve to returns series for diagnostic analysis.
-
-    Args:
-        equity_curve: List or array of portfolio values over time
-
-    Returns:
-        Polars Series of period returns
-
-    Example:
-        >>> returns = to_returns_series(engine.broker.equity_history)
-        >>> # Use with diagnostic Sharpe analysis
-        >>> from ml4t.diagnostic.evaluation import sharpe_ratio
-        >>> sr = sharpe_ratio(returns, confidence_intervals=True)
-    """
-    values = np.array(equity_curve)
-    if len(values) < 2:
-        return pl.Series("returns", [], dtype=pl.Float64)
-    returns = np.diff(values) / values[:-1]
-    return pl.Series("returns", returns)
-
-
-def to_equity_dataframe(
-    equity_history: list[float],
-    timestamps: list[Any] | None = None,
-) -> pl.DataFrame:
-    """Convert equity history to DataFrame with timestamps.
-
-    Args:
-        equity_history: List of portfolio values
-        timestamps: Optional list of timestamps (same length)
-
-    Returns:
-        DataFrame with 'timestamp', 'equity', 'returns' columns
-    """
-    n = len(equity_history)
-    if n == 0:
-        return pl.DataFrame(
-            schema={"timestamp": pl.Datetime, "equity": pl.Float64, "returns": pl.Float64}
-        )
-
-    # Calculate returns
-    values = np.array(equity_history)
-    returns = np.zeros(n)
-    returns[1:] = np.diff(values) / values[:-1]
-
-    data = {
-        "equity": [float(x) for x in equity_history],  # Ensure consistent float type
-        "returns": returns.tolist(),
-    }
-
-    if timestamps is not None:
-        data["timestamp"] = timestamps
-    else:
-        # Generate integer index if no timestamps
-        data["bar"] = list(range(n))
-
-    return pl.DataFrame(data)
+__all__ = [
+    "to_trade_record",
+    "to_trade_records",
+    "to_returns_series",
+    "to_equity_dataframe",
+    "TradeStatistics",
+    "BacktestAnalyzer",
+]
 
 
 class TradeStatistics:

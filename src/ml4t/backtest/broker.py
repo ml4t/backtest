@@ -423,6 +423,204 @@ class Broker:
             return self.submit_order(asset, abs(pos.quantity), side)
         return None
 
+    def get_buying_power(self) -> float:
+        """Get current buying power.
+
+        Returns:
+            Available buying power based on account policy:
+            - Cash account: max(0, cash)
+            - Margin account: (NLV - maintenance_margin) / initial_margin_rate
+        """
+        return self.account.buying_power
+
+    def order_target_percent(
+        self,
+        asset: str,
+        target_percent: float,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Order to achieve target portfolio weight.
+
+        Calculates the order quantity needed to reach the target percentage
+        of total portfolio value for this asset.
+
+        Args:
+            asset: Asset symbol
+            target_percent: Target weight as decimal (0.10 = 10% of portfolio)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Submitted order, or None if no order needed or rejected
+
+        Example:
+            # Target 10% of portfolio in AAPL
+            broker.order_target_percent("AAPL", 0.10)
+
+            # Target 0% (close position)
+            broker.order_target_percent("AAPL", 0.0)
+        """
+        if target_percent < -1.0 or target_percent > 1.0:
+            # Allow up to 100% long or 100% short
+            return None
+
+        portfolio_value = self.get_account_value()
+        if portfolio_value <= 0:
+            return None
+
+        price = self._current_prices.get(asset)
+        if price is None or price <= 0:
+            return None
+
+        target_value = portfolio_value * target_percent
+        return self._order_to_target_value(asset, target_value, price, order_type, limit_price)
+
+    def order_target_value(
+        self,
+        asset: str,
+        target_value: float,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Order to achieve target position value.
+
+        Calculates the order quantity needed to reach the target dollar value
+        for this position.
+
+        Args:
+            asset: Asset symbol
+            target_value: Target position value in dollars (negative for short)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Submitted order, or None if no order needed or rejected
+
+        Example:
+            # Target $10,000 position in AAPL
+            broker.order_target_value("AAPL", 10000)
+
+            # Target short $5,000
+            broker.order_target_value("AAPL", -5000)
+        """
+        price = self._current_prices.get(asset)
+        if price is None or price <= 0:
+            return None
+
+        return self._order_to_target_value(asset, target_value, price, order_type, limit_price)
+
+    def _order_to_target_value(
+        self,
+        asset: str,
+        target_value: float,
+        price: float,
+        order_type: OrderType,
+        limit_price: float | None,
+    ) -> Order | None:
+        """Internal helper to order toward a target value."""
+        # Get current position value
+        pos = self.positions.get(asset)
+        current_value = 0.0
+        if pos and pos.quantity != 0:
+            current_value = pos.quantity * price
+
+        # Calculate delta
+        delta_value = target_value - current_value
+        if abs(delta_value) < 0.01:  # Less than 1 cent, no trade needed
+            return None
+
+        # Convert to quantity
+        delta_qty = delta_value / price
+
+        # Submit order
+        if delta_qty > 0:
+            return self.submit_order(
+                asset, delta_qty, OrderSide.BUY, order_type, limit_price=limit_price
+            )
+        elif delta_qty < 0:
+            return self.submit_order(
+                asset, abs(delta_qty), OrderSide.SELL, order_type, limit_price=limit_price
+            )
+        return None
+
+    def rebalance_to_weights(
+        self,
+        target_weights: dict[str, float],
+        order_type: OrderType = OrderType.MARKET,
+    ) -> list[Order]:
+        """Rebalance portfolio to target weights.
+
+        Calculates orders needed to achieve target portfolio allocation.
+        Processes sells before buys to free up capital.
+
+        Args:
+            target_weights: Dict of {asset: weight} where weights are decimals
+                           (0.10 = 10%). Weights should sum to <= 1.0.
+            order_type: Order type for all orders (default MARKET)
+
+        Returns:
+            List of submitted orders (may include None for rejected orders)
+
+        Example:
+            # Equal weight three stocks
+            broker.rebalance_to_weights({
+                "AAPL": 0.33,
+                "GOOGL": 0.33,
+                "MSFT": 0.34,
+            })
+        """
+        portfolio_value = self.get_account_value()
+        if portfolio_value <= 0:
+            return []
+
+        orders: list[Order] = []
+        sells: list[tuple[str, float]] = []  # (asset, target_value)
+        buys: list[tuple[str, float]] = []  # (asset, target_value)
+
+        # Calculate target values and categorize as buys or sells
+        for asset, weight in target_weights.items():
+            price = self._current_prices.get(asset)
+            if price is None or price <= 0:
+                continue
+
+            target_value = portfolio_value * weight
+
+            pos = self.positions.get(asset)
+            current_value = pos.quantity * price if pos and pos.quantity != 0 else 0.0
+
+            delta = target_value - current_value
+            if abs(delta) < 0.01:  # Less than 1 cent
+                continue
+
+            if delta < 0:
+                sells.append((asset, target_value))
+            else:
+                buys.append((asset, target_value))
+
+        # Also close positions not in target weights
+        for asset, pos in self.positions.items():
+            if pos.quantity != 0 and asset not in target_weights:
+                sells.append((asset, 0.0))
+
+        # Process sells first (frees capital for buys)
+        for asset, target_value in sells:
+            price = self._current_prices.get(asset)
+            if price and price > 0:
+                order = self._order_to_target_value(asset, target_value, price, order_type, None)
+                if order:
+                    orders.append(order)
+
+        # Then process buys
+        for asset, target_value in buys:
+            price = self._current_prices.get(asset)
+            if price and price > 0:
+                order = self._order_to_target_value(asset, target_value, price, order_type, None)
+                if order:
+                    orders.append(order)
+
+        return orders
+
     def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
         for order in self.orders:

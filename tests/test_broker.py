@@ -2043,3 +2043,177 @@ class TestBracketOrderParentCancellation:
         # Take profit should NOT be cancelled (sibling still active)
         assert take_profit.status == OrderStatus.PENDING
         assert take_profit in broker.pending_orders
+
+
+class TestConvenienceMethods:
+    """Test convenience methods for order sizing."""
+
+    def test_get_buying_power(self, broker):
+        """Test get_buying_power returns cash for cash account."""
+        assert broker.get_buying_power() == 100000.0
+
+    def test_order_target_percent_no_position(self, broker):
+        """Test order_target_percent creates position from scratch."""
+        # Set current prices
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        # Target 10% of portfolio in AAPL
+        order = broker.order_target_percent("AAPL", 0.10)
+
+        assert order is not None
+        # 10% of 100k = 10k, at $100/share = 100 shares
+        assert abs(order.quantity - 100.0) < 0.01
+        assert order.side == OrderSide.BUY
+
+    def test_order_target_percent_increase_position(self, broker_with_position):
+        """Test order_target_percent increases existing position."""
+        broker = broker_with_position
+        # Position: 100 shares @ $150 = $15,000 value
+        # Portfolio value = $100,000 - $15,000 + $15,000 = ~$100,000
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        # Sync account with position
+        broker.account.positions["AAPL"] = broker.positions["AAPL"]
+        broker.account.mark_to_market(broker._current_prices)
+
+        # Target 20% - should buy more
+        order = broker.order_target_percent("AAPL", 0.20)
+
+        assert order is not None
+        assert order.side == OrderSide.BUY  # Need to buy more
+
+    def test_order_target_percent_close_position(self, broker_with_position):
+        """Test order_target_percent can close position."""
+        broker = broker_with_position
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        broker.account.positions["AAPL"] = broker.positions["AAPL"]
+        broker.account.mark_to_market(broker._current_prices)
+
+        # Target 0% - should close
+        order = broker.order_target_percent("AAPL", 0.0)
+
+        assert order is not None
+        assert order.side == OrderSide.SELL
+        assert abs(order.quantity - 100.0) < 0.01  # Close all 100 shares
+
+    def test_order_target_value_buy(self, broker):
+        """Test order_target_value creates buy order."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        # Target $10,000 position
+        order = broker.order_target_value("AAPL", 10000.0)
+
+        assert order is not None
+        assert abs(order.quantity - 100.0) < 0.01  # $10k / $100 = 100 shares
+        assert order.side == OrderSide.BUY
+
+    def test_order_target_value_no_change_needed(self, broker_with_position):
+        """Test order_target_value returns None when at target."""
+        broker = broker_with_position
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 150.0},  # 100 shares * $150 = $15,000
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        # Target exactly $15,000 (what we already have)
+        order = broker.order_target_value("AAPL", 15000.0)
+
+        # Should return None (no order needed)
+        assert order is None
+
+    def test_rebalance_to_weights(self, broker):
+        """Test rebalance_to_weights creates correct orders."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0, "GOOGL": 200.0, "MSFT": 50.0},
+            opens={"AAPL": 100.0, "GOOGL": 200.0, "MSFT": 50.0},
+            volumes={"AAPL": 10000.0, "GOOGL": 5000.0, "MSFT": 20000.0},
+            highs={"AAPL": 101.0, "GOOGL": 201.0, "MSFT": 51.0},
+            lows={"AAPL": 99.0, "GOOGL": 199.0, "MSFT": 49.0},
+            signals={},
+        )
+
+        # Rebalance to 30/30/40
+        orders = broker.rebalance_to_weights(
+            {
+                "AAPL": 0.30,
+                "GOOGL": 0.30,
+                "MSFT": 0.40,
+            }
+        )
+
+        # Should have 3 buy orders
+        assert len(orders) == 3
+
+        # All should be buy orders (starting from cash)
+        for order in orders:
+            assert order.side == OrderSide.BUY
+
+    def test_rebalance_closes_positions_not_in_target(self, broker_with_position):
+        """Test rebalance closes positions not in target weights."""
+        broker = broker_with_position
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 150.0, "GOOGL": 200.0},
+            opens={"AAPL": 150.0, "GOOGL": 200.0},
+            volumes={"AAPL": 10000.0, "GOOGL": 5000.0},
+            highs={"AAPL": 151.0, "GOOGL": 201.0},
+            lows={"AAPL": 149.0, "GOOGL": 199.0},
+            signals={},
+        )
+
+        broker.account.positions["AAPL"] = broker.positions["AAPL"]
+        broker.account.mark_to_market(broker._current_prices)
+
+        # Rebalance to only GOOGL (should close AAPL)
+        orders = broker.rebalance_to_weights({"GOOGL": 1.0})
+
+        # Should have at least 2 orders: sell AAPL, buy GOOGL
+        assert len(orders) >= 2
+
+        # Find the AAPL order - should be a sell
+        aapl_orders = [o for o in orders if o.asset == "AAPL"]
+        assert len(aapl_orders) == 1
+        assert aapl_orders[0].side == OrderSide.SELL
