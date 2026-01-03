@@ -104,52 +104,17 @@ class Gatekeeper:
         order_qty_delta = self._calculate_quantity_delta(order.side, order.quantity)
 
         # Check for position reversal (long→short or short→long)
-        # This is a special case that requires different validation
+        # Delegate to policy's handle_reversal() method
         if self._is_reversal(current_qty, order_qty_delta):
-            # Cash accounts don't allow reversals (no short selling)
-            if not self.account.policy.allows_short_selling():
-                return False, "Position reversal not allowed in cash account"
-
-            # Margin accounts: Reversal is conceptually split into:
-            # 1. Close existing position (always approved - reduces risk)
-            # 2. Open new opposite position (must validate buying power)
-            #
-            # To validate correctly, we must simulate the close first:
-            # - Remove the old position from the positions dict
-            # - Calculate cash after close (add proceeds from selling old position)
-            # - Then validate the new opposite position with post-close state
-
             commission = self.commission_model.calculate(order.asset, order.quantity, price)
-
-            # Simulate close: Create a copy of positions without the closing asset
-            positions_after_close = {
-                k: v for k, v in self.account.positions.items() if k != order.asset
-            }
-
-            # Calculate cash after close:
-            # For long position: get back market value
-            # For short position: return borrowed shares, pay back short proceeds
-            close_proceeds = abs(current_qty * price)
-            if current_qty > 0:
-                # Closing long: receive cash
-                cash_after_close = self.account.cash + close_proceeds
-            else:
-                # Closing short: pay back borrowed value
-                cash_after_close = self.account.cash - close_proceeds
-
-            # Account for commission
-            cash_after_close -= commission
-
-            # Calculate the new opposite position quantity
-            new_qty = current_qty + order_qty_delta
-
-            # Validate the new position as if opening fresh (with post-close state)
-            return self.account.policy.validate_new_position(
+            return self.account.policy.handle_reversal(
                 asset=order.asset,
-                quantity=new_qty,
+                current_quantity=current_qty,
+                order_quantity_delta=order_qty_delta,
                 price=price,
-                current_positions=positions_after_close,
-                cash=cash_after_close,
+                current_positions=self.account.positions,
+                cash=self.account.cash,
+                commission=commission,
             )
 
         # Check if this is a reducing order (closing/reducing existing position)

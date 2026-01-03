@@ -98,6 +98,38 @@ class AccountPolicy(ABC):
         pass
 
     @abstractmethod
+    def handle_reversal(
+        self,
+        asset: str,
+        current_quantity: float,
+        order_quantity_delta: float,
+        price: float,
+        current_positions: dict[str, Position],
+        cash: float,
+        commission: float,
+    ) -> tuple[bool, str]:
+        """Handle position reversal validation (long→short or short→long).
+
+        This method is called by the Gatekeeper when a reversal is detected.
+        Each account policy implements this according to its rules:
+        - Cash accounts reject all reversals (no short selling)
+        - Margin accounts validate buying power for the new opposite position
+
+        Args:
+            asset: Asset identifier
+            current_quantity: Current position quantity (non-zero)
+            order_quantity_delta: Order quantity delta causing reversal
+            price: Expected fill price
+            current_positions: Current positions dict
+            cash: Current cash balance
+            commission: Pre-calculated commission for the order
+
+        Returns:
+            (is_valid, reason) tuple
+        """
+        pass
+
+    @abstractmethod
     def validate_position_change(
         self,
         asset: str,
@@ -169,6 +201,23 @@ class CashAccountPolicy(AccountPolicy):
             False - Short selling not allowed
         """
         return False
+
+    def handle_reversal(
+        self,
+        asset: str,
+        current_quantity: float,
+        order_quantity_delta: float,
+        price: float,
+        current_positions: dict[str, Position],
+        cash: float,
+        commission: float,
+    ) -> tuple[bool, str]:
+        """Cash accounts do not allow position reversals.
+
+        Returns:
+            (False, rejection_reason) - Always rejects reversals
+        """
+        return False, "Position reversal not allowed in cash account"
 
     def validate_new_position(
         self,
@@ -524,6 +573,47 @@ class MarginAccountPolicy(AccountPolicy):
             True - Short selling is allowed with appropriate margin
         """
         return True
+
+    def handle_reversal(
+        self,
+        asset: str,
+        current_quantity: float,
+        order_quantity_delta: float,
+        price: float,
+        current_positions: dict[str, Position],
+        cash: float,
+        commission: float,
+    ) -> tuple[bool, str]:
+        """Handle position reversal for margin account.
+
+        Reversal is conceptually split into:
+        1. Close existing position (always approved - reduces risk)
+        2. Open new opposite position (must validate buying power)
+
+        We simulate the close first, then validate the new position.
+        """
+        # Simulate close: Create positions dict without the closing asset
+        positions_after_close = {k: v for k, v in current_positions.items() if k != asset}
+
+        # Calculate cash after close:
+        # Long position: receive market value; Short: pay back borrowed value
+        close_proceeds = abs(current_quantity * price)
+        cash_after_close = cash + close_proceeds if current_quantity > 0 else cash - close_proceeds
+
+        # Account for commission
+        cash_after_close -= commission
+
+        # Calculate the new opposite position quantity
+        new_qty = current_quantity + order_quantity_delta
+
+        # Validate the new position as if opening fresh (with post-close state)
+        return self.validate_new_position(
+            asset=asset,
+            quantity=new_qty,
+            price=price,
+            current_positions=positions_after_close,
+            cash=cash_after_close,
+        )
 
     def validate_new_position(
         self,
