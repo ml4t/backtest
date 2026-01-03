@@ -149,6 +149,7 @@ class Order:
     filled_at: datetime | None = None
     filled_price: float | None = None
     filled_quantity: float = 0.0
+    rejection_reason: str | None = None  # Reason if order was rejected
     # Internal risk management fields (set by broker)
     _signal_price: float | None = None  # Close price at order creation time
     _risk_exit_reason: str | None = None  # Reason for risk-triggered exit

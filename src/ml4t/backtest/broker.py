@@ -180,6 +180,30 @@ class Broker:
             value += pos.quantity * price * multiplier
         return value
 
+    def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
+        """Get all rejected orders, optionally filtered by asset.
+
+        Args:
+            asset: If provided, filter to only this asset's rejected orders
+
+        Returns:
+            List of rejected Order objects with rejection_reason populated
+        """
+        rejected = [o for o in self.orders if o.status == OrderStatus.REJECTED]
+        if asset is not None:
+            rejected = [o for o in rejected if o.asset == asset]
+        return rejected
+
+    @property
+    def last_rejection_reason(self) -> str | None:
+        """Get reason for most recent order rejection.
+
+        Returns:
+            Rejection reason string, or None if no orders have been rejected
+        """
+        rejected = [o for o in self.orders if o.status == OrderStatus.REJECTED]
+        return rejected[-1].rejection_reason if rejected else None
+
     # === Risk Management ===
 
     def set_position_rules(self, rules, asset: str | None = None) -> None:
@@ -844,9 +868,9 @@ class Broker:
                         # Update order quantity to remaining
                         self._update_partial_order(order)
                 else:
-                    # Reject order
+                    # Reject order and store reason
                     order.status = OrderStatus.REJECTED
-                    # Note: rejection_reason could be logged here if needed
+                    order.rejection_reason = rejection_reason
 
         # Remove filled/rejected orders from pending (only fully filled ones)
         for order in filled_orders:

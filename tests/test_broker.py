@@ -2217,3 +2217,124 @@ class TestConvenienceMethods:
         aapl_orders = [o for o in orders if o.asset == "AAPL"]
         assert len(aapl_orders) == 1
         assert aapl_orders[0].side == OrderSide.SELL
+
+
+class TestOrderRejection:
+    """Test order rejection tracking and querying."""
+
+    def test_get_rejected_orders_empty(self, broker):
+        """Test get_rejected_orders returns empty list when no rejections."""
+        assert broker.get_rejected_orders() == []
+
+    def test_last_rejection_reason_none(self, broker):
+        """Test last_rejection_reason returns None when no rejections."""
+        assert broker.last_rejection_reason is None
+
+    def test_rejection_insufficient_cash(self):
+        """Test rejection reason is stored when order rejected for insufficient cash."""
+        # Create broker with very little cash
+        broker = Broker(
+            initial_cash=100.0,  # Only $100
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        # Set up market data
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        # Submit order that requires more cash than available
+        order = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        assert order is not None
+
+        # Process the order - should be rejected
+        broker._process_orders()
+
+        # Check rejection
+        assert order.status == OrderStatus.REJECTED
+        assert order.rejection_reason is not None
+        assert "cash" in order.rejection_reason.lower() or "Insufficient" in order.rejection_reason
+
+        # Check query methods
+        rejected = broker.get_rejected_orders()
+        assert len(rejected) == 1
+        assert rejected[0] == order
+
+        assert broker.last_rejection_reason is not None
+
+    def test_rejection_short_not_allowed(self):
+        """Test rejection when short selling not allowed in cash account."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            account_type="cash",  # Cash accounts don't allow shorts
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        # Try to short sell (should be rejected)
+        order = broker.submit_order("AAPL", 100.0, OrderSide.SELL)
+        assert order is not None
+
+        broker._process_orders()
+
+        assert order.status == OrderStatus.REJECTED
+        assert order.rejection_reason is not None
+        assert "short" in order.rejection_reason.lower()
+
+    def test_get_rejected_orders_by_asset(self):
+        """Test filtering rejected orders by asset."""
+        broker = Broker(
+            initial_cash=100.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0, "GOOGL": 200.0},
+            opens={"AAPL": 150.0, "GOOGL": 200.0},
+            volumes={"AAPL": 10000.0, "GOOGL": 5000.0},
+            highs={"AAPL": 151.0, "GOOGL": 201.0},
+            lows={"AAPL": 149.0, "GOOGL": 199.0},
+            signals={},
+        )
+
+        # Submit orders that will both be rejected
+        order1 = broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        order2 = broker.submit_order("GOOGL", 50.0, OrderSide.BUY)
+
+        broker._process_orders()
+
+        # Both should be rejected
+        assert order1.status == OrderStatus.REJECTED
+        assert order2.status == OrderStatus.REJECTED
+
+        # Filter by asset
+        aapl_rejected = broker.get_rejected_orders("AAPL")
+        assert len(aapl_rejected) == 1
+        assert aapl_rejected[0].asset == "AAPL"
+
+        googl_rejected = broker.get_rejected_orders("GOOGL")
+        assert len(googl_rejected) == 1
+        assert googl_rejected[0].asset == "GOOGL"
+
+        # All rejected
+        all_rejected = broker.get_rejected_orders()
+        assert len(all_rejected) == 2
