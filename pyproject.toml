@@ -1,0 +1,241 @@
+# ml4t.backtest - Event-driven backtesting with institutional-grade correctness guarantees
+# Independent package configuration for standalone distribution
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/ml4t/backtest/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ml4t"]
+namespaces = true
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+]
+
+[project]
+name = "ml4t-backtest"
+dynamic = ["version"]
+description = "State-of-the-art event-driven backtesting engine for quantitative trading"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "QuantLab Team", email = "info@quantlab.io" },
+]
+maintainers = [
+    { name = "QuantLab Contributors", email = "dev@quantlab.io" },
+]
+keywords = [
+    "finance",
+    "backtesting",
+    "trading",
+    "simulation",
+    "event-driven",
+    "quantitative-finance",
+    "algorithmic-trading",
+    "portfolio",
+    "risk-management",
+    "execution",
+    "polars",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+requires-python = ">=3.11"
+
+# Core dependencies
+dependencies = [
+    # Data processing
+    "polars>=0.20.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pyarrow>=14.0.0",
+    "tables>=3.8.0",  # PyTables for HDF5 support
+    # Event system
+    "sortedcontainers>=2.4.0", # Efficient priority queue
+    # Performance optimization
+    "numba>=0.57.0",
+    # Configuration and validation
+    "pydantic>=1.10.0,<3.0.0",  # Configuration schema and validation
+    "PyYAML>=6.0.0",  # YAML configuration support
+    # Utilities
+    "structlog>=23.0.0",
+    "python-dateutil>=2.8.0",
+    # Market calendars (needed for clock module)
+    "pandas-market-calendars>=4.0.0",
+]
+
+[project.optional-dependencies]
+# Visualization and reporting
+viz = [
+    "plotly>=5.15.0",
+    "matplotlib>=3.7.0",
+    "dash>=2.11.0",  # Interactive dashboards
+]
+
+# Advanced execution models
+advanced = [
+    "networkx>=3.0",  # Order routing graphs
+    "cvxpy>=1.3.0",  # Portfolio optimization
+]
+
+# Comparison libraries (for benchmarking)
+comparison = [
+    "vectorbt>=0.24.0",
+    "backtrader>=1.9.0",
+    "zipline-reloaded>=2.4.0",
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.3.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "hypothesis>=6.80.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "ipython>=8.14.0",
+    "ipdb>=0.13.0",
+    "pre-commit>=3.3.0",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "sphinx-autodoc-typehints>=1.24.0",
+    "myst-parser>=2.0.0",
+    "nbsphinx>=0.9.0",
+]
+
+# All optional dependencies
+all = [
+    "ml4t-backtest[viz,advanced,dev,docs]",
+]
+
+[project.urls]
+Homepage = "https://github.com/ml4t/ml4t-backtest"
+Documentation = "https://ml4t-backtest.readthedocs.io"
+Repository = "https://github.com/ml4t/ml4t-backtest"
+Issues = "https://github.com/ml4t/ml4t-backtest/issues"
+Changelog = "https://github.com/ml4t/ml4t-backtest/blob/main/CHANGELOG.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--ignore=tests/private",  # Exclude private/commercial dependency tests
+    "--ignore=tests/validation",  # Exclude optional cross-framework validation tests
+    "--cov=ml4t.backtest",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "benchmark: marks benchmark tests",
+    "unit: marks unit tests",
+    "private: requires commercial dependencies (vectorbtpro) - excluded by default",
+    "requires_comparison: requires optional comparison frameworks (vectorbt, backtrader, zipline)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::UserWarning:vectorbt",  # VectorBT accessor registration warnings
+    "ignore::tables.NaturalNameWarning",  # PyTables naming warnings
+    "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
+    "ignore::pytest.PytestReturnNotNoneWarning",  # Some tests return values for direct execution
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+fix = true
+exclude = [
+    "validation/*",  # Standalone scripts run in isolated venvs
+    "docs/*",        # Documentation artifacts
+    ".claude/*",     # Claude workspace files
+    ".serena/*",     # Serena workspace files
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "ARG",  # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "B905",  # zip without explicit strict parameter
+    "ARG002",  # unused method arguments (intentional in strategy callbacks)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002"]  # Test functions often have unused fixtures
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_return_any = false  # numpy/pandas return Any, too many false positives
+warn_unused_ignores = true
+disallow_untyped_defs = false
+disallow_any_unimported = false
+no_implicit_optional = true
+check_untyped_defs = true
+show_error_codes = true
+warn_redundant_casts = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/ml4t/backtest"]
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError:",
+    "@abstractmethod",
+]
