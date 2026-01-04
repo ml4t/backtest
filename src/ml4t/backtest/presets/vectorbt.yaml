@@ -1,0 +1,46 @@
+# VectorBT-Compatible Configuration
+#
+# Use this preset to replicate VectorBT's default behavior.
+# Key characteristics:
+# - FRACTIONAL shares (allows 0.5, 1.234, etc.)
+# - Same-bar execution (vectorized processing)
+# - Process ALL signals (no position state check)
+# - Percentage-based fees
+
+execution:
+  fill_timing: same_bar  # VectorBT is vectorized
+  execution_price: close
+
+position_sizing:
+  share_type: fractional  # VectorBT allows fractional shares
+  sizing_method: percent_of_portfolio
+  default_position_pct: 0.10
+
+signals:
+  signal_processing: process_all  # Process ALL signals
+  accumulate_positions: false     # accumulate=False in VectorBT
+
+commission:
+  model: percentage
+  rate: 0.001  # fees parameter
+  per_share: 0.0
+  per_trade: 0.0
+  minimum: 0.0
+
+slippage:
+  model: percentage
+  rate: 0.001  # slippage parameter
+  fixed: 0.0
+
+cash:
+  initial: 100000.0
+  allow_negative: false
+  buffer_pct: 0.0
+
+orders:
+  reject_on_insufficient_cash: false  # VectorBT is more permissive
+  partial_fills_allowed: true
+
+account:
+  type: cash
+  margin_requirement: 0.5

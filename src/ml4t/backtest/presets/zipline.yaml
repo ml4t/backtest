@@ -1,0 +1,46 @@
+# Zipline-Compatible Configuration
+#
+# Use this preset to replicate Zipline's default behavior.
+# Key characteristics:
+# - INTEGER shares (rounds down to whole shares)
+# - Next-bar execution (order on bar N, fill on bar N+1)
+# - Per-share commission (IB-style)
+# - Volume-based slippage
+
+execution:
+  fill_timing: next_bar_open
+  execution_price: open
+
+position_sizing:
+  share_type: integer  # Zipline uses whole shares
+  sizing_method: percent_of_portfolio
+  default_position_pct: 0.10
+
+signals:
+  signal_processing: check_position
+  accumulate_positions: false
+
+commission:
+  model: per_share  # Zipline uses per-share commission (IB-style)
+  rate: 0.0
+  per_share: 0.005  # $0.005 per share (IB-style)
+  per_trade: 0.0
+  minimum: 1.0  # $1 minimum per trade
+
+slippage:
+  model: volume_based  # Zipline's signature feature
+  rate: 0.1  # 10% of bar volume
+  fixed: 0.0
+
+cash:
+  initial: 100000.0
+  allow_negative: false
+  buffer_pct: 0.0
+
+orders:
+  reject_on_insufficient_cash: true
+  partial_fills_allowed: true  # Volume-based = partial fills
+
+account:
+  type: cash
+  margin_requirement: 0.5

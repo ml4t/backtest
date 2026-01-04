@@ -1,0 +1,87 @@
+name: ml4t-backtest
+version: 1.0.0
+python_requires: ">=3.11"
+description: Event-driven backtesting engine with VectorBT validation
+
+modules:
+  - path: ml4t.backtest
+    description: Main entry point
+    classes:
+      - name: Engine
+        description: Main backtest execution engine
+        params:
+          - name: data
+            type: polars.DataFrame
+            required: true
+          - name: strategy
+            type: Strategy
+            required: true
+          - name: config
+            type: BacktestConfig
+            required: false
+        methods:
+          - name: run
+            returns: BacktestResult
+            
+      - name: Strategy
+        description: Base class for trading strategies
+        methods:
+          - name: on_bar
+            params: [{name: bar, type: Bar}]
+            description: Called for each price bar
+          - name: buy
+            params: [{name: size, type: int}, {name: price, type: float | None}]
+          - name: sell
+            params: [{name: size, type: int}, {name: price, type: float | None}]
+          - name: close
+            description: Close current position
+        properties:
+          - name: position
+            type: int
+          - name: equity
+            type: float
+            
+      - name: BacktestConfig
+        params:
+          - name: initial_cash
+            type: float
+            default: 100000.0
+          - name: commission
+            type: float
+            default: 0.001
+          - name: slippage
+            type: float
+            default: 0.0
+          - name: margin_ratio
+            type: float
+            default: 1.0
+            
+      - name: BacktestResult
+        properties:
+          - name: equity_curve
+            type: polars.DataFrame
+          - name: trades
+            type: list[Trade]
+          - name: metrics
+            type: dict
+          - name: final_equity
+            type: float
+        methods:
+          - name: to_tearsheet
+            returns: str
+          - name: to_vectorbt
+            returns: Any
+
+types:
+  Order:
+    fields: [symbol, side, type, size, price, timestamp]
+  Fill:
+    fields: [order_id, price, size, commission, timestamp]
+  Trade:
+    fields: [entry_time, exit_time, side, size, pnl, return_pct]
+  Position:
+    fields: [symbol, size, avg_price, unrealized_pnl]
+
+enums:
+  OrderType: [MARKET, LIMIT, STOP, STOP_LIMIT]
+  OrderSide: [BUY, SELL]

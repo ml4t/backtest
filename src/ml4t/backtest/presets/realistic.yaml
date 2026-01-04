@@ -1,0 +1,48 @@
+# Realistic Configuration
+#
+# Conservative settings for production-like simulation.
+# - INTEGER shares (like real brokers)
+# - Next-bar execution (no look-ahead)
+# - Higher costs (pessimistic estimates)
+# - Extra stop slippage (gaps hurt in fast markets)
+# - Cash buffer (margin of safety)
+# - Smaller positions (risk management)
+
+execution:
+  fill_timing: next_bar_open
+  execution_price: open
+
+position_sizing:
+  share_type: integer  # Real brokers use whole shares
+  sizing_method: percent_of_portfolio
+  default_position_pct: 0.05  # Smaller positions for risk management
+
+signals:
+  signal_processing: check_position
+  accumulate_positions: false
+
+commission:
+  model: percentage
+  rate: 0.002  # 0.2% - higher to be conservative
+  per_share: 0.0
+  per_trade: 0.0
+  minimum: 1.0  # $1 minimum per trade
+
+slippage:
+  model: percentage
+  rate: 0.002  # 0.2% - higher to be conservative
+  fixed: 0.0
+  stop_rate: 0.001  # Extra 0.1% for stop fills (gaps hurt in fast markets)
+
+cash:
+  initial: 100000.0
+  allow_negative: false
+  buffer_pct: 0.02  # Keep 2% cash reserve
+
+orders:
+  reject_on_insufficient_cash: true
+  partial_fills_allowed: false
+
+account:
+  type: cash
+  margin_requirement: 0.5
