@@ -165,6 +165,7 @@ class BacktestConfig:
     slippage_model: SlippageModel = SlippageModel.PERCENTAGE
     slippage_rate: float = 0.001  # 0.1%
     slippage_fixed: float = 0.0  # $ per share (if fixed model)
+    stop_slippage_rate: float = 0.0  # Additional slippage for stop/risk exits (on top of normal)
 
     # === Cash Management ===
     initial_cash: float = 100000.0
@@ -218,6 +219,7 @@ class BacktestConfig:
                 "model": self.slippage_model.value,
                 "rate": self.slippage_rate,
                 "fixed": self.slippage_fixed,
+                "stop_rate": self.stop_slippage_rate,
             },
             "cash": {
                 "initial": self.initial_cash,
@@ -269,6 +271,7 @@ class BacktestConfig:
             slippage_model=SlippageModel(slip_cfg.get("model", "percentage")),
             slippage_rate=slip_cfg.get("rate", 0.001),
             slippage_fixed=slip_cfg.get("fixed", 0.0),
+            stop_slippage_rate=slip_cfg.get("stop_rate", 0.0),
             # Cash
             initial_cash=cash_cfg.get("initial", 100000.0),
             allow_negative_cash=cash_cfg.get("allow_negative", False),
@@ -448,6 +451,7 @@ class BacktestConfig:
         - Integer shares (like real brokers)
         - Next-bar execution (no look-ahead)
         - Higher costs (more conservative)
+        - Additional stop slippage (gaps hurt in fast markets)
         - Cash buffer (margin of safety)
         """
         return cls(
@@ -462,6 +466,7 @@ class BacktestConfig:
             commission_rate=0.002,  # Higher commission
             slippage_model=SlippageModel.PERCENTAGE,
             slippage_rate=0.002,  # Higher slippage
+            stop_slippage_rate=0.001,  # Extra 0.1% slippage for stop fills
             initial_cash=100000.0,
             allow_negative_cash=False,
             cash_buffer_pct=0.02,  # 2% cash buffer
@@ -491,6 +496,9 @@ class BacktestConfig:
             "Costs:",
             f"  Commission: {self.commission_model.value} @ {self.commission_rate:.2%}",
             f"  Slippage: {self.slippage_model.value} @ {self.slippage_rate:.2%}",
+            f"  Stop slippage: +{self.stop_slippage_rate:.2%}"
+            if self.stop_slippage_rate > 0
+            else "",
             "",
             "Cash:",
             f"  Initial: ${self.initial_cash:,.0f}",

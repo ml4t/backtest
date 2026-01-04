@@ -2338,3 +2338,127 @@ class TestOrderRejection:
         # All rejected
         all_rejected = broker.get_rejected_orders()
         assert len(all_rejected) == 2
+
+
+class TestStopSlippage:
+    """Test stop_slippage_rate for risk-triggered exits."""
+
+    def test_stop_slippage_applied_to_long_exit(self):
+        """Test that stop slippage is applied to long position stop-loss exit."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            stop_slippage_rate=0.01,  # 1% additional slippage
+        )
+
+        # Set up position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+
+        # Create an exit order with _risk_fill_price (simulating stop-loss trigger)
+        order = broker.submit_order("AAPL", -100, OrderSide.SELL)
+        order._risk_fill_price = 95.0  # Stop triggered at $95
+
+        # Get the fill price - should have 1% slippage applied
+        fill_price = broker._check_market_fill(order, 100.0)
+
+        # Expected: 95.0 * (1 - 0.01) = 94.05
+        assert fill_price == pytest.approx(94.05, rel=1e-6)
+
+    def test_stop_slippage_applied_to_short_exit(self):
+        """Test that stop slippage is applied to short position stop-loss exit."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            stop_slippage_rate=0.01,  # 1% additional slippage
+        )
+
+        # Set up
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+
+        # Create a buy-to-cover order with _risk_fill_price (stop-loss on short)
+        order = broker.submit_order("AAPL", 100, OrderSide.BUY)
+        order._risk_fill_price = 105.0  # Stop triggered at $105
+
+        # Get the fill price - should have 1% slippage applied (price goes up)
+        fill_price = broker._check_market_fill(order, 100.0)
+
+        # Expected: 105.0 * (1 + 0.01) = 106.05
+        assert fill_price == pytest.approx(106.05, rel=1e-6)
+
+    def test_no_stop_slippage_for_normal_orders(self):
+        """Test that stop slippage is NOT applied to normal market orders."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            stop_slippage_rate=0.01,  # 1% additional slippage
+        )
+
+        # Set up
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+
+        # Create a normal order (no _risk_fill_price)
+        order = broker.submit_order("AAPL", 100, OrderSide.BUY)
+        # Do NOT set _risk_fill_price
+
+        # Get the fill price - should be the market price, no stop slippage
+        fill_price = broker._check_market_fill(order, 100.0)
+
+        # Expected: 100.0 (no slippage applied to non-risk orders)
+        assert fill_price == 100.0
+
+    def test_zero_stop_slippage_no_effect(self):
+        """Test that zero stop slippage rate has no effect."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            stop_slippage_rate=0.0,  # No additional slippage
+        )
+
+        # Set up
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+
+        # Create an exit order with _risk_fill_price
+        order = broker.submit_order("AAPL", -100, OrderSide.SELL)
+        order._risk_fill_price = 95.0
+
+        # Get the fill price
+        fill_price = broker._check_market_fill(order, 100.0)
+
+        # Expected: 95.0 (exactly the risk fill price, no additional slippage)
+        assert fill_price == 95.0

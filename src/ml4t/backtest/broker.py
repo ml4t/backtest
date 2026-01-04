@@ -61,6 +61,7 @@ class Broker:
         initial_cash: float = 100000.0,
         commission_model: CommissionModel | None = None,
         slippage_model: SlippageModel | None = None,
+        stop_slippage_rate: float = 0.0,
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
@@ -91,6 +92,7 @@ class Broker:
         self.cash = initial_cash
         self.commission_model = commission_model or NoCommission()
         self.slippage_model = slippage_model or NoSlippage()
+        self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
@@ -1004,6 +1006,7 @@ class Broker:
 
         For risk-triggered exits (stop-loss, take-profit), checks for gap-through
         scenarios where we must fill at worse price than the stop level.
+        Also applies additional stop slippage if configured.
 
         Args:
             order: Market order to check
@@ -1018,7 +1021,19 @@ class Broker:
 
         bar_open = self._current_opens.get(order.asset, price)
         gap_price = self._check_gap_through(order.side, risk_fill_price, bar_open)
-        return gap_price if gap_price is not None else risk_fill_price
+        fill_price = gap_price if gap_price is not None else risk_fill_price
+
+        # Apply additional stop slippage if configured
+        # This models the reality that stop orders often fill at worse prices in fast markets
+        if self.stop_slippage_rate > 0:
+            if order.side == OrderSide.SELL:
+                # Selling: slippage makes price worse (lower)
+                fill_price = fill_price * (1 - self.stop_slippage_rate)
+            else:
+                # Buying (covering short): slippage makes price worse (higher)
+                fill_price = fill_price * (1 + self.stop_slippage_rate)
+
+        return fill_price
 
     def _check_limit_fill(self, order: Order, high: float, low: float) -> float | None:
         """Check if limit order should fill.

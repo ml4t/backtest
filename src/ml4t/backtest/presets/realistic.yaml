@@ -4,6 +4,7 @@
 # - INTEGER shares (like real brokers)
 # - Next-bar execution (no look-ahead)
 # - Higher costs (pessimistic estimates)
+# - Extra stop slippage (gaps hurt in fast markets)
 # - Cash buffer (margin of safety)
 # - Smaller positions (risk management)
 
@@ -31,6 +32,7 @@ slippage:
   model: percentage
   rate: 0.002  # 0.2% - higher to be conservative
   fixed: 0.0
+  stop_rate: 0.001  # Extra 0.1% for stop fills (gaps hurt in fast markets)
 
 cash:
   initial: 100000.0
