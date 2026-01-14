@@ -34,3 +34,7 @@ htmlcov/
 # Jupyter
 .ipynb_checkpoints/
 src/ml4t/backtest/_version.py
+
+# Claude Code (local development only)
+CLAUDE.md
+.claude/
