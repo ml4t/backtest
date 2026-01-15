@@ -6,7 +6,14 @@ import pytest
 
 from ml4t.backtest.broker import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage
-from ml4t.backtest.types import Order, OrderSide, OrderStatus, OrderType, Position
+from ml4t.backtest.types import (
+    ExecutionMode,
+    Order,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    Position,
+)
 
 
 @pytest.fixture
@@ -2462,3 +2469,380 @@ class TestStopSlippage:
 
         # Expected: 95.0 (exactly the risk fill price, no additional slippage)
         assert fill_price == 95.0
+
+
+# =============================================================================
+# Bug Fix Tests - External Code Review (2026-01)
+# =============================================================================
+
+
+class TestBugFix3QuantitySignEnforcement:
+    """Bug #3: Quantity sign should always be normalized to positive."""
+
+    def test_explicit_side_normalizes_negative_quantity(self):
+        """Explicit side with negative quantity should normalize to positive."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        order = broker.submit_order("AAPL", -100.0, OrderSide.BUY)
+        assert order is not None
+        assert order.quantity == 100.0  # Should be positive
+        assert order.side == OrderSide.BUY
+
+    def test_explicit_side_sell_normalizes_negative_quantity(self):
+        """Explicit SELL side with negative quantity should normalize."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        order = broker.submit_order("AAPL", -50.0, OrderSide.SELL)
+        assert order is not None
+        assert order.quantity == 50.0  # Should be positive
+        assert order.side == OrderSide.SELL
+
+    def test_zero_quantity_returns_none(self):
+        """Zero quantity should return None (no order)."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        order = broker.submit_order("AAPL", 0.0, OrderSide.BUY)
+        assert order is None
+
+
+class TestBugFix4BracketOrdersForShorts:
+    """Bug #4: Bracket orders should derive exit side from entry direction."""
+
+    def test_bracket_long_entry_has_sell_exits(self):
+        """Long entry brackets should have SELL exits (existing behavior)."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+        result = broker.submit_bracket("AAPL", 100.0, take_profit=160.0, stop_loss=140.0)
+        assert result is not None
+        entry, tp, sl = result
+        assert entry.side == OrderSide.BUY  # Long entry
+        assert tp.side == OrderSide.SELL  # Sell to take profit
+        assert sl.side == OrderSide.SELL  # Sell to stop loss
+
+    def test_bracket_short_entry_has_buy_exits(self):
+        """Short entry brackets should have BUY exits."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+        result = broker.submit_bracket("AAPL", -100.0, take_profit=140.0, stop_loss=160.0)
+        assert result is not None
+        entry, tp, sl = result
+        assert entry.side == OrderSide.SELL  # Short entry
+        assert tp.side == OrderSide.BUY  # Buy to cover at profit
+        assert sl.side == OrderSide.BUY  # Buy to cover at stop
+
+
+class TestBugFix5BuyTrailingStops:
+    """Bug #5: BUY trailing stops should protect short positions."""
+
+    def test_trailing_stop_buy_trails_from_low(self):
+        """BUY trailing stop should trail UP from lows."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+
+        # Setup: enter short position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.SELL)
+        broker._process_orders()
+        assert broker.get_position("AAPL").quantity == -100
+
+        # Submit trailing stop buy with $5 trail
+        order = broker.submit_order(
+            "AAPL", 100.0, OrderSide.BUY, OrderType.TRAILING_STOP, trail_amount=5.0
+        )
+        assert order is not None
+
+        # Bar 2: Price drops - stop should trail down (good for short)
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 95.0},
+            opens={"AAPL": 98.0},
+            highs={"AAPL": 99.0},
+            lows={"AAPL": 94.0},  # New low
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+        broker._process_orders()
+
+        # Stop should be at low + trail = 94 + 5 = 99
+        assert order.stop_price == 99.0
+
+    def test_trailing_stop_buy_triggers_on_high(self):
+        """BUY trailing stop should trigger when high crosses stop."""
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+
+        # Setup: enter short position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0, OrderSide.SELL)
+        broker._process_orders()
+
+        # Submit trailing stop buy
+        order = broker.submit_order(
+            "AAPL", 100.0, OrderSide.BUY, OrderType.TRAILING_STOP, trail_amount=5.0
+        )
+        # Initial stop: low(99) + 5 = 104
+
+        # Bar 2: Price spikes through stop
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 106.0},
+            opens={"AAPL": 102.0},
+            highs={"AAPL": 107.0},  # High crosses stop
+            lows={"AAPL": 101.0},
+            volumes={"AAPL": 10000.0},
+            signals={},
+        )
+        broker._process_orders()
+
+        # Order should be filled
+        assert order.status == OrderStatus.FILLED
+        # Position should be closed
+        assert broker.get_position("AAPL") is None
+
+
+class TestBugFix2MultiplierInTargeting:
+    """Bug #2: order_target_* methods should account for contract multiplier."""
+
+    def test_order_target_value_with_futures_multiplier(self):
+        """Target value should account for contract multiplier."""
+        from ml4t.backtest.types import AssetClass, ContractSpec
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.0)},
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"ES": 5000.0},
+            opens={"ES": 5000.0},
+            highs={"ES": 5010.0},
+            lows={"ES": 4990.0},
+            volumes={"ES": 10000.0},
+            signals={},
+        )
+
+        # Target $250,000 notional in ES
+        # ES at $5000 with 50x multiplier = $250,000 per contract
+        # Should order 1 contract
+        order = broker.order_target_value("ES", 250000.0)
+
+        assert order is not None
+        assert abs(order.quantity - 1.0) < 0.01  # 1 contract
+
+    def test_order_target_percent_with_futures_multiplier(self):
+        """Target percent should account for contract multiplier."""
+        from ml4t.backtest.types import AssetClass, ContractSpec
+
+        broker = Broker(
+            initial_cash=250000.0,  # $250k cash
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.0)},
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"ES": 5000.0},
+            opens={"ES": 5000.0},
+            highs={"ES": 5010.0},
+            lows={"ES": 4990.0},
+            volumes={"ES": 10000.0},
+            signals={},
+        )
+
+        # Target 100% of portfolio in ES
+        # Portfolio = $250,000
+        # ES notional per contract = $5000 * 50 = $250,000
+        # Should order 1 contract
+        order = broker.order_target_percent("ES", 1.0)
+
+        assert order is not None
+        assert abs(order.quantity - 1.0) < 0.01  # 1 contract
+
+    def test_rebalance_to_weights_with_futures_multiplier(self):
+        """Rebalance should account for contract multiplier in position value."""
+        from ml4t.backtest.types import AssetClass, ContractSpec
+
+        broker = Broker(
+            initial_cash=500000.0,  # $500k cash
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.0)},
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"ES": 5000.0},
+            opens={"ES": 5000.0},
+            highs={"ES": 5010.0},
+            lows={"ES": 4990.0},
+            volumes={"ES": 10000.0},
+            signals={},
+        )
+
+        # Target 50% of portfolio in ES
+        # Portfolio = $500,000
+        # 50% = $250,000
+        # ES notional per contract = $5000 * 50 = $250,000
+        # Should order 1 contract
+        orders = broker.rebalance_to_weights({"ES": 0.5})
+
+        assert len(orders) == 1
+        assert orders[0] is not None
+        assert abs(orders[0].quantity - 1.0) < 0.01  # 1 contract
+
+
+# =============================================================================
+# Bug #1: Deferred Exits in NEXT_BAR Mode
+# =============================================================================
+class TestBugFix1DeferredExitsInNextBarMode:
+    """Test that deferred exits fill at the correct bar in NEXT_BAR mode.
+
+    Bug: Deferred exits skip a bar because:
+    1. _process_pending_exits() calls submit_order()
+    2. submit_order() adds order to _orders_this_bar in NEXT_BAR mode
+    3. _process_orders() skips orders in _orders_this_bar
+
+    Result: Exit at bar t triggers, deferred to t+1, but executes at t+2.
+    Fix: Add _SubmitOrderOptions with eligible_in_next_bar_mode flag.
+    """
+
+    def test_deferred_exit_not_in_orders_this_bar(self):
+        """Deferred exit orders should NOT be added to _orders_this_bar."""
+        broker = Broker(100_000.0, NoCommission(), NoSlippage())
+        broker.execution_mode = ExecutionMode.NEXT_BAR
+
+        # Bar 0: submit entry order (will be deferred to next bar)
+        broker._update_time(
+            datetime(2024, 1, 1, 10, 0),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0)
+        # Order is in _orders_this_bar, won't execute yet
+
+        # Bar 1: Clear _orders_this_bar (new bar) and execute entry
+        broker._orders_this_bar.clear()
+        broker._update_time(
+            datetime(2024, 1, 1, 10, 1),
+            prices={"AAPL": 152.0},
+            opens={"AAPL": 151.0},
+            highs={"AAPL": 153.0},
+            lows={"AAPL": 150.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
+        )
+        broker._process_orders(use_open=True)
+        assert broker.positions["AAPL"].quantity == 100.0, "Entry should have filled"
+
+        # Simulate pending exit (as if a stop triggered in bar 1)
+        broker._pending_exits["AAPL"] = {"quantity": 100.0, "reason": "stop_loss"}
+
+        # Bar 2: Clear _orders_this_bar (new bar) and process pending exits
+        broker._orders_this_bar.clear()
+        broker._update_time(
+            datetime(2024, 1, 1, 10, 2),
+            prices={"AAPL": 145.0},
+            opens={"AAPL": 145.0},
+            highs={"AAPL": 146.0},
+            lows={"AAPL": 144.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
+        )
+        exit_orders = broker._process_pending_exits()
+
+        # The exit order should NOT be in _orders_this_bar
+        assert len(exit_orders) == 1
+        assert exit_orders[0] not in broker._orders_this_bar, (
+            "Deferred exit orders should not be added to _orders_this_bar"
+        )
+
+    def test_deferred_exit_is_eligible_for_execution(self):
+        """Deferred exit orders should be eligible for immediate execution."""
+        broker = Broker(100_000.0, NoCommission(), NoSlippage())
+        broker.execution_mode = ExecutionMode.NEXT_BAR
+
+        # Bar 0: submit entry order (will be deferred to next bar)
+        broker._update_time(
+            datetime(2024, 1, 1, 10, 0),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100.0)
+
+        # Bar 1: Clear _orders_this_bar (new bar) and execute entry
+        broker._orders_this_bar.clear()
+        broker._update_time(
+            datetime(2024, 1, 1, 10, 1),
+            prices={"AAPL": 152.0},
+            opens={"AAPL": 151.0},
+            highs={"AAPL": 153.0},
+            lows={"AAPL": 150.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
+        )
+        broker._process_orders(use_open=True)
+        assert broker.positions["AAPL"].quantity == 100.0
+
+        # Simulate pending exit (as if a stop triggered in bar 1)
+        broker._pending_exits["AAPL"] = {"quantity": 100.0, "reason": "stop_loss"}
+
+        # Bar 2: Clear _orders_this_bar (new bar) and process pending exits
+        broker._orders_this_bar.clear()
+        broker._update_time(
+            datetime(2024, 1, 1, 10, 2),
+            prices={"AAPL": 145.0},
+            opens={"AAPL": 145.0},
+            highs={"AAPL": 146.0},
+            lows={"AAPL": 144.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
+        )
+        exit_orders = broker._process_pending_exits()
+
+        # Process orders - the exit should execute in THIS bar (not next bar)
+        broker._process_orders(use_open=True)
+
+        # Position should be closed
+        pos = broker.positions.get("AAPL")
+        assert pos is None or pos.quantity == 0.0, (
+            "Deferred exit should execute immediately at next bar open"
+        )

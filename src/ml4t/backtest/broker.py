@@ -1,5 +1,6 @@
 """Broker for order execution and position management."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -25,6 +26,22 @@ from .types import (
     StopLevelBasis,
     Trade,
 )
+
+
+@dataclass
+class _SubmitOrderOptions:
+    """Internal options for submit_order behavior.
+
+    Used to control special cases like deferred exits that need
+    to bypass the normal NEXT_BAR mode order deferral.
+    """
+
+    eligible_in_next_bar_mode: bool = False
+    """If True, order is eligible for immediate execution even in NEXT_BAR mode.
+
+    This is used for deferred exits that should execute at the next bar's open,
+    not be deferred to the bar after that.
+    """
 
 
 def _reason_to_exit_reason(reason: str) -> ExitReason:
@@ -89,7 +106,7 @@ class Broker:
         )
 
         self.initial_cash = initial_cash
-        self.cash = initial_cash
+        # Note: self.cash is now a property delegating to self.account.cash (Bug #5 fix)
         self.commission_model = commission_model or NoCommission()
         self.slippage_model = slippage_model or NoSlippage()
         self.stop_slippage_rate = stop_slippage_rate
@@ -162,6 +179,17 @@ class Broker:
 
         # Fill execution (extracted from _execute_fill)
         self._fill_executor = FillExecutor(self)
+
+    # Phase 4.1: Make cash a property delegating to account to prevent state drift
+    @property
+    def cash(self) -> float:
+        """Current cash balance (delegates to AccountState)."""
+        return self.account.cash
+
+    @cash.setter
+    def cash(self, value: float) -> None:
+        """Set cash balance (delegates to AccountState)."""
+        self.account.cash = value
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Get contract specification for an asset."""
@@ -382,6 +410,7 @@ class Broker:
         limit_price: float | None = None,
         stop_price: float | None = None,
         trail_amount: float | None = None,
+        _options: _SubmitOrderOptions | None = None,
     ) -> Order | None:
         """Submit a new order to the broker.
 
@@ -418,8 +447,13 @@ class Broker:
                                         stop_price=145.0)
         """
         if side is None:
+            if quantity == 0:
+                return None
             side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
-            quantity = abs(quantity)
+        # Always normalize quantity to positive (Bug #3 fix)
+        quantity = abs(quantity)
+        if quantity == 0:
+            return None
 
         # VBT Pro compatibility: prevent same-bar re-entry after stop exit
         # When a stop/trail exit occurs, don't allow new entry until next bar
@@ -447,7 +481,10 @@ class Broker:
         self.pending_orders.append(order)
 
         # Track orders placed this bar for next-bar execution mode
-        if self.execution_mode == ExecutionMode.NEXT_BAR:
+        # Bug #1 fix: Allow eligible orders (e.g., deferred exits) to skip this tracking
+        if self.execution_mode == ExecutionMode.NEXT_BAR and (
+            _options is None or not _options.eligible_in_next_bar_mode
+        ):
             self._orders_this_bar.append(order)
 
         return order
@@ -470,29 +507,64 @@ class Broker:
         if entry is None:
             return None
 
-        tp = self.submit_order(
-            asset, quantity, OrderSide.SELL, OrderType.LIMIT, limit_price=take_profit
-        )
+        # Derive exit side from entry direction (Bug #4 fix)
+        # Long entry (BUY) -> SELL to exit; Short entry (SELL) -> BUY to cover
+        exit_side = OrderSide.SELL if entry.side == OrderSide.BUY else OrderSide.BUY
+        exit_qty = abs(quantity)
+
+        tp = self.submit_order(asset, exit_qty, exit_side, OrderType.LIMIT, limit_price=take_profit)
         if tp is None:
             return None
         tp.parent_id = entry.order_id
 
-        sl = self.submit_order(
-            asset, quantity, OrderSide.SELL, OrderType.STOP, stop_price=stop_loss
-        )
+        sl = self.submit_order(asset, exit_qty, exit_side, OrderType.STOP, stop_price=stop_loss)
         if sl is None:
             return None
         sl.parent_id = entry.order_id
 
         return entry, tp, sl
 
+    # Phase 4.2: Whitelist updatable order fields to prevent mutation of immutable fields
+    _UPDATABLE_ORDER_FIELDS: frozenset[str] = frozenset(
+        {
+            "quantity",
+            "limit_price",
+            "stop_price",
+            "trail_amount",
+        }
+    )
+
     def update_order(self, order_id: str, **kwargs) -> bool:
-        """Update pending order parameters (stop_price, limit_price, quantity, trail_amount)."""
+        """Update pending order parameters.
+
+        Only the following fields can be updated:
+        - quantity: Order size
+        - limit_price: Limit price for LIMIT orders
+        - stop_price: Stop/trigger price for STOP orders
+        - trail_amount: Trail distance for TRAILING_STOP orders
+
+        Args:
+            order_id: ID of the order to update
+            **kwargs: Fields to update
+
+        Returns:
+            True if order was found and updated, False otherwise
+
+        Raises:
+            ValueError: If attempting to update non-updatable fields
+        """
+        # Validate all fields are updatable
+        invalid_fields = set(kwargs.keys()) - self._UPDATABLE_ORDER_FIELDS
+        if invalid_fields:
+            raise ValueError(
+                f"Cannot update order fields: {invalid_fields}. "
+                f"Updatable fields: {sorted(self._UPDATABLE_ORDER_FIELDS)}"
+            )
+
         for order in self.pending_orders:
             if order.order_id == order_id:
                 for key, value in kwargs.items():
-                    if hasattr(order, key):
-                        setattr(order, key, value)
+                    setattr(order, key, value)
                 return True
         return False
 
@@ -621,19 +693,23 @@ class Broker:
         limit_price: float | None,
     ) -> Order | None:
         """Internal helper to order toward a target value."""
-        # Get current position value
+        # Bug #2 fix: Include contract multiplier in value calculations
+        multiplier = self.get_multiplier(asset)
+        unit_notional = price * multiplier  # Notional value per share/contract
+
+        # Get current position value (with multiplier)
         pos = self.positions.get(asset)
         current_value = 0.0
         if pos and pos.quantity != 0:
-            current_value = pos.quantity * price
+            current_value = pos.quantity * unit_notional
 
         # Calculate delta
         delta_value = target_value - current_value
         if abs(delta_value) < 0.01:  # Less than 1 cent, no trade needed
             return None
 
-        # Convert to quantity
-        delta_qty = delta_value / price
+        # Convert to quantity (accounting for multiplier)
+        delta_qty = delta_value / unit_notional
 
         # Submit order
         if delta_qty > 0:
@@ -689,7 +765,9 @@ class Broker:
             target_value = portfolio_value * weight
 
             pos = self.positions.get(asset)
-            current_value = pos.quantity * price if pos and pos.quantity != 0 else 0.0
+            # Bug #2 fix: Include contract multiplier in value calculations
+            multiplier = self.get_multiplier(asset)
+            current_value = pos.quantity * price * multiplier if pos and pos.quantity != 0 else 0.0
 
             delta = target_value - current_value
             if abs(delta) < 0.01:  # Less than 1 cent
@@ -791,8 +869,14 @@ class Broker:
                 continue
 
             # Create exit order with fill price = open price
+            # Bug #1 fix: Pass eligible_in_next_bar_mode=True so exit executes this bar
             exit_qty = pending["quantity"]
-            order = self.submit_order(asset, -exit_qty, order_type=OrderType.MARKET)
+            order = self.submit_order(
+                asset,
+                -exit_qty,
+                order_type=OrderType.MARKET,
+                _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
+            )
             if order:
                 order._risk_exit_reason = pending["reason"]
                 order._exit_reason = _reason_to_exit_reason(pending["reason"])
@@ -1102,14 +1186,14 @@ class Broker:
     ) -> float | None:
         """Update trailing stop level and check if triggered.
 
-        Updates the stop price based on the high water mark, then checks
+        Updates the stop price based on the water mark, then checks
         if the stop has been triggered.
 
         Note: This method mutates order.stop_price as trailing stops
-        must track the high water mark.
+        must track the water mark.
 
         Args:
-            order: Trailing stop order (must be SELL side)
+            order: Trailing stop order (SELL protects longs, BUY protects shorts)
             high: Bar high price
             low: Bar low price
             bar_open: Bar open price
@@ -1117,19 +1201,33 @@ class Broker:
         Returns:
             Fill price if triggered, None otherwise
         """
-        if order.side != OrderSide.SELL:
-            return None  # Only SELL trailing stops supported currently
+        if order.trail_amount is None:
+            return None
 
-        # Update trailing stop based on high water mark
-        if order.trail_amount is not None:
+        if order.side == OrderSide.SELL:
+            # SELL trailing stop: protects long positions
+            # Stop trails below the high water mark
             new_stop = high - order.trail_amount
             if order.stop_price is None or new_stop > order.stop_price:
                 order.stop_price = new_stop
 
-        # Check if triggered
-        if order.stop_price is None or low > order.stop_price:
-            return None
+            # Check if triggered: low touched or crossed stop
+            if order.stop_price is None or low > order.stop_price:
+                return None
 
+        else:  # OrderSide.BUY - Bug #5 fix
+            # BUY trailing stop: protects short positions
+            # Stop trails above the low water mark
+            new_stop = low + order.trail_amount
+            if order.stop_price is None or new_stop < order.stop_price:
+                order.stop_price = new_stop
+
+            # Check if triggered: high touched or crossed stop
+            if order.stop_price is None or high < order.stop_price:
+                return None
+
+        # At this point stop_price is guaranteed non-None (set above, returned if None)
+        assert order.stop_price is not None
         gap_price = self._check_gap_through(order.side, order.stop_price, bar_open)
         return gap_price if gap_price is not None else order.stop_price
 
