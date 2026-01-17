@@ -44,6 +44,7 @@ class SignalFollowingStrategy(Strategy):
     signal_column: str = "signal"
     position_size: float = 0.10
     allow_shorts: bool = False
+    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
 
     @abstractmethod
     def should_enter_long(self, signal: float) -> bool:
@@ -102,12 +103,14 @@ class SignalFollowingStrategy(Strategy):
                 # No position - check for entry
                 if self.should_enter_long(signal):
                     equity = broker.get_account_value()
-                    shares = int((equity * self.position_size) / price) if price > 0 else 0
+                    raw_shares = (equity * self.position_size) / price if price > 0 else 0
+                    shares = raw_shares if self.allow_fractional else int(raw_shares)
                     if shares > 0:
                         broker.submit_order(asset, shares)
                 elif self.allow_shorts and self.should_enter_short(signal):
                     equity = broker.get_account_value()
-                    shares = int((equity * self.position_size) / price) if price > 0 else 0
+                    raw_shares = (equity * self.position_size) / price if price > 0 else 0
+                    shares = raw_shares if self.allow_fractional else int(raw_shares)
                     if shares > 0:
                         broker.submit_order(asset, -shares)
             else:
@@ -139,6 +142,7 @@ class MomentumStrategy(Strategy):
     entry_threshold: float = 0.05
     exit_threshold: float = -0.02
     position_size: float = 0.10
+    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
 
     def __init__(self) -> None:
         self.price_history: dict[str, list[float]] = defaultdict(list)
@@ -186,7 +190,8 @@ class MomentumStrategy(Strategy):
             if position is None and momentum > self.entry_threshold:
                 # Enter long on strong momentum
                 equity = broker.get_account_value()
-                shares = int((equity * self.position_size) / close)
+                raw_shares = (equity * self.position_size) / close
+                shares = raw_shares if self.allow_fractional else int(raw_shares)
                 if shares > 0:
                     broker.submit_order(asset, shares)
             elif position is not None and momentum < self.exit_threshold:
@@ -217,6 +222,7 @@ class MeanReversionStrategy(Strategy):
     entry_zscore: float = -2.0
     exit_zscore: float = 0.0
     position_size: float = 0.10
+    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
 
     def __init__(self) -> None:
         self.price_history: dict[str, list[float]] = defaultdict(list)
@@ -277,7 +283,8 @@ class MeanReversionStrategy(Strategy):
             if position is None and zscore < self.entry_zscore:
                 # Enter long on oversold condition
                 equity = broker.get_account_value()
-                shares = int((equity * self.position_size) / close)
+                raw_shares = (equity * self.position_size) / close
+                shares = raw_shares if self.allow_fractional else int(raw_shares)
                 if shares > 0:
                     broker.submit_order(asset, shares)
             elif position is not None and zscore > self.exit_zscore:
@@ -310,6 +317,7 @@ class LongShortStrategy(Strategy):
     short_count: int = 5
     position_size: float = 0.05
     rebalance_frequency: int = 20
+    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
 
     def __init__(self) -> None:
         self.bar_count = 0
@@ -378,7 +386,8 @@ class LongShortStrategy(Strategy):
                 continue
 
             position = broker.get_position(asset)
-            target_shares = int((equity * self.position_size) / price)
+            raw_shares = (equity * self.position_size) / price
+            target_shares = raw_shares if self.allow_fractional else int(raw_shares)
 
             if position is None and target_shares > 0:
                 broker.submit_order(asset, target_shares)
@@ -389,7 +398,8 @@ class LongShortStrategy(Strategy):
                 continue
 
             position = broker.get_position(asset)
-            target_shares = int((equity * self.position_size) / price)
+            raw_shares = (equity * self.position_size) / price
+            target_shares = raw_shares if self.allow_fractional else int(raw_shares)
 
             if position is None and target_shares > 0:
                 broker.submit_order(asset, -target_shares)

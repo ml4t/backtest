@@ -105,8 +105,8 @@ class PositionState:
     side: str  # "long" or "short"
     entry_price: float
     current_price: float
-    quantity: int
-    initial_quantity: int
+    quantity: float
+    initial_quantity: float
     unrealized_pnl: float
     unrealized_return: float
     bars_held: int

@@ -119,7 +119,7 @@ class BacktestResult:
             drawdown, high_water_mark
 
         Returns:
-            Polars DataFrame with one row per bar
+            Polars DataFrame with one row per bar, sorted by timestamp
         """
         if self._equity_df is not None:
             return self._equity_df
@@ -130,37 +130,30 @@ class BacktestResult:
         timestamps = [ts for ts, _ in self.equity_curve]
         values = [v for _, v in self.equity_curve]
 
-        # Compute returns and drawdowns
-        returns = [0.0]  # First bar has no return
-        for i in range(1, len(values)):
-            if values[i - 1] != 0:
-                returns.append((values[i] - values[i - 1]) / values[i - 1])
-            else:
-                returns.append(0.0)
+        # Build base DataFrame and sort by timestamp
+        df = pl.DataFrame({"timestamp": timestamps, "equity": values}).sort("timestamp")
 
-        # Cumulative returns from initial value
-        initial = values[0] if values else 1.0
-        cum_returns = [(v / initial) - 1.0 for v in values]
+        # Vectorized computation using Polars
+        df = df.with_columns(
+            [
+                # Returns: percent change, first bar has no return
+                pl.col("equity").pct_change().fill_null(0.0).alias("return"),
+                # Cumulative return from initial equity
+                (pl.col("equity") / pl.first("equity") - 1.0).alias("cumulative_return"),
+                # High water mark (running maximum)
+                pl.col("equity").cum_max().alias("high_water_mark"),
+            ]
+        ).with_columns(
+            # Drawdown: (equity / hwm) - 1, handle division by zero
+            pl.when(pl.col("high_water_mark") > 0)
+            .then(pl.col("equity") / pl.col("high_water_mark") - 1.0)
+            .otherwise(0.0)
+            .alias("drawdown")
+        )
 
-        # Drawdown calculation
-        hwm = values[0] if values else 0.0
-        hwm_series = []
-        drawdowns = []
-        for v in values:
-            if v > hwm:
-                hwm = v
-            hwm_series.append(hwm)
-            drawdowns.append((v - hwm) / hwm if hwm > 0 else 0.0)
-
-        self._equity_df = pl.DataFrame(
-            {
-                "timestamp": timestamps,
-                "equity": values,
-                "return": returns,
-                "cumulative_return": cum_returns,
-                "drawdown": drawdowns,
-                "high_water_mark": hwm_series,
-            }
+        # Reorder columns to match expected schema
+        self._equity_df = df.select(
+            ["timestamp", "equity", "return", "cumulative_return", "drawdown", "high_water_mark"]
         )
 
         return self._equity_df
@@ -347,6 +340,15 @@ class BacktestResult:
                     serializable[k] = v
                 elif isinstance(v, datetime):
                     serializable[k] = v.isoformat()
+                else:
+                    # Handle numpy scalars (np.float64, np.int64, etc.)
+                    try:
+                        import numpy as np
+
+                        if isinstance(v, np.generic):
+                            serializable[k] = v.item()
+                    except (ImportError, AttributeError):
+                        pass  # Skip if numpy not available or not a numpy type
             with open(metrics_path, "w") as f:
                 json.dump(serializable, f, indent=2)
             written["metrics"] = metrics_path
@@ -416,12 +418,27 @@ class BacktestResult:
             with open(metrics_path) as f:
                 metrics = json.load(f)
 
+        # Load config if available
+        config = None
+        config_path = path / "config.yaml"
+        if config_path.exists():
+            try:
+                import yaml
+
+                from .config import BacktestConfig
+
+                with open(config_path) as f:
+                    config_data = yaml.safe_load(f)
+                config = BacktestConfig.from_dict(config_data)
+            except (ImportError, Exception):
+                pass  # Skip if yaml not available or config invalid
+
         return cls(
             trades=trades,
             equity_curve=equity_curve,
             fills=[],  # Fills not persisted by default
             metrics=metrics,
-            config=None,  # Config would need separate loading
+            config=config,
         )
 
     @staticmethod
@@ -708,6 +725,9 @@ def enrich_trades_with_signals(
     if not signal_columns:
         return trades_df
 
+    # Preserve original trade order (join_asof requires sorting which disrupts order)
+    trades_df = trades_df.with_row_index("_original_order")
+
     # Ensure signals are sorted by timestamp for join_asof
     signals_sorted = signals_df.sort(timestamp_col)
 
@@ -761,4 +781,5 @@ def enrich_trades_with_signals(
             strategy="backward",
         )
 
-    return result
+    # Restore original trade order and remove temporary column
+    return result.sort("_original_order").drop("_original_order")

@@ -308,10 +308,10 @@ class Broker:
             side=pos.side,
             entry_price=pos.entry_price,
             current_price=current_price,
-            quantity=abs(int(pos.quantity)),
-            initial_quantity=abs(int(pos.initial_quantity))
+            quantity=abs(pos.quantity),
+            initial_quantity=abs(pos.initial_quantity)
             if pos.initial_quantity
-            else abs(int(pos.quantity)),
+            else abs(pos.quantity),
             unrealized_pnl=pos.unrealized_pnl(current_price),
             unrealized_return=pos.pnl_percent(current_price),
             bars_held=pos.bars_held,
@@ -380,7 +380,7 @@ class Broker:
             elif action.action == ActionType.EXIT_PARTIAL:
                 if action.defer_fill:
                     # NEXT_BAR_OPEN mode: defer partial exit to next bar
-                    exit_qty = int(abs(pos.quantity) * action.pct)
+                    exit_qty = abs(pos.quantity) * action.pct
                     if exit_qty > 0:
                         self._pending_exits[asset] = {
                             "reason": action.reason,
@@ -389,7 +389,7 @@ class Broker:
                         }
                 else:
                     # Generate partial exit order immediately
-                    exit_qty = int(abs(pos.quantity) * action.pct)
+                    exit_qty = abs(pos.quantity) * action.pct
                     if exit_qty > 0:
                         actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
                         order = self.submit_order(asset, actual_qty, order_type=OrderType.MARKET)

@@ -283,6 +283,7 @@ def is_market_open(
 
     This accounts for:
     - Regular trading hours
+    - Overnight sessions (e.g., CME futures that span midnight)
     - Intraday breaks (e.g., CME maintenance break 4-5 PM CT)
     - Early closes
 
@@ -303,28 +304,36 @@ def is_market_open(
 
     # Convert to pandas Timestamp
     ts = pd.Timestamp(check_datetime)
+    check_date = ts.date()
 
-    # Get schedule for that day
-    schedule = calendar.schedule(start_date=ts.date(), end_date=ts.date())
+    # For overnight sessions, we need to check both today's and yesterday's schedule
+    # because a session that opened yesterday may still be open today
+    prev_date = check_date - pd.Timedelta(days=1)
+    schedule = calendar.schedule(start_date=prev_date, end_date=check_date)
 
     if schedule.empty:
         return False
 
-    market_open = schedule.iloc[0]["market_open"]
-    market_close = schedule.iloc[0]["market_close"]
+    # Check each session in the schedule (yesterday and today)
+    for _, row in schedule.iterrows():
+        market_open = row["market_open"]
+        market_close = row["market_close"]
 
-    # Check if within regular hours
-    if not (market_open <= ts <= market_close):
-        return False
+        # Check if within regular hours (exclusive end - market_close is first moment after close)
+        if not (market_open <= ts < market_close):
+            continue
 
-    # Check for intraday breaks if available
-    if "break_start" in schedule.columns and pd.notna(schedule.iloc[0]["break_start"]):
-        break_start = schedule.iloc[0]["break_start"]
-        break_end = schedule.iloc[0]["break_end"]
-        if break_start <= ts <= break_end:
-            return False
+        # Check for intraday breaks if available
+        if "break_start" in schedule.columns and pd.notna(row.get("break_start")):
+            break_start = row["break_start"]
+            break_end = row["break_end"]
+            if break_start <= ts < break_end:
+                continue  # In break, check next session
 
-    return True
+        # Found a valid session
+        return True
+
+    return False
 
 
 def next_trading_day(
@@ -589,9 +598,13 @@ def filter_to_trading_sessions(
     min_date = df.select(pl.col(timestamp_col).dt.date().min()).item()
     max_date = df.select(pl.col(timestamp_col).dt.date().max()).item()
 
-    # Get schedule for the date range
+    # For overnight sessions (e.g., CME futures 5pm-4pm), a session that opened
+    # on the previous day may still be open. Expand window by 1 day to capture this.
+    prev_date = pd.Timestamp(min_date) - pd.Timedelta(days=1)
+
+    # Get schedule for the expanded date range
     calendar = get_calendar(calendar_id)
-    schedule_pd = calendar.schedule(start_date=min_date, end_date=max_date)
+    schedule_pd = calendar.schedule(start_date=prev_date.date(), end_date=max_date)
 
     if schedule_pd.empty:
         return df.clear()  # No trading days in range
@@ -631,7 +644,7 @@ def filter_to_trading_sessions(
     )
 
     # Use join_asof to find the session that starts at or before each timestamp
-    # Then filter to rows where timestamp <= session_close
+    # Then filter to rows where timestamp < session_close (exclusive end)
     result = (
         df.lazy()
         .sort(timestamp_col)
@@ -642,8 +655,8 @@ def filter_to_trading_sessions(
             strategy="backward",  # Find session that starts at or before timestamp
         )
         .filter(
-            # Timestamp must be within the matched session
-            pl.col(timestamp_col) <= pl.col("session_close")
+            # Timestamp must be within the matched session (exclusive end)
+            pl.col(timestamp_col) < pl.col("session_close")
         )
         .drop(["session_open", "session_close"])
         .collect()
