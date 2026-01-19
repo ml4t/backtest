@@ -138,10 +138,11 @@ class Engine:
 
         for timestamp, assets_data, context in self.feed:
             # Calendar session enforcement
-            if self._calendar and self.config and self.config.enforce_sessions:
+            calendar_id = self.config.calendar if self.config else None
+            if self._calendar and calendar_id and self.config and self.config.enforce_sessions and is_trading_day_fn:
                 # For daily data, check trading day; for intraday, check market hours
                 if self.config.data_frequency.value == "daily":
-                    if not is_trading_day_fn(self.config.calendar, timestamp.date()):
+                    if not is_trading_day_fn(calendar_id, timestamp.date()):
                         self._skipped_bars += 1
                         continue
                 else:
@@ -149,7 +150,7 @@ class Engine:
                     bar_date = timestamp.date()
                     if bar_date not in trading_day_cache:
                         trading_day_cache[bar_date] = is_trading_day_fn(
-                            self.config.calendar, bar_date
+                            calendar_id, bar_date
                         )
                     if not trading_day_cache[bar_date]:
                         self._skipped_bars += 1
