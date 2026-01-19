@@ -363,10 +363,17 @@ class Broker:
                         "reason": action.reason,
                         "pct": 1.0,
                         "quantity": pos.quantity,
+                        "fill_price": action.fill_price,  # Preserve for STOP_PRICE mode
                     }
                 else:
                     # Generate full exit order immediately
-                    order = self.submit_order(asset, -pos.quantity, order_type=OrderType.MARKET)
+                    # For STOP_PRICE mode, risk exits should fill on trigger bar even in NEXT_BAR mode
+                    order = self.submit_order(
+                        asset,
+                        -pos.quantity,
+                        order_type=OrderType.MARKET,
+                        _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
+                    )
                     if order:
                         order._risk_exit_reason = action.reason
                         order._exit_reason = _reason_to_exit_reason(action.reason)
@@ -386,13 +393,20 @@ class Broker:
                             "reason": action.reason,
                             "pct": action.pct,
                             "quantity": exit_qty if pos.quantity > 0 else -exit_qty,
+                            "fill_price": action.fill_price,  # Preserve for STOP_PRICE mode
                         }
                 else:
                     # Generate partial exit order immediately
+                    # For STOP_PRICE mode, risk exits should fill on trigger bar even in NEXT_BAR mode
                     exit_qty = abs(pos.quantity) * action.pct
                     if exit_qty > 0:
                         actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
-                        order = self.submit_order(asset, actual_qty, order_type=OrderType.MARKET)
+                        order = self.submit_order(
+                            asset,
+                            actual_qty,
+                            order_type=OrderType.MARKET,
+                            _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
+                        )
                         if order:
                             order._risk_exit_reason = action.reason
                             order._exit_reason = _reason_to_exit_reason(action.reason)
@@ -497,12 +511,42 @@ class Broker:
         stop_loss: float,
         entry_type: OrderType = OrderType.MARKET,
         entry_limit: float | None = None,
+        validate_prices: bool = True,
     ) -> tuple[Order, Order, Order] | None:
         """Submit entry with take-profit and stop-loss.
 
+        Creates a bracket order with entry, take-profit limit, and stop-loss orders.
+        The exit side is automatically determined from the entry direction.
+
+        Args:
+            asset: Asset symbol to trade
+            quantity: Position size (positive for long, negative for short)
+            take_profit: Take-profit price level (LIMIT order)
+            stop_loss: Stop-loss price level (STOP order)
+            entry_type: Entry order type (default MARKET)
+            entry_limit: Entry limit price (if entry_type is LIMIT)
+            validate_prices: If True, validate that TP/SL prices are sensible
+                            for the position direction (default True)
+
         Returns:
             Tuple of (entry_order, take_profit_order, stop_loss_order) or None if any fails.
+
+        Raises:
+            ValueError: If validate_prices=True and prices are inverted for direction.
+
+        Notes:
+            For LONG entries (quantity > 0):
+                - take_profit should be > reference_price (profit on up move)
+                - stop_loss should be < reference_price (exit on down move)
+
+            For SHORT entries (quantity < 0):
+                - take_profit should be < reference_price (profit on down move)
+                - stop_loss should be > reference_price (exit on up move)
+
+            Reference price is entry_limit (if LIMIT order) or current market price.
         """
+        import warnings
+
         entry = self.submit_order(asset, quantity, order_type=entry_type, limit_price=entry_limit)
         if entry is None:
             return None
@@ -511,6 +555,45 @@ class Broker:
         # Long entry (BUY) -> SELL to exit; Short entry (SELL) -> BUY to cover
         exit_side = OrderSide.SELL if entry.side == OrderSide.BUY else OrderSide.BUY
         exit_qty = abs(quantity)
+
+        # Validate bracket prices if requested
+        if validate_prices:
+            ref_price = entry_limit if entry_limit is not None else self._current_prices.get(asset)
+            if ref_price is not None:
+                is_long = entry.side == OrderSide.BUY
+
+                if is_long:
+                    # Long: TP should be above entry, SL should be below
+                    if take_profit <= ref_price:
+                        warnings.warn(
+                            f"Bracket order for LONG {asset}: take_profit ({take_profit}) <= "
+                            f"entry ({ref_price}). TP should be above entry for longs.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    if stop_loss >= ref_price:
+                        warnings.warn(
+                            f"Bracket order for LONG {asset}: stop_loss ({stop_loss}) >= "
+                            f"entry ({ref_price}). SL should be below entry for longs.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                else:
+                    # Short: TP should be below entry, SL should be above
+                    if take_profit >= ref_price:
+                        warnings.warn(
+                            f"Bracket order for SHORT {asset}: take_profit ({take_profit}) >= "
+                            f"entry ({ref_price}). TP should be below entry for shorts.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    if stop_loss <= ref_price:
+                        warnings.warn(
+                            f"Bracket order for SHORT {asset}: stop_loss ({stop_loss}) <= "
+                            f"entry ({ref_price}). SL should be above entry for shorts.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
 
         tp = self.submit_order(asset, exit_qty, exit_side, OrderType.LIMIT, limit_price=take_profit)
         if tp is None:
@@ -851,8 +934,13 @@ class Broker:
     def _process_pending_exits(self) -> list[Order]:
         """Process pending exits from NEXT_BAR_OPEN mode.
 
-        Called at the start of a new bar to fill deferred exits at open price.
-        Returns list of exit orders that were created and will be filled at open.
+        Called at the start of a new bar to fill deferred exits.
+        The fill price depends on stop_fill_mode:
+        - STOP_PRICE: Fill at the stop price (with gap-through check)
+        - NEXT_BAR_OPEN: Fill at open price
+        - Other modes: Fill at open price
+
+        Returns list of exit orders that were created and will be filled.
         """
         exit_orders = []
 
@@ -868,7 +956,18 @@ class Broker:
                 # No open price available, skip this bar
                 continue
 
-            # Create exit order with fill price = open price
+            # Determine fill price based on stop_fill_mode
+            stored_fill_price = pending.get("fill_price")
+            if self.stop_fill_mode == StopFillMode.STOP_PRICE and stored_fill_price is not None:
+                # Use the original stop price, but check for gap-through
+                exit_side = OrderSide.SELL if pending["quantity"] > 0 else OrderSide.BUY
+                gap_price = self._check_gap_through(exit_side, stored_fill_price, open_price)
+                fill_price = gap_price if gap_price is not None else stored_fill_price
+            else:
+                # Default: fill at open price
+                fill_price = open_price
+
+            # Create exit order
             # Bug #1 fix: Pass eligible_in_next_bar_mode=True so exit executes this bar
             exit_qty = pending["quantity"]
             order = self.submit_order(
@@ -880,8 +979,7 @@ class Broker:
             if order:
                 order._risk_exit_reason = pending["reason"]
                 order._exit_reason = _reason_to_exit_reason(pending["reason"])
-                # Fill at current bar's open (this is the "next bar" from when stop triggered)
-                order._risk_fill_price = open_price
+                order._risk_fill_price = fill_price
                 exit_orders.append(order)
 
             # Remove from pending

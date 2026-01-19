@@ -145,6 +145,90 @@ class BacktestConfig:
     fill_timing: FillTiming = FillTiming.NEXT_BAR_OPEN
     execution_price: ExecutionPrice = ExecutionPrice.CLOSE
 
+    def validate(self, warn: bool = True) -> list[str]:
+        """Validate configuration and return warnings for edge cases.
+
+        Checks for configurations that may produce unexpected results or
+        indicate potential issues. Returns a list of warning messages.
+
+        Args:
+            warn: If True, emit warnings via warnings.warn(). Default True.
+
+        Returns:
+            List of warning message strings (empty if no issues found).
+
+        Example:
+            config = BacktestConfig(fill_timing=FillTiming.SAME_BAR)
+            warnings = config.validate()
+            # ["SAME_BAR execution has look-ahead bias risk..."]
+        """
+        import warnings as _warnings
+
+        issues: list[str] = []
+
+        # Look-ahead bias warning
+        if self.fill_timing == FillTiming.SAME_BAR:
+            issues.append(
+                "SAME_BAR execution has look-ahead bias risk. "
+                "Use NEXT_BAR_OPEN for realistic backtesting."
+            )
+
+        # Zero cost warning
+        if (
+            self.commission_model == CommissionModel.NONE
+            and self.slippage_model == SlippageModel.NONE
+        ):
+            issues.append(
+                "Both commission and slippage are disabled. "
+                "Results may be overly optimistic. Consider using Mode.REALISTIC."
+            )
+
+        # High position concentration
+        if self.default_position_pct > 0.25:
+            issues.append(
+                f"Default position size ({self.default_position_pct:.0%}) exceeds 25%. "
+                "High concentration increases single-stock risk."
+            )
+
+        # Margin account with cash settings
+        if self.account_type == "margin" and self.allow_negative_cash:
+            issues.append(
+                "Margin account with allow_negative_cash may cause unrealistic leverage. "
+                "Margin requirements are enforced separately from cash balance."
+            )
+
+        # Volume-based slippage without partial fills
+        if (
+            self.slippage_model == SlippageModel.VOLUME_BASED
+            and not self.partial_fills_allowed
+        ):
+            issues.append(
+                "Volume-based slippage without partial_fills_allowed may cause "
+                "orders to be rejected in low-volume conditions."
+            )
+
+        # High slippage + high commission
+        total_cost = self.slippage_rate + self.commission_rate
+        if total_cost > 0.01:  # > 1% round-trip
+            issues.append(
+                f"Total transaction cost ({total_cost:.2%}) is high. "
+                "Verify this matches your broker's actual costs."
+            )
+
+        # Fractional shares warning for production
+        if self.share_type == ShareType.FRACTIONAL and self.preset_name == "realistic":
+            issues.append(
+                "REALISTIC preset with fractional shares may not match all brokers. "
+                "Set share_type=INTEGER for most accurate simulation."
+            )
+
+        # Emit warnings if requested
+        if warn and issues:
+            for msg in issues:
+                _warnings.warn(msg, UserWarning, stacklevel=2)
+
+        return issues
+
     # === Position Sizing ===
     share_type: ShareType = ShareType.FRACTIONAL
     sizing_method: SizingMethod = SizingMethod.PERCENT_OF_PORTFOLIO

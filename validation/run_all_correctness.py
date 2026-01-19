@@ -42,12 +42,12 @@ FRAMEWORKS = {
         "display_name": "VectorBT OSS",
     },
     "backtrader": {
-        "venv": ".venv",  # Can also use .venv-validation or .venv-backtrader
+        "venv": ".venv-backtrader",
         "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "Backtrader",
     },
     "zipline": {
-        "venv": ".venv",  # Can also use .venv-validation or .venv-zipline
+        "venv": ".venv-zipline",
         "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09"],  # No scenario 10
         "display_name": "Zipline",
     },

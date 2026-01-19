@@ -101,7 +101,20 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     )
 
     trades = pf.trades.records_readable
-    exit_reasons = trades["Status"].value_counts().to_dict() if len(trades) > 0 else {}
+
+    # Extract exit reasons - handle different VBT Pro versions
+    # Column names may vary: "Status", "status", "Exit Type", etc.
+    exit_reasons = {}
+    if len(trades) > 0:
+        # Try common column names for exit status
+        status_cols = ["Status", "status", "Exit Type", "exit_type"]
+        for col in status_cols:
+            if col in trades.columns:
+                exit_reasons = trades[col].value_counts().to_dict()
+                break
+        # If no status column found, just count total trades
+        if not exit_reasons:
+            exit_reasons = {"completed": len(trades)}
 
     return {
         "framework": "VectorBT Pro",

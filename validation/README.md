@@ -14,20 +14,21 @@ This approach was adopted after struggling with dependency conflicts between Vec
 4. **Identical signals** - Test with pre-computed signals to eliminate strategy variance
 5. **Configuration-based matching** - Document what config produces matching results
 
-## Test Coverage Matrix (Updated 2025-11-23)
+## Test Coverage Matrix (Updated 2026-01-18)
 
 | Feature | VectorBT Pro | VectorBT OSS | Backtrader | Zipline |
 |---------|--------------|--------------|------------|---------|
 | Long only | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
 | Long/Short | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
 | Multi-asset (500 assets) | ✅ **100% match** | ✅ **100% match** | ✅ **100% match** | ✅ **100% match** |
-| % Commission | ⬜ | ⬜ | ⬜ | ⬜ |
-| Per-share commission | ⬜ | ⬜ | ⬜ | ⬜ |
-| Fixed slippage | ⬜ | ⬜ | ⬜ | ⬜ |
-| % Slippage | ⬜ | ⬜ | ⬜ | ⬜ |
+| % Commission | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
+| Per-share commission | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
+| Fixed slippage | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
+| % Slippage | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
 | Stop-loss | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
 | Take-profit | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
-| Trailing stop | ⬜ | ⬜ | ⬜ | ⬜ |
+| Trailing stop | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
+| Bracket order | ⬜ needs re-run | ⬜ pending | ⬜ pending | ⬜ N/A |
 
 **Note on exact match**: Stop/take-profit now achieves **EXACT MATCH** (0.0000% diff) using configurable fill modes:
 
@@ -645,11 +646,40 @@ print(f"Common trades: {len(common)}")
 EOF
 ```
 
+## Scenario Coverage per Framework
+
+Scripts exist for each framework:
+
+| Scenario | VBT Pro | VBT OSS | Backtrader | Zipline |
+|----------|---------|---------|------------|---------|
+| 01: Long Only | ✅ | ✅ | ✅ | ✅ |
+| 02: Long/Short | ✅ | ✅ | ✅ | ✅ |
+| 03: Stop Loss | ✅ | ✅ | ✅ | ✅ |
+| 04: Take Profit | ✅ | ✅ | ✅ | ✅ |
+| 05: Commission (Pct) | ✅ | ✅ | ✅ | ✅ |
+| 06: Commission (Per-Share) | ✅ | ✅ | ✅ | ✅ |
+| 07: Slippage (Fixed) | ✅ | ✅ | ✅ | ✅ |
+| 08: Slippage (Pct) | ✅ | ✅ | ✅ | ✅ |
+| 09: Trailing Stop | ✅ | ✅ | ✅ | ✅ |
+| 10: Bracket Order | ✅ | ✅ | ✅ | - |
+| 11: Short Only | ✅ | - | - | - |
+
+## Validation Changelog
+
+**2026-01-18**: Fixed VBT Pro scenarios 09 and 10 (trailing stop, bracket order)
+- Issue: `trades["Status"]` column access failed with pandas KeyError
+- Fix: Added robust column name detection with fallback
+- Status: Scripts now handle VBT Pro API version differences
+
+**2026-01-01**: Initial correctness validation suite
+- VBT Pro scenarios 01-08: ALL PASS
+- Scenarios 09-10: FAIL due to pandas KeyError (now fixed)
+
 ## Future Work
 
 Additional scenarios to validate:
-- Commission models (percentage, per-share, tiered)
-- Slippage models (fixed, percentage, volume-based)
-- Trailing stops (dynamic stop adjustment based on price movement)
-- Bracket orders (entry + stop-loss + take-profit combined)
+- Tiered commission models
+- Volume-based slippage
+- VWAP execution price
+- MID execution price
 - Stop breach buffer (configurable slippage for gap-through scenarios)

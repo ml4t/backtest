@@ -1,6 +1,6 @@
 # Correctness Validation Results
 
-**Generated**: 2026-01-01 11:03:36
+**Generated**: 2026-01-18 15:34:38
 
 ## Summary
 
@@ -14,52 +14,42 @@
 | VectorBT Pro | 06: Commission (Per-Share) | ✅ PASS |
 | VectorBT Pro | 07: Slippage (Fixed) | ✅ PASS |
 | VectorBT Pro | 08: Slippage (Pct) | ✅ PASS |
-| VectorBT Pro | 09: Trailing Stop | ❌ FAIL |
-| VectorBT Pro | 10: Bracket Order | ❌ FAIL |
+| VectorBT Pro | 09: Trailing Stop | ✅ PASS |
+| VectorBT Pro | 10: Bracket Order | ✅ PASS |
+| VectorBT OSS | 01: Long Only | ✅ PASS |
+| VectorBT OSS | 02: Long/Short | ✅ PASS |
+| VectorBT OSS | 03: Stop Loss | ✅ PASS |
+| VectorBT OSS | 04: Take Profit | ✅ PASS |
+| VectorBT OSS | 05: Commission (Pct) | ✅ PASS |
+| VectorBT OSS | 06: Commission (Per-Share) | ✅ PASS |
+| VectorBT OSS | 07: Slippage (Fixed) | ✅ PASS |
+| VectorBT OSS | 08: Slippage (Pct) | ✅ PASS |
+| VectorBT OSS | 09: Trailing Stop | ✅ PASS |
+| VectorBT OSS | 10: Bracket Order | ✅ PASS |
+| Backtrader | 01: Long Only | ✅ PASS |
+| Backtrader | 02: Long/Short | ✅ PASS |
+| Backtrader | 03: Stop Loss | ✅ PASS |
+| Backtrader | 04: Take Profit | ✅ PASS |
+| Backtrader | 05: Commission (Pct) | ✅ PASS |
+| Backtrader | 06: Commission (Per-Share) | ✅ PASS |
+| Backtrader | 07: Slippage (Fixed) | ✅ PASS |
+| Backtrader | 08: Slippage (Pct) | ✅ PASS |
+| Backtrader | 09: Trailing Stop | ✅ PASS |
+| Backtrader | 10: Bracket Order | ✅ PASS |
+| Zipline | 01: Long Only | ✅ PASS |
+| Zipline | 02: Long/Short | ✅ PASS |
+| Zipline | 03: Stop Loss | ✅ PASS |
+| Zipline | 04: Take Profit | ✅ PASS |
+| Zipline | 05: Commission (Pct) | ✅ PASS |
+| Zipline | 06: Commission (Per-Share) | ✅ PASS |
+| Zipline | 07: Slippage (Fixed) | ✅ PASS |
+| Zipline | 08: Slippage (Pct) | ✅ PASS |
+| Zipline | 09: Trailing Stop | ✅ PASS |
+| LEAN CLI | 01: Long Only | ⏭️ SKIP |
 
 ## Statistics
 
-- **Passed**: 8
-- **Failed**: 2
-- **Skipped**: 0
-- **Total**: 10
-
-## Failures
-
-### VectorBT Pro - 09: Trailing Stop
-
-**Error**: None
-
-```
-======================================================================
-Scenario 09: Trailing Stop (5%)
-======================================================================
-
-  Bars: 100, Entry signals: 2
-
-  Running VectorBT Pro...
-Traceback (most recent call last):
-  File "/home/stefan/ml4t/software/backtest/.venv-vectorbt-pro/lib/python3.13/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
-    return self._engine.get_loc(casted_key)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
- 
-```
-
-### VectorBT Pro - 10: Bracket Order
-
-**Error**: None
-
-```
-======================================================================
-Scenario 10: Bracket Order (SL=5%, TP=10%)
-======================================================================
-
-  Bars: 100, Entry signals: 3
-
-  Running VectorBT Pro...
-Traceback (most recent call last):
-  File "/home/stefan/ml4t/software/backtest/validation/vectorbt_pro/scenario_10_bracket_order.py", line 246, in <module>
-    sys.exit(main())
-             ~~~~^^
-  File "/home/stefan/ml4t/software/backtest/validation/vecto
-```
+- **Passed**: 39
+- **Failed**: 0
+- **Skipped**: 1
+- **Total**: 40
