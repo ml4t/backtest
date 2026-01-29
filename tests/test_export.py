@@ -21,7 +21,7 @@ def sample_result() -> BacktestResult:
     base_time = datetime(2024, 1, 1, 10, 0)
     trades = [
         Trade(
-            asset="AAPL",
+            symbol="AAPL",
             entry_time=base_time,
             exit_time=base_time + timedelta(hours=2),
             entry_price=150.0,
@@ -30,7 +30,7 @@ def sample_result() -> BacktestResult:
             pnl=500.0,
             pnl_percent=3.33,
             bars_held=24,
-            commission=10.0,
+            fees=10.0,
             slippage=5.0,
         ),
     ]
@@ -73,7 +73,7 @@ def multiple_results() -> list[BacktestResult]:
     for i in range(3):
         trades = [
             Trade(
-                asset="AAPL",
+                symbol="AAPL",
                 entry_time=base_time,
                 exit_time=base_time + timedelta(hours=2),
                 entry_price=150.0,
@@ -82,7 +82,7 @@ def multiple_results() -> list[BacktestResult]:
                 pnl=(i + 1) * 500.0,
                 pnl_percent=(i + 1) * 3.33,
                 bars_held=24,
-                commission=10.0,
+                fees=10.0,
                 slippage=5.0,
             ),
         ]

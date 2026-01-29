@@ -6,8 +6,7 @@ import pytest
 
 from src.ml4t.backtest.accounting import (
     AccountState,
-    CashAccountPolicy,
-    MarginAccountPolicy,
+    UnifiedAccountPolicy,
 )
 
 
@@ -16,7 +15,7 @@ class TestAccountStateApplyFillLongPositions:
 
     def test_open_long_position(self):
         """Test opening a new long position decreases cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 100 shares @ $150
@@ -36,7 +35,7 @@ class TestAccountStateApplyFillLongPositions:
 
     def test_add_to_long_position(self):
         """Test adding to existing long position updates cost basis."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 100 @ $150
@@ -53,7 +52,7 @@ class TestAccountStateApplyFillLongPositions:
 
     def test_close_long_position(self):
         """Test closing long position increases cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 100 @ $150
@@ -67,7 +66,7 @@ class TestAccountStateApplyFillLongPositions:
 
     def test_partial_close_long(self):
         """Test partial close of long position."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 100 @ $150
@@ -91,7 +90,7 @@ class TestAccountStateApplyFillShortPositions:
         TASK-012 acceptance criteria:
         - Cash increases when opening shorts (proceeds received)
         """
-        policy = MarginAccountPolicy()  # Only margin accounts allow shorts
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)  # Only margin accounts allow shorts
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 shares @ $150 (sell shares we don't own)
@@ -116,7 +115,7 @@ class TestAccountStateApplyFillShortPositions:
         TASK-012 acceptance criteria:
         - Cost basis calculation correct for adding to shorts
         """
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -137,7 +136,7 @@ class TestAccountStateApplyFillShortPositions:
         TASK-012 acceptance criteria:
         - Cash decreases when covering shorts (cost to close)
         """
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -151,7 +150,7 @@ class TestAccountStateApplyFillShortPositions:
 
     def test_close_short_at_loss(self):
         """Test covering short at a loss."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -165,7 +164,7 @@ class TestAccountStateApplyFillShortPositions:
 
     def test_partial_close_short(self):
         """Test partial cover of short position."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -185,7 +184,7 @@ class TestAccountStateApplyFillShortPositions:
         TASK-012 acceptance criteria:
         - Market value calculation correct for shorts
         """
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -212,7 +211,7 @@ class TestAccountStateApplyFillPositionReversals:
 
     def test_reversal_long_to_short(self):
         """Test reversing from long to short position."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Open long 100 @ $150
@@ -230,7 +229,7 @@ class TestAccountStateApplyFillPositionReversals:
 
     def test_reversal_short_to_long(self):
         """Test reversing from short to long position."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Open short 100 @ $150
@@ -252,7 +251,7 @@ class TestAccountStateApplyFillEquityCalculation:
 
     def test_equity_with_long_position(self):
         """Test equity calculation with long position."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 100 @ $150
@@ -266,7 +265,7 @@ class TestAccountStateApplyFillEquityCalculation:
 
     def test_equity_with_short_position(self):
         """Test equity calculation with short position."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -280,7 +279,7 @@ class TestAccountStateApplyFillEquityCalculation:
 
     def test_equity_with_short_at_loss(self):
         """Test equity with short position at a loss."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 @ $150
@@ -294,7 +293,7 @@ class TestAccountStateApplyFillEquityCalculation:
 
     def test_equity_with_multiple_positions(self):
         """Test equity with both long and short positions."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Long AAPL 100 @ $150
@@ -321,7 +320,7 @@ class TestAccountStateApplyFillEdgeCases:
 
     def test_zero_quantity_delta_no_change(self):
         """Test that zero quantity delta does nothing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         cash_change = account.apply_fill("AAPL", 0.0, 150.0, datetime.now())
@@ -332,7 +331,7 @@ class TestAccountStateApplyFillEdgeCases:
 
     def test_fractional_shares(self):
         """Test fractional share positions (crypto, fractional stocks)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 0.5 BTC @ $50,000
@@ -345,7 +344,7 @@ class TestAccountStateApplyFillEdgeCases:
 
     def test_very_small_price(self):
         """Test with very small prices (penny stocks, crypto)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Buy 10,000 shares @ $0.01

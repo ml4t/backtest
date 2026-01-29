@@ -169,18 +169,47 @@ The following real-world factors are **not** simulated:
 
 ml4t-backtest has been validated against:
 
-| Framework | Trade Count | Match Rate |
-|-----------|-------------|------------|
-| VectorBT Pro | 119,000+ | 100% |
-| Backtrader | 15,000+ | 100% |
-| Zipline | 8,000+ | 100% |
+| Framework | Trade Count | Match Rate | Notes |
+|-----------|-------------|------------|-------|
+| VectorBT Pro | 119,000+ | 100% | Full feature coverage |
+| Backtrader | 119,577 | 100% | LONG positions only for risk rules |
+| Zipline | 119,577 | 100% | LONG positions only for risk rules |
+| VectorBT OSS | 114,607 | 100% | LONG positions only for risk rules |
 
-Validation covers:
+### What's Validated
+
+**Core Execution** (119k+ trades across 500 assets × 10 years):
 - Entry/exit timing
 - Fill prices
 - Position tracking
 - P&L calculations
-- Stop-loss/take-profit triggers
+- Multi-asset portfolio management
+- Cash constraints and margin
+
+**Risk Rules - LONG Positions** (Scenario tests):
+- Stop-loss triggers
+- Take-profit triggers
+- Trailing stop (close-based HWM)
+- Bracket orders
+
+### What's NOT Validated (Gaps)
+
+**SHORT Position Risk Rules** (VBT Pro only):
+- SHORT stop-loss triggers - VBT Pro validated, others untested
+- SHORT take-profit triggers - VBT Pro validated, others untested
+- SHORT trailing stop - VBT Pro validated, others untested
+- SHORT bracket orders - VBT Pro validated, others untested
+
+**Rule Combinations** (Not tested anywhere):
+- TSL + TP when both trigger same bar
+- TSL + SL when both trigger same bar
+- TSL + TP + SL (triple rule interaction)
+- Rule priority in simultaneous breach
+
+**Stress Conditions** (Limited testing):
+- Gap openings through stop levels
+- High volatility periods
+- Extended (1000+ bar) trailing stop tracking
 
 ## Recommendations
 

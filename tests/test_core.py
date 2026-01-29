@@ -388,7 +388,7 @@ class TestBroker:
 
     def test_order_rejection_insufficient_cash(self):
         """Test that orders are rejected when insufficient cash (Phase 2 validation)."""
-        broker = Broker(initial_cash=10000, account_type="cash")  # Only $10k
+        broker = Broker(initial_cash=10000, allow_short_selling=False)  # Only $10k
         broker._current_time = datetime(2024, 1, 1)
         broker._current_prices = {"AAPL": 150.0}
         broker._current_volumes = {"AAPL": 1000000}
@@ -502,7 +502,10 @@ class TestTradeRecording:
         assert len(results["trades"]) == 1
         trade = results["trades"][0]
         assert trade.bars_held >= 1
-        assert "ml_score" in trade.exit_signals
+        # Note: entry_signals/exit_signals are not Trade fields
+        # Signals are available in context during on_data, not stored on Trade
+        assert trade.symbol == "AAPL"
+        assert trade.pnl != 0  # Should have some P&L
 
 
 class TestMultiAsset:
@@ -635,8 +638,9 @@ class TestEngineFromConfig:
         strategy = BuyAndHoldStrategy("AAPL")
 
         config = BacktestConfig(
-            account_type="margin",
-            margin_requirement=0.4,
+            allow_short_selling=True,
+            allow_leverage=True,
+            initial_margin=0.4,
         )
         engine = Engine.from_config(feed, strategy, config)
         results = engine.run()
@@ -690,6 +694,7 @@ class TestRunBacktestWithConfig:
         config = BacktestConfig(
             initial_cash=50000,
             commission_model=CommissionModel.NONE,
+            slippage_model=SlippageModel.NONE,  # Must disable slippage too
         )
         results = run_backtest(prices=prices, strategy=strategy, config=config)
 

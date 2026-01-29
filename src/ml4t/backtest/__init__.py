@@ -70,7 +70,10 @@ from .config import (
     ShareType,
     SignalProcessing,
     SizingMethod,
-    TrailHwmSource,
+    StatsConfig,
+    TrailHwmSource,  # Deprecated alias for WaterMarkSource
+    TrailStopTiming,
+    WaterMarkSource,
 )
 from .config import (
     CommissionModel as CommissionModelType,
@@ -139,6 +142,7 @@ from .strategies import (
 from .strategy import Strategy
 from .types import (
     AssetClass,
+    AssetTradingStats,
     ContractSpec,
     ExecutionMode,
     ExitReason,
@@ -156,6 +160,7 @@ from .types import (
 __all__ = [
     # Types
     "AssetClass",
+    "AssetTradingStats",
     "ContractSpec",
     "OrderType",
     "OrderSide",
@@ -202,13 +207,16 @@ __all__ = [
     # Configuration
     "BacktestConfig",
     "Mode",
+    "StatsConfig",
     "DataFrequency",
     "FillTiming",
     "ExecutionPrice",
     "ShareType",
     "SizingMethod",
     "SignalProcessing",
-    "TrailHwmSource",
+    "TrailHwmSource",  # Deprecated alias for WaterMarkSource
+    "TrailStopTiming",
+    "WaterMarkSource",
     "InitialHwmSource",
     "CommissionModelType",
     "SlippageModelType",

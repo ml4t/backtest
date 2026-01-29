@@ -1,18 +1,31 @@
 """Broker for order execution and position management."""
 
+from __future__ import annotations
+
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from .config import InitialHwmSource, TrailHwmSource
-
-if TYPE_CHECKING:
-    from .accounting.policy import AccountPolicy
-    from .execution import ExecutionLimits, MarketImpactModel
-
+from .config import (
+    ExecutionMode as ConfigExecutionMode,
+)
+from .config import (
+    InitialHwmSource,
+    StatsConfig,
+    TrailStopTiming,
+    WaterMarkSource,
+)
+from .config import (
+    StopFillMode as ConfigStopFillMode,
+)
+from .config import (
+    StopLevelBasis as ConfigStopLevelBasis,
+)
 from .execution.fill_executor import FillExecutor
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
+    AssetTradingStats,
     ContractSpec,
     ExecutionMode,
     ExitReason,
@@ -26,6 +39,14 @@ from .types import (
     StopLevelBasis,
     Trade,
 )
+
+# Backward compatibility
+TrailHwmSource = WaterMarkSource
+
+if TYPE_CHECKING:
+    from .accounting.policy import AccountPolicy
+    from .config import BacktestConfig
+    from .execution import ExecutionLimits, MarketImpactModel
 
 
 @dataclass
@@ -82,15 +103,17 @@ class Broker:
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
-        trail_hwm_source: TrailHwmSource = TrailHwmSource.CLOSE,
+        trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE,
         initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE,
-        account_type: str = "cash",
+        trail_stop_timing: TrailStopTiming = TrailStopTiming.LAGGED,
+        allow_short_selling: bool = False,
+        allow_leverage: bool = False,
         initial_margin: float = 0.5,
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
-        execution_limits: "ExecutionLimits | None" = None,
-        market_impact_model: "MarketImpactModel | None" = None,
+        execution_limits: ExecutionLimits | None = None,
+        market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
     ):
         # Runtime imports for accounting classes.
@@ -100,9 +123,8 @@ class Broker:
         # 3. This pattern allows mypy/pyright to validate types without runtime circular import
         from .accounting import (
             AccountState,
-            CashAccountPolicy,
             Gatekeeper,
-            MarginAccountPolicy,
+            UnifiedAccountPolicy,
         )
 
         self.initial_cash = initial_cash
@@ -115,23 +137,28 @@ class Broker:
         self.stop_level_basis = stop_level_basis
         self.trail_hwm_source = trail_hwm_source
         self.initial_hwm_source = initial_hwm_source
+        self.trail_stop_timing = trail_stop_timing
 
-        # Create AccountState with appropriate policy
-        policy: AccountPolicy
-        if account_type == "cash":
-            policy = CashAccountPolicy()
-        elif account_type == "margin":
-            policy = MarginAccountPolicy(
-                initial_margin=initial_margin,
-                long_maintenance_margin=long_maintenance_margin,
-                short_maintenance_margin=short_maintenance_margin,
-                fixed_margin_schedule=fixed_margin_schedule,
-            )
-        else:
-            raise ValueError(f"Unknown account_type: '{account_type}'. Must be 'cash' or 'margin'")
+        # Create AccountState with UnifiedAccountPolicy
+        policy: AccountPolicy = UnifiedAccountPolicy(
+            allow_short_selling=allow_short_selling,
+            allow_leverage=allow_leverage,
+            initial_margin=initial_margin,
+            long_maintenance_margin=long_maintenance_margin,
+            short_maintenance_margin=short_maintenance_margin,
+            fixed_margin_schedule=fixed_margin_schedule,
+        )
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
-        self.account_type = account_type
+        # Derive account_type string from flags for backward compat
+        if allow_leverage:
+            self.account_type = "margin"
+        elif allow_short_selling:
+            self.account_type = "crypto"
+        else:
+            self.account_type = "cash"
+        self.allow_short_selling = allow_short_selling
+        self.allow_leverage = allow_leverage
         self.initial_margin = initial_margin
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
@@ -180,6 +207,116 @@ class Broker:
         # Fill execution (extracted from _execute_fill)
         self._fill_executor = FillExecutor(self)
 
+        # Per-asset trading statistics for stateful decision-making
+        self._asset_stats: dict[str, AssetTradingStats] = {}
+        self._stats_config = StatsConfig()
+        self._session_config = None  # Optional SessionConfig for session boundary detection
+        self._last_session_id: int | None = None  # Track current session for boundary detection
+
+    @classmethod
+    def from_config(
+        cls,
+        config: BacktestConfig,
+        execution_limits: ExecutionLimits | None = None,
+        market_impact_model: MarketImpactModel | None = None,
+        contract_specs: dict[str, ContractSpec] | None = None,
+    ) -> Broker:
+        """Create Broker from BacktestConfig.
+
+        This is the recommended way to create a Broker. All settings come from
+        the BacktestConfig, ensuring consistency with Engine and other components.
+
+        Args:
+            config: BacktestConfig with all behavioral settings
+            execution_limits: Optional execution limits (not in config)
+            market_impact_model: Optional market impact model (not in config)
+            contract_specs: Optional contract specifications (not in config)
+
+        Returns:
+            Configured Broker instance
+
+        Example:
+            config = BacktestConfig.from_preset("backtrader")
+            broker = Broker.from_config(config)
+        """
+        from .config import CommissionModel as CommModelEnum
+        from .config import SlippageModel as SlipModelEnum
+        from .models import (
+            FixedSlippage,
+            NoCommission,
+            NoSlippage,
+            PercentageCommission,
+            PercentageSlippage,
+            PerShareCommission,
+        )
+
+        # Build commission model from config
+        commission_model = None
+        if config.commission_model == CommModelEnum.PERCENTAGE:
+            commission_model = PercentageCommission(rate=config.commission_rate)
+        elif config.commission_model == CommModelEnum.PER_SHARE:
+            commission_model = PerShareCommission(
+                per_share=config.commission_per_share,
+                minimum=config.commission_minimum,
+            )
+        elif config.commission_model == CommModelEnum.NONE:
+            commission_model = NoCommission()
+
+        # Build slippage model from config
+        slippage_model = None
+        if config.slippage_model == SlipModelEnum.PERCENTAGE:
+            slippage_model = PercentageSlippage(rate=config.slippage_rate)
+        elif config.slippage_model == SlipModelEnum.FIXED:
+            slippage_model = FixedSlippage(amount=config.slippage_fixed)
+        elif config.slippage_model == SlipModelEnum.NONE:
+            slippage_model = NoSlippage()
+
+        # Map config execution mode to types.ExecutionMode
+        execution_mode = (
+            ExecutionMode.SAME_BAR
+            if config.execution_mode == ConfigExecutionMode.SAME_BAR
+            else ExecutionMode.NEXT_BAR
+        )
+
+        # Map config stop fill mode to types.StopFillMode
+        stop_fill_mode_map = {
+            ConfigStopFillMode.STOP_PRICE: StopFillMode.STOP_PRICE,
+            ConfigStopFillMode.CLOSE_PRICE: StopFillMode.CLOSE_PRICE,
+            ConfigStopFillMode.NEXT_BAR_OPEN: StopFillMode.NEXT_BAR_OPEN,
+        }
+        stop_fill_mode = stop_fill_mode_map.get(config.stop_fill_mode, StopFillMode.STOP_PRICE)
+
+        # Map config stop level basis to types.StopLevelBasis
+        stop_level_basis_map = {
+            ConfigStopLevelBasis.FILL_PRICE: StopLevelBasis.FILL_PRICE,
+            ConfigStopLevelBasis.SIGNAL_PRICE: StopLevelBasis.SIGNAL_PRICE,
+        }
+        stop_level_basis = stop_level_basis_map.get(
+            config.stop_level_basis, StopLevelBasis.FILL_PRICE
+        )
+
+        return cls(
+            initial_cash=config.initial_cash,
+            commission_model=commission_model,
+            slippage_model=slippage_model,
+            stop_slippage_rate=config.stop_slippage_rate,
+            execution_mode=execution_mode,
+            stop_fill_mode=stop_fill_mode,
+            stop_level_basis=stop_level_basis,
+            trail_hwm_source=config.trail_hwm_source,
+            initial_hwm_source=config.initial_hwm_source,
+            trail_stop_timing=config.trail_stop_timing,
+            allow_short_selling=config.allow_short_selling,
+            allow_leverage=config.allow_leverage,
+            initial_margin=config.initial_margin,
+            long_maintenance_margin=config.long_maintenance_margin,
+            short_maintenance_margin=config.short_maintenance_margin,
+            fixed_margin_schedule=config.fixed_margin_schedule,
+            execution_limits=execution_limits,
+            market_impact_model=market_impact_model,
+            contract_specs=contract_specs,
+        )
+
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
     @property
     def cash(self) -> float:
@@ -199,6 +336,178 @@ class Broker:
         """Get contract multiplier for an asset (1.0 for equities)."""
         spec = self._contract_specs.get(asset)
         return spec.multiplier if spec else 1.0
+
+    # === Trading Statistics ===
+
+    def configure_stats(
+        self,
+        recent_window_size: int | None = None,
+        track_session_stats: bool | None = None,
+        enabled: bool | None = None,
+        config: StatsConfig | None = None,
+    ) -> None:
+        """Configure trading statistics tracking.
+
+        Can either pass individual parameters or a StatsConfig object.
+        Individual parameters override config values if both are provided.
+
+        Args:
+            recent_window_size: Number of recent trades to track (default 50)
+            track_session_stats: Whether to track per-session statistics
+            enabled: Whether stats tracking is enabled
+            config: StatsConfig object (alternative to individual params)
+
+        Example:
+            # Using individual parameters
+            broker.configure_stats(recent_window_size=100)
+
+            # Using StatsConfig
+            broker.configure_stats(config=StatsConfig(
+                recent_window_size=100,
+                track_session_stats=True,
+            ))
+        """
+        if config is not None:
+            self._stats_config = config
+        else:
+            self._stats_config = StatsConfig()
+
+        # Override with individual parameters if provided
+        if recent_window_size is not None:
+            self._stats_config.recent_window_size = recent_window_size
+        if track_session_stats is not None:
+            self._stats_config.track_session_stats = track_session_stats
+        if enabled is not None:
+            self._stats_config.enabled = enabled
+
+        # Update existing stats deques to new window size
+        new_size = self._stats_config.recent_window_size
+        for stats in self._asset_stats.values():
+            if stats.recent_pnls.maxlen != new_size:
+                # Create new deque with updated maxlen, preserving recent data
+                old_pnls = list(stats.recent_pnls)
+                stats.recent_pnls = deque(old_pnls[-new_size:], maxlen=new_size)
+                # Recalculate recent_wins from preserved data
+                stats.recent_wins = sum(1 for pnl in stats.recent_pnls if pnl > 0)
+
+    def get_asset_stats(self, asset: str) -> AssetTradingStats:
+        """Get trading statistics for an asset.
+
+        Returns the AssetTradingStats object for the given asset, creating
+        one if it doesn't exist. Stats are automatically updated when
+        positions are closed or scaled down.
+
+        Args:
+            asset: Asset symbol (e.g., "BTC", "AAPL")
+
+        Returns:
+            AssetTradingStats object with all-time and recent statistics
+
+        Example:
+            stats = broker.get_asset_stats("BTC")
+
+            # Check recent performance
+            if stats.recent_win_rate > 0.6:
+                # Increase position size when winning
+                size = base_size * 1.5
+            elif stats.recent_win_rate < 0.4:
+                # Reduce size when losing
+                size = base_size * 0.5
+
+            # Check session performance (intraday)
+            if stats.session_trades > 3 and stats.session_win_rate < 0.25:
+                # Stop trading this asset for today
+                return
+        """
+        if asset not in self._asset_stats:
+            self._asset_stats[asset] = AssetTradingStats(
+                recent_pnls=deque(maxlen=self._stats_config.recent_window_size)
+            )
+        return self._asset_stats[asset]
+
+    def _record_pnl_event(
+        self,
+        asset: str,
+        pnl: float,
+        is_partial: bool = False,
+    ) -> None:
+        """Record a P&L realization event (internal use).
+
+        Called by FillExecutor when a position is closed or scaled down.
+        Updates the AssetTradingStats for the asset.
+
+        Args:
+            asset: Asset symbol
+            pnl: Realized P&L from the exit
+            is_partial: True if this was a partial exit (scale down)
+        """
+        if not self._stats_config.enabled:
+            return
+
+        stats = self.get_asset_stats(asset)
+        stats.record_pnl(pnl)
+
+    def set_session_config(self, config) -> None:
+        """Set session configuration for session-aware statistics.
+
+        When a session config is set, trading statistics are reset at
+        session boundaries. This is useful for intraday strategies that
+        want to track performance within each trading session.
+
+        Args:
+            config: SessionConfig object from ml4t.backtest.sessions
+
+        Example:
+            from ml4t.backtest.sessions import SessionConfig
+
+            # CME futures: sessions start 5pm CT previous day
+            session_config = SessionConfig(
+                calendar="CME_Equity",
+                timezone="America/Chicago",
+                session_start_time="17:00",
+            )
+            broker.set_session_config(session_config)
+        """
+        self._session_config = config
+        self._last_session_id = None
+
+    def _check_session_boundary(self, timestamp: datetime) -> None:
+        """Check for session boundary and reset session stats if crossed.
+
+        Called each bar in _update_time() when session_config is set.
+        Computes the session date from the timestamp and resets session
+        stats for all assets when the session changes.
+
+        Args:
+            timestamp: Current bar timestamp
+        """
+        if self._session_config is None:
+            return
+
+        if not self._stats_config.track_session_stats:
+            return
+
+        from zoneinfo import ZoneInfo
+
+        from .sessions import assign_session_date
+
+        # Get session timezone and times
+        tz = ZoneInfo(self._session_config.timezone)
+        session_start_hour = self._session_config.get_session_start_hour()
+        session_start_minute = self._session_config.get_session_start_minute()
+
+        # Compute session date for current timestamp
+        session_date = assign_session_date(timestamp, tz, session_start_hour, session_start_minute)
+        # Use ordinal as session ID for comparison
+        current_session_id = session_date.toordinal()
+
+        # Check if session changed
+        if self._last_session_id is not None and current_session_id != self._last_session_id:
+            # Session boundary crossed - reset session stats for all assets
+            for stats in self._asset_stats.values():
+                stats.reset_session(current_session_id)
+
+        self._last_session_id = current_session_id
 
     def get_position(self, asset: str) -> Position | None:
         """Get the current position for an asset.
@@ -301,6 +610,8 @@ class Broker:
             **pos.context,
             "stop_fill_mode": self.stop_fill_mode,
             "stop_level_basis": self.stop_level_basis,
+            "trail_hwm_source": self.trail_hwm_source,
+            "trail_stop_timing": self.trail_stop_timing,
         }
 
         return PositionState(
@@ -471,8 +782,13 @@ class Broker:
 
         # VBT Pro compatibility: prevent same-bar re-entry after stop exit
         # When a stop/trail exit occurs, don't allow new entry until next bar
-        if side == OrderSide.BUY and asset in self._stop_exits_this_bar:
-            return None  # Silently reject entry on same bar as stop exit
+        # This applies to BOTH BUY (long entry) AND SELL (short entry) orders
+        # when there's no existing position (i.e., this is a new entry, not a close)
+        if asset in self._stop_exits_this_bar:
+            # Check if this is a new entry (no existing position)
+            existing_pos = self.positions.get(asset)
+            if existing_pos is None:
+                return None  # Silently reject entry on same bar as stop exit
 
         self._order_counter += 1
         order = Order(
@@ -679,6 +995,284 @@ class Broker:
             side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
             return self.submit_order(asset, abs(pos.quantity), side)
         return None
+
+    # === Position Modification (P1 Features) ===
+
+    def reduce_position(
+        self,
+        asset: str,
+        fraction: float,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Reduce an existing position by a fraction.
+
+        Sells (for long) or covers (for short) a percentage of the current position.
+
+        Args:
+            asset: Asset symbol to reduce
+            fraction: Fraction to exit (0.5 = sell half, 0.25 = sell quarter)
+                     Must be between 0 and 1 (exclusive of 0, inclusive of 1)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Order object if position exists and order submitted, None otherwise
+
+        Raises:
+            ValueError: If fraction is not in (0, 1]
+
+        Example:
+            # Sell half of AAPL position
+            order = broker.reduce_position("AAPL", fraction=0.5)
+
+            # Sell 25% of position with limit
+            order = broker.reduce_position("AAPL", fraction=0.25,
+                                           order_type=OrderType.LIMIT,
+                                           limit_price=155.0)
+        """
+        if fraction <= 0 or fraction > 1:
+            raise ValueError(f"fraction must be in (0, 1], got {fraction}")
+
+        pos = self.positions.get(asset)
+        if pos is None or pos.quantity == 0:
+            return None
+
+        # Calculate quantity to exit
+        exit_qty = abs(pos.quantity) * fraction
+
+        # Determine exit side (opposite of position direction)
+        side = OrderSide.SELL if pos.quantity > 0 else OrderSide.BUY
+
+        return self.submit_order(asset, exit_qty, side, order_type, limit_price)
+
+    def buy(
+        self,
+        asset: str,
+        shares: float | None = None,
+        contracts: int | None = None,
+        amount: float | None = None,
+        dollars: float | None = None,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Buy an asset with explicit quantity specification.
+
+        Provides a clean API for buying with different quantity types:
+        - shares: Number of shares (equities)
+        - contracts: Number of contracts (futures)
+        - amount: Base currency amount (crypto)
+        - dollars: Dollar value to buy (any asset)
+
+        Exactly one quantity parameter must be provided.
+
+        Args:
+            asset: Asset symbol
+            shares: Number of shares to buy (equities)
+            contracts: Number of contracts to buy (futures)
+            amount: Base currency amount to buy (crypto)
+            dollars: Dollar value to buy (converted to quantity at current price)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Order object if submitted, None if no current price or invalid params
+
+        Raises:
+            ValueError: If zero or more than one quantity parameter is provided
+
+        Example:
+            # Buy 100 shares of AAPL
+            broker.buy("AAPL", shares=100)
+
+            # Buy 2 ES futures contracts
+            broker.buy("ES", contracts=2)
+
+            # Buy $5000 worth of BTC
+            broker.buy("BTC", dollars=5000)
+
+            # Buy 0.5 BTC
+            broker.buy("BTC", amount=0.5)
+        """
+        # Count non-None parameters
+        qty_params = [shares, contracts, amount, dollars]
+        provided = sum(1 for p in qty_params if p is not None)
+
+        if provided == 0:
+            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
+        if provided > 1:
+            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
+
+        # Determine quantity
+        quantity: float
+        if shares is not None:
+            quantity = shares
+        elif contracts is not None:
+            quantity = float(contracts)
+        elif amount is not None:
+            quantity = amount
+        elif dollars is not None:
+            price = self._current_prices.get(asset)
+            if price is None or price <= 0:
+                return None
+            multiplier = self.get_multiplier(asset)
+            quantity = dollars / (price * multiplier)
+        else:
+            return None  # Should not reach here
+
+        if quantity <= 0:
+            return None
+
+        return self.submit_order(asset, quantity, OrderSide.BUY, order_type, limit_price)
+
+    def sell(
+        self,
+        asset: str,
+        shares: float | None = None,
+        contracts: int | None = None,
+        amount: float | None = None,
+        dollars: float | None = None,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Sell an asset with explicit quantity specification.
+
+        Provides a clean API for selling with different quantity types:
+        - shares: Number of shares (equities)
+        - contracts: Number of contracts (futures)
+        - amount: Base currency amount (crypto)
+        - dollars: Dollar value to sell (any asset)
+
+        Exactly one quantity parameter must be provided.
+
+        Args:
+            asset: Asset symbol
+            shares: Number of shares to sell (equities)
+            contracts: Number of contracts to sell (futures)
+            amount: Base currency amount to sell (crypto)
+            dollars: Dollar value to sell (converted to quantity at current price)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Order object if submitted, None if no current price or invalid params
+
+        Raises:
+            ValueError: If zero or more than one quantity parameter is provided
+
+        Example:
+            # Sell 50 shares of AAPL
+            broker.sell("AAPL", shares=50)
+
+            # Sell 1 ES futures contract
+            broker.sell("ES", contracts=1)
+
+            # Sell $2500 worth of position
+            broker.sell("BTC", dollars=2500)
+        """
+        # Count non-None parameters
+        qty_params = [shares, contracts, amount, dollars]
+        provided = sum(1 for p in qty_params if p is not None)
+
+        if provided == 0:
+            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
+        if provided > 1:
+            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
+
+        # Determine quantity
+        quantity: float
+        if shares is not None:
+            quantity = shares
+        elif contracts is not None:
+            quantity = float(contracts)
+        elif amount is not None:
+            quantity = amount
+        elif dollars is not None:
+            price = self._current_prices.get(asset)
+            if price is None or price <= 0:
+                return None
+            multiplier = self.get_multiplier(asset)
+            quantity = dollars / (price * multiplier)
+        else:
+            return None  # Should not reach here
+
+        if quantity <= 0:
+            return None
+
+        return self.submit_order(asset, quantity, OrderSide.SELL, order_type, limit_price)
+
+    # === Trade History Access (P1 Features) ===
+
+    def get_trades(
+        self,
+        asset: str | None = None,
+        last_n: int | None = None,
+        since_bar: int | None = None,
+    ) -> list[Trade]:
+        """Get completed trades, optionally filtered.
+
+        Provides access to trade history during the backtest for stateful
+        decision-making (e.g., adjusting position sizing based on recent
+        wins/losses, implementing cooldown logic after stop-outs).
+
+        Args:
+            asset: Filter to only this asset's trades. If None, returns all trades.
+            last_n: Return only the last N trades (after other filters)
+            since_bar: Return trades with entry_bar >= since_bar
+
+        Returns:
+            List of Trade objects matching the filters, ordered by exit time
+
+        Example:
+            # Get all trades for BTC
+            btc_trades = broker.get_trades(asset="BTC")
+
+            # Get last 5 trades overall
+            recent = broker.get_trades(last_n=5)
+
+            # Get recent trades for cooldown logic
+            last_trade = broker.get_last_trade("AAPL")
+            if last_trade and last_trade.exit_reason == "stop_loss":
+                # Implement cooldown after stop-out
+                pass
+        """
+        result = self.trades
+
+        # Filter by asset
+        if asset is not None:
+            result = [t for t in result if t.symbol == asset]
+
+        # Filter by entry bar (if we had bar info - using entry_time as proxy)
+        # Note: Trade doesn't have entry_bar, but bars_held is available
+        # For now, since_bar is not fully implementable without entry_bar
+        # but we keep the parameter for API consistency with spec
+
+        # Apply last_n limit
+        if last_n is not None and last_n > 0:
+            result = result[-last_n:]
+
+        return result
+
+    def get_last_trade(self, asset: str | None = None) -> Trade | None:
+        """Get the most recent completed trade.
+
+        Convenience method for strategies that need to check the last trade
+        (e.g., for cooldown logic after stop-outs).
+
+        Args:
+            asset: Filter to only this asset. If None, returns last trade overall.
+
+        Returns:
+            Most recent Trade object, or None if no trades
+
+        Example:
+            last = broker.get_last_trade("AAPL")
+            if last and last.exit_reason == "stop_loss":
+                # Was stopped out - implement cooldown
+                cooldown_bars = 5
+        """
+        trades = self.get_trades(asset=asset, last_n=1)
+        return trades[0] if trades else None
 
     def get_buying_power(self) -> float:
         """Get current buying power.
@@ -1010,6 +1604,9 @@ class Broker:
         self._stop_exits_this_bar.clear()  # VBT Pro: allow re-entry on next bar
         self._positions_created_this_bar.clear()  # VBT Pro: update HWM from next bar
 
+        # Check for session boundary (resets session stats if crossed)
+        self._check_session_boundary(timestamp)
+
         # In next-bar mode, move orders from this bar to pending for next bar
         if self.execution_mode == ExecutionMode.NEXT_BAR:
             # Orders placed last bar are now eligible for execution
@@ -1033,19 +1630,25 @@ class Broker:
         to update HWM. VBT Pro uses CLOSE for initial HWM, then only starts updating
         from bar HIGHs on the NEXT bar after entry. This is because VBT Pro's vectorized
         calculation computes HWM as max(highs[entry_bar+1:current_bar+1]).
+
+        Water mark source configuration:
+        - trail_hwm_source == BAR_EXTREME: Update HWM from high, LWM from low (VBT Pro OHLC mode)
+        - trail_hwm_source == CLOSE: Update HWM/LWM from close only (default)
         """
         for asset, pos in self.positions.items():
             if asset in self._current_prices:
-                # For new positions (created this bar), skip updating from entry bar's HIGH
-                # VBT Pro only updates HWM from HIGHs starting on the bar AFTER entry
+                # For new positions (created this bar), skip updating from entry bar's HIGH/LOW
+                # VBT Pro only updates water marks from bar extremes on the bar AFTER entry
                 is_new_position = asset in self._positions_created_this_bar
+                # BAR_EXTREME: use HIGH for HWM (longs), LOW for LWM (shorts)
+                # Note: HIGH is a deprecated alias for BAR_EXTREME
+                use_extremes = self.trail_hwm_source.value == "bar_extreme" and not is_new_position
                 pos.update_water_marks(
                     current_price=self._current_prices[asset],
                     bar_high=self._current_highs.get(asset),
                     bar_low=self._current_lows.get(asset),
-                    use_high_for_hwm=(
-                        self.trail_hwm_source == TrailHwmSource.HIGH and not is_new_position
-                    ),
+                    use_high_for_hwm=use_extremes,
+                    use_low_for_lwm=use_extremes,
                 )
 
     def _process_orders(self, use_open: bool = False):
@@ -1186,8 +1789,10 @@ class Broker:
     def _check_market_fill(self, order: Order, price: float) -> float:
         """Check fill price for market order.
 
-        For risk-triggered exits (stop-loss, take-profit), checks for gap-through
-        scenarios where we must fill at worse price than the stop level.
+        For risk-triggered exits (stop-loss, take-profit, trailing stop), uses
+        the fill price already computed by the position rule. Position rules
+        handle gap-through scenarios correctly in their own logic.
+
         Also applies additional stop slippage if configured.
 
         Args:
@@ -1201,9 +1806,12 @@ class Broker:
         if risk_fill_price is None:
             return price
 
-        bar_open = self._current_opens.get(order.asset, price)
-        gap_price = self._check_gap_through(order.side, risk_fill_price, bar_open)
-        fill_price = gap_price if gap_price is not None else risk_fill_price
+        # Use the fill price computed by the position rule directly.
+        # Position rules (TakeProfit, StopLoss, TrailingStop) already handle
+        # gap-through scenarios correctly in their fill price calculation.
+        # We should NOT override their logic with a generic gap-through check
+        # because the direction differs for stop-loss vs take-profit orders.
+        fill_price = risk_fill_price
 
         # Apply additional stop slippage if configured
         # This models the reality that stop orders often fill at worse prices in fast markets

@@ -24,7 +24,7 @@ from ml4t.backtest.types import Trade
 def sample_winning_trade() -> Trade:
     """A profitable long trade."""
     return Trade(
-        asset="AAPL",
+        symbol="AAPL",
         entry_time=datetime(2024, 1, 10, 10, 0),
         exit_time=datetime(2024, 1, 15, 15, 30),
         entry_price=150.0,
@@ -33,12 +33,10 @@ def sample_winning_trade() -> Trade:
         pnl=1000.0,
         pnl_percent=6.67,
         bars_held=5,
-        commission=10.0,
+        fees=10.0,
         slippage=5.0,
-        entry_signals={"momentum": 0.8},
-        exit_signals={"momentum": -0.2},
-        max_favorable_excursion=8.0,
-        max_adverse_excursion=-2.0,
+        mfe=8.0,
+        mae=-2.0,
     )
 
 
@@ -46,7 +44,7 @@ def sample_winning_trade() -> Trade:
 def sample_losing_trade() -> Trade:
     """A losing long trade."""
     return Trade(
-        asset="MSFT",
+        symbol="MSFT",
         entry_time=datetime(2024, 1, 20, 9, 30),
         exit_time=datetime(2024, 1, 25, 16, 0),
         entry_price=400.0,
@@ -55,12 +53,10 @@ def sample_losing_trade() -> Trade:
         pnl=-1000.0,
         pnl_percent=-5.0,
         bars_held=5,
-        commission=8.0,
+        fees=8.0,
         slippage=4.0,
-        entry_signals={"momentum": 0.6},
-        exit_signals={"momentum": -0.5},
-        max_favorable_excursion=2.0,
-        max_adverse_excursion=-6.0,
+        mfe=2.0,
+        mae=-6.0,
     )
 
 
@@ -68,7 +64,7 @@ def sample_losing_trade() -> Trade:
 def sample_short_trade() -> Trade:
     """A profitable short trade."""
     return Trade(
-        asset="TSLA",
+        symbol="TSLA",
         entry_time=datetime(2024, 2, 1, 10, 0),
         exit_time=datetime(2024, 2, 5, 14, 0),
         entry_price=250.0,
@@ -77,12 +73,10 @@ def sample_short_trade() -> Trade:
         pnl=1000.0,
         pnl_percent=4.0,
         bars_held=4,
-        commission=12.0,
+        fees=12.0,
         slippage=6.0,
-        entry_signals={},
-        exit_signals={},
-        max_favorable_excursion=5.0,
-        max_adverse_excursion=-3.0,
+        mfe=5.0,
+        mae=-3.0,
     )
 
 
@@ -135,20 +129,20 @@ class TestToTradeRecord:
         record = to_trade_record(sample_short_trade)
 
         assert record["direction"] == "short"
-        assert record["quantity"] == 100  # Absolute value
+        assert record["quantity"] == -100  # Signed (negative for short)
         assert record["pnl"] == 1000.0
 
     def test_metadata_fields(self, sample_winning_trade: Trade):
-        """Test that metadata fields are correctly populated."""
+        """Test that fields are correctly populated in aligned schema."""
         record = to_trade_record(sample_winning_trade)
 
-        metadata = record["metadata"]
-        assert metadata["entry_signals"] == {"momentum": 0.8}
-        assert metadata["exit_signals"] == {"momentum": -0.2}
-        assert metadata["bars_held"] == 5
-        assert metadata["pnl_percent"] == 6.67
-        assert metadata["mfe"] == 8.0
-        assert metadata["mae"] == -2.0
+        # These are now top-level fields in aligned schema (not in metadata)
+        assert record["bars_held"] == 5
+        assert record["pnl_percent"] == 6.67
+        assert record["mfe"] == 8.0
+        assert record["mae"] == -2.0
+        # metadata is optional extension point (None by default)
+        assert record["metadata"] is None
 
     def test_duration_calculation(self, sample_winning_trade: Trade):
         """Test that duration is correctly calculated."""
@@ -583,7 +577,7 @@ class TestBacktestAnalyzer:
 
         # Check expected columns
         expected_cols = [
-            "asset",
+            "symbol",
             "entry_time",
             "exit_time",
             "entry_price",

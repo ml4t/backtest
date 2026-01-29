@@ -180,7 +180,7 @@ def benchmark_ml4t(asset_data: dict, entries: np.ndarray, exits: np.ndarray, dat
         small_feed,
         BenchmarkStrategy(),
         initial_cash=100_000_000.0,  # Match main run
-        account_type="cash",
+        allow_short_selling=False,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.SAME_BAR,
@@ -196,7 +196,7 @@ def benchmark_ml4t(asset_data: dict, entries: np.ndarray, exits: np.ndarray, dat
         feed,
         BenchmarkStrategy(),
         initial_cash=100_000_000.0,  # $100M to handle 500 assets
-        account_type="cash",
+        allow_short_selling=False,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.SAME_BAR,

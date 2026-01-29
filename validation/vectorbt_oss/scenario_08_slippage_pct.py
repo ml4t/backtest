@@ -91,7 +91,7 @@ def run_ml4t_backtest(prices_df, entries, exits):
 
     engine = Engine(
         DataFeed(prices_df=prices_pl, signals_df=signals_pl),
-        SignalStrategy(), initial_cash=100_000.0, account_type="cash",
+        SignalStrategy(), initial_cash=100_000.0, allow_short_selling=False,
         commission_model=NoCommission(), slippage_model=PercentageSlippage(rate=SLIPPAGE_RATE),
         execution_mode=ExecutionMode.SAME_BAR,
     )

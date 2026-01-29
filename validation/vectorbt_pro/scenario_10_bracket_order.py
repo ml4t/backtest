@@ -190,7 +190,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
         feed,
         BracketOrderStrategy(),
         initial_cash=100_000.0,
-        account_type="cash",
+        allow_short_selling=False,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.SAME_BAR,

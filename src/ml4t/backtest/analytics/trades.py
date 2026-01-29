@@ -116,9 +116,14 @@ class TradeAnalyzer:
         return float(np.mean(bars)) if bars else 0.0
 
     @property
+    def total_fees(self) -> float:
+        """Total transaction fees paid across all trades."""
+        return sum(t.fees for t in self.trades)
+
+    @property
     def total_commission(self) -> float:
-        """Total commission paid across all trades."""
-        return sum(t.commission for t in self.trades)
+        """Total commission paid across all trades (alias for total_fees)."""
+        return self.total_fees
 
     @property
     def total_slippage(self) -> float:
@@ -130,10 +135,14 @@ class TradeAnalyzer:
         filtered = [t for t in self.trades if t.side == side]
         return TradeAnalyzer(filtered)
 
-    def by_asset(self, asset: str) -> "TradeAnalyzer":
-        """Filter trades by asset."""
-        filtered = [t for t in self.trades if t.asset == asset]
+    def by_symbol(self, symbol: str) -> "TradeAnalyzer":
+        """Filter trades by symbol."""
+        filtered = [t for t in self.trades if t.symbol == symbol]
         return TradeAnalyzer(filtered)
+
+    def by_asset(self, asset: str) -> "TradeAnalyzer":
+        """Filter trades by asset (alias for by_symbol)."""
+        return self.by_symbol(asset)
 
     # MFE/MAE Analysis Methods
 
@@ -142,7 +151,7 @@ class TradeAnalyzer:
         """Average maximum favorable excursion across trades."""
         if not self.trades:
             return 0.0
-        mfes = [t.max_favorable_excursion for t in self.trades]
+        mfes = [t.mfe for t in self.trades]
         return float(np.mean(mfes))
 
     @property
@@ -150,7 +159,7 @@ class TradeAnalyzer:
         """Average maximum adverse excursion across trades."""
         if not self.trades:
             return 0.0
-        maes = [t.max_adverse_excursion for t in self.trades]
+        maes = [t.mae for t in self.trades]
         return float(np.mean(maes))
 
     @property
@@ -164,8 +173,8 @@ class TradeAnalyzer:
             return 0.0
         ratios = []
         for t in self.trades:
-            if t.max_favorable_excursion > 0:
-                ratios.append(t.pnl_percent / t.max_favorable_excursion)
+            if t.mfe > 0:
+                ratios.append(t.pnl_percent / t.mfe)
         return float(np.mean(ratios)) if ratios else 0.0
 
     @property
@@ -179,9 +188,9 @@ class TradeAnalyzer:
             return 0.0
         ratios = []
         for t in self.trades:
-            if t.max_adverse_excursion < 0 and t.pnl_percent < 0:
+            if t.mae < 0 and t.pnl_percent < 0:
                 # Both negative: MAE was -10%, final was -5% = recovered 50%
-                recovery = (t.max_adverse_excursion - t.pnl_percent) / abs(t.max_adverse_excursion)
+                recovery = (t.mae - t.pnl_percent) / abs(t.mae)
                 ratios.append(recovery)
         return float(np.mean(ratios)) if ratios else 0.0
 
@@ -249,8 +258,8 @@ class MAEMFEAnalyzer:
 
     def __post_init__(self):
         if self.trades:
-            self._maes = np.array([t.max_adverse_excursion for t in self.trades])
-            self._mfes = np.array([t.max_favorable_excursion for t in self.trades])
+            self._maes = np.array([t.mae for t in self.trades])
+            self._mfes = np.array([t.mfe for t in self.trades])
         else:
             self._maes = np.array([])
             self._mfes = np.array([])
@@ -343,8 +352,8 @@ class MAEMFEAnalyzer:
             return 0.0
         efficiencies = []
         for t in self.trades:
-            if t.max_favorable_excursion > 0:
-                efficiencies.append(t.pnl_percent / t.max_favorable_excursion)
+            if t.mfe > 0:
+                efficiencies.append(t.pnl_percent / t.mfe)
         return float(np.mean(efficiencies)) if efficiencies else 0.0
 
     # --- Optimization Suggestions ---
@@ -367,7 +376,7 @@ class MAEMFEAnalyzer:
             return 0.0
 
         # Get MAE for winning trades only
-        winner_maes = np.array([t.max_adverse_excursion for t in self.trades if t.pnl > 0])
+        winner_maes = np.array([t.mae for t in self.trades if t.pnl > 0])
         if len(winner_maes) == 0:
             return self.mae_percentile(100 - percentile)
 

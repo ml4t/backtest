@@ -100,18 +100,30 @@ class DataFrequency(str, Enum):
     IRREGULAR = "irregular"  # Trade bars, tick aggregations (no fixed frequency)
 
 
-class TrailHwmSource(str, Enum):
-    """Source for trailing stop high-water mark UPDATE calculation.
+class WaterMarkSource(str, Enum):
+    """Source for water mark updates in trailing stops.
 
-    Controls which price is used to update HWM on each bar AFTER entry:
-    - CLOSE: Use close prices for HWM updates (default, matches backtest-nb/rs)
-    - HIGH: Use high prices for HWM updates (VBT Pro with OHLC data)
+    Controls which price is used to update water marks on each bar AFTER entry.
+    Works for both LONG (High Water Mark) and SHORT (Low Water Mark) positions:
 
-    Note: Initial HWM on entry bar is controlled by InitialHwmSource.
+    - CLOSE: Use close prices for water mark updates (default, simpler behavior)
+    - BAR_EXTREME: Use HIGH for HWM (longs), LOW for LWM (shorts) - VBT Pro OHLC mode
+
+    This is direction-agnostic and works identically for long-only, short-only,
+    or combined long-short strategies.
+
+    Note: Initial water mark on entry bar is controlled by InitialHwmSource.
     """
 
-    CLOSE = "close"  # Use close prices for HWM updates (default)
-    HIGH = "high"  # Use high prices for HWM updates (VBT Pro with OHLC)
+    CLOSE = "close"  # Use close prices for water mark updates (default)
+    BAR_EXTREME = "bar_extreme"  # Use HIGH for HWM, LOW for LWM (VBT Pro with OHLC)
+
+    # Deprecated alias for backward compatibility
+    HIGH = "bar_extreme"  # Deprecated: use BAR_EXTREME instead
+
+
+# Backward compatibility alias
+TrailHwmSource = WaterMarkSource
 
 
 class InitialHwmSource(str, Enum):
@@ -132,6 +144,104 @@ class InitialHwmSource(str, Enum):
     BAR_HIGH = "bar_high"  # Use bar's high (VBT Pro with OHLC)
 
 
+class TrailStopTiming(str, Enum):
+    """Timing of water mark update relative to trailing stop check.
+
+    Controls when water marks are updated for trailing stop calculation:
+
+    LAGGED mode (formerly END_OF_BAR):
+        1. Check stop using HWM/LWM from PREVIOUS bar
+        2. Update HWM/LWM at end of current bar
+        ⚠️ This causes 1-bar delay in stop triggers vs VBT Pro
+
+    INTRABAR mode:
+        1. Compute live water mark: max/min(previous, current_bar_extreme)
+        2. Check stop using live water mark against HIGH/LOW
+        3. If triggered, fill per StopFillMode configuration
+        4. Update water mark at end of bar
+        ⚠️ Too aggressive - triggers on HIGH when VBT Pro only checks CLOSE
+
+    VBT_PRO mode (true VBT Pro compatible, two-pass algorithm):
+        1. First pass: Check stop using LAGGED water mark against HIGH/LOW
+        2. If first pass doesn't trigger, update water mark from current bar extreme
+        3. Second pass: Check stop using UPDATED water mark against CLOSE only
+        4. This matches VBT Pro's exact algorithm where the second pass can only
+           use CLOSE (can_use_ohlc=False in VBT Pro source code)
+
+    VBT_PRO mode for SHORT positions:
+        Pass 1: LWM from previous bar, check if HIGH >= stop
+        Pass 2: Update LWM from bar_low, check if CLOSE >= stop (not HIGH!)
+
+    VBT_PRO mode for LONG positions:
+        Pass 1: HWM from previous bar, check if LOW <= stop
+        Pass 2: Update HWM from bar_high, check if CLOSE <= stop (not LOW!)
+    """
+
+    LAGGED = "lagged"  # Use previous bar's water mark (1-bar lag)
+    INTRABAR = "intrabar"  # Update water mark before check, triggers on HIGH/LOW
+    VBT_PRO = "vbt_pro"  # Two-pass: LAGGED check, then INTRABAR check using CLOSE only
+
+
+class ExecutionMode(str, Enum):
+    """Order execution timing mode.
+
+    Controls when orders are eligible for execution relative to signal generation.
+    """
+
+    SAME_BAR = "same_bar"  # Fill on same bar as order submission
+    NEXT_BAR = "next_bar"  # Fill on next bar after order submission
+
+
+@dataclass
+class StatsConfig:
+    """Configuration for per-asset trading statistics tracking.
+
+    Controls how AssetTradingStats are computed and managed during backtesting.
+
+    Attributes:
+        recent_window_size: Number of recent trades to track (default 50).
+            Larger windows provide more stable statistics but slower response
+            to regime changes. Recommended: 3x average holding period in bars.
+        track_session_stats: Whether to track per-session statistics.
+            Requires session configuration to detect session boundaries.
+        enabled: Whether stats tracking is enabled. Disable for maximum
+            performance when stats are not needed.
+
+    Example:
+        # Configure stats for a strategy with ~3 day average holding period
+        config = StatsConfig(
+            recent_window_size=100,  # ~1 month of trades
+            track_session_stats=True,
+        )
+        broker.configure_stats(config)
+    """
+
+    recent_window_size: int = 50
+    track_session_stats: bool = True
+    enabled: bool = True
+
+
+class StopFillMode(str, Enum):
+    """Price used for stop order fills.
+
+    Controls what price is used when a stop order triggers.
+    """
+
+    STOP_PRICE = "stop_price"  # Fill at stop price (if not gapped)
+    CLOSE_PRICE = "close_price"  # Fill at bar close (conservative)
+    NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open
+
+
+class StopLevelBasis(str, Enum):
+    """Reference price for calculating stop levels.
+
+    Controls what price the stop percentage/amount is applied to.
+    """
+
+    FILL_PRICE = "fill_price"  # Use actual fill price (most accurate)
+    SIGNAL_PRICE = "signal_price"  # Use price at signal time (Backtrader style)
+
+
 @dataclass
 class BacktestConfig:
     """
@@ -139,11 +249,30 @@ class BacktestConfig:
 
     All behavioral differences between frameworks are captured here.
     Load presets to match specific frameworks exactly.
+
+    This is the single source of truth for all backtest settings.
+    Broker and Engine are configured entirely from this dataclass.
     """
+
+    # === Account Type (replaces class hierarchy) ===
+    allow_short_selling: bool = False  # True for margin/crypto
+    allow_leverage: bool = False  # True for margin only
+    initial_margin: float = 0.5  # Only used if allow_leverage=True (Reg T = 0.5)
+    long_maintenance_margin: float = 0.25  # Reg T standard for longs
+    short_maintenance_margin: float = 0.30  # Reg T standard for shorts (higher!)
+    fixed_margin_schedule: dict[str, tuple[float, float]] | None = None  # For futures
 
     # === Execution Timing ===
     fill_timing: FillTiming = FillTiming.NEXT_BAR_OPEN
     execution_price: ExecutionPrice = ExecutionPrice.CLOSE
+    execution_mode: ExecutionMode = ExecutionMode.SAME_BAR  # Order execution timing
+
+    # === Stop Configuration ===
+    stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE
+    stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE
+    trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE
+    initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE
+    trail_stop_timing: TrailStopTiming = TrailStopTiming.LAGGED
 
     def validate(self, warn: bool = True) -> list[str]:
         """Validate configuration and return warnings for edge cases.
@@ -190,18 +319,15 @@ class BacktestConfig:
                 "High concentration increases single-stock risk."
             )
 
-        # Margin account with cash settings
-        if self.account_type == "margin" and self.allow_negative_cash:
+        # Leverage account with negative cash settings
+        if self.allow_leverage and self.allow_negative_cash:
             issues.append(
-                "Margin account with allow_negative_cash may cause unrealistic leverage. "
+                "Leverage account with allow_negative_cash may cause unrealistic leverage. "
                 "Margin requirements are enforced separately from cash balance."
             )
 
         # Volume-based slippage without partial fills
-        if (
-            self.slippage_model == SlippageModel.VOLUME_BASED
-            and not self.partial_fills_allowed
-        ):
+        if self.slippage_model == SlippageModel.VOLUME_BASED and not self.partial_fills_allowed:
             issues.append(
                 "Volume-based slippage without partial_fills_allowed may cause "
                 "orders to be rejected in low-volume conditions."
@@ -222,12 +348,56 @@ class BacktestConfig:
                 "Set share_type=INTEGER for most accurate simulation."
             )
 
+        # Margin parameter validation
+        if self.allow_leverage:
+            if not 0.0 < self.initial_margin <= 1.0:
+                issues.append(f"initial_margin ({self.initial_margin}) must be in (0.0, 1.0]")
+            if not 0.0 < self.long_maintenance_margin <= 1.0:
+                issues.append(
+                    f"long_maintenance_margin ({self.long_maintenance_margin}) must be in (0.0, 1.0]"
+                )
+            if not 0.0 < self.short_maintenance_margin <= 1.0:
+                issues.append(
+                    f"short_maintenance_margin ({self.short_maintenance_margin}) must be in (0.0, 1.0]"
+                )
+            if self.long_maintenance_margin >= self.initial_margin:
+                issues.append(
+                    f"long_maintenance_margin ({self.long_maintenance_margin}) must be < "
+                    f"initial_margin ({self.initial_margin})"
+                )
+            if self.short_maintenance_margin >= self.initial_margin:
+                issues.append(
+                    f"short_maintenance_margin ({self.short_maintenance_margin}) must be < "
+                    f"initial_margin ({self.initial_margin})"
+                )
+
         # Emit warnings if requested
         if warn and issues:
             for msg in issues:
                 _warnings.warn(msg, UserWarning, stacklevel=2)
 
         return issues
+
+    def get_effective_account_settings(self) -> tuple[bool, bool]:
+        """Get account settings as a tuple.
+
+        Returns:
+            Tuple of (allow_short_selling, allow_leverage)
+        """
+        return self.allow_short_selling, self.allow_leverage
+
+    def get_effective_account_type(self) -> str:
+        """Get account type string based on current settings.
+
+        Returns:
+            "cash", "crypto", or "margin" based on flags.
+        """
+        if self.allow_leverage:
+            return "margin"
+        elif self.allow_short_selling:
+            return "crypto"
+        else:
+            return "cash"
 
     # === Position Sizing ===
     share_type: ShareType = ShareType.FRACTIONAL
@@ -260,9 +430,7 @@ class BacktestConfig:
     reject_on_insufficient_cash: bool = True
     partial_fills_allowed: bool = False
 
-    # === Account Type ===
-    account_type: str = "cash"  # "cash" or "margin"
-    margin_requirement: float = 0.5  # 50% margin requirement
+    # Note: margin_requirement removed - use initial_margin instead
 
     # === Calendar & Timezone ===
     calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
@@ -270,18 +438,31 @@ class BacktestConfig:
     data_frequency: DataFrequency = DataFrequency.DAILY  # Data frequency
     enforce_sessions: bool = False  # Skip bars outside trading sessions (requires calendar)
 
-    # === Trailing Stop Configuration ===
-    trail_hwm_source: TrailHwmSource = TrailHwmSource.CLOSE  # HWM source for trailing stop
-
     # === Metadata ===
     preset_name: str | None = None  # Name of preset this was loaded from
 
     def to_dict(self) -> dict:
         """Convert config to dictionary for serialization."""
         return {
+            "account": {
+                "allow_short_selling": self.allow_short_selling,
+                "allow_leverage": self.allow_leverage,
+                "initial_margin": self.initial_margin,
+                "long_maintenance_margin": self.long_maintenance_margin,
+                "short_maintenance_margin": self.short_maintenance_margin,
+                "fixed_margin_schedule": self.fixed_margin_schedule,
+            },
             "execution": {
                 "fill_timing": self.fill_timing.value,
                 "execution_price": self.execution_price.value,
+                "execution_mode": self.execution_mode.value,
+            },
+            "stops": {
+                "stop_fill_mode": self.stop_fill_mode.value,
+                "stop_level_basis": self.stop_level_basis.value,
+                "trail_hwm_source": self.trail_hwm_source.value,
+                "initial_hwm_source": self.initial_hwm_source.value,
+                "trail_stop_timing": self.trail_stop_timing.value,
             },
             "position_sizing": {
                 "share_type": self.share_type.value,
@@ -314,28 +495,63 @@ class BacktestConfig:
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
                 "partial_fills_allowed": self.partial_fills_allowed,
             },
-            "account": {
-                "type": self.account_type,
-                "margin_requirement": self.margin_requirement,
-            },
         }
 
     @classmethod
     def from_dict(cls, data: dict, preset_name: str | None = None) -> BacktestConfig:
         """Create config from dictionary."""
+        acct_cfg = data.get("account", {})
         exec_cfg = data.get("execution", {})
+        stops_cfg = data.get("stops", {})
         sizing_cfg = data.get("position_sizing", {})
         signal_cfg = data.get("signals", {})
         comm_cfg = data.get("commission", {})
         slip_cfg = data.get("slippage", {})
         cash_cfg = data.get("cash", {})
         order_cfg = data.get("orders", {})
-        acct_cfg = data.get("account", {})
+
+        # Handle legacy account type for migration
+        legacy_type = acct_cfg.get("type")
+        legacy_margin_req = acct_cfg.get("margin_requirement")
+
+        # Determine account settings from new or legacy fields
+        if "allow_short_selling" in acct_cfg:
+            # New format
+            allow_short_selling = acct_cfg.get("allow_short_selling", False)
+            allow_leverage = acct_cfg.get("allow_leverage", False)
+        elif legacy_type is not None:
+            # Convert legacy format to new flags
+            if legacy_type == "cash":
+                allow_short_selling, allow_leverage = False, False
+            elif legacy_type == "crypto":
+                allow_short_selling, allow_leverage = True, False
+            elif legacy_type == "margin":
+                allow_short_selling, allow_leverage = True, True
+            else:
+                raise ValueError(f"Unknown account type: '{legacy_type}'")
+        else:
+            # Default
+            allow_short_selling = False
+            allow_leverage = False
 
         return cls(
+            # Account
+            allow_short_selling=allow_short_selling,
+            allow_leverage=allow_leverage,
+            initial_margin=acct_cfg.get("initial_margin", legacy_margin_req or 0.5),
+            long_maintenance_margin=acct_cfg.get("long_maintenance_margin", 0.25),
+            short_maintenance_margin=acct_cfg.get("short_maintenance_margin", 0.30),
+            fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
             # Execution
             fill_timing=FillTiming(exec_cfg.get("fill_timing", "next_bar_open")),
             execution_price=ExecutionPrice(exec_cfg.get("execution_price", "close")),
+            execution_mode=ExecutionMode(exec_cfg.get("execution_mode", "same_bar")),
+            # Stops
+            stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
+            stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),
+            trail_hwm_source=WaterMarkSource(stops_cfg.get("trail_hwm_source", "close")),
+            initial_hwm_source=InitialHwmSource(stops_cfg.get("initial_hwm_source", "fill_price")),
+            trail_stop_timing=TrailStopTiming(stops_cfg.get("trail_stop_timing", "lagged")),
             # Sizing
             share_type=ShareType(sizing_cfg.get("share_type", "fractional")),
             sizing_method=SizingMethod(sizing_cfg.get("sizing_method", "percent_of_portfolio")),
@@ -363,9 +579,6 @@ class BacktestConfig:
             # Orders
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
-            # Account
-            account_type=acct_cfg.get("type", "cash"),
-            margin_requirement=acct_cfg.get("margin_requirement", 0.5),
             # Metadata
             preset_name=preset_name,
         )
@@ -416,17 +629,30 @@ class BacktestConfig:
     def _default_preset(cls) -> BacktestConfig:
         """Default configuration - balanced between realism and ease of use."""
         return cls(
+            # Account: cash-like (no shorts, no leverage)
+            allow_short_selling=False,
+            allow_leverage=False,
+            # Execution
             fill_timing=FillTiming.NEXT_BAR_OPEN,
             execution_price=ExecutionPrice.OPEN,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            # Stops
+            stop_fill_mode=StopFillMode.STOP_PRICE,
+            stop_level_basis=StopLevelBasis.FILL_PRICE,
+            trail_hwm_source=WaterMarkSource.CLOSE,
+            trail_stop_timing=TrailStopTiming.LAGGED,
+            # Sizing
             share_type=ShareType.FRACTIONAL,
             sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
+            # Costs
             commission_model=CommissionModel.PERCENTAGE,
             commission_rate=0.001,
             slippage_model=SlippageModel.PERCENTAGE,
             slippage_rate=0.001,
+            # Cash
             initial_cash=100000.0,
             allow_negative_cash=False,
             cash_buffer_pct=0.0,
@@ -444,19 +670,37 @@ class BacktestConfig:
         - Next-bar execution (COO disabled by default)
         - Check position state before acting
         - Percentage commission
+        - Margin account (shorts and leverage allowed)
+        - Stop level from signal price (not fill price)
         """
         return cls(
+            # Account: margin (backtrader allows shorts and leverage)
+            allow_short_selling=True,
+            allow_leverage=True,
+            initial_margin=0.5,
+            long_maintenance_margin=0.25,
+            short_maintenance_margin=0.30,
+            # Execution
             fill_timing=FillTiming.NEXT_BAR_OPEN,
             execution_price=ExecutionPrice.OPEN,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            # Stops: Backtrader calculates stops from signal price
+            stop_fill_mode=StopFillMode.STOP_PRICE,
+            stop_level_basis=StopLevelBasis.SIGNAL_PRICE,  # Key Backtrader behavior!
+            trail_hwm_source=WaterMarkSource.CLOSE,
+            trail_stop_timing=TrailStopTiming.LAGGED,
+            # Sizing
             share_type=ShareType.INTEGER,  # Key difference!
             sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
+            # Costs
             commission_model=CommissionModel.PERCENTAGE,
             commission_rate=0.001,
             slippage_model=SlippageModel.PERCENTAGE,
             slippage_rate=0.001,
+            # Cash
             initial_cash=100000.0,
             allow_negative_cash=False,
             cash_buffer_pct=0.0,
@@ -467,26 +711,43 @@ class BacktestConfig:
     @classmethod
     def _vectorbt_preset(cls) -> BacktestConfig:
         """
-        Match VectorBT's default behavior.
+        Match VectorBT Pro's default behavior.
 
         Key characteristics:
         - FRACTIONAL shares
         - Same-bar execution (vectorized)
         - Process ALL signals (no position state check)
         - Percentage fees
+        - Shorts allowed (crypto-like), no leverage
+        - Intrabar trailing stop timing (live HWM updates)
+        - HWM from bar high (not close)
         """
         return cls(
+            # Account: crypto-like (shorts OK, no leverage)
+            allow_short_selling=True,
+            allow_leverage=False,
+            # Execution
             fill_timing=FillTiming.SAME_BAR,  # Vectorized = same bar
             execution_price=ExecutionPrice.CLOSE,
+            execution_mode=ExecutionMode.SAME_BAR,
+            # Stops: VBT Pro uses INTRABAR timing with HIGH for HWM
+            stop_fill_mode=StopFillMode.STOP_PRICE,
+            stop_level_basis=StopLevelBasis.FILL_PRICE,
+            trail_hwm_source=WaterMarkSource.BAR_EXTREME,  # VBT Pro with OHLC!
+            initial_hwm_source=InitialHwmSource.BAR_HIGH,  # VBT Pro uses bar high
+            trail_stop_timing=TrailStopTiming.INTRABAR,  # Live HWM updates!
+            # Sizing
             share_type=ShareType.FRACTIONAL,
             sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.PROCESS_ALL,  # Key difference!
-            accumulate_positions=False,  # Use accumulate=False
-            commission_model=CommissionModel.PERCENTAGE,
-            commission_rate=0.001,
-            slippage_model=SlippageModel.PERCENTAGE,
-            slippage_rate=0.001,
+            accumulate_positions=False,
+            # Costs: often zero for quick prototyping
+            commission_model=CommissionModel.NONE,
+            commission_rate=0.0,
+            slippage_model=SlippageModel.NONE,
+            slippage_rate=0.0,
+            # Cash
             initial_cash=100000.0,
             allow_negative_cash=False,
             cash_buffer_pct=0.0,
@@ -504,21 +765,35 @@ class BacktestConfig:
         - Integer shares
         - Per-share commission (IB-style)
         - Volume-based slippage
+        - Cash account (no shorts by default)
         """
         return cls(
+            # Account: cash (Zipline is conservative by default)
+            allow_short_selling=False,
+            allow_leverage=False,
+            # Execution
             fill_timing=FillTiming.NEXT_BAR_OPEN,
             execution_price=ExecutionPrice.OPEN,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            # Stops
+            stop_fill_mode=StopFillMode.STOP_PRICE,
+            stop_level_basis=StopLevelBasis.FILL_PRICE,
+            trail_hwm_source=WaterMarkSource.CLOSE,
+            trail_stop_timing=TrailStopTiming.LAGGED,
+            # Sizing
             share_type=ShareType.INTEGER,
             sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
+            # Costs: IB-style
             commission_model=CommissionModel.PER_SHARE,  # Zipline uses per-share
             commission_rate=0.0,
             commission_per_share=0.005,  # $0.005 per share (IB-style)
             commission_minimum=1.0,  # $1 minimum
             slippage_model=SlippageModel.VOLUME_BASED,  # Key difference!
             slippage_rate=0.1,  # 10% of bar volume
+            # Cash
             initial_cash=100000.0,
             allow_negative_cash=False,
             cash_buffer_pct=0.0,
@@ -537,20 +812,34 @@ class BacktestConfig:
         - Higher costs (more conservative)
         - Additional stop slippage (gaps hurt in fast markets)
         - Cash buffer (margin of safety)
+        - Cash account (most conservative)
         """
         return cls(
+            # Account: cash (most conservative)
+            allow_short_selling=False,
+            allow_leverage=False,
+            # Execution
             fill_timing=FillTiming.NEXT_BAR_OPEN,
             execution_price=ExecutionPrice.OPEN,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            # Stops: realistic
+            stop_fill_mode=StopFillMode.NEXT_BAR_OPEN,  # Conservative: fill at open
+            stop_level_basis=StopLevelBasis.FILL_PRICE,
+            trail_hwm_source=WaterMarkSource.CLOSE,
+            trail_stop_timing=TrailStopTiming.LAGGED,
+            # Sizing
             share_type=ShareType.INTEGER,
             sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.05,  # Smaller positions
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
+            # Costs: higher for realism
             commission_model=CommissionModel.PERCENTAGE,
             commission_rate=0.002,  # Higher commission
             slippage_model=SlippageModel.PERCENTAGE,
             slippage_rate=0.002,  # Higher slippage
             stop_slippage_rate=0.001,  # Extra 0.1% slippage for stop fills
+            # Cash
             initial_cash=100000.0,
             allow_negative_cash=False,
             cash_buffer_pct=0.02,  # 2% cash buffer
@@ -560,36 +849,71 @@ class BacktestConfig:
 
     def describe(self) -> str:
         """Return human-readable description of configuration."""
+        allow_shorts, allow_leverage = self.get_effective_account_settings()
+        account_str = self.get_effective_account_type()
+
         lines = [
             f"BacktestConfig (preset: {self.preset_name or 'custom'})",
             "=" * 50,
             "",
-            "Execution:",
-            f"  Fill timing: {self.fill_timing.value}",
-            f"  Execution price: {self.execution_price.value}",
-            "",
-            "Position Sizing:",
-            f"  Share type: {self.share_type.value}",
-            f"  Sizing method: {self.sizing_method.value}",
-            f"  Default position: {self.default_position_pct:.1%}",
-            "",
-            "Signal Processing:",
-            f"  Processing: {self.signal_processing.value}",
-            f"  Accumulate: {self.accumulate_positions}",
-            "",
-            "Costs:",
-            f"  Commission: {self.commission_model.value} @ {self.commission_rate:.2%}",
-            f"  Slippage: {self.slippage_model.value} @ {self.slippage_rate:.2%}",
-            f"  Stop slippage: +{self.stop_slippage_rate:.2%}"
-            if self.stop_slippage_rate > 0
-            else "",
-            "",
-            "Cash:",
-            f"  Initial: ${self.initial_cash:,.0f}",
-            f"  Buffer: {self.cash_buffer_pct:.1%}",
-            f"  Reject insufficient: {self.reject_on_insufficient_cash}",
+            "Account:",
+            f"  Type: {account_str}",
+            f"  Short selling: {'allowed' if allow_shorts else 'disabled'}",
+            f"  Leverage: {'enabled' if allow_leverage else 'disabled'}",
         ]
-        return "\n".join(lines)
+
+        if allow_leverage:
+            lines.extend(
+                [
+                    f"  Initial margin: {self.initial_margin:.0%}",
+                    f"  Long maintenance: {self.long_maintenance_margin:.0%}",
+                    f"  Short maintenance: {self.short_maintenance_margin:.0%}",
+                ]
+            )
+
+        lines.extend(
+            [
+                "",
+                "Execution:",
+                f"  Fill timing: {self.fill_timing.value}",
+                f"  Execution mode: {self.execution_mode.value}",
+                f"  Execution price: {self.execution_price.value}",
+                "",
+                "Stops:",
+                f"  Fill mode: {self.stop_fill_mode.value}",
+                f"  Level basis: {self.stop_level_basis.value}",
+                f"  Trail HWM source: {self.trail_hwm_source.value}",
+                f"  Trail timing: {self.trail_stop_timing.value}",
+                "",
+                "Position Sizing:",
+                f"  Share type: {self.share_type.value}",
+                f"  Sizing method: {self.sizing_method.value}",
+                f"  Default position: {self.default_position_pct:.1%}",
+                "",
+                "Signal Processing:",
+                f"  Processing: {self.signal_processing.value}",
+                f"  Accumulate: {self.accumulate_positions}",
+                "",
+                "Costs:",
+                f"  Commission: {self.commission_model.value} @ {self.commission_rate:.2%}",
+                f"  Slippage: {self.slippage_model.value} @ {self.slippage_rate:.2%}",
+            ]
+        )
+
+        if self.stop_slippage_rate > 0:
+            lines.append(f"  Stop slippage: +{self.stop_slippage_rate:.2%}")
+
+        lines.extend(
+            [
+                "",
+                "Cash:",
+                f"  Initial: ${self.initial_cash:,.0f}",
+                f"  Buffer: {self.cash_buffer_pct:.1%}",
+                f"  Reject insufficient: {self.reject_on_insufficient_cash}",
+            ]
+        )
+
+        return "\n".join(line for line in lines if line is not None)
 
 
 # Export presets directory path for users who want to load custom YAML files
@@ -625,11 +949,18 @@ class Mode(str, Enum):
     def to_config(self) -> BacktestConfig:
         """Convert mode to a BacktestConfig instance."""
         if self == Mode.FAST:
-            # Special case: fast mode minimizes friction
+            # Special case: fast mode minimizes friction for rapid prototyping
             return BacktestConfig(
+                # Account: permissive (shorts allowed for flexibility)
+                allow_short_selling=True,
+                allow_leverage=False,
+                # Execution: same-bar for speed
                 fill_timing=FillTiming.SAME_BAR,
                 execution_price=ExecutionPrice.CLOSE,
+                execution_mode=ExecutionMode.SAME_BAR,
+                # Sizing
                 share_type=ShareType.FRACTIONAL,
+                # Costs: none for frictionless testing
                 commission_model=CommissionModel.NONE,
                 slippage_model=SlippageModel.NONE,
                 preset_name="fast",

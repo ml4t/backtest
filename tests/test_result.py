@@ -20,7 +20,7 @@ def sample_trades() -> list[Trade]:
     base_time = datetime(2024, 1, 1, 10, 0)
     return [
         Trade(
-            asset="AAPL",
+            symbol="AAPL",
             entry_time=base_time,
             exit_time=base_time + timedelta(hours=2),
             entry_price=150.0,
@@ -29,14 +29,14 @@ def sample_trades() -> list[Trade]:
             pnl=500.0,
             pnl_percent=3.33,
             bars_held=24,
-            commission=10.0,
+            fees=10.0,
             slippage=5.0,
             exit_reason="signal",
-            max_favorable_excursion=4.0,
-            max_adverse_excursion=-1.0,
+            mfe=4.0,
+            mae=-1.0,
         ),
         Trade(
-            asset="MSFT",
+            symbol="MSFT",
             entry_time=base_time + timedelta(hours=3),
             exit_time=base_time + timedelta(hours=6),
             entry_price=300.0,
@@ -45,11 +45,11 @@ def sample_trades() -> list[Trade]:
             pnl=250.0,
             pnl_percent=1.67,
             bars_held=36,
-            commission=8.0,
+            fees=8.0,
             slippage=3.0,
             exit_reason="stop_loss",
-            max_favorable_excursion=2.5,
-            max_adverse_excursion=-0.5,
+            mfe=2.5,
+            mae=-0.5,
         ),
     ]
 
@@ -126,7 +126,7 @@ class TestBacktestResultTradesDataFrame:
         assert isinstance(df, pl.DataFrame)
         assert len(df) == 2
         assert df.columns == [
-            "asset",
+            "symbol",
             "entry_time",
             "exit_time",
             "entry_price",
@@ -136,11 +136,12 @@ class TestBacktestResultTradesDataFrame:
             "pnl",
             "pnl_percent",
             "bars_held",
-            "commission",
+            "fees",
             "slippage",
             "mfe",
             "mae",
             "exit_reason",
+            "status",
         ]
 
     def test_trades_dataframe_values(self, backtest_result: BacktestResult):
@@ -148,7 +149,7 @@ class TestBacktestResultTradesDataFrame:
         df = backtest_result.to_trades_dataframe()
 
         # First trade (long)
-        assert df["asset"][0] == "AAPL"
+        assert df["symbol"][0] == "AAPL"
         assert df["entry_price"][0] == 150.0
         assert df["exit_price"][0] == 155.0
         assert df["quantity"][0] == 100.0
@@ -157,7 +158,7 @@ class TestBacktestResultTradesDataFrame:
         assert df["exit_reason"][0] == "signal"
 
         # Second trade (short)
-        assert df["asset"][1] == "MSFT"
+        assert df["symbol"][1] == "MSFT"
         assert df["direction"][1] == "short"
         assert df["exit_reason"][1] == "stop_loss"
 
@@ -174,7 +175,7 @@ class TestBacktestResultTradesDataFrame:
         assert isinstance(df, pl.DataFrame)
         assert len(df) == 0
         # Should have correct schema even when empty
-        assert "asset" in df.columns
+        assert "symbol" in df.columns
         assert "exit_reason" in df.columns
 
     def test_trades_dataframe_caching(self, backtest_result: BacktestResult):
@@ -567,7 +568,7 @@ class TestBacktestResultSchemas:
         """Test trades schema definition."""
         schema = BacktestResult._trades_schema()
 
-        assert schema["asset"] == pl.String()
+        assert schema["symbol"] == pl.String()
         assert schema["entry_time"] == pl.Datetime()
         assert schema["pnl"] == pl.Float64()
         assert schema["bars_held"] == pl.Int32()

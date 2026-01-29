@@ -264,7 +264,7 @@ def run_ml4t_backtest(
         feed,
         strategy,
         initial_cash=100_000.0,
-        account_type="margin",  # Margin account for short selling
+        allow_short_selling=True, allow_leverage=True,  # Margin account for short selling
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.NEXT_BAR,  # Match Backtrader default

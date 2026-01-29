@@ -38,6 +38,7 @@ class RiskManager:
     _initial_equity: float = 0.0
     _high_water_mark: float = 0.0
     _daily_start_equity: float = 0.0
+    _last_equity: float = 0.0  # Track for current_drawdown property
     _last_date: date | None = None
     _halted: bool = False
     _halt_reason: str = ""
@@ -53,6 +54,7 @@ class RiskManager:
         self._initial_equity = initial_equity
         self._high_water_mark = initial_equity
         self._daily_start_equity = initial_equity
+        self._last_equity = initial_equity  # Track for current_drawdown property
         self._last_date = timestamp.date() if timestamp else None
         self._halted = False
         self._halt_reason = ""
@@ -76,7 +78,8 @@ class RiskManager:
         Returns:
             List of LimitResult for any breached limits
         """
-        # Update high water mark
+        # Update high water mark and track last equity
+        self._last_equity = equity
         if equity > self._high_water_mark:
             self._high_water_mark = equity
 
@@ -185,8 +188,7 @@ class RiskManager:
     def current_drawdown(self) -> float:
         """Current drawdown from high water mark (0 to 1)."""
         if self._high_water_mark > 0:
-            # This is a snapshot - actual drawdown needs current equity
-            return 0.0
+            return max(0.0, (self._high_water_mark - self._last_equity) / self._high_water_mark)
         return 0.0
 
     def reset_halt(self) -> None:

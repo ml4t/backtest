@@ -1,50 +1,123 @@
 # Account Policies
 
-Configure cash or margin accounts for your backtests.
+Configure account behavior for your backtests using simple boolean flags.
+
+## Account Types
+
+ml4t-backtest uses a **unified configuration** approach with two key flags:
+
+| Flag | Description |
+|------|-------------|
+| `allow_short_selling` | Whether short positions are allowed |
+| `allow_leverage` | Whether margin leverage is allowed |
+
+These flags map to traditional account types:
+
+| Account Type | `allow_short_selling` | `allow_leverage` |
+|--------------|----------------------|------------------|
+| Cash | `False` | `False` |
+| Crypto | `True` | `False` |
+| Margin | `True` | `True` |
 
 ## Cash Account (Default)
 
-No leverage - can only use available cash:
+Long-only with no leverage - simplest and safest:
 
 ```python
-from ml4t.backtest import BacktestConfig
+from ml4t.backtest import BacktestConfig, Engine
 
 config = BacktestConfig(
     initial_cash=100_000,
-    margin_ratio=1.0,  # No leverage
+    allow_short_selling=False,  # Default
+    allow_leverage=False,       # Default
+)
+
+# Or equivalently, just use defaults:
+config = BacktestConfig(initial_cash=100_000)
+```
+
+## Crypto Account
+
+Short selling allowed, but no leverage:
+
+```python
+config = BacktestConfig(
+    initial_cash=100_000,
+    allow_short_selling=True,
+    allow_leverage=False,
 )
 ```
 
 ## Margin Account
 
-Use leverage for larger positions:
+Full margin trading with short selling and leverage:
 
 ```python
 config = BacktestConfig(
     initial_cash=100_000,
-    margin_ratio=0.5,  # 2x leverage
+    allow_short_selling=True,
+    allow_leverage=True,
+    initial_margin=0.5,              # 50% initial margin (2x leverage)
+    long_maintenance_margin=0.25,    # 25% maintenance for longs
+    short_maintenance_margin=0.30,   # 30% maintenance for shorts
 )
 ```
 
-Common margin ratios:
+Common margin configurations:
 
-| Margin Ratio | Leverage | Description |
-|--------------|----------|-------------|
-| 1.0 | 1x | Cash account |
-| 0.5 | 2x | Standard margin |
-| 0.25 | 4x | Day trading margin |
-| 0.1 | 10x | Futures-style margin |
+| Use Case | `initial_margin` | Max Leverage |
+|----------|------------------|--------------|
+| Standard margin | 0.50 | 2x |
+| Day trading | 0.25 | 4x |
+| Futures-style | 0.10 | 10x |
+
+## Using Engine Directly
+
+You can also pass account settings directly to Engine:
+
+```python
+from ml4t.backtest import Engine, DataFeed
+
+engine = Engine(
+    feed=feed,
+    strategy=strategy,
+    initial_cash=100_000,
+    allow_short_selling=True,
+    allow_leverage=True,
+    initial_margin=0.5,
+)
+```
+
+## Using Broker.from_config()
+
+For advanced use cases, create a broker from config:
+
+```python
+from ml4t.backtest import Broker, BacktestConfig
+
+config = BacktestConfig(
+    initial_cash=100_000,
+    allow_short_selling=True,
+    allow_leverage=True,
+)
+
+broker = Broker.from_config(config)
+```
 
 ## Transaction Costs
 
-Configure realistic costs:
+Configure commission and slippage:
 
 ```python
+from ml4t.backtest import BacktestConfig
+from ml4t.backtest.config import CommissionModel, SlippageModel
+
 config = BacktestConfig(
     initial_cash=100_000,
-    commission=0.001,     # 0.1% per trade
-    slippage=0.0005,      # 0.05% slippage
-    margin_ratio=1.0,
+    commission_model=CommissionModel.PERCENTAGE,
+    commission_rate=0.001,     # 0.1% per trade
+    slippage_model=SlippageModel.PERCENTAGE,
+    slippage_rate=0.0005,      # 0.05% slippage
 )
 ```
 
@@ -53,25 +126,43 @@ config = BacktestConfig(
 Use presets for common scenarios:
 
 ```python
-from ml4t.backtest.presets import crypto_futures, us_equities
+from ml4t.backtest import BacktestConfig
 
-# Binance Futures (0.04% maker, 0.1x margin)
-config = crypto_futures()
+# Backtrader-compatible settings
+config = BacktestConfig.from_preset("backtrader")
 
-# US Equities via IB
-config = us_equities()
+# VectorBT-compatible settings
+config = BacktestConfig.from_preset("vectorbt")
+
+# Conservative production settings
+config = BacktestConfig.from_preset("realistic")
 ```
 
 ## Insufficient Funds
 
-Orders that exceed available buying power will:
-
-1. Be rejected with `InsufficientFunds` error
-2. Or be automatically sized down (if `auto_size=True`)
+Orders that exceed available buying power will be rejected. Use the Gatekeeper to check orders before submission:
 
 ```python
-config = BacktestConfig(
-    initial_cash=100_000,
-    auto_size=True,  # Automatically reduce order size
-)
+from ml4t.backtest.accounting import Gatekeeper
+
+gatekeeper = Gatekeeper(account_state, policy)
+is_valid, reason = gatekeeper.validate_order(order)
+if not is_valid:
+    print(f"Order rejected: {reason}")
+```
+
+## Migration from `account_type` (Pre-1.0)
+
+If you were using the old `account_type` string parameter, update as follows:
+
+```python
+# Old API (deprecated)
+broker = Broker(account_type="margin")
+
+# New API
+broker = Broker(allow_short_selling=True, allow_leverage=True)
+
+# Or with config
+config = BacktestConfig(allow_short_selling=True, allow_leverage=True)
+broker = Broker.from_config(config)
 ```

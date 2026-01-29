@@ -9,9 +9,9 @@ import polars as pl
 
 from .analytics import EquityCurve, TradeAnalyzer
 from .broker import Broker
-from .config import InitialHwmSource, Mode, TrailHwmSource
+from .config import InitialHwmSource, Mode, TrailStopTiming, WaterMarkSource
 from .datafeed import DataFeed
-from .models import CommissionModel, PercentageCommission, PercentageSlippage, SlippageModel
+from .models import CommissionModel, SlippageModel
 from .strategy import Strategy
 from .types import ContractSpec, ExecutionMode, StopFillMode, StopLevelBasis
 
@@ -73,9 +73,11 @@ class Engine:
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
-        trail_hwm_source: TrailHwmSource = TrailHwmSource.CLOSE,
+        trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE,
         initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE,
-        account_type: str = "cash",
+        trail_stop_timing: TrailStopTiming = TrailStopTiming.LAGGED,
+        allow_short_selling: bool = False,
+        allow_leverage: bool = False,
         initial_margin: float = 0.5,
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
@@ -101,7 +103,9 @@ class Engine:
             stop_level_basis=stop_level_basis,
             trail_hwm_source=trail_hwm_source,
             initial_hwm_source=initial_hwm_source,
-            account_type=account_type,
+            trail_stop_timing=trail_stop_timing,
+            allow_short_selling=allow_short_selling,
+            allow_leverage=allow_leverage,
             initial_margin=initial_margin,
             long_maintenance_margin=long_maintenance_margin,
             short_maintenance_margin=short_maintenance_margin,
@@ -139,7 +143,13 @@ class Engine:
         for timestamp, assets_data, context in self.feed:
             # Calendar session enforcement
             calendar_id = self.config.calendar if self.config else None
-            if self._calendar and calendar_id and self.config and self.config.enforce_sessions and is_trading_day_fn:
+            if (
+                self._calendar
+                and calendar_id
+                and self.config
+                and self.config.enforce_sessions
+                and is_trading_day_fn
+            ):
                 # For daily data, check trading day; for intraday, check market hours
                 if self.config.data_frequency.value == "daily":
                     if not is_trading_day_fn(calendar_id, timestamp.date()):
@@ -149,9 +159,7 @@ class Engine:
                     # Intraday: use cached trading day check (avoid expensive calendar.valid_days per bar)
                     bar_date = timestamp.date()
                     if bar_date not in trading_day_cache:
-                        trading_day_cache[bar_date] = is_trading_day_fn(
-                            calendar_id, bar_date
-                        )
+                        trading_day_cache[bar_date] = is_trading_day_fn(calendar_id, bar_date)
                     if not trading_day_cache[bar_date]:
                         self._skipped_bars += 1
                         continue
@@ -208,6 +216,7 @@ class Engine:
     def _generate_results(self) -> BacktestResult:
         """Generate backtest results with full analytics."""
         from .result import BacktestResult
+        from .types import Trade
 
         if not self.equity_curve:
             # Return empty result for no-data case
@@ -224,8 +233,42 @@ class Engine:
         for ts, value in self.equity_curve:
             equity.append(ts, value)
 
-        # Build TradeAnalyzer
-        trade_analyzer = TradeAnalyzer(self.broker.trades)
+        # Collect all trades (closed + open)
+        all_trades = list(self.broker.trades)  # Closed trades
+
+        # Add open positions as trades with status="open" (mark-to-market)
+        if self.equity_curve:
+            last_timestamp = self.equity_curve[-1][0]
+            for asset, pos in self.broker.positions.items():
+                # Get last known price for this asset
+                last_price = self.broker._current_prices.get(asset, pos.entry_price)
+
+                # Calculate mark-to-market PnL
+                pnl = (last_price - pos.entry_price) * pos.quantity - pos.entry_commission
+                pnl_pct = (last_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
+
+                open_trade = Trade(
+                    symbol=asset,  # Asset identifier (Position.asset -> Trade.symbol)
+                    entry_time=pos.entry_time,
+                    exit_time=last_timestamp,  # Mark-to-market time
+                    entry_price=pos.entry_price,
+                    exit_price=last_price,  # Mark-to-market price
+                    quantity=pos.quantity,
+                    pnl=pnl,
+                    pnl_percent=pnl_pct,
+                    bars_held=pos.bars_held,
+                    fees=pos.entry_commission,  # Only entry fees so far
+                    slippage=0.0,  # No exit slippage yet
+                    exit_reason="end_of_backtest",
+                    status="open",
+                    mfe=pos.max_favorable_excursion,
+                    mae=pos.max_adverse_excursion,
+                )
+                all_trades.append(open_trade)
+
+        # Build TradeAnalyzer (only on closed trades for accurate stats)
+        closed_trades = [t for t in all_trades if t.status == "closed"]
+        trade_analyzer = TradeAnalyzer(closed_trades)
 
         # Build metrics dictionary (backward compatible)
         metrics = {
@@ -261,7 +304,7 @@ class Engine:
         }
 
         return BacktestResult(
-            trades=self.broker.trades,
+            trades=all_trades,  # Includes both closed and open trades
             equity_curve=self.equity_curve,
             fills=self.broker.fills,
             metrics=metrics,
@@ -283,6 +326,9 @@ class Engine:
         This is the recommended way to create an engine when you want
         to replicate specific framework behavior (Backtrader, VectorBT, etc.).
 
+        All configuration is handled by BacktestConfig and Broker.from_config(),
+        ensuring consistent behavior across the system.
+
         Example:
             from ml4t.backtest import Engine, BacktestConfig, DataFeed, Strategy
 
@@ -299,62 +345,34 @@ class Engine:
         Returns:
             Configured Engine instance
         """
-        from .config import CommissionModel as CommModelEnum
         from .config import FillTiming
-        from .config import SlippageModel as SlipModelEnum
 
-        # Map config fill timing to ExecutionMode
-        if config.fill_timing == FillTiming.SAME_BAR:
-            execution_mode = ExecutionMode.SAME_BAR
-        else:
-            # NEXT_BAR_OPEN or NEXT_BAR_CLOSE both use NEXT_BAR mode
-            execution_mode = ExecutionMode.NEXT_BAR
+        # Create broker from config (handles all commission/slippage/account setup)
+        broker = Broker.from_config(config)
 
-        # Build commission model from config
-        commission_model: CommissionModel | None = None
-        if config.commission_model == CommModelEnum.PERCENTAGE:
-            commission_model = PercentageCommission(
-                rate=config.commission_rate,
-            )
-        elif config.commission_model == CommModelEnum.PER_SHARE:
-            from .models import PerShareCommission
-
-            commission_model = PerShareCommission(
-                per_share=config.commission_per_share,
-                minimum=config.commission_minimum,
-            )
-        elif config.commission_model == CommModelEnum.PER_TRADE:
-            from .models import NoCommission
-
-            # For per-trade, we'd need a new model, use NoCommission for now
-            commission_model = NoCommission()
-        # NONE or unrecognized -> None (will use NoCommission in Broker)
-
-        # Build slippage model from config
-        slippage_model: SlippageModel | None = None
-        if config.slippage_model == SlipModelEnum.PERCENTAGE:
-            slippage_model = PercentageSlippage(rate=config.slippage_rate)
-        elif config.slippage_model == SlipModelEnum.FIXED:
-            from .models import FixedSlippage
-
-            slippage_model = FixedSlippage(amount=config.slippage_fixed)
-        # NONE, VOLUME_BASED, or unrecognized -> None (will use NoSlippage)
-
-        return cls(
-            feed=feed,
-            strategy=strategy,
-            initial_cash=config.initial_cash,
-            commission_model=commission_model,
-            slippage_model=slippage_model,
-            stop_slippage_rate=config.stop_slippage_rate,
-            execution_mode=execution_mode,
-            account_type=config.account_type,
-            initial_margin=config.margin_requirement,
-            long_maintenance_margin=config.margin_requirement * 0.5,  # 50% of initial
-            short_maintenance_margin=config.margin_requirement
-            * 0.6,  # 60% of initial (higher for shorts)
-            config=config,  # Store config for strategy access
+        # Map fill_timing to Engine's execution_mode
+        # SAME_BAR fill_timing → SAME_BAR execution
+        # NEXT_BAR_OPEN or NEXT_BAR_CLOSE → NEXT_BAR execution
+        execution_mode = (
+            ExecutionMode.SAME_BAR
+            if config.fill_timing == FillTiming.SAME_BAR
+            else ExecutionMode.NEXT_BAR
         )
+
+        # Create engine with pre-configured broker
+        engine = cls.__new__(cls)
+        engine.feed = feed
+        engine.strategy = strategy
+        engine.execution_mode = execution_mode
+        engine.stop_fill_mode = broker.stop_fill_mode
+        engine.stop_level_basis = broker.stop_level_basis
+        engine.config = config
+        engine.broker = broker
+        engine.equity_curve = []
+        engine._calendar = None
+        engine._skipped_bars = 0
+
+        return engine
 
     @classmethod
     def from_mode(

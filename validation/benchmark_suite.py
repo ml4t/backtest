@@ -686,7 +686,7 @@ def benchmark_ml4t(
         warmup_feed,
         TopBottomStrategy(config.top_n, config.bottom_n, config.stop_loss, config.take_profit),
         initial_cash=1e15,  # Unlimited cash to eliminate margin rejections
-        account_type="margin",
+        allow_short_selling=True, allow_leverage=True,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=exec_mode,
@@ -707,7 +707,7 @@ def benchmark_ml4t(
         feed,
         strategy,
         initial_cash=1e15,  # Unlimited cash to eliminate margin rejections
-        account_type="margin",
+        allow_short_selling=True, allow_leverage=True,
         commission_model=commission,
         slippage_model=slippage,
         execution_mode=exec_mode,

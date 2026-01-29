@@ -307,7 +307,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, signals: dict) -> dict:
         feed,
         strategy,
         initial_cash=10_000_000.0,
-        account_type="cash",
+        allow_short_selling=False,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.NEXT_BAR,  # Match Backtrader

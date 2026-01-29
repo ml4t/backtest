@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from ml4t.backtest.risk.position.signal import SignalExit, VolatilityTrailingStop
+from ml4t.backtest.risk.position.signal import SignalExit
+from ml4t.backtest.risk.position.dynamic import VolatilityTrailingStop
 from ml4t.backtest.risk.types import ActionType, PositionState
 
 
@@ -122,28 +123,28 @@ class TestVolatilityTrailingStopLong:
 
     def test_no_volatility_holds(self):
         """No exit when volatility is not in context."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         state = make_position_state(side="long", context={})
         action = rule.evaluate(state)
         assert action.action == ActionType.HOLD
 
     def test_zero_volatility_holds(self):
         """No exit when volatility is zero."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         state = make_position_state(side="long", context={"atr": 0.0})
         action = rule.evaluate(state)
         assert action.action == ActionType.HOLD
 
     def test_negative_volatility_holds(self):
         """No exit when volatility is negative (invalid)."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         state = make_position_state(side="long", context={"atr": -1.0})
         action = rule.evaluate(state)
         assert action.action == ActionType.HOLD
 
     def test_trail_based_on_volatility(self):
         """Trail distance calculated from volatility."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         # ATR = 2.50, multiplier = 2.0, trail = 5.0
         # HWM = 110, stop at 105
         state = make_position_state(
@@ -155,11 +156,11 @@ class TestVolatilityTrailingStopLong:
         )
         action = rule.evaluate(state)
         assert action.action == ActionType.EXIT_FULL
-        assert "vol_trail" in action.reason
+        assert "vol_trailing_stop" in action.reason
 
     def test_above_trail_holds(self):
         """No exit when price is above volatility trail."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         # ATR = 2.50, multiplier = 2.0, trail = 5.0
         # HWM = 110, stop at 105
         state = make_position_state(
@@ -174,7 +175,7 @@ class TestVolatilityTrailingStopLong:
 
     def test_custom_volatility_key(self):
         """Can use custom volatility key."""
-        rule = VolatilityTrailingStop(volatility_key="my_vol", multiplier=3.0)
+        rule = VolatilityTrailingStop(atr_key="my_vol", multiplier=3.0)
         # vol = 1.0, multiplier = 3.0, trail = 3.0
         # HWM = 100, stop at 97
         state = make_position_state(
@@ -192,7 +193,7 @@ class TestVolatilityTrailingStopShort:
 
     def test_trail_for_shorts(self):
         """Trail calculated from low water mark for shorts."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         # ATR = 2.50, multiplier = 2.0, trail = 5.0
         # LWM = 90, stop at 95
         state = make_position_state(
@@ -207,7 +208,7 @@ class TestVolatilityTrailingStopShort:
 
     def test_below_trail_holds(self):
         """No exit when price is below volatility trail for shorts."""
-        rule = VolatilityTrailingStop(volatility_key="atr", multiplier=2.0)
+        rule = VolatilityTrailingStop(atr_key="atr", multiplier=2.0)
         # ATR = 2.50, multiplier = 2.0, trail = 5.0
         # LWM = 90, stop at 95
         state = make_position_state(

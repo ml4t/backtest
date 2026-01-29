@@ -12,6 +12,20 @@ def _get_stop_fill_mode_for_trail(context: dict):
     return context.get("stop_fill_mode", StopFillMode.STOP_PRICE)
 
 
+def _get_trail_hwm_source(context: dict):
+    """Get WaterMarkSource from context, defaulting to CLOSE."""
+    from ml4t.backtest.config import WaterMarkSource
+
+    return context.get("trail_hwm_source", WaterMarkSource.CLOSE)
+
+
+def _get_trail_stop_timing(context: dict):
+    """Get TrailStopTiming from context, defaulting to LAGGED."""
+    from ml4t.backtest.config import TrailStopTiming
+
+    return context.get("trail_stop_timing", TrailStopTiming.LAGGED)
+
+
 @dataclass
 class TrailingStop:
     """Exit when price retraces from high water mark.
@@ -39,48 +53,147 @@ class TrailingStop:
         Handles gap-through: if bar opens beyond stop level, fill at open.
 
         Fill price depends on StopFillMode configuration:
-        - STOP_PRICE: Fill at exact trail level (default, VBT Pro behavior)
+        - STOP_PRICE: Fill at exact trail level (default)
         - CLOSE_PRICE: Fill at bar's close price
         - BAR_EXTREME: Fill at bar's low (long) or high (short)
+
+        Water mark timing depends on TrailStopTiming configuration:
+        - LAGGED: Use water mark from PREVIOUS bar (default, 1-bar lag)
+        - INTRABAR: Compute "live" water mark using current bar's extreme, then check.
+                    VBT Pro compatible: respects StopFillMode for fill price.
 
         Gap-through handling: When bar opens beyond the stop level (gap down for
         longs, gap up for shorts), the fill is at the open price regardless of
         StopFillMode. This matches VBT Pro behavior.
         """
+
         fill_mode = _get_stop_fill_mode_for_trail(state.context)
+        trail_timing = _get_trail_stop_timing(state.context)
 
         if state.is_long:
-            # Long: stop triggers when bar's low drops below (hwm - trail%)
-            # Also triggers on gap-through: when bar opens below trail level
-            stop_price = state.high_water_mark * (1 - self.pct)
-            bar_low = state.bar_low if state.bar_low is not None else state.current_price
-            bar_open = state.bar_open if state.bar_open is not None else state.current_price
-            # Check both low touch AND gap-through (open below trail)
-            if bar_low <= stop_price or bar_open < stop_price:
-                # Determine fill price based on StopFillMode and gap-through
-                fill_price = self._get_fill_price_long(
-                    stop_price, state.current_price, bar_low, bar_open, fill_mode
-                )
-                return PositionAction.exit_full(
-                    f"trailing_stop_{self.pct:.1%}",
-                    fill_price=fill_price,
-                )
+            return self._evaluate_long(state, fill_mode, trail_timing)
         else:
-            # Short: stop triggers when bar's high rises above (lwm + trail%)
-            # Also triggers on gap-through: when bar opens above trail level
-            stop_price = state.low_water_mark * (1 + self.pct)
-            bar_high = state.bar_high if state.bar_high is not None else state.current_price
-            bar_open = state.bar_open if state.bar_open is not None else state.current_price
-            # Check both high touch AND gap-through (open above trail)
-            if bar_high >= stop_price or bar_open > stop_price:
-                # Determine fill price based on StopFillMode and gap-through
-                fill_price = self._get_fill_price_short(
-                    stop_price, state.current_price, bar_high, bar_open, fill_mode
+            return self._evaluate_short(state, fill_mode, trail_timing)
+
+    def _evaluate_long(self, state: PositionState, fill_mode, trail_timing) -> PositionAction:
+        """Evaluate trailing stop for LONG position."""
+        from ml4t.backtest.config import TrailStopTiming
+
+        bar_low = state.bar_low if state.bar_low is not None else state.current_price
+        bar_high = state.bar_high if state.bar_high is not None else state.current_price
+        bar_open = state.bar_open if state.bar_open is not None else state.current_price
+        bar_close = state.current_price  # current_price is the close
+
+        if trail_timing == TrailStopTiming.VBT_PRO:
+            # VBT_PRO mode: Two-pass algorithm matching VectorBT Pro exactly
+            #
+            # Pass 1: Check with LAGGED water mark against LOW
+            lagged_stop = state.high_water_mark * (1 - self.pct)
+            if bar_low <= lagged_stop or bar_open < lagged_stop:
+                fill_price = self._get_fill_price_long(
+                    lagged_stop, bar_close, bar_low, bar_open, fill_mode
                 )
                 return PositionAction.exit_full(
                     f"trailing_stop_{self.pct:.1%}",
                     fill_price=fill_price,
                 )
+
+            # Pass 2: Update water mark, check against CLOSE only
+            live_hwm = max(state.high_water_mark, bar_high)
+            live_stop = live_hwm * (1 - self.pct)
+            # VBT Pro's second pass can only use CLOSE (can_use_ohlc=False)
+            if bar_close <= live_stop:
+                # Fill at close price since that's what triggered it
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}",
+                    fill_price=bar_close,
+                )
+
+            return PositionAction.hold()
+
+        elif trail_timing == TrailStopTiming.INTRABAR:
+            # INTRABAR mode: compute live HWM from max(previous_hwm, current_bar_high)
+            # For LONG, HWM only increases so use max of previous and current bar high
+            live_hwm = max(state.high_water_mark, bar_high)
+            stop_price = live_hwm * (1 - self.pct)
+        else:
+            # LAGGED mode: use previous bar's HWM
+            stop_price = state.high_water_mark * (1 - self.pct)
+
+        # Check both low touch AND gap-through (open below trail)
+        if bar_low <= stop_price or bar_open < stop_price:
+            # Use StopFillMode for fill price calculation (both LAGGED and INTRABAR)
+            fill_price = self._get_fill_price_long(
+                stop_price, bar_close, bar_low, bar_open, fill_mode
+            )
+            return PositionAction.exit_full(
+                f"trailing_stop_{self.pct:.1%}",
+                fill_price=fill_price,
+            )
+
+        return PositionAction.hold()
+
+    def _evaluate_short(self, state: PositionState, fill_mode, trail_timing) -> PositionAction:
+        """Evaluate trailing stop for SHORT position."""
+        from ml4t.backtest.config import TrailStopTiming
+
+        bar_low = state.bar_low if state.bar_low is not None else state.current_price
+        bar_high = state.bar_high if state.bar_high is not None else state.current_price
+        bar_open = state.bar_open if state.bar_open is not None else state.current_price
+        bar_close = state.current_price  # current_price is the close
+
+        if trail_timing == TrailStopTiming.VBT_PRO:
+            # VBT_PRO mode: Two-pass algorithm matching VectorBT Pro exactly
+            #
+            # VBT Pro uses LAGGED water mark for the initial check:
+            # Pass 1: Check with LAGGED LWM (previous bar's LWM) against HIGH
+            # Pass 2: Update LWM, check against CLOSE only
+            #
+            # This matches the LONG implementation pattern.
+
+            # Pass 1: Check with LAGGED water mark against HIGH
+            lagged_stop = state.low_water_mark * (1 + self.pct)
+            if bar_high >= lagged_stop or bar_open > lagged_stop:
+                fill_price = self._get_fill_price_short(
+                    lagged_stop, bar_close, bar_high, bar_open, fill_mode
+                )
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}",
+                    fill_price=fill_price,
+                )
+
+            # Pass 2: Update water mark, check against CLOSE only
+            live_lwm = min(state.low_water_mark, bar_low)
+            live_stop = live_lwm * (1 + self.pct)
+            # VBT Pro's second pass can only use CLOSE (can_use_ohlc=False)
+            if bar_close >= live_stop:
+                # Fill at close price since that's what triggered it
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}",
+                    fill_price=bar_close,
+                )
+
+            return PositionAction.hold()
+
+        elif trail_timing == TrailStopTiming.INTRABAR:
+            # INTRABAR mode: compute live LWM from min(previous_lwm, current_bar_low)
+            # For SHORT, LWM only decreases so use min of previous and current bar low
+            live_lwm = min(state.low_water_mark, bar_low)
+            stop_price = live_lwm * (1 + self.pct)
+        else:
+            # LAGGED mode: use previous bar's LWM
+            stop_price = state.low_water_mark * (1 + self.pct)
+
+        # Check both high touch AND gap-through (open above trail)
+        if bar_high >= stop_price or bar_open > stop_price:
+            # Use StopFillMode for fill price calculation (both LAGGED and INTRABAR)
+            fill_price = self._get_fill_price_short(
+                stop_price, bar_close, bar_high, bar_open, fill_mode
+            )
+            return PositionAction.exit_full(
+                f"trailing_stop_{self.pct:.1%}",
+                fill_price=fill_price,
+            )
 
         return PositionAction.hold()
 
@@ -199,9 +312,17 @@ class ScaledExit:
             (0.15, 0.50),  # At +15%: exit 50% of remaining
         ])
 
-    Note:
-        This rule tracks triggered levels internally. For proper operation
-        in backtesting, create a new instance per position.
+    Warning:
+        **STATEFUL RULE**: This rule tracks triggered levels internally.
+
+        Do NOT reuse the same instance across multiple positions or assets.
+        Either:
+        - Use per-asset rules via broker.set_position_rules(rule, asset="AAPL")
+        - Create new rule instances for each position in your strategy
+        - Call reset() when positions close if reusing the same instance
+
+        For truly stateless rules, consider storing state in Position.context
+        and reading it in the rule's evaluate() method.
     """
 
     targets: list[tuple[float, float]]
@@ -249,6 +370,14 @@ class VolatilityStop:
     Note:
         Requires strategy to compute ATR and pass via context dict.
         If ATR not found in context, rule does nothing (returns HOLD).
+
+    Warning:
+        **STATEFUL RULE** (when use_entry_atr=True): This rule caches the
+        entry ATR value internally.
+
+        Do NOT reuse the same instance across multiple positions or assets.
+        Either use per-asset rules, create new instances, or call reset()
+        when positions close.
     """
 
     multiplier: float = 2.0

@@ -21,6 +21,9 @@ def to_trade_record(trade: Trade) -> dict[str, Any]:
     This creates a dictionary compatible with ml4t.diagnostic.integration.TradeRecord.
     We use a dict to avoid hard dependency on diagnostic library.
 
+    With the aligned schema (v0.1.0a6+), field names now match between
+    backtest Trade and diagnostic TradeRecord, simplifying this conversion.
+
     Args:
         trade: A completed Trade from backtest
 
@@ -35,25 +38,29 @@ def to_trade_record(trade: Trade) -> dict[str, Any]:
         >>> tr = TradeRecord(**record)
     """
     return {
-        "timestamp": trade.exit_time,
-        "symbol": trade.asset,
+        # Primary fields (aligned schema)
+        "symbol": trade.symbol,
+        "entry_time": trade.entry_time,
+        "exit_time": trade.exit_time,
         "entry_price": trade.entry_price,
         "exit_price": trade.exit_price,
+        "quantity": trade.quantity,  # Signed (positive=long, negative=short)
         "pnl": trade.pnl,
-        "duration": trade.exit_time - trade.entry_time,
-        "direction": "long" if trade.quantity > 0 else "short",
-        "quantity": abs(trade.quantity),
-        "entry_timestamp": trade.entry_time,
-        "fees": trade.commission,
+        "pnl_percent": trade.pnl_percent,
+        "bars_held": trade.bars_held,
+        "fees": trade.fees,
         "slippage": trade.slippage,
-        "metadata": {
-            "entry_signals": trade.entry_signals,
-            "exit_signals": trade.exit_signals,
-            "bars_held": trade.bars_held,
-            "pnl_percent": trade.pnl_percent,
-            "mfe": trade.max_favorable_excursion,
-            "mae": trade.max_adverse_excursion,
-        },
+        "exit_reason": trade.exit_reason,
+        "status": trade.status,
+        "mfe": trade.mfe,
+        "mae": trade.mae,
+        "metadata": trade.metadata,
+        # Diagnostic-specific computed fields
+        "duration": trade.exit_time - trade.entry_time,
+        # Legacy field (diagnostic still expects this)
+        "timestamp": trade.exit_time,  # Alias for exit_time
+        "entry_timestamp": trade.entry_time,  # Alias for entry_time
+        "direction": trade.direction,  # Derived from quantity sign
     }
 
 

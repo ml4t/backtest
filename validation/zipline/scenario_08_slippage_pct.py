@@ -210,7 +210,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     feed = DataFeed(prices_df=prices_pl, signals_df=signals_pl)
     engine = Engine(
         feed, HoldStrategy(),
-        initial_cash=100_000.0, account_type="cash",
+        initial_cash=100_000.0, allow_short_selling=False,
         commission_model=NoCommission(),
         slippage_model=PercentageSlippage(rate=SLIPPAGE_RATE),
         execution_mode=ExecutionMode.NEXT_BAR,

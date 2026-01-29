@@ -222,12 +222,16 @@ class TestRiskManagerProperties:
     def test_current_drawdown_property(self):
         """Test current_drawdown property."""
         manager = RiskManager()
-        # Default returns 0.0
+        # Default returns 0.0 (both HWM and last_equity are 0)
         assert manager.current_drawdown == 0.0
 
-        manager._high_water_mark = 100000.0
-        # Still returns 0.0 since it's a snapshot (needs equity)
-        assert manager.current_drawdown == 0.0
+        # Initialize properly to test drawdown calculation
+        manager.initialize(100000.0)
+        assert manager.current_drawdown == 0.0  # No drawdown at start
+
+        # Simulate a drawdown via update
+        manager.update(90000.0, {})  # 10% drawdown
+        assert manager.current_drawdown == 0.1  # (100000 - 90000) / 100000
 
 
 class TestRiskManagerReset:

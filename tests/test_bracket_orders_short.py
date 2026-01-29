@@ -22,7 +22,7 @@ class TestBracketOrdersShortEntry:
 
     def test_short_bracket_exit_sides(self):
         """Short entry brackets should have BUY exits."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},
@@ -46,7 +46,7 @@ class TestBracketOrdersShortEntry:
 
     def test_short_bracket_take_profit_triggers(self):
         """Short bracket take-profit should trigger when price drops."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
 
         # Entry bar
         broker._update_time(
@@ -91,7 +91,7 @@ class TestBracketOrdersShortEntry:
 
     def test_short_bracket_stop_loss_triggers(self):
         """Short bracket stop-loss should trigger when price rises."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
 
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
@@ -179,7 +179,7 @@ class TestBracketPriceValidation:
 
     def test_short_bracket_inverted_tp_warning(self):
         """Short bracket with TP above entry should warn."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},
@@ -201,7 +201,7 @@ class TestBracketPriceValidation:
 
     def test_short_bracket_inverted_sl_warning(self):
         """Short bracket with SL below entry should warn."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},
@@ -244,7 +244,7 @@ class TestBracketPriceValidation:
 
     def test_valid_short_bracket_no_warning(self):
         """Valid short bracket should not warn."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},
@@ -320,7 +320,7 @@ class TestBracketOrdersWithLimitEntry:
 
     def test_limit_entry_short_validation(self):
         """Short bracket with limit entry should validate against limit."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},

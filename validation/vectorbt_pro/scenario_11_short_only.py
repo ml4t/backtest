@@ -197,7 +197,7 @@ def run_ml4t_backtest(data_list, entries, exits):
         feed=feed,
         strategy=strategy,
         initial_cash=1_000_000.0,
-        account_type="margin",
+        allow_short_selling=True, allow_leverage=True,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
     )

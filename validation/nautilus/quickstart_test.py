@@ -183,7 +183,7 @@ def run_backtest():
     venue = BacktestVenueConfig(
         name="SIM",
         oms_type="NETTING",
-        account_type="MARGIN",
+        allow_short_selling=True, allow_leverage=True,
         base_currency="USD",
         starting_balances=["1_000_000 USD"],
     )

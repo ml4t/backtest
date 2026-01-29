@@ -180,7 +180,7 @@ def test_short_only_falling_market():
         feed=feed,
         strategy=strategy,
         initial_cash=1_000_000.0,
-        account_type="margin",  # Need margin for shorts
+        allow_short_selling=True, allow_leverage=True,  # Need margin for shorts
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
     )
@@ -244,7 +244,7 @@ def test_short_only_rising_market():
         feed=feed,
         strategy=strategy,
         initial_cash=1_000_000.0,
-        account_type="margin",
+        allow_short_selling=True, allow_leverage=True,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
     )
@@ -284,7 +284,7 @@ def test_long_short_hedged():
         feed=feed,
         strategy=strategy,
         initial_cash=1_000_000.0,
-        account_type="margin",
+        allow_short_selling=True, allow_leverage=True,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
     )
@@ -371,7 +371,7 @@ def test_short_pnl_correctness():
         feed=feed,
         strategy=strategy,
         initial_cash=100_000.0,
-        account_type="margin",
+        allow_short_selling=True, allow_leverage=True,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
     )

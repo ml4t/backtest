@@ -23,7 +23,7 @@ def create_sample_result(n_trades: int = 50) -> BacktestResult:
         pnl = np.random.normal(50, 200)
         trades.append(
             Trade(
-                asset=f"ASSET_{i % 5}",
+                symbol=f"ASSET_{i % 5}",
                 entry_time=entry_time,
                 exit_time=exit_time,
                 entry_price=100.0,
@@ -32,11 +32,11 @@ def create_sample_result(n_trades: int = 50) -> BacktestResult:
                 pnl=pnl,
                 pnl_percent=pnl / 10000,
                 bars_held=np.random.randint(1, 10),
-                commission=5.0,
+                fees=5.0,
                 slippage=2.0,
                 exit_reason="signal",
-                max_favorable_excursion=abs(np.random.normal(0.02, 0.01)),
-                max_adverse_excursion=-abs(np.random.normal(0.01, 0.005)),
+                mfe=abs(np.random.normal(0.02, 0.01)),
+                mae=-abs(np.random.normal(0.01, 0.005)),
             )
         )
 

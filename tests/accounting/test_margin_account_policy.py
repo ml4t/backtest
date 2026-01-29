@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 from ml4t.backtest import Position
-from src.ml4t.backtest.accounting.policy import MarginAccountPolicy
+from src.ml4t.backtest.accounting.policy import UnifiedAccountPolicy
 
 
 class TestMarginAccountPolicyInitialization:
@@ -13,13 +13,13 @@ class TestMarginAccountPolicyInitialization:
 
     def test_default_initialization(self):
         """Test initialization with default Reg T parameters."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         assert policy.initial_margin == 0.5  # 50% = Reg T standard
         assert policy.long_maintenance_margin == 0.25  # 25% = Reg T standard
 
     def test_custom_initialization(self):
         """Test initialization with custom margin parameters."""
-        policy = MarginAccountPolicy(
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, 
             initial_margin=0.3, long_maintenance_margin=0.15, short_maintenance_margin=0.15
         )
         assert policy.initial_margin == 0.3
@@ -27,7 +27,7 @@ class TestMarginAccountPolicyInitialization:
 
     def test_conservative_margin(self):
         """Test initialization with conservative (no leverage) parameters."""
-        policy = MarginAccountPolicy(
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, 
             initial_margin=1.0, long_maintenance_margin=0.5, short_maintenance_margin=0.5
         )
         assert policy.initial_margin == 1.0
@@ -36,32 +36,32 @@ class TestMarginAccountPolicyInitialization:
     def test_invalid_initial_margin_too_low(self):
         """Test that initial_margin must be > 0."""
         with pytest.raises(ValueError, match="Initial margin must be in"):
-            MarginAccountPolicy(initial_margin=0.0)
+            UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.0)
 
     def test_invalid_initial_margin_too_high(self):
         """Test that initial_margin must be <= 1.0."""
         with pytest.raises(ValueError, match="Initial margin must be in"):
-            MarginAccountPolicy(initial_margin=1.5)
+            UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=1.5)
 
     def test_invalid_maintenance_margin_too_low(self):
         """Test that long_maintenance_margin must be > 0."""
         with pytest.raises(ValueError, match="maintenance margin must be in"):
-            MarginAccountPolicy(long_maintenance_margin=0.0)
+            UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, long_maintenance_margin=0.0)
 
     def test_invalid_maintenance_margin_too_high(self):
         """Test that long_maintenance_margin must be <= 1.0."""
         with pytest.raises(ValueError, match="maintenance margin must be in"):
-            MarginAccountPolicy(long_maintenance_margin=1.5)
+            UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, long_maintenance_margin=1.5)
 
     def test_invalid_maintenance_greater_than_initial(self):
         """Test that long_maintenance_margin must be < initial_margin."""
         with pytest.raises(ValueError, match="maintenance margin.*must be <"):
-            MarginAccountPolicy(initial_margin=0.25, long_maintenance_margin=0.5)
+            UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.25, long_maintenance_margin=0.5)
 
     def test_invalid_maintenance_equal_to_initial(self):
         """Test that long_maintenance_margin cannot equal initial_margin."""
         with pytest.raises(ValueError, match="maintenance margin.*must be <"):
-            MarginAccountPolicy(initial_margin=0.5, long_maintenance_margin=0.5)
+            UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5, long_maintenance_margin=0.5)
 
 
 class TestMarginAccountPolicyBuyingPower:
@@ -81,7 +81,7 @@ class TestMarginAccountPolicyBuyingPower:
         Old (buggy) formula allowed 4x leverage.
         New (correct) formula enforces 2x leverage.
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
 
         # Step 1: Start with $10k cash, no positions
         # BP = $10k / 0.5 = $20k (can buy $20k worth)
@@ -127,7 +127,7 @@ class TestMarginAccountPolicyBuyingPower:
         NLV = $100k, MM = $0
         BP = ($100k - $0) / 0.5 = $200k (2x leverage)
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         bp = policy.calculate_buying_power(cash=100_000.0, positions={})
         assert bp == 200_000.0  # 2x leverage
 
@@ -140,7 +140,7 @@ class TestMarginAccountPolicyBuyingPower:
         Excess Equity = $150k - $50k = $100k
         BP = $100k / 0.5 = $200k
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -162,7 +162,7 @@ class TestMarginAccountPolicyBuyingPower:
         Excess Equity = $50k - $50k = $0
         BP = max(0, $0 / 0.5) = $0 (at limit)
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -184,7 +184,7 @@ class TestMarginAccountPolicyBuyingPower:
         Excess Equity = $40k - $25k = $15k
         BP = $15k / 0.5 = $30k
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -208,7 +208,7 @@ class TestMarginAccountPolicyBuyingPower:
         Excess Equity = $100k - $100k = $0
         BP = max(0, $0 / 0.5) = $0 (at limit)
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -234,7 +234,7 @@ class TestMarginAccountPolicyBuyingPower:
         cash=$100k, positions={}
         BP = ($100k - $0) / 1.0 = $100k (no leverage)
         """
-        policy = MarginAccountPolicy(
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, 
             initial_margin=1.0, long_maintenance_margin=0.5, short_maintenance_margin=0.5
         )
         bp = policy.calculate_buying_power(cash=100_000.0, positions={})
@@ -246,7 +246,7 @@ class TestMarginAccountPolicyBuyingPower:
         cash=$100k, positions={}
         BP = ($100k - $0) / 0.25 = $400k (4x leverage)
         """
-        policy = MarginAccountPolicy(
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, 
             initial_margin=0.25, long_maintenance_margin=0.15, short_maintenance_margin=0.15
         )
         bp = policy.calculate_buying_power(cash=100_000.0, positions={})
@@ -261,7 +261,7 @@ class TestMarginAccountPolicyBuyingPower:
         Excess Equity = -$10k - $20k = -$30k
         BP = max(0, -$30k / 0.5) = $0 (clamped to zero)
         """
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -280,7 +280,7 @@ class TestMarginAccountPolicyShortSelling:
 
     def test_allows_short_selling_returns_true(self):
         """Test that margin accounts allow short selling."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         assert policy.allows_short_selling() is True
 
 
@@ -289,7 +289,7 @@ class TestMarginAccountPolicyNewPositionValidation:
 
     def test_valid_long_position_with_sufficient_buying_power(self):
         """Test approving long position with sufficient buying power."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # BP = $100k / 0.5 = $200k, order cost = 100 × $150 = $15k
         valid, reason = policy.validate_new_position(
             asset="AAPL",
@@ -303,7 +303,7 @@ class TestMarginAccountPolicyNewPositionValidation:
 
     def test_valid_short_position(self):
         """Test approving short position (margin accounts allow shorts)."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # BP = $100k / 0.5 = $200k, order cost = 100 × $150 = $15k
         valid, reason = policy.validate_new_position(
             asset="AAPL",
@@ -317,7 +317,7 @@ class TestMarginAccountPolicyNewPositionValidation:
 
     def test_reject_position_insufficient_buying_power(self):
         """Test rejecting position with insufficient buying power."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # BP = $10k / 0.5 = $20k, order cost = 1000 × $100 = $100k (too much)
         valid, reason = policy.validate_new_position(
             asset="AAPL",
@@ -333,7 +333,7 @@ class TestMarginAccountPolicyNewPositionValidation:
 
     def test_valid_position_with_existing_positions(self):
         """Test approving position with existing positions affecting BP."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         existing = {
             "AAPL": Position(
                 asset="AAPL",
@@ -364,7 +364,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_valid_add_to_long_position(self):
         """Test adding to existing long position."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=100, delta=+50, cash=$100k -> BP = $200k
         # Risk increase = 50 × $150 = $7.5k
         valid, reason = policy.validate_position_change(
@@ -380,7 +380,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_valid_partial_close_long(self):
         """Test partial close of long position (always allowed)."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=100, delta=-50 (partial close)
         valid, reason = policy.validate_position_change(
             asset="AAPL",
@@ -395,7 +395,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_valid_full_close_long(self):
         """Test full close of long position (always allowed)."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=100, delta=-100 (full close)
         valid, reason = policy.validate_position_change(
             asset="AAPL",
@@ -410,7 +410,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_valid_position_reversal_long_to_short(self):
         """Test position reversal from long to short (allowed in margin accounts)."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=100, delta=-200 -> new=-100 (reversed to short)
         # BP = $100k / 0.5 = $200k
         # Risk = |-100| × $150 = $15k
@@ -427,7 +427,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_valid_position_reversal_short_to_long(self):
         """Test position reversal from short to long."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=-100, delta=+200 -> new=+100 (reversed to long)
         # BP = $100k / 0.5 = $200k
         # Risk = |100| × $150 = $15k
@@ -444,7 +444,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_valid_add_to_short_position(self):
         """Test adding to existing short position."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=-100, delta=-50 (adding to short)
         # BP = $100k / 0.5 = $200k
         # Risk = |-50| × $150 = $7.5k
@@ -461,7 +461,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_reject_position_change_insufficient_buying_power(self):
         """Test rejecting position change with insufficient buying power."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=100, delta=+1000
         # BP = $10k / 0.5 = $20k
         # Risk = 1000 × $100 = $100k (too much)
@@ -478,7 +478,7 @@ class TestMarginAccountPolicyPositionChange:
 
     def test_reject_reversal_insufficient_buying_power(self):
         """Test rejecting position reversal when insufficient BP for new side."""
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         # current=100, delta=-1000 -> new=-900 (large short)
         # BP = $10k / 0.5 = $20k
         # Risk = |-900| × $100 = $90k (too much)
@@ -499,14 +499,14 @@ class TestMarginAccountPolicyAsymmetricMaintenance:
 
     def test_default_asymmetric_maintenance(self):
         """Test default maintenance margins: 25% long, 30% short."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         assert policy.initial_margin == 0.5
         assert policy.long_maintenance_margin == 0.25
         assert policy.short_maintenance_margin == 0.30
 
     def test_get_margin_requirement_long_maintenance(self):
         """Test maintenance margin requirement for long position."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         # Long 100 @ $100 = $10,000 market value
         # Long maintenance = 25% = $2,500
         margin = policy.get_margin_requirement("AAPL", 100, 100.0, for_initial=False)
@@ -514,7 +514,7 @@ class TestMarginAccountPolicyAsymmetricMaintenance:
 
     def test_get_margin_requirement_short_maintenance(self):
         """Test maintenance margin requirement for short position (higher than long)."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         # Short 100 @ $100 = $10,000 market value
         # Short maintenance = 30% = $3,000
         margin = policy.get_margin_requirement("AAPL", -100, 100.0, for_initial=False)
@@ -522,7 +522,7 @@ class TestMarginAccountPolicyAsymmetricMaintenance:
 
     def test_get_margin_requirement_initial_same_for_both(self):
         """Test initial margin is the same for longs and shorts."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         # Both should be 50% of $10,000 = $5,000
         long_margin = policy.get_margin_requirement("AAPL", 100, 100.0, for_initial=True)
         short_margin = policy.get_margin_requirement("AAPL", -100, 100.0, for_initial=True)
@@ -535,21 +535,21 @@ class TestMarginAccountPolicyFuturesMargin:
 
     def test_futures_fixed_margin_initial(self):
         """Test fixed dollar margin for futures (initial)."""
-        policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
         # 2 ES contracts @ $12,000 per contract
         margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=True)
         assert margin == 24_000.0
 
     def test_futures_fixed_margin_maintenance(self):
         """Test fixed dollar margin for futures (maintenance)."""
-        policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
         # 2 ES contracts @ $6,000 maintenance per contract
         margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=False)
         assert margin == 12_000.0
 
     def test_futures_margin_ignores_price(self):
         """Test that futures margin is per-contract, not price-based."""
-        policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
         # Margin should be same regardless of price
         margin_low = policy.get_margin_requirement("ES", 1, 4000.0, for_initial=True)
         margin_high = policy.get_margin_requirement("ES", 1, 6000.0, for_initial=True)
@@ -557,14 +557,14 @@ class TestMarginAccountPolicyFuturesMargin:
 
     def test_futures_margin_short_same_as_long(self):
         """Test futures margin is same for long and short."""
-        policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
         long_margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=True)
         short_margin = policy.get_margin_requirement("ES", -2, 5000.0, for_initial=True)
         assert long_margin == short_margin == 24_000.0
 
     def test_equity_uses_percentage_not_fixed(self):
         """Test equities not in schedule use percentage margin."""
-        policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
         # AAPL not in schedule, should use percentage
         # 100 shares @ $150 = $15,000 × 50% = $7,500
         margin = policy.get_margin_requirement("AAPL", 100, 150.0, for_initial=True)
@@ -572,7 +572,7 @@ class TestMarginAccountPolicyFuturesMargin:
 
     def test_mixed_portfolio_buying_power(self):
         """Test buying power with mixed equities and futures."""
-        policy = MarginAccountPolicy(fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, fixed_margin_schedule={"ES": (12_000.0, 6_000.0)})
         # Cash $100k, holding 2 ES contracts
         # ES doesn't contribute market_value in traditional sense (it's a derivative)
         # But we need margin for it
@@ -601,7 +601,7 @@ class TestMarginAccountPolicyMarginCall:
 
     def test_no_margin_call_with_excess_equity(self):
         """Test no margin call when equity exceeds maintenance requirement."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -618,7 +618,7 @@ class TestMarginAccountPolicyMarginCall:
 
     def test_margin_call_when_underwater(self):
         """Test margin call triggered when equity below maintenance."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -636,7 +636,7 @@ class TestMarginAccountPolicyMarginCall:
 
     def test_short_margin_call_higher_threshold(self):
         """Test short positions have higher maintenance (30% vs 25%)."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -655,7 +655,7 @@ class TestMarginAccountPolicyMarginCall:
 
     def test_no_margin_call_empty_positions(self):
         """Test no margin call with no positions."""
-        policy = MarginAccountPolicy()
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)
         assert policy.is_margin_call(100_000.0, {}) is False
 
 

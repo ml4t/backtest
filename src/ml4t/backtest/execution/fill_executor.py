@@ -197,8 +197,9 @@ class FillExecutor:
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
 
-        # Update cash
-        cash_change = -signed_qty * fill_price - actual_commission
+        # Update cash (include multiplier for futures/derivatives)
+        multiplier = broker.get_multiplier(order.asset)
+        cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
 
         # Sync position to AccountState
@@ -266,6 +267,29 @@ class FillExecutor:
         else:
             return fill_price
 
+    def _get_initial_lwm(self, asset: str, fill_price: float) -> float:
+        """Get initial low water mark based on configuration.
+
+        For VBT Pro compatibility with OHLC data, LWM should be initialized
+        from the entry bar's LOW price, not the high. This is critical for
+        short positions where trailing stops use LWM.
+
+        Args:
+            asset: Asset symbol
+            fill_price: Fill price (default fallback)
+
+        Returns:
+            Initial LWM value based on configuration
+        """
+        broker = self.broker
+        # When using BAR_HIGH for HWM, use BAR_LOW for LWM
+        if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
+            return broker._current_lows.get(asset, fill_price)
+        elif broker.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
+            return broker._current_prices.get(asset, fill_price)
+        else:
+            return fill_price
+
     def _build_position_context(self, order: Order) -> dict:
         """Build position context with signal_price.
 
@@ -291,6 +315,7 @@ class FillExecutor:
         order = ctx.order
 
         initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
+        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
         context = self._build_position_context(order)
 
         pos = Position(
@@ -302,7 +327,7 @@ class FillExecutor:
             multiplier=broker.get_multiplier(order.asset),
             entry_commission=ctx.commission,
             high_water_mark=initial_hwm,
-            low_water_mark=initial_hwm,
+            low_water_mark=initial_lwm,
         )
         broker.positions[order.asset] = pos
         broker._positions_created_this_bar.add(order.asset)
@@ -318,13 +343,13 @@ class FillExecutor:
         broker = self.broker
         order = ctx.order
 
-        # PnL includes both entry and exit commission
+        # PnL includes both entry and exit commission, and multiplier for futures
         total_commission = pos.entry_commission + ctx.commission
-        pnl = (ctx.fill_price - pos.entry_price) * old_qty - total_commission
+        pnl = (ctx.fill_price - pos.entry_price) * old_qty * pos.multiplier - total_commission
         pnl_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
 
         trade = Trade(
-            asset=order.asset,
+            symbol=order.asset,  # Order.asset -> Trade.symbol
             entry_time=pos.entry_time,
             exit_time=ctx.current_time,
             entry_price=pos.entry_price,
@@ -333,16 +358,17 @@ class FillExecutor:
             pnl=pnl,
             pnl_percent=pnl_pct,
             bars_held=pos.bars_held,
-            commission=total_commission,
+            fees=total_commission,
             slippage=ctx.slippage,
             exit_reason=_get_exit_reason(order),
-            entry_signals=broker._current_signals.get(order.asset, {}),
-            exit_signals=broker._current_signals.get(order.asset, {}),
-            max_favorable_excursion=pos.max_favorable_excursion,
-            max_adverse_excursion=pos.max_adverse_excursion,
+            mfe=pos.max_favorable_excursion,
+            mae=pos.max_adverse_excursion,
         )
         broker.trades.append(trade)
         del broker.positions[order.asset]
+
+        # Record P&L event for trading stats
+        broker._record_pnl_event(order.asset, pnl, is_partial=False)
 
     def _flip_position(
         self, ctx: FillContext, pos: Position, old_qty: float, new_qty: float
@@ -369,13 +395,13 @@ class FillExecutor:
         open_commission = broker.commission_model.calculate(order.asset, open_qty, ctx.fill_price)
         total_commission = close_commission + open_commission
 
-        # Close the old position
+        # Close the old position (include multiplier for futures)
         total_close_commission = pos.entry_commission + close_commission
-        pnl = (ctx.fill_price - pos.entry_price) * old_qty - total_close_commission
+        pnl = (ctx.fill_price - pos.entry_price) * old_qty * pos.multiplier - total_close_commission
         pnl_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
 
         trade = Trade(
-            asset=order.asset,
+            symbol=order.asset,  # Order.asset -> Trade.symbol
             entry_time=pos.entry_time,
             exit_time=ctx.current_time,
             entry_price=pos.entry_price,
@@ -384,18 +410,20 @@ class FillExecutor:
             pnl=pnl,
             pnl_percent=pnl_pct,
             bars_held=pos.bars_held,
-            commission=total_close_commission,
+            fees=total_close_commission,
             slippage=ctx.slippage * (close_qty / ctx.fill_quantity),
             exit_reason=_get_exit_reason(order),
-            entry_signals=broker._current_signals.get(order.asset, {}),
-            exit_signals=broker._current_signals.get(order.asset, {}),
-            max_favorable_excursion=pos.max_favorable_excursion,
-            max_adverse_excursion=pos.max_adverse_excursion,
+            mfe=pos.max_favorable_excursion,
+            mae=pos.max_adverse_excursion,
         )
         broker.trades.append(trade)
 
+        # Record P&L event for trading stats (flip = close old position)
+        broker._record_pnl_event(order.asset, pnl, is_partial=False)
+
         # Create new position in opposite direction
         initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
+        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
         context = self._build_position_context(order)
 
         broker.positions[order.asset] = Position(
@@ -407,7 +435,7 @@ class FillExecutor:
             multiplier=broker.get_multiplier(order.asset),
             entry_commission=open_commission,
             high_water_mark=initial_hwm,
-            low_water_mark=initial_hwm,
+            low_water_mark=initial_lwm,
         )
         broker._positions_created_this_bar.add(order.asset)
 
@@ -430,10 +458,36 @@ class FillExecutor:
             old_qty: Original position quantity
             new_qty: New position quantity (same sign)
         """
-        if abs(new_qty) > abs(old_qty):
+        broker = self.broker
+
+        if abs(new_qty) < abs(old_qty):
+            # Scaling down - this is a partial exit, calculate and record P&L
+            exited_qty = abs(old_qty) - abs(new_qty)
+
+            # Calculate P&L for the exited portion (include multiplier for futures)
+            # For long positions: pnl = (exit_price - entry_price) * exited_qty * multiplier
+            # For short positions: pnl = (entry_price - exit_price) * exited_qty * multiplier
+            if old_qty > 0:  # Long position
+                pnl = (ctx.fill_price - pos.entry_price) * exited_qty * pos.multiplier
+            else:  # Short position
+                pnl = (pos.entry_price - ctx.fill_price) * exited_qty * pos.multiplier
+
+            # Subtract proportional commission
+            # entry_commission is for the full position, so we take the proportional part
+            exit_portion_ratio = exited_qty / abs(pos.initial_quantity or old_qty)
+            proportional_entry_commission = pos.entry_commission * exit_portion_ratio
+            partial_exit_commission = ctx.commission
+            total_commission = proportional_entry_commission + partial_exit_commission
+            pnl -= total_commission
+
+            # Record P&L event for trading stats
+            broker._record_pnl_event(ctx.order.asset, pnl, is_partial=True)
+
+        elif abs(new_qty) > abs(old_qty):
             # Scaling up - recalculate average entry price
             total_cost = pos.entry_price * abs(old_qty) + ctx.fill_price * abs(ctx.signed_qty)
             pos.entry_price = total_cost / abs(new_qty)
+
         pos.quantity = new_qty
 
     def _sync_account_state(self, asset: str) -> None:
@@ -450,7 +504,7 @@ class FillExecutor:
             if asset in broker.account.positions:
                 del broker.account.positions[asset]
         else:
-            # Update or create position in account
+            # Update or create position in account (include multiplier for correct valuation)
             broker.account.positions[asset] = Position(
                 asset=broker_pos.asset,
                 quantity=broker_pos.quantity,
@@ -458,4 +512,5 @@ class FillExecutor:
                 current_price=broker._current_prices.get(asset, broker_pos.entry_price),
                 entry_time=broker_pos.entry_time,
                 bars_held=broker_pos.bars_held,
+                multiplier=broker_pos.multiplier,
             )

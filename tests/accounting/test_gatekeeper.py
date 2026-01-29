@@ -10,9 +10,9 @@ from ml4t.backtest import (
 )
 from ml4t.backtest.accounting import (
     AccountState,
-    CashAccountPolicy,
     Gatekeeper,
     Position,
+    UnifiedAccountPolicy,
 )
 
 
@@ -21,7 +21,7 @@ class TestGatekeeperInitialization:
 
     def test_init_with_cash_account(self):
         """Test initialization with cash account."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         commission = NoCommission()
 
@@ -36,7 +36,7 @@ class TestCalculateQuantityDelta:
 
     def test_buy_order_positive_delta(self):
         """Buy orders produce positive delta."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -45,7 +45,7 @@ class TestCalculateQuantityDelta:
 
     def test_sell_order_negative_delta(self):
         """Sell orders produce negative delta."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -58,7 +58,7 @@ class TestIsReversal:
 
     def test_no_position_is_not_reversal(self):
         """Opening a position from flat is not a reversal."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -72,7 +72,7 @@ class TestIsReversal:
 
     def test_long_to_short_is_reversal(self):
         """Selling more than long position creates reversal."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -82,7 +82,7 @@ class TestIsReversal:
 
     def test_short_to_long_is_reversal(self):
         """Buying more than short position creates reversal."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -92,7 +92,7 @@ class TestIsReversal:
 
     def test_closing_position_is_not_reversal(self):
         """Closing a position completely is not a reversal."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -106,7 +106,7 @@ class TestIsReversal:
 
     def test_reducing_position_is_not_reversal(self):
         """Partial close is not a reversal."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -120,7 +120,7 @@ class TestIsReversal:
 
     def test_adding_to_position_is_not_reversal(self):
         """Adding to a position is not a reversal."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -138,7 +138,7 @@ class TestIsReducingOrder:
 
     def test_no_position_is_not_reducing(self):
         """Opening a position is not reducing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -152,7 +152,7 @@ class TestIsReducingOrder:
 
     def test_long_position_sell_is_reducing(self):
         """Selling from long position is reducing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -166,7 +166,7 @@ class TestIsReducingOrder:
 
     def test_long_position_buy_is_not_reducing(self):
         """Buying more long is not reducing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -176,7 +176,7 @@ class TestIsReducingOrder:
 
     def test_short_position_buy_is_reducing(self):
         """Buying to cover short is reducing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -190,7 +190,7 @@ class TestIsReducingOrder:
 
     def test_short_position_sell_is_not_reducing(self):
         """Selling more short is not reducing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -200,7 +200,7 @@ class TestIsReducingOrder:
 
     def test_position_reversal_is_not_reducing(self):
         """Position reversal (long->short or short->long) is not reducing."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -218,7 +218,7 @@ class TestValidateOrderReducing:
 
     def test_reducing_order_always_approved(self):
         """Reducing orders always approved regardless of cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=1000.0, policy=policy)  # Low cash
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -241,7 +241,7 @@ class TestValidateOrderReducing:
 
     def test_closing_order_always_approved(self):
         """Closing full position always approved."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=0.0, policy=policy)  # No cash!
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -268,7 +268,7 @@ class TestValidateOrderOpening:
 
     def test_new_long_position_approved_with_cash(self):
         """New long position approved if sufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -281,7 +281,7 @@ class TestValidateOrderOpening:
 
     def test_new_long_position_rejected_insufficient_cash(self):
         """New long position rejected if insufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=10000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -294,7 +294,7 @@ class TestValidateOrderOpening:
 
     def test_new_short_position_rejected_cash_account(self):
         """Cash account rejects new short positions."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -307,7 +307,7 @@ class TestValidateOrderOpening:
 
     def test_adding_to_long_position_approved(self):
         """Adding to long position approved if sufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=20000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -330,7 +330,7 @@ class TestValidateOrderOpening:
 
     def test_adding_to_long_position_rejected_insufficient_cash(self):
         """Adding to long position rejected if insufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=5000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -357,7 +357,7 @@ class TestValidateOrderPositionReversal:
 
     def test_position_reversal_rejected_cash_account(self):
         """Cash account rejects position reversals (long -> short)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -380,9 +380,9 @@ class TestValidateOrderPositionReversal:
 
     def test_position_reversal_approved_margin_account(self):
         """Margin account approves position reversals with sufficient buying power."""
-        from ml4t.backtest.accounting import MarginAccountPolicy
+        from ml4t.backtest.accounting import UnifiedAccountPolicy
 
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -408,9 +408,9 @@ class TestValidateOrderPositionReversal:
 
     def test_position_reversal_rejected_margin_account_insufficient_bp(self):
         """Margin account rejects reversals with insufficient buying power."""
-        from ml4t.backtest.accounting import MarginAccountPolicy
+        from ml4t.backtest.accounting import UnifiedAccountPolicy
 
-        policy = MarginAccountPolicy(initial_margin=0.5)
+        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
         account = AccountState(initial_cash=1000.0, policy=policy)  # Low cash
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -440,7 +440,7 @@ class TestValidateOrderWithCommission:
 
     def test_commission_included_in_cost(self):
         """Commission is included when checking cash constraints."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=15100.0, policy=policy)
         commission = PercentageCommission(rate=0.01)  # 1% commission
         gatekeeper = Gatekeeper(account, commission)
@@ -458,7 +458,7 @@ class TestValidateOrderWithCommission:
 
     def test_order_approved_with_commission(self):
         """Order approved when cash covers price + commission."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=15200.0, policy=policy)
         commission = PercentageCommission(rate=0.01)  # 1% commission
         gatekeeper = Gatekeeper(account, commission)
@@ -480,7 +480,7 @@ class TestValidateOrderEdgeCases:
 
     def test_zero_cash_rejects_new_buy(self):
         """Zero cash rejects new buy orders."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=0.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -492,7 +492,7 @@ class TestValidateOrderEdgeCases:
 
     def test_exact_cash_amount_approved(self):
         """Order approved when cash exactly covers cost."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=15000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -505,7 +505,7 @@ class TestValidateOrderEdgeCases:
 
     def test_fractional_quantities(self):
         """Test with fractional quantities (crypto, fractional shares)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         account = AccountState(initial_cash=10000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 

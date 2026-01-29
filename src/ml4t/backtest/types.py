@@ -1,8 +1,10 @@
 """Core types for backtesting engine."""
 
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 # === Enums ===
 
@@ -274,22 +276,25 @@ class Position:
         bar_high: float | None = None,
         bar_low: float | None = None,
         use_high_for_hwm: bool = False,
+        use_low_for_lwm: bool = False,
     ) -> None:
         """Update high/low water marks and excursion tracking.
 
         Args:
             current_price: Current bar's close price
             bar_high: Bar's high price (used for HWM if use_high_for_hwm=True)
-            bar_low: Bar's low price (used for LWM tracking if provided)
-            use_high_for_hwm: If True, use bar_high for HWM (VBT Pro mode).
+            bar_low: Bar's low price (used for LWM if use_low_for_lwm=True)
+            use_high_for_hwm: If True, use bar_high for HWM (VBT Pro OHLC mode).
                               If False, use current_price (close) for HWM (default).
+            use_low_for_lwm: If True, use bar_low for LWM (VBT Pro OHLC mode).
+                             If False, use current_price (close) for LWM (default).
         """
         # Update current price
         self.current_price = current_price
 
         # Select HWM source based on configuration
         high_for_hwm = bar_high if use_high_for_hwm and bar_high is not None else current_price
-        low_for_lwm = bar_low if bar_low is not None else current_price
+        low_for_lwm = bar_low if use_low_for_lwm and bar_low is not None else current_price
 
         # Update water marks (guaranteed non-None after __post_init__)
         if self.high_water_mark is None or high_for_hwm > self.high_water_mark:
@@ -344,34 +349,257 @@ class Fill:
 
 @dataclass
 class Trade:
-    """Completed round-trip trade.
+    """Round-trip trade (closed or open).
 
     This dataclass is part of the cross-library API specification, designed to
     produce identical Parquet output across Python, Numba, and Rust implementations.
+
+    For open trades (status="open"), exit_time and exit_price represent
+    mark-to-market values at the end of the backtest period.
+
+    Schema Alignment (v0.1.0a6):
+        - symbol: Asset identifier (was 'asset' in earlier versions)
+        - fees: Total transaction fees (was 'commission')
+        - mfe/mae: Max favorable/adverse excursion (was 'max_favorable_excursion'/'max_adverse_excursion')
+        - direction: Derived property from quantity sign
     """
 
-    asset: str
+    symbol: str  # Asset identifier (aligned with ml4t-diagnostic TradeRecord)
     entry_time: datetime
     exit_time: datetime
     entry_price: float
     exit_price: float
-    quantity: float
+    quantity: float  # Signed: positive=long, negative=short
     pnl: float
     pnl_percent: float
     bars_held: int
-    commission: float = 0.0
+    fees: float = 0.0  # Total transaction fees (aligned with ml4t-diagnostic)
     slippage: float = 0.0
     # Exit reason for trade analysis (cross-library API field)
     exit_reason: str = "signal"  # ExitReason enum value as string
-    # Deprecated: signals now handled via post-process join (enrich_trades_with_signals)
-    # Kept for backward compatibility but not exported to DataFrame
-    entry_signals: dict[str, float] = field(default_factory=dict)
-    exit_signals: dict[str, float] = field(default_factory=dict)
-    # MFE/MAE preserved from Position for trade analysis
-    max_favorable_excursion: float = 0.0  # Best unrealized return during trade
-    max_adverse_excursion: float = 0.0  # Worst unrealized return during trade
+    # Trade status: "closed" (actually exited) or "open" (mark-to-market at end)
+    status: str = "closed"
+    # MFE/MAE preserved from Position for trade analysis (shorter field names)
+    mfe: float = 0.0  # Max favorable excursion (best unrealized return)
+    mae: float = 0.0  # Max adverse excursion (worst unrealized return)
+    # Optional metadata extension point
+    metadata: dict[str, Any] | None = None
+
+    @property
+    def direction(self) -> str:
+        """Return 'long' or 'short' based on quantity sign."""
+        return "long" if self.quantity > 0 else "short"
 
     @property
     def side(self) -> str:
-        """Return 'long' or 'short' based on quantity sign."""
-        return "long" if self.quantity > 0 else "short"
+        """Alias for direction (backward compatibility)."""
+        return self.direction
+
+    @property
+    def is_open(self) -> bool:
+        """Return True if this is an open (mark-to-market) trade."""
+        return self.status == "open"
+
+    # === Backward compatibility aliases (deprecated) ===
+
+    @property
+    def asset(self) -> str:
+        """Deprecated: Use 'symbol' instead."""
+        return self.symbol
+
+    @property
+    def commission(self) -> float:
+        """Deprecated: Use 'fees' instead."""
+        return self.fees
+
+    @property
+    def max_favorable_excursion(self) -> float:
+        """Deprecated: Use 'mfe' instead."""
+        return self.mfe
+
+    @property
+    def max_adverse_excursion(self) -> float:
+        """Deprecated: Use 'mae' instead."""
+        return self.mae
+
+
+@dataclass
+class PartialExit:
+    """Record of a partial position exit (scaling down).
+
+    This dataclass tracks when a position is partially reduced, enabling
+    strategies to access trade history during the backtest for stateful
+    decision-making (e.g., adjusting position sizing based on recent wins/losses).
+
+    Unlike Trade which represents a fully closed round-trip, PartialExit
+    captures incremental reductions while the position remains open.
+    """
+
+    symbol: str  # Asset identifier
+    timestamp: datetime  # When the partial exit occurred
+    quantity: float  # Quantity exited (positive value)
+    direction: str  # 'long' or 'short' (original position direction)
+    entry_price: float  # Average entry price at time of exit
+    exit_price: float  # Fill price of the exit
+    pnl: float  # Realized P&L from this portion
+    pnl_percent: float  # Return as decimal (0.05 = 5%)
+    exit_reason: str = "partial_exit"  # Why the exit occurred
+    fees: float = 0.0  # Transaction fees for this exit
+
+    @property
+    def is_win(self) -> bool:
+        """Return True if this partial exit was profitable."""
+        return self.pnl > 0
+
+
+@dataclass
+class AssetTradingStats:
+    """Per-asset trading statistics for stateful decision-making.
+
+    Tracks realized P&L events (both full closes and partial exits) to enable
+    strategies to make decisions based on recent trading performance.
+
+    This dataclass provides O(1) aggregate statistics plus O(N) recent history
+    where N is the configurable window size.
+
+    Example usage in strategy:
+        def on_data(self, timestamp, data, context, broker):
+            stats = broker.get_asset_stats("BTC")
+
+            # Kelly criterion sizing based on recent win rate
+            if stats.recent_win_rate > 0.6:
+                size = 100  # Full size when winning
+            elif stats.recent_win_rate < 0.4:
+                size = 25   # Reduced size when losing
+            else:
+                size = 50   # Normal size
+
+            # Stop trading after N consecutive losses
+            if stats.total_trades > 0 and stats.recent_win_rate == 0:
+                return  # Sit out until win streak improves
+    """
+
+    # All-time aggregates (O(1) memory)
+    total_realized_pnl: float = 0.0
+    total_trades: int = 0  # Count of P&L realizations (full close or partial exit)
+    total_wins: int = 0
+
+    # Recent window - last N P&L events (O(N) memory, N configurable)
+    recent_pnls: deque = field(default_factory=lambda: deque(maxlen=50))
+    recent_wins: int = 0  # Count of wins in window
+
+    # Current session (for intraday, reset at session boundary)
+    session_pnl: float = 0.0
+    session_trades: int = 0
+    session_wins: int = 0
+    session_id: int | None = None  # Current session identifier
+
+    @property
+    def win_rate(self) -> float:
+        """All-time win rate as decimal (0.0 to 1.0).
+
+        Returns 0.0 if no trades have been recorded.
+        """
+        if self.total_trades == 0:
+            return 0.0
+        return self.total_wins / self.total_trades
+
+    @property
+    def recent_win_rate(self) -> float:
+        """Win rate for recent window as decimal (0.0 to 1.0).
+
+        Returns 0.0 if no trades in recent window.
+        """
+        if len(self.recent_pnls) == 0:
+            return 0.0
+        return self.recent_wins / len(self.recent_pnls)
+
+    @property
+    def recent_expectancy(self) -> float:
+        """Average P&L per trade in recent window.
+
+        Returns 0.0 if no trades in recent window.
+        """
+        if len(self.recent_pnls) == 0:
+            return 0.0
+        return sum(self.recent_pnls) / len(self.recent_pnls)
+
+    @property
+    def recent_total_pnl(self) -> float:
+        """Total P&L in recent window."""
+        return sum(self.recent_pnls)
+
+    @property
+    def session_win_rate(self) -> float:
+        """Win rate for current session as decimal (0.0 to 1.0).
+
+        Returns 0.0 if no trades in current session.
+        """
+        if self.session_trades == 0:
+            return 0.0
+        return self.session_wins / self.session_trades
+
+    @property
+    def avg_pnl(self) -> float:
+        """All-time average P&L per trade.
+
+        Returns 0.0 if no trades have been recorded.
+        """
+        if self.total_trades == 0:
+            return 0.0
+        return self.total_realized_pnl / self.total_trades
+
+    def record_pnl(self, pnl: float) -> None:
+        """Record a P&L event (internal use by broker).
+
+        Updates all-time aggregates and recent window. The recent window
+        uses a circular buffer that automatically drops the oldest entry
+        when full.
+
+        Args:
+            pnl: Realized P&L from a full close or partial exit
+        """
+        # Update all-time aggregates
+        self.total_realized_pnl += pnl
+        self.total_trades += 1
+        if pnl > 0:
+            self.total_wins += 1
+
+        # Update recent window (circular buffer)
+        # If buffer is full, the oldest entry will be dropped
+        if len(self.recent_pnls) == self.recent_pnls.maxlen:
+            # Oldest entry is about to be dropped - adjust recent_wins
+            old_pnl = self.recent_pnls[0]
+            if old_pnl > 0:
+                self.recent_wins -= 1
+
+        self.recent_pnls.append(pnl)
+        if pnl > 0:
+            self.recent_wins += 1
+
+        # Update session stats
+        self.session_pnl += pnl
+        self.session_trades += 1
+        if pnl > 0:
+            self.session_wins += 1
+
+    def reset_session(self, new_session_id: int | None = None) -> None:
+        """Reset session statistics (called at session boundary).
+
+        Args:
+            new_session_id: Identifier for the new session (e.g., date ordinal)
+        """
+        self.session_pnl = 0.0
+        self.session_trades = 0
+        self.session_wins = 0
+        self.session_id = new_session_id
+
+    def __repr__(self) -> str:
+        """String representation for debugging."""
+        return (
+            f"AssetTradingStats("
+            f"trades={self.total_trades}, "
+            f"win_rate={self.win_rate:.1%}, "
+            f"total_pnl=${self.total_realized_pnl:,.2f}, "
+            f"recent_win_rate={self.recent_win_rate:.1%})"
+        )

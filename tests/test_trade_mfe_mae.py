@@ -14,7 +14,7 @@ class TestTradeMfeMAeFields:
     def test_trade_has_mfe_mae_fields(self):
         """Test Trade class has MFE/MAE fields."""
         trade = Trade(
-            asset="AAPL",
+            symbol="AAPL",
             entry_time=datetime(2024, 1, 1, 9, 30),
             exit_time=datetime(2024, 1, 5, 16, 0),
             entry_price=150.0,
@@ -25,13 +25,13 @@ class TestTradeMfeMAeFields:
             bars_held=5,
         )
         # Should have default values
-        assert trade.max_favorable_excursion == 0.0
-        assert trade.max_adverse_excursion == 0.0
+        assert trade.mfe == 0.0
+        assert trade.mae == 0.0
 
     def test_trade_with_mfe_mae_values(self):
         """Test Trade preserves MFE/MAE values."""
         trade = Trade(
-            asset="AAPL",
+            symbol="AAPL",
             entry_time=datetime(2024, 1, 1, 9, 30),
             exit_time=datetime(2024, 1, 5, 16, 0),
             entry_price=150.0,
@@ -40,11 +40,11 @@ class TestTradeMfeMAeFields:
             pnl=500.0,
             pnl_percent=0.0333,  # 3.33% gain
             bars_held=5,
-            max_favorable_excursion=0.05,  # Hit +5% during trade
-            max_adverse_excursion=-0.02,  # Hit -2% during trade
+            mfe=0.05,  # Hit +5% during trade
+            mae=-0.02,  # Hit -2% during trade
         )
-        assert trade.max_favorable_excursion == 0.05
-        assert trade.max_adverse_excursion == -0.02
+        assert trade.mfe == 0.05
+        assert trade.mae == -0.02
 
 
 class TestTradeAnalyzerMfeMae:
@@ -55,7 +55,7 @@ class TestTradeAnalyzerMfeMae:
         """Create sample trades with various MFE/MAE values."""
         return [
             Trade(
-                asset="AAPL",
+                symbol="AAPL",
                 entry_time=datetime(2024, 1, 1),
                 exit_time=datetime(2024, 1, 2),
                 entry_price=100.0,
@@ -64,11 +64,11 @@ class TestTradeAnalyzerMfeMae:
                 pnl=500.0,
                 pnl_percent=0.05,  # 5% gain
                 bars_held=1,
-                max_favorable_excursion=0.08,  # Hit +8% peak
-                max_adverse_excursion=-0.01,  # Minimal drawdown
+                mfe=0.08,  # Hit +8% peak
+                mae=-0.01,  # Minimal drawdown
             ),
             Trade(
-                asset="GOOG",
+                symbol="GOOG",
                 entry_time=datetime(2024, 1, 3),
                 exit_time=datetime(2024, 1, 4),
                 entry_price=200.0,
@@ -77,11 +77,11 @@ class TestTradeAnalyzerMfeMae:
                 pnl=-500.0,
                 pnl_percent=-0.05,  # 5% loss
                 bars_held=1,
-                max_favorable_excursion=0.02,  # Briefly profitable
-                max_adverse_excursion=-0.08,  # Hit -8% at worst
+                mfe=0.02,  # Briefly profitable
+                mae=-0.08,  # Hit -8% at worst
             ),
             Trade(
-                asset="MSFT",
+                symbol="MSFT",
                 entry_time=datetime(2024, 1, 5),
                 exit_time=datetime(2024, 1, 6),
                 entry_price=300.0,
@@ -90,8 +90,8 @@ class TestTradeAnalyzerMfeMae:
                 pnl=180.0,
                 pnl_percent=0.02,  # 2% gain
                 bars_held=1,
-                max_favorable_excursion=0.04,  # Hit +4% peak
-                max_adverse_excursion=-0.03,  # Hit -3% drawdown
+                mfe=0.04,  # Hit +4% peak
+                mae=-0.03,  # Hit -3% drawdown
             ),
         ]
 
@@ -160,7 +160,7 @@ class TestTradeAnalyzerMfeCaptureEdgeCases:
         """Test that trades with zero MFE are excluded from capture ratio."""
         trades = [
             Trade(
-                asset="A",
+                symbol="A",
                 entry_time=datetime(2024, 1, 1),
                 exit_time=datetime(2024, 1, 2),
                 entry_price=100.0,
@@ -169,8 +169,8 @@ class TestTradeAnalyzerMfeCaptureEdgeCases:
                 pnl=-500.0,
                 pnl_percent=-0.05,
                 bars_held=1,
-                max_favorable_excursion=0.0,  # Never profitable
-                max_adverse_excursion=-0.06,
+                mfe=0.0,  # Never profitable
+                mae=-0.06,
             ),
         ]
         analyzer = TradeAnalyzer(trades)
@@ -181,7 +181,7 @@ class TestTradeAnalyzerMfeCaptureEdgeCases:
         """Test capture ratio for trades that exit near peak."""
         trades = [
             Trade(
-                asset="A",
+                symbol="A",
                 entry_time=datetime(2024, 1, 1),
                 exit_time=datetime(2024, 1, 2),
                 entry_price=100.0,
@@ -190,8 +190,8 @@ class TestTradeAnalyzerMfeCaptureEdgeCases:
                 pnl=1000.0,
                 pnl_percent=0.10,  # 10% gain
                 bars_held=1,
-                max_favorable_excursion=0.10,  # Exited at peak!
-                max_adverse_excursion=-0.01,
+                mfe=0.10,  # Exited at peak!
+                mae=-0.01,
             ),
         ]
         analyzer = TradeAnalyzer(trades)
@@ -207,7 +207,7 @@ class TestMAEMFEAnalyzer:
         """Create sample trades with various MFE/MAE values."""
         return [
             Trade(
-                asset="AAPL",
+                symbol="AAPL",
                 entry_time=datetime(2024, 1, 1),
                 exit_time=datetime(2024, 1, 2),
                 entry_price=100.0,
@@ -216,11 +216,11 @@ class TestMAEMFEAnalyzer:
                 pnl=500.0,
                 pnl_percent=0.05,  # 5% gain
                 bars_held=1,
-                max_favorable_excursion=0.08,  # Hit +8% peak
-                max_adverse_excursion=-0.01,  # Minimal drawdown
+                mfe=0.08,  # Hit +8% peak
+                mae=-0.01,  # Minimal drawdown
             ),
             Trade(
-                asset="GOOG",
+                symbol="GOOG",
                 entry_time=datetime(2024, 1, 3),
                 exit_time=datetime(2024, 1, 4),
                 entry_price=200.0,
@@ -229,11 +229,11 @@ class TestMAEMFEAnalyzer:
                 pnl=-500.0,
                 pnl_percent=-0.05,  # 5% loss
                 bars_held=1,
-                max_favorable_excursion=0.02,  # Briefly profitable
-                max_adverse_excursion=-0.08,  # Hit -8% at worst
+                mfe=0.02,  # Briefly profitable
+                mae=-0.08,  # Hit -8% at worst
             ),
             Trade(
-                asset="MSFT",
+                symbol="MSFT",
                 entry_time=datetime(2024, 1, 5),
                 exit_time=datetime(2024, 1, 6),
                 entry_price=300.0,
@@ -242,8 +242,8 @@ class TestMAEMFEAnalyzer:
                 pnl=180.0,
                 pnl_percent=0.02,  # 2% gain
                 bars_held=1,
-                max_favorable_excursion=0.04,  # Hit +4% peak
-                max_adverse_excursion=-0.03,  # Hit -3% drawdown
+                mfe=0.04,  # Hit +4% peak
+                mae=-0.03,  # Hit -3% drawdown
             ),
         ]
 

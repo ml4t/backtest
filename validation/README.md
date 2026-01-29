@@ -189,7 +189,7 @@ engine = Engine(
     feed,
     strategy,
     initial_cash=100_000.0,
-    account_type="margin",  # For short selling support
+    allow_short_selling=True, allow_leverage=True,  # For short selling support
     commission_model=NoCommission(),
     slippage_model=NoSlippage(),
     execution_mode=ExecutionMode.SAME_BAR,  # Fill at close price
@@ -215,7 +215,7 @@ engine = Engine(
     feed,
     strategy,
     initial_cash=100_000.0,
-    account_type="margin",  # For short selling support
+    allow_short_selling=True, allow_leverage=True,  # For short selling support
     commission_model=NoCommission(),
     slippage_model=NoSlippage(),
     execution_mode=ExecutionMode.NEXT_BAR,  # Fill at next bar's open
@@ -241,7 +241,7 @@ engine = Engine(
     feed,
     strategy,
     initial_cash=100_000.0,
-    account_type="margin",  # For short selling support
+    allow_short_selling=True, allow_leverage=True,  # For short selling support
     commission_model=NoCommission(),
     slippage_model=NoSlippage(),
     execution_mode=ExecutionMode.SAME_BAR,  # Fill at close price
@@ -282,7 +282,7 @@ engine = Engine(
     feed,
     strategy,
     initial_cash=100_000.0,
-    account_type="margin",  # For short selling support
+    allow_short_selling=True, allow_leverage=True,  # For short selling support
     commission_model=NoCommission(),
     slippage_model=NoSlippage(),
     execution_mode=ExecutionMode.NEXT_BAR,  # Fill at next bar's open
@@ -654,17 +654,98 @@ Scripts exist for each framework:
 |----------|---------|---------|------------|---------|
 | 01: Long Only | ✅ | ✅ | ✅ | ✅ |
 | 02: Long/Short | ✅ | ✅ | ✅ | ✅ |
-| 03: Stop Loss | ✅ | ✅ | ✅ | ✅ |
-| 04: Take Profit | ✅ | ✅ | ✅ | ✅ |
+| 03: Stop Loss (LONG) | ✅ | ✅ | ✅ | ✅ |
+| 04: Take Profit (LONG) | ✅ | ✅ | ✅ | ✅ |
 | 05: Commission (Pct) | ✅ | ✅ | ✅ | ✅ |
 | 06: Commission (Per-Share) | ✅ | ✅ | ✅ | ✅ |
 | 07: Slippage (Fixed) | ✅ | ✅ | ✅ | ✅ |
 | 08: Slippage (Pct) | ✅ | ✅ | ✅ | ✅ |
-| 09: Trailing Stop | ✅ | ✅ | ✅ | ✅ |
-| 10: Bracket Order | ✅ | ✅ | ✅ | - |
-| 11: Short Only | ✅ | - | - | - |
+| 09: Trailing Stop (LONG) | ✅ | ✅ | ✅ | ✅ |
+| 10: Bracket Order (LONG) | ✅ | ✅ | ✅ | - |
+| 11: Short Only | ✅ | ✅ | ✅ | ✅ |
+| 12: Short TSL | ✅ | ✅ | ✅ | ✅ |
+| 13: TSL + TP Combo | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
+| 14: TSL + SL Combo | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
+| 15: Triple Rule | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
+| 16: Stress Test (1500 bars) | ✅ NEW | ✅ NEW | ✅ NEW | ✅ NEW |
+
+## Known Validation Gaps (2026-01-20)
+
+**IMPORTANT**: The validation suite has coverage gaps that should be understood:
+
+### 1. SHORT Position Risk Rules (Updated 2026-01-20)
+
+| Feature | VBT Pro | VBT OSS | Backtrader | Zipline |
+|---------|---------|---------|------------|---------|
+| SHORT Stop Loss | ✅ | ⏳ pending | ⏳ pending | ⏳ pending |
+| SHORT Take Profit | ✅ | ⏳ pending | ⏳ pending | ⏳ pending |
+| SHORT Trailing Stop | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
+| SHORT Bracket Order | ✅ | ⏳ pending | ⏳ pending | ⏳ N/A |
+
+**Status**: SHORT trailing stop scenarios (scenario_12) added for all frameworks.
+SHORT stop-loss and take-profit scenarios still pending (scenarios 13-14).
+
+### 2. Rule Combination Testing (Updated 2026-01-20)
+
+| Combination | Tested | Notes |
+|-------------|--------|-------|
+| TSL + TP | ✅ NEW | Scenario 13: Tests which triggers first |
+| TSL + SL | ✅ NEW | Scenario 14: Tests rule priority |
+| TSL + TP + SL | ✅ NEW | Scenario 15: Triple rule interactions |
+| SL + TP (Bracket) | ✅ | Only LONG tested |
+
+**Status**: Rule combination scenarios (13-15) created for ALL 4 frameworks.
+Run scenarios to verify rule priority behavior matches between frameworks.
+
+### 3. Scenario Depth (Updated 2026-01-20)
+
+| Metric | Basic Scenarios (01-15) | Stress Test (16) |
+|--------|-------------------------|------------------|
+| Bars per scenario | ~50-100 | **1500** |
+| Trend reversals | 2-3 | **9** |
+| Gap events | 0 | **~15** (10% random) |
+| Volatile periods | 1 | **5+** |
+
+**Status**: Scenario 16 (Stress Test) now tests extended market conditions with 1500 bars across 9 market regimes.
+
+### 4. About the "119k Trades" Claim
+
+The 119,000+ trade validation comes from the multi-asset ranking strategy (`benchmark_suite.py`),
+which tests:
+- Entry/exit timing
+- Fill prices
+- Position tracking
+- Basic P&L
+
+This validation does **NOT** test:
+- Trailing stop logic (ranking strategy doesn't use TSL)
+- Stop loss / take profit (ranking strategy exits on signal)
+- Bracket orders (ranking strategy uses simple orders)
+- Rule combinations (single rule or no rules)
+
+The 119k trades validate **core execution mechanics**, not risk management rules.
 
 ## Validation Changelog
+
+**2026-01-20**: Validation Audit - Phase 4 Complete (Stress Testing)
+- Added scenario_16_stress_1000bars.py to ALL 4 frameworks
+- Tests 1500 bars across 9 market regimes (uptrend, crash, recovery, choppy, bull, flash crash, downtrend, volatile, final recovery)
+- Includes gap events (~10% probability) and extreme volatility periods
+- Total stress test scenarios: 4 files (1 scenario × 4 frameworks)
+
+**2026-01-20**: Validation Audit - Phase 3 Complete (Rule Combination Scenarios)
+- Added scenario_13_tsl_tp_combo.py to ALL 4 frameworks (TSL + TP priority)
+- Added scenario_14_tsl_sl_combo.py to ALL 4 frameworks (TSL + SL priority)
+- Added scenario_15_triple_rule.py to ALL 4 frameworks (TSL + TP + SL)
+- Total new scenarios: 12 files (3 scenarios × 4 frameworks)
+- Rule combination behavior now documented across all frameworks
+
+**2026-01-20**: Validation Audit - Documentation Honesty Update
+- Documented known validation gaps (SHORT risk rules, rule combinations)
+- Clarified that trailing stop scenarios are LONG-only except for VBT Pro
+- Added "Known Validation Gaps" section with specific coverage matrix
+- Clarified that 119k trades validates core execution, not risk rules
+- Added scenario depth limitations (100 bars vs recommended 1000+)
 
 **2026-01-18**: Fixed VBT Pro scenarios 09 and 10 (trailing stop, bracket order)
 - Issue: `trades["Status"]` column access failed with pandas KeyError

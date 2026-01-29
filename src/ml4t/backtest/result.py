@@ -37,6 +37,53 @@ if TYPE_CHECKING:
     from .config import BacktestConfig
 
 
+# Annualization factors for common trading calendars
+_ANNUALIZATION_FACTORS: dict[str, int] = {
+    "crypto": 365,  # 24/7 trading
+    "NYSE": 252,
+    "NASDAQ": 252,
+    "CME_Equity": 252,
+    "CME_Agriculture": 252,
+    "CME_Globex_Energy_and_Metals": 252,
+    "LSE": 253,
+    "XETRA": 252,
+    "TSX": 252,
+    "HKEX": 252,
+    "JPX": 245,
+}
+
+
+def _get_annualization_factor(calendar: str | None) -> int:
+    """Get annualization factor for a trading calendar.
+
+    Args:
+        calendar: Trading calendar name. If None, defaults to 252.
+
+    Returns:
+        Number of trading days per year for the calendar.
+    """
+    if calendar is None:
+        return 252  # Default for equities
+
+    # Check known calendars (case-insensitive)
+    cal_upper = calendar.upper()
+    for name, factor in _ANNUALIZATION_FACTORS.items():
+        if name.upper() == cal_upper:
+            return factor
+
+    # Try pandas_market_calendars for unknown calendars
+    try:
+        from pandas_market_calendars import get_calendar
+
+        cal = get_calendar(calendar)
+        # Estimate from typical year
+        schedule = cal.schedule("2024-01-01", "2024-12-31")
+        return len(schedule)
+    except Exception:
+        # Default fallback
+        return 252
+
+
 @dataclass
 class BacktestResult:
     """Structured backtest result with export capabilities.
@@ -75,7 +122,10 @@ class BacktestResult:
         Returns DataFrame with columns:
             asset, entry_time, exit_time, entry_price, exit_price,
             quantity, direction, pnl, pnl_percent, bars_held,
-            commission, slippage, mfe, mae
+            commission, slippage, mfe, mae, exit_reason, status
+
+        The status column indicates "closed" (actually exited) or "open"
+        (mark-to-market at end of backtest).
 
         Returns:
             Polars DataFrame with one row per trade
@@ -90,21 +140,22 @@ class BacktestResult:
         for t in self.trades:
             records.append(
                 {
-                    "asset": t.asset,
+                    "symbol": t.symbol,
                     "entry_time": t.entry_time,
                     "exit_time": t.exit_time,
                     "entry_price": t.entry_price,
                     "exit_price": t.exit_price,
                     "quantity": t.quantity,
-                    "direction": t.side,
+                    "direction": t.direction,
                     "pnl": t.pnl,
                     "pnl_percent": t.pnl_percent,
                     "bars_held": t.bars_held,
-                    "commission": t.commission,
+                    "fees": t.fees,
                     "slippage": t.slippage,
-                    "mfe": t.max_favorable_excursion,
-                    "mae": t.max_adverse_excursion,
+                    "mfe": t.mfe,
+                    "mae": t.mae,
                     "exit_reason": t.exit_reason,
+                    "status": t.status,
                 }
             )
 
@@ -241,8 +292,58 @@ class BacktestResult:
 
         return daily
 
+    def to_daily_returns(
+        self,
+        calendar: str | None = None,
+        session_aligned: bool | None = None,
+    ) -> pl.Series:
+        """Get daily returns as Polars Series for ml4t-diagnostic integration.
+
+        This method properly aggregates bar-level equity to daily returns,
+        which is the correct input for computing risk metrics like Sharpe ratio.
+        For intraday data, using bar-level returns would give incorrect results.
+
+        Args:
+            calendar: Trading calendar for context. If provided and known,
+                enables session-aware aggregation. Common values:
+                - "crypto": 365 days/year (24/7)
+                - "NYSE", "NASDAQ": 252 days/year
+                - "CME_Equity", etc: Uses pandas_market_calendars
+                If None, uses config calendar or defaults to calendar day boundaries.
+            session_aligned: If True, align to trading sessions (e.g., CME 5pm CT).
+                If None, auto-detect from calendar (True for CME, False for crypto).
+                If False, use calendar day boundaries.
+
+        Returns:
+            Series of daily returns (percentage, e.g., 0.01 = 1%)
+
+        Example:
+            >>> result = engine.run()
+            >>> daily_returns = result.to_daily_returns(calendar="NYSE")
+            >>> # Use with ml4t-diagnostic
+            >>> from ml4t.diagnostic import sharpe_ratio
+            >>> sharpe = sharpe_ratio(daily_returns.to_numpy(), annualization_factor=252)
+        """
+        # Determine session alignment
+        if session_aligned is None:
+            # Auto-detect: CME calendars typically need session alignment
+            cal = calendar or (self.config.calendar if self.config else None)
+            session_aligned = cal is not None and "CME" in str(cal).upper()
+
+        # Get daily P&L DataFrame
+        daily_df = self.to_daily_pnl(session_aligned=session_aligned)
+
+        if daily_df.is_empty():
+            return pl.Series("daily_return", [], dtype=pl.Float64)
+
+        # Return the return_pct column as a Series
+        return daily_df["return_pct"].alias("daily_return")
+
     def to_returns_series(self) -> pl.Series:
         """Get period returns as Polars Series.
+
+        Note: This returns BAR-LEVEL returns, not daily returns.
+        For risk metrics like Sharpe ratio, use to_daily_returns() instead.
 
         Returns:
             Series of period returns (one per bar)
@@ -259,9 +360,157 @@ class BacktestResult:
         Returns:
             List of trade record dictionaries
         """
-        from .analysis import to_trade_records
+        from .analytics.bridge import to_trade_records
 
         return to_trade_records(self.trades)
+
+    def compute_metrics(
+        self,
+        calendar: str | None = None,
+        confidence_intervals: bool = False,
+    ) -> dict[str, Any]:
+        """Compute performance metrics via ml4t-diagnostic.
+
+        This method provides properly computed risk-adjusted metrics using
+        daily returns. For intraday backtests, this is critical to get
+        correct Sharpe/Sortino ratios (bar-level returns give wrong values).
+
+        Args:
+            calendar: Trading calendar for annualization:
+                - "crypto": 365 days/year (24/7)
+                - "NYSE", "NASDAQ": 252 days/year
+                - Any pandas_market_calendars calendar
+                If None, uses config calendar or defaults to 252.
+            confidence_intervals: If True, include bootstrap CI for Sharpe
+                (requires ml4t-diagnostic with bootstrap support)
+
+        Returns:
+            Dictionary with metrics:
+                - sharpe_ratio: Annualized Sharpe ratio
+                - sortino_ratio: Annualized Sortino ratio
+                - calmar_ratio: CAGR / Max Drawdown
+                - max_drawdown: Maximum drawdown (negative)
+                - cagr: Compound annual growth rate
+                - total_return: Total return
+                - num_trades: Number of trades
+                - win_rate: Percentage of winning trades
+                - profit_factor: Gross profits / Gross losses
+                - expectancy: Average expected P&L per trade
+                Plus trade statistics from TradeAnalyzer
+
+        Raises:
+            ImportError: If ml4t-diagnostic is not installed
+
+        Example:
+            >>> result = engine.run()
+            >>> metrics = result.compute_metrics(calendar="crypto")
+            >>> print(f"Sharpe: {metrics['sharpe_ratio']:.2f}")
+        """
+        # Import from ml4t-diagnostic (optional dependency)
+        # Using dynamic import to avoid type checker issues with optional deps
+        import importlib
+        from collections.abc import Callable
+
+        try:
+            diagnostic = importlib.import_module("ml4t.diagnostic")
+            sharpe_ratio: Callable[..., float] = diagnostic.sharpe_ratio
+            sortino_ratio: Callable[..., float] = diagnostic.sortino_ratio
+        except (ImportError, AttributeError) as e:
+            raise ImportError(
+                "ml4t-diagnostic is required for compute_metrics(). "
+                "Install with: pip install ml4t-diagnostic"
+            ) from e
+
+        # Get calendar and annualization factor
+        cal = calendar or (self.config.calendar if self.config else None)
+        annualization_factor = _get_annualization_factor(cal)
+
+        # Get daily returns
+        daily_returns = self.to_daily_returns(calendar=cal)
+        returns_array = daily_returns.to_numpy()
+
+        # Compute metrics via diagnostic library
+        metrics: dict[str, Any] = {}
+
+        # Risk-adjusted returns
+        if len(returns_array) > 0:
+            metrics["sharpe_ratio"] = sharpe_ratio(
+                returns_array, annualization_factor=annualization_factor
+            )
+            metrics["sortino_ratio"] = sortino_ratio(
+                returns_array, annualization_factor=annualization_factor
+            )
+        else:
+            metrics["sharpe_ratio"] = 0.0
+            metrics["sortino_ratio"] = 0.0
+
+        # Drawdown metrics (from equity curve)
+        equity_df = self.to_equity_dataframe()
+        if len(equity_df) > 0:
+            # Get max drawdown as float
+            dd_values = equity_df["drawdown"].to_list()
+            max_dd: float = min(dd_values) if dd_values else 0.0
+            metrics["max_drawdown"] = max_dd
+
+            # CAGR from total return and days
+            equity_values = equity_df["equity"].to_list()
+            first_val: float = equity_values[0] if equity_values else 1.0
+            last_val: float = equity_values[-1] if equity_values else 1.0
+            total_return: float = (last_val / first_val) - 1.0
+            metrics["total_return"] = total_return
+
+            # Days in backtest
+            timestamps = equity_df["timestamp"].to_list()
+            first_ts = timestamps[0]
+            last_ts = timestamps[-1]
+            days: float = (last_ts - first_ts).total_seconds() / 86400
+            years: float = days / 365.25
+            if years > 0:
+                cagr: float = (1 + total_return) ** (1 / years) - 1
+                metrics["cagr"] = cagr
+                if max_dd != 0:
+                    metrics["calmar_ratio"] = cagr / abs(max_dd)
+                else:
+                    metrics["calmar_ratio"] = 0.0
+            else:
+                metrics["cagr"] = 0.0
+                metrics["calmar_ratio"] = 0.0
+        else:
+            metrics["max_drawdown"] = 0.0
+            metrics["total_return"] = 0.0
+            metrics["cagr"] = 0.0
+            metrics["calmar_ratio"] = 0.0
+
+        # Trade statistics
+        if self.trade_analyzer is not None:
+            ta = self.trade_analyzer
+            metrics["num_trades"] = ta.num_trades
+            metrics["win_rate"] = ta.win_rate
+            metrics["profit_factor"] = ta.profit_factor
+            metrics["expectancy"] = ta.expectancy
+            metrics["avg_trade"] = ta.avg_trade
+            metrics["avg_winner"] = ta.avg_win
+            metrics["avg_loser"] = ta.avg_loss
+            metrics["total_fees"] = ta.total_fees
+        elif self.trades:
+            # Compute basic stats
+            wins = [t for t in self.trades if t.pnl > 0]
+            losses = [t for t in self.trades if t.pnl < 0]
+            metrics["num_trades"] = len(self.trades)
+            metrics["win_rate"] = len(wins) / len(self.trades) if self.trades else 0.0
+            total_wins = sum(t.pnl for t in wins)
+            total_losses = abs(sum(t.pnl for t in losses))
+            metrics["profit_factor"] = total_wins / total_losses if total_losses > 0 else 0.0
+            metrics["avg_trade"] = sum(t.pnl for t in self.trades) / len(self.trades)
+            metrics["expectancy"] = metrics["avg_trade"]
+        else:
+            metrics["num_trades"] = 0
+            metrics["win_rate"] = 0.0
+            metrics["profit_factor"] = 0.0
+            metrics["expectancy"] = 0.0
+            metrics["avg_trade"] = 0.0
+
+        return metrics
 
     def to_dict(self) -> dict[str, Any]:
         """Export as dictionary (backward compatible with Engine.run()).
@@ -336,7 +585,7 @@ class BacktestResult:
             # Filter to JSON-serializable metrics
             serializable = {}
             for k, v in self.metrics.items():
-                if isinstance(v, int | float | str | bool | type(None)):
+                if isinstance(v, (int, float, str, bool, type(None))):
                     serializable[k] = v
                 elif isinstance(v, datetime):
                     serializable[k] = v.isoformat()
@@ -384,9 +633,12 @@ class BacktestResult:
         if trades_path.exists():
             trades_df = pl.read_parquet(trades_path)
             for row in trades_df.iter_rows(named=True):
+                # Support both old (asset/commission) and new (symbol/fees) column names
+                symbol = row.get("symbol") or row.get("asset", "")
+                fees = row.get("fees") or row.get("commission", 0.0)
                 trades.append(
                     Trade(
-                        asset=row["asset"],
+                        symbol=symbol,
                         entry_time=row["entry_time"],
                         exit_time=row["exit_time"],
                         entry_price=row["entry_price"],
@@ -395,11 +647,11 @@ class BacktestResult:
                         pnl=row["pnl"],
                         pnl_percent=row["pnl_percent"],
                         bars_held=row["bars_held"],
-                        commission=row["commission"],
+                        fees=fees,
                         slippage=row["slippage"],
                         exit_reason=row.get("exit_reason", "signal"),
-                        max_favorable_excursion=row["mfe"],
-                        max_adverse_excursion=row["mae"],
+                        mfe=row["mfe"],
+                        mae=row["mae"],
                     )
                 )
 
@@ -447,9 +699,13 @@ class BacktestResult:
 
         This schema is part of the cross-library API specification, designed to
         produce identical Parquet output across Python, Numba, and Rust implementations.
+
+        Schema Alignment (v0.1.0a6):
+            - symbol: Asset identifier (was 'asset')
+            - fees: Total transaction fees (was 'commission')
         """
         return {
-            "asset": pl.String(),
+            "symbol": pl.String(),
             "entry_time": pl.Datetime(),
             "exit_time": pl.Datetime(),
             "entry_price": pl.Float64(),
@@ -459,11 +715,12 @@ class BacktestResult:
             "pnl": pl.Float64(),
             "pnl_percent": pl.Float64(),
             "bars_held": pl.Int32(),
-            "commission": pl.Float64(),
+            "fees": pl.Float64(),
             "slippage": pl.Float64(),
             "mfe": pl.Float64(),
             "mae": pl.Float64(),
             "exit_reason": pl.String(),
+            "status": pl.String(),  # "closed" or "open"
         }
 
     @staticmethod
@@ -626,7 +883,7 @@ class BacktestResult:
             winners = sum(1 for t in self.trades if t.pnl > 0)
             tearsheet_metrics["win_rate"] = winners / len(self.trades) if self.trades else 0
         if "total_commission" not in tearsheet_metrics and self.trades:
-            tearsheet_metrics["total_commission"] = sum(t.commission for t in self.trades)
+            tearsheet_metrics["total_commission"] = sum(t.fees for t in self.trades)
         if "total_slippage" not in tearsheet_metrics and self.trades:
             tearsheet_metrics["total_slippage"] = sum(t.slippage for t in self.trades)
 

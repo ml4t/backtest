@@ -195,7 +195,7 @@ def benchmark_ml4t_backtest(
         feed,
         strategy,
         initial_cash=100_000.0,
-        account_type="cash",
+        allow_short_selling=False,
         commission_model=NoCommission(),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.NEXT_BAR,  # Match Backtrader

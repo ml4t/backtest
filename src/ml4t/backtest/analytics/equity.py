@@ -1,5 +1,6 @@
 """Equity curve tracking and analysis."""
 
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -75,11 +76,37 @@ class EquityCurve:
         return len(self.values) / TRADING_DAYS_PER_YEAR if self.values else 0.0
 
     def sharpe(self, risk_free_rate: float = 0.0) -> float:
-        """Annualized Sharpe ratio."""
+        """Annualized Sharpe ratio.
+
+        .. deprecated::
+            This method uses bar-level returns which gives incorrect results
+            for intraday data. Use ``result.compute_metrics()`` instead for
+            properly computed Sharpe ratio with daily returns.
+        """
+        warnings.warn(
+            "EquityCurve.sharpe() uses bar-level returns which is incorrect for "
+            "intraday data. Use result.compute_metrics() instead for proper "
+            "Sharpe ratio with daily returns.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return sharpe_ratio(self.returns, risk_free_rate)
 
     def sortino(self, risk_free_rate: float = 0.0) -> float:
-        """Annualized Sortino ratio."""
+        """Annualized Sortino ratio.
+
+        .. deprecated::
+            This method uses bar-level returns which gives incorrect results
+            for intraday data. Use ``result.compute_metrics()`` instead for
+            properly computed Sortino ratio with daily returns.
+        """
+        warnings.warn(
+            "EquityCurve.sortino() uses bar-level returns which is incorrect for "
+            "intraday data. Use result.compute_metrics() instead for proper "
+            "Sortino ratio with daily returns.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return sortino_ratio(self.returns, risk_free_rate)
 
     def max_drawdown_info(self) -> tuple[float, int, int]:
@@ -99,7 +126,20 @@ class EquityCurve:
 
     @property
     def calmar(self) -> float:
-        """Calmar ratio (CAGR / Max Drawdown)."""
+        """Calmar ratio (CAGR / Max Drawdown).
+
+        .. deprecated::
+            This property assumes bars=days for CAGR calculation, which is
+            incorrect for intraday data. Use ``result.compute_metrics()``
+            instead for properly computed Calmar ratio.
+        """
+        warnings.warn(
+            "EquityCurve.calmar assumes bars=days for CAGR, which is incorrect for "
+            "intraday data. Use result.compute_metrics() instead for proper "
+            "Calmar ratio.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return calmar_ratio(self.cagr, self.max_dd)
 
     @property

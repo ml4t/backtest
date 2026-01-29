@@ -167,7 +167,7 @@ class TradeStatistics:
         pnls = np.array([t.pnl for t in trades])
         pnl_pcts = np.array([t.pnl_percent for t in trades])
         bars = np.array([t.bars_held for t in trades])
-        commissions = np.array([t.commission for t in trades])
+        commissions = np.array([t.fees for t in trades])
         slippages = np.array([t.slippage for t in trades])
 
         n_trades = len(trades)
@@ -368,7 +368,7 @@ class BacktestAnalyzer:
         for t in self.trades:
             records.append(
                 {
-                    "asset": t.asset,
+                    "symbol": t.symbol,
                     "entry_time": t.entry_time,
                     "exit_time": t.exit_time,
                     "entry_price": t.entry_price,
@@ -377,11 +377,11 @@ class BacktestAnalyzer:
                     "pnl": t.pnl,
                     "pnl_percent": t.pnl_percent,
                     "bars_held": t.bars_held,
-                    "commission": t.commission,
+                    "fees": t.fees,
                     "slippage": t.slippage,
-                    "direction": "long" if t.quantity > 0 else "short",
-                    "mfe": t.max_favorable_excursion,
-                    "mae": t.max_adverse_excursion,
+                    "direction": t.direction,
+                    "mfe": t.mfe,
+                    "mae": t.mae,
                 }
             )
 

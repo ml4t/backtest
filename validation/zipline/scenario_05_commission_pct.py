@@ -291,7 +291,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
         feed,
         strategy,
         initial_cash=100_000.0,
-        account_type="cash",
+        allow_short_selling=False,
         commission_model=PercentageCommission(rate=COMMISSION_RATE),
         slippage_model=NoSlippage(),
         execution_mode=ExecutionMode.NEXT_BAR,  # Match Zipline

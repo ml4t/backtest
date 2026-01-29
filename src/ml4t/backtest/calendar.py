@@ -268,7 +268,7 @@ def is_trading_day(calendar_id: str, check_date: date | datetime | str) -> bool:
     calendar = get_calendar(calendar_id)
 
     # Convert to pandas Timestamp for comparison
-    if isinstance(check_date, str | date | datetime):
+    if isinstance(check_date, (str, date, datetime)):
         check_date = pd.Timestamp(check_date)
 
     valid_days = calendar.valid_days(start_date=check_date, end_date=check_date)

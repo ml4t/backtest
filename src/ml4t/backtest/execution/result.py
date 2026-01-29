@@ -10,9 +10,17 @@ class ExecutionResult:
     Attributes:
         fillable_quantity: Quantity that can be filled this bar
         remaining_quantity: Quantity that must wait for next bar
-        adjusted_price: Price after market impact adjustment
-        impact_cost: Cost of market impact (price difference * quantity)
+        adjusted_price: Price after market impact adjustment (currently equals
+                       input price - market impact models not yet implemented)
+        impact_cost: Cost of market impact (currently 0.0 - placeholder for
+                    future market impact modeling)
         participation_rate: Actual participation rate (fillable / volume)
+
+    Note:
+        The current execution limit implementations (VolumeParticipationLimit,
+        AdaptiveParticipationLimit) focus on volume constraints only. The
+        adjusted_price and impact_cost fields are placeholders for future
+        market impact models (e.g., Almgren-Chriss, Kyle's Lambda).
     """
 
     fillable_quantity: float

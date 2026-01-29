@@ -124,6 +124,7 @@ dev = [
     "ipython>=8.14.0",
     "ipdb>=0.13.0",
     "pre-commit>=3.3.0",
+    "ml4t-diagnostic",  # Sibling package for tearsheet integration tests
 ]
 
 # Documentation dependencies
@@ -242,3 +243,7 @@ exclude_lines = [
     "except ImportError:",
     "@abstractmethod",
 ]
+
+[tool.uv.sources]
+# Sibling package for optional tearsheet integration
+ml4t-diagnostic = { path = "../ml4t-diagnostic", editable = true }

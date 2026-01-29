@@ -423,7 +423,7 @@ class TestCommissionSplitOnFlip:
             initial_cash=100_000.0,
             commission_model=PerShareCommission(0.01),
             slippage_model=NoSlippage(),
-            account_type="margin",  # Allow position flips
+            allow_short_selling=True, allow_leverage=True,  # Allow position flips
         )
 
         # Setup: Create long position (100 shares @ $100)
@@ -519,7 +519,7 @@ class TestBracketCancellationOnFlip:
             initial_cash=100_000.0,
             commission_model=PerShareCommission(0.01),
             slippage_model=NoSlippage(),
-            account_type="margin",
+            allow_short_selling=True, allow_leverage=True,
         )
 
         # Bar 1: $150 - Open long 100 with brackets
@@ -645,7 +645,7 @@ class TestPositionFlipValidation:
             initial_cash=100_000.0,
             commission_model=PerShareCommission(0.01),
             slippage_model=NoSlippage(),
-            account_type="margin",
+            allow_short_selling=True, allow_leverage=True,
         )
 
         # Bar 1: $100 - Open long 100 shares (costs $10,000 + $1 commission)
@@ -710,11 +710,6 @@ class TestPositionFlipValidation:
 class TestBrokerEdgeCases:
     """Test edge cases and error handling."""
 
-    def test_invalid_account_type(self):
-        """Test that invalid account_type raises ValueError."""
-        with pytest.raises(ValueError, match="Unknown account_type"):
-            Broker(initial_cash=100000.0, account_type="invalid")
-
     def test_position_scaling_up(self):
         """Test adding to an existing position (scaling up)."""
         broker = Broker(
@@ -767,7 +762,7 @@ class TestBrokerEdgeCases:
             initial_cash=100000.0,
             commission_model=NoCommission(),
             slippage_model=NoSlippage(),
-            account_type="margin",
+            allow_short_selling=True, allow_leverage=True,
         )
 
         # Open initial short position: -100 shares @ $150
@@ -1818,7 +1813,7 @@ class TestMarketImpactIntegration:
             commission_model=NoCommission(),
             slippage_model=NoSlippage(),
             market_impact_model=LinearImpact(coefficient=0.1),
-            account_type="margin",
+            allow_short_selling=True, allow_leverage=True,
         )
 
         broker._update_time(
@@ -2226,6 +2221,402 @@ class TestConvenienceMethods:
         assert aapl_orders[0].side == OrderSide.SELL
 
 
+class TestP1PositionModification:
+    """Test P1 position modification methods (reduce_position, buy, sell)."""
+
+    def test_reduce_position_half(self, broker_with_position):
+        """Test reduce_position sells half of a long position."""
+        broker = broker_with_position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 160.0},
+            opens={"AAPL": 160.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 161.0},
+            lows={"AAPL": 159.0},
+            signals={},
+        )
+
+        # Reduce by 50%
+        order = broker.reduce_position("AAPL", fraction=0.5)
+
+        assert order is not None
+        assert order.side == OrderSide.SELL
+        assert order.quantity == 50.0  # Half of 100 shares
+
+    def test_reduce_position_quarter(self, broker_with_position):
+        """Test reduce_position sells a quarter of a position."""
+        broker = broker_with_position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 160.0},
+            opens={"AAPL": 160.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 161.0},
+            lows={"AAPL": 159.0},
+            signals={},
+        )
+
+        order = broker.reduce_position("AAPL", fraction=0.25)
+
+        assert order is not None
+        assert order.side == OrderSide.SELL
+        assert order.quantity == 25.0  # Quarter of 100 shares
+
+    def test_reduce_position_full(self, broker_with_position):
+        """Test reduce_position with fraction=1 closes entire position."""
+        broker = broker_with_position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 160.0},
+            opens={"AAPL": 160.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 161.0},
+            lows={"AAPL": 159.0},
+            signals={},
+        )
+
+        order = broker.reduce_position("AAPL", fraction=1.0)
+
+        assert order is not None
+        assert order.side == OrderSide.SELL
+        assert order.quantity == 100.0  # Full 100 shares
+
+    def test_reduce_position_short(self, broker):
+        """Test reduce_position covers part of a short position."""
+        # Create short position
+        pos = Position(
+            asset="AAPL",
+            quantity=-100.0,  # Short position
+            entry_price=150.0,
+            entry_time=datetime(2024, 1, 1, 9, 30),
+        )
+        broker.positions["AAPL"] = pos
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 140.0},
+            opens={"AAPL": 140.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 141.0},
+            lows={"AAPL": 139.0},
+            signals={},
+        )
+
+        order = broker.reduce_position("AAPL", fraction=0.5)
+
+        assert order is not None
+        assert order.side == OrderSide.BUY  # Cover short
+        assert order.quantity == 50.0
+
+    def test_reduce_position_no_position(self, broker):
+        """Test reduce_position returns None for non-existent position."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        order = broker.reduce_position("AAPL", fraction=0.5)
+        assert order is None
+
+    def test_reduce_position_invalid_fraction(self, broker_with_position):
+        """Test reduce_position raises ValueError for invalid fraction."""
+        broker = broker_with_position
+
+        with pytest.raises(ValueError, match="fraction must be in"):
+            broker.reduce_position("AAPL", fraction=0.0)
+
+        with pytest.raises(ValueError, match="fraction must be in"):
+            broker.reduce_position("AAPL", fraction=-0.5)
+
+        with pytest.raises(ValueError, match="fraction must be in"):
+            broker.reduce_position("AAPL", fraction=1.5)
+
+    def test_reduce_position_with_limit_order(self, broker_with_position):
+        """Test reduce_position creates limit order when specified."""
+        broker = broker_with_position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 160.0},
+            opens={"AAPL": 160.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 161.0},
+            lows={"AAPL": 159.0},
+            signals={},
+        )
+
+        order = broker.reduce_position(
+            "AAPL", fraction=0.5, order_type=OrderType.LIMIT, limit_price=165.0
+        )
+
+        assert order is not None
+        assert order.order_type == OrderType.LIMIT
+        assert order.limit_price == 165.0
+
+
+class TestP1BuySellApi:
+    """Test P1 explicit buy/sell API with asset-class aware units."""
+
+    def test_buy_with_shares(self, broker):
+        """Test buy with explicit shares parameter."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        order = broker.buy("AAPL", shares=100)
+
+        assert order is not None
+        assert order.side == OrderSide.BUY
+        assert order.quantity == 100.0
+
+    def test_buy_with_dollars(self, broker):
+        """Test buy with dollars converts to correct quantity."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        order = broker.buy("AAPL", dollars=5000)
+
+        assert order is not None
+        assert order.side == OrderSide.BUY
+        assert order.quantity == 50.0  # $5000 / $100 = 50 shares
+
+    def test_buy_with_contracts(self, broker):
+        """Test buy with contracts parameter (futures)."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"ES": 5000.0},
+            opens={"ES": 5000.0},
+            volumes={"ES": 1000.0},
+            highs={"ES": 5010.0},
+            lows={"ES": 4990.0},
+            signals={},
+        )
+
+        order = broker.buy("ES", contracts=2)
+
+        assert order is not None
+        assert order.side == OrderSide.BUY
+        assert order.quantity == 2.0
+
+    def test_buy_with_amount(self, broker):
+        """Test buy with amount parameter (crypto base currency)."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"BTC": 50000.0},
+            opens={"BTC": 50000.0},
+            volumes={"BTC": 100.0},
+            highs={"BTC": 50500.0},
+            lows={"BTC": 49500.0},
+            signals={},
+        )
+
+        order = broker.buy("BTC", amount=0.5)
+
+        assert order is not None
+        assert order.side == OrderSide.BUY
+        assert order.quantity == 0.5
+
+    def test_buy_no_quantity_raises(self, broker):
+        """Test buy without quantity parameter raises ValueError."""
+        with pytest.raises(ValueError, match="Must provide one of"):
+            broker.buy("AAPL")
+
+    def test_buy_multiple_quantities_raises(self, broker):
+        """Test buy with multiple quantity params raises ValueError."""
+        with pytest.raises(ValueError, match="Must provide only one of"):
+            broker.buy("AAPL", shares=100, dollars=5000)
+
+    def test_buy_no_price_returns_none(self, broker):
+        """Test buy with dollars but no price returns None."""
+        # No _update_time called, so no current price
+        order = broker.buy("AAPL", dollars=5000)
+        assert order is None
+
+    def test_sell_with_shares(self, broker):
+        """Test sell with explicit shares parameter."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        order = broker.sell("AAPL", shares=50)
+
+        assert order is not None
+        assert order.side == OrderSide.SELL
+        assert order.quantity == 50.0
+
+    def test_sell_with_dollars(self, broker_with_position):
+        """Test sell with dollars converts to correct quantity."""
+        broker = broker_with_position
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        order = broker.sell("AAPL", dollars=2500)
+
+        assert order is not None
+        assert order.side == OrderSide.SELL
+        assert order.quantity == 25.0  # $2500 / $100 = 25 shares
+
+    def test_buy_with_limit_order(self, broker):
+        """Test buy creates limit order when specified."""
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 150.0},
+            opens={"AAPL": 150.0},
+            volumes={"AAPL": 10000.0},
+            highs={"AAPL": 151.0},
+            lows={"AAPL": 149.0},
+            signals={},
+        )
+
+        order = broker.buy("AAPL", shares=100, order_type=OrderType.LIMIT, limit_price=145.0)
+
+        assert order is not None
+        assert order.order_type == OrderType.LIMIT
+        assert order.limit_price == 145.0
+
+
+class TestP1TradeHistory:
+    """Test P1 trade history access during backtest."""
+
+    @pytest.fixture
+    def broker_with_trades(self):
+        """Create broker with some completed trades."""
+        from ml4t.backtest.types import Trade
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+
+        # Add some mock trades
+        broker.trades = [
+            Trade(
+                symbol="AAPL",
+                entry_time=datetime(2024, 1, 1, 9, 30),
+                exit_time=datetime(2024, 1, 2, 15, 30),
+                entry_price=150.0,
+                exit_price=155.0,
+                quantity=100.0,
+                pnl=500.0,
+                pnl_percent=0.0333,
+                bars_held=1,
+                exit_reason="signal",
+            ),
+            Trade(
+                symbol="AAPL",
+                entry_time=datetime(2024, 1, 3, 9, 30),
+                exit_time=datetime(2024, 1, 4, 15, 30),
+                entry_price=155.0,
+                exit_price=150.0,
+                quantity=100.0,
+                pnl=-500.0,
+                pnl_percent=-0.0323,
+                bars_held=1,
+                exit_reason="stop_loss",
+            ),
+            Trade(
+                symbol="GOOGL",
+                entry_time=datetime(2024, 1, 2, 9, 30),
+                exit_time=datetime(2024, 1, 5, 15, 30),
+                entry_price=200.0,
+                exit_price=210.0,
+                quantity=50.0,
+                pnl=500.0,
+                pnl_percent=0.05,
+                bars_held=3,
+                exit_reason="take_profit",
+            ),
+        ]
+
+        return broker
+
+    def test_get_trades_all(self, broker_with_trades):
+        """Test get_trades returns all trades."""
+        trades = broker_with_trades.get_trades()
+        assert len(trades) == 3
+
+    def test_get_trades_by_asset(self, broker_with_trades):
+        """Test get_trades filters by asset."""
+        aapl_trades = broker_with_trades.get_trades(asset="AAPL")
+        assert len(aapl_trades) == 2
+        assert all(t.symbol == "AAPL" for t in aapl_trades)
+
+        googl_trades = broker_with_trades.get_trades(asset="GOOGL")
+        assert len(googl_trades) == 1
+        assert googl_trades[0].symbol == "GOOGL"
+
+    def test_get_trades_last_n(self, broker_with_trades):
+        """Test get_trades returns last N trades."""
+        recent = broker_with_trades.get_trades(last_n=2)
+        assert len(recent) == 2
+        # Should be the last 2 trades (AAPL stop_loss and GOOGL take_profit)
+
+    def test_get_trades_combined_filters(self, broker_with_trades):
+        """Test get_trades with asset and last_n filters."""
+        recent_aapl = broker_with_trades.get_trades(asset="AAPL", last_n=1)
+        assert len(recent_aapl) == 1
+        assert recent_aapl[0].exit_reason == "stop_loss"  # Last AAPL trade
+
+    def test_get_trades_empty(self, broker):
+        """Test get_trades returns empty list when no trades."""
+        trades = broker.get_trades()
+        assert trades == []
+
+    def test_get_last_trade(self, broker_with_trades):
+        """Test get_last_trade returns most recent trade."""
+        last = broker_with_trades.get_last_trade()
+        assert last is not None
+        assert last.symbol == "GOOGL"  # Last trade in list
+
+    def test_get_last_trade_by_asset(self, broker_with_trades):
+        """Test get_last_trade with asset filter."""
+        last_aapl = broker_with_trades.get_last_trade(asset="AAPL")
+        assert last_aapl is not None
+        assert last_aapl.symbol == "AAPL"
+        assert last_aapl.exit_reason == "stop_loss"  # Second AAPL trade
+
+    def test_get_last_trade_no_trades(self, broker):
+        """Test get_last_trade returns None when no trades."""
+        last = broker.get_last_trade()
+        assert last is None
+
+    def test_get_last_trade_no_matching_asset(self, broker_with_trades):
+        """Test get_last_trade returns None for non-existent asset."""
+        last = broker_with_trades.get_last_trade(asset="MSFT")
+        assert last is None
+
+
 class TestOrderRejection:
     """Test order rejection tracking and querying."""
 
@@ -2282,7 +2673,7 @@ class TestOrderRejection:
             initial_cash=100000.0,
             commission_model=NoCommission(),
             slippage_model=NoSlippage(),
-            account_type="cash",  # Cash accounts don't allow shorts
+            allow_short_selling=False,  # Cash accounts don't allow shorts
         )
 
         broker._update_time(
@@ -2526,7 +2917,7 @@ class TestBugFix4BracketOrdersForShorts:
 
     def test_bracket_short_entry_has_buy_exits(self):
         """Short entry brackets should have BUY exits."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},
@@ -2549,7 +2940,7 @@ class TestBugFix5BuyTrailingStops:
 
     def test_trailing_stop_buy_trails_from_low(self):
         """BUY trailing stop should trail UP from lows."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
 
         # Setup: enter short position
         broker._update_time(
@@ -2588,7 +2979,7 @@ class TestBugFix5BuyTrailingStops:
 
     def test_trailing_stop_buy_triggers_on_high(self):
         """BUY trailing stop should trigger when high crosses stop."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
 
         # Setup: enter short position
         broker._update_time(

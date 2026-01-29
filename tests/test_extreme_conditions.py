@@ -97,7 +97,7 @@ class TestGapOpens:
 
     def test_short_gap_up_through_stop(self):
         """Short position stop should fill at open on gap up."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), account_type="margin")
+        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
 
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),

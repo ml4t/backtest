@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from ml4t.backtest import Position
-from src.ml4t.backtest.accounting.policy import CashAccountPolicy
+from src.ml4t.backtest.accounting.policy import UnifiedAccountPolicy
 
 
 class TestCashAccountPolicyBuyingPower:
@@ -11,25 +11,25 @@ class TestCashAccountPolicyBuyingPower:
 
     def test_positive_cash_buying_power(self):
         """Test buying power equals cash when cash is positive."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         bp = policy.calculate_buying_power(cash=10000.0, positions={})
         assert bp == 10000.0
 
     def test_zero_cash_buying_power(self):
         """Test buying power is zero when cash is zero."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         bp = policy.calculate_buying_power(cash=0.0, positions={})
         assert bp == 0.0
 
     def test_negative_cash_buying_power_is_zero(self):
         """Test buying power is capped at zero when cash is negative."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         bp = policy.calculate_buying_power(cash=-5000.0, positions={})
         assert bp == 0.0
 
     def test_buying_power_ignores_positions(self):
         """Test buying power calculation ignores position values."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         positions = {
             "AAPL": Position(
                 asset="AAPL",
@@ -45,7 +45,7 @@ class TestCashAccountPolicyBuyingPower:
 
     def test_buying_power_with_large_cash(self):
         """Test buying power with large cash amount."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         bp = policy.calculate_buying_power(cash=1_000_000.0, positions={})
         assert bp == 1_000_000.0
 
@@ -55,7 +55,7 @@ class TestCashAccountPolicyShortSelling:
 
     def test_allows_short_selling_returns_false(self):
         """Test that cash accounts do not allow short selling."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         assert policy.allows_short_selling() is False
 
 
@@ -64,7 +64,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_valid_long_position_with_sufficient_cash(self):
         """Test approving long position with sufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=100.0,
@@ -77,7 +77,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_valid_long_position_exact_cash(self):
         """Test approving long position when cash exactly equals cost."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=100.0,
@@ -90,7 +90,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_reject_long_position_insufficient_cash(self):
         """Test rejecting long position with insufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=100.0,
@@ -105,7 +105,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_reject_short_position(self):
         """Test rejecting short position (negative quantity)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=-100.0,  # Short
@@ -118,7 +118,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_reject_zero_quantity(self):
         """Test behavior with zero quantity (edge case)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=0.0,
@@ -132,7 +132,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_fractional_shares_validation(self):
         """Test validation with fractional shares."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="BTC-USD",
             quantity=0.5,
@@ -144,7 +144,7 @@ class TestCashAccountPolicyNewPositionValidation:
 
     def test_fractional_shares_insufficient_cash(self):
         """Test rejection with fractional shares and insufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="BTC-USD",
             quantity=0.5,
@@ -161,7 +161,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_add_to_long_position_with_sufficient_cash(self):
         """Test adding to existing long position."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,
@@ -175,7 +175,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_add_to_position_insufficient_cash(self):
         """Test rejecting addition with insufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,
@@ -189,7 +189,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_close_long_position(self):
         """Test closing long position (always allowed)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,
@@ -203,7 +203,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_reduce_long_position(self):
         """Test reducing long position (partial close)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,
@@ -216,7 +216,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_reject_overselling(self):
         """Test rejecting sell order larger than position."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,
@@ -231,7 +231,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_reject_position_reversal_long_to_short(self):
         """Test rejecting position reversal from long to short."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,  # Long 100
@@ -247,7 +247,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_reject_position_reversal_short_to_long(self):
         """Test rejecting position reversal from short to long."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=-100.0,  # Short 100
@@ -261,7 +261,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_reject_opening_short_from_flat(self):
         """Test rejecting short position from no position."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=0.0,  # No position
@@ -275,7 +275,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_reject_adding_to_short_position(self):
         """Test rejecting addition to short position."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=-100.0,  # Already short
@@ -289,7 +289,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_closing_short_position_allowed(self):
         """Test that closing a short position is allowed."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=-100.0,  # Short 100
@@ -303,7 +303,7 @@ class TestCashAccountPolicyPositionChangeValidation:
 
     def test_zero_position_change(self):
         """Test edge case of zero position change."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_position_change(
             asset="AAPL",
             current_quantity=100.0,
@@ -320,7 +320,7 @@ class TestCashAccountPolicyEdgeCases:
 
     def test_very_small_fractional_order(self):
         """Test validation with very small fractional quantity."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="ETH-USD",
             quantity=0.001,
@@ -332,7 +332,7 @@ class TestCashAccountPolicyEdgeCases:
 
     def test_very_large_order(self):
         """Test validation with very large order."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=1_000_000.0,
@@ -344,7 +344,7 @@ class TestCashAccountPolicyEdgeCases:
 
     def test_very_large_order_insufficient_cash(self):
         """Test rejecting very large order with insufficient cash."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=1_000_000.0,
@@ -356,7 +356,7 @@ class TestCashAccountPolicyEdgeCases:
 
     def test_nearly_zero_cash_remaining(self):
         """Test order that leaves minimal cash remaining."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
         valid, reason = policy.validate_new_position(
             asset="AAPL",
             quantity=100.0,
@@ -372,7 +372,7 @@ class TestCashAccountPolicyRealWorldScenarios:
 
     def test_day_trader_multiple_trades(self):
         """Test scenario: Day trader executing multiple trades."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
 
         # Trade 1: Buy 50 TSLA at $200 with $15,000 cash
         valid, _ = policy.validate_new_position(
@@ -406,7 +406,7 @@ class TestCashAccountPolicyRealWorldScenarios:
 
     def test_retail_investor_ira_account(self):
         """Test scenario: Retail investor in IRA (cash account)."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
 
         # Try to short in IRA (not allowed)
         valid, reason = policy.validate_new_position(
@@ -421,7 +421,7 @@ class TestCashAccountPolicyRealWorldScenarios:
 
     def test_penny_stock_trader(self):
         """Test scenario: Trading penny stocks with limited capital."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
 
         # Buy 10,000 shares at $0.50
         valid, _ = policy.validate_new_position(
@@ -446,7 +446,7 @@ class TestCashAccountPolicyRealWorldScenarios:
 
     def test_crypto_fractional_trading(self):
         """Test scenario: Buying fractional crypto."""
-        policy = CashAccountPolicy()
+        policy = UnifiedAccountPolicy()
 
         # Buy 0.1 BTC at $60,000
         valid, _ = policy.validate_new_position(
