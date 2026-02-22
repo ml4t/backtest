@@ -148,6 +148,20 @@ Repository = "https://github.com/ml4t/ml4t-backtest"
 Issues = "https://github.com/ml4t/ml4t-backtest/issues"
 Changelog = "https://github.com/ml4t/ml4t-backtest/blob/main/CHANGELOG.md"
 
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.3.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-benchmark>=4.0.0",
+    "hypothesis>=6.80.0",
+    "ruff>=0.8.0",
+    "ty",
+    "pre-commit>=3.3.0",
+    "twine>=6.0.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -210,7 +224,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG001", "ARG002"]  # Test functions often have unused fixtures
+"tests/*" = ["ARG001", "ARG002", "F841", "SIM102"]  # Test patterns
 
 [tool.mypy]
 python_version = "3.11"
@@ -224,6 +238,14 @@ check_untyped_defs = true
 show_error_codes = true
 warn_redundant_casts = true
 ignore_missing_imports = true
+
+[tool.ty.environment]
+python-version = "3.11"
+root = ["src"]
+
+[tool.ty.src]
+include = ["src"]
+exclude = ["tests", "validation", "docs"]
 
 [tool.coverage.run]
 source = ["src/ml4t/backtest"]

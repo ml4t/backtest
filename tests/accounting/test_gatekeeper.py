@@ -382,7 +382,9 @@ class TestValidateOrderPositionReversal:
         """Margin account approves position reversals with sufficient buying power."""
         from ml4t.backtest.accounting import UnifiedAccountPolicy
 
-        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True, allow_leverage=True, initial_margin=0.5
+        )
         account = AccountState(initial_cash=100000.0, policy=policy)
         gatekeeper = Gatekeeper(account, NoCommission())
 
@@ -410,7 +412,9 @@ class TestValidateOrderPositionReversal:
         """Margin account rejects reversals with insufficient buying power."""
         from ml4t.backtest.accounting import UnifiedAccountPolicy
 
-        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True, initial_margin=0.5)
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True, allow_leverage=True, initial_margin=0.5
+        )
         account = AccountState(initial_cash=1000.0, policy=policy)  # Low cash
         gatekeeper = Gatekeeper(account, NoCommission())
 

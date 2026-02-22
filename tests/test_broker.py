@@ -423,7 +423,8 @@ class TestCommissionSplitOnFlip:
             initial_cash=100_000.0,
             commission_model=PerShareCommission(0.01),
             slippage_model=NoSlippage(),
-            allow_short_selling=True, allow_leverage=True,  # Allow position flips
+            allow_short_selling=True,
+            allow_leverage=True,  # Allow position flips
         )
 
         # Setup: Create long position (100 shares @ $100)
@@ -465,15 +466,15 @@ class TestCommissionSplitOnFlip:
         assert len(broker.trades) == 1
         closing_trade = broker.trades[0]
         assert closing_trade.quantity == 100.0  # Long 100 closed
-        assert (
-            closing_trade.commission == 1.0
-        ), f"Expected close commission $1.00, got ${closing_trade.commission}"
+        assert closing_trade.commission == 1.0, (
+            f"Expected close commission $1.00, got ${closing_trade.commission}"
+        )
 
         # Check PnL calculation includes only close commission
         expected_pnl = (110.0 - 100.0) * 100.0 - 1.0  # Profit minus close commission
-        assert (
-            closing_trade.pnl == expected_pnl
-        ), f"Expected PnL ${expected_pnl}, got ${closing_trade.pnl}"
+        assert closing_trade.pnl == expected_pnl, (
+            f"Expected PnL ${expected_pnl}, got ${closing_trade.pnl}"
+        )
 
         # Verify new position created (short 100)
         new_pos = broker.positions.get("AAPL")
@@ -491,9 +492,9 @@ class TestCommissionSplitOnFlip:
         #   - $1 (open commission)
         # Total: $90,000 + $10,000 + $1,000 - $1 + $11,000 - $1 = $111,998
         expected_cash = 100_000.0 - 10_000.0 + 10_000.0 + 1_000.0 - 1.0 + 11_000.0 - 1.0
-        assert (
-            abs(broker.cash - expected_cash) < 0.01
-        ), f"Expected cash ${expected_cash:.2f}, got ${broker.cash:.2f}"
+        assert abs(broker.cash - expected_cash) < 0.01, (
+            f"Expected cash ${expected_cash:.2f}, got ${broker.cash:.2f}"
+        )
 
 
 class TestBracketCancellationOnFlip:
@@ -519,7 +520,8 @@ class TestBracketCancellationOnFlip:
             initial_cash=100_000.0,
             commission_model=PerShareCommission(0.01),
             slippage_model=NoSlippage(),
-            allow_short_selling=True, allow_leverage=True,
+            allow_short_selling=True,
+            allow_leverage=True,
         )
 
         # Bar 1: $150 - Open long 100 with brackets
@@ -582,9 +584,9 @@ class TestBracketCancellationOnFlip:
         assert pos.quantity == -100, f"Expected short 100, got {pos.quantity}"
 
         # CRITICAL: Verify old bracket orders were cancelled
-        assert (
-            len(broker.pending_orders) == 0
-        ), f"Expected 0 pending orders after flip, got {len(broker.pending_orders)}"
+        assert len(broker.pending_orders) == 0, (
+            f"Expected 0 pending orders after flip, got {len(broker.pending_orders)}"
+        )
 
         # Verify bracket orders have CANCELLED status
         assert stop_loss.status == OrderStatus.CANCELLED
@@ -645,7 +647,8 @@ class TestPositionFlipValidation:
             initial_cash=100_000.0,
             commission_model=PerShareCommission(0.01),
             slippage_model=NoSlippage(),
-            allow_short_selling=True, allow_leverage=True,
+            allow_short_selling=True,
+            allow_leverage=True,
         )
 
         # Bar 1: $100 - Open long 100 shares (costs $10,000 + $1 commission)
@@ -702,9 +705,9 @@ class TestPositionFlipValidation:
         # Open short: +$15,000 - $1 = +$14,999
         # Final: $89,999 + $14,999 + $14,999 = $119,997
         expected_cash = 89_999.0 + 15_000.0 - 1.0 + 15_000.0 - 1.0
-        assert (
-            abs(broker.cash - expected_cash) < 0.01
-        ), f"Expected cash ${expected_cash:.2f}, got ${broker.cash:.2f}"
+        assert abs(broker.cash - expected_cash) < 0.01, (
+            f"Expected cash ${expected_cash:.2f}, got ${broker.cash:.2f}"
+        )
 
 
 class TestBrokerEdgeCases:
@@ -762,7 +765,8 @@ class TestBrokerEdgeCases:
             initial_cash=100000.0,
             commission_model=NoCommission(),
             slippage_model=NoSlippage(),
-            allow_short_selling=True, allow_leverage=True,
+            allow_short_selling=True,
+            allow_leverage=True,
         )
 
         # Open initial short position: -100 shares @ $150
@@ -1813,7 +1817,8 @@ class TestMarketImpactIntegration:
             commission_model=NoCommission(),
             slippage_model=NoSlippage(),
             market_impact_model=LinearImpact(coefficient=0.1),
-            allow_short_selling=True, allow_leverage=True,
+            allow_short_selling=True,
+            allow_leverage=True,
         )
 
         broker._update_time(
@@ -2917,7 +2922,9 @@ class TestBugFix4BracketOrdersForShorts:
 
     def test_bracket_short_entry_has_buy_exits(self):
         """Short entry brackets should have BUY exits."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
+        broker = Broker(
+            100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True
+        )
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
             prices={"AAPL": 150.0},
@@ -2940,7 +2947,9 @@ class TestBugFix5BuyTrailingStops:
 
     def test_trailing_stop_buy_trails_from_low(self):
         """BUY trailing stop should trail UP from lows."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
+        broker = Broker(
+            100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True
+        )
 
         # Setup: enter short position
         broker._update_time(
@@ -2979,7 +2988,9 @@ class TestBugFix5BuyTrailingStops:
 
     def test_trailing_stop_buy_triggers_on_high(self):
         """BUY trailing stop should trigger when high crosses stop."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
+        broker = Broker(
+            100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True
+        )
 
         # Setup: enter short position
         broker._update_time(

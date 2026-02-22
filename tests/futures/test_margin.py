@@ -5,10 +5,7 @@ Note: ml4t-backtest uses account-level margin policies rather than
 per-contract margin from ContractSpec by default.
 """
 
-import pytest
-from datetime import datetime
-
-from ml4t.backtest.types import ContractSpec, Position
+from ml4t.backtest.types import ContractSpec
 
 
 class TestInitialMargin:
@@ -43,9 +40,7 @@ class TestInitialMargin:
 class TestPortfolioMargin:
     """Test portfolio-level margin calculations."""
 
-    def test_portfolio_margin_additive(
-        self, es_contract: ContractSpec, cl_contract: ContractSpec
-    ):
+    def test_portfolio_margin_additive(self, es_contract: ContractSpec, cl_contract: ContractSpec):
         """Basic portfolio margin: sum of individual margins.
 
         5 ES + 2 CL = 5*15,000 + 2*6,000 = $75,000 + $12,000 = $87,000

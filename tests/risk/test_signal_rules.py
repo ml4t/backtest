@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from ml4t.backtest.risk.position.signal import SignalExit
 from ml4t.backtest.risk.position.dynamic import VolatilityTrailingStop
+from ml4t.backtest.risk.position.signal import SignalExit
 from ml4t.backtest.risk.types import ActionType, PositionState
 
 

@@ -4,7 +4,6 @@ Validates aggregation of P&L, costs, and margin across
 multiple futures positions.
 """
 
-import pytest
 from datetime import datetime
 
 from ml4t.backtest.types import ContractSpec, Position

@@ -7,8 +7,6 @@ Validates commission calculations against PySystemTrade's formula:
 Reference: sysobjects/instruments.py in PySystemTrade
 """
 
-import pytest
-
 from ml4t.backtest.models import FuturesCommission
 
 

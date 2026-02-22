@@ -9,7 +9,6 @@ import pytest
 from ml4t.backtest.models import FuturesCommission, FuturesSlippage
 from ml4t.backtest.types import AssetClass, ContractSpec
 
-
 # === Standard Contract Specifications ===
 # Reference: CME Group product specifications
 

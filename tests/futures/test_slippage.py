@@ -6,8 +6,6 @@ Validates slippage calculations against PySystemTrade's formula:
 Reference: sysobjects/instruments.py in PySystemTrade
 """
 
-import pytest
-
 from ml4t.backtest.models import FuturesSlippage
 
 
@@ -71,9 +69,7 @@ class TestFuturesSlippageWithMultiplier:
 class TestTotalTransactionCost:
     """Test combined commission + slippage costs."""
 
-    def test_total_transaction_cost(
-        self, ib_commission, es_slippage, es_contract
-    ):
+    def test_total_transaction_cost(self, ib_commission, es_slippage, es_contract):
         """Total cost = commission + slippage.
 
         2 ES:
@@ -92,9 +88,7 @@ class TestTotalTransactionCost:
         assert slippage == 25.0
         assert commission + slippage == 29.50
 
-    def test_round_trip_total_cost(
-        self, ib_commission, es_slippage, es_contract
-    ):
+    def test_round_trip_total_cost(self, ib_commission, es_slippage, es_contract):
         """Round trip: 2x slippage, 2x commission.
 
         Entry + Exit for 2 ES:

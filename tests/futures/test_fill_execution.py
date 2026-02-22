@@ -3,10 +3,7 @@
 Validates fill value calculations for futures orders.
 """
 
-import pytest
-from datetime import datetime
-
-from ml4t.backtest.types import ContractSpec, Fill, OrderSide
+from ml4t.backtest.types import ContractSpec
 
 
 class TestFillValue:

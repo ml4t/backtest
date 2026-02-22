@@ -6,10 +6,9 @@ Validates P&L calculations against PySystemTrade's formula:
 Reference: systems/accounts/pandl_calculators/pandl_cash_costs.py
 """
 
-import pytest
+from datetime import datetime
 
 from ml4t.backtest.types import ContractSpec, Position
-from datetime import datetime
 
 
 class TestBasicPnL:

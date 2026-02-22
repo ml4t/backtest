@@ -4,19 +4,15 @@ Validates that Trade objects correctly track P&L, costs, and exit reasons
 for futures trades.
 """
 
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from ml4t.backtest.types import ContractSpec, Trade
-from ml4t.backtest.models import FuturesCommission, FuturesSlippage
 
 
 class TestCompleteTradeRecord:
     """Test complete trade lifecycle with costs."""
 
-    def test_complete_trade(
-        self, es_contract: ContractSpec, ib_commission, es_slippage
-    ):
+    def test_complete_trade(self, es_contract: ContractSpec, ib_commission, es_slippage):
         """Entry → Hold → Exit with correct MTM and net PnL.
 
         Entry: Buy 2 ES at 4000
@@ -51,9 +47,7 @@ class TestCompleteTradeRecord:
         net_pnl = gross_pnl - total_comm - total_slip
         assert net_pnl == 1441.0
 
-    def test_losing_trade_with_costs(
-        self, es_contract: ContractSpec, ib_commission, es_slippage
-    ):
+    def test_losing_trade_with_costs(self, es_contract: ContractSpec, ib_commission, es_slippage):
         """Losing trade: costs make it worse.
 
         Entry: Buy 2 ES at 4000
@@ -144,20 +138,12 @@ class TestCostsMatchPySysTradeFormula:
         assert gross_pnl == 5000.0  # 5 * 20 * 50
 
         # Entry costs (using PST commission model)
-        entry_comm = pysystemtrade_commission.calculate(
-            "ES", qty, entry_price, multiplier
-        )
-        entry_slip = es_slippage.calculate(
-            "ES", qty, entry_price, multiplier=multiplier
-        )
+        entry_comm = pysystemtrade_commission.calculate("ES", qty, entry_price, multiplier)
+        entry_slip = es_slippage.calculate("ES", qty, entry_price, multiplier=multiplier)
 
         # Exit costs
-        exit_comm = pysystemtrade_commission.calculate(
-            "ES", -qty, exit_price, multiplier
-        )
-        exit_slip = es_slippage.calculate(
-            "ES", -qty, exit_price, multiplier=multiplier
-        )
+        exit_comm = pysystemtrade_commission.calculate("ES", -qty, exit_price, multiplier)
+        exit_slip = es_slippage.calculate("ES", -qty, exit_price, multiplier=multiplier)
 
         # Total costs
         total_comm = entry_comm + exit_comm

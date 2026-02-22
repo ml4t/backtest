@@ -5,7 +5,7 @@ stateful decision-making during backtests.
 """
 
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest

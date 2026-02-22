@@ -90,7 +90,9 @@ class TestAccountStateApplyFillShortPositions:
         TASK-012 acceptance criteria:
         - Cash increases when opening shorts (proceeds received)
         """
-        policy = UnifiedAccountPolicy(allow_short_selling=True, allow_leverage=True)  # Only margin accounts allow shorts
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True, allow_leverage=True
+        )  # Only margin accounts allow shorts
         account = AccountState(initial_cash=100_000.0, policy=policy)
 
         # Short 100 shares @ $150 (sell shares we don't own)

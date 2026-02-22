@@ -9,8 +9,6 @@ These tests verify behavior in NEXT_BAR execution mode, specifically:
 
 from datetime import datetime
 
-import pytest
-
 from ml4t.backtest import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage
 from ml4t.backtest.risk import StopLoss

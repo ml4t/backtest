@@ -16,13 +16,10 @@ import hashlib
 import json
 from datetime import datetime, timedelta
 
-import pytest
-
-from ml4t.backtest import Broker, DataFeed, Engine, Strategy
+from ml4t.backtest import DataFeed, Engine, Strategy
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageCommission, PercentageSlippage
-from ml4t.backtest.risk import StopLoss, TakeProfit, TrailingStop
+from ml4t.backtest.risk import StopLoss
 from ml4t.backtest.types import ExecutionMode, OrderSide
-
 
 # ============================================================================
 # Synthetic Data Generation

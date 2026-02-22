@@ -4,8 +4,6 @@ Validates that ContractSpec correctly stores and exposes
 futures contract characteristics for P&L calculation.
 """
 
-import pytest
-
 from ml4t.backtest.types import AssetClass, ContractSpec
 
 

@@ -12,13 +12,10 @@ This test module validates:
 
 from datetime import datetime
 
-import pytest
-
-from ml4t.backtest.risk.position.composite import AllOf, AnyOf, RuleChain
+from ml4t.backtest.risk.position.composite import RuleChain
 from ml4t.backtest.risk.position.dynamic import TrailingStop
 from ml4t.backtest.risk.position.static import StopLoss, TakeProfit, TimeExit
 from ml4t.backtest.risk.types import ActionType, PositionState
-from ml4t.backtest.types import StopFillMode
 
 
 def make_position_state(
@@ -72,10 +69,12 @@ class TestRuleChainPriority:
 
     def test_first_rule_takes_priority(self):
         """When first rule triggers, subsequent rules are not evaluated."""
-        chain = RuleChain([
-            StopLoss(pct=0.05),    # First priority
-            TakeProfit(pct=0.10),  # Second priority
-        ])
+        chain = RuleChain(
+            [
+                StopLoss(pct=0.05),  # First priority
+                TakeProfit(pct=0.10),  # Second priority
+            ]
+        )
 
         # Price at 94 triggers stop loss
         state = make_position_state(entry_price=100.0, current_price=94.0)
@@ -85,10 +84,12 @@ class TestRuleChainPriority:
 
     def test_second_rule_triggers_when_first_holds(self):
         """Second rule triggers only when first rule holds."""
-        chain = RuleChain([
-            StopLoss(pct=0.05),    # Doesn't trigger
-            TakeProfit(pct=0.10),  # Triggers
-        ])
+        chain = RuleChain(
+            [
+                StopLoss(pct=0.05),  # Doesn't trigger
+                TakeProfit(pct=0.10),  # Triggers
+            ]
+        )
 
         # Price at 111 triggers take profit
         state = make_position_state(entry_price=100.0, current_price=111.0)
@@ -99,16 +100,20 @@ class TestRuleChainPriority:
     def test_rule_order_matters(self):
         """Changing rule order changes which rule wins."""
         # Order 1: SL before TP
-        chain1 = RuleChain([
-            StopLoss(pct=0.20),    # Stop at 80
-            TakeProfit(pct=0.10),  # TP at 110
-        ])
+        chain1 = RuleChain(
+            [
+                StopLoss(pct=0.20),  # Stop at 80
+                TakeProfit(pct=0.10),  # TP at 110
+            ]
+        )
 
         # Order 2: TP before SL
-        chain2 = RuleChain([
-            TakeProfit(pct=0.10),  # TP at 110
-            StopLoss(pct=0.20),    # Stop at 80
-        ])
+        chain2 = RuleChain(
+            [
+                TakeProfit(pct=0.10),  # TP at 110
+                StopLoss(pct=0.20),  # Stop at 80
+            ]
+        )
 
         # At price 78, both would trigger
         # But only first in chain wins
@@ -126,10 +131,12 @@ class TestTSLWithTPCombination:
 
     def test_tsl_triggers_before_tp_on_decline(self):
         """TSL triggers on price decline, TP doesn't."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),  # Trail from HWM
-            TakeProfit(pct=0.15),    # TP at +15%
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),  # Trail from HWM
+                TakeProfit(pct=0.15),  # TP at +15%
+            ]
+        )
 
         # LONG at 100, rallied to 110 (HWM), now at 104 (below trail at 104.5)
         state = make_position_state(
@@ -143,10 +150,12 @@ class TestTSLWithTPCombination:
 
     def test_tp_triggers_before_tsl_on_rally(self):
         """TP triggers when price reaches target, TSL doesn't."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),  # Trail from HWM
-            TakeProfit(pct=0.10),    # TP at +10%
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),  # Trail from HWM
+                TakeProfit(pct=0.10),  # TP at +10%
+            ]
+        )
 
         # LONG at 100, price at 112 (above TP at 110)
         # HWM = 112, trail at 106.4 - TSL not triggered
@@ -161,10 +170,12 @@ class TestTSLWithTPCombination:
 
     def test_tsl_first_in_chain_priority(self):
         """When TSL is first, it's checked before TP."""
-        chain = RuleChain([
-            TrailingStop(pct=0.02),  # Very tight 2% trail
-            TakeProfit(pct=0.10),
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.02),  # Very tight 2% trail
+                TakeProfit(pct=0.10),
+            ]
+        )
 
         # HWM at 115, trail at 112.7
         # Price at 112 triggers TSL even though it's above entry
@@ -182,10 +193,12 @@ class TestTSLWithSLCombination:
 
     def test_sl_triggers_on_crash(self):
         """Stop loss triggers on sharp decline, TSL doesn't (no HWM update)."""
-        chain = RuleChain([
-            TrailingStop(pct=0.10),  # 10% trail from HWM
-            StopLoss(pct=0.08),      # 8% stop from entry
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.10),  # 10% trail from HWM
+                StopLoss(pct=0.08),  # 8% stop from entry
+            ]
+        )
 
         # LONG at 100, price crashes to 90 (10% loss)
         # HWM never updated, TSL trail at 90 (100 * 0.9)
@@ -201,10 +214,12 @@ class TestTSLWithSLCombination:
 
     def test_sl_triggers_before_tsl_when_first(self):
         """When SL is first in chain, it triggers before TSL evaluation."""
-        chain = RuleChain([
-            StopLoss(pct=0.05),      # First: 5% stop at 95
-            TrailingStop(pct=0.10),  # Second: 10% trail
-        ])
+        chain = RuleChain(
+            [
+                StopLoss(pct=0.05),  # First: 5% stop at 95
+                TrailingStop(pct=0.10),  # Second: 10% trail
+            ]
+        )
 
         # Price at 94 triggers SL
         state = make_position_state(
@@ -217,10 +232,12 @@ class TestTSLWithSLCombination:
 
     def test_tsl_triggers_from_hwm_before_sl(self):
         """TSL from HWM triggers before SL from entry."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),  # First: 5% trail
-            StopLoss(pct=0.10),      # Second: 10% stop
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),  # First: 5% trail
+                StopLoss(pct=0.10),  # Second: 10% stop
+            ]
+        )
 
         # HWM at 110, trail at 104.5
         # SL at 90 (not triggered)
@@ -239,11 +256,13 @@ class TestTripleRuleCombination:
 
     def test_triple_rule_tsl_first(self):
         """TSL triggers first in TSL -> TP -> SL chain."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),
-            TakeProfit(pct=0.15),
-            StopLoss(pct=0.10),
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),
+                TakeProfit(pct=0.15),
+                StopLoss(pct=0.10),
+            ]
+        )
 
         # HWM at 108, trail at 102.6, price at 102
         state = make_position_state(
@@ -256,11 +275,13 @@ class TestTripleRuleCombination:
 
     def test_triple_rule_tp_second(self):
         """TP triggers when TSL holds in TSL -> TP -> SL chain."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),  # Trail at 114 from 120
-            TakeProfit(pct=0.15),    # TP at 115
-            StopLoss(pct=0.10),
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),  # Trail at 114 from 120
+                TakeProfit(pct=0.15),  # TP at 115
+                StopLoss(pct=0.10),
+            ]
+        )
 
         # Price at 116 above both trail and TP
         state = make_position_state(
@@ -273,11 +294,13 @@ class TestTripleRuleCombination:
 
     def test_triple_rule_sl_last(self):
         """SL triggers when TSL and TP both hold."""
-        chain = RuleChain([
-            TrailingStop(pct=0.03),  # 3% trail
-            TakeProfit(pct=0.20),    # 20% TP
-            StopLoss(pct=0.08),      # 8% SL at 92
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.03),  # 3% trail
+                TakeProfit(pct=0.20),  # 20% TP
+                StopLoss(pct=0.08),  # 8% SL at 92
+            ]
+        )
 
         # Price crashed from 100 (HWM=100)
         # Trail at 97, price at 91 (below SL)
@@ -296,10 +319,12 @@ class TestSameBarDoubleBreach:
 
     def test_intrabar_both_tsl_and_sl_breach(self):
         """When both TSL and SL breach in same bar, first in chain wins."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),  # Trail at 95 from HWM 100
-            StopLoss(pct=0.08),      # SL at 92
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),  # Trail at 95 from HWM 100
+                StopLoss(pct=0.08),  # SL at 92
+            ]
+        )
 
         # Bar drops from 96 to 90, crossing both levels
         state = make_position_state(
@@ -315,10 +340,12 @@ class TestSameBarDoubleBreach:
 
     def test_intrabar_both_tp_and_tsl_breach_long(self):
         """Wide bar that touches both TP and TSL - first rule wins."""
-        chain = RuleChain([
-            TakeProfit(pct=0.10),    # TP at 110
-            TrailingStop(pct=0.05),  # Trail at 104.5 from HWM 110
-        ])
+        chain = RuleChain(
+            [
+                TakeProfit(pct=0.10),  # TP at 110
+                TrailingStop(pct=0.05),  # Trail at 104.5 from HWM 110
+            ]
+        )
 
         # Volatile bar: high touches TP, then crashes through TSL
         state = make_position_state(
@@ -327,7 +354,7 @@ class TestSameBarDoubleBreach:
             high_water_mark=110.0,
             bar_open=108.0,
             bar_high=112.0,  # Above TP
-            bar_low=102.0,   # Below TSL
+            bar_low=102.0,  # Below TSL
         )
         action = chain.evaluate(state)
         # TP is first in chain and bar_high triggers it
@@ -339,10 +366,12 @@ class TestShortPositionRulePriority:
 
     def test_short_tsl_tp_priority(self):
         """TSL triggers for SHORT when price rises to trail."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),  # Trail from LWM
-            TakeProfit(pct=0.15),    # TP when price drops 15%
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),  # Trail from LWM
+                TakeProfit(pct=0.15),  # TP when price drops 15%
+            ]
+        )
 
         # SHORT at 100, LWM at 90, trail at 94.5
         # Price at 95 triggers TSL
@@ -357,10 +386,12 @@ class TestShortPositionRulePriority:
 
     def test_short_tp_triggers_on_drop(self):
         """TP triggers for SHORT when price drops enough."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),
-            TakeProfit(pct=0.15),  # TP at 85 for short
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),
+                TakeProfit(pct=0.15),  # TP at 85 for short
+            ]
+        )
 
         # SHORT at 100, price drops to 84
         # LWM = 84, trail at 88.2 - no TSL trigger
@@ -375,10 +406,12 @@ class TestShortPositionRulePriority:
 
     def test_short_sl_triggers_on_rally(self):
         """SL triggers for SHORT when price rises against position."""
-        chain = RuleChain([
-            TrailingStop(pct=0.10),  # 10% trail
-            StopLoss(pct=0.05),      # 5% stop at 105
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.10),  # 10% trail
+                StopLoss(pct=0.05),  # 5% stop at 105
+            ]
+        )
 
         # SHORT at 100, price rises to 106
         # LWM stays at 100, trail at 110
@@ -398,12 +431,14 @@ class TestRuleChainWithTimeExit:
 
     def test_time_exit_last_resort(self):
         """TimeExit triggers when other rules hold."""
-        chain = RuleChain([
-            TrailingStop(pct=0.10),
-            TakeProfit(pct=0.20),
-            StopLoss(pct=0.15),
-            TimeExit(max_bars=50),
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.10),
+                TakeProfit(pct=0.20),
+                StopLoss(pct=0.15),
+                TimeExit(max_bars=50),
+            ]
+        )
 
         # Price at entry, no rules trigger except time
         state = make_position_state(
@@ -417,10 +452,12 @@ class TestRuleChainWithTimeExit:
 
     def test_tsl_beats_time_exit(self):
         """TSL triggers even if time limit reached."""
-        chain = RuleChain([
-            TrailingStop(pct=0.05),
-            TimeExit(max_bars=50),
-        ])
+        chain = RuleChain(
+            [
+                TrailingStop(pct=0.05),
+                TimeExit(max_bars=50),
+            ]
+        )
 
         # Both would trigger
         state = make_position_state(

@@ -7,7 +7,6 @@ Validates notional/leverage calculations against PySystemTrade:
 Reference: systems/accounts/curves/account_curve.py
 """
 
-import pytest
 from datetime import datetime
 
 from ml4t.backtest.types import ContractSpec, Position
@@ -113,9 +112,7 @@ class TestLeverage:
 class TestPortfolioNotional:
     """Test portfolio-level notional calculations."""
 
-    def test_portfolio_notional(
-        self, es_contract: ContractSpec, cl_contract: ContractSpec
-    ):
+    def test_portfolio_notional(self, es_contract: ContractSpec, cl_contract: ContractSpec):
         """Portfolio notional: sum of individual notionals.
 
         5 ES at 4000: 5 * 4000 * 50 = $1,000,000
@@ -128,9 +125,7 @@ class TestPortfolioNotional:
         total = es_notional + cl_notional
         assert total == 1_160_000.0
 
-    def test_portfolio_leverage(
-        self, es_contract: ContractSpec, cl_contract: ContractSpec
-    ):
+    def test_portfolio_leverage(self, es_contract: ContractSpec, cl_contract: ContractSpec):
         """Portfolio leverage = total notional / capital."""
         capital = 100_000.0
 
@@ -141,9 +136,7 @@ class TestPortfolioNotional:
         leverage = total_notional / capital
         assert leverage == 11.6
 
-    def test_mixed_long_short_notional(
-        self, es_contract: ContractSpec, cl_contract: ContractSpec
-    ):
+    def test_mixed_long_short_notional(self, es_contract: ContractSpec, cl_contract: ContractSpec):
         """Mixed positions: gross notional uses absolute values.
 
         Long 5 ES: $1,000,000

@@ -10,12 +10,10 @@ These tests verify correct behavior during:
 
 from datetime import datetime
 
-import pytest
-
 from ml4t.backtest import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageSlippage
 from ml4t.backtest.risk import StopLoss, TakeProfit, TrailingStop
-from ml4t.backtest.types import ExecutionMode, OrderSide, OrderStatus, StopFillMode
+from ml4t.backtest.types import ExecutionMode, OrderSide
 
 
 class TestGapOpens:
@@ -97,7 +95,9 @@ class TestGapOpens:
 
     def test_short_gap_up_through_stop(self):
         """Short position stop should fill at open on gap up."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True)
+        broker = Broker(
+            100000.0, NoCommission(), NoSlippage(), allow_short_selling=True, allow_leverage=True
+        )
 
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),
