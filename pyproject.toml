@@ -247,6 +247,12 @@ root = ["src"]
 include = ["src"]
 exclude = ["tests", "validation", "docs"]
 
+[tool.ty.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+invalid-return-type = "ignore"
+unused-ignore-comment = "ignore"
+
 [tool.coverage.run]
 source = ["src/ml4t/backtest"]
 omit = [

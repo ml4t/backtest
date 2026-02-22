@@ -25,7 +25,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --no-sources
 
       - name: Run ruff check
         run: uv run ruff check src/ tests/
@@ -48,7 +48,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --no-sources
 
       - name: Run ty check
         run: uv run ty check
@@ -73,7 +73,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --no-sources
 
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short -x --no-cov
