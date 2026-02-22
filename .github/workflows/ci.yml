@@ -8,6 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
+  UV_NO_SOURCES: "1"
 
 jobs:
   lint:
@@ -25,9 +26,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: |
-          uv lock --no-sources
-          uv sync --dev --no-sources
+        run: uv sync --dev
 
       - name: Run ruff check
         run: uv run ruff check src/ tests/
@@ -50,9 +49,7 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: |
-          uv lock --no-sources
-          uv sync --dev --no-sources
+        run: uv sync --dev
 
       - name: Run ty check
         run: uv run ty check
@@ -77,9 +74,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: |
-          uv lock --no-sources
-          uv sync --dev --no-sources
+        run: uv sync --dev
 
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short -x --no-cov
