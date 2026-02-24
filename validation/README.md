@@ -1,5 +1,10 @@
 # ml4t.backtest Validation Strategy
 
+## Related Documents
+
+- [Known Limitations and Assumptions](../LIMITATIONS.md) — edge cases, what's not modeled, recommendations
+- [SHORT Trailing Stop Validation](vectorbt_pro/README_SHORT_TSL_VALIDATION.md) — detailed SHORT TSL results vs VBT Pro
+
 ## Overview
 
 Framework validation is performed **per-framework** in **isolated environments**, NOT through a unified pytest suite.
@@ -356,9 +361,10 @@ Same strategy code, but use `ExecutionMode.NEXT_BAR`. ml4t.backtest now uses the
 
 ## How to Run Validation
 
+All commands assume you are in the repository root directory.
+
 ### VectorBT Pro
 ```bash
-cd /home/stefan/ml4t/software/backtest
 source .venv-vectorbt-pro/bin/activate
 python validation/vectorbt_pro/scenario_01_long_only.py
 python validation/vectorbt_pro/scenario_02_long_short.py
@@ -368,14 +374,12 @@ python validation/vectorbt_pro/scenario_04_take_profit.py
 
 ### VectorBT OSS
 ```bash
-cd /home/stefan/ml4t/software/backtest
 .venv-vectorbt/bin/python3 validation/vectorbt_oss/scenario_01_long_only.py
 .venv-vectorbt/bin/python3 validation/vectorbt_oss/scenario_02_long_short.py
 ```
 
 ### Backtrader
 ```bash
-cd /home/stefan/ml4t/software/backtest
 .venv-backtrader/bin/python3 validation/backtrader/scenario_01_long_only.py
 .venv-backtrader/bin/python3 validation/backtrader/scenario_02_long_short.py
 .venv-backtrader/bin/python3 validation/backtrader/scenario_03_stop_loss.py
@@ -384,14 +388,12 @@ cd /home/stefan/ml4t/software/backtest
 
 ### Zipline
 ```bash
-cd /home/stefan/ml4t/software/backtest
 .venv-zipline/bin/python3 validation/zipline/scenario_01_long_only.py
 .venv-zipline/bin/python3 validation/zipline/scenario_02_long_short.py
 ```
 
 ### Risk Management Validation (internal)
 ```bash
-cd /home/stefan/ml4t/software/backtest
 source .venv/bin/activate
 python validation/risk_validation.py
 ```
@@ -491,6 +493,18 @@ python3 -m venv .venv-zipline
 | 1,000 x 50 | 10.494 | 1.241 | ml4t | 8.5x |
 
 **Analysis**: Both are event-driven frameworks. Backtrader is slightly faster for single-asset strategies, but ml4t.backtest is **4-8x faster** for multi-asset strategies due to more efficient data handling.
+
+### Zipline vs ml4t.backtest
+
+| Config | ml4t Time | Zipline Time | ml4t Faster By |
+|--------|-----------|--------------|----------------|
+| 100x1 | 0.008s | 0.260s | **32x** |
+| 500x1 | 0.033s | 0.627s | **19x** |
+| 1000x1 | 0.062s | 1.120s | **18x** |
+| 500x5 | 0.059s | 0.739s | **12x** |
+| 1000x10 | 0.170s | 1.658s | **10x** |
+
+**Analysis**: Zipline's bundle-based architecture adds significant overhead. ml4t.backtest is **10-32x faster** across all tested configurations.
 
 ### Framework Selection Guide
 
