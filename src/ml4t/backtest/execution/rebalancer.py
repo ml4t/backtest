@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from ..broker import Broker
     from ..types import Order
 
+from ..config import ShareType
 from ..types import OrderSide
 
 
@@ -56,7 +57,7 @@ class RebalanceConfig:
     min_weight_change: float = 0.01
 
     # Share handling
-    allow_fractional: bool = False
+    allow_fractional: bool | None = None  # None = defer to broker.share_type
     round_lots: bool = False
     lot_size: int = 100
 
@@ -200,9 +201,16 @@ class TargetWeightExecutor:
         shares = delta_value / price
 
         # Apply share rounding
+        # Resolve fractional setting: explicit config > broker.share_type > default
+        use_fractional = self.config.allow_fractional
+        if use_fractional is None:
+            use_fractional = (
+                getattr(broker, "share_type", ShareType.FRACTIONAL) == ShareType.FRACTIONAL
+            )
+
         if self.config.round_lots:
             shares = round(shares / self.config.lot_size) * self.config.lot_size
-        elif not self.config.allow_fractional:
+        elif not use_fractional:
             shares = int(shares)
 
         if shares == 0:
@@ -313,7 +321,7 @@ class TargetWeightExecutor:
                     skip_reason = "weight_change_too_small"
                 elif abs(delta_value) < self.config.min_trade_value:
                     skip_reason = "trade_value_too_small"
-                elif not self.config.allow_fractional and abs(int(shares)) == 0:
+                elif self.config.allow_fractional is False and abs(int(shares)) == 0:
                     skip_reason = "rounds_to_zero_shares"
 
                 previews.append(

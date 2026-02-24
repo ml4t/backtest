@@ -22,7 +22,7 @@ class TestRebalanceConfig:
         config = RebalanceConfig()
         assert config.min_trade_value == 100.0
         assert config.min_weight_change == 0.01
-        assert config.allow_fractional is False
+        assert config.allow_fractional is None
         assert config.round_lots is False
         assert config.lot_size == 100
         assert config.allow_short is False

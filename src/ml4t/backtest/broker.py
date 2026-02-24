@@ -11,7 +11,9 @@ from .config import (
     ExecutionMode as ConfigExecutionMode,
 )
 from .config import (
+    FillOrdering,
     InitialHwmSource,
+    ShareType,
     StatsConfig,
     TrailStopTiming,
     WaterMarkSource,
@@ -115,6 +117,11 @@ class Broker:
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
+        share_type: ShareType = ShareType.FRACTIONAL,
+        fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST,
+        reject_on_insufficient_cash: bool = True,
+        cash_buffer_pct: float = 0.0,
+        partial_fills_allowed: bool = False,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -138,6 +145,11 @@ class Broker:
         self.trail_hwm_source = trail_hwm_source
         self.initial_hwm_source = initial_hwm_source
         self.trail_stop_timing = trail_stop_timing
+        self.share_type = share_type
+        self.fill_ordering = fill_ordering
+        self.reject_on_insufficient_cash = reject_on_insufficient_cash
+        self.cash_buffer_pct = cash_buffer_pct
+        self.partial_fills_allowed = partial_fills_allowed
 
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
@@ -165,7 +177,9 @@ class Broker:
         self.fixed_margin_schedule = fixed_margin_schedule or {}
 
         # Create Gatekeeper for order validation
-        self.gatekeeper = Gatekeeper(self.account, self.commission_model)
+        self.gatekeeper = Gatekeeper(
+            self.account, self.commission_model, cash_buffer_pct=self.cash_buffer_pct
+        )
 
         self.positions: dict[str, Position] = {}
         self.orders: list[Order] = []
@@ -315,6 +329,11 @@ class Broker:
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,
             contract_specs=contract_specs,
+            share_type=config.share_type,
+            fill_ordering=config.fill_ordering,
+            reject_on_insufficient_cash=config.reject_on_insufficient_cash,
+            cash_buffer_pct=config.cash_buffer_pct,
+            partial_fills_allowed=config.partial_fills_allowed,
         )
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
@@ -1651,102 +1670,214 @@ class Broker:
                     use_low_for_lwm=use_extremes,
                 )
 
+    def _get_available_cash(self) -> float:
+        """Get available cash after applying cash buffer.
+
+        Returns:
+            Cash available for new orders (total cash minus buffer reserve).
+        """
+        if self.cash_buffer_pct > 0:
+            return self.account.cash * (1.0 - self.cash_buffer_pct)
+        return self.account.cash
+
+    def _apply_share_rounding(self, order: Order) -> None:
+        """Round order quantity to integer if share_type is INTEGER.
+
+        Modifies order in-place. If rounding reduces quantity to zero,
+        the order will be rejected during validation (zero-quantity check).
+        """
+        if self.share_type == ShareType.INTEGER:
+            order.quantity = float(int(order.quantity))
+
+    def _try_partial_fill(self, order: Order, fill_price: float) -> bool:
+        """Attempt a partial fill when full order cannot be afforded.
+
+        Only used when partial_fills_allowed is True and the gatekeeper
+        rejects an entry order for insufficient cash.
+
+        Returns:
+            True if a partial fill was executed, False otherwise.
+        """
+        available = self._get_available_cash()
+        commission_rate = 0.0
+        # Estimate commission rate for sizing
+        test_commission = self.commission_model.calculate(order.asset, 1.0, fill_price)
+        if fill_price > 0:
+            commission_rate = test_commission / fill_price
+
+        # Max affordable shares (accounting for commission)
+        max_value = available / (1.0 + commission_rate) if commission_rate > 0 else available
+        max_shares = max_value / fill_price if fill_price > 0 else 0
+
+        if self.share_type == ShareType.INTEGER:
+            max_shares = float(int(max_shares))
+
+        if max_shares <= 0:
+            return False
+
+        # Modify order to affordable quantity and execute
+        order.quantity = max_shares
+        return bool(self._execute_fill(order, fill_price))
+
     def _process_orders(self, use_open: bool = False):
-        """Process pending orders against current prices with exit-first sequencing.
+        """Process pending orders against current prices.
 
-        Exit-first sequencing ensures capital efficiency:
-        1. Process all exit orders first (closing positions frees capital)
-        2. Update account equity after exits
-        3. Process all entry orders with updated buying power
+        Fill ordering is controlled by ``self.fill_ordering``:
 
-        This prevents rejecting entry orders when we have pending exits that
-        would free up capital.
+        - EXIT_FIRST: All exits → mark-to-market → all entries (capital-efficient).
+        - FIFO: Orders process in submission order with sequential cash updates.
+
+        ``reject_on_insufficient_cash``, ``cash_buffer_pct``, ``partial_fills_allowed``,
+        and ``share_type`` are all enforced here.
 
         Args:
-            use_open: If True, use open prices (for next-bar mode at bar start)
+            use_open: If True, use open prices (for next-bar mode at bar start).
         """
-        # Split orders into exits and entries
-        exit_orders = []
-        entry_orders = []
+        if self.fill_ordering == FillOrdering.EXIT_FIRST:
+            self._process_orders_exit_first(use_open)
+        else:
+            self._process_orders_fifo(use_open)
 
-        for order in self.pending_orders[:]:
-            # In next-bar mode, skip orders placed this bar
-            if self.execution_mode == ExecutionMode.NEXT_BAR and order in self._orders_this_bar:
-                continue
+    def _get_fill_price_for_order(self, order: Order, use_open: bool) -> float | None:
+        """Get the fill price for an order based on execution mode."""
+        if use_open and self.execution_mode == ExecutionMode.NEXT_BAR:
+            return self._current_opens.get(order.asset)
+        return self._current_prices.get(order.asset)
 
-            if self._is_exit_order(order):
-                exit_orders.append(order)
-            else:
-                entry_orders.append(order)
+    def _process_single_order(
+        self, order: Order, use_open: bool, filled_orders: list[Order]
+    ) -> None:
+        """Process a single order (shared logic for both ordering modes).
 
-        filled_orders = []
+        Handles exit vs entry detection, gatekeeper validation, share rounding,
+        partial fills, and reject_on_insufficient_cash bypass.
+        """
+        price = self._get_fill_price_for_order(order, use_open)
+        if price is None:
+            return
 
-        # Phase 1: Process exit orders (always allowed - frees capital)
-        for order in exit_orders:
-            # Get execution price based on mode
-            if use_open and self.execution_mode == ExecutionMode.NEXT_BAR:
-                price = self._current_opens.get(order.asset)
-            else:
-                price = self._current_prices.get(order.asset)
+        is_exit = self._is_exit_order(order)
 
-            if price is None:
-                continue
-
+        if is_exit:
+            # Exit orders always allowed (frees capital)
             fill_price = self._check_fill(order, price)
             if fill_price is not None:
                 fully_filled = self._execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
-                    # Clean up partial tracking
                     self._partial_orders.pop(order.order_id, None)
                 else:
-                    # Update order quantity to remaining
                     self._update_partial_order(order)
-
-        # Phase 2: Update account equity after exits
-        self.account.mark_to_market(self._current_prices)
-
-        # Phase 3: Process entry orders (validated via Gatekeeper)
-        for order in entry_orders:
-            # Get execution price based on mode
-            if use_open and self.execution_mode == ExecutionMode.NEXT_BAR:
-                price = self._current_opens.get(order.asset)
-            else:
-                price = self._current_prices.get(order.asset)
-
-            if price is None:
-                continue
+        else:
+            # Entry order — apply share rounding before validation
+            self._apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                return
 
             fill_price = self._check_fill(order, price)
-            if fill_price is not None:
-                # CRITICAL: Validate order before executing
-                valid, rejection_reason = self.gatekeeper.validate_order(order, fill_price)
+            if fill_price is None:
+                return
 
-                if valid:
-                    fully_filled = self._execute_fill(order, fill_price)
-                    if fully_filled:
-                        filled_orders.append(order)
-                        # Clean up partial tracking
-                        self._partial_orders.pop(order.order_id, None)
-                    else:
-                        # Update order quantity to remaining
-                        self._update_partial_order(order)
+            # Validate via gatekeeper
+            valid, rejection_reason = self.gatekeeper.validate_order(order, fill_price)
+
+            if valid:
+                fully_filled = self._execute_fill(order, fill_price)
+                if fully_filled:
+                    filled_orders.append(order)
+                    self._partial_orders.pop(order.order_id, None)
                 else:
-                    # Reject order and store reason
+                    self._update_partial_order(order)
+            elif (
+                not self.reject_on_insufficient_cash and "insufficient" in rejection_reason.lower()
+            ):
+                # Permissive mode: skip instead of rejecting
+                if self.partial_fills_allowed and self._try_partial_fill(order, fill_price):
+                    filled_orders.append(order)
+                    self._partial_orders.pop(order.order_id, None)
+                # else: silently skip (VBT-like behavior)
+            elif self.partial_fills_allowed and "insufficient" in rejection_reason.lower():
+                # Strict mode but partial fills allowed
+                if self._try_partial_fill(order, fill_price):
+                    filled_orders.append(order)
+                    self._partial_orders.pop(order.order_id, None)
+                else:
                     order.status = OrderStatus.REJECTED
                     order.rejection_reason = rejection_reason
+            else:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = rejection_reason
 
-        # Remove filled/rejected orders from pending (only fully filled ones)
+    def _cleanup_filled_orders(self, filled_orders: list[Order]) -> None:
+        """Remove filled and rejected orders from pending lists."""
         for order in filled_orders:
             if order in self.pending_orders:
                 self.pending_orders.remove(order)
             if order in self._orders_this_bar:
                 self._orders_this_bar.remove(order)
 
-        # Also remove rejected orders
         for order in self.pending_orders[:]:
             if order.status == OrderStatus.REJECTED:
                 self.pending_orders.remove(order)
+
+    def _process_orders_exit_first(self, use_open: bool = False):
+        """EXIT_FIRST ordering: all exits → mark-to-market → all entries."""
+        exit_orders = []
+        entry_orders = []
+
+        for order in self.pending_orders[:]:
+            if self.execution_mode == ExecutionMode.NEXT_BAR and order in self._orders_this_bar:
+                continue
+            if self._is_exit_order(order):
+                exit_orders.append(order)
+            else:
+                entry_orders.append(order)
+
+        filled_orders: list[Order] = []
+
+        # Phase 1: Process exit orders
+        for order in exit_orders:
+            price = self._get_fill_price_for_order(order, use_open)
+            if price is None:
+                continue
+            fill_price = self._check_fill(order, price)
+            if fill_price is not None:
+                fully_filled = self._execute_fill(order, fill_price)
+                if fully_filled:
+                    filled_orders.append(order)
+                    self._partial_orders.pop(order.order_id, None)
+                else:
+                    self._update_partial_order(order)
+
+        # Phase 2: Update account equity after exits
+        self.account.mark_to_market(self._current_prices)
+
+        # Phase 3: Process entry orders
+        for order in entry_orders:
+            self._process_single_order(order, use_open, filled_orders)
+
+        self._cleanup_filled_orders(filled_orders)
+
+    def _process_orders_fifo(self, use_open: bool = False):
+        """FIFO ordering: process orders in submission order with sequential cash updates."""
+        eligible_orders = []
+        for order in self.pending_orders[:]:
+            if self.execution_mode == ExecutionMode.NEXT_BAR and order in self._orders_this_bar:
+                continue
+            eligible_orders.append(order)
+
+        filled_orders: list[Order] = []
+
+        for order in eligible_orders:
+            self._process_single_order(order, use_open, filled_orders)
+            # Sequential cash update: mark-to-market after each fill
+            # so the next order sees updated buying power
+            if filled_orders and filled_orders[-1] is order:
+                self.account.mark_to_market(self._current_prices)
+
+        self._cleanup_filled_orders(filled_orders)
 
     def _get_effective_quantity(self, order: Order) -> float:
         """Get effective order quantity (considering partial fills).

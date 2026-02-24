@@ -12,10 +12,18 @@ from datetime import datetime
 from statistics import mean, stdev
 from typing import TYPE_CHECKING, Any
 
+from ..config import ShareType
 from ..strategy import Strategy
 
 if TYPE_CHECKING:
     from ..broker import Broker
+
+
+def _use_fractional(allow_fractional: bool | None, broker: Broker) -> bool:
+    """Resolve fractional share setting from strategy override or broker config."""
+    if allow_fractional is not None:
+        return allow_fractional
+    return getattr(broker, "share_type", ShareType.FRACTIONAL) == ShareType.FRACTIONAL
 
 
 class SignalFollowingStrategy(Strategy):
@@ -44,7 +52,7 @@ class SignalFollowingStrategy(Strategy):
     signal_column: str = "signal"
     position_size: float = 0.10
     allow_shorts: bool = False
-    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
+    allow_fractional: bool | None = None  # None = defer to broker.share_type
 
     @abstractmethod
     def should_enter_long(self, signal: float) -> bool:
@@ -101,16 +109,17 @@ class SignalFollowingStrategy(Strategy):
 
             if position is None:
                 # No position - check for entry
+                fractional = _use_fractional(self.allow_fractional, broker)
                 if self.should_enter_long(signal):
                     equity = broker.get_account_value()
                     raw_shares = (equity * self.position_size) / price if price > 0 else 0
-                    shares = raw_shares if self.allow_fractional else int(raw_shares)
+                    shares = raw_shares if fractional else int(raw_shares)
                     if shares > 0:
                         broker.submit_order(asset, shares)
                 elif self.allow_shorts and self.should_enter_short(signal):
                     equity = broker.get_account_value()
                     raw_shares = (equity * self.position_size) / price if price > 0 else 0
-                    shares = raw_shares if self.allow_fractional else int(raw_shares)
+                    shares = raw_shares if fractional else int(raw_shares)
                     if shares > 0:
                         broker.submit_order(asset, -shares)
             else:
@@ -142,7 +151,7 @@ class MomentumStrategy(Strategy):
     entry_threshold: float = 0.05
     exit_threshold: float = -0.02
     position_size: float = 0.10
-    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
+    allow_fractional: bool | None = None  # None = defer to broker.share_type
 
     def __init__(self) -> None:
         self.price_history: dict[str, list[float]] = defaultdict(list)
@@ -191,7 +200,8 @@ class MomentumStrategy(Strategy):
                 # Enter long on strong momentum
                 equity = broker.get_account_value()
                 raw_shares = (equity * self.position_size) / close
-                shares = raw_shares if self.allow_fractional else int(raw_shares)
+                fractional = _use_fractional(self.allow_fractional, broker)
+                shares = raw_shares if fractional else int(raw_shares)
                 if shares > 0:
                     broker.submit_order(asset, shares)
             elif position is not None and momentum < self.exit_threshold:
@@ -222,7 +232,7 @@ class MeanReversionStrategy(Strategy):
     entry_zscore: float = -2.0
     exit_zscore: float = 0.0
     position_size: float = 0.10
-    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
+    allow_fractional: bool | None = None  # None = defer to broker.share_type
 
     def __init__(self) -> None:
         self.price_history: dict[str, list[float]] = defaultdict(list)
@@ -284,7 +294,8 @@ class MeanReversionStrategy(Strategy):
                 # Enter long on oversold condition
                 equity = broker.get_account_value()
                 raw_shares = (equity * self.position_size) / close
-                shares = raw_shares if self.allow_fractional else int(raw_shares)
+                fractional = _use_fractional(self.allow_fractional, broker)
+                shares = raw_shares if fractional else int(raw_shares)
                 if shares > 0:
                     broker.submit_order(asset, shares)
             elif position is not None and zscore > self.exit_zscore:
@@ -317,7 +328,7 @@ class LongShortStrategy(Strategy):
     short_count: int = 5
     position_size: float = 0.05
     rebalance_frequency: int = 20
-    allow_fractional: bool = True  # Allow fractional shares (crypto/FX)
+    allow_fractional: bool | None = None  # None = defer to broker.share_type
 
     def __init__(self) -> None:
         self.bar_count = 0
@@ -379,6 +390,7 @@ class LongShortStrategy(Strategy):
 
         # Open/adjust positions
         equity = broker.get_account_value()
+        fractional = _use_fractional(self.allow_fractional, broker)
 
         for asset in long_assets:
             price = data.get(asset, {}).get("close", 0)
@@ -387,7 +399,7 @@ class LongShortStrategy(Strategy):
 
             position = broker.get_position(asset)
             raw_shares = (equity * self.position_size) / price
-            target_shares = raw_shares if self.allow_fractional else int(raw_shares)
+            target_shares = raw_shares if fractional else int(raw_shares)
 
             if position is None and target_shares > 0:
                 broker.submit_order(asset, target_shares)
@@ -399,7 +411,7 @@ class LongShortStrategy(Strategy):
 
             position = broker.get_position(asset)
             raw_shares = (equity * self.position_size) / price
-            target_shares = raw_shares if self.allow_fractional else int(raw_shares)
+            target_shares = raw_shares if fractional else int(raw_shares)
 
             if position is None and target_shares > 0:
                 broker.submit_order(asset, -target_shares)

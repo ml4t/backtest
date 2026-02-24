@@ -54,12 +54,38 @@ class ShareType(str, Enum):
 
 
 class SizingMethod(str, Enum):
-    """How position size is calculated."""
+    """How position size is calculated.
+
+    .. deprecated::
+        This enum is not consumed by any runtime code. Position sizing is
+        always determined by strategy code. Retained for serialization
+        backward compatibility only.
+    """
 
     PERCENT_OF_PORTFOLIO = "percent_of_portfolio"  # % of total portfolio value
     PERCENT_OF_CASH = "percent_of_cash"  # % of available cash only
     FIXED_VALUE = "fixed_value"  # Fixed dollar amount per position
     FIXED_SHARES = "fixed_shares"  # Fixed number of shares
+
+
+class FillOrdering(str, Enum):
+    """Order processing sequence within a single bar.
+
+    Controls how pending orders are sequenced during fill processing:
+
+    EXIT_FIRST (default):
+        All exits → mark-to-market → all entries (with gatekeeper validation).
+        Capital-efficient: exits free cash before entries need it.
+        Matches VectorBT ``call_seq='auto'`` behavior.
+
+    FIFO:
+        Orders process in submission order with sequential cash updates.
+        Each order's gatekeeper check sees cash from all prior fills.
+        Matches Backtrader's submission-order processing.
+    """
+
+    EXIT_FIRST = "exit_first"
+    FIFO = "fifo"
 
 
 class SignalProcessing(str, Enum):
@@ -319,13 +345,6 @@ class BacktestConfig:
                 "High concentration increases single-stock risk."
             )
 
-        # Leverage account with negative cash settings
-        if self.allow_leverage and self.allow_negative_cash:
-            issues.append(
-                "Leverage account with allow_negative_cash may cause unrealistic leverage. "
-                "Margin requirements are enforced separately from cash balance."
-            )
-
         # Volume-based slippage without partial fills
         if self.slippage_model == SlippageModel.VOLUME_BASED and not self.partial_fills_allowed:
             issues.append(
@@ -401,7 +420,6 @@ class BacktestConfig:
 
     # === Position Sizing ===
     share_type: ShareType = ShareType.FRACTIONAL
-    sizing_method: SizingMethod = SizingMethod.PERCENT_OF_PORTFOLIO
     default_position_pct: float = 0.10  # 10% of portfolio per position
 
     # === Signal Processing ===
@@ -423,14 +441,12 @@ class BacktestConfig:
 
     # === Cash Management ===
     initial_cash: float = 100000.0
-    allow_negative_cash: bool = False
     cash_buffer_pct: float = 0.0  # Reserve this % of cash (0 = use all)
 
     # === Order Handling ===
     reject_on_insufficient_cash: bool = True
     partial_fills_allowed: bool = False
-
-    # Note: margin_requirement removed - use initial_margin instead
+    fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
 
     # === Calendar & Timezone ===
     calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
@@ -466,7 +482,6 @@ class BacktestConfig:
             },
             "position_sizing": {
                 "share_type": self.share_type.value,
-                "sizing_method": self.sizing_method.value,
                 "default_position_pct": self.default_position_pct,
             },
             "signals": {
@@ -488,12 +503,12 @@ class BacktestConfig:
             },
             "cash": {
                 "initial": self.initial_cash,
-                "allow_negative": self.allow_negative_cash,
                 "buffer_pct": self.cash_buffer_pct,
             },
             "orders": {
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
                 "partial_fills_allowed": self.partial_fills_allowed,
+                "fill_ordering": self.fill_ordering.value,
             },
         }
 
@@ -554,7 +569,6 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming(stops_cfg.get("trail_stop_timing", "lagged")),
             # Sizing
             share_type=ShareType(sizing_cfg.get("share_type", "fractional")),
-            sizing_method=SizingMethod(sizing_cfg.get("sizing_method", "percent_of_portfolio")),
             default_position_pct=sizing_cfg.get("default_position_pct", 0.10),
             # Signals
             signal_processing=SignalProcessing(
@@ -574,11 +588,11 @@ class BacktestConfig:
             stop_slippage_rate=slip_cfg.get("stop_rate", 0.0),
             # Cash
             initial_cash=cash_cfg.get("initial", 100000.0),
-            allow_negative_cash=cash_cfg.get("allow_negative", False),
             cash_buffer_pct=cash_cfg.get("buffer_pct", 0.0),
             # Orders
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
+            fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
             # Metadata
             preset_name=preset_name,
         )
@@ -643,7 +657,6 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming.LAGGED,
             # Sizing
             share_type=ShareType.FRACTIONAL,
-            sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
@@ -654,10 +667,10 @@ class BacktestConfig:
             slippage_rate=0.001,
             # Cash
             initial_cash=100000.0,
-            allow_negative_cash=False,
             cash_buffer_pct=0.0,
             reject_on_insufficient_cash=True,
             partial_fills_allowed=False,
+            fill_ordering=FillOrdering.EXIT_FIRST,
         )
 
     @classmethod
@@ -691,7 +704,6 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming.LAGGED,
             # Sizing
             share_type=ShareType.INTEGER,  # Key difference!
-            sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
@@ -702,10 +714,10 @@ class BacktestConfig:
             slippage_rate=0.001,
             # Cash
             initial_cash=100000.0,
-            allow_negative_cash=False,
             cash_buffer_pct=0.0,
             reject_on_insufficient_cash=True,
             partial_fills_allowed=False,
+            fill_ordering=FillOrdering.FIFO,  # Backtrader processes in submission order
         )
 
     @classmethod
@@ -738,7 +750,6 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming.INTRABAR,  # Live HWM updates!
             # Sizing
             share_type=ShareType.FRACTIONAL,
-            sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.PROCESS_ALL,  # Key difference!
             accumulate_positions=False,
@@ -749,10 +760,10 @@ class BacktestConfig:
             slippage_rate=0.0,
             # Cash
             initial_cash=100000.0,
-            allow_negative_cash=False,
             cash_buffer_pct=0.0,
             reject_on_insufficient_cash=False,  # VectorBT is more permissive
             partial_fills_allowed=True,
+            fill_ordering=FillOrdering.EXIT_FIRST,  # VBT call_seq='auto'
         )
 
     @classmethod
@@ -782,7 +793,6 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming.LAGGED,
             # Sizing
             share_type=ShareType.INTEGER,
-            sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.10,
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
@@ -795,10 +805,10 @@ class BacktestConfig:
             slippage_rate=0.1,  # 10% of bar volume
             # Cash
             initial_cash=100000.0,
-            allow_negative_cash=False,
             cash_buffer_pct=0.0,
             reject_on_insufficient_cash=True,
             partial_fills_allowed=True,  # Volume-based = partial fills
+            fill_ordering=FillOrdering.EXIT_FIRST,
         )
 
     @classmethod
@@ -829,7 +839,6 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming.LAGGED,
             # Sizing
             share_type=ShareType.INTEGER,
-            sizing_method=SizingMethod.PERCENT_OF_PORTFOLIO,
             default_position_pct=0.05,  # Smaller positions
             signal_processing=SignalProcessing.CHECK_POSITION,
             accumulate_positions=False,
@@ -841,10 +850,10 @@ class BacktestConfig:
             stop_slippage_rate=0.001,  # Extra 0.1% slippage for stop fills
             # Cash
             initial_cash=100000.0,
-            allow_negative_cash=False,
             cash_buffer_pct=0.02,  # 2% cash buffer
             reject_on_insufficient_cash=True,
             partial_fills_allowed=False,
+            fill_ordering=FillOrdering.EXIT_FIRST,
         )
 
     def describe(self) -> str:
@@ -887,7 +896,6 @@ class BacktestConfig:
                 "",
                 "Position Sizing:",
                 f"  Share type: {self.share_type.value}",
-                f"  Sizing method: {self.sizing_method.value}",
                 f"  Default position: {self.default_position_pct:.1%}",
                 "",
                 "Signal Processing:",
@@ -906,10 +914,14 @@ class BacktestConfig:
         lines.extend(
             [
                 "",
+                "Orders:",
+                f"  Fill ordering: {self.fill_ordering.value}",
+                f"  Reject insufficient: {self.reject_on_insufficient_cash}",
+                f"  Partial fills: {self.partial_fills_allowed}",
+                "",
                 "Cash:",
                 f"  Initial: ${self.initial_cash:,.0f}",
                 f"  Buffer: {self.cash_buffer_pct:.1%}",
-                f"  Reject insufficient: {self.reject_on_insufficient_cash}",
             ]
         )
 

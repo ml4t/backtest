@@ -64,6 +64,7 @@ from .config import (
     BacktestConfig,
     DataFrequency,
     ExecutionPrice,
+    FillOrdering,
     FillTiming,
     InitialHwmSource,
     Mode,
@@ -213,6 +214,7 @@ __all__ = [
     "ExecutionPrice",
     "ShareType",
     "SizingMethod",
+    "FillOrdering",
     "SignalProcessing",
     "TrailHwmSource",  # Deprecated alias for WaterMarkSource
     "TrailStopTiming",

@@ -36,15 +36,28 @@ class Gatekeeper:
         >>> print(valid)  # True (have enough cash)
     """
 
-    def __init__(self, account: AccountState, commission_model: CommissionModel):
+    def __init__(
+        self,
+        account: AccountState,
+        commission_model: CommissionModel,
+        cash_buffer_pct: float = 0.0,
+    ):
         """Initialize gatekeeper with account and commission model.
 
         Args:
             account: AccountState instance to validate against
             commission_model: CommissionModel for calculating transaction costs
+            cash_buffer_pct: Fraction of cash to reserve (0.02 = keep 2% as buffer)
         """
         self.account = account
         self.commission_model = commission_model
+        self.cash_buffer_pct = cash_buffer_pct
+
+    def _available_cash(self) -> float:
+        """Cash available for new orders after applying buffer reserve."""
+        if self.cash_buffer_pct > 0:
+            return self.account.cash * (1.0 - self.cash_buffer_pct)
+        return self.account.cash
 
     def validate_order(self, order: Order, price: float) -> tuple[bool, str]:
         """Validate order before execution.
@@ -126,6 +139,9 @@ class Gatekeeper:
         # Calculate commission to include in cost
         commission = self.commission_model.calculate(order.asset, order.quantity, price)
 
+        # Use buffered cash (reserves cash_buffer_pct for safety margin)
+        available = self._available_cash()
+
         # Validate based on whether we have an existing position
         if current_qty == 0.0:
             # New position - use validate_new_position
@@ -135,7 +151,7 @@ class Gatekeeper:
                 quantity=new_qty,
                 price=price,
                 current_positions=self.account.positions,
-                cash=self.account.cash - commission,  # Account for commission cost
+                cash=available - commission,
             )
         else:
             # Adding to existing position - use validate_position_change
@@ -145,7 +161,7 @@ class Gatekeeper:
                 quantity_delta=order_qty_delta,
                 price=price,
                 current_positions=self.account.positions,
-                cash=self.account.cash - commission,  # Account for commission cost
+                cash=available - commission,
             )
 
     def _is_reversal(self, current_qty: float, order_qty_delta: float) -> bool:
