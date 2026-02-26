@@ -179,7 +179,7 @@ class BacktestResult:
             return pl.DataFrame(schema=self._equity_schema())
 
         timestamps = [ts for ts, _ in self.equity_curve]
-        values = [v for _, v in self.equity_curve]
+        values = [float(v) for _, v in self.equity_curve]
 
         # Build base DataFrame and sort by timestamp
         df = pl.DataFrame({"timestamp": timestamps, "equity": values}).sort("timestamp")
