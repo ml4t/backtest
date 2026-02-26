@@ -814,6 +814,7 @@ class BacktestResult:
         title: str | None = None,
         output_path: str | Path | None = None,
         include_statistical: bool = True,
+        calendar: str | None = None,
     ) -> str:
         """Generate an interactive HTML tearsheet for the backtest results.
 
@@ -841,6 +842,9 @@ class BacktestResult:
         include_statistical : bool
             Whether to include statistical validity analysis (DSR, RAS).
             Requires sufficient trades for meaningful statistics.
+        calendar : str, optional
+            Trading calendar for session alignment (e.g. "NYSE", "crypto").
+            Passed to to_daily_returns() for correct daily aggregation.
 
         Returns
         -------
@@ -869,7 +873,8 @@ class BacktestResult:
 
         # Extract data for tearsheet
         trades_df = self.to_trades_dataframe()
-        returns = self.to_returns_series().to_numpy()
+        # Use daily returns (not bar-level) for correct annualized metrics
+        returns = self.to_daily_returns(calendar=calendar).to_numpy()
 
         # Build metrics dict with all available metrics
         tearsheet_metrics = dict(self.metrics)
@@ -887,11 +892,15 @@ class BacktestResult:
         if "total_slippage" not in tearsheet_metrics and self.trades:
             tearsheet_metrics["total_slippage"] = sum(t.slippage for t in self.trades)
 
+        # Extract equity curve for portfolio-level charts
+        equity_df = self.to_equity_dataframe() if self.equity_curve else None
+
         # Generate tearsheet
         html = generate_backtest_tearsheet(
             metrics=tearsheet_metrics,
             trades=trades_df if len(trades_df) > 0 else None,
             returns=returns if len(returns) > 0 else None,
+            equity_curve=equity_df,
             template=template,
             theme=theme,
             title=title or "Backtest Tearsheet",
