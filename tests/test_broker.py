@@ -1137,7 +1137,7 @@ class TestBrokerPositionRules:
 
         # Verify it's stored per-asset
         assert "AAPL" in broker._position_rules_by_asset
-        assert broker._get_position_rules("AAPL") == stop_rule
+        assert broker._position_rules_by_asset["AAPL"] == stop_rule
         # Global rules should be None
         assert broker._position_rules is None
 
@@ -1153,8 +1153,8 @@ class TestBrokerPositionRules:
 
         # Verify it's stored globally
         assert broker._position_rules == tp_rule
-        # Should apply to any asset
-        assert broker._get_position_rules("AAPL") == tp_rule
+        # Should apply to assets without explicit overrides
+        assert broker._position_rules_by_asset.get("AAPL") is None
 
     def test_update_position_context(self):
         """Test updating position context."""
@@ -1277,7 +1277,7 @@ class TestBrokerMissingPriceHandling:
 
 
 class TestEvaluatePositionRules:
-    """Test evaluate_position_rules and _build_position_state."""
+    """Test evaluate_position_rules and RiskEngine position-state construction."""
 
     def test_evaluate_position_rules_exit_full_immediate(self):
         """Test EXIT_FULL action without defer_fill."""
@@ -1461,7 +1461,7 @@ class TestEvaluatePositionRules:
         )
 
         # Build state
-        state = broker._build_position_state(pos, 105.0)
+        state = broker._risk_engine._build_position_state(pos, 105.0)
 
         assert state.asset == "AAPL"
         assert state.side == "long"

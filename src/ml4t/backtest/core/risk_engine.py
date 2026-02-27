@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..risk.types import ActionType
+from ..risk.types import ActionType, PositionState
 from ..types import OrderSide, OrderType
 from .shared import SubmitOrderOptions, reason_to_exit_reason
 
@@ -18,7 +18,7 @@ class RiskEngine:
         exit_orders = []
 
         for asset, pos in list(broker.positions.items()):
-            rules = broker._get_position_rules(asset)
+            rules = self._get_position_rules(asset)
             if rules is None:
                 continue
 
@@ -26,7 +26,7 @@ class RiskEngine:
             if price is None:
                 continue
 
-            state = broker._build_position_state(pos, price)
+            state = self._build_position_state(pos, price)
             action = rules.evaluate(state)
 
             if action.action == ActionType.EXIT_FULL:
@@ -78,6 +78,49 @@ class RiskEngine:
                             exit_orders.append(order)
 
         return exit_orders
+
+    def _get_position_rules(self, asset: str):
+        broker = self.broker
+        return broker._position_rules_by_asset.get(asset) or broker._position_rules
+
+    def _build_position_state(self, pos, current_price: float):
+        broker = self.broker
+        asset = pos.asset
+        context = {
+            **pos.context,
+            "stop_fill_mode": broker.stop_fill_mode,
+            "stop_level_basis": broker.stop_level_basis,
+            "trail_hwm_source": broker.trail_hwm_source,
+            "trail_stop_timing": broker.trail_stop_timing,
+        }
+
+        return PositionState(
+            asset=asset,
+            side=pos.side,
+            entry_price=pos.entry_price,
+            current_price=current_price,
+            quantity=abs(pos.quantity),
+            initial_quantity=abs(pos.initial_quantity)
+            if pos.initial_quantity
+            else abs(pos.quantity),
+            unrealized_pnl=pos.unrealized_pnl(current_price),
+            unrealized_return=pos.pnl_percent(current_price),
+            bars_held=pos.bars_held,
+            high_water_mark=pos.high_water_mark
+            if pos.high_water_mark is not None
+            else pos.entry_price,
+            low_water_mark=pos.low_water_mark
+            if pos.low_water_mark is not None
+            else pos.entry_price,
+            bar_open=broker._current_opens.get(asset),
+            bar_high=broker._current_highs.get(asset),
+            bar_low=broker._current_lows.get(asset),
+            max_favorable_excursion=pos.max_favorable_excursion,
+            max_adverse_excursion=pos.max_adverse_excursion,
+            entry_time=pos.entry_time,
+            current_time=broker._current_time,
+            context=context,
+        )
 
     def process_pending_exits(self):
         broker = self.broker

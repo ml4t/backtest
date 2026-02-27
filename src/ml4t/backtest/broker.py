@@ -536,55 +536,6 @@ class Broker:
         if pos:
             pos.context.update(context)
 
-    def _get_position_rules(self, asset: str):
-        """Get applicable rules for an asset (per-asset or global)."""
-        return self._position_rules_by_asset.get(asset) or self._position_rules
-
-    def _build_position_state(self, pos: Position, current_price: float):
-        """Build PositionState from Position for rule evaluation."""
-        # Import here to avoid circular imports
-        from .risk.types import PositionState
-
-        asset = pos.asset
-
-        # Merge stop configuration into context for rules to access
-        context = {
-            **pos.context,
-            "stop_fill_mode": self.stop_fill_mode,
-            "stop_level_basis": self.stop_level_basis,
-            "trail_hwm_source": self.trail_hwm_source,
-            "trail_stop_timing": self.trail_stop_timing,
-        }
-
-        return PositionState(
-            asset=asset,
-            side=pos.side,
-            entry_price=pos.entry_price,
-            current_price=current_price,
-            quantity=abs(pos.quantity),
-            initial_quantity=abs(pos.initial_quantity)
-            if pos.initial_quantity
-            else abs(pos.quantity),
-            unrealized_pnl=pos.unrealized_pnl(current_price),
-            unrealized_return=pos.pnl_percent(current_price),
-            bars_held=pos.bars_held,
-            high_water_mark=pos.high_water_mark
-            if pos.high_water_mark is not None
-            else pos.entry_price,
-            low_water_mark=pos.low_water_mark
-            if pos.low_water_mark is not None
-            else pos.entry_price,
-            # Bar OHLC for intrabar stop/limit detection
-            bar_open=self._current_opens.get(asset),
-            bar_high=self._current_highs.get(asset),
-            bar_low=self._current_lows.get(asset),
-            max_favorable_excursion=pos.max_favorable_excursion,
-            max_adverse_excursion=pos.max_adverse_excursion,
-            entry_time=pos.entry_time,
-            current_time=self._current_time,
-            context=context,
-        )
-
     def evaluate_position_rules(self) -> list[Order]:
         """Evaluate position rules for all open positions.
 
