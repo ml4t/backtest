@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..types import OrderStatus
+from ..types import ExecutionMode, OrderSide, OrderStatus
 
 
 class ExecutionEngine:
@@ -24,7 +24,7 @@ class ExecutionEngine:
         if pos is None or pos.quantity == 0:
             return False
 
-        signed_qty = order.quantity if order.side.name == "BUY" else -order.quantity
+        signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
 
         if pos.quantity > 0 and signed_qty < 0:
             new_qty = pos.quantity + signed_qty
@@ -39,9 +39,13 @@ class ExecutionEngine:
         fill = broker._fill_engine
         exit_orders = []
         entry_orders = []
+        orders_this_bar_ids = broker._orders_this_bar_ids
 
         for order in broker.pending_orders[:]:
-            if broker.execution_mode.value == "next_bar" and order in broker._orders_this_bar:
+            if (
+                broker.execution_mode is ExecutionMode.NEXT_BAR
+                and order.order_id in orders_this_bar_ids
+            ):
                 continue
             if self._is_exit_order(order):
                 exit_orders.append(order)
@@ -73,8 +77,12 @@ class ExecutionEngine:
     def _process_orders_fifo(self, use_open: bool = False):
         broker = self.broker
         eligible_orders = []
+        orders_this_bar_ids = broker._orders_this_bar_ids
         for order in broker.pending_orders[:]:
-            if broker.execution_mode.value == "next_bar" and order in broker._orders_this_bar:
+            if (
+                broker.execution_mode is ExecutionMode.NEXT_BAR
+                and order.order_id in orders_this_bar_ids
+            ):
                 continue
             eligible_orders.append(order)
 
@@ -145,12 +153,19 @@ class ExecutionEngine:
 
     def _cleanup_filled_orders(self, filled_orders: list) -> None:
         broker = self.broker
-        for order in filled_orders:
-            if order in broker.pending_orders:
-                broker.pending_orders.remove(order)
-            if order in broker._orders_this_bar:
-                broker._orders_this_bar.remove(order)
+        filled_ids = {o.order_id for o in filled_orders}
+        if filled_ids:
+            broker._orders_this_bar_ids.difference_update(filled_ids)
 
-        for order in broker.pending_orders[:]:
-            if order.status == OrderStatus.REJECTED:
-                broker.pending_orders.remove(order)
+        new_pending = []
+        for order in broker.pending_orders:
+            if order.order_id in filled_ids or order.status == OrderStatus.REJECTED:
+                broker._orders_this_bar_ids.discard(order.order_id)
+                continue
+            new_pending.append(order)
+        broker.pending_orders = new_pending
+
+        if broker._orders_this_bar:
+            broker._orders_this_bar = [
+                o for o in broker._orders_this_bar if o.order_id in broker._orders_this_bar_ids
+            ]

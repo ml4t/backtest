@@ -39,7 +39,7 @@ class PositionAction:
     @classmethod
     def hold(cls) -> "PositionAction":
         """Convenience: return HOLD action."""
-        return cls(ActionType.HOLD)
+        return _HOLD_ACTION
 
     @classmethod
     def exit_full(
@@ -145,3 +145,6 @@ class PositionState:
         return (self.max_favorable_excursion - self.unrealized_return) / (
             1 + self.max_favorable_excursion
         )
+
+
+_HOLD_ACTION = PositionAction(ActionType.HOLD)

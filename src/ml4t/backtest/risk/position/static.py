@@ -2,13 +2,12 @@
 
 from dataclasses import dataclass
 
+from ...types import StopFillMode, StopLevelBasis
 from ..types import PositionAction, PositionState
 
 
 def _get_stop_fill_mode(context: dict):
     """Get StopFillMode from context, defaulting to STOP_PRICE."""
-    from ml4t.backtest.types import StopFillMode
-
     return context.get("stop_fill_mode", StopFillMode.STOP_PRICE)
 
 
@@ -18,8 +17,6 @@ def _get_stop_base_price(state, context: dict) -> float:
     If stop_level_basis is SIGNAL_PRICE and signal_price is available,
     use signal_price (Backtrader behavior). Otherwise use entry_price.
     """
-    from ml4t.backtest.types import StopLevelBasis
-
     basis = context.get("stop_level_basis", StopLevelBasis.FILL_PRICE)
     if basis == StopLevelBasis.SIGNAL_PRICE:
         signal_price = context.get("signal_price")
@@ -51,8 +48,6 @@ class StopLoss:
 
     def evaluate(self, state: PositionState) -> PositionAction:
         """Exit if stop price was breached during the bar."""
-        from ml4t.backtest.types import StopFillMode
-
         # Get base price for stop level calculation (entry_price or signal_price)
         base_price = _get_stop_base_price(state, state.context)
 
@@ -153,8 +148,6 @@ class TakeProfit:
 
     def evaluate(self, state: PositionState) -> PositionAction:
         """Exit if target price was reached during the bar."""
-        from ml4t.backtest.types import StopFillMode
-
         # Get base price for target level calculation (entry_price or signal_price)
         base_price = _get_stop_base_price(state, state.context)
 

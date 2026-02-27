@@ -158,6 +158,7 @@ class Broker:
         self._last_prices: dict[str, float] = {}
         self._asset_bars_seen: dict[str, int] = {}
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
+        self._orders_this_bar_ids: set[str] = set()
 
         # Risk management
         self._position_rules: Any = None  # Global position rules
@@ -1339,6 +1340,7 @@ class Broker:
             pass  # They're already in pending_orders
             # Clear orders placed this bar (will be processed next bar)
             self._orders_this_bar = []
+            self._orders_this_bar_ids.clear()
 
         for _asset, pos in self.positions.items():
             pos.bars_held += 1

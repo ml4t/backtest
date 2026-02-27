@@ -278,8 +278,17 @@ class FillExecutor:
         Returns:
             Context dict for Position
         """
+        broker = self.broker
         signal_price = getattr(order, "_signal_price", None)
-        return {"signal_price": signal_price} if signal_price is not None else {}
+        context = {
+            "stop_fill_mode": broker.stop_fill_mode,
+            "stop_level_basis": broker.stop_level_basis,
+            "trail_hwm_source": broker.trail_hwm_source,
+            "trail_stop_timing": broker.trail_stop_timing,
+        }
+        if signal_price is not None:
+            context["signal_price"] = signal_price
+        return context
 
     def _create_position(self, ctx: FillContext) -> None:
         """Create a new position from flat.
@@ -481,12 +490,22 @@ class FillExecutor:
                 del broker.account.positions[asset]
         else:
             # Update or create position in account (include multiplier for correct valuation)
-            broker.account.positions[asset] = Position(
-                asset=broker_pos.asset,
-                quantity=broker_pos.quantity,
-                entry_price=broker_pos.entry_price,
-                current_price=broker._current_prices.get(asset, broker_pos.entry_price),
-                entry_time=broker_pos.entry_time,
-                bars_held=broker_pos.bars_held,
-                multiplier=broker_pos.multiplier,
-            )
+            account_pos = broker.account.positions.get(asset)
+            current_price = broker._current_prices.get(asset, broker_pos.entry_price)
+            if account_pos is None:
+                broker.account.positions[asset] = Position(
+                    asset=broker_pos.asset,
+                    quantity=broker_pos.quantity,
+                    entry_price=broker_pos.entry_price,
+                    current_price=current_price,
+                    entry_time=broker_pos.entry_time,
+                    bars_held=broker_pos.bars_held,
+                    multiplier=broker_pos.multiplier,
+                )
+            else:
+                account_pos.quantity = broker_pos.quantity
+                account_pos.entry_price = broker_pos.entry_price
+                account_pos.current_price = current_price
+                account_pos.entry_time = broker_pos.entry_time
+                account_pos.bars_held = broker_pos.bars_held
+                account_pos.multiplier = broker_pos.multiplier

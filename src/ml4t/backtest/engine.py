@@ -165,12 +165,27 @@ class Engine:
                         self._skipped_bars += 1
                         continue
 
-            prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
-            opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
-            highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
-            lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
-            volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
-            signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
+            prices = getattr(assets_data, "_prices", None)
+            opens = getattr(assets_data, "_opens", None)
+            highs = getattr(assets_data, "_highs", None)
+            lows = getattr(assets_data, "_lows", None)
+            volumes = getattr(assets_data, "_volumes", None)
+            signals = getattr(assets_data, "_signals", None)
+
+            if (
+                prices is None
+                or opens is None
+                or highs is None
+                or lows is None
+                or volumes is None
+                or signals is None
+            ):
+                prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
+                opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
+                highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
+                lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
+                volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
+                signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
 
             self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
 

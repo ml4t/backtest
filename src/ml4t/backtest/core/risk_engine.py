@@ -86,13 +86,8 @@ class RiskEngine:
     def _build_position_state(self, pos, current_price: float):
         broker = self.broker
         asset = pos.asset
-        context = {
-            **pos.context,
-            "stop_fill_mode": broker.stop_fill_mode,
-            "stop_level_basis": broker.stop_level_basis,
-            "trail_hwm_source": broker.trail_hwm_source,
-            "trail_stop_timing": broker.trail_stop_timing,
-        }
+        context = pos.context
+        initial_qty = pos.initial_quantity if pos.initial_quantity is not None else pos.quantity
 
         return PositionState(
             asset=asset,
@@ -100,9 +95,7 @@ class RiskEngine:
             entry_price=pos.entry_price,
             current_price=current_price,
             quantity=abs(pos.quantity),
-            initial_quantity=abs(pos.initial_quantity)
-            if pos.initial_quantity
-            else abs(pos.quantity),
+            initial_quantity=abs(initial_qty),
             unrealized_pnl=pos.unrealized_pnl(current_price),
             unrealized_return=pos.pnl_percent(current_price),
             bars_held=pos.bars_held,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..types import Order, OrderSide, OrderStatus, OrderType
+from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType
 from .shared import SubmitOrderOptions
 
 
@@ -60,10 +60,11 @@ class OrderBook:
         broker.orders.append(order)
         broker.pending_orders.append(order)
 
-        if broker.execution_mode.value == "next_bar" and (
+        if broker.execution_mode is ExecutionMode.NEXT_BAR and (
             options is None or not options.eligible_in_next_bar_mode
         ):
             broker._orders_this_bar.append(order)
+            broker._orders_this_bar_ids.add(order.order_id)
 
         return order
 
