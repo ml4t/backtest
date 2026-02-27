@@ -6,11 +6,16 @@ import json
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
 
-from ml4t.backtest.result import BacktestResult, enrich_trades_with_signals
+from ml4t.backtest.result import (
+    BacktestResult,
+    _get_annualization_factor,
+    enrich_trades_with_signals,
+)
 from ml4t.backtest.types import Fill, OrderSide, Trade
 
 
@@ -345,6 +350,27 @@ class TestBacktestResultDict:
         assert "BacktestResult" in s
         assert "trades=2" in s
 
+    def test_dict_like_accessors(self, backtest_result: BacktestResult):
+        """Test __getitem__, get, keys, and items helpers."""
+        assert backtest_result["sharpe"] == 1.5
+        assert backtest_result.get("missing", 42) == 42
+        assert "sharpe" in dict(backtest_result.items())
+        assert ("sharpe", 1.5) in list(backtest_result.items())
+
+    def test_to_dict_includes_optional_analytics(self):
+        """Test to_dict includes equity and trade_analyzer when set."""
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={},
+            equity=SimpleNamespace(name="eq"),
+            trade_analyzer=SimpleNamespace(name="ta"),
+        )
+        d = result.to_dict()
+        assert "equity" in d
+        assert "trade_analyzer" in d
+
 
 class TestBacktestResultParquet:
     """Tests for Parquet serialization."""
@@ -537,6 +563,125 @@ class TestEnrichTradesWithSignals:
 
         assert aapl_row["entry_momentum"][0] == 0.5
         assert msft_row["entry_momentum"][0] == 0.3
+
+    def test_enrich_multi_asset_requires_trade_asset_column(self):
+        """Test multi-asset enrichment fails if trades have no asset/symbol column."""
+        trades_df = pl.DataFrame(
+            {
+                "entry_time": [datetime(2024, 1, 1, 10, 0)],
+                "exit_time": [datetime(2024, 1, 1, 14, 0)],
+            }
+        )
+        signals_df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, 10, 0)],
+                "asset": ["AAPL"],
+                "momentum": [0.5],
+            }
+        )
+        with pytest.raises(ValueError, match="requires trades_df to include"):
+            enrich_trades_with_signals(
+                trades_df,
+                signals_df,
+                signal_columns=["momentum"],
+                asset_col="asset",
+            )
+
+    def test_enrich_multi_asset_rejects_unknown_trade_asset_column(self):
+        """Test multi-asset enrichment validates explicit trades_asset_col."""
+        trades_df = pl.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "entry_time": [datetime(2024, 1, 1, 10, 0)],
+                "exit_time": [datetime(2024, 1, 1, 14, 0)],
+            }
+        )
+        signals_df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, 10, 0)],
+                "asset": ["AAPL"],
+                "momentum": [0.5],
+            }
+        )
+        with pytest.raises(ValueError, match="not found in trades_df"):
+            enrich_trades_with_signals(
+                trades_df,
+                signals_df,
+                signal_columns=["momentum"],
+                asset_col="asset",
+                trades_asset_col="ticker",
+            )
+
+
+class TestBacktestResultMetrics:
+    """Tests for annualization and compute_metrics branches."""
+
+    def test_get_annualization_factor_known_and_fallback(self):
+        assert _get_annualization_factor("nyse") == 252
+        assert _get_annualization_factor("crypto") == 365
+        assert _get_annualization_factor(None) == 252
+        assert _get_annualization_factor("not_a_real_calendar") == 252
+
+    def test_compute_metrics_import_error(self, backtest_result: BacktestResult, monkeypatch):
+        def _raise(_name: str):
+            raise ImportError("nope")
+
+        monkeypatch.setattr("importlib.import_module", _raise)
+        with pytest.raises(ImportError, match="ml4t-diagnostic is required"):
+            backtest_result.compute_metrics()
+
+    def test_compute_metrics_with_empty_inputs(self, monkeypatch):
+        def _sharpe(_arr, annualization_factor):
+            return 1.23 + (annualization_factor * 0.0)
+
+        def _sortino(_arr, annualization_factor):
+            return 2.34 + (annualization_factor * 0.0)
+
+        diag = SimpleNamespace(
+            sharpe_ratio=_sharpe,
+            sortino_ratio=_sortino,
+        )
+        monkeypatch.setattr("importlib.import_module", lambda _name: diag)
+
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+        metrics = result.compute_metrics(calendar="NYSE")
+
+        assert metrics["sharpe_ratio"] == 0.0
+        assert metrics["sortino_ratio"] == 0.0
+        assert metrics["max_drawdown"] == 0.0
+        assert metrics["total_return"] == 0.0
+        assert metrics["cagr"] == 0.0
+        assert metrics["calmar_ratio"] == 0.0
+        assert metrics["num_trades"] == 0
+
+    def test_compute_metrics_with_trade_analyzer(
+        self, backtest_result: BacktestResult, monkeypatch
+    ):
+        def _sharpe(_arr, annualization_factor):
+            return 1.11 + (annualization_factor * 0.0)
+
+        def _sortino(_arr, annualization_factor):
+            return 1.22 + (annualization_factor * 0.0)
+
+        diag = SimpleNamespace(
+            sharpe_ratio=_sharpe,
+            sortino_ratio=_sortino,
+        )
+        monkeypatch.setattr("importlib.import_module", lambda _name: diag)
+        backtest_result.trade_analyzer = SimpleNamespace(
+            num_trades=7,
+            win_rate=0.57,
+            profit_factor=1.8,
+            expectancy=12.0,
+            avg_trade=9.0,
+            avg_win=21.0,
+            avg_loss=-8.0,
+            total_fees=34.0,
+        )
+
+        metrics = backtest_result.compute_metrics(calendar="NYSE")
+        assert metrics["num_trades"] == 7
+        assert metrics["total_fees"] == 34.0
 
 
 class TestBacktestResultSchemas:
