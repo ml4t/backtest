@@ -400,6 +400,25 @@ class TestBacktestResultParquet:
             assert "metrics" in written
             assert "equity" not in written
 
+    def test_to_parquet_config_write_failure_is_non_fatal(self):
+        """Test config export failure is swallowed (ImportError/AttributeError path)."""
+
+        class _BadConfig:
+            def to_dict(self):
+                raise AttributeError("no to_dict")
+
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={},
+            config=_BadConfig(),
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            written = result.to_parquet(path, include=["config"])
+            assert "config" not in written
+
     def test_from_parquet_roundtrip(self, backtest_result: BacktestResult):
         """Test Parquet save and load roundtrip."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -426,6 +445,22 @@ class TestBacktestResultParquet:
             loaded = BacktestResult.from_parquet(tmpdir)
             assert len(loaded.trades) == 0
             assert len(loaded.equity_curve) == 0
+
+    def test_from_parquet_invalid_config_is_non_fatal(self, monkeypatch):
+        """Test config load failures are swallowed and config remains None."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir)
+            (path / "config.yaml").write_text("bad: [")
+            # Force yaml.safe_load failure branch
+            import yaml
+
+            monkeypatch.setattr(
+                yaml,
+                "safe_load",
+                lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad yaml")),
+            )
+            loaded = BacktestResult.from_parquet(path)
+            assert loaded.config is None
 
     def test_metrics_json_serialization(self, backtest_result: BacktestResult):
         """Test metrics JSON contains only serializable values."""
@@ -705,3 +740,26 @@ class TestBacktestResultSchemas:
         assert schema["equity"] == pl.Float64()
         assert schema["return"] == pl.Float64()
         assert schema["drawdown"] == pl.Float64()
+
+
+class TestBacktestResultTearsheet:
+    """Tests for tearsheet import-error handling."""
+
+    def test_to_tearsheet_import_error(self, monkeypatch):
+        """Test to_tearsheet raises helpful ImportError when diagnostic is unavailable."""
+        import builtins
+
+        real_import = builtins.__import__
+
+        def _raising_import(name, *args, **kwargs):
+            if name == "ml4t.diagnostic.visualization.backtest":
+                raise ImportError("diagnostic missing")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _raising_import)
+
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+        with pytest.raises(
+            ImportError, match="ml4t-diagnostic is required for tearsheet generation"
+        ):
+            result.to_tearsheet()
