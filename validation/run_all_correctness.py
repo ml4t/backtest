@@ -20,6 +20,7 @@ Output:
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -35,26 +36,31 @@ FRAMEWORKS = {
         "venv": ".venv-vectorbt-pro",
         "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "VectorBT Pro",
+        "ml4t_profile": "vectorbt",
     },
     "vectorbt_oss": {
         "venv": ".venv",  # Can also use .venv-validation
         "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "VectorBT OSS",
+        "ml4t_profile": "vectorbt",
     },
     "backtrader": {
         "venv": ".venv-backtrader",
         "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "Backtrader",
+        "ml4t_profile": "backtrader",
     },
     "zipline": {
         "venv": ".venv-zipline",
         "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09"],  # No scenario 10
         "display_name": "Zipline",
+        "ml4t_profile": "zipline",
     },
     "lean": {
         "venv": None,  # Uses Docker
         "scenarios": ["01"],  # Start with basic scenarios
         "display_name": "LEAN CLI",
+        "ml4t_profile": "default",
     },
 }
 
@@ -71,6 +77,26 @@ SCENARIO_NAMES = {
     "09": "Trailing Stop",
     "10": "Bracket Order",
 }
+
+
+def _extract_error_summary(output: str, returncode: int) -> str | None:
+    """Extract a concise failure summary from script output."""
+    if returncode == 0:
+        return None
+
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if not lines:
+        return f"Process exited with code {returncode}"
+
+    # Prefer explicit Python exception lines if present.
+    for line in reversed(lines):
+        if line.startswith(("AssertionError", "ValueError", "TypeError", "RuntimeError")):
+            return line
+        if "Error" in line or "Exception" in line or line.startswith("Traceback"):
+            return line
+
+    # Fall back to last emitted line.
+    return lines[-1][:200]
 
 
 def run_scenario(framework: str, scenario: str) -> dict:
@@ -100,26 +126,28 @@ def run_scenario(framework: str, scenario: str) -> dict:
         return {"passed": None, "error": f"venv not found: {venv_path}", "output": ""}
 
     try:
+        env = {
+            **os.environ,
+            "ML4T_PROFILE": config.get("ml4t_profile", "default"),
+        }
+        if framework == "zipline":
+            env["ZIPLINE_ROOT"] = str(VALIDATION_DIR / ".zipline")
+
         result = subprocess.run(
             [str(python_path), str(script_path)],
             capture_output=True,
             text=True,
             timeout=120,
             cwd=str(PROJECT_ROOT),
+            env=env,
         )
 
         output = result.stdout + result.stderr
 
-        # Check for PASS/FAIL in output
-        if "PASS" in output.upper() and "FAIL" not in output.upper():
-            passed = True
-        elif "FAIL" in output.upper() or result.returncode != 0:
-            passed = False
-        else:
-            # Check for error indicators
-            passed = result.returncode == 0
-
-        return {"passed": passed, "error": None, "output": output}
+        # Use process status as source of truth for determinism.
+        passed = result.returncode == 0
+        error = _extract_error_summary(output, result.returncode)
+        return {"passed": passed, "error": error, "output": output}
 
     except subprocess.TimeoutExpired:
         return {"passed": False, "error": "Timeout (120s)", "output": ""}

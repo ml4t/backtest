@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.ml4t.backtest.accounting import (
+from ml4t.backtest.accounting import (
     AccountState,
     UnifiedAccountPolicy,
 )
@@ -31,7 +31,7 @@ class TestAccountStateApplyFillLongPositions:
         assert "AAPL" in account.positions
         pos = account.positions["AAPL"]
         assert pos.quantity == 100.0
-        assert pos.avg_entry_price == 150.0
+        assert pos.entry_price == 150.0
 
     def test_add_to_long_position(self):
         """Test adding to existing long position updates cost basis."""
@@ -48,7 +48,7 @@ class TestAccountStateApplyFillLongPositions:
         pos = account.positions["AAPL"]
         assert pos.quantity == 150.0
         # Weighted average: (100×150 + 50×160) / 150 = 23,000 / 150 = 153.33
-        assert abs(pos.avg_entry_price - 153.333) < 0.01
+        assert abs(pos.entry_price - 153.333) < 0.01
 
     def test_close_long_position(self):
         """Test closing long position increases cash."""
@@ -78,7 +78,7 @@ class TestAccountStateApplyFillLongPositions:
         assert account.cash == 94_600.0  # 100k - 15k + 9.6k
         pos = account.positions["AAPL"]
         assert pos.quantity == 40.0  # 100 - 60
-        assert pos.avg_entry_price == 150.0  # Unchanged for partial close
+        assert pos.entry_price == 150.0  # Unchanged for partial close
 
 
 class TestAccountStateApplyFillShortPositions:
@@ -108,7 +108,7 @@ class TestAccountStateApplyFillShortPositions:
         assert "AAPL" in account.positions
         pos = account.positions["AAPL"]
         assert pos.quantity == -100.0  # Negative quantity
-        assert pos.avg_entry_price == 150.0
+        assert pos.entry_price == 150.0
         assert pos.market_value == -15_000.0  # Negative market value (liability)
 
     def test_add_to_short_position_updates_cost_basis(self):
@@ -130,7 +130,7 @@ class TestAccountStateApplyFillShortPositions:
         pos = account.positions["AAPL"]
         assert pos.quantity == -150.0  # Total short position
         # Weighted average: (100×150 + 50×160) / 150 = 23,000 / 150 = 153.33
-        assert abs(pos.avg_entry_price - 153.333) < 0.01
+        assert abs(pos.entry_price - 153.333) < 0.01
 
     def test_close_short_position_decreases_cash(self):
         """Test covering short position decreases cash.
@@ -178,7 +178,7 @@ class TestAccountStateApplyFillShortPositions:
         assert account.cash == 109_200.0  # 100k + 15k - 5.8k
         pos = account.positions["AAPL"]
         assert pos.quantity == -60.0  # Still short 60
-        assert pos.avg_entry_price == 150.0  # Unchanged for partial close
+        assert pos.entry_price == 150.0  # Unchanged for partial close
 
     def test_short_position_market_value_negative(self):
         """Test that short position market value is negative (liability).
@@ -227,7 +227,7 @@ class TestAccountStateApplyFillPositionReversals:
         assert account.cash == 117_000.0  # 85k + 32k
         pos = account.positions["AAPL"]
         assert pos.quantity == -100.0  # Now short 100
-        assert pos.avg_entry_price == 160.0  # New entry price for short
+        assert pos.entry_price == 160.0  # New entry price for short
 
     def test_reversal_short_to_long(self):
         """Test reversing from short to long position."""
@@ -245,7 +245,7 @@ class TestAccountStateApplyFillPositionReversals:
         assert account.cash == 86_000.0  # 115k - 29k
         pos = account.positions["AAPL"]
         assert pos.quantity == 100.0  # Now long 100
-        assert pos.avg_entry_price == 145.0  # New entry price for long
+        assert pos.entry_price == 145.0  # New entry price for long
 
 
 class TestAccountStateApplyFillEquityCalculation:
@@ -342,7 +342,7 @@ class TestAccountStateApplyFillEdgeCases:
         assert account.cash == 75_000.0  # 100k - 25k
         pos = account.positions["BTC"]
         assert pos.quantity == 0.5
-        assert pos.avg_entry_price == 50_000.0
+        assert pos.entry_price == 50_000.0
 
     def test_very_small_price(self):
         """Test with very small prices (penny stocks, crypto)."""
@@ -355,7 +355,7 @@ class TestAccountStateApplyFillEdgeCases:
         assert account.cash == 99_900.0  # 100k - 100
         pos = account.positions["PENNY"]
         assert pos.quantity == 10_000.0
-        assert pos.avg_entry_price == 0.01
+        assert pos.entry_price == 0.01
 
 
 if __name__ == "__main__":

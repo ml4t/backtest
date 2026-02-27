@@ -86,7 +86,7 @@ def run_vectorbt_oss(prices_df, entries):
 
 def run_ml4t_backtest(prices_df, entries):
     import polars as pl
-    from ml4t.backtest import DataFeed, Engine, ExecutionMode, NoSlippage, NoCommission, Strategy
+    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, NoSlippage, NoCommission, Strategy
     from ml4t.backtest.risk.position import StopLoss, TakeProfit
     from ml4t.backtest.risk.position.composite import RuleChain
 

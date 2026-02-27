@@ -294,21 +294,7 @@ class TestLongShortStrategy:
 
 
 class TestStrategyImports:
-    """Test that strategy templates are properly exported."""
-
-    def test_import_from_package(self):
-        """Test importing from ml4t.backtest."""
-        from ml4t.backtest import (
-            LongShortStrategy,
-            MeanReversionStrategy,
-            MomentumStrategy,
-            SignalFollowingStrategy,
-        )
-
-        assert SignalFollowingStrategy is not None
-        assert MomentumStrategy is not None
-        assert MeanReversionStrategy is not None
-        assert LongShortStrategy is not None
+    """Test strategy template import paths."""
 
     def test_import_from_strategies(self):
         """Test importing from ml4t.backtest.strategies."""

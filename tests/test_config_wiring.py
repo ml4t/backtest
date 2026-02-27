@@ -17,10 +17,15 @@ from ml4t.backtest import (
     BacktestConfig,
     Broker,
     ExecutionMode,
-    FillOrdering,
+)
+from ml4t.backtest.config import CommissionModel, FillOrdering, ShareType, SlippageModel
+from ml4t.backtest.models import (
+    CombinedCommission,
     NoCommission,
     NoSlippage,
-    ShareType,
+    PerShareCommission,
+    TieredCommission,
+    VolumeShareSlippage,
 )
 from ml4t.backtest.types import OrderSide
 
@@ -373,3 +378,48 @@ class TestPresetRoundTrip:
         """allow_negative_cash was removed from BacktestConfig fields."""
         config = BacktestConfig()
         assert not hasattr(config, "allow_negative_cash")
+
+
+class TestConfigModelWiring:
+    """All commission/slippage enum choices should map to model instances."""
+
+    def test_per_trade_commission_maps_to_combined_commission(self):
+        broker = Broker.from_config(
+            BacktestConfig(
+                commission_model=CommissionModel.PER_TRADE,
+                commission_per_trade=2.5,
+            )
+        )
+        assert isinstance(broker.commission_model, CombinedCommission)
+        assert broker.commission_model.fixed == 2.5
+
+    def test_tiered_commission_maps_to_tiered_commission(self):
+        broker = Broker.from_config(
+            BacktestConfig(
+                commission_model=CommissionModel.TIERED,
+                commission_rate=0.0012,
+            )
+        )
+        assert isinstance(broker.commission_model, TieredCommission)
+        assert broker.commission_model.tiers == [(float("inf"), 0.0012)]
+
+    def test_volume_based_slippage_maps_to_volume_share_slippage(self):
+        broker = Broker.from_config(
+            BacktestConfig(
+                slippage_model=SlippageModel.VOLUME_BASED,
+                slippage_rate=0.25,
+            )
+        )
+        assert isinstance(broker.slippage_model, VolumeShareSlippage)
+        assert broker.slippage_model.impact_factor == 0.25
+
+    def test_per_share_commission_still_maps_correctly(self):
+        broker = Broker.from_config(
+            BacktestConfig(
+                commission_model=CommissionModel.PER_SHARE,
+                commission_per_share=0.01,
+                commission_minimum=1.0,
+            )
+        )
+        assert isinstance(broker.commission_model, PerShareCommission)
+        assert broker.commission_model.per_share == 0.01

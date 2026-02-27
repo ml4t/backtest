@@ -24,6 +24,7 @@ ENV/
 
 # Testing
 .pytest_cache/
+.hypothesis/
 .coverage
 htmlcov/
 .tox/
@@ -39,3 +40,7 @@ src/ml4t/backtest/_version.py
 # Claude Code (local development only)
 CLAUDE.md
 .claude/
+
+# Validation-generated local artifacts
+validation/.zipline/
+validation/CORRECTNESS_RESULTS.md

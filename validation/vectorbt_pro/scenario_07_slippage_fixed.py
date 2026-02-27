@@ -98,7 +98,7 @@ def run_vectorbt_pro(prices_df: pd.DataFrame, entries: np.ndarray, exits: np.nda
 def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, exits: np.ndarray) -> dict:
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed,
         Engine,
         ExecutionMode,

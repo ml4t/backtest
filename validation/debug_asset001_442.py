@@ -76,7 +76,7 @@ def run_vbt_with_trace(data, trail_pct=0.03, target_entry=442):
 
 def run_ml4t_with_trace(data, trail_pct=0.03, target_entry=442):
     """Run ml4t with detailed HWM tracing."""
-    from ml4t.backtest import Broker, OrderSide, TrailHwmSource, StopFillMode
+    from ml4t.backtest._validation_imports import Broker, OrderSide, TrailHwmSource, StopFillMode
     from ml4t.backtest.models import PercentageCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

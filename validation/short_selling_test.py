@@ -29,7 +29,7 @@ import polars as pl
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from ml4t.backtest import (
+from ml4t.backtest._validation_imports import (
     DataFeed,
     Engine,
     NoCommission,

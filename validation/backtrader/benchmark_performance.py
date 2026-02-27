@@ -137,7 +137,7 @@ def benchmark_ml4t_backtest(
     """Benchmark ml4t.backtest."""
     import polars as pl
 
-    from ml4t.backtest import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
+    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
 
     # Prepare data in polars format
     rows = []

@@ -109,7 +109,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, exits: np.nd
     """Run backtest using ml4t.backtest with percentage commission."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed,
         Engine,
         ExecutionMode,

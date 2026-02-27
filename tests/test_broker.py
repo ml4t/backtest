@@ -200,7 +200,7 @@ class TestClosePosition:
 
 
 class TestIsExitOrder:
-    """Test _is_exit_order internal method."""
+    """Test ExecutionEngine._is_exit_order internal method."""
 
     def test_no_position_is_not_exit(self, broker):
         """Test order with no position is not exit."""
@@ -210,7 +210,7 @@ class TestIsExitOrder:
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        assert broker._is_exit_order(order) is False
+        assert broker._execution_engine._is_exit_order(order) is False
 
     def test_sell_with_long_is_exit(self, broker_with_position):
         """Test sell order with long position is exit."""
@@ -220,7 +220,7 @@ class TestIsExitOrder:
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is True
+        assert broker_with_position._execution_engine._is_exit_order(order) is True
 
     def test_sell_full_position_is_exit(self, broker_with_position):
         """Test sell order that flattens is exit."""
@@ -230,7 +230,7 @@ class TestIsExitOrder:
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is True
+        assert broker_with_position._execution_engine._is_exit_order(order) is True
 
     def test_sell_reversal_is_not_exit(self, broker_with_position):
         """Test sell that reverses position is not exit."""
@@ -240,7 +240,7 @@ class TestIsExitOrder:
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is False
+        assert broker_with_position._execution_engine._is_exit_order(order) is False
 
     def test_buy_with_long_is_not_exit(self, broker_with_position):
         """Test buy with long position is not exit (adding)."""
@@ -250,7 +250,7 @@ class TestIsExitOrder:
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is False
+        assert broker_with_position._execution_engine._is_exit_order(order) is False
 
     def test_buy_with_short_is_exit(self, broker):
         """Test buy with short position is exit."""
@@ -269,7 +269,7 @@ class TestIsExitOrder:
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        assert broker._is_exit_order(order) is True
+        assert broker._execution_engine._is_exit_order(order) is True
 
 
 class TestContractSpec:
@@ -466,8 +466,8 @@ class TestCommissionSplitOnFlip:
         assert len(broker.trades) == 1
         closing_trade = broker.trades[0]
         assert closing_trade.quantity == 100.0  # Long 100 closed
-        assert closing_trade.commission == 1.0, (
-            f"Expected close commission $1.00, got ${closing_trade.commission}"
+        assert closing_trade.fees == 1.0, (
+            f"Expected close commission $1.00, got ${closing_trade.fees}"
         )
 
         # Check PnL calculation includes only close commission
@@ -1137,7 +1137,7 @@ class TestBrokerPositionRules:
 
         # Verify it's stored per-asset
         assert "AAPL" in broker._position_rules_by_asset
-        assert broker._get_position_rules("AAPL") == stop_rule
+        assert broker._position_rules_by_asset["AAPL"] == stop_rule
         # Global rules should be None
         assert broker._position_rules is None
 
@@ -1153,8 +1153,8 @@ class TestBrokerPositionRules:
 
         # Verify it's stored globally
         assert broker._position_rules == tp_rule
-        # Should apply to any asset
-        assert broker._get_position_rules("AAPL") == tp_rule
+        # Should apply to assets without explicit overrides
+        assert broker._position_rules_by_asset.get("AAPL") is None
 
     def test_update_position_context(self):
         """Test updating position context."""
@@ -1277,7 +1277,7 @@ class TestBrokerMissingPriceHandling:
 
 
 class TestEvaluatePositionRules:
-    """Test evaluate_position_rules and _build_position_state."""
+    """Test evaluate_position_rules and RiskEngine position-state construction."""
 
     def test_evaluate_position_rules_exit_full_immediate(self):
         """Test EXIT_FULL action without defer_fill."""
@@ -1461,7 +1461,7 @@ class TestEvaluatePositionRules:
         )
 
         # Build state
-        state = broker._build_position_state(pos, 105.0)
+        state = broker._risk_engine._build_position_state(pos, 105.0)
 
         assert state.asset == "AAPL"
         assert state.side == "long"
@@ -2771,7 +2771,7 @@ class TestStopSlippage:
         order._risk_fill_price = 95.0  # Stop triggered at $95
 
         # Get the fill price - should have 1% slippage applied
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 95.0 * (1 - 0.01) = 94.05
         assert fill_price == pytest.approx(94.05, rel=1e-6)
@@ -2801,7 +2801,7 @@ class TestStopSlippage:
         order._risk_fill_price = 105.0  # Stop triggered at $105
 
         # Get the fill price - should have 1% slippage applied (price goes up)
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 105.0 * (1 + 0.01) = 106.05
         assert fill_price == pytest.approx(106.05, rel=1e-6)
@@ -2831,7 +2831,7 @@ class TestStopSlippage:
         # Do NOT set _risk_fill_price
 
         # Get the fill price - should be the market price, no stop slippage
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 100.0 (no slippage applied to non-risk orders)
         assert fill_price == 100.0
@@ -2861,7 +2861,7 @@ class TestStopSlippage:
         order._risk_fill_price = 95.0
 
         # Get the fill price
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 95.0 (exactly the risk fill price, no additional slippage)
         assert fill_price == 95.0

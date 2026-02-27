@@ -22,7 +22,6 @@ Example:
 from __future__ import annotations
 
 import json
-import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -179,7 +178,7 @@ class BacktestResult:
             return pl.DataFrame(schema=self._equity_schema())
 
         timestamps = [ts for ts, _ in self.equity_curve]
-        values = [v for _, v in self.equity_curve]
+        values = [float(v) for _, v in self.equity_curve]
 
         # Build base DataFrame and sort by timestamp
         df = pl.DataFrame({"timestamp": timestamps, "equity": values}).sort("timestamp")
@@ -532,6 +531,19 @@ class BacktestResult:
             result["trade_analyzer"] = self.trade_analyzer
         return result
 
+    # Dict-like access keeps validation scripts and older notebook code working.
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.to_dict().get(key, default)
+
+    def keys(self):
+        return self.to_dict().keys()
+
+    def items(self):
+        return self.to_dict().items()
+
     def to_parquet(
         self,
         path: str | Path,
@@ -585,7 +597,7 @@ class BacktestResult:
             # Filter to JSON-serializable metrics
             serializable = {}
             for k, v in self.metrics.items():
-                if isinstance(v, (int, float, str, bool, type(None))):
+                if isinstance(v, int | float | str | bool | type(None)):
                     serializable[k] = v
                 elif isinstance(v, datetime):
                     serializable[k] = v.isoformat()
@@ -735,78 +747,6 @@ class BacktestResult:
             "high_water_mark": pl.Float64(),
         }
 
-    # --- Backward compatibility: dict-like access ---
-
-    def __getitem__(self, key: str) -> Any:
-        """Allow dictionary-style access for backward compatibility.
-
-        .. deprecated:: 0.3.0
-            Dict-style access (result["key"]) is deprecated and will be removed
-            in a future version. Use direct attribute access instead:
-            - result.trades instead of result["trades"]
-            - result.metrics["sharpe"] instead of result["sharpe"]
-
-        Example:
-            result["sharpe"]  # Same as result.metrics["sharpe"]
-            result["trades"]  # Same as result.trades
-        """
-        warnings.warn(
-            "Dict-style access (result['key']) is deprecated. "
-            "Use result.trades, result.metrics['sharpe'], etc. instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Special keys that map to attributes
-        attr_map = {
-            "trades": self.trades,
-            "equity_curve": self.equity_curve,
-            "fills": self.fills,
-            "equity": self.equity,
-            "trade_analyzer": self.trade_analyzer,
-        }
-        if key in attr_map:
-            return attr_map[key]
-        # Everything else from metrics
-        return self.metrics[key]
-
-    def __contains__(self, key: str) -> bool:
-        """Support 'key in result' checks.
-
-        .. deprecated:: 0.3.0
-            Use hasattr() or check result.metrics directly.
-        """
-        warnings.warn(
-            "'key in result' is deprecated. Use hasattr() or check result.metrics.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if key in ("trades", "equity_curve", "fills", "equity", "trade_analyzer"):
-            return True
-        return key in self.metrics
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Dict-like get() for backward compatibility.
-
-        .. deprecated:: 0.3.0
-            Use direct attribute access or result.metrics.get().
-        """
-        warnings.warn(
-            "result.get() is deprecated. Use result.metrics.get() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Direct lookup to avoid double deprecation warning from __getitem__
-        attr_map = {
-            "trades": self.trades,
-            "equity_curve": self.equity_curve,
-            "fills": self.fills,
-            "equity": self.equity,
-            "trade_analyzer": self.trade_analyzer,
-        }
-        if key in attr_map:
-            return attr_map[key]
-        return self.metrics.get(key, default)
-
     def to_tearsheet(
         self,
         template: Literal["quant_trader", "hedge_fund", "risk_manager", "full"] = "full",
@@ -814,6 +754,7 @@ class BacktestResult:
         title: str | None = None,
         output_path: str | Path | None = None,
         include_statistical: bool = True,
+        calendar: str | None = None,
     ) -> str:
         """Generate an interactive HTML tearsheet for the backtest results.
 
@@ -841,6 +782,9 @@ class BacktestResult:
         include_statistical : bool
             Whether to include statistical validity analysis (DSR, RAS).
             Requires sufficient trades for meaningful statistics.
+        calendar : str, optional
+            Trading calendar for session alignment (e.g. "NYSE", "crypto").
+            Passed to to_daily_returns() for correct daily aggregation.
 
         Returns
         -------
@@ -869,7 +813,8 @@ class BacktestResult:
 
         # Extract data for tearsheet
         trades_df = self.to_trades_dataframe()
-        returns = self.to_returns_series().to_numpy()
+        # Use daily returns (not bar-level) for correct annualized metrics
+        returns = self.to_daily_returns(calendar=calendar).to_numpy()
 
         # Build metrics dict with all available metrics
         tearsheet_metrics = dict(self.metrics)
@@ -887,11 +832,15 @@ class BacktestResult:
         if "total_slippage" not in tearsheet_metrics and self.trades:
             tearsheet_metrics["total_slippage"] = sum(t.slippage for t in self.trades)
 
+        # Extract equity curve for portfolio-level charts
+        equity_df = self.to_equity_dataframe() if self.equity_curve else None
+
         # Generate tearsheet
         html = generate_backtest_tearsheet(
             metrics=tearsheet_metrics,
             trades=trades_df if len(trades_df) > 0 else None,
             returns=returns if len(returns) > 0 else None,
+            equity_curve=equity_df,
             template=template,
             theme=theme,
             title=title or "Backtest Tearsheet",
@@ -923,6 +872,7 @@ def enrich_trades_with_signals(
     signal_columns: list[str] | None = None,
     timestamp_col: str = "timestamp",
     asset_col: str | None = None,
+    trades_asset_col: str | None = None,
 ) -> pl.DataFrame:
     """Enrich trades DataFrame with signal values at entry/exit times via as-of join.
 
@@ -944,6 +894,8 @@ def enrich_trades_with_signals(
         timestamp_col: Name of timestamp column in signals_df.
         asset_col: Name of asset column in signals_df for multi-asset signals.
             If None, assumes single-asset or already filtered.
+        trades_asset_col: Name of asset column in trades_df.
+            If None, auto-detects: "symbol" first, then "asset".
 
     Returns:
         Trades DataFrame with added columns:
@@ -985,8 +937,32 @@ def enrich_trades_with_signals(
     # Preserve original trade order (join_asof requires sorting which disrupts order)
     trades_df = trades_df.with_row_index("_original_order")
 
-    # Ensure signals are sorted by timestamp for join_asof
-    signals_sorted = signals_df.sort(timestamp_col)
+    # Detect trade-side asset column when doing multi-asset enrichment
+    if asset_col and asset_col in signals_df.columns:
+        if trades_asset_col is None:
+            if "symbol" in trades_df.columns:
+                trades_asset_col = "symbol"
+            elif "asset" in trades_df.columns:
+                trades_asset_col = "asset"
+            else:
+                raise ValueError(
+                    "Multi-asset enrichment requires trades_df to include 'symbol' or 'asset', "
+                    "or set trades_asset_col explicitly."
+                )
+        if trades_asset_col not in trades_df.columns:
+            raise ValueError(f"trades_asset_col '{trades_asset_col}' not found in trades_df")
+
+    # Ensure sortedness for join_asof
+    signals_sorted = (
+        signals_df.sort([asset_col, timestamp_col])
+        if asset_col and asset_col in signals_df.columns
+        else signals_df.sort(timestamp_col)
+    )
+    trades_sorted = (
+        trades_df.sort([trades_asset_col, "entry_time"])
+        if trades_asset_col
+        else trades_df.sort("entry_time")
+    )
 
     # Join for entry signals
     entry_cols = [timestamp_col] + signal_columns
@@ -999,17 +975,18 @@ def enrich_trades_with_signals(
 
     if asset_col and asset_col in signals_df.columns:
         # Multi-asset: join on both timestamp and asset
-        result = trades_df.join_asof(
+        result = trades_sorted.join_asof(
             entry_signals,
             left_on="entry_time",
             right_on=timestamp_col,
-            by_left="asset",
+            by_left=trades_asset_col,
             by_right=asset_col,
             strategy="backward",
+            check_sortedness=False,
         )
     else:
         # Single-asset: join on timestamp only
-        result = trades_df.join_asof(
+        result = trades_sorted.join_asof(
             entry_signals,
             left_on="entry_time",
             right_on=timestamp_col,
@@ -1020,18 +997,24 @@ def enrich_trades_with_signals(
     exit_signals = signals_sorted.select(entry_cols)
     exit_rename = {c: f"exit_{c}" for c in signal_columns}
     exit_signals = exit_signals.rename(exit_rename)
+    result_for_exit = (
+        result.sort([trades_asset_col, "exit_time"])
+        if trades_asset_col
+        else result.sort("exit_time")
+    )
 
     if asset_col and asset_col in signals_df.columns:
-        result = result.join_asof(
+        result = result_for_exit.join_asof(
             exit_signals,
             left_on="exit_time",
             right_on=timestamp_col,
-            by_left="asset",
+            by_left=trades_asset_col,
             by_right=asset_col,
             strategy="backward",
+            check_sortedness=False,
         )
     else:
-        result = result.join_asof(
+        result = result_for_exit.join_asof(
             exit_signals,
             left_on="exit_time",
             right_on=timestamp_col,

@@ -228,7 +228,7 @@ def run_ml4t(prices_df: pd.DataFrame, entries: np.ndarray, scenario: str) -> dic
     """ml4t.backtest with TSL + SL for LONG positions."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy,
     )
     from ml4t.backtest.risk import RuleChain

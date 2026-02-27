@@ -55,7 +55,7 @@ def run_vectorbt_oss(prices_df, entries, exits):
 
 def run_ml4t_backtest(prices_df, entries, exits):
     import polars as pl
-    from ml4t.backtest import DataFeed, Engine, ExecutionMode, FixedSlippage, NoCommission, Strategy
+    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, FixedSlippage, NoCommission, Strategy
 
     prices_pl = pl.DataFrame({
         "timestamp": prices_df.index.to_pydatetime().tolist(),

@@ -6,11 +6,16 @@ import json
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
 
-from ml4t.backtest.result import BacktestResult, enrich_trades_with_signals
+from ml4t.backtest.result import (
+    BacktestResult,
+    _get_annualization_factor,
+    enrich_trades_with_signals,
+)
 from ml4t.backtest.types import Fill, OrderSide, Trade
 
 
@@ -327,7 +332,7 @@ class TestBacktestResultTradeRecords:
 
 
 class TestBacktestResultDict:
-    """Tests for to_dict() and dict-like access."""
+    """Tests for to_dict()."""
 
     def test_to_dict_basic(self, backtest_result: BacktestResult):
         """Test dictionary conversion."""
@@ -339,33 +344,32 @@ class TestBacktestResultDict:
         assert "fills" in d
         assert "sharpe" in d
 
-    def test_getitem_metrics(self, backtest_result: BacktestResult):
-        """Test dictionary-style access for metrics."""
-        assert backtest_result["sharpe"] == 1.5
-        assert backtest_result["final_value"] == 100750.0
-
-    def test_getitem_attributes(self, backtest_result: BacktestResult):
-        """Test dictionary-style access for attributes."""
-        assert backtest_result["trades"] == backtest_result.trades
-        assert backtest_result["equity_curve"] == backtest_result.equity_curve
-        assert backtest_result["fills"] == backtest_result.fills
-
-    def test_contains(self, backtest_result: BacktestResult):
-        """Test 'in' operator."""
-        assert "trades" in backtest_result
-        assert "sharpe" in backtest_result
-        assert "nonexistent" not in backtest_result
-
-    def test_get_method(self, backtest_result: BacktestResult):
-        """Test get() method with default."""
-        assert backtest_result.get("sharpe") == 1.5
-        assert backtest_result.get("nonexistent", 42) == 42
-
     def test_repr(self, backtest_result: BacktestResult):
         """Test string representation."""
         s = repr(backtest_result)
         assert "BacktestResult" in s
         assert "trades=2" in s
+
+    def test_dict_like_accessors(self, backtest_result: BacktestResult):
+        """Test __getitem__, get, keys, and items helpers."""
+        assert backtest_result["sharpe"] == 1.5
+        assert backtest_result.get("missing", 42) == 42
+        assert "sharpe" in dict(backtest_result.items())
+        assert ("sharpe", 1.5) in list(backtest_result.items())
+
+    def test_to_dict_includes_optional_analytics(self):
+        """Test to_dict includes equity and trade_analyzer when set."""
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={},
+            equity=SimpleNamespace(name="eq"),
+            trade_analyzer=SimpleNamespace(name="ta"),
+        )
+        d = result.to_dict()
+        assert "equity" in d
+        assert "trade_analyzer" in d
 
 
 class TestBacktestResultParquet:
@@ -396,6 +400,25 @@ class TestBacktestResultParquet:
             assert "metrics" in written
             assert "equity" not in written
 
+    def test_to_parquet_config_write_failure_is_non_fatal(self):
+        """Test config export failure is swallowed (ImportError/AttributeError path)."""
+
+        class _BadConfig:
+            def to_dict(self):
+                raise AttributeError("no to_dict")
+
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={},
+            config=_BadConfig(),
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            written = result.to_parquet(path, include=["config"])
+            assert "config" not in written
+
     def test_from_parquet_roundtrip(self, backtest_result: BacktestResult):
         """Test Parquet save and load roundtrip."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -422,6 +445,22 @@ class TestBacktestResultParquet:
             loaded = BacktestResult.from_parquet(tmpdir)
             assert len(loaded.trades) == 0
             assert len(loaded.equity_curve) == 0
+
+    def test_from_parquet_invalid_config_is_non_fatal(self, monkeypatch):
+        """Test config load failures are swallowed and config remains None."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir)
+            (path / "config.yaml").write_text("bad: [")
+            # Force yaml.safe_load failure branch
+            import yaml
+
+            monkeypatch.setattr(
+                yaml,
+                "safe_load",
+                lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad yaml")),
+            )
+            loaded = BacktestResult.from_parquet(path)
+            assert loaded.config is None
 
     def test_metrics_json_serialization(self, backtest_result: BacktestResult):
         """Test metrics JSON contains only serializable values."""
@@ -560,6 +599,125 @@ class TestEnrichTradesWithSignals:
         assert aapl_row["entry_momentum"][0] == 0.5
         assert msft_row["entry_momentum"][0] == 0.3
 
+    def test_enrich_multi_asset_requires_trade_asset_column(self):
+        """Test multi-asset enrichment fails if trades have no asset/symbol column."""
+        trades_df = pl.DataFrame(
+            {
+                "entry_time": [datetime(2024, 1, 1, 10, 0)],
+                "exit_time": [datetime(2024, 1, 1, 14, 0)],
+            }
+        )
+        signals_df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, 10, 0)],
+                "asset": ["AAPL"],
+                "momentum": [0.5],
+            }
+        )
+        with pytest.raises(ValueError, match="requires trades_df to include"):
+            enrich_trades_with_signals(
+                trades_df,
+                signals_df,
+                signal_columns=["momentum"],
+                asset_col="asset",
+            )
+
+    def test_enrich_multi_asset_rejects_unknown_trade_asset_column(self):
+        """Test multi-asset enrichment validates explicit trades_asset_col."""
+        trades_df = pl.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "entry_time": [datetime(2024, 1, 1, 10, 0)],
+                "exit_time": [datetime(2024, 1, 1, 14, 0)],
+            }
+        )
+        signals_df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, 10, 0)],
+                "asset": ["AAPL"],
+                "momentum": [0.5],
+            }
+        )
+        with pytest.raises(ValueError, match="not found in trades_df"):
+            enrich_trades_with_signals(
+                trades_df,
+                signals_df,
+                signal_columns=["momentum"],
+                asset_col="asset",
+                trades_asset_col="ticker",
+            )
+
+
+class TestBacktestResultMetrics:
+    """Tests for annualization and compute_metrics branches."""
+
+    def test_get_annualization_factor_known_and_fallback(self):
+        assert _get_annualization_factor("nyse") == 252
+        assert _get_annualization_factor("crypto") == 365
+        assert _get_annualization_factor(None) == 252
+        assert _get_annualization_factor("not_a_real_calendar") == 252
+
+    def test_compute_metrics_import_error(self, backtest_result: BacktestResult, monkeypatch):
+        def _raise(_name: str):
+            raise ImportError("nope")
+
+        monkeypatch.setattr("importlib.import_module", _raise)
+        with pytest.raises(ImportError, match="ml4t-diagnostic is required"):
+            backtest_result.compute_metrics()
+
+    def test_compute_metrics_with_empty_inputs(self, monkeypatch):
+        def _sharpe(_arr, annualization_factor):
+            return 1.23 + (annualization_factor * 0.0)
+
+        def _sortino(_arr, annualization_factor):
+            return 2.34 + (annualization_factor * 0.0)
+
+        diag = SimpleNamespace(
+            sharpe_ratio=_sharpe,
+            sortino_ratio=_sortino,
+        )
+        monkeypatch.setattr("importlib.import_module", lambda _name: diag)
+
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+        metrics = result.compute_metrics(calendar="NYSE")
+
+        assert metrics["sharpe_ratio"] == 0.0
+        assert metrics["sortino_ratio"] == 0.0
+        assert metrics["max_drawdown"] == 0.0
+        assert metrics["total_return"] == 0.0
+        assert metrics["cagr"] == 0.0
+        assert metrics["calmar_ratio"] == 0.0
+        assert metrics["num_trades"] == 0
+
+    def test_compute_metrics_with_trade_analyzer(
+        self, backtest_result: BacktestResult, monkeypatch
+    ):
+        def _sharpe(_arr, annualization_factor):
+            return 1.11 + (annualization_factor * 0.0)
+
+        def _sortino(_arr, annualization_factor):
+            return 1.22 + (annualization_factor * 0.0)
+
+        diag = SimpleNamespace(
+            sharpe_ratio=_sharpe,
+            sortino_ratio=_sortino,
+        )
+        monkeypatch.setattr("importlib.import_module", lambda _name: diag)
+        backtest_result.trade_analyzer = SimpleNamespace(
+            num_trades=7,
+            win_rate=0.57,
+            profit_factor=1.8,
+            expectancy=12.0,
+            avg_trade=9.0,
+            avg_win=21.0,
+            avg_loss=-8.0,
+            total_fees=34.0,
+        )
+
+        metrics = backtest_result.compute_metrics(calendar="NYSE")
+        assert metrics["num_trades"] == 7
+        assert metrics["total_fees"] == 34.0
+
 
 class TestBacktestResultSchemas:
     """Tests for schema definitions."""
@@ -582,3 +740,26 @@ class TestBacktestResultSchemas:
         assert schema["equity"] == pl.Float64()
         assert schema["return"] == pl.Float64()
         assert schema["drawdown"] == pl.Float64()
+
+
+class TestBacktestResultTearsheet:
+    """Tests for tearsheet import-error handling."""
+
+    def test_to_tearsheet_import_error(self, monkeypatch):
+        """Test to_tearsheet raises helpful ImportError when diagnostic is unavailable."""
+        import builtins
+
+        real_import = builtins.__import__
+
+        def _raising_import(name, *args, **kwargs):
+            if name == "ml4t.diagnostic.visualization.backtest":
+                raise ImportError("diagnostic missing")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _raising_import)
+
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+        with pytest.raises(
+            ImportError, match="ml4t-diagnostic is required for tearsheet generation"
+        ):
+            result.to_tearsheet()

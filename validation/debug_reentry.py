@@ -81,7 +81,7 @@ def run_vbt(data, trail_pct=0.03):
 
 def run_ml4t(data, trail_pct=0.03):
     """Run ml4t.backtest."""
-    from ml4t.backtest import Broker, OrderSide, TrailHwmSource
+    from ml4t.backtest._validation_imports import Broker, OrderSide, TrailHwmSource
     from ml4t.backtest.models import PercentageCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

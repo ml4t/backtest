@@ -29,14 +29,14 @@ class OrderStatus(Enum):
     REJECTED = "rejected"
 
 
-class ExecutionMode(Enum):
+class ExecutionMode(str, Enum):
     """Order execution timing mode."""
 
     SAME_BAR = "same_bar"  # Orders fill at current bar's close (default)
     NEXT_BAR = "next_bar"  # Orders fill at next bar's open (like Backtrader)
 
 
-class StopFillMode(Enum):
+class StopFillMode(str, Enum):
     """Stop/take-profit fill price mode.
 
     Different frameworks handle stop order fills differently:
@@ -115,7 +115,7 @@ class ExitReason(str, Enum):
     END_OF_DATA = "end_of_data"  # Backtest ended with open position
 
 
-class StopLevelBasis(Enum):
+class StopLevelBasis(str, Enum):
     """Basis for calculating stop/take-profit levels.
 
     Different frameworks calculate stop levels from different reference prices:
@@ -213,11 +213,6 @@ class Position:
             self.initial_quantity = self.quantity
         if self.current_price is None:
             self.current_price = self.entry_price
-
-    @property
-    def avg_entry_price(self) -> float:
-        """Alias for entry_price (accounting compatibility)."""
-        return self.entry_price
 
     @property
     def market_value(self) -> float:
@@ -391,36 +386,14 @@ class Trade:
         return "long" if self.quantity > 0 else "short"
 
     @property
-    def side(self) -> str:
-        """Alias for direction (backward compatibility)."""
-        return self.direction
-
-    @property
     def is_open(self) -> bool:
         """Return True if this is an open (mark-to-market) trade."""
         return self.status == "open"
 
-    # === Backward compatibility aliases (deprecated) ===
-
-    @property
-    def asset(self) -> str:
-        """Deprecated: Use 'symbol' instead."""
-        return self.symbol
-
     @property
     def commission(self) -> float:
-        """Deprecated: Use 'fees' instead."""
+        """Backward-compat alias for validation scripts expecting `commission`."""
         return self.fees
-
-    @property
-    def max_favorable_excursion(self) -> float:
-        """Deprecated: Use 'mfe' instead."""
-        return self.mfe
-
-    @property
-    def max_adverse_excursion(self) -> float:
-        """Deprecated: Use 'mae' instead."""
-        return self.mae
 
 
 @dataclass

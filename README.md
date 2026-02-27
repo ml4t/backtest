@@ -146,6 +146,18 @@ The library is validated against VectorBT Pro, Backtrader, and Zipline:
 
 See [validation/README.md](validation/README.md) for test methodology.
 
+Release-gate commands:
+
+```bash
+# Fast parity contract gate (scenario 01 across vectorbt/backtrader/zipline)
+ML4T_COMPARISON_INPROC=1 uv run pytest tests/contracts/test_cross_engine_contracts.py -q
+
+# Full correctness runner (selected scenarios)
+python validation/run_all_correctness.py --framework vectorbt_oss --scenarios 01,03,05,09
+python validation/run_all_correctness.py --framework backtrader --scenarios 01,03,05,09
+python validation/run_all_correctness.py --framework zipline --scenarios 01,03,05,09
+```
+
 ## Technical Characteristics
 
 - **Event-driven**: Each bar processes sequentially with exit-first logic

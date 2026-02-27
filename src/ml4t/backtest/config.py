@@ -28,6 +28,8 @@ from pathlib import Path
 
 import yaml
 
+from .types import ExecutionMode, StopFillMode, StopLevelBasis
+
 
 class FillTiming(str, Enum):
     """When orders are filled relative to signal generation."""
@@ -53,21 +55,6 @@ class ShareType(str, Enum):
     INTEGER = "integer"  # Round down to whole shares (like most real brokers)
 
 
-class SizingMethod(str, Enum):
-    """How position size is calculated.
-
-    .. deprecated::
-        This enum is not consumed by any runtime code. Position sizing is
-        always determined by strategy code. Retained for serialization
-        backward compatibility only.
-    """
-
-    PERCENT_OF_PORTFOLIO = "percent_of_portfolio"  # % of total portfolio value
-    PERCENT_OF_CASH = "percent_of_cash"  # % of available cash only
-    FIXED_VALUE = "fixed_value"  # Fixed dollar amount per position
-    FIXED_SHARES = "fixed_shares"  # Fixed number of shares
-
-
 class FillOrdering(str, Enum):
     """Order processing sequence within a single bar.
 
@@ -86,6 +73,52 @@ class FillOrdering(str, Enum):
 
     EXIT_FIRST = "exit_first"
     FIFO = "fifo"
+
+
+class RebalanceMode(str, Enum):
+    """How portfolio value is computed during multi-asset rebalancing.
+
+    When rebalancing across multiple assets, the engine must decide whether
+    to recompute portfolio value after each fill or freeze it. Real brokers
+    differ: some snapshot account value at order placement, others update
+    incrementally as each fill settles.
+
+    SNAPSHOT:
+        Freeze portfolio value at the start of the rebalance. All targets
+        computed from the same base, orders batch and fill at once. Matches
+        Backtrader's ``order_target_percent`` in ``next()`` where
+        ``broker.getvalue()`` is constant across all submissions.
+
+    INCREMENTAL:
+        Recompute portfolio value after each asset's order fills. Most
+        accurate cash tracking — each target uses the latest portfolio
+        state. May produce more trades than SNAPSHOT because cascading
+        value changes create small corrections.
+
+    HYBRID:
+        Freeze portfolio value for target computation, but fill
+        sequentially (cash constraints checked against live state).
+        Matches VectorBT's default behavior with ``auto_call_seq=False``
+        and ``update_value=False``.
+    """
+
+    SNAPSHOT = "snapshot"
+    INCREMENTAL = "incremental"
+    HYBRID = "hybrid"
+
+
+class MissingPricePolicy(str, Enum):
+    """How target-weight rebalancing handles missing current-bar prices."""
+
+    SKIP = "skip"
+    USE_LAST = "use_last"
+
+
+class LateAssetPolicy(str, Enum):
+    """How target-weight rebalancing handles assets that start late."""
+
+    ALLOW = "allow"
+    REQUIRE_HISTORY = "require_history"
 
 
 class SignalProcessing(str, Enum):
@@ -144,13 +177,6 @@ class WaterMarkSource(str, Enum):
     CLOSE = "close"  # Use close prices for water mark updates (default)
     BAR_EXTREME = "bar_extreme"  # Use HIGH for HWM, LOW for LWM (VBT Pro with OHLC)
 
-    # Deprecated alias for backward compatibility
-    HIGH = "bar_extreme"  # Deprecated: use BAR_EXTREME instead
-
-
-# Backward compatibility alias
-TrailHwmSource = WaterMarkSource
-
 
 class InitialHwmSource(str, Enum):
     """Source for initial high-water mark on position entry.
@@ -208,16 +234,6 @@ class TrailStopTiming(str, Enum):
     VBT_PRO = "vbt_pro"  # Two-pass: LAGGED check, then INTRABAR check using CLOSE only
 
 
-class ExecutionMode(str, Enum):
-    """Order execution timing mode.
-
-    Controls when orders are eligible for execution relative to signal generation.
-    """
-
-    SAME_BAR = "same_bar"  # Fill on same bar as order submission
-    NEXT_BAR = "next_bar"  # Fill on next bar after order submission
-
-
 @dataclass
 class StatsConfig:
     """Configuration for per-asset trading statistics tracking.
@@ -245,27 +261,6 @@ class StatsConfig:
     recent_window_size: int = 50
     track_session_stats: bool = True
     enabled: bool = True
-
-
-class StopFillMode(str, Enum):
-    """Price used for stop order fills.
-
-    Controls what price is used when a stop order triggers.
-    """
-
-    STOP_PRICE = "stop_price"  # Fill at stop price (if not gapped)
-    CLOSE_PRICE = "close_price"  # Fill at bar close (conservative)
-    NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open
-
-
-class StopLevelBasis(str, Enum):
-    """Reference price for calculating stop levels.
-
-    Controls what price the stop percentage/amount is applied to.
-    """
-
-    FILL_PRICE = "fill_price"  # Use actual fill price (most accurate)
-    SIGNAL_PRICE = "signal_price"  # Use price at signal time (Backtrader style)
 
 
 @dataclass
@@ -390,6 +385,13 @@ class BacktestConfig:
                     f"initial_margin ({self.initial_margin})"
                 )
 
+        if not 0.0 < self.rebalance_headroom_pct <= 1.0:
+            issues.append(
+                f"rebalance_headroom_pct ({self.rebalance_headroom_pct}) must be in (0.0, 1.0]"
+            )
+        if self.late_asset_min_bars < 1:
+            issues.append(f"late_asset_min_bars ({self.late_asset_min_bars}) must be >= 1")
+
         # Emit warnings if requested
         if warn and issues:
             for msg in issues:
@@ -447,6 +449,11 @@ class BacktestConfig:
     reject_on_insufficient_cash: bool = True
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
+    rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
+    rebalance_headroom_pct: float = 1.0
+    missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP
+    late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW
+    late_asset_min_bars: int = 1
 
     # === Calendar & Timezone ===
     calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
@@ -509,12 +516,86 @@ class BacktestConfig:
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
                 "partial_fills_allowed": self.partial_fills_allowed,
                 "fill_ordering": self.fill_ordering.value,
+                "rebalance_mode": self.rebalance_mode.value,
+                "rebalance_headroom_pct": self.rebalance_headroom_pct,
+                "missing_price_policy": self.missing_price_policy.value,
+                "late_asset_policy": self.late_asset_policy.value,
+                "late_asset_min_bars": self.late_asset_min_bars,
             },
         }
 
     @classmethod
-    def from_dict(cls, data: dict, preset_name: str | None = None) -> BacktestConfig:
-        """Create config from dictionary."""
+    def from_dict(
+        cls, data: dict, preset_name: str | None = None, strict: bool = True
+    ) -> BacktestConfig:
+        """Create config from dictionary.
+
+        Args:
+            data: Nested config dictionary
+            preset_name: Optional metadata label
+            strict: If True, reject unknown sections/keys
+        """
+        if not isinstance(data, dict):
+            raise TypeError(f"Config data must be a dict, got {type(data).__name__}")
+
+        if strict:
+            allowed_sections = {
+                "account",
+                "execution",
+                "stops",
+                "position_sizing",
+                "signals",
+                "commission",
+                "slippage",
+                "cash",
+                "orders",
+            }
+            unknown_sections = set(data) - allowed_sections
+            if unknown_sections:
+                raise ValueError(f"Unknown config section(s): {sorted(unknown_sections)}")
+
+            allowed_keys_by_section = {
+                "account": {
+                    "allow_short_selling",
+                    "allow_leverage",
+                    "initial_margin",
+                    "long_maintenance_margin",
+                    "short_maintenance_margin",
+                    "fixed_margin_schedule",
+                },
+                "execution": {"fill_timing", "execution_price", "execution_mode"},
+                "stops": {
+                    "stop_fill_mode",
+                    "stop_level_basis",
+                    "trail_hwm_source",
+                    "initial_hwm_source",
+                    "trail_stop_timing",
+                },
+                "position_sizing": {"share_type", "default_position_pct"},
+                "signals": {"signal_processing", "accumulate_positions"},
+                "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
+                "slippage": {"model", "rate", "fixed", "stop_rate"},
+                "cash": {"initial", "buffer_pct"},
+                "orders": {
+                    "reject_on_insufficient_cash",
+                    "partial_fills_allowed",
+                    "fill_ordering",
+                    "rebalance_mode",
+                    "rebalance_headroom_pct",
+                    "missing_price_policy",
+                    "late_asset_policy",
+                    "late_asset_min_bars",
+                },
+            }
+            for section, cfg in data.items():
+                if not isinstance(cfg, dict):
+                    raise TypeError(f"Section '{section}' must be a dict, got {type(cfg).__name__}")
+                unknown_keys = set(cfg) - allowed_keys_by_section[section]
+                if unknown_keys:
+                    raise ValueError(
+                        f"Unknown key(s) in section '{section}': {sorted(unknown_keys)}"
+                    )
+
         acct_cfg = data.get("account", {})
         exec_cfg = data.get("execution", {})
         stops_cfg = data.get("stops", {})
@@ -525,35 +606,14 @@ class BacktestConfig:
         cash_cfg = data.get("cash", {})
         order_cfg = data.get("orders", {})
 
-        # Handle legacy account type for migration
-        legacy_type = acct_cfg.get("type")
-        legacy_margin_req = acct_cfg.get("margin_requirement")
-
-        # Determine account settings from new or legacy fields
-        if "allow_short_selling" in acct_cfg:
-            # New format
-            allow_short_selling = acct_cfg.get("allow_short_selling", False)
-            allow_leverage = acct_cfg.get("allow_leverage", False)
-        elif legacy_type is not None:
-            # Convert legacy format to new flags
-            if legacy_type == "cash":
-                allow_short_selling, allow_leverage = False, False
-            elif legacy_type == "crypto":
-                allow_short_selling, allow_leverage = True, False
-            elif legacy_type == "margin":
-                allow_short_selling, allow_leverage = True, True
-            else:
-                raise ValueError(f"Unknown account type: '{legacy_type}'")
-        else:
-            # Default
-            allow_short_selling = False
-            allow_leverage = False
+        allow_short_selling = acct_cfg.get("allow_short_selling", False)
+        allow_leverage = acct_cfg.get("allow_leverage", False)
 
         return cls(
             # Account
             allow_short_selling=allow_short_selling,
             allow_leverage=allow_leverage,
-            initial_margin=acct_cfg.get("initial_margin", legacy_margin_req or 0.5),
+            initial_margin=acct_cfg.get("initial_margin", 0.5),
             long_maintenance_margin=acct_cfg.get("long_maintenance_margin", 0.25),
             short_maintenance_margin=acct_cfg.get("short_maintenance_margin", 0.30),
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
@@ -593,6 +653,11 @@ class BacktestConfig:
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
             fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
+            rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
+            rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
+            missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),
+            late_asset_policy=LateAssetPolicy(order_cfg.get("late_asset_policy", "allow")),
+            late_asset_min_bars=order_cfg.get("late_asset_min_bars", 1),
             # Metadata
             preset_name=preset_name,
         )
@@ -609,7 +674,7 @@ class BacktestConfig:
         path = Path(path)
         with open(path) as f:
             data = yaml.safe_load(f)
-        return cls.from_dict(data, preset_name=path.stem)
+        return cls.from_dict(data, preset_name=path.stem, strict=True)
 
     @classmethod
     def from_preset(cls, preset: str) -> BacktestConfig:
@@ -623,238 +688,10 @@ class BacktestConfig:
         - "zipline": Match Zipline's default behavior
         - "realistic": Conservative settings for realistic simulation
         """
-        presets = {
-            "default": cls._default_preset(),
-            "backtrader": cls._backtrader_preset(),
-            "vectorbt": cls._vectorbt_preset(),
-            "zipline": cls._zipline_preset(),
-            "realistic": cls._realistic_preset(),
-        }
+        from .profiles import get_profile_config
 
-        if preset not in presets:
-            available = ", ".join(presets.keys())
-            raise ValueError(f"Unknown preset '{preset}'. Available: {available}")
-
-        config = presets[preset]
-        config.preset_name = preset
-        return config
-
-    @classmethod
-    def _default_preset(cls) -> BacktestConfig:
-        """Default configuration - balanced between realism and ease of use."""
-        return cls(
-            # Account: cash-like (no shorts, no leverage)
-            allow_short_selling=False,
-            allow_leverage=False,
-            # Execution
-            fill_timing=FillTiming.NEXT_BAR_OPEN,
-            execution_price=ExecutionPrice.OPEN,
-            execution_mode=ExecutionMode.NEXT_BAR,
-            # Stops
-            stop_fill_mode=StopFillMode.STOP_PRICE,
-            stop_level_basis=StopLevelBasis.FILL_PRICE,
-            trail_hwm_source=WaterMarkSource.CLOSE,
-            trail_stop_timing=TrailStopTiming.LAGGED,
-            # Sizing
-            share_type=ShareType.FRACTIONAL,
-            default_position_pct=0.10,
-            signal_processing=SignalProcessing.CHECK_POSITION,
-            accumulate_positions=False,
-            # Costs
-            commission_model=CommissionModel.PERCENTAGE,
-            commission_rate=0.001,
-            slippage_model=SlippageModel.PERCENTAGE,
-            slippage_rate=0.001,
-            # Cash
-            initial_cash=100000.0,
-            cash_buffer_pct=0.0,
-            reject_on_insufficient_cash=True,
-            partial_fills_allowed=False,
-            fill_ordering=FillOrdering.EXIT_FIRST,
-        )
-
-    @classmethod
-    def _backtrader_preset(cls) -> BacktestConfig:
-        """
-        Match Backtrader's default behavior.
-
-        Key characteristics:
-        - INTEGER shares (rounds down to whole shares)
-        - Next-bar execution (COO disabled by default)
-        - Check position state before acting
-        - Percentage commission
-        - Margin account (shorts and leverage allowed)
-        - Stop level from signal price (not fill price)
-        """
-        return cls(
-            # Account: margin (backtrader allows shorts and leverage)
-            allow_short_selling=True,
-            allow_leverage=True,
-            initial_margin=0.5,
-            long_maintenance_margin=0.25,
-            short_maintenance_margin=0.30,
-            # Execution
-            fill_timing=FillTiming.NEXT_BAR_OPEN,
-            execution_price=ExecutionPrice.OPEN,
-            execution_mode=ExecutionMode.NEXT_BAR,
-            # Stops: Backtrader calculates stops from signal price
-            stop_fill_mode=StopFillMode.STOP_PRICE,
-            stop_level_basis=StopLevelBasis.SIGNAL_PRICE,  # Key Backtrader behavior!
-            trail_hwm_source=WaterMarkSource.CLOSE,
-            trail_stop_timing=TrailStopTiming.LAGGED,
-            # Sizing
-            share_type=ShareType.INTEGER,  # Key difference!
-            default_position_pct=0.10,
-            signal_processing=SignalProcessing.CHECK_POSITION,
-            accumulate_positions=False,
-            # Costs
-            commission_model=CommissionModel.PERCENTAGE,
-            commission_rate=0.001,
-            slippage_model=SlippageModel.PERCENTAGE,
-            slippage_rate=0.001,
-            # Cash
-            initial_cash=100000.0,
-            cash_buffer_pct=0.0,
-            reject_on_insufficient_cash=True,
-            partial_fills_allowed=False,
-            fill_ordering=FillOrdering.FIFO,  # Backtrader processes in submission order
-        )
-
-    @classmethod
-    def _vectorbt_preset(cls) -> BacktestConfig:
-        """
-        Match VectorBT Pro's default behavior.
-
-        Key characteristics:
-        - FRACTIONAL shares
-        - Same-bar execution (vectorized)
-        - Process ALL signals (no position state check)
-        - Percentage fees
-        - Shorts allowed (crypto-like), no leverage
-        - Intrabar trailing stop timing (live HWM updates)
-        - HWM from bar high (not close)
-        """
-        return cls(
-            # Account: crypto-like (shorts OK, no leverage)
-            allow_short_selling=True,
-            allow_leverage=False,
-            # Execution
-            fill_timing=FillTiming.SAME_BAR,  # Vectorized = same bar
-            execution_price=ExecutionPrice.CLOSE,
-            execution_mode=ExecutionMode.SAME_BAR,
-            # Stops: VBT Pro uses INTRABAR timing with HIGH for HWM
-            stop_fill_mode=StopFillMode.STOP_PRICE,
-            stop_level_basis=StopLevelBasis.FILL_PRICE,
-            trail_hwm_source=WaterMarkSource.BAR_EXTREME,  # VBT Pro with OHLC!
-            initial_hwm_source=InitialHwmSource.BAR_HIGH,  # VBT Pro uses bar high
-            trail_stop_timing=TrailStopTiming.INTRABAR,  # Live HWM updates!
-            # Sizing
-            share_type=ShareType.FRACTIONAL,
-            default_position_pct=0.10,
-            signal_processing=SignalProcessing.PROCESS_ALL,  # Key difference!
-            accumulate_positions=False,
-            # Costs: often zero for quick prototyping
-            commission_model=CommissionModel.NONE,
-            commission_rate=0.0,
-            slippage_model=SlippageModel.NONE,
-            slippage_rate=0.0,
-            # Cash
-            initial_cash=100000.0,
-            cash_buffer_pct=0.0,
-            reject_on_insufficient_cash=False,  # VectorBT is more permissive
-            partial_fills_allowed=True,
-            fill_ordering=FillOrdering.EXIT_FIRST,  # VBT call_seq='auto'
-        )
-
-    @classmethod
-    def _zipline_preset(cls) -> BacktestConfig:
-        """
-        Match Zipline's default behavior.
-
-        Key characteristics:
-        - Next-bar execution (order on bar N, fill on bar N+1)
-        - Integer shares
-        - Per-share commission (IB-style)
-        - Volume-based slippage
-        - Cash account (no shorts by default)
-        """
-        return cls(
-            # Account: cash (Zipline is conservative by default)
-            allow_short_selling=False,
-            allow_leverage=False,
-            # Execution
-            fill_timing=FillTiming.NEXT_BAR_OPEN,
-            execution_price=ExecutionPrice.OPEN,
-            execution_mode=ExecutionMode.NEXT_BAR,
-            # Stops
-            stop_fill_mode=StopFillMode.STOP_PRICE,
-            stop_level_basis=StopLevelBasis.FILL_PRICE,
-            trail_hwm_source=WaterMarkSource.CLOSE,
-            trail_stop_timing=TrailStopTiming.LAGGED,
-            # Sizing
-            share_type=ShareType.INTEGER,
-            default_position_pct=0.10,
-            signal_processing=SignalProcessing.CHECK_POSITION,
-            accumulate_positions=False,
-            # Costs: IB-style
-            commission_model=CommissionModel.PER_SHARE,  # Zipline uses per-share
-            commission_rate=0.0,
-            commission_per_share=0.005,  # $0.005 per share (IB-style)
-            commission_minimum=1.0,  # $1 minimum
-            slippage_model=SlippageModel.VOLUME_BASED,  # Key difference!
-            slippage_rate=0.1,  # 10% of bar volume
-            # Cash
-            initial_cash=100000.0,
-            cash_buffer_pct=0.0,
-            reject_on_insufficient_cash=True,
-            partial_fills_allowed=True,  # Volume-based = partial fills
-            fill_ordering=FillOrdering.EXIT_FIRST,
-        )
-
-    @classmethod
-    def _realistic_preset(cls) -> BacktestConfig:
-        """
-        Conservative settings for realistic simulation.
-
-        Key characteristics:
-        - Integer shares (like real brokers)
-        - Next-bar execution (no look-ahead)
-        - Higher costs (more conservative)
-        - Additional stop slippage (gaps hurt in fast markets)
-        - Cash buffer (margin of safety)
-        - Cash account (most conservative)
-        """
-        return cls(
-            # Account: cash (most conservative)
-            allow_short_selling=False,
-            allow_leverage=False,
-            # Execution
-            fill_timing=FillTiming.NEXT_BAR_OPEN,
-            execution_price=ExecutionPrice.OPEN,
-            execution_mode=ExecutionMode.NEXT_BAR,
-            # Stops: realistic
-            stop_fill_mode=StopFillMode.NEXT_BAR_OPEN,  # Conservative: fill at open
-            stop_level_basis=StopLevelBasis.FILL_PRICE,
-            trail_hwm_source=WaterMarkSource.CLOSE,
-            trail_stop_timing=TrailStopTiming.LAGGED,
-            # Sizing
-            share_type=ShareType.INTEGER,
-            default_position_pct=0.05,  # Smaller positions
-            signal_processing=SignalProcessing.CHECK_POSITION,
-            accumulate_positions=False,
-            # Costs: higher for realism
-            commission_model=CommissionModel.PERCENTAGE,
-            commission_rate=0.002,  # Higher commission
-            slippage_model=SlippageModel.PERCENTAGE,
-            slippage_rate=0.002,  # Higher slippage
-            stop_slippage_rate=0.001,  # Extra 0.1% slippage for stop fills
-            # Cash
-            initial_cash=100000.0,
-            cash_buffer_pct=0.02,  # 2% cash buffer
-            reject_on_insufficient_cash=True,
-            partial_fills_allowed=False,
-            fill_ordering=FillOrdering.EXIT_FIRST,
-        )
+        profile_data = get_profile_config(preset)
+        return cls.from_dict(profile_data, preset_name=preset, strict=True)
 
     def describe(self) -> str:
         """Return human-readable description of configuration."""
@@ -916,6 +753,11 @@ class BacktestConfig:
                 "",
                 "Orders:",
                 f"  Fill ordering: {self.fill_ordering.value}",
+                f"  Rebalance mode: {self.rebalance_mode.value}",
+                f"  Rebalance headroom: {self.rebalance_headroom_pct:.3f}",
+                f"  Missing price policy: {self.missing_price_policy.value}",
+                f"  Late asset policy: {self.late_asset_policy.value}",
+                f"  Late asset min bars: {self.late_asset_min_bars}",
                 f"  Reject insufficient: {self.reject_on_insufficient_cash}",
                 f"  Partial fills: {self.partial_fills_allowed}",
                 "",

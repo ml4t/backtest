@@ -3,10 +3,8 @@
 from datetime import datetime
 
 from ml4t.backtest import (
-    NoCommission,
     Order,
     OrderSide,
-    PercentageCommission,
 )
 from ml4t.backtest.accounting import (
     AccountState,
@@ -14,6 +12,7 @@ from ml4t.backtest.accounting import (
     Position,
     UnifiedAccountPolicy,
 )
+from ml4t.backtest.models import NoCommission, PercentageCommission
 
 
 class TestGatekeeperInitialization:

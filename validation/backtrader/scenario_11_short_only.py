@@ -172,7 +172,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, exits: np.nd
     """Run short-only backtest using ml4t.backtest."""
     import polars as pl
 
-    from ml4t.backtest import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, OrderSide, Strategy
+    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, OrderSide, Strategy
 
     prices_pl = pl.DataFrame(
         {

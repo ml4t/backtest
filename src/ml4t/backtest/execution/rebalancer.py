@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from ..broker import Broker
     from ..types import Order
 
-from ..config import ShareType
+from ..config import RebalanceMode, ShareType
 from ..types import OrderSide
 
 
@@ -50,6 +50,10 @@ class RebalanceConfig:
         max_single_weight: Maximum weight allowed for any single asset.
         cancel_before_rebalance: Cancel pending orders before rebalancing (safest).
         account_for_pending: Consider pending orders when calculating current weights.
+        rebalance_mode: How portfolio value is computed during rebalancing.
+            SNAPSHOT (default): Freeze value, batch fills (backward compatible).
+            INCREMENTAL: Recompute value after each fill (most accurate).
+            HYBRID: Frozen targets, sequential fills (VBT-style).
     """
 
     # Trade thresholds
@@ -68,6 +72,7 @@ class RebalanceConfig:
     # Order handling
     cancel_before_rebalance: bool = True
     account_for_pending: bool = True
+    rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
 
 
 class TargetWeightExecutor:
@@ -107,6 +112,15 @@ class TargetWeightExecutor:
     ) -> list["Order"]:
         """Execute rebalancing to target weights.
 
+        Behavior depends on ``self.config.rebalance_mode``:
+
+        - **SNAPSHOT** (default): Compute portfolio value once, submit all orders,
+          fill at once. Backward compatible — matches the pre-v0.18 behavior.
+        - **INCREMENTAL**: Recompute portfolio value after each fill. Most accurate
+          cash tracking. Each target uses the latest portfolio state.
+        - **HYBRID**: Freeze portfolio value for target computation, but fill
+          sequentially (cash constraints checked against live state).
+
         Args:
             target_weights: Dict of asset -> target weight (0.0 to 1.0).
                             Sum can be < 1.0 to hold cash.
@@ -126,6 +140,7 @@ class TargetWeightExecutor:
             return []
 
         orders: list[Order] = []
+        mode = self.config.rebalance_mode
 
         # 2. Get current weights (effective or actual based on config)
         if self.config.account_for_pending and not self.config.cancel_before_rebalance:
@@ -148,6 +163,15 @@ class TargetWeightExecutor:
             if order is not None:
                 orders.append(order)
 
+            # INCREMENTAL / HYBRID: fill after each asset
+            if mode in (RebalanceMode.INCREMENTAL, RebalanceMode.HYBRID) and order is not None:
+                broker._process_orders()
+
+                # INCREMENTAL: recompute equity and weights from updated state
+                if mode == RebalanceMode.INCREMENTAL:
+                    equity = broker.get_account_value()
+                    current_weights = self._get_current_weights(broker, data)
+
         # 5. Close positions not in target
         for asset in current_weights:
             if asset not in target_weights:
@@ -156,6 +180,12 @@ class TargetWeightExecutor:
                     close_order: Order | None = broker.close_position(asset)
                     if close_order:
                         orders.append(close_order)
+
+                    # Process close orders immediately for INCREMENTAL/HYBRID
+                    if mode in (RebalanceMode.INCREMENTAL, RebalanceMode.HYBRID):
+                        broker._process_orders()
+                        if mode == RebalanceMode.INCREMENTAL:
+                            equity = broker.get_account_value()
 
         return orders
 

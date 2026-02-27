@@ -7,7 +7,7 @@ from datetime import datetime
 
 import polars as pl
 
-from ml4t.backtest import (
+from ml4t.backtest._validation_imports import (
     DataFeed,
     Engine,
     LinearImpact,

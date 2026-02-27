@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from .analytics import EquityCurve, TradeAnalyzer
+from .analytics.metrics import calmar_ratio, sharpe_ratio, sortino_ratio
 from .broker import Broker
 from .config import InitialHwmSource, Mode, TrailStopTiming, WaterMarkSource
 from .datafeed import DataFeed
@@ -287,9 +288,9 @@ class Engine:
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(f.slippage for f in self.broker.fills),
             # Additional metrics
-            "sharpe": equity.sharpe(),
-            "sortino": equity.sortino(),
-            "calmar": equity.calmar,
+            "sharpe": sharpe_ratio(equity.returns),
+            "sortino": sortino_ratio(equity.returns),
+            "calmar": calmar_ratio(equity.cagr, equity.max_dd),
             "cagr": equity.cagr,
             "volatility": equity.volatility,
             "profit_factor": trade_analyzer.profit_factor,
@@ -345,25 +346,14 @@ class Engine:
         Returns:
             Configured Engine instance
         """
-        from .config import FillTiming
-
         # Create broker from config (handles all commission/slippage/account setup)
         broker = Broker.from_config(config)
-
-        # Map fill_timing to Engine's execution_mode
-        # SAME_BAR fill_timing → SAME_BAR execution
-        # NEXT_BAR_OPEN or NEXT_BAR_CLOSE → NEXT_BAR execution
-        execution_mode = (
-            ExecutionMode.SAME_BAR
-            if config.fill_timing == FillTiming.SAME_BAR
-            else ExecutionMode.NEXT_BAR
-        )
 
         # Create engine with pre-configured broker
         engine = cls.__new__(cls)
         engine.feed = feed
         engine.strategy = strategy
-        engine.execution_mode = execution_mode
+        engine.execution_mode = config.execution_mode
         engine.stop_fill_mode = broker.stop_fill_mode
         engine.stop_level_basis = broker.stop_level_basis
         engine.config = config
@@ -484,7 +474,3 @@ def run_backtest(
         execution_mode=execution_mode,
     )
     return engine.run()
-
-
-# Backward compatibility: BacktestEngine was renamed to Engine in v0.2.0
-BacktestEngine = Engine

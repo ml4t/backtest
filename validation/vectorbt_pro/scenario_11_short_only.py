@@ -145,7 +145,7 @@ def run_ml4t_backtest(data_list, entries, exits):
     """Run short-only backtest using ml4t.backtest."""
     import polars as pl
 
-    from ml4t.backtest import DataFeed, Engine, NoCommission, NoSlippage, OrderSide, Strategy
+    from ml4t.backtest._validation_imports import DataFeed, Engine, NoCommission, NoSlippage, OrderSide, Strategy
 
     # Build polars DataFrame
     all_rows = []

@@ -269,7 +269,7 @@ def run_ml4t_long(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     """ml4t.backtest with TSL + TP for LONG positions."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy,
     )
     from ml4t.backtest.risk import RuleChain
@@ -346,7 +346,7 @@ def run_ml4t_short(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     """ml4t.backtest with TSL + TP for SHORT positions."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, OrderSide, Strategy,
     )
     from ml4t.backtest.risk import RuleChain

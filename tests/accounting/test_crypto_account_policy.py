@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from ml4t.backtest import Position
-from src.ml4t.backtest.accounting.policy import UnifiedAccountPolicy
+from ml4t.backtest.accounting.policy import UnifiedAccountPolicy
 
 
 class TestCryptoAccountPolicyBuyingPower:

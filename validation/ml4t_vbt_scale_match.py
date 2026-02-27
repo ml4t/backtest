@@ -148,7 +148,7 @@ def run_vbt_pro(data: dict, n_bars: int, trail_pct: float = 0.03) -> list[TradeR
 
 def run_ml4t(data: dict, n_bars: int, trail_pct: float = 0.03) -> list[TradeRecord]:
     """Run ml4t.backtest and extract trades."""
-    from ml4t.backtest import Broker, OrderSide, Strategy, TrailHwmSource, StopFillMode, InitialHwmSource
+    from ml4t.backtest._validation_imports import Broker, OrderSide, Strategy, TrailHwmSource, StopFillMode, InitialHwmSource
     from ml4t.backtest.models import PercentageCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

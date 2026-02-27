@@ -205,7 +205,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, sl_pct: float) -> dict:
     """Run backtest using ml4t.backtest with stop-loss (next-bar mode)."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed,
         Engine,
         ExecutionMode,

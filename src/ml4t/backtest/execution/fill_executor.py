@@ -27,12 +27,7 @@ if TYPE_CHECKING:
 
 
 def _get_exit_reason(order: Order) -> str:
-    """Get exit reason from order, preferring typed enum over string parsing.
-
-    Priority:
-    1. order._exit_reason (ExitReason enum) - preferred, set by broker
-    2. order._risk_exit_reason (str) - legacy, parsed for backward compatibility
-    3. ExitReason.SIGNAL - default for strategy-initiated exits
+    """Get exit reason from order.
 
     Args:
         order: Order with exit reason metadata
@@ -40,28 +35,9 @@ def _get_exit_reason(order: Order) -> str:
     Returns:
         ExitReason enum value as string
     """
-    # Prefer typed enum if available
     if order._exit_reason is not None:
         return order._exit_reason.value
-
-    # Fall back to string parsing for backward compatibility
-    reason = order._risk_exit_reason
-    if reason is None:
-        return ExitReason.SIGNAL.value
-
-    reason_lower = reason.lower()
-    if "stop_loss" in reason_lower:
-        return ExitReason.STOP_LOSS.value
-    elif "take_profit" in reason_lower:
-        return ExitReason.TAKE_PROFIT.value
-    elif "trailing" in reason_lower:
-        return ExitReason.TRAILING_STOP.value
-    elif "time" in reason_lower:
-        return ExitReason.TIME_STOP.value
-    elif "end_of_data" in reason_lower:
-        return ExitReason.END_OF_DATA.value
-    else:
-        return ExitReason.SIGNAL.value
+    return ExitReason.SIGNAL.value
 
 
 @dataclass
@@ -124,7 +100,7 @@ class FillExecutor:
         volume = broker._current_volumes.get(order.asset)
 
         # Get effective quantity (considering partial fills from previous bars)
-        effective_quantity = broker._get_effective_quantity(order)
+        effective_quantity = broker._fill_engine.get_effective_quantity(order)
         fill_quantity = effective_quantity
 
         # Apply execution limits (volume participation)

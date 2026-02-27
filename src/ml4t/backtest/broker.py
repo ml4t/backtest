@@ -3,26 +3,26 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .config import (
-    ExecutionMode as ConfigExecutionMode,
-)
-from .config import (
     FillOrdering,
     InitialHwmSource,
+    LateAssetPolicy,
+    MissingPricePolicy,
     ShareType,
     StatsConfig,
     TrailStopTiming,
     WaterMarkSource,
 )
-from .config import (
-    StopFillMode as ConfigStopFillMode,
-)
-from .config import (
-    StopLevelBasis as ConfigStopLevelBasis,
+from .core import (
+    ExecutionEngine,
+    FillEngine,
+    OrderBook,
+    PortfolioLedger,
+    RiskEngine,
+    SubmitOrderOptions,
 )
 from .execution.fill_executor import FillExecutor
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
@@ -30,11 +30,9 @@ from .types import (
     AssetTradingStats,
     ContractSpec,
     ExecutionMode,
-    ExitReason,
     Fill,
     Order,
     OrderSide,
-    OrderStatus,
     OrderType,
     Position,
     StopFillMode,
@@ -42,55 +40,10 @@ from .types import (
     Trade,
 )
 
-# Backward compatibility
-TrailHwmSource = WaterMarkSource
-
 if TYPE_CHECKING:
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
     from .execution import ExecutionLimits, MarketImpactModel
-
-
-@dataclass
-class _SubmitOrderOptions:
-    """Internal options for submit_order behavior.
-
-    Used to control special cases like deferred exits that need
-    to bypass the normal NEXT_BAR mode order deferral.
-    """
-
-    eligible_in_next_bar_mode: bool = False
-    """If True, order is eligible for immediate execution even in NEXT_BAR mode.
-
-    This is used for deferred exits that should execute at the next bar's open,
-    not be deferred to the bar after that.
-    """
-
-
-def _reason_to_exit_reason(reason: str) -> ExitReason:
-    """Map reason string to ExitReason enum.
-
-    Used when setting order._exit_reason from risk rule action.reason.
-
-    Args:
-        reason: Human-readable reason string (e.g., "stop_loss_5.0%")
-
-    Returns:
-        Corresponding ExitReason enum value
-    """
-    reason_lower = reason.lower()
-    if "stop_loss" in reason_lower:
-        return ExitReason.STOP_LOSS
-    elif "take_profit" in reason_lower:
-        return ExitReason.TAKE_PROFIT
-    elif "trailing" in reason_lower:
-        return ExitReason.TRAILING_STOP
-    elif "time" in reason_lower:
-        return ExitReason.TIME_STOP
-    elif "end_of_data" in reason_lower:
-        return ExitReason.END_OF_DATA
-    else:
-        return ExitReason.SIGNAL
 
 
 class Broker:
@@ -122,6 +75,10 @@ class Broker:
         reject_on_insufficient_cash: bool = True,
         cash_buffer_pct: float = 0.0,
         partial_fills_allowed: bool = False,
+        rebalance_headroom_pct: float = 1.0,
+        missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP,
+        late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW,
+        late_asset_min_bars: int = 1,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -150,6 +107,10 @@ class Broker:
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
         self.cash_buffer_pct = cash_buffer_pct
         self.partial_fills_allowed = partial_fills_allowed
+        self.rebalance_headroom_pct = rebalance_headroom_pct
+        self.missing_price_policy = missing_price_policy
+        self.late_asset_policy = late_asset_policy
+        self.late_asset_min_bars = late_asset_min_bars
 
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
@@ -194,6 +155,8 @@ class Broker:
         self._current_lows: dict[str, float] = {}  # low prices for limit/stop checks
         self._current_volumes: dict[str, float] = {}
         self._current_signals: dict[str, dict[str, float]] = {}
+        self._last_prices: dict[str, float] = {}
+        self._asset_bars_seen: dict[str, int] = {}
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
 
         # Risk management
@@ -227,6 +190,13 @@ class Broker:
         self._session_config = None  # Optional SessionConfig for session boundary detection
         self._last_session_id: int | None = None  # Track current session for boundary detection
 
+        # Extracted orchestration components (Phase B1 alpha-reset)
+        self._order_book = OrderBook(self)
+        self._risk_engine = RiskEngine(self)
+        self._fill_engine = FillEngine(self)
+        self._execution_engine = ExecutionEngine(self)
+        self._portfolio_ledger = PortfolioLedger(self)
+
     @classmethod
     def from_config(
         cls,
@@ -256,12 +226,15 @@ class Broker:
         from .config import CommissionModel as CommModelEnum
         from .config import SlippageModel as SlipModelEnum
         from .models import (
+            CombinedCommission,
             FixedSlippage,
             NoCommission,
             NoSlippage,
             PercentageCommission,
             PercentageSlippage,
             PerShareCommission,
+            TieredCommission,
+            VolumeShareSlippage,
         )
 
         # Build commission model from config
@@ -273,6 +246,12 @@ class Broker:
                 per_share=config.commission_per_share,
                 minimum=config.commission_minimum,
             )
+        elif config.commission_model == CommModelEnum.PER_TRADE:
+            commission_model = CombinedCommission(fixed=config.commission_per_trade)
+        elif config.commission_model == CommModelEnum.TIERED:
+            commission_model = TieredCommission(
+                tiers=[(float("inf"), config.commission_rate)],
+            )
         elif config.commission_model == CommModelEnum.NONE:
             commission_model = NoCommission()
 
@@ -282,41 +261,19 @@ class Broker:
             slippage_model = PercentageSlippage(rate=config.slippage_rate)
         elif config.slippage_model == SlipModelEnum.FIXED:
             slippage_model = FixedSlippage(amount=config.slippage_fixed)
+        elif config.slippage_model == SlipModelEnum.VOLUME_BASED:
+            slippage_model = VolumeShareSlippage(impact_factor=config.slippage_rate)
         elif config.slippage_model == SlipModelEnum.NONE:
             slippage_model = NoSlippage()
-
-        # Map config execution mode to types.ExecutionMode
-        execution_mode = (
-            ExecutionMode.SAME_BAR
-            if config.execution_mode == ConfigExecutionMode.SAME_BAR
-            else ExecutionMode.NEXT_BAR
-        )
-
-        # Map config stop fill mode to types.StopFillMode
-        stop_fill_mode_map = {
-            ConfigStopFillMode.STOP_PRICE: StopFillMode.STOP_PRICE,
-            ConfigStopFillMode.CLOSE_PRICE: StopFillMode.CLOSE_PRICE,
-            ConfigStopFillMode.NEXT_BAR_OPEN: StopFillMode.NEXT_BAR_OPEN,
-        }
-        stop_fill_mode = stop_fill_mode_map.get(config.stop_fill_mode, StopFillMode.STOP_PRICE)
-
-        # Map config stop level basis to types.StopLevelBasis
-        stop_level_basis_map = {
-            ConfigStopLevelBasis.FILL_PRICE: StopLevelBasis.FILL_PRICE,
-            ConfigStopLevelBasis.SIGNAL_PRICE: StopLevelBasis.SIGNAL_PRICE,
-        }
-        stop_level_basis = stop_level_basis_map.get(
-            config.stop_level_basis, StopLevelBasis.FILL_PRICE
-        )
 
         return cls(
             initial_cash=config.initial_cash,
             commission_model=commission_model,
             slippage_model=slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
-            execution_mode=execution_mode,
-            stop_fill_mode=stop_fill_mode,
-            stop_level_basis=stop_level_basis,
+            execution_mode=config.execution_mode,
+            stop_fill_mode=config.stop_fill_mode,
+            stop_level_basis=config.stop_level_basis,
             trail_hwm_source=config.trail_hwm_source,
             initial_hwm_source=config.initial_hwm_source,
             trail_stop_timing=config.trail_stop_timing,
@@ -334,6 +291,10 @@ class Broker:
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
             cash_buffer_pct=config.cash_buffer_pct,
             partial_fills_allowed=config.partial_fills_allowed,
+            rebalance_headroom_pct=config.rebalance_headroom_pct,
+            missing_price_policy=config.missing_price_policy,
+            late_asset_policy=config.late_asset_policy,
+            late_asset_min_bars=config.late_asset_min_bars,
         )
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
@@ -557,12 +518,7 @@ class Broker:
 
     def get_account_value(self) -> float:
         """Calculate total account value (cash + position values)."""
-        value = self.cash
-        for asset, pos in self.positions.items():
-            price = self._current_prices.get(asset, pos.entry_price)
-            multiplier = self.get_multiplier(asset)
-            value += pos.quantity * price * multiplier
-        return value
+        return self._portfolio_ledger.get_account_value()
 
     def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
         """Get all rejected orders, optionally filtered by asset.
@@ -573,10 +529,7 @@ class Broker:
         Returns:
             List of rejected Order objects with rejection_reason populated
         """
-        rejected = [o for o in self.orders if o.status == OrderStatus.REJECTED]
-        if asset is not None:
-            rejected = [o for o in rejected if o.asset == asset]
-        return rejected
+        return self._portfolio_ledger.get_rejected_orders(asset=asset)
 
     @property
     def last_rejection_reason(self) -> str | None:
@@ -585,8 +538,7 @@ class Broker:
         Returns:
             Rejection reason string, or None if no orders have been rejected
         """
-        rejected = [o for o in self.orders if o.status == OrderStatus.REJECTED]
-        return rejected[-1].rejection_reason if rejected else None
+        return self._portfolio_ledger.last_rejection_reason
 
     # === Risk Management ===
 
@@ -613,137 +565,13 @@ class Broker:
         if pos:
             pos.context.update(context)
 
-    def _get_position_rules(self, asset: str):
-        """Get applicable rules for an asset (per-asset or global)."""
-        return self._position_rules_by_asset.get(asset) or self._position_rules
-
-    def _build_position_state(self, pos: Position, current_price: float):
-        """Build PositionState from Position for rule evaluation."""
-        # Import here to avoid circular imports
-        from .risk.types import PositionState
-
-        asset = pos.asset
-
-        # Merge stop configuration into context for rules to access
-        context = {
-            **pos.context,
-            "stop_fill_mode": self.stop_fill_mode,
-            "stop_level_basis": self.stop_level_basis,
-            "trail_hwm_source": self.trail_hwm_source,
-            "trail_stop_timing": self.trail_stop_timing,
-        }
-
-        return PositionState(
-            asset=asset,
-            side=pos.side,
-            entry_price=pos.entry_price,
-            current_price=current_price,
-            quantity=abs(pos.quantity),
-            initial_quantity=abs(pos.initial_quantity)
-            if pos.initial_quantity
-            else abs(pos.quantity),
-            unrealized_pnl=pos.unrealized_pnl(current_price),
-            unrealized_return=pos.pnl_percent(current_price),
-            bars_held=pos.bars_held,
-            high_water_mark=pos.high_water_mark
-            if pos.high_water_mark is not None
-            else pos.entry_price,
-            low_water_mark=pos.low_water_mark
-            if pos.low_water_mark is not None
-            else pos.entry_price,
-            # Bar OHLC for intrabar stop/limit detection
-            bar_open=self._current_opens.get(asset),
-            bar_high=self._current_highs.get(asset),
-            bar_low=self._current_lows.get(asset),
-            max_favorable_excursion=pos.max_favorable_excursion,
-            max_adverse_excursion=pos.max_adverse_excursion,
-            entry_time=pos.entry_time,
-            current_time=self._current_time,
-            context=context,
-        )
-
     def evaluate_position_rules(self) -> list[Order]:
         """Evaluate position rules for all open positions.
 
         Called by Engine before processing orders. Returns list of exit orders.
         Handles defer_fill=True by storing pending exits for next bar.
         """
-        from .risk.types import ActionType
-
-        exit_orders = []
-
-        for asset, pos in list(self.positions.items()):
-            rules = self._get_position_rules(asset)
-            if rules is None:
-                continue
-
-            price = self._current_prices.get(asset)
-            if price is None:
-                continue
-
-            # Build state and evaluate
-            state = self._build_position_state(pos, price)
-            action = rules.evaluate(state)
-
-            if action.action == ActionType.EXIT_FULL:
-                if action.defer_fill:
-                    # NEXT_BAR_OPEN mode: defer exit to next bar
-                    # Store pending exit info (will be processed at next bar's open)
-                    self._pending_exits[asset] = {
-                        "reason": action.reason,
-                        "pct": 1.0,
-                        "quantity": pos.quantity,
-                        "fill_price": action.fill_price,  # Preserve for STOP_PRICE mode
-                    }
-                else:
-                    # Generate full exit order immediately
-                    # For STOP_PRICE mode, risk exits should fill on trigger bar even in NEXT_BAR mode
-                    order = self.submit_order(
-                        asset,
-                        -pos.quantity,
-                        order_type=OrderType.MARKET,
-                        _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
-                    )
-                    if order:
-                        order._risk_exit_reason = action.reason
-                        order._exit_reason = _reason_to_exit_reason(action.reason)
-                        # Store fill price for stop/limit triggered exits
-                        # This is the price at which the stop/limit was triggered
-                        order._risk_fill_price = action.fill_price
-                        exit_orders.append(order)
-                        # VBT Pro compatibility: prevent same-bar re-entry
-                        self._stop_exits_this_bar.add(asset)
-
-            elif action.action == ActionType.EXIT_PARTIAL:
-                if action.defer_fill:
-                    # NEXT_BAR_OPEN mode: defer partial exit to next bar
-                    exit_qty = abs(pos.quantity) * action.pct
-                    if exit_qty > 0:
-                        self._pending_exits[asset] = {
-                            "reason": action.reason,
-                            "pct": action.pct,
-                            "quantity": exit_qty if pos.quantity > 0 else -exit_qty,
-                            "fill_price": action.fill_price,  # Preserve for STOP_PRICE mode
-                        }
-                else:
-                    # Generate partial exit order immediately
-                    # For STOP_PRICE mode, risk exits should fill on trigger bar even in NEXT_BAR mode
-                    exit_qty = abs(pos.quantity) * action.pct
-                    if exit_qty > 0:
-                        actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
-                        order = self.submit_order(
-                            asset,
-                            actual_qty,
-                            order_type=OrderType.MARKET,
-                            _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
-                        )
-                        if order:
-                            order._risk_exit_reason = action.reason
-                            order._exit_reason = _reason_to_exit_reason(action.reason)
-                            order._risk_fill_price = action.fill_price
-                            exit_orders.append(order)
-
-        return exit_orders
+        return self._risk_engine.evaluate_position_rules()
 
     def submit_order(
         self,
@@ -754,7 +582,7 @@ class Broker:
         limit_price: float | None = None,
         stop_price: float | None = None,
         trail_amount: float | None = None,
-        _options: _SubmitOrderOptions | None = None,
+        _options: SubmitOrderOptions | None = None,
     ) -> Order | None:
         """Submit a new order to the broker.
 
@@ -790,53 +618,16 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
-        if side is None:
-            if quantity == 0:
-                return None
-            side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
-        # Always normalize quantity to positive (Bug #3 fix)
-        quantity = abs(quantity)
-        if quantity == 0:
-            return None
-
-        # VBT Pro compatibility: prevent same-bar re-entry after stop exit
-        # When a stop/trail exit occurs, don't allow new entry until next bar
-        # This applies to BOTH BUY (long entry) AND SELL (short entry) orders
-        # when there's no existing position (i.e., this is a new entry, not a close)
-        if asset in self._stop_exits_this_bar:
-            # Check if this is a new entry (no existing position)
-            existing_pos = self.positions.get(asset)
-            if existing_pos is None:
-                return None  # Silently reject entry on same bar as stop exit
-
-        self._order_counter += 1
-        order = Order(
+        return self._order_book.submit_order(
             asset=asset,
-            side=side,
             quantity=quantity,
+            side=side,
             order_type=order_type,
             limit_price=limit_price,
             stop_price=stop_price,
             trail_amount=trail_amount,
-            order_id=f"ORD-{self._order_counter}",
-            created_at=self._current_time,
+            options=_options,
         )
-
-        # Capture signal price (close at order time) for stop level calculation
-        # This is used when stop_level_basis is SIGNAL_PRICE (Backtrader behavior)
-        order._signal_price = self._current_prices.get(asset)
-
-        self.orders.append(order)
-        self.pending_orders.append(order)
-
-        # Track orders placed this bar for next-bar execution mode
-        # Bug #1 fix: Allow eligible orders (e.g., deferred exits) to skip this tracking
-        if self.execution_mode == ExecutionMode.NEXT_BAR and (
-            _options is None or not _options.eligible_in_next_bar_mode
-        ):
-            self._orders_this_bar.append(order)
-
-        return order
 
     def submit_bracket(
         self,
@@ -942,16 +733,6 @@ class Broker:
 
         return entry, tp, sl
 
-    # Phase 4.2: Whitelist updatable order fields to prevent mutation of immutable fields
-    _UPDATABLE_ORDER_FIELDS: frozenset[str] = frozenset(
-        {
-            "quantity",
-            "limit_price",
-            "stop_price",
-            "trail_amount",
-        }
-    )
-
     def update_order(self, order_id: str, **kwargs) -> bool:
         """Update pending order parameters.
 
@@ -971,28 +752,10 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
-        # Validate all fields are updatable
-        invalid_fields = set(kwargs.keys()) - self._UPDATABLE_ORDER_FIELDS
-        if invalid_fields:
-            raise ValueError(
-                f"Cannot update order fields: {invalid_fields}. "
-                f"Updatable fields: {sorted(self._UPDATABLE_ORDER_FIELDS)}"
-            )
-
-        for order in self.pending_orders:
-            if order.order_id == order_id:
-                for key, value in kwargs.items():
-                    setattr(order, key, value)
-                return True
-        return False
+        return self._order_book.update_order(order_id, **kwargs)
 
     def cancel_order(self, order_id: str) -> bool:
-        for order in self.pending_orders:
-            if order.order_id == order_id:
-                order.status = OrderStatus.CANCELLED
-                self.pending_orders.remove(order)
-                return True
-        return False
+        return self._order_book.cancel_order(order_id)
 
     def close_position(self, asset: str) -> Order | None:
         """Close an open position for the given asset.
@@ -1452,10 +1215,31 @@ class Broker:
         sells: list[tuple[str, float]] = []  # (asset, target_value)
         buys: list[tuple[str, float]] = []  # (asset, target_value)
 
-        # Calculate target values and categorize as buys or sells
-        for asset, weight in target_weights.items():
+        scaled_weights = {
+            asset: weight * self.rebalance_headroom_pct for asset, weight in target_weights.items()
+        }
+
+        def resolve_price(asset: str) -> float | None:
             price = self._current_prices.get(asset)
-            if price is None or price <= 0:
+            if price is not None and price > 0:
+                return price
+            if self.missing_price_policy == MissingPricePolicy.USE_LAST:
+                last = self._last_prices.get(asset)
+                if last is not None and last > 0:
+                    return last
+            return None
+
+        def allows_trading(asset: str) -> bool:
+            if self.late_asset_policy != LateAssetPolicy.REQUIRE_HISTORY:
+                return True
+            return self._asset_bars_seen.get(asset, 0) >= self.late_asset_min_bars
+
+        # Calculate target values and categorize as buys or sells
+        for asset, weight in scaled_weights.items():
+            if not allows_trading(asset):
+                continue
+            price = resolve_price(asset)
+            if price is None:
                 continue
 
             target_value = portfolio_value * weight
@@ -1476,21 +1260,21 @@ class Broker:
 
         # Also close positions not in target weights
         for asset, pos in self.positions.items():
-            if pos.quantity != 0 and asset not in target_weights:
+            if pos.quantity != 0 and asset not in scaled_weights:
                 sells.append((asset, 0.0))
 
         # Process sells first (frees capital for buys)
         for asset, target_value in sells:
-            price = self._current_prices.get(asset)
-            if price and price > 0:
+            price = resolve_price(asset)
+            if price is not None:
                 order = self._order_to_target_value(asset, target_value, price, order_type, None)
                 if order:
                     orders.append(order)
 
         # Then process buys
         for asset, target_value in buys:
-            price = self._current_prices.get(asset)
-            if price and price > 0:
+            price = resolve_price(asset)
+            if price is not None:
                 order = self._order_to_target_value(asset, target_value, price, order_type, None)
                 if order:
                     orders.append(order)
@@ -1499,50 +1283,11 @@ class Broker:
 
     def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
-        for order in self.orders:
-            if order.order_id == order_id:
-                return order
-        return None
+        return self._order_book.get_order(order_id)
 
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
         """Get pending orders, optionally filtered by asset."""
-        if asset is None:
-            return list(self.pending_orders)
-        return [o for o in self.pending_orders if o.asset == asset]
-
-    def _is_exit_order(self, order: Order) -> bool:
-        """Check if order is an exit (reducing existing position).
-
-        Exit orders are:
-        - SELL when we have a long position (reducing long)
-        - BUY when we have a short position (covering short)
-        - Does NOT reverse the position
-
-        Args:
-            order: Order to check
-
-        Returns:
-            True if order is reducing an existing position, False otherwise
-        """
-        pos = self.positions.get(order.asset)
-        if pos is None or pos.quantity == 0:
-            return False  # No position, so this is entry, not exit
-
-        # Calculate signed quantity delta
-        signed_qty = order.quantity if order.side == OrderSide.BUY else -order.quantity
-
-        # Check if opposite sign (reducing) and doesn't reverse
-        if pos.quantity > 0 and signed_qty < 0:
-            # Long position, sell order
-            new_qty = pos.quantity + signed_qty
-            return new_qty >= 0  # Exit if still long or flat, not reversal
-        elif pos.quantity < 0 and signed_qty > 0:
-            # Short position, buy order
-            new_qty = pos.quantity + signed_qty
-            return new_qty <= 0  # Exit if still short or flat, not reversal
-        else:
-            # Same sign - adding to position, not exiting
-            return False
+        return self._order_book.get_pending_orders(asset=asset)
 
     def _process_pending_exits(self) -> list[Order]:
         """Process pending exits from NEXT_BAR_OPEN mode.
@@ -1555,50 +1300,7 @@ class Broker:
 
         Returns list of exit orders that were created and will be filled.
         """
-        exit_orders = []
-
-        for asset, pending in list(self._pending_exits.items()):
-            pos = self.positions.get(asset)
-            if pos is None:
-                # Position no longer exists (shouldn't happen normally)
-                del self._pending_exits[asset]
-                continue
-
-            open_price = self._current_opens.get(asset)
-            if open_price is None:
-                # No open price available, skip this bar
-                continue
-
-            # Determine fill price based on stop_fill_mode
-            stored_fill_price = pending.get("fill_price")
-            if self.stop_fill_mode == StopFillMode.STOP_PRICE and stored_fill_price is not None:
-                # Use the original stop price, but check for gap-through
-                exit_side = OrderSide.SELL if pending["quantity"] > 0 else OrderSide.BUY
-                gap_price = self._check_gap_through(exit_side, stored_fill_price, open_price)
-                fill_price = gap_price if gap_price is not None else stored_fill_price
-            else:
-                # Default: fill at open price
-                fill_price = open_price
-
-            # Create exit order
-            # Bug #1 fix: Pass eligible_in_next_bar_mode=True so exit executes this bar
-            exit_qty = pending["quantity"]
-            order = self.submit_order(
-                asset,
-                -exit_qty,
-                order_type=OrderType.MARKET,
-                _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
-            )
-            if order:
-                order._risk_exit_reason = pending["reason"]
-                order._exit_reason = _reason_to_exit_reason(pending["reason"])
-                order._risk_fill_price = fill_price
-                exit_orders.append(order)
-
-            # Remove from pending
-            del self._pending_exits[asset]
-
-        return exit_orders
+        return self._risk_engine.process_pending_exits()
 
     def _update_time(
         self,
@@ -1617,6 +1319,11 @@ class Broker:
         self._current_lows = lows
         self._current_volumes = volumes
         self._current_signals = signals
+
+        for asset, price in prices.items():
+            if price > 0:
+                self._last_prices[asset] = price
+                self._asset_bars_seen[asset] = self._asset_bars_seen.get(asset, 0) + 1
 
         # Clear per-bar tracking at start of new bar
         self._filled_this_bar.clear()
@@ -1660,7 +1367,6 @@ class Broker:
                 # VBT Pro only updates water marks from bar extremes on the bar AFTER entry
                 is_new_position = asset in self._positions_created_this_bar
                 # BAR_EXTREME: use HIGH for HWM (longs), LOW for LWM (shorts)
-                # Note: HIGH is a deprecated alias for BAR_EXTREME
                 use_extremes = self.trail_hwm_source.value == "bar_extreme" and not is_new_position
                 pos.update_water_marks(
                     current_price=self._current_prices[asset],
@@ -1669,55 +1375,6 @@ class Broker:
                     use_high_for_hwm=use_extremes,
                     use_low_for_lwm=use_extremes,
                 )
-
-    def _get_available_cash(self) -> float:
-        """Get available cash after applying cash buffer.
-
-        Returns:
-            Cash available for new orders (total cash minus buffer reserve).
-        """
-        if self.cash_buffer_pct > 0:
-            return self.account.cash * (1.0 - self.cash_buffer_pct)
-        return self.account.cash
-
-    def _apply_share_rounding(self, order: Order) -> None:
-        """Round order quantity to integer if share_type is INTEGER.
-
-        Modifies order in-place. If rounding reduces quantity to zero,
-        the order will be rejected during validation (zero-quantity check).
-        """
-        if self.share_type == ShareType.INTEGER:
-            order.quantity = float(int(order.quantity))
-
-    def _try_partial_fill(self, order: Order, fill_price: float) -> bool:
-        """Attempt a partial fill when full order cannot be afforded.
-
-        Only used when partial_fills_allowed is True and the gatekeeper
-        rejects an entry order for insufficient cash.
-
-        Returns:
-            True if a partial fill was executed, False otherwise.
-        """
-        available = self._get_available_cash()
-        commission_rate = 0.0
-        # Estimate commission rate for sizing
-        test_commission = self.commission_model.calculate(order.asset, 1.0, fill_price)
-        if fill_price > 0:
-            commission_rate = test_commission / fill_price
-
-        # Max affordable shares (accounting for commission)
-        max_value = available / (1.0 + commission_rate) if commission_rate > 0 else available
-        max_shares = max_value / fill_price if fill_price > 0 else 0
-
-        if self.share_type == ShareType.INTEGER:
-            max_shares = float(int(max_shares))
-
-        if max_shares <= 0:
-            return False
-
-        # Modify order to affordable quantity and execute
-        order.quantity = max_shares
-        return bool(self._execute_fill(order, fill_price))
 
     def _process_orders(self, use_open: bool = False):
         """Process pending orders against current prices.
@@ -1733,383 +1390,4 @@ class Broker:
         Args:
             use_open: If True, use open prices (for next-bar mode at bar start).
         """
-        if self.fill_ordering == FillOrdering.EXIT_FIRST:
-            self._process_orders_exit_first(use_open)
-        else:
-            self._process_orders_fifo(use_open)
-
-    def _get_fill_price_for_order(self, order: Order, use_open: bool) -> float | None:
-        """Get the fill price for an order based on execution mode."""
-        if use_open and self.execution_mode == ExecutionMode.NEXT_BAR:
-            return self._current_opens.get(order.asset)
-        return self._current_prices.get(order.asset)
-
-    def _process_single_order(
-        self, order: Order, use_open: bool, filled_orders: list[Order]
-    ) -> None:
-        """Process a single order (shared logic for both ordering modes).
-
-        Handles exit vs entry detection, gatekeeper validation, share rounding,
-        partial fills, and reject_on_insufficient_cash bypass.
-        """
-        price = self._get_fill_price_for_order(order, use_open)
-        if price is None:
-            return
-
-        is_exit = self._is_exit_order(order)
-
-        if is_exit:
-            # Exit orders always allowed (frees capital)
-            fill_price = self._check_fill(order, price)
-            if fill_price is not None:
-                fully_filled = self._execute_fill(order, fill_price)
-                if fully_filled:
-                    filled_orders.append(order)
-                    self._partial_orders.pop(order.order_id, None)
-                else:
-                    self._update_partial_order(order)
-        else:
-            # Entry order — apply share rounding before validation
-            self._apply_share_rounding(order)
-            if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
-                return
-
-            fill_price = self._check_fill(order, price)
-            if fill_price is None:
-                return
-
-            # Validate via gatekeeper
-            valid, rejection_reason = self.gatekeeper.validate_order(order, fill_price)
-
-            if valid:
-                fully_filled = self._execute_fill(order, fill_price)
-                if fully_filled:
-                    filled_orders.append(order)
-                    self._partial_orders.pop(order.order_id, None)
-                else:
-                    self._update_partial_order(order)
-            elif (
-                not self.reject_on_insufficient_cash and "insufficient" in rejection_reason.lower()
-            ):
-                # Permissive mode: skip instead of rejecting
-                if self.partial_fills_allowed and self._try_partial_fill(order, fill_price):
-                    filled_orders.append(order)
-                    self._partial_orders.pop(order.order_id, None)
-                # else: silently skip (VBT-like behavior)
-            elif self.partial_fills_allowed and "insufficient" in rejection_reason.lower():
-                # Strict mode but partial fills allowed
-                if self._try_partial_fill(order, fill_price):
-                    filled_orders.append(order)
-                    self._partial_orders.pop(order.order_id, None)
-                else:
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = rejection_reason
-            else:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = rejection_reason
-
-    def _cleanup_filled_orders(self, filled_orders: list[Order]) -> None:
-        """Remove filled and rejected orders from pending lists."""
-        for order in filled_orders:
-            if order in self.pending_orders:
-                self.pending_orders.remove(order)
-            if order in self._orders_this_bar:
-                self._orders_this_bar.remove(order)
-
-        for order in self.pending_orders[:]:
-            if order.status == OrderStatus.REJECTED:
-                self.pending_orders.remove(order)
-
-    def _process_orders_exit_first(self, use_open: bool = False):
-        """EXIT_FIRST ordering: all exits → mark-to-market → all entries."""
-        exit_orders = []
-        entry_orders = []
-
-        for order in self.pending_orders[:]:
-            if self.execution_mode == ExecutionMode.NEXT_BAR and order in self._orders_this_bar:
-                continue
-            if self._is_exit_order(order):
-                exit_orders.append(order)
-            else:
-                entry_orders.append(order)
-
-        filled_orders: list[Order] = []
-
-        # Phase 1: Process exit orders
-        for order in exit_orders:
-            price = self._get_fill_price_for_order(order, use_open)
-            if price is None:
-                continue
-            fill_price = self._check_fill(order, price)
-            if fill_price is not None:
-                fully_filled = self._execute_fill(order, fill_price)
-                if fully_filled:
-                    filled_orders.append(order)
-                    self._partial_orders.pop(order.order_id, None)
-                else:
-                    self._update_partial_order(order)
-
-        # Phase 2: Update account equity after exits
-        self.account.mark_to_market(self._current_prices)
-
-        # Phase 3: Process entry orders
-        for order in entry_orders:
-            self._process_single_order(order, use_open, filled_orders)
-
-        self._cleanup_filled_orders(filled_orders)
-
-    def _process_orders_fifo(self, use_open: bool = False):
-        """FIFO ordering: process orders in submission order with sequential cash updates."""
-        eligible_orders = []
-        for order in self.pending_orders[:]:
-            if self.execution_mode == ExecutionMode.NEXT_BAR and order in self._orders_this_bar:
-                continue
-            eligible_orders.append(order)
-
-        filled_orders: list[Order] = []
-
-        for order in eligible_orders:
-            self._process_single_order(order, use_open, filled_orders)
-            # Sequential cash update: mark-to-market after each fill
-            # so the next order sees updated buying power
-            if filled_orders and filled_orders[-1] is order:
-                self.account.mark_to_market(self._current_prices)
-
-        self._cleanup_filled_orders(filled_orders)
-
-    def _get_effective_quantity(self, order: Order) -> float:
-        """Get effective order quantity (considering partial fills).
-
-        For orders with partial fills in progress, returns the remaining quantity.
-        """
-        remaining = self._partial_orders.get(order.order_id)
-        if remaining is not None:
-            return remaining
-        return order.quantity
-
-    def _update_partial_order(self, order: Order) -> None:
-        """Update order quantity after partial fill for next bar."""
-        remaining = self._partial_orders.get(order.order_id)
-        if remaining is not None:
-            order.quantity = remaining
-
-    def _check_gap_through(
-        self, side: OrderSide, stop_price: float, bar_open: float
-    ) -> float | None:
-        """Check if bar gapped through stop level.
-
-        If the bar opened beyond our stop level, we must fill at the open price
-        (worse execution due to gap).
-
-        Args:
-            side: Order side (BUY or SELL)
-            stop_price: The stop price level
-            bar_open: The bar's opening price
-
-        Returns:
-            bar_open if gapped through, None if normal trigger
-        """
-        if side == OrderSide.SELL and bar_open <= stop_price:
-            return bar_open  # Gapped down through stop
-        elif side == OrderSide.BUY and bar_open >= stop_price:
-            return bar_open  # Gapped up through stop
-        return None
-
-    def _check_market_fill(self, order: Order, price: float) -> float:
-        """Check fill price for market order.
-
-        For risk-triggered exits (stop-loss, take-profit, trailing stop), uses
-        the fill price already computed by the position rule. Position rules
-        handle gap-through scenarios correctly in their own logic.
-
-        Also applies additional stop slippage if configured.
-
-        Args:
-            order: Market order to check
-            price: Current market price (close)
-
-        Returns:
-            Fill price for the market order
-        """
-        risk_fill_price = getattr(order, "_risk_fill_price", None)
-        if risk_fill_price is None:
-            return price
-
-        # Use the fill price computed by the position rule directly.
-        # Position rules (TakeProfit, StopLoss, TrailingStop) already handle
-        # gap-through scenarios correctly in their fill price calculation.
-        # We should NOT override their logic with a generic gap-through check
-        # because the direction differs for stop-loss vs take-profit orders.
-        fill_price = risk_fill_price
-
-        # Apply additional stop slippage if configured
-        # This models the reality that stop orders often fill at worse prices in fast markets
-        if self.stop_slippage_rate > 0:
-            if order.side == OrderSide.SELL:
-                # Selling: slippage makes price worse (lower)
-                fill_price = fill_price * (1 - self.stop_slippage_rate)
-            else:
-                # Buying (covering short): slippage makes price worse (higher)
-                fill_price = fill_price * (1 + self.stop_slippage_rate)
-
-        return fill_price
-
-    def _check_limit_fill(self, order: Order, high: float, low: float) -> float | None:
-        """Check if limit order should fill.
-
-        Limit buy fills if price dipped to our level (Low <= limit).
-        Limit sell fills if price rose to our level (High >= limit).
-
-        Args:
-            order: Limit order to check
-            high: Bar high price
-            low: Bar low price
-
-        Returns:
-            Limit price if order should fill, None otherwise
-        """
-        if order.limit_price is None:
-            return None
-
-        if (
-            order.side == OrderSide.BUY
-            and low <= order.limit_price
-            or order.side == OrderSide.SELL
-            and high >= order.limit_price
-        ):
-            return order.limit_price
-        return None
-
-    def _check_stop_fill(
-        self, order: Order, high: float, low: float, bar_open: float
-    ) -> float | None:
-        """Check if stop order should fill.
-
-        Stop buy triggers if price rose to trigger (High >= stop).
-        Stop sell triggers if price fell to trigger (Low <= stop).
-        Handles gap-through scenarios.
-
-        Args:
-            order: Stop order to check
-            high: Bar high price
-            low: Bar low price
-            bar_open: Bar open price
-
-        Returns:
-            Fill price if triggered, None otherwise
-        """
-        if order.stop_price is None:
-            return None
-
-        triggered = False
-        if (
-            order.side == OrderSide.BUY
-            and high >= order.stop_price
-            or order.side == OrderSide.SELL
-            and low <= order.stop_price
-        ):
-            triggered = True
-
-        if not triggered:
-            return None
-
-        gap_price = self._check_gap_through(order.side, order.stop_price, bar_open)
-        return gap_price if gap_price is not None else order.stop_price
-
-    def _update_and_check_trailing_stop(
-        self, order: Order, high: float, low: float, bar_open: float
-    ) -> float | None:
-        """Update trailing stop level and check if triggered.
-
-        Updates the stop price based on the water mark, then checks
-        if the stop has been triggered.
-
-        Note: This method mutates order.stop_price as trailing stops
-        must track the water mark.
-
-        Args:
-            order: Trailing stop order (SELL protects longs, BUY protects shorts)
-            high: Bar high price
-            low: Bar low price
-            bar_open: Bar open price
-
-        Returns:
-            Fill price if triggered, None otherwise
-        """
-        if order.trail_amount is None:
-            return None
-
-        if order.side == OrderSide.SELL:
-            # SELL trailing stop: protects long positions
-            # Stop trails below the high water mark
-            new_stop = high - order.trail_amount
-            if order.stop_price is None or new_stop > order.stop_price:
-                order.stop_price = new_stop
-
-            # Check if triggered: low touched or crossed stop
-            if order.stop_price is None or low > order.stop_price:
-                return None
-
-        else:  # OrderSide.BUY - Bug #5 fix
-            # BUY trailing stop: protects short positions
-            # Stop trails above the low water mark
-            new_stop = low + order.trail_amount
-            if order.stop_price is None or new_stop < order.stop_price:
-                order.stop_price = new_stop
-
-            # Check if triggered: high touched or crossed stop
-            if order.stop_price is None or high < order.stop_price:
-                return None
-
-        # At this point stop_price is guaranteed non-None (set above, returned if None)
-        assert order.stop_price is not None
-        gap_price = self._check_gap_through(order.side, order.stop_price, bar_open)
-        return gap_price if gap_price is not None else order.stop_price
-
-    def _check_fill(self, order: Order, price: float) -> float | None:
-        """Check if order should fill, return fill price or None.
-
-        Delegates to specialized methods based on order type:
-        - Market orders: immediate fill, with gap-through handling for risk exits
-        - Limit orders: fill if bar range touched limit price
-        - Stop orders: fill at stop price (or worse) if bar triggered it
-        - Trailing stops: update stop level, then check for trigger
-
-        Args:
-            order: Order to check
-            price: Current market price (close)
-
-        Returns:
-            Fill price if order should fill, None otherwise
-        """
-        high = self._current_highs.get(order.asset, price)
-        low = self._current_lows.get(order.asset, price)
-        bar_open = self._current_opens.get(order.asset, price)
-
-        if order.order_type == OrderType.MARKET:
-            return self._check_market_fill(order, price)
-        elif order.order_type == OrderType.LIMIT:
-            return self._check_limit_fill(order, high, low)
-        elif order.order_type == OrderType.STOP:
-            return self._check_stop_fill(order, high, low, bar_open)
-        elif order.order_type == OrderType.TRAILING_STOP:
-            return self._update_and_check_trailing_stop(order, high, low, bar_open)
-
-        return None
-
-    def _execute_fill(self, order: Order, base_price: float) -> bool:
-        """Execute a fill and update positions.
-
-        This method delegates to FillExecutor for the actual implementation.
-        See execution/fill_executor.py for the detailed logic.
-
-        Args:
-            order: Order to fill
-            base_price: Base fill price before adjustments
-
-        Returns:
-            True if order is fully filled, False if partially filled (remainder pending)
-        """
-        return self._fill_executor.execute(order, base_price)
+        self._execution_engine.process_orders(use_open=use_open)

@@ -23,7 +23,7 @@ class TestPositionLongPositions:
 
         assert pos.asset == "AAPL"
         assert pos.quantity == 100.0
-        assert pos.avg_entry_price == 150.0
+        assert pos.entry_price == 150.0
         assert pos.current_price == 150.0
         assert pos.bars_held == 0
 
@@ -103,7 +103,7 @@ class TestPositionShortPositions:
         )
 
         assert pos.quantity == -100.0
-        assert pos.avg_entry_price == 150.0
+        assert pos.entry_price == 150.0
 
     def test_short_position_market_value_is_negative(self):
         """Test that short positions have negative market value (liability)."""
@@ -316,11 +316,10 @@ class TestPositionMarkToMarket:
 class TestPositionCostBasisTracking:
     """Tests for weighted average cost basis tracking."""
 
-    def test_avg_entry_price_represents_cost_basis(self):
-        """Test that avg_entry_price is the cost basis."""
-        # This test documents that entry_price (via avg_entry_price property)
-        # is used for cost basis. Updates are done externally
-        # (e.g., by AccountState when adding to a position)
+    def test_entry_price_represents_cost_basis(self):
+        """Test that entry_price is the cost basis."""
+        # This test documents that entry_price is used for cost basis.
+        # Updates are done externally (e.g., by AccountState when adding to a position)
 
         pos = Position(
             asset="AAPL",
@@ -330,8 +329,7 @@ class TestPositionCostBasisTracking:
             entry_time=datetime.now(),
         )
 
-        # Verify cost basis is tracked (avg_entry_price is alias for entry_price)
-        assert pos.avg_entry_price == 150.0
+        # Verify cost basis is tracked
         assert pos.entry_price == 150.0
 
         # Simulating adding 100 shares at $160
@@ -340,8 +338,8 @@ class TestPositionCostBasisTracking:
         pos.entry_price = 155.0
         pos.quantity = 200.0
 
-        # Verify avg_entry_price property reflects updated entry_price
-        assert pos.avg_entry_price == 155.0
+        # Verify entry_price reflects updated cost basis
+        assert pos.entry_price == 155.0
 
         # Now verify P&L is based on weighted average
         pos.current_price = 160.0

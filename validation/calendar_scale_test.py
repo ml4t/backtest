@@ -13,7 +13,7 @@ import time
 import numpy as np
 import polars as pl
 
-from ml4t.backtest import Engine, Strategy, DataFeed, OrderSide
+from ml4t.backtest._validation_imports import Engine, Strategy, DataFeed, OrderSide
 from ml4t.backtest.config import BacktestConfig, DataFrequency
 
 

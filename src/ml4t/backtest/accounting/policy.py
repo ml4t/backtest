@@ -272,9 +272,6 @@ class UnifiedAccountPolicy(AccountPolicy):
     def from_config(cls, config: BacktestConfig) -> UnifiedAccountPolicy:
         """Create policy from BacktestConfig.
 
-        Handles both new-style (allow_short_selling, allow_leverage) and
-        deprecated (account_type) configuration.
-
         Args:
             config: BacktestConfig instance
 
