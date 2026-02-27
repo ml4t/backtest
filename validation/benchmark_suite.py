@@ -568,18 +568,15 @@ def benchmark_ml4t(
     import polars as pl
 
     from ml4t.backtest._validation_imports import (
+        BacktestConfig,
         DataFeed,
         Engine,
-        ExecutionMode,
-        NoCommission,
-        NoSlippage,
-        PercentageCommission,
-        PercentageSlippage,
         Strategy,
     )
+    from ml4t.backtest.config import CommissionModel, SlippageModel
 
-    # Select execution mode
-    exec_mode = ExecutionMode.NEXT_BAR if execution_mode == "next_bar" else ExecutionMode.SAME_BAR
+    # Select profile by execution style
+    profile_name = "backtrader" if execution_mode == "next_bar" else "vectorbt"
     framework_name = (
         "ml4t.backtest" if execution_mode == "same_bar" else "ml4t.backtest (backtrader-mode)"
     )
@@ -671,25 +668,40 @@ def benchmark_ml4t(
                     if target_qty != 0:
                         broker.submit_order(asset_name, target_qty)
 
-    # Set up commission/slippage
-    commission = (
-        PercentageCommission(config.commission_pct) if config.commission_pct > 0 else NoCommission()
-    )
-    slippage = PercentageSlippage(config.slippage_pct) if config.slippage_pct > 0 else NoSlippage()
+    def build_ml4t_config(no_costs: bool) -> BacktestConfig:
+        cfg = BacktestConfig.from_preset(profile_name)
+        cfg.initial_cash = 1e15  # Unlimited cash to eliminate margin rejections
+        cfg.allow_short_selling = True
+        cfg.allow_leverage = True
+        if no_costs:
+            cfg.commission_model = CommissionModel.NONE
+            cfg.commission_rate = 0.0
+            cfg.slippage_model = SlippageModel.NONE
+            cfg.slippage_rate = 0.0
+        else:
+            if config.commission_pct > 0:
+                cfg.commission_model = CommissionModel.PERCENTAGE
+                cfg.commission_rate = config.commission_pct
+            else:
+                cfg.commission_model = CommissionModel.NONE
+                cfg.commission_rate = 0.0
+            if config.slippage_pct > 0:
+                cfg.slippage_model = SlippageModel.PERCENTAGE
+                cfg.slippage_rate = config.slippage_pct
+            else:
+                cfg.slippage_model = SlippageModel.NONE
+                cfg.slippage_rate = 0.0
+        return cfg
 
     # Warm-up run (smaller data)
     n_warmup = min(1000, config.n_bars // 10)
     warmup_prices = prices_pl.head(n_warmup * config.n_assets)
     warmup_signals = signals_pl.filter(pl.col("timestamp") <= dates[n_warmup])
     warmup_feed = DataFeed(prices_df=warmup_prices, signals_df=warmup_signals)
-    warmup_engine = Engine(
+    warmup_engine = Engine.from_config(
         warmup_feed,
         TopBottomStrategy(config.top_n, config.bottom_n, config.stop_loss, config.take_profit),
-        initial_cash=1e15,  # Unlimited cash to eliminate margin rejections
-        allow_short_selling=True, allow_leverage=True,
-        commission_model=NoCommission(),
-        slippage_model=NoSlippage(),
-        execution_mode=exec_mode,
+        config=build_ml4t_config(no_costs=True),
     )
     _ = warmup_engine.run()
 
@@ -703,14 +715,10 @@ def benchmark_ml4t(
         config.top_n, config.bottom_n, config.stop_loss, config.take_profit
     )
 
-    engine = Engine(
+    engine = Engine.from_config(
         feed,
         strategy,
-        initial_cash=1e15,  # Unlimited cash to eliminate margin rejections
-        allow_short_selling=True, allow_leverage=True,
-        commission_model=commission,
-        slippage_model=slippage,
-        execution_mode=exec_mode,
+        config=build_ml4t_config(no_costs=False),
     )
 
     results = engine.run()
@@ -728,7 +736,7 @@ def benchmark_ml4t(
                 {
                     "timestamp": t.entry_time,
                     "exit_time": t.exit_time,
-                    "asset": t.asset,
+                    "asset": t.symbol,
                     "side": "long" if t.quantity > 0 else "short",
                     "quantity": abs(t.quantity),
                     "entry_price": t.entry_price,
