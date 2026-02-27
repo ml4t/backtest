@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ..types import OrderSide, OrderType
 from ..risk.types import ActionType
+from ..types import OrderSide, OrderType
 from .shared import SubmitOrderOptions, reason_to_exit_reason
 
 

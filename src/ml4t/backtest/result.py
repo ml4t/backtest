@@ -531,6 +531,19 @@ class BacktestResult:
             result["trade_analyzer"] = self.trade_analyzer
         return result
 
+    # Dict-like access keeps validation scripts and older notebook code working.
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.to_dict().get(key, default)
+
+    def keys(self):
+        return self.to_dict().keys()
+
+    def items(self):
+        return self.to_dict().items()
+
     def to_parquet(
         self,
         path: str | Path,

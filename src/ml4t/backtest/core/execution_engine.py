@@ -107,7 +107,8 @@ class ExecutionEngine:
                 else:
                     broker._update_partial_order(order)
             elif (
-                not broker.reject_on_insufficient_cash and "insufficient" in rejection_reason.lower()
+                not broker.reject_on_insufficient_cash
+                and "insufficient" in rejection_reason.lower()
             ):
                 if broker.partial_fills_allowed and broker._try_partial_fill(order, fill_price):
                     filled_orders.append(order)

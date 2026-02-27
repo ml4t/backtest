@@ -14,9 +14,26 @@ except ImportError:
     __version__ = "0.0.0.dev0"
 
 from .broker import Broker
-from .config import BacktestConfig, Mode
+from .config import (
+    BacktestConfig,
+    InitialHwmSource,
+    Mode,
+    RebalanceMode,
+    WaterMarkSource,
+)
 from .datafeed import DataFeed
 from .engine import Engine, run_backtest
+from .execution.impact import LinearImpact
+from .execution.limits import VolumeParticipationLimit
+from .execution.rebalancer import RebalanceConfig, TargetWeightExecutor
+from .models import (
+    FixedSlippage,
+    NoCommission,
+    NoSlippage,
+    PercentageCommission,
+    PercentageSlippage,
+    PerShareCommission,
+)
 from .result import BacktestResult
 
 # Risk management rules (position-level)
@@ -38,6 +55,8 @@ from .types import (
     Trade,
 )
 
+TrailHwmSource = WaterMarkSource
+
 __all__ = [
     # Core API
     "DataFeed",
@@ -48,6 +67,20 @@ __all__ = [
     "BacktestConfig",
     "Mode",
     "BacktestResult",
+    "NoCommission",
+    "PercentageCommission",
+    "PerShareCommission",
+    "NoSlippage",
+    "FixedSlippage",
+    "PercentageSlippage",
+    "VolumeParticipationLimit",
+    "LinearImpact",
+    "RebalanceConfig",
+    "TargetWeightExecutor",
+    "WaterMarkSource",
+    "TrailHwmSource",
+    "InitialHwmSource",
+    "RebalanceMode",
     # Canonical domain types
     "OrderType",
     "OrderSide",

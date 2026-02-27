@@ -390,6 +390,11 @@ class Trade:
         """Return True if this is an open (mark-to-market) trade."""
         return self.status == "open"
 
+    @property
+    def commission(self) -> float:
+        """Backward-compat alias for validation scripts expecting `commission`."""
+        return self.fees
+
 
 @dataclass
 class PartialExit:

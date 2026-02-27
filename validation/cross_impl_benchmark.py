@@ -40,11 +40,10 @@ except ImportError:
 # Import frameworks
 try:
     from ml4t.backtest import (
+        BacktestConfig,
         Broker,
         DataFeed,
         Engine,
-        PercentageCommission,
-        PercentageSlippage,
         StopFillMode,
         Strategy,
     )
@@ -505,21 +504,25 @@ def run_ml4t_backtest(
     # Create DataFeed
     feed = DataFeed(prices_df=prices_with_ts, signals_df=signals_with_ts)
 
-    # Create commission/slippage models
-    commission_model = PercentageCommission(commission) if commission > 0 else None
-    slippage_model = PercentageSlippage(slippage) if slippage > 0 else None
+    from ml4t.backtest.config import CommissionModel, SlippageModel
 
-    # Create engine with CLOSE_PRICE fill mode to match VBT Pro default
-    # VBT Pro default (StopExitPrice.Stop/Close): stops fill at bar's close price
-    # Use STOP_PRICE only if matching VBT Pro with StopExitPrice.HardStop
-    engine = Engine(
-        feed=feed,
-        strategy=strategy,
-        initial_cash=initial_cash,
-        commission_model=commission_model,
-        slippage_model=slippage_model,
-        stop_fill_mode=StopFillMode.STOP_PRICE,
-    )
+    config = BacktestConfig.from_preset("vectorbt")
+    config.initial_cash = initial_cash
+    config.stop_fill_mode = StopFillMode.STOP_PRICE
+    if commission > 0:
+        config.commission_model = CommissionModel.PERCENTAGE
+        config.commission_rate = commission
+    else:
+        config.commission_model = CommissionModel.NONE
+        config.commission_rate = 0.0
+    if slippage > 0:
+        config.slippage_model = SlippageModel.PERCENTAGE
+        config.slippage_rate = slippage
+    else:
+        config.slippage_model = SlippageModel.NONE
+        config.slippage_rate = 0.0
+
+    engine = Engine.from_config(feed=feed, strategy=strategy, config=config)
 
     # Run with timing
     gc.collect()
