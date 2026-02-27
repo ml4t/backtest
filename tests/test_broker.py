@@ -200,7 +200,7 @@ class TestClosePosition:
 
 
 class TestIsExitOrder:
-    """Test _is_exit_order internal method."""
+    """Test ExecutionEngine._is_exit_order internal method."""
 
     def test_no_position_is_not_exit(self, broker):
         """Test order with no position is not exit."""
@@ -210,7 +210,7 @@ class TestIsExitOrder:
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        assert broker._is_exit_order(order) is False
+        assert broker._execution_engine._is_exit_order(order) is False
 
     def test_sell_with_long_is_exit(self, broker_with_position):
         """Test sell order with long position is exit."""
@@ -220,7 +220,7 @@ class TestIsExitOrder:
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is True
+        assert broker_with_position._execution_engine._is_exit_order(order) is True
 
     def test_sell_full_position_is_exit(self, broker_with_position):
         """Test sell order that flattens is exit."""
@@ -230,7 +230,7 @@ class TestIsExitOrder:
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is True
+        assert broker_with_position._execution_engine._is_exit_order(order) is True
 
     def test_sell_reversal_is_not_exit(self, broker_with_position):
         """Test sell that reverses position is not exit."""
@@ -240,7 +240,7 @@ class TestIsExitOrder:
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is False
+        assert broker_with_position._execution_engine._is_exit_order(order) is False
 
     def test_buy_with_long_is_not_exit(self, broker_with_position):
         """Test buy with long position is not exit (adding)."""
@@ -250,7 +250,7 @@ class TestIsExitOrder:
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        assert broker_with_position._is_exit_order(order) is False
+        assert broker_with_position._execution_engine._is_exit_order(order) is False
 
     def test_buy_with_short_is_exit(self, broker):
         """Test buy with short position is exit."""
@@ -269,7 +269,7 @@ class TestIsExitOrder:
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        assert broker._is_exit_order(order) is True
+        assert broker._execution_engine._is_exit_order(order) is True
 
 
 class TestContractSpec:

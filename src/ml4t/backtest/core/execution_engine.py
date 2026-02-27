@@ -17,6 +17,23 @@ class ExecutionEngine:
         else:
             self._process_orders_fifo(use_open)
 
+    def _is_exit_order(self, order) -> bool:
+        """Check if an order reduces an existing position without reversing."""
+        broker = self.broker
+        pos = broker.positions.get(order.asset)
+        if pos is None or pos.quantity == 0:
+            return False
+
+        signed_qty = order.quantity if order.side.name == "BUY" else -order.quantity
+
+        if pos.quantity > 0 and signed_qty < 0:
+            new_qty = pos.quantity + signed_qty
+            return new_qty >= 0
+        if pos.quantity < 0 and signed_qty > 0:
+            new_qty = pos.quantity + signed_qty
+            return new_qty <= 0
+        return False
+
     def _process_orders_exit_first(self, use_open: bool = False):
         broker = self.broker
         fill = broker._fill_engine
@@ -26,7 +43,7 @@ class ExecutionEngine:
         for order in broker.pending_orders[:]:
             if broker.execution_mode.value == "next_bar" and order in broker._orders_this_bar:
                 continue
-            if broker._is_exit_order(order):
+            if self._is_exit_order(order):
                 exit_orders.append(order)
             else:
                 entry_orders.append(order)
@@ -77,7 +94,7 @@ class ExecutionEngine:
         if price is None:
             return
 
-        is_exit = broker._is_exit_order(order)
+        is_exit = self._is_exit_order(order)
 
         if is_exit:
             fill_price = fill.check_fill(order, price)

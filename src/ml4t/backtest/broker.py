@@ -1241,40 +1241,6 @@ class Broker:
         """Get pending orders, optionally filtered by asset."""
         return self._order_book.get_pending_orders(asset=asset)
 
-    def _is_exit_order(self, order: Order) -> bool:
-        """Check if order is an exit (reducing existing position).
-
-        Exit orders are:
-        - SELL when we have a long position (reducing long)
-        - BUY when we have a short position (covering short)
-        - Does NOT reverse the position
-
-        Args:
-            order: Order to check
-
-        Returns:
-            True if order is reducing an existing position, False otherwise
-        """
-        pos = self.positions.get(order.asset)
-        if pos is None or pos.quantity == 0:
-            return False  # No position, so this is entry, not exit
-
-        # Calculate signed quantity delta
-        signed_qty = order.quantity if order.side == OrderSide.BUY else -order.quantity
-
-        # Check if opposite sign (reducing) and doesn't reverse
-        if pos.quantity > 0 and signed_qty < 0:
-            # Long position, sell order
-            new_qty = pos.quantity + signed_qty
-            return new_qty >= 0  # Exit if still long or flat, not reversal
-        elif pos.quantity < 0 and signed_qty > 0:
-            # Short position, buy order
-            new_qty = pos.quantity + signed_qty
-            return new_qty <= 0  # Exit if still short or flat, not reversal
-        else:
-            # Same sign - adding to position, not exiting
-            return False
-
     def _process_pending_exits(self) -> list[Order]:
         """Process pending exits from NEXT_BAR_OPEN mode.
 
