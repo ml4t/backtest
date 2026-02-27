@@ -162,7 +162,7 @@ def run_comparison(prices_df: pd.DataFrame, entries: np.ndarray,
     import vectorbtpro as vbt
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed,
         Engine,
         ExecutionMode,

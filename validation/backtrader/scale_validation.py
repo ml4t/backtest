@@ -257,7 +257,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, signals: dict) -> dict:
     """Run multi-asset backtest using ml4t.backtest."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed,
         Engine,
         ExecutionMode,

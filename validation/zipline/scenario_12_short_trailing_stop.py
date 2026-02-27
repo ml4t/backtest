@@ -239,7 +239,7 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     """ml4t.backtest trailing stop for SHORT positions."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed,
         Engine,
         ExecutionMode,

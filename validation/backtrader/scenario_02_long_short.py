@@ -204,7 +204,7 @@ def run_ml4t_backtest(
     """Run backtest using ml4t.backtest with next-bar execution."""
     import polars as pl
 
-    from ml4t.backtest import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
+    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
 
     prices_pl = pl.DataFrame(
         {

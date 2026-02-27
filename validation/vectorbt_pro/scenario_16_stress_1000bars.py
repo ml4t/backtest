@@ -174,7 +174,7 @@ def run_ml4t(prices_df: pd.DataFrame, entries: np.ndarray) -> dict:
     """ml4t.backtest stress test with TSL."""
     import polars as pl
 
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy,
     )
     from ml4t.backtest.risk.position import TrailingStop

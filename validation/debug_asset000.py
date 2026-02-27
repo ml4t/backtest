@@ -74,7 +74,7 @@ def main():
 
     # Run ml4t
     from datetime import datetime, timedelta
-    from ml4t.backtest import Broker, OrderSide, TrailHwmSource, StopFillMode, InitialHwmSource
+    from ml4t.backtest._validation_imports import Broker, OrderSide, TrailHwmSource, StopFillMode, InitialHwmSource
     from ml4t.backtest.models import PercentageCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

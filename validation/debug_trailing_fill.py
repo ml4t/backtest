@@ -13,7 +13,7 @@ import pandas as pd
 
 def run_ml4t_debug():
     """Run ml4t.backtest with debug output."""
-    from ml4t.backtest import Broker, Order, OrderSide, OrderStatus, OrderType, TrailHwmSource
+    from ml4t.backtest._validation_imports import Broker, Order, OrderSide, OrderStatus, OrderType, TrailHwmSource
     from ml4t.backtest.models import NoCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

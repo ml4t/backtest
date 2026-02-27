@@ -6,12 +6,10 @@ import pytest
 
 from ml4t.backtest import (
     Broker,
-    NoCommission,
-    NoSlippage,
     OrderSide,
-    RebalanceConfig,
-    TargetWeightExecutor,
 )
+from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
+from ml4t.backtest.models import NoCommission, NoSlippage
 
 
 class TestRebalanceConfig:

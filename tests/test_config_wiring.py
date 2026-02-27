@@ -17,11 +17,9 @@ from ml4t.backtest import (
     BacktestConfig,
     Broker,
     ExecutionMode,
-    FillOrdering,
-    NoCommission,
-    NoSlippage,
-    ShareType,
 )
+from ml4t.backtest.config import FillOrdering, ShareType
+from ml4t.backtest.models import NoCommission, NoSlippage
 from ml4t.backtest.types import OrderSide
 
 # ---------------------------------------------------------------------------

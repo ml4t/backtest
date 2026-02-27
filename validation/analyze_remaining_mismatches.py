@@ -59,7 +59,7 @@ def run_vbt_pro(data: dict, n_bars: int, trail_pct: float = 0.03):
 
 
 def run_ml4t(data: dict, n_bars: int, trail_pct: float = 0.03):
-    from ml4t.backtest import Broker, OrderSide, TrailHwmSource, StopFillMode
+    from ml4t.backtest._validation_imports import Broker, OrderSide, TrailHwmSource, StopFillMode
     from ml4t.backtest.models import PercentageCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

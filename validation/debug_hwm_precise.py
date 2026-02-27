@@ -85,7 +85,7 @@ def debug_vbt_pro():
 def debug_ml4t():
     """Debug ml4t HWM behavior for asset_038."""
     from datetime import datetime, timedelta
-    from ml4t.backtest import Broker, OrderSide, TrailHwmSource, StopFillMode, InitialHwmSource
+    from ml4t.backtest._validation_imports import Broker, OrderSide, TrailHwmSource, StopFillMode, InitialHwmSource
     from ml4t.backtest.models import PercentageCommission, PercentageSlippage
     from ml4t.backtest.risk.position import TrailingStop
 

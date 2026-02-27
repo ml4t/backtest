@@ -39,7 +39,7 @@ except ImportError:
 
 # Import frameworks
 try:
-    from ml4t.backtest import (
+    from ml4t.backtest._validation_imports import (
         BacktestConfig,
         Broker,
         DataFeed,
