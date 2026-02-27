@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from .config import (
-    ExecutionMode as ConfigExecutionMode,
-)
 from .config import (
     FillOrdering,
     InitialHwmSource,
@@ -18,11 +14,12 @@ from .config import (
     TrailStopTiming,
     WaterMarkSource,
 )
-from .config import (
-    StopFillMode as ConfigStopFillMode,
-)
-from .config import (
-    StopLevelBasis as ConfigStopLevelBasis,
+from .core import (
+    ExecutionEngine,
+    OrderBook,
+    PortfolioLedger,
+    RiskEngine,
+    SubmitOrderOptions,
 )
 from .execution.fill_executor import FillExecutor
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
@@ -30,7 +27,6 @@ from .types import (
     AssetTradingStats,
     ContractSpec,
     ExecutionMode,
-    ExitReason,
     Fill,
     Order,
     OrderSide,
@@ -46,48 +42,6 @@ if TYPE_CHECKING:
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
     from .execution import ExecutionLimits, MarketImpactModel
-
-
-@dataclass
-class _SubmitOrderOptions:
-    """Internal options for submit_order behavior.
-
-    Used to control special cases like deferred exits that need
-    to bypass the normal NEXT_BAR mode order deferral.
-    """
-
-    eligible_in_next_bar_mode: bool = False
-    """If True, order is eligible for immediate execution even in NEXT_BAR mode.
-
-    This is used for deferred exits that should execute at the next bar's open,
-    not be deferred to the bar after that.
-    """
-
-
-def _reason_to_exit_reason(reason: str) -> ExitReason:
-    """Map reason string to ExitReason enum.
-
-    Used when setting order._exit_reason from risk rule action.reason.
-
-    Args:
-        reason: Human-readable reason string (e.g., "stop_loss_5.0%")
-
-    Returns:
-        Corresponding ExitReason enum value
-    """
-    reason_lower = reason.lower()
-    if "stop_loss" in reason_lower:
-        return ExitReason.STOP_LOSS
-    elif "take_profit" in reason_lower:
-        return ExitReason.TAKE_PROFIT
-    elif "trailing" in reason_lower:
-        return ExitReason.TRAILING_STOP
-    elif "time" in reason_lower:
-        return ExitReason.TIME_STOP
-    elif "end_of_data" in reason_lower:
-        return ExitReason.END_OF_DATA
-    else:
-        return ExitReason.SIGNAL
 
 
 class Broker:
@@ -224,6 +178,12 @@ class Broker:
         self._session_config = None  # Optional SessionConfig for session boundary detection
         self._last_session_id: int | None = None  # Track current session for boundary detection
 
+        # Extracted orchestration components (Phase B1 alpha-reset)
+        self._order_book = OrderBook(self)
+        self._risk_engine = RiskEngine(self)
+        self._execution_engine = ExecutionEngine(self)
+        self._portfolio_ledger = PortfolioLedger(self)
+
     @classmethod
     def from_config(
         cls,
@@ -282,38 +242,14 @@ class Broker:
         elif config.slippage_model == SlipModelEnum.NONE:
             slippage_model = NoSlippage()
 
-        # Map config execution mode to types.ExecutionMode
-        execution_mode = (
-            ExecutionMode.SAME_BAR
-            if config.execution_mode == ConfigExecutionMode.SAME_BAR
-            else ExecutionMode.NEXT_BAR
-        )
-
-        # Map config stop fill mode to types.StopFillMode
-        stop_fill_mode_map = {
-            ConfigStopFillMode.STOP_PRICE: StopFillMode.STOP_PRICE,
-            ConfigStopFillMode.CLOSE_PRICE: StopFillMode.CLOSE_PRICE,
-            ConfigStopFillMode.NEXT_BAR_OPEN: StopFillMode.NEXT_BAR_OPEN,
-        }
-        stop_fill_mode = stop_fill_mode_map.get(config.stop_fill_mode, StopFillMode.STOP_PRICE)
-
-        # Map config stop level basis to types.StopLevelBasis
-        stop_level_basis_map = {
-            ConfigStopLevelBasis.FILL_PRICE: StopLevelBasis.FILL_PRICE,
-            ConfigStopLevelBasis.SIGNAL_PRICE: StopLevelBasis.SIGNAL_PRICE,
-        }
-        stop_level_basis = stop_level_basis_map.get(
-            config.stop_level_basis, StopLevelBasis.FILL_PRICE
-        )
-
         return cls(
             initial_cash=config.initial_cash,
             commission_model=commission_model,
             slippage_model=slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
-            execution_mode=execution_mode,
-            stop_fill_mode=stop_fill_mode,
-            stop_level_basis=stop_level_basis,
+            execution_mode=config.execution_mode,
+            stop_fill_mode=config.stop_fill_mode,
+            stop_level_basis=config.stop_level_basis,
             trail_hwm_source=config.trail_hwm_source,
             initial_hwm_source=config.initial_hwm_source,
             trail_stop_timing=config.trail_stop_timing,
@@ -554,12 +490,7 @@ class Broker:
 
     def get_account_value(self) -> float:
         """Calculate total account value (cash + position values)."""
-        value = self.cash
-        for asset, pos in self.positions.items():
-            price = self._current_prices.get(asset, pos.entry_price)
-            multiplier = self.get_multiplier(asset)
-            value += pos.quantity * price * multiplier
-        return value
+        return self._portfolio_ledger.get_account_value()
 
     def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
         """Get all rejected orders, optionally filtered by asset.
@@ -570,10 +501,7 @@ class Broker:
         Returns:
             List of rejected Order objects with rejection_reason populated
         """
-        rejected = [o for o in self.orders if o.status == OrderStatus.REJECTED]
-        if asset is not None:
-            rejected = [o for o in rejected if o.asset == asset]
-        return rejected
+        return self._portfolio_ledger.get_rejected_orders(asset=asset)
 
     @property
     def last_rejection_reason(self) -> str | None:
@@ -582,8 +510,7 @@ class Broker:
         Returns:
             Rejection reason string, or None if no orders have been rejected
         """
-        rejected = [o for o in self.orders if o.status == OrderStatus.REJECTED]
-        return rejected[-1].rejection_reason if rejected else None
+        return self._portfolio_ledger.last_rejection_reason
 
     # === Risk Management ===
 
@@ -665,82 +592,7 @@ class Broker:
         Called by Engine before processing orders. Returns list of exit orders.
         Handles defer_fill=True by storing pending exits for next bar.
         """
-        from .risk.types import ActionType
-
-        exit_orders = []
-
-        for asset, pos in list(self.positions.items()):
-            rules = self._get_position_rules(asset)
-            if rules is None:
-                continue
-
-            price = self._current_prices.get(asset)
-            if price is None:
-                continue
-
-            # Build state and evaluate
-            state = self._build_position_state(pos, price)
-            action = rules.evaluate(state)
-
-            if action.action == ActionType.EXIT_FULL:
-                if action.defer_fill:
-                    # NEXT_BAR_OPEN mode: defer exit to next bar
-                    # Store pending exit info (will be processed at next bar's open)
-                    self._pending_exits[asset] = {
-                        "reason": action.reason,
-                        "pct": 1.0,
-                        "quantity": pos.quantity,
-                        "fill_price": action.fill_price,  # Preserve for STOP_PRICE mode
-                    }
-                else:
-                    # Generate full exit order immediately
-                    # For STOP_PRICE mode, risk exits should fill on trigger bar even in NEXT_BAR mode
-                    order = self.submit_order(
-                        asset,
-                        -pos.quantity,
-                        order_type=OrderType.MARKET,
-                        _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
-                    )
-                    if order:
-                        order._risk_exit_reason = action.reason
-                        order._exit_reason = _reason_to_exit_reason(action.reason)
-                        # Store fill price for stop/limit triggered exits
-                        # This is the price at which the stop/limit was triggered
-                        order._risk_fill_price = action.fill_price
-                        exit_orders.append(order)
-                        # VBT Pro compatibility: prevent same-bar re-entry
-                        self._stop_exits_this_bar.add(asset)
-
-            elif action.action == ActionType.EXIT_PARTIAL:
-                if action.defer_fill:
-                    # NEXT_BAR_OPEN mode: defer partial exit to next bar
-                    exit_qty = abs(pos.quantity) * action.pct
-                    if exit_qty > 0:
-                        self._pending_exits[asset] = {
-                            "reason": action.reason,
-                            "pct": action.pct,
-                            "quantity": exit_qty if pos.quantity > 0 else -exit_qty,
-                            "fill_price": action.fill_price,  # Preserve for STOP_PRICE mode
-                        }
-                else:
-                    # Generate partial exit order immediately
-                    # For STOP_PRICE mode, risk exits should fill on trigger bar even in NEXT_BAR mode
-                    exit_qty = abs(pos.quantity) * action.pct
-                    if exit_qty > 0:
-                        actual_qty = -exit_qty if pos.quantity > 0 else exit_qty
-                        order = self.submit_order(
-                            asset,
-                            actual_qty,
-                            order_type=OrderType.MARKET,
-                            _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
-                        )
-                        if order:
-                            order._risk_exit_reason = action.reason
-                            order._exit_reason = _reason_to_exit_reason(action.reason)
-                            order._risk_fill_price = action.fill_price
-                            exit_orders.append(order)
-
-        return exit_orders
+        return self._risk_engine.evaluate_position_rules()
 
     def submit_order(
         self,
@@ -751,7 +603,7 @@ class Broker:
         limit_price: float | None = None,
         stop_price: float | None = None,
         trail_amount: float | None = None,
-        _options: _SubmitOrderOptions | None = None,
+        _options: SubmitOrderOptions | None = None,
     ) -> Order | None:
         """Submit a new order to the broker.
 
@@ -787,53 +639,16 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
-        if side is None:
-            if quantity == 0:
-                return None
-            side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
-        # Always normalize quantity to positive (Bug #3 fix)
-        quantity = abs(quantity)
-        if quantity == 0:
-            return None
-
-        # VBT Pro compatibility: prevent same-bar re-entry after stop exit
-        # When a stop/trail exit occurs, don't allow new entry until next bar
-        # This applies to BOTH BUY (long entry) AND SELL (short entry) orders
-        # when there's no existing position (i.e., this is a new entry, not a close)
-        if asset in self._stop_exits_this_bar:
-            # Check if this is a new entry (no existing position)
-            existing_pos = self.positions.get(asset)
-            if existing_pos is None:
-                return None  # Silently reject entry on same bar as stop exit
-
-        self._order_counter += 1
-        order = Order(
+        return self._order_book.submit_order(
             asset=asset,
-            side=side,
             quantity=quantity,
+            side=side,
             order_type=order_type,
             limit_price=limit_price,
             stop_price=stop_price,
             trail_amount=trail_amount,
-            order_id=f"ORD-{self._order_counter}",
-            created_at=self._current_time,
+            options=_options,
         )
-
-        # Capture signal price (close at order time) for stop level calculation
-        # This is used when stop_level_basis is SIGNAL_PRICE (Backtrader behavior)
-        order._signal_price = self._current_prices.get(asset)
-
-        self.orders.append(order)
-        self.pending_orders.append(order)
-
-        # Track orders placed this bar for next-bar execution mode
-        # Bug #1 fix: Allow eligible orders (e.g., deferred exits) to skip this tracking
-        if self.execution_mode == ExecutionMode.NEXT_BAR and (
-            _options is None or not _options.eligible_in_next_bar_mode
-        ):
-            self._orders_this_bar.append(order)
-
-        return order
 
     def submit_bracket(
         self,
@@ -939,16 +754,6 @@ class Broker:
 
         return entry, tp, sl
 
-    # Phase 4.2: Whitelist updatable order fields to prevent mutation of immutable fields
-    _UPDATABLE_ORDER_FIELDS: frozenset[str] = frozenset(
-        {
-            "quantity",
-            "limit_price",
-            "stop_price",
-            "trail_amount",
-        }
-    )
-
     def update_order(self, order_id: str, **kwargs) -> bool:
         """Update pending order parameters.
 
@@ -968,28 +773,10 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
-        # Validate all fields are updatable
-        invalid_fields = set(kwargs.keys()) - self._UPDATABLE_ORDER_FIELDS
-        if invalid_fields:
-            raise ValueError(
-                f"Cannot update order fields: {invalid_fields}. "
-                f"Updatable fields: {sorted(self._UPDATABLE_ORDER_FIELDS)}"
-            )
-
-        for order in self.pending_orders:
-            if order.order_id == order_id:
-                for key, value in kwargs.items():
-                    setattr(order, key, value)
-                return True
-        return False
+        return self._order_book.update_order(order_id, **kwargs)
 
     def cancel_order(self, order_id: str) -> bool:
-        for order in self.pending_orders:
-            if order.order_id == order_id:
-                order.status = OrderStatus.CANCELLED
-                self.pending_orders.remove(order)
-                return True
-        return False
+        return self._order_book.cancel_order(order_id)
 
     def close_position(self, asset: str) -> Order | None:
         """Close an open position for the given asset.
@@ -1496,16 +1283,11 @@ class Broker:
 
     def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
-        for order in self.orders:
-            if order.order_id == order_id:
-                return order
-        return None
+        return self._order_book.get_order(order_id)
 
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
         """Get pending orders, optionally filtered by asset."""
-        if asset is None:
-            return list(self.pending_orders)
-        return [o for o in self.pending_orders if o.asset == asset]
+        return self._order_book.get_pending_orders(asset=asset)
 
     def _is_exit_order(self, order: Order) -> bool:
         """Check if order is an exit (reducing existing position).
@@ -1552,50 +1334,7 @@ class Broker:
 
         Returns list of exit orders that were created and will be filled.
         """
-        exit_orders = []
-
-        for asset, pending in list(self._pending_exits.items()):
-            pos = self.positions.get(asset)
-            if pos is None:
-                # Position no longer exists (shouldn't happen normally)
-                del self._pending_exits[asset]
-                continue
-
-            open_price = self._current_opens.get(asset)
-            if open_price is None:
-                # No open price available, skip this bar
-                continue
-
-            # Determine fill price based on stop_fill_mode
-            stored_fill_price = pending.get("fill_price")
-            if self.stop_fill_mode == StopFillMode.STOP_PRICE and stored_fill_price is not None:
-                # Use the original stop price, but check for gap-through
-                exit_side = OrderSide.SELL if pending["quantity"] > 0 else OrderSide.BUY
-                gap_price = self._check_gap_through(exit_side, stored_fill_price, open_price)
-                fill_price = gap_price if gap_price is not None else stored_fill_price
-            else:
-                # Default: fill at open price
-                fill_price = open_price
-
-            # Create exit order
-            # Bug #1 fix: Pass eligible_in_next_bar_mode=True so exit executes this bar
-            exit_qty = pending["quantity"]
-            order = self.submit_order(
-                asset,
-                -exit_qty,
-                order_type=OrderType.MARKET,
-                _options=_SubmitOrderOptions(eligible_in_next_bar_mode=True),
-            )
-            if order:
-                order._risk_exit_reason = pending["reason"]
-                order._exit_reason = _reason_to_exit_reason(pending["reason"])
-                order._risk_fill_price = fill_price
-                exit_orders.append(order)
-
-            # Remove from pending
-            del self._pending_exits[asset]
-
-        return exit_orders
+        return self._risk_engine.process_pending_exits()
 
     def _update_time(
         self,
@@ -1729,10 +1468,7 @@ class Broker:
         Args:
             use_open: If True, use open prices (for next-bar mode at bar start).
         """
-        if self.fill_ordering == FillOrdering.EXIT_FIRST:
-            self._process_orders_exit_first(use_open)
-        else:
-            self._process_orders_fifo(use_open)
+        self._execution_engine.process_orders(use_open=use_open)
 
     def _get_fill_price_for_order(self, order: Order, use_open: bool) -> float | None:
         """Get the fill price for an order based on execution mode."""
