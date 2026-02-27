@@ -28,6 +28,8 @@ from pathlib import Path
 
 import yaml
 
+from .types import ExecutionMode, StopFillMode, StopLevelBasis
+
 
 class FillTiming(str, Enum):
     """When orders are filled relative to signal generation."""
@@ -218,16 +220,6 @@ class TrailStopTiming(str, Enum):
     VBT_PRO = "vbt_pro"  # Two-pass: LAGGED check, then INTRABAR check using CLOSE only
 
 
-class ExecutionMode(str, Enum):
-    """Order execution timing mode.
-
-    Controls when orders are eligible for execution relative to signal generation.
-    """
-
-    SAME_BAR = "same_bar"  # Fill on same bar as order submission
-    NEXT_BAR = "next_bar"  # Fill on next bar after order submission
-
-
 @dataclass
 class StatsConfig:
     """Configuration for per-asset trading statistics tracking.
@@ -255,27 +247,6 @@ class StatsConfig:
     recent_window_size: int = 50
     track_session_stats: bool = True
     enabled: bool = True
-
-
-class StopFillMode(str, Enum):
-    """Price used for stop order fills.
-
-    Controls what price is used when a stop order triggers.
-    """
-
-    STOP_PRICE = "stop_price"  # Fill at stop price (if not gapped)
-    CLOSE_PRICE = "close_price"  # Fill at bar close (conservative)
-    NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open
-
-
-class StopLevelBasis(str, Enum):
-    """Reference price for calculating stop levels.
-
-    Controls what price the stop percentage/amount is applied to.
-    """
-
-    FILL_PRICE = "fill_price"  # Use actual fill price (most accurate)
-    SIGNAL_PRICE = "signal_price"  # Use price at signal time (Backtrader style)
 
 
 @dataclass
@@ -525,8 +496,73 @@ class BacktestConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: dict, preset_name: str | None = None) -> BacktestConfig:
-        """Create config from dictionary."""
+    def from_dict(
+        cls, data: dict, preset_name: str | None = None, strict: bool = True
+    ) -> BacktestConfig:
+        """Create config from dictionary.
+
+        Args:
+            data: Nested config dictionary
+            preset_name: Optional metadata label
+            strict: If True, reject unknown sections/keys
+        """
+        if not isinstance(data, dict):
+            raise TypeError(f"Config data must be a dict, got {type(data).__name__}")
+
+        if strict:
+            allowed_sections = {
+                "account",
+                "execution",
+                "stops",
+                "position_sizing",
+                "signals",
+                "commission",
+                "slippage",
+                "cash",
+                "orders",
+            }
+            unknown_sections = set(data) - allowed_sections
+            if unknown_sections:
+                raise ValueError(f"Unknown config section(s): {sorted(unknown_sections)}")
+
+            allowed_keys_by_section = {
+                "account": {
+                    "allow_short_selling",
+                    "allow_leverage",
+                    "initial_margin",
+                    "long_maintenance_margin",
+                    "short_maintenance_margin",
+                    "fixed_margin_schedule",
+                },
+                "execution": {"fill_timing", "execution_price", "execution_mode"},
+                "stops": {
+                    "stop_fill_mode",
+                    "stop_level_basis",
+                    "trail_hwm_source",
+                    "initial_hwm_source",
+                    "trail_stop_timing",
+                },
+                "position_sizing": {"share_type", "default_position_pct"},
+                "signals": {"signal_processing", "accumulate_positions"},
+                "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
+                "slippage": {"model", "rate", "fixed", "stop_rate"},
+                "cash": {"initial", "buffer_pct"},
+                "orders": {
+                    "reject_on_insufficient_cash",
+                    "partial_fills_allowed",
+                    "fill_ordering",
+                    "rebalance_mode",
+                },
+            }
+            for section, cfg in data.items():
+                if not isinstance(cfg, dict):
+                    raise TypeError(f"Section '{section}' must be a dict, got {type(cfg).__name__}")
+                unknown_keys = set(cfg) - allowed_keys_by_section[section]
+                if unknown_keys:
+                    raise ValueError(
+                        f"Unknown key(s) in section '{section}': {sorted(unknown_keys)}"
+                    )
+
         acct_cfg = data.get("account", {})
         exec_cfg = data.get("execution", {})
         stops_cfg = data.get("stops", {})
@@ -601,7 +637,7 @@ class BacktestConfig:
         path = Path(path)
         with open(path) as f:
             data = yaml.safe_load(f)
-        return cls.from_dict(data, preset_name=path.stem)
+        return cls.from_dict(data, preset_name=path.stem, strict=True)
 
     @classmethod
     def from_preset(cls, preset: str) -> BacktestConfig:

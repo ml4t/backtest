@@ -29,14 +29,14 @@ class OrderStatus(Enum):
     REJECTED = "rejected"
 
 
-class ExecutionMode(Enum):
+class ExecutionMode(str, Enum):
     """Order execution timing mode."""
 
     SAME_BAR = "same_bar"  # Orders fill at current bar's close (default)
     NEXT_BAR = "next_bar"  # Orders fill at next bar's open (like Backtrader)
 
 
-class StopFillMode(Enum):
+class StopFillMode(str, Enum):
     """Stop/take-profit fill price mode.
 
     Different frameworks handle stop order fills differently:
@@ -115,7 +115,7 @@ class ExitReason(str, Enum):
     END_OF_DATA = "end_of_data"  # Backtest ended with open position
 
 
-class StopLevelBasis(Enum):
+class StopLevelBasis(str, Enum):
     """Basis for calculating stop/take-profit levels.
 
     Different frameworks calculate stop levels from different reference prices:

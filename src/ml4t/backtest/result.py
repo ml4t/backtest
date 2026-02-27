@@ -584,7 +584,7 @@ class BacktestResult:
             # Filter to JSON-serializable metrics
             serializable = {}
             for k, v in self.metrics.items():
-                if isinstance(v, (int, float, str, bool, type(None))):
+                if isinstance(v, int | float | str | bool | type(None)):
                     serializable[k] = v
                 elif isinstance(v, datetime):
                     serializable[k] = v.isoformat()
@@ -859,6 +859,7 @@ def enrich_trades_with_signals(
     signal_columns: list[str] | None = None,
     timestamp_col: str = "timestamp",
     asset_col: str | None = None,
+    trades_asset_col: str | None = None,
 ) -> pl.DataFrame:
     """Enrich trades DataFrame with signal values at entry/exit times via as-of join.
 
@@ -880,6 +881,8 @@ def enrich_trades_with_signals(
         timestamp_col: Name of timestamp column in signals_df.
         asset_col: Name of asset column in signals_df for multi-asset signals.
             If None, assumes single-asset or already filtered.
+        trades_asset_col: Name of asset column in trades_df.
+            If None, auto-detects: "symbol" first, then "asset".
 
     Returns:
         Trades DataFrame with added columns:
@@ -921,8 +924,32 @@ def enrich_trades_with_signals(
     # Preserve original trade order (join_asof requires sorting which disrupts order)
     trades_df = trades_df.with_row_index("_original_order")
 
-    # Ensure signals are sorted by timestamp for join_asof
-    signals_sorted = signals_df.sort(timestamp_col)
+    # Detect trade-side asset column when doing multi-asset enrichment
+    if asset_col and asset_col in signals_df.columns:
+        if trades_asset_col is None:
+            if "symbol" in trades_df.columns:
+                trades_asset_col = "symbol"
+            elif "asset" in trades_df.columns:
+                trades_asset_col = "asset"
+            else:
+                raise ValueError(
+                    "Multi-asset enrichment requires trades_df to include 'symbol' or 'asset', "
+                    "or set trades_asset_col explicitly."
+                )
+        if trades_asset_col not in trades_df.columns:
+            raise ValueError(f"trades_asset_col '{trades_asset_col}' not found in trades_df")
+
+    # Ensure sortedness for join_asof
+    signals_sorted = (
+        signals_df.sort([asset_col, timestamp_col])
+        if asset_col and asset_col in signals_df.columns
+        else signals_df.sort(timestamp_col)
+    )
+    trades_sorted = (
+        trades_df.sort([trades_asset_col, "entry_time"])
+        if trades_asset_col
+        else trades_df.sort("entry_time")
+    )
 
     # Join for entry signals
     entry_cols = [timestamp_col] + signal_columns
@@ -935,17 +962,18 @@ def enrich_trades_with_signals(
 
     if asset_col and asset_col in signals_df.columns:
         # Multi-asset: join on both timestamp and asset
-        result = trades_df.join_asof(
+        result = trades_sorted.join_asof(
             entry_signals,
             left_on="entry_time",
             right_on=timestamp_col,
-            by_left="asset",
+            by_left=trades_asset_col,
             by_right=asset_col,
             strategy="backward",
+            check_sortedness=False,
         )
     else:
         # Single-asset: join on timestamp only
-        result = trades_df.join_asof(
+        result = trades_sorted.join_asof(
             entry_signals,
             left_on="entry_time",
             right_on=timestamp_col,
@@ -956,18 +984,24 @@ def enrich_trades_with_signals(
     exit_signals = signals_sorted.select(entry_cols)
     exit_rename = {c: f"exit_{c}" for c in signal_columns}
     exit_signals = exit_signals.rename(exit_rename)
+    result_for_exit = (
+        result.sort([trades_asset_col, "exit_time"])
+        if trades_asset_col
+        else result.sort("exit_time")
+    )
 
     if asset_col and asset_col in signals_df.columns:
-        result = result.join_asof(
+        result = result_for_exit.join_asof(
             exit_signals,
             left_on="exit_time",
             right_on=timestamp_col,
-            by_left="asset",
+            by_left=trades_asset_col,
             by_right=asset_col,
             strategy="backward",
+            check_sortedness=False,
         )
     else:
-        result = result.join_asof(
+        result = result_for_exit.join_asof(
             exit_signals,
             left_on="exit_time",
             right_on=timestamp_col,
