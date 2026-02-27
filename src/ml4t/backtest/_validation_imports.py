@@ -15,9 +15,9 @@ from .models import (
     FixedSlippage,
     NoCommission,
     NoSlippage,
-    PerShareCommission,
     PercentageCommission,
     PercentageSlippage,
+    PerShareCommission,
 )
 from .strategy import Strategy
 from .types import (
