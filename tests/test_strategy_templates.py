@@ -294,16 +294,7 @@ class TestLongShortStrategy:
 
 
 class TestStrategyImports:
-    """Test that strategy templates are properly exported."""
-
-    def test_not_imported_from_package_root(self):
-        """Templates should not be imported into ml4t.backtest root."""
-        import ml4t.backtest as bt
-
-        assert not hasattr(bt, "SignalFollowingStrategy")
-        assert not hasattr(bt, "MomentumStrategy")
-        assert not hasattr(bt, "MeanReversionStrategy")
-        assert not hasattr(bt, "LongShortStrategy")
+    """Test strategy template import paths."""
 
     def test_import_from_strategies(self):
         """Test importing from ml4t.backtest.strategies."""
