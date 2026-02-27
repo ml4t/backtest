@@ -139,7 +139,9 @@ class RiskEngine:
             stored_fill_price = pending.get("fill_price")
             if broker.stop_fill_mode.value == "stop_price" and stored_fill_price is not None:
                 exit_side = OrderSide.SELL if pending["quantity"] > 0 else OrderSide.BUY
-                gap_price = broker._check_gap_through(exit_side, stored_fill_price, open_price)
+                gap_price = broker._fill_engine.check_gap_through(
+                    exit_side, stored_fill_price, open_price
+                )
                 fill_price = gap_price if gap_price is not None else stored_fill_price
             else:
                 fill_price = open_price

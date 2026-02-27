@@ -2771,7 +2771,7 @@ class TestStopSlippage:
         order._risk_fill_price = 95.0  # Stop triggered at $95
 
         # Get the fill price - should have 1% slippage applied
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 95.0 * (1 - 0.01) = 94.05
         assert fill_price == pytest.approx(94.05, rel=1e-6)
@@ -2801,7 +2801,7 @@ class TestStopSlippage:
         order._risk_fill_price = 105.0  # Stop triggered at $105
 
         # Get the fill price - should have 1% slippage applied (price goes up)
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 105.0 * (1 + 0.01) = 106.05
         assert fill_price == pytest.approx(106.05, rel=1e-6)
@@ -2831,7 +2831,7 @@ class TestStopSlippage:
         # Do NOT set _risk_fill_price
 
         # Get the fill price - should be the market price, no stop slippage
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 100.0 (no slippage applied to non-risk orders)
         assert fill_price == 100.0
@@ -2861,7 +2861,7 @@ class TestStopSlippage:
         order._risk_fill_price = 95.0
 
         # Get the fill price
-        fill_price = broker._check_market_fill(order, 100.0)
+        fill_price = broker._fill_engine.check_market_fill(order, 100.0)
 
         # Expected: 95.0 (exactly the risk fill price, no additional slippage)
         assert fill_price == 95.0

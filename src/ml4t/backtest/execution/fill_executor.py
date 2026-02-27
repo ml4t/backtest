@@ -100,7 +100,7 @@ class FillExecutor:
         volume = broker._current_volumes.get(order.asset)
 
         # Get effective quantity (considering partial fills from previous bars)
-        effective_quantity = broker._get_effective_quantity(order)
+        effective_quantity = broker._fill_engine.get_effective_quantity(order)
         fill_quantity = effective_quantity
 
         # Apply execution limits (volume participation)

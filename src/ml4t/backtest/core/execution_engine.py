@@ -19,6 +19,7 @@ class ExecutionEngine:
 
     def _process_orders_exit_first(self, use_open: bool = False):
         broker = self.broker
+        fill = broker._fill_engine
         exit_orders = []
         entry_orders = []
 
@@ -33,17 +34,17 @@ class ExecutionEngine:
         filled_orders: list = []
 
         for order in exit_orders:
-            price = broker._get_fill_price_for_order(order, use_open)
+            price = fill.get_fill_price_for_order(order, use_open)
             if price is None:
                 continue
-            fill_price = broker._check_fill(order, price)
+            fill_price = fill.check_fill(order, price)
             if fill_price is not None:
-                fully_filled = broker._execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
                 else:
-                    broker._update_partial_order(order)
+                    fill.update_partial_order(order)
 
         broker.account.mark_to_market(broker._current_prices)
 
@@ -71,50 +72,51 @@ class ExecutionEngine:
 
     def _process_single_order(self, order, use_open: bool, filled_orders: list) -> None:
         broker = self.broker
-        price = broker._get_fill_price_for_order(order, use_open)
+        fill = broker._fill_engine
+        price = fill.get_fill_price_for_order(order, use_open)
         if price is None:
             return
 
         is_exit = broker._is_exit_order(order)
 
         if is_exit:
-            fill_price = broker._check_fill(order, price)
+            fill_price = fill.check_fill(order, price)
             if fill_price is not None:
-                fully_filled = broker._execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
                 else:
-                    broker._update_partial_order(order)
+                    fill.update_partial_order(order)
         else:
-            broker._apply_share_rounding(order)
+            fill.apply_share_rounding(order)
             if order.quantity <= 0:
                 order.status = OrderStatus.REJECTED
                 order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
                 return
 
-            fill_price = broker._check_fill(order, price)
+            fill_price = fill.check_fill(order, price)
             if fill_price is None:
                 return
 
             valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
 
             if valid:
-                fully_filled = broker._execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
                 else:
-                    broker._update_partial_order(order)
+                    fill.update_partial_order(order)
             elif (
                 not broker.reject_on_insufficient_cash
                 and "insufficient" in rejection_reason.lower()
             ):
-                if broker.partial_fills_allowed and broker._try_partial_fill(order, fill_price):
+                if broker.partial_fills_allowed and fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
             elif broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
-                if broker._try_partial_fill(order, fill_price):
+                if fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
                 else:
