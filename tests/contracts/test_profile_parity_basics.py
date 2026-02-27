@@ -63,9 +63,24 @@ def test_profiles_enforce_expected_entry_timing_contract() -> None:
 
     assert vbt.trades[0].entry_price == 101.0  # same-bar close
     assert 110.0 < bt.trades[0].entry_price < 111.0  # next-bar open with default slippage
-    assert zl.trades[0].entry_price == 110.0  # next-bar open
+    assert 110.0 < zl.trades[0].entry_price < 111.0  # next-bar open with volume slippage
 
 
 def test_backtrader_profile_uses_signal_price_stop_basis() -> None:
     cfg = BacktestConfig.from_preset("backtrader")
     assert cfg.stop_level_basis == StopLevelBasis.SIGNAL_PRICE
+
+
+def test_backtrader_profile_parity_order_knobs() -> None:
+    cfg = BacktestConfig.from_preset("backtrader")
+    assert cfg.rebalance_headroom_pct == 0.998
+    assert cfg.missing_price_policy.value == "use_last"
+    assert cfg.late_asset_policy.value == "require_history"
+    assert cfg.late_asset_min_bars == 2
+
+
+def test_zipline_profile_parity_order_knobs() -> None:
+    cfg = BacktestConfig.from_preset("zipline")
+    assert cfg.rebalance_headroom_pct == 0.998
+    assert cfg.missing_price_policy.value == "use_last"
+    assert cfg.late_asset_policy.value == "allow"

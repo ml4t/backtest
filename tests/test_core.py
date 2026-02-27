@@ -607,27 +607,41 @@ class TestEngineFromConfig:
 
         assert results.metrics["total_slippage"] > 0
 
-    def test_from_config_fill_timing_same_bar(self):
-        """Test from_config with SAME_BAR fill timing."""
+    def test_from_config_execution_mode_same_bar(self):
+        """Test from_config with SAME_BAR execution mode."""
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
         feed = DataFeed(prices_df=prices)
         strategy = BuyAndHoldStrategy("AAPL")
 
-        config = BacktestConfig(fill_timing=FillTiming.SAME_BAR)
+        config = BacktestConfig(execution_mode=ExecutionMode.SAME_BAR)
         engine = Engine.from_config(feed, strategy, config)
 
         assert engine.execution_mode == ExecutionMode.SAME_BAR
 
-    def test_from_config_fill_timing_next_bar(self):
-        """Test from_config with NEXT_BAR_OPEN fill timing."""
+    def test_from_config_execution_mode_next_bar(self):
+        """Test from_config with NEXT_BAR execution mode."""
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
         feed = DataFeed(prices_df=prices)
         strategy = BuyAndHoldStrategy("AAPL")
 
-        config = BacktestConfig(fill_timing=FillTiming.NEXT_BAR_OPEN)
+        config = BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR)
         engine = Engine.from_config(feed, strategy, config)
 
         assert engine.execution_mode == ExecutionMode.NEXT_BAR
+
+    def test_from_config_execution_mode_takes_precedence_over_fill_timing(self):
+        """execution_mode is authoritative even if fill_timing is inconsistent."""
+        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
+        feed = DataFeed(prices_df=prices)
+        strategy = BuyAndHoldStrategy("AAPL")
+
+        config = BacktestConfig(
+            execution_mode=ExecutionMode.SAME_BAR,
+            fill_timing=FillTiming.NEXT_BAR_OPEN,
+        )
+        engine = Engine.from_config(feed, strategy, config)
+
+        assert engine.execution_mode == ExecutionMode.SAME_BAR
 
     def test_from_config_margin_account(self):
         """Test from_config with margin account."""

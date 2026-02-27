@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 from .config import (
     FillOrdering,
     InitialHwmSource,
+    LateAssetPolicy,
+    MissingPricePolicy,
     ShareType,
     StatsConfig,
     TrailStopTiming,
@@ -73,6 +75,10 @@ class Broker:
         reject_on_insufficient_cash: bool = True,
         cash_buffer_pct: float = 0.0,
         partial_fills_allowed: bool = False,
+        rebalance_headroom_pct: float = 1.0,
+        missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP,
+        late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW,
+        late_asset_min_bars: int = 1,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -101,6 +107,10 @@ class Broker:
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
         self.cash_buffer_pct = cash_buffer_pct
         self.partial_fills_allowed = partial_fills_allowed
+        self.rebalance_headroom_pct = rebalance_headroom_pct
+        self.missing_price_policy = missing_price_policy
+        self.late_asset_policy = late_asset_policy
+        self.late_asset_min_bars = late_asset_min_bars
 
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
@@ -145,6 +155,8 @@ class Broker:
         self._current_lows: dict[str, float] = {}  # low prices for limit/stop checks
         self._current_volumes: dict[str, float] = {}
         self._current_signals: dict[str, dict[str, float]] = {}
+        self._last_prices: dict[str, float] = {}
+        self._asset_bars_seen: dict[str, int] = {}
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
 
         # Risk management
@@ -214,12 +226,15 @@ class Broker:
         from .config import CommissionModel as CommModelEnum
         from .config import SlippageModel as SlipModelEnum
         from .models import (
+            CombinedCommission,
             FixedSlippage,
             NoCommission,
             NoSlippage,
             PercentageCommission,
             PercentageSlippage,
             PerShareCommission,
+            TieredCommission,
+            VolumeShareSlippage,
         )
 
         # Build commission model from config
@@ -231,6 +246,12 @@ class Broker:
                 per_share=config.commission_per_share,
                 minimum=config.commission_minimum,
             )
+        elif config.commission_model == CommModelEnum.PER_TRADE:
+            commission_model = CombinedCommission(fixed=config.commission_per_trade)
+        elif config.commission_model == CommModelEnum.TIERED:
+            commission_model = TieredCommission(
+                tiers=[(float("inf"), config.commission_rate)],
+            )
         elif config.commission_model == CommModelEnum.NONE:
             commission_model = NoCommission()
 
@@ -240,6 +261,8 @@ class Broker:
             slippage_model = PercentageSlippage(rate=config.slippage_rate)
         elif config.slippage_model == SlipModelEnum.FIXED:
             slippage_model = FixedSlippage(amount=config.slippage_fixed)
+        elif config.slippage_model == SlipModelEnum.VOLUME_BASED:
+            slippage_model = VolumeShareSlippage(impact_factor=config.slippage_rate)
         elif config.slippage_model == SlipModelEnum.NONE:
             slippage_model = NoSlippage()
 
@@ -268,6 +291,10 @@ class Broker:
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
             cash_buffer_pct=config.cash_buffer_pct,
             partial_fills_allowed=config.partial_fills_allowed,
+            rebalance_headroom_pct=config.rebalance_headroom_pct,
+            missing_price_policy=config.missing_price_policy,
+            late_asset_policy=config.late_asset_policy,
+            late_asset_min_bars=config.late_asset_min_bars,
         )
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
@@ -1188,10 +1215,31 @@ class Broker:
         sells: list[tuple[str, float]] = []  # (asset, target_value)
         buys: list[tuple[str, float]] = []  # (asset, target_value)
 
-        # Calculate target values and categorize as buys or sells
-        for asset, weight in target_weights.items():
+        scaled_weights = {
+            asset: weight * self.rebalance_headroom_pct for asset, weight in target_weights.items()
+        }
+
+        def resolve_price(asset: str) -> float | None:
             price = self._current_prices.get(asset)
-            if price is None or price <= 0:
+            if price is not None and price > 0:
+                return price
+            if self.missing_price_policy == MissingPricePolicy.USE_LAST:
+                last = self._last_prices.get(asset)
+                if last is not None and last > 0:
+                    return last
+            return None
+
+        def allows_trading(asset: str) -> bool:
+            if self.late_asset_policy != LateAssetPolicy.REQUIRE_HISTORY:
+                return True
+            return self._asset_bars_seen.get(asset, 0) >= self.late_asset_min_bars
+
+        # Calculate target values and categorize as buys or sells
+        for asset, weight in scaled_weights.items():
+            if not allows_trading(asset):
+                continue
+            price = resolve_price(asset)
+            if price is None:
                 continue
 
             target_value = portfolio_value * weight
@@ -1212,21 +1260,21 @@ class Broker:
 
         # Also close positions not in target weights
         for asset, pos in self.positions.items():
-            if pos.quantity != 0 and asset not in target_weights:
+            if pos.quantity != 0 and asset not in scaled_weights:
                 sells.append((asset, 0.0))
 
         # Process sells first (frees capital for buys)
         for asset, target_value in sells:
-            price = self._current_prices.get(asset)
-            if price and price > 0:
+            price = resolve_price(asset)
+            if price is not None:
                 order = self._order_to_target_value(asset, target_value, price, order_type, None)
                 if order:
                     orders.append(order)
 
         # Then process buys
         for asset, target_value in buys:
-            price = self._current_prices.get(asset)
-            if price and price > 0:
+            price = resolve_price(asset)
+            if price is not None:
                 order = self._order_to_target_value(asset, target_value, price, order_type, None)
                 if order:
                     orders.append(order)
@@ -1271,6 +1319,11 @@ class Broker:
         self._current_lows = lows
         self._current_volumes = volumes
         self._current_signals = signals
+
+        for asset, price in prices.items():
+            if price > 0:
+                self._last_prices[asset] = price
+                self._asset_bars_seen[asset] = self._asset_bars_seen.get(asset, 0) + 1
 
         # Clear per-bar tracking at start of new bar
         self._filled_this_bar.clear()

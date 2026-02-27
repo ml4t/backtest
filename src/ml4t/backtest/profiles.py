@@ -45,6 +45,10 @@ DEFAULT_PROFILE = {
         "partial_fills_allowed": False,
         "fill_ordering": "exit_first",
         "rebalance_mode": "incremental",
+        "rebalance_headroom_pct": 1.0,
+        "missing_price_policy": "skip",
+        "late_asset_policy": "allow",
+        "late_asset_min_bars": 1,
     },
 }
 
@@ -92,6 +96,10 @@ BACKTRADER_PROFILE = {
         "partial_fills_allowed": False,
         "fill_ordering": "fifo",
         "rebalance_mode": "snapshot",
+        "rebalance_headroom_pct": 0.998,
+        "missing_price_policy": "use_last",
+        "late_asset_policy": "require_history",
+        "late_asset_min_bars": 2,
     },
 }
 
@@ -137,6 +145,10 @@ VECTORBT_PROFILE = {
         "partial_fills_allowed": True,
         "fill_ordering": "exit_first",
         "rebalance_mode": "hybrid",
+        "rebalance_headroom_pct": 1.0,
+        "missing_price_policy": "use_last",
+        "late_asset_policy": "allow",
+        "late_asset_min_bars": 1,
     },
 }
 
@@ -183,6 +195,10 @@ ZIPLINE_PROFILE = {
         "partial_fills_allowed": True,
         "fill_ordering": "exit_first",
         "rebalance_mode": "snapshot",
+        "rebalance_headroom_pct": 0.998,
+        "missing_price_policy": "use_last",
+        "late_asset_policy": "allow",
+        "late_asset_min_bars": 1,
     },
 }
 
@@ -228,6 +244,10 @@ REALISTIC_PROFILE = {
         "partial_fills_allowed": False,
         "fill_ordering": "exit_first",
         "rebalance_mode": "incremental",
+        "rebalance_headroom_pct": 1.0,
+        "missing_price_policy": "skip",
+        "late_asset_policy": "allow",
+        "late_asset_min_bars": 1,
     },
 }
 

@@ -107,6 +107,20 @@ class RebalanceMode(str, Enum):
     HYBRID = "hybrid"
 
 
+class MissingPricePolicy(str, Enum):
+    """How target-weight rebalancing handles missing current-bar prices."""
+
+    SKIP = "skip"
+    USE_LAST = "use_last"
+
+
+class LateAssetPolicy(str, Enum):
+    """How target-weight rebalancing handles assets that start late."""
+
+    ALLOW = "allow"
+    REQUIRE_HISTORY = "require_history"
+
+
 class SignalProcessing(str, Enum):
     """How signals are processed relative to existing positions."""
 
@@ -371,6 +385,13 @@ class BacktestConfig:
                     f"initial_margin ({self.initial_margin})"
                 )
 
+        if not 0.0 < self.rebalance_headroom_pct <= 1.0:
+            issues.append(
+                f"rebalance_headroom_pct ({self.rebalance_headroom_pct}) must be in (0.0, 1.0]"
+            )
+        if self.late_asset_min_bars < 1:
+            issues.append(f"late_asset_min_bars ({self.late_asset_min_bars}) must be >= 1")
+
         # Emit warnings if requested
         if warn and issues:
             for msg in issues:
@@ -429,6 +450,10 @@ class BacktestConfig:
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
+    rebalance_headroom_pct: float = 1.0
+    missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP
+    late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW
+    late_asset_min_bars: int = 1
 
     # === Calendar & Timezone ===
     calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
@@ -492,6 +517,10 @@ class BacktestConfig:
                 "partial_fills_allowed": self.partial_fills_allowed,
                 "fill_ordering": self.fill_ordering.value,
                 "rebalance_mode": self.rebalance_mode.value,
+                "rebalance_headroom_pct": self.rebalance_headroom_pct,
+                "missing_price_policy": self.missing_price_policy.value,
+                "late_asset_policy": self.late_asset_policy.value,
+                "late_asset_min_bars": self.late_asset_min_bars,
             },
         }
 
@@ -552,6 +581,10 @@ class BacktestConfig:
                     "partial_fills_allowed",
                     "fill_ordering",
                     "rebalance_mode",
+                    "rebalance_headroom_pct",
+                    "missing_price_policy",
+                    "late_asset_policy",
+                    "late_asset_min_bars",
                 },
             }
             for section, cfg in data.items():
@@ -621,6 +654,10 @@ class BacktestConfig:
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
             fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
             rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
+            rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
+            missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),
+            late_asset_policy=LateAssetPolicy(order_cfg.get("late_asset_policy", "allow")),
+            late_asset_min_bars=order_cfg.get("late_asset_min_bars", 1),
             # Metadata
             preset_name=preset_name,
         )
@@ -717,6 +754,10 @@ class BacktestConfig:
                 "Orders:",
                 f"  Fill ordering: {self.fill_ordering.value}",
                 f"  Rebalance mode: {self.rebalance_mode.value}",
+                f"  Rebalance headroom: {self.rebalance_headroom_pct:.3f}",
+                f"  Missing price policy: {self.missing_price_policy.value}",
+                f"  Late asset policy: {self.late_asset_policy.value}",
+                f"  Late asset min bars: {self.late_asset_min_bars}",
                 f"  Reject insufficient: {self.reject_on_insufficient_cash}",
                 f"  Partial fills: {self.partial_fills_allowed}",
                 "",

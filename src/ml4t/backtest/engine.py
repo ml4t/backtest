@@ -346,25 +346,14 @@ class Engine:
         Returns:
             Configured Engine instance
         """
-        from .config import FillTiming
-
         # Create broker from config (handles all commission/slippage/account setup)
         broker = Broker.from_config(config)
-
-        # Map fill_timing to Engine's execution_mode
-        # SAME_BAR fill_timing → SAME_BAR execution
-        # NEXT_BAR_OPEN or NEXT_BAR_CLOSE → NEXT_BAR execution
-        execution_mode = (
-            ExecutionMode.SAME_BAR
-            if config.fill_timing == FillTiming.SAME_BAR
-            else ExecutionMode.NEXT_BAR
-        )
 
         # Create engine with pre-configured broker
         engine = cls.__new__(cls)
         engine.feed = feed
         engine.strategy = strategy
-        engine.execution_mode = execution_mode
+        engine.execution_mode = config.execution_mode
         engine.stop_fill_mode = broker.stop_fill_mode
         engine.stop_level_basis = broker.stop_level_basis
         engine.config = config
