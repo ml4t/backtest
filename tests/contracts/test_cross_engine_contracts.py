@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -22,12 +23,26 @@ FRAMEWORK_PROFILES = {
     "zipline": "zipline",
 }
 
+FRAMEWORK_IMPORTS = {
+    "vectorbt_oss": "vectorbt",
+    "backtrader": "backtrader",
+    "zipline": "zipline",
+}
+
+
+def _framework_available(framework: str) -> bool:
+    module_name = FRAMEWORK_IMPORTS[framework]
+    return importlib.util.find_spec(module_name) is not None
+
 
 @pytest.mark.requires_comparison
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.parametrize("framework", ["vectorbt_oss", "backtrader", "zipline"])
 def test_cross_engine_scenario_01_contract(framework: str, tmp_path: Path) -> None:
+    if not _framework_available(framework):
+        pytest.skip(f"{framework} dependencies not installed in this environment")
+
     venv_dir = PROJECT_ROOT / FRAMEWORK_VENVS[framework]
     inproc = os.getenv("ML4T_COMPARISON_INPROC") == "1"
 
