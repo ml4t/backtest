@@ -2,13 +2,19 @@
 
 ML4T Backtest supports multiple order types for realistic simulation.
 
+Orders are submitted from a strategy using `broker.submit_order(...)`.
+
 ## Market Orders
 
-Execute at the next bar's open price:
+```python
+from ml4t.backtest.types import OrderType
+```
+
+Execute at market according to the configured execution mode/profile:
 
 ```python
-self.buy(size=100)  # Market buy
-self.sell(size=100)  # Market sell
+broker.submit_order("AAPL", 100, order_type=OrderType.MARKET)   # buy
+broker.submit_order("AAPL", -100, order_type=OrderType.MARKET)  # sell
 ```
 
 ## Limit Orders
@@ -16,9 +22,12 @@ self.sell(size=100)  # Market sell
 Execute only if price reaches the limit:
 
 ```python
-from ml4t.backtest import OrderType
-
-self.buy(size=100, price=99.50, order_type=OrderType.LIMIT)
+broker.submit_order(
+    "AAPL",
+    100,
+    order_type=OrderType.LIMIT,
+    limit_price=99.50,
+)
 ```
 
 - **Buy limit**: Fills if price drops to or below limit
@@ -29,22 +38,27 @@ self.buy(size=100, price=99.50, order_type=OrderType.LIMIT)
 Trigger a market order when stop price is reached:
 
 ```python
-self.buy(size=100, stop=101.00, order_type=OrderType.STOP)
+broker.submit_order(
+    "AAPL",
+    -100,
+    order_type=OrderType.STOP,
+    stop_price=95.00,
+)
 ```
 
 - **Buy stop**: Triggers when price rises to stop (breakout entry)
 - **Sell stop**: Triggers when price falls to stop (stop loss)
 
-## Stop-Limit Orders
+## Trailing Stop Orders
 
-Trigger a limit order when stop is reached:
+Trailing stops dynamically update the stop level as price moves favorably.
 
 ```python
-self.buy(
-    size=100,
-    stop=101.00,
-    price=101.50,
-    order_type=OrderType.STOP_LIMIT
+broker.submit_order(
+    "AAPL",
+    -100,
+    order_type=OrderType.TRAILING_STOP,
+    trail_amount=2.50,
 )
 ```
 
@@ -60,12 +74,12 @@ This matches real broker behavior and prevents unrealistic fills.
 ## Order Management
 
 ```python
-# Set stop loss after entry
-self.set_stop(price=95.00)
+broker.get_order(order_id)
+broker.get_pending_orders()
+broker.update_order(order_id, limit_price=100.0)
+broker.cancel_order(order_id)
+broker.close_position("AAPL")
 
-# Set profit target
-self.set_target(price=110.00)
-
-# Cancel all open orders
-self.cancel_all()
+# Bracket order helper: entry + take profit + stop loss
+broker.submit_bracket("AAPL", quantity=100, take_profit=110, stop_loss=95)
 ```
