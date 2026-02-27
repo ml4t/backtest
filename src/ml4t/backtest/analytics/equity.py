@@ -1,6 +1,5 @@
 """Equity curve tracking and analysis."""
 
-import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -75,40 +74,6 @@ class EquityCurve:
         """Duration in years based on trading days."""
         return len(self.values) / TRADING_DAYS_PER_YEAR if self.values else 0.0
 
-    def sharpe(self, risk_free_rate: float = 0.0) -> float:
-        """Annualized Sharpe ratio.
-
-        .. deprecated::
-            This method uses bar-level returns which gives incorrect results
-            for intraday data. Use ``result.compute_metrics()`` instead for
-            properly computed Sharpe ratio with daily returns.
-        """
-        warnings.warn(
-            "EquityCurve.sharpe() uses bar-level returns which is incorrect for "
-            "intraday data. Use result.compute_metrics() instead for proper "
-            "Sharpe ratio with daily returns.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return sharpe_ratio(self.returns, risk_free_rate)
-
-    def sortino(self, risk_free_rate: float = 0.0) -> float:
-        """Annualized Sortino ratio.
-
-        .. deprecated::
-            This method uses bar-level returns which gives incorrect results
-            for intraday data. Use ``result.compute_metrics()`` instead for
-            properly computed Sortino ratio with daily returns.
-        """
-        warnings.warn(
-            "EquityCurve.sortino() uses bar-level returns which is incorrect for "
-            "intraday data. Use result.compute_metrics() instead for proper "
-            "Sortino ratio with daily returns.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return sortino_ratio(self.returns, risk_free_rate)
-
     def max_drawdown_info(self) -> tuple[float, int, int]:
         """Maximum drawdown with peak/trough indices."""
         return max_drawdown(self.values)
@@ -123,24 +88,6 @@ class EquityCurve:
     def cagr(self) -> float:
         """Compound Annual Growth Rate."""
         return cagr(self.initial_value, self.final_value, self.years)
-
-    @property
-    def calmar(self) -> float:
-        """Calmar ratio (CAGR / Max Drawdown).
-
-        .. deprecated::
-            This property assumes bars=days for CAGR calculation, which is
-            incorrect for intraday data. Use ``result.compute_metrics()``
-            instead for properly computed Calmar ratio.
-        """
-        warnings.warn(
-            "EquityCurve.calmar assumes bars=days for CAGR, which is incorrect for "
-            "intraday data. Use result.compute_metrics() instead for proper "
-            "Calmar ratio.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return calmar_ratio(self.cagr, self.max_dd)
 
     @property
     def volatility(self) -> float:
@@ -162,10 +109,10 @@ class EquityCurve:
             "final_value": self.final_value,
             "total_return": self.total_return,
             "cagr": self.cagr,
-            "sharpe": self.sharpe(),
-            "sortino": self.sortino(),
+            "sharpe": sharpe_ratio(self.returns),
+            "sortino": sortino_ratio(self.returns),
             "max_drawdown": self.max_dd,
-            "calmar": self.calmar,
+            "calmar": calmar_ratio(self.cagr, self.max_dd),
             "volatility": self.volatility,
             "trading_days": len(self.values),
             "years": self.years,

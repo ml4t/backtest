@@ -327,7 +327,7 @@ class TestBacktestResultTradeRecords:
 
 
 class TestBacktestResultDict:
-    """Tests for to_dict() and dict-like access."""
+    """Tests for to_dict()."""
 
     def test_to_dict_basic(self, backtest_result: BacktestResult):
         """Test dictionary conversion."""
@@ -338,28 +338,6 @@ class TestBacktestResultDict:
         assert "equity_curve" in d
         assert "fills" in d
         assert "sharpe" in d
-
-    def test_getitem_metrics(self, backtest_result: BacktestResult):
-        """Test dictionary-style access for metrics."""
-        assert backtest_result["sharpe"] == 1.5
-        assert backtest_result["final_value"] == 100750.0
-
-    def test_getitem_attributes(self, backtest_result: BacktestResult):
-        """Test dictionary-style access for attributes."""
-        assert backtest_result["trades"] == backtest_result.trades
-        assert backtest_result["equity_curve"] == backtest_result.equity_curve
-        assert backtest_result["fills"] == backtest_result.fills
-
-    def test_contains(self, backtest_result: BacktestResult):
-        """Test 'in' operator."""
-        assert "trades" in backtest_result
-        assert "sharpe" in backtest_result
-        assert "nonexistent" not in backtest_result
-
-    def test_get_method(self, backtest_result: BacktestResult):
-        """Test get() method with default."""
-        assert backtest_result.get("sharpe") == 1.5
-        assert backtest_result.get("nonexistent", 42) == 42
 
     def test_repr(self, backtest_result: BacktestResult):
         """Test string representation."""

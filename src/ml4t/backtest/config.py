@@ -53,21 +53,6 @@ class ShareType(str, Enum):
     INTEGER = "integer"  # Round down to whole shares (like most real brokers)
 
 
-class SizingMethod(str, Enum):
-    """How position size is calculated.
-
-    .. deprecated::
-        This enum is not consumed by any runtime code. Position sizing is
-        always determined by strategy code. Retained for serialization
-        backward compatibility only.
-    """
-
-    PERCENT_OF_PORTFOLIO = "percent_of_portfolio"  # % of total portfolio value
-    PERCENT_OF_CASH = "percent_of_cash"  # % of available cash only
-    FIXED_VALUE = "fixed_value"  # Fixed dollar amount per position
-    FIXED_SHARES = "fixed_shares"  # Fixed number of shares
-
-
 class FillOrdering(str, Enum):
     """Order processing sequence within a single bar.
 
@@ -86,6 +71,38 @@ class FillOrdering(str, Enum):
 
     EXIT_FIRST = "exit_first"
     FIFO = "fifo"
+
+
+class RebalanceMode(str, Enum):
+    """How portfolio value is computed during multi-asset rebalancing.
+
+    When rebalancing across multiple assets, the engine must decide whether
+    to recompute portfolio value after each fill or freeze it. Real brokers
+    differ: some snapshot account value at order placement, others update
+    incrementally as each fill settles.
+
+    SNAPSHOT:
+        Freeze portfolio value at the start of the rebalance. All targets
+        computed from the same base, orders batch and fill at once. Matches
+        Backtrader's ``order_target_percent`` in ``next()`` where
+        ``broker.getvalue()`` is constant across all submissions.
+
+    INCREMENTAL:
+        Recompute portfolio value after each asset's order fills. Most
+        accurate cash tracking — each target uses the latest portfolio
+        state. May produce more trades than SNAPSHOT because cascading
+        value changes create small corrections.
+
+    HYBRID:
+        Freeze portfolio value for target computation, but fill
+        sequentially (cash constraints checked against live state).
+        Matches VectorBT's default behavior with ``auto_call_seq=False``
+        and ``update_value=False``.
+    """
+
+    SNAPSHOT = "snapshot"
+    INCREMENTAL = "incremental"
+    HYBRID = "hybrid"
 
 
 class SignalProcessing(str, Enum):
@@ -143,13 +160,6 @@ class WaterMarkSource(str, Enum):
 
     CLOSE = "close"  # Use close prices for water mark updates (default)
     BAR_EXTREME = "bar_extreme"  # Use HIGH for HWM, LOW for LWM (VBT Pro with OHLC)
-
-    # Deprecated alias for backward compatibility
-    HIGH = "bar_extreme"  # Deprecated: use BAR_EXTREME instead
-
-
-# Backward compatibility alias
-TrailHwmSource = WaterMarkSource
 
 
 class InitialHwmSource(str, Enum):
@@ -447,6 +457,7 @@ class BacktestConfig:
     reject_on_insufficient_cash: bool = True
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
+    rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
 
     # === Calendar & Timezone ===
     calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
@@ -509,6 +520,7 @@ class BacktestConfig:
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
                 "partial_fills_allowed": self.partial_fills_allowed,
                 "fill_ordering": self.fill_ordering.value,
+                "rebalance_mode": self.rebalance_mode.value,
             },
         }
 
@@ -525,35 +537,14 @@ class BacktestConfig:
         cash_cfg = data.get("cash", {})
         order_cfg = data.get("orders", {})
 
-        # Handle legacy account type for migration
-        legacy_type = acct_cfg.get("type")
-        legacy_margin_req = acct_cfg.get("margin_requirement")
-
-        # Determine account settings from new or legacy fields
-        if "allow_short_selling" in acct_cfg:
-            # New format
-            allow_short_selling = acct_cfg.get("allow_short_selling", False)
-            allow_leverage = acct_cfg.get("allow_leverage", False)
-        elif legacy_type is not None:
-            # Convert legacy format to new flags
-            if legacy_type == "cash":
-                allow_short_selling, allow_leverage = False, False
-            elif legacy_type == "crypto":
-                allow_short_selling, allow_leverage = True, False
-            elif legacy_type == "margin":
-                allow_short_selling, allow_leverage = True, True
-            else:
-                raise ValueError(f"Unknown account type: '{legacy_type}'")
-        else:
-            # Default
-            allow_short_selling = False
-            allow_leverage = False
+        allow_short_selling = acct_cfg.get("allow_short_selling", False)
+        allow_leverage = acct_cfg.get("allow_leverage", False)
 
         return cls(
             # Account
             allow_short_selling=allow_short_selling,
             allow_leverage=allow_leverage,
-            initial_margin=acct_cfg.get("initial_margin", legacy_margin_req or 0.5),
+            initial_margin=acct_cfg.get("initial_margin", 0.5),
             long_maintenance_margin=acct_cfg.get("long_maintenance_margin", 0.25),
             short_maintenance_margin=acct_cfg.get("short_maintenance_margin", 0.30),
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
@@ -593,6 +584,7 @@ class BacktestConfig:
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
             fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
+            rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
             # Metadata
             preset_name=preset_name,
         )
@@ -671,6 +663,7 @@ class BacktestConfig:
             reject_on_insufficient_cash=True,
             partial_fills_allowed=False,
             fill_ordering=FillOrdering.EXIT_FIRST,
+            rebalance_mode=RebalanceMode.INCREMENTAL,
         )
 
     @classmethod
@@ -718,6 +711,7 @@ class BacktestConfig:
             reject_on_insufficient_cash=True,
             partial_fills_allowed=False,
             fill_ordering=FillOrdering.FIFO,  # Backtrader processes in submission order
+            rebalance_mode=RebalanceMode.SNAPSHOT,  # BT batches all orders before filling
         )
 
     @classmethod
@@ -764,6 +758,7 @@ class BacktestConfig:
             reject_on_insufficient_cash=False,  # VectorBT is more permissive
             partial_fills_allowed=True,
             fill_ordering=FillOrdering.EXIT_FIRST,  # VBT call_seq='auto'
+            rebalance_mode=RebalanceMode.HYBRID,  # Frozen targets, sequential fills
         )
 
     @classmethod
@@ -809,6 +804,7 @@ class BacktestConfig:
             reject_on_insufficient_cash=True,
             partial_fills_allowed=True,  # Volume-based = partial fills
             fill_ordering=FillOrdering.EXIT_FIRST,
+            rebalance_mode=RebalanceMode.SNAPSHOT,  # Zipline batches orders in handle_data
         )
 
     @classmethod
@@ -854,6 +850,7 @@ class BacktestConfig:
             reject_on_insufficient_cash=True,
             partial_fills_allowed=False,
             fill_ordering=FillOrdering.EXIT_FIRST,
+            rebalance_mode=RebalanceMode.INCREMENTAL,
         )
 
     def describe(self) -> str:
@@ -916,6 +913,7 @@ class BacktestConfig:
                 "",
                 "Orders:",
                 f"  Fill ordering: {self.fill_ordering.value}",
+                f"  Rebalance mode: {self.rebalance_mode.value}",
                 f"  Reject insufficient: {self.reject_on_insufficient_cash}",
                 f"  Partial fills: {self.partial_fills_allowed}",
                 "",

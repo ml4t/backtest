@@ -422,7 +422,7 @@ class TestEngine:
         engine = Engine(feed, strategy, initial_cash=100000)
         results = engine.run()
 
-        assert results["num_trades"] == 0  # Still holding
+        assert results.metrics["num_trades"] == 0  # Still holding
         assert len(engine.broker.positions) == 1
         assert engine.broker.get_position("AAPL").quantity == 100
 
@@ -436,8 +436,8 @@ class TestEngine:
         results = engine.run()
 
         # Should have some trades
-        assert len(results["equity_curve"]) == 30
-        assert results["final_value"] > 0
+        assert len(results.equity_curve) == 30
+        assert results.metrics["final_value"] > 0
 
     def test_vix_filter_strategy(self):
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 20)
@@ -449,7 +449,7 @@ class TestEngine:
         engine = Engine(feed, strategy, initial_cash=100000)
         results = engine.run()
 
-        assert len(results["equity_curve"]) == 20
+        assert len(results.equity_curve) == 20
 
     def test_with_commission(self):
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
@@ -460,7 +460,7 @@ class TestEngine:
         engine = Engine(feed, strategy, initial_cash=100000, commission_model=commission)
         results = engine.run()
 
-        assert results["total_commission"] >= 1.0
+        assert results.metrics["total_commission"] >= 1.0
 
     def test_convenience_function(self):
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10)
@@ -472,8 +472,8 @@ class TestEngine:
             initial_cash=50000,
         )
 
-        assert results["initial_cash"] == 50000
-        assert len(results["equity_curve"]) == 10
+        assert results.metrics["initial_cash"] == 50000
+        assert len(results.equity_curve) == 10
 
 
 class TestTradeRecording:
@@ -499,8 +499,8 @@ class TestTradeRecording:
         engine = Engine(feed, QuickTrade(), initial_cash=100000)
         results = engine.run()
 
-        assert len(results["trades"]) == 1
-        trade = results["trades"][0]
+        assert len(results.trades) == 1
+        trade = results.trades[0]
         assert trade.bars_held >= 1
         # Note: entry_signals/exit_signals are not Trade fields
         # Signals are available in context during on_data, not stored on Trade
@@ -548,7 +548,7 @@ class TestEngineFromConfig:
         results = engine.run()
 
         # Verify commission was applied
-        assert results["total_commission"] > 0
+        assert results.metrics["total_commission"] > 0
 
     def test_from_config_per_share_commission(self):
         """Test from_config with per-share commission."""
@@ -565,7 +565,7 @@ class TestEngineFromConfig:
         results = engine.run()
 
         # Should have minimum commission applied
-        assert results["total_commission"] >= 1.0
+        assert results.metrics["total_commission"] >= 1.0
 
     def test_from_config_no_commission(self):
         """Test from_config with no commission."""
@@ -577,7 +577,7 @@ class TestEngineFromConfig:
         engine = Engine.from_config(feed, strategy, config)
         results = engine.run()
 
-        assert results["total_commission"] == 0.0
+        assert results.metrics["total_commission"] == 0.0
 
     def test_from_config_percentage_slippage(self):
         """Test from_config with percentage slippage."""
@@ -592,7 +592,7 @@ class TestEngineFromConfig:
         engine = Engine.from_config(feed, strategy, config)
         results = engine.run()
 
-        assert results["total_slippage"] > 0
+        assert results.metrics["total_slippage"] > 0
 
     def test_from_config_fixed_slippage(self):
         """Test from_config with fixed slippage."""
@@ -607,7 +607,7 @@ class TestEngineFromConfig:
         engine = Engine.from_config(feed, strategy, config)
         results = engine.run()
 
-        assert results["total_slippage"] > 0
+        assert results.metrics["total_slippage"] > 0
 
     def test_from_config_fill_timing_same_bar(self):
         """Test from_config with SAME_BAR fill timing."""
@@ -645,7 +645,7 @@ class TestEngineFromConfig:
         engine = Engine.from_config(feed, strategy, config)
         results = engine.run()
 
-        assert results["final_value"] > 0
+        assert results.metrics["final_value"] > 0
 
 
 class TestNextBarExecutionMode:
@@ -698,7 +698,7 @@ class TestRunBacktestWithConfig:
         )
         results = run_backtest(prices=prices, strategy=strategy, config=config)
 
-        assert results["initial_cash"] == 50000
+        assert results.metrics["initial_cash"] == 50000
 
     def test_run_backtest_with_string_preset(self):
         """Test run_backtest with string preset name."""
@@ -707,8 +707,8 @@ class TestRunBacktestWithConfig:
 
         results = run_backtest(prices=prices, strategy=strategy, config="default")
 
-        assert "equity_curve" in results
-        assert len(results["equity_curve"]) == 10
+        assert results.equity_curve is not None
+        assert len(results.equity_curve) == 10
 
 
 class TestEmptyDataFeed:
@@ -735,7 +735,7 @@ class TestEmptyDataFeed:
         results = engine.run()
 
         # Should return empty or minimal results without error
-        assert results.get("num_trades", 0) == 0
+        assert results.metrics.get("num_trades", 0) == 0
 
 
 if __name__ == "__main__":

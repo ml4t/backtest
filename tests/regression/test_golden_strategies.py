@@ -389,7 +389,7 @@ class TestRegressionMarker:
         # Add trade details if available
         if result.trades:
             fingerprint_data["first_trade_entry"] = round(result.trades[0].entry_price, 2)
-            fingerprint_data["first_trade_commission"] = round(result.trades[0].commission, 4)
+            fingerprint_data["first_trade_commission"] = round(result.trades[0].fees, 4)
 
         # Create hash of fingerprint
         fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)

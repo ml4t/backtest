@@ -42,9 +42,6 @@ from .types import (
     Trade,
 )
 
-# Backward compatibility
-TrailHwmSource = WaterMarkSource
-
 if TYPE_CHECKING:
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
@@ -1660,7 +1657,6 @@ class Broker:
                 # VBT Pro only updates water marks from bar extremes on the bar AFTER entry
                 is_new_position = asset in self._positions_created_this_bar
                 # BAR_EXTREME: use HIGH for HWM (longs), LOW for LWM (shorts)
-                # Note: HIGH is a deprecated alias for BAR_EXTREME
                 use_extremes = self.trail_hwm_source.value == "bar_extreme" and not is_new_position
                 pos.update_water_marks(
                     current_price=self._current_prices[asset],

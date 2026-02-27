@@ -135,7 +135,7 @@ class TestCalendarEnforcementDaily:
 
         # All 14 bars should be processed
         assert strategy.bars_processed == 14
-        assert results["skipped_bars"] == 0
+        assert results.metrics["skipped_bars"] == 0
 
     def test_enforce_false_processes_all_bars(self):
         """With enforce_sessions=False, all bars are processed."""
@@ -155,7 +155,7 @@ class TestCalendarEnforcementDaily:
 
         # All 14 bars should be processed
         assert strategy.bars_processed == 14
-        assert results["skipped_bars"] == 0
+        assert results.metrics["skipped_bars"] == 0
 
     def test_skip_weekend_data(self):
         """With enforce_sessions=True, weekend bars are skipped."""
@@ -181,7 +181,7 @@ class TestCalendarEnforcementDaily:
 
         # Should skip 4 weekend days + 1 MLK Day = 5 non-trading days
         # 14 days - 5 = 9 trading days
-        assert results["skipped_bars"] == 5
+        assert results.metrics["skipped_bars"] == 5
         assert strategy.bars_processed == 9
 
         # Verify no weekend timestamps in processed bars
@@ -225,7 +225,7 @@ class TestCalendarEnforcementDaily:
         results = engine.run()
 
         # July 4th should be skipped
-        assert results["skipped_bars"] == 1
+        assert results.metrics["skipped_bars"] == 1
         assert strategy.bars_processed == 4
 
         # Verify July 4th not in processed timestamps
@@ -279,7 +279,7 @@ class TestCalendarEnforcementIntraday:
 
         # All bars should be skipped (Saturday)
         assert strategy.bars_processed == 0
-        assert results["skipped_bars"] == 3
+        assert results.metrics["skipped_bars"] == 3
 
     def test_intraday_holiday_skipped(self):
         """Holiday intraday bars are skipped (via trading day fallback)."""
@@ -317,7 +317,7 @@ class TestCalendarEnforcementIntraday:
 
         # All bars should be skipped (holiday)
         assert strategy.bars_processed == 0
-        assert results["skipped_bars"] == 2
+        assert results.metrics["skipped_bars"] == 2
 
     def test_intraday_trading_day_processed(self):
         """Intraday bars on trading days are processed."""
@@ -356,7 +356,7 @@ class TestCalendarEnforcementIntraday:
 
         # All bars should be processed (regular trading day)
         assert strategy.bars_processed == 3
-        assert results["skipped_bars"] == 0
+        assert results.metrics["skipped_bars"] == 0
 
 
 class TestCalendarEdgeCases:
@@ -397,7 +397,7 @@ class TestCalendarEdgeCases:
         results = engine.run()
 
         assert strategy.bars_processed == 0
-        assert results["skipped_bars"] == 0
+        assert results.metrics["skipped_bars"] == 0
 
     def test_mixed_valid_invalid_days(self):
         """Mix of trading days and non-trading days."""
@@ -437,7 +437,7 @@ class TestCalendarEdgeCases:
 
         # Should process 3 trading days, skip 3 (Sat, Sun, MLK Day)
         assert strategy.bars_processed == 3
-        assert results["skipped_bars"] == 3
+        assert results.metrics["skipped_bars"] == 3
 
     def test_different_calendar_cme(self):
         """CME calendar has different trading hours."""
@@ -459,4 +459,4 @@ class TestCalendarEdgeCases:
 
         # All 5 trading days should be processed (no weekends in data)
         assert strategy.bars_processed == 5
-        assert results["skipped_bars"] == 0
+        assert results.metrics["skipped_bars"] == 0

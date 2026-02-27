@@ -15,10 +15,6 @@ except ImportError:
 
 # Import from modules
 # Analytics
-# Deprecated: Import from analysis for backward compatibility
-# These emit deprecation warnings when imported
-import warnings as _warnings
-
 from .analytics import (
     # Analytics classes
     EquityCurve,
@@ -35,11 +31,6 @@ from .analytics import (
     to_trade_records,
     volatility,
 )
-
-with _warnings.catch_warnings():
-    _warnings.filterwarnings("ignore", category=DeprecationWarning)
-    from .analysis import BacktestAnalyzer, TradeStatistics
-
 from .broker import Broker
 
 # Calendar functions (pandas_market_calendars integration)
@@ -68,22 +59,15 @@ from .config import (
     FillTiming,
     InitialHwmSource,
     Mode,
+    RebalanceMode,
     ShareType,
     SignalProcessing,
-    SizingMethod,
     StatsConfig,
-    TrailHwmSource,  # Deprecated alias for WaterMarkSource
     TrailStopTiming,
     WaterMarkSource,
 )
-from .config import (
-    CommissionModel as CommissionModelType,
-)
-from .config import (
-    SlippageModel as SlippageModelType,
-)
 from .datafeed import DataFeed
-from .engine import BacktestEngine, Engine, run_backtest
+from .engine import Engine, run_backtest
 
 # Execution model (volume limits, market impact, rebalancing)
 from .execution import (
@@ -191,7 +175,6 @@ __all__ = [
     "Broker",
     "Strategy",
     "Engine",
-    "BacktestEngine",  # Backward compatibility alias
     "run_backtest",
     "BacktestResult",
     "BacktestExporter",
@@ -213,15 +196,12 @@ __all__ = [
     "FillTiming",
     "ExecutionPrice",
     "ShareType",
-    "SizingMethod",
     "FillOrdering",
     "SignalProcessing",
-    "TrailHwmSource",  # Deprecated alias for WaterMarkSource
+    "RebalanceMode",
     "TrailStopTiming",
     "WaterMarkSource",
     "InitialHwmSource",
-    "CommissionModelType",
-    "SlippageModelType",
     "PRESETS_DIR",
     # Analytics
     "EquityCurve",
@@ -232,9 +212,7 @@ __all__ = [
     "max_drawdown",
     "cagr",
     "volatility",
-    # Analysis (diagnostic integration)
-    "BacktestAnalyzer",
-    "TradeStatistics",
+    # Bridge (diagnostic integration)
     "to_trade_record",
     "to_trade_records",
     "to_returns_series",

@@ -466,8 +466,8 @@ class TestCommissionSplitOnFlip:
         assert len(broker.trades) == 1
         closing_trade = broker.trades[0]
         assert closing_trade.quantity == 100.0  # Long 100 closed
-        assert closing_trade.commission == 1.0, (
-            f"Expected close commission $1.00, got ${closing_trade.commission}"
+        assert closing_trade.fees == 1.0, (
+            f"Expected close commission $1.00, got ${closing_trade.fees}"
         )
 
         # Check PnL calculation includes only close commission

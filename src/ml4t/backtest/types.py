@@ -215,11 +215,6 @@ class Position:
             self.current_price = self.entry_price
 
     @property
-    def avg_entry_price(self) -> float:
-        """Alias for entry_price (accounting compatibility)."""
-        return self.entry_price
-
-    @property
     def market_value(self) -> float:
         """Current market value of the position.
 
@@ -391,36 +386,9 @@ class Trade:
         return "long" if self.quantity > 0 else "short"
 
     @property
-    def side(self) -> str:
-        """Alias for direction (backward compatibility)."""
-        return self.direction
-
-    @property
     def is_open(self) -> bool:
         """Return True if this is an open (mark-to-market) trade."""
         return self.status == "open"
-
-    # === Backward compatibility aliases (deprecated) ===
-
-    @property
-    def asset(self) -> str:
-        """Deprecated: Use 'symbol' instead."""
-        return self.symbol
-
-    @property
-    def commission(self) -> float:
-        """Deprecated: Use 'fees' instead."""
-        return self.fees
-
-    @property
-    def max_favorable_excursion(self) -> float:
-        """Deprecated: Use 'mfe' instead."""
-        return self.mfe
-
-    @property
-    def max_adverse_excursion(self) -> float:
-        """Deprecated: Use 'mae' instead."""
-        return self.mae
 
 
 @dataclass
