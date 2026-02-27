@@ -48,4 +48,3 @@ def test_round_trip_pnl_reconciles_cash(entry: float, exit_: float, qty: float) 
     assert abs(trade.pnl - expected_pnl) < 1e-8
     assert abs((initial_cash + expected_pnl) - broker.cash) < 1e-8
     assert abs(broker.get_account_value() - broker.cash) < 1e-8
-

@@ -57,4 +57,3 @@ def test_exit_first_never_underfills_vs_fifo(price: float, qty: float) -> None:
 
     assert exit_first_qty >= fifo_qty
     assert abs(exit_first_value - fifo_value) < 1e-8
-
