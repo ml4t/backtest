@@ -79,6 +79,26 @@ SCENARIO_NAMES = {
 }
 
 
+def _extract_error_summary(output: str, returncode: int) -> str | None:
+    """Extract a concise failure summary from script output."""
+    if returncode == 0:
+        return None
+
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if not lines:
+        return f"Process exited with code {returncode}"
+
+    # Prefer explicit Python exception lines if present.
+    for line in reversed(lines):
+        if line.startswith(("AssertionError", "ValueError", "TypeError", "RuntimeError")):
+            return line
+        if "Error" in line or "Exception" in line or line.startswith("Traceback"):
+            return line
+
+    # Fall back to last emitted line.
+    return lines[-1][:200]
+
+
 def run_scenario(framework: str, scenario: str) -> dict:
     """Run a single validation scenario.
 
@@ -124,16 +144,10 @@ def run_scenario(framework: str, scenario: str) -> dict:
 
         output = result.stdout + result.stderr
 
-        # Check for PASS/FAIL in output
-        if "PASS" in output.upper() and "FAIL" not in output.upper():
-            passed = True
-        elif "FAIL" in output.upper() or result.returncode != 0:
-            passed = False
-        else:
-            # Check for error indicators
-            passed = result.returncode == 0
-
-        return {"passed": passed, "error": None, "output": output}
+        # Use process status as source of truth for determinism.
+        passed = result.returncode == 0
+        error = _extract_error_summary(output, result.returncode)
+        return {"passed": passed, "error": error, "output": output}
 
     except subprocess.TimeoutExpired:
         return {"passed": False, "error": "Timeout (120s)", "output": ""}
