@@ -401,8 +401,11 @@ class UnifiedAccountPolicy(AccountPolicy):
             else:
                 cash_after_close = cash - close_proceeds
         else:
-            # Crypto: simple proceeds
-            cash_after_close = cash + close_proceeds
+            # Non-levered: long close receives proceeds, short cover pays cash.
+            if current_quantity > 0:
+                cash_after_close = cash + close_proceeds
+            else:
+                cash_after_close = cash - close_proceeds
 
         cash_after_close -= commission
 

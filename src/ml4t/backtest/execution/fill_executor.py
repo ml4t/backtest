@@ -80,6 +80,7 @@ class FillExecutor:
             broker: The Broker instance whose state we'll modify
         """
         self.broker = broker
+        self._qty_zero_epsilon = 1e-12
 
     def execute(self, order: Order, base_price: float) -> bool:
         """Execute a fill and update positions.
@@ -212,6 +213,8 @@ class FillExecutor:
         else:
             old_qty = pos.quantity
             new_qty = old_qty + ctx.signed_qty
+            if abs(new_qty) < self._qty_zero_epsilon:
+                new_qty = 0.0
 
             if new_qty == 0:
                 self._close_position(ctx, pos, old_qty)

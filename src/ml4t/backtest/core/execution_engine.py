@@ -132,6 +132,10 @@ class ExecutionEngine:
                 if broker.partial_fills_allowed and fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
+                else:
+                    # Permissive mode: if nothing is affordable, clear the order
+                    # so it does not remain pending forever.
+                    order.status = OrderStatus.CANCELLED
             elif broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
                 if fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
@@ -152,5 +156,5 @@ class ExecutionEngine:
                 broker._orders_this_bar.remove(order)
 
         for order in broker.pending_orders[:]:
-            if order.status == OrderStatus.REJECTED:
+            if order.status in {OrderStatus.REJECTED, OrderStatus.CANCELLED}:
                 broker.pending_orders.remove(order)

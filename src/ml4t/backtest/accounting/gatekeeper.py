@@ -112,6 +112,8 @@ class Gatekeeper:
         """
         # Get current position quantity (0 if no position)
         current_qty = self.account.get_position_quantity(order.asset)
+        if abs(current_qty) < 1e-12:
+            current_qty = 0.0
 
         # Determine order direction (positive=buy, negative=sell)
         order_qty_delta = self._calculate_quantity_delta(order.side, order.quantity)
