@@ -67,6 +67,15 @@ class AccountPolicy(ABC):
         pass
 
     @abstractmethod
+    def get_spendable_cash(self, cash: float, positions: dict[str, Position]) -> float:
+        """Calculate spendable cash for new entries.
+
+        This can differ from raw cash for account policies that reserve
+        collateral (e.g., locked short proceeds).
+        """
+        pass
+
+    @abstractmethod
     def validate_new_position(
         self,
         asset: str,
@@ -218,6 +227,7 @@ class UnifiedAccountPolicy(AccountPolicy):
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
+        short_cash_policy: str = "credit",
     ) -> None:
         """Initialize unified account policy.
 
@@ -234,6 +244,8 @@ class UnifiedAccountPolicy(AccountPolicy):
             fixed_margin_schedule: Per-asset fixed dollar margin for futures.
                 - Dict mapping asset symbol to (initial, maintenance) tuple
                 - Example: {"ES": (12000, 6000)}
+            short_cash_policy: How short proceeds affect spendable cash in
+                non-levered accounts. One of {"credit", "lock_notional"}.
 
         Raises:
             ValueError: If margin parameters are invalid when leverage is enabled.
@@ -244,6 +256,12 @@ class UnifiedAccountPolicy(AccountPolicy):
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
         self.fixed_margin_schedule = fixed_margin_schedule or {}
+        if short_cash_policy not in {"credit", "credit_proceeds", "lock_notional"}:
+            raise ValueError(
+                "short_cash_policy must be 'credit', 'credit_proceeds', or "
+                f"'lock_notional', got {short_cash_policy}"
+            )
+        self.short_cash_policy = short_cash_policy
 
         # Validate margin parameters if leverage is enabled
         if allow_leverage:
@@ -286,11 +304,48 @@ class UnifiedAccountPolicy(AccountPolicy):
             long_maintenance_margin=config.long_maintenance_margin,
             short_maintenance_margin=config.short_maintenance_margin,
             fixed_margin_schedule=config.fixed_margin_schedule,
+            short_cash_policy=config.short_cash_policy.value,
         )
 
     def allows_short_selling(self) -> bool:
         """Whether this policy allows short selling."""
         return self.allow_short_selling
+
+    def get_spendable_cash(self, cash: float, positions: dict[str, Position]) -> float:
+        """Cash available for new entries after policy reserves.
+
+        For non-levered short-enabled accounts:
+
+        ``lock_notional`` mirrors VectorBT ``lock_cash=True`` free-cash behavior:
+        spendable_cash = cash - 2 * short_debt_basis.
+
+        ``credit_proceeds`` reserves 1x short notional to prevent shorts from
+        inflating the budget for long entries:
+        spendable_cash = cash - short_debt_basis.
+
+        short_debt_basis is tracked from short entry basis (cost basis), not
+        mark-to-market short value.
+        """
+        if self.allow_leverage:
+            return cash
+        if not self.allow_short_selling:
+            return cash
+
+        if self.short_cash_policy == "lock_notional":
+            short_debt_basis = 0.0
+            for pos in positions.values():
+                if pos.quantity < 0:
+                    short_debt_basis += abs(pos.quantity) * pos.entry_price * pos.multiplier
+            return cash - (2.0 * short_debt_basis)
+
+        if self.short_cash_policy == "credit_proceeds":
+            short_notional = 0.0
+            for pos in positions.values():
+                if pos.quantity < 0:
+                    short_notional += abs(pos.quantity) * pos.entry_price * pos.multiplier
+            return cash - short_notional
+
+        return cash
 
     def calculate_buying_power(self, cash: float, positions: dict[str, Position]) -> float:
         """Calculate available buying power.
@@ -299,8 +354,8 @@ class UnifiedAccountPolicy(AccountPolicy):
         For margin accounts: buying_power = (NLV - required_IM) / initial_margin
         """
         if not self.allow_leverage:
-            # Cash or Crypto: simple cash balance
-            return max(0.0, cash)
+            # Cash/Crypto: spendable cash can reserve short collateral.
+            return max(0.0, self.get_spendable_cash(cash, positions))
 
         # Margin account: calculate based on equity and margin requirements
         total_market_value = sum(pos.market_value for pos in positions.values())
@@ -401,8 +456,11 @@ class UnifiedAccountPolicy(AccountPolicy):
             else:
                 cash_after_close = cash - close_proceeds
         else:
-            # Crypto: simple proceeds
-            cash_after_close = cash + close_proceeds
+            # Non-levered: long close receives proceeds, short cover pays cash.
+            if current_quantity > 0:
+                cash_after_close = cash + close_proceeds
+            else:
+                cash_after_close = cash - close_proceeds
 
         cash_after_close -= commission
 
@@ -422,6 +480,8 @@ class UnifiedAccountPolicy(AccountPolicy):
             )
         else:
             # Crypto: check cash covers new position
+            if self.short_cash_policy == "credit_proceeds" and new_qty < 0:
+                return True, ""
             # Floating-point tolerance for cash comparison ($0.01 = 1 cent)
             CASH_TOLERANCE = 0.01
             if new_position_cost > cash_after_close + CASH_TOLERANCE:
@@ -451,6 +511,14 @@ class UnifiedAccountPolicy(AccountPolicy):
         # This prevents rejections due to floating-point arithmetic rounding
         # e.g., when equity/price * price != equity exactly
         CASH_TOLERANCE = 0.01
+
+        if (
+            not self.allow_leverage
+            and self.allow_short_selling
+            and self.short_cash_policy == "credit_proceeds"
+            and quantity < 0
+        ):
+            return True, ""
 
         if self.allow_leverage:
             # Margin: check buying power
@@ -520,6 +588,15 @@ class UnifiedAccountPolicy(AccountPolicy):
                 pass
             else:
                 return True, ""
+
+        if (
+            not self.allow_leverage
+            and self.allow_short_selling
+            and self.short_cash_policy == "credit_proceeds"
+            and new_quantity < 0
+            and quantity_delta < 0
+        ):
+            return True, ""
 
         # Calculate order cost for validation
         if current_quantity == 0:

@@ -7,11 +7,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .config import (
+    EntryOrderPriority,
     FillOrdering,
     InitialHwmSource,
     LateAssetPolicy,
     MissingPricePolicy,
     ShareType,
+    ShortCashPolicy,
     StatsConfig,
     TrailStopTiming,
     WaterMarkSource,
@@ -67,11 +69,15 @@ class Broker:
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
+        short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT,
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
         share_type: ShareType = ShareType.FRACTIONAL,
         fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST,
+        entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION,
+        next_bar_submission_precheck: bool = False,
+        next_bar_simple_cash_check: bool = False,
         reject_on_insufficient_cash: bool = True,
         cash_buffer_pct: float = 0.0,
         partial_fills_allowed: bool = False,
@@ -79,6 +85,7 @@ class Broker:
         missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP,
         late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW,
         late_asset_min_bars: int = 1,
+        settlement_delay: int = 0,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -104,6 +111,9 @@ class Broker:
         self.trail_stop_timing = trail_stop_timing
         self.share_type = share_type
         self.fill_ordering = fill_ordering
+        self.entry_order_priority = entry_order_priority
+        self.next_bar_submission_precheck = next_bar_submission_precheck
+        self.next_bar_simple_cash_check = next_bar_simple_cash_check
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
         self.cash_buffer_pct = cash_buffer_pct
         self.partial_fills_allowed = partial_fills_allowed
@@ -111,6 +121,8 @@ class Broker:
         self.missing_price_policy = missing_price_policy
         self.late_asset_policy = late_asset_policy
         self.late_asset_min_bars = late_asset_min_bars
+        self.settlement_delay = settlement_delay
+        self._bar_index: int = 0
 
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
@@ -120,6 +132,7 @@ class Broker:
             long_maintenance_margin=long_maintenance_margin,
             short_maintenance_margin=short_maintenance_margin,
             fixed_margin_schedule=fixed_margin_schedule,
+            short_cash_policy=short_cash_policy.value,
         )
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
@@ -136,6 +149,7 @@ class Broker:
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
         self.fixed_margin_schedule = fixed_margin_schedule or {}
+        self.short_cash_policy = short_cash_policy
 
         # Create Gatekeeper for order validation
         self.gatekeeper = Gatekeeper(
@@ -284,11 +298,15 @@ class Broker:
             long_maintenance_margin=config.long_maintenance_margin,
             short_maintenance_margin=config.short_maintenance_margin,
             fixed_margin_schedule=config.fixed_margin_schedule,
+            short_cash_policy=config.short_cash_policy,
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,
             contract_specs=contract_specs,
             share_type=config.share_type,
             fill_ordering=config.fill_ordering,
+            entry_order_priority=config.entry_order_priority,
+            next_bar_submission_precheck=config.next_bar_submission_precheck,
+            next_bar_simple_cash_check=config.next_bar_simple_cash_check,
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
             cash_buffer_pct=config.cash_buffer_pct,
             partial_fills_allowed=config.partial_fills_allowed,
@@ -296,6 +314,7 @@ class Broker:
             missing_price_policy=config.missing_price_policy,
             late_asset_policy=config.late_asset_policy,
             late_asset_min_bars=config.late_asset_min_bars,
+            settlement_delay=config.settlement_delay,
         )
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
@@ -1320,6 +1339,11 @@ class Broker:
         self._current_lows = lows
         self._current_volumes = volumes
         self._current_signals = signals
+        self._bar_index += 1
+
+        # Release settled holds at bar start
+        if self.settlement_delay > 0:
+            self.account.release_settled(self._bar_index)
 
         for asset, price in prices.items():
             if price > 0:

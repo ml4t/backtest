@@ -75,6 +75,45 @@ class FillOrdering(str, Enum):
     FIFO = "fifo"
 
 
+class EntryOrderPriority(str, Enum):
+    """Priority for sequencing entry orders under cash constraints.
+
+    Applied when ``fill_ordering=EXIT_FIRST`` after exits are processed.
+
+    SUBMISSION:
+        Keep strategy submission order.
+
+    NOTIONAL_DESC:
+        Process larger notional entries first.
+
+    NOTIONAL_ASC:
+        Process smaller notional entries first.
+    """
+
+    SUBMISSION = "submission"
+    NOTIONAL_DESC = "notional_desc"
+    NOTIONAL_ASC = "notional_asc"
+
+
+class ShortCashPolicy(str, Enum):
+    """How short-sale proceeds affect spendable cash in non-levered accounts.
+
+    CREDIT:
+        Legacy behavior: short entries are cash-checked by notional.
+
+    CREDIT_PROCEEDS:
+        Short proceeds are immediately spendable for new entries/reversals.
+
+    LOCK_NOTIONAL:
+        Lock short notional as collateral from spendable cash.
+        This emulates engines that reserve short proceeds under constraints.
+    """
+
+    CREDIT = "credit"
+    CREDIT_PROCEEDS = "credit_proceeds"
+    LOCK_NOTIONAL = "lock_notional"
+
+
 class RebalanceMode(str, Enum):
     """How portfolio value is computed during multi-asset rebalancing.
 
@@ -282,6 +321,7 @@ class BacktestConfig:
     long_maintenance_margin: float = 0.25  # Reg T standard for longs
     short_maintenance_margin: float = 0.30  # Reg T standard for shorts (higher!)
     fixed_margin_schedule: dict[str, tuple[float, float]] | None = None  # For futures
+    short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT
 
     # === Execution Timing ===
     fill_timing: FillTiming = FillTiming.NEXT_BAR_OPEN
@@ -385,6 +425,12 @@ class BacktestConfig:
                     f"initial_margin ({self.initial_margin})"
                 )
 
+        if self.settlement_delay < 0 or self.settlement_delay > 5:
+            issues.append(
+                f"settlement_delay ({self.settlement_delay}) should be 0-5. "
+                "Common values: 0 (instant), 1 (T+1), 2 (T+2 US equities)."
+            )
+
         if not 0.0 < self.rebalance_headroom_pct <= 1.0:
             issues.append(
                 f"rebalance_headroom_pct ({self.rebalance_headroom_pct}) must be in (0.0, 1.0]"
@@ -445,10 +491,16 @@ class BacktestConfig:
     initial_cash: float = 100000.0
     cash_buffer_pct: float = 0.0  # Reserve this % of cash (0 = use all)
 
+    # === Settlement ===
+    settlement_delay: int = 0  # Bars until sale proceeds are spendable (T+0 default)
+
     # === Order Handling ===
     reject_on_insufficient_cash: bool = True
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
+    entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION
+    next_bar_submission_precheck: bool = False
+    next_bar_simple_cash_check: bool = False
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
     rebalance_headroom_pct: float = 1.0
     missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP
@@ -474,6 +526,7 @@ class BacktestConfig:
                 "long_maintenance_margin": self.long_maintenance_margin,
                 "short_maintenance_margin": self.short_maintenance_margin,
                 "fixed_margin_schedule": self.fixed_margin_schedule,
+                "short_cash_policy": self.short_cash_policy.value,
             },
             "execution": {
                 "fill_timing": self.fill_timing.value,
@@ -512,10 +565,16 @@ class BacktestConfig:
                 "initial": self.initial_cash,
                 "buffer_pct": self.cash_buffer_pct,
             },
+            "settlement": {
+                "delay": self.settlement_delay,
+            },
             "orders": {
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
                 "partial_fills_allowed": self.partial_fills_allowed,
                 "fill_ordering": self.fill_ordering.value,
+                "entry_order_priority": self.entry_order_priority.value,
+                "next_bar_submission_precheck": self.next_bar_submission_precheck,
+                "next_bar_simple_cash_check": self.next_bar_simple_cash_check,
                 "rebalance_mode": self.rebalance_mode.value,
                 "rebalance_headroom_pct": self.rebalance_headroom_pct,
                 "missing_price_policy": self.missing_price_policy.value,
@@ -548,6 +607,7 @@ class BacktestConfig:
                 "commission",
                 "slippage",
                 "cash",
+                "settlement",
                 "orders",
             }
             unknown_sections = set(data) - allowed_sections
@@ -562,6 +622,7 @@ class BacktestConfig:
                     "long_maintenance_margin",
                     "short_maintenance_margin",
                     "fixed_margin_schedule",
+                    "short_cash_policy",
                 },
                 "execution": {"fill_timing", "execution_price", "execution_mode"},
                 "stops": {
@@ -576,10 +637,14 @@ class BacktestConfig:
                 "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
                 "slippage": {"model", "rate", "fixed", "stop_rate"},
                 "cash": {"initial", "buffer_pct"},
+                "settlement": {"delay"},
                 "orders": {
                     "reject_on_insufficient_cash",
                     "partial_fills_allowed",
                     "fill_ordering",
+                    "entry_order_priority",
+                    "next_bar_submission_precheck",
+                    "next_bar_simple_cash_check",
                     "rebalance_mode",
                     "rebalance_headroom_pct",
                     "missing_price_policy",
@@ -604,6 +669,7 @@ class BacktestConfig:
         comm_cfg = data.get("commission", {})
         slip_cfg = data.get("slippage", {})
         cash_cfg = data.get("cash", {})
+        settle_cfg = data.get("settlement", {})
         order_cfg = data.get("orders", {})
 
         allow_short_selling = acct_cfg.get("allow_short_selling", False)
@@ -617,6 +683,7 @@ class BacktestConfig:
             long_maintenance_margin=acct_cfg.get("long_maintenance_margin", 0.25),
             short_maintenance_margin=acct_cfg.get("short_maintenance_margin", 0.30),
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
+            short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
             # Execution
             fill_timing=FillTiming(exec_cfg.get("fill_timing", "next_bar_open")),
             execution_price=ExecutionPrice(exec_cfg.get("execution_price", "close")),
@@ -649,10 +716,17 @@ class BacktestConfig:
             # Cash
             initial_cash=cash_cfg.get("initial", 100000.0),
             cash_buffer_pct=cash_cfg.get("buffer_pct", 0.0),
+            # Settlement
+            settlement_delay=settle_cfg.get("delay", 0),
             # Orders
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
             fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
+            entry_order_priority=EntryOrderPriority(
+                order_cfg.get("entry_order_priority", "submission")
+            ),
+            next_bar_submission_precheck=order_cfg.get("next_bar_submission_precheck", False),
+            next_bar_simple_cash_check=order_cfg.get("next_bar_simple_cash_check", False),
             rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
             rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
             missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),
@@ -686,6 +760,7 @@ class BacktestConfig:
         - "backtrader": Match Backtrader's default behavior
         - "vectorbt": Match VectorBT's default behavior
         - "zipline": Match Zipline's default behavior
+        - "lean": Match QuantConnect LEAN's default behavior
         - "realistic": Conservative settings for realistic simulation
         """
         from .profiles import get_profile_config
@@ -753,6 +828,9 @@ class BacktestConfig:
                 "",
                 "Orders:",
                 f"  Fill ordering: {self.fill_ordering.value}",
+                f"  Entry priority: {self.entry_order_priority.value}",
+                f"  Next-bar precheck: {self.next_bar_submission_precheck}",
+                f"  Next-bar cash check: {self.next_bar_simple_cash_check}",
                 f"  Rebalance mode: {self.rebalance_mode.value}",
                 f"  Rebalance headroom: {self.rebalance_headroom_pct:.3f}",
                 f"  Missing price policy: {self.missing_price_policy.value}",
@@ -766,6 +844,15 @@ class BacktestConfig:
                 f"  Buffer: {self.cash_buffer_pct:.1%}",
             ]
         )
+
+        if self.settlement_delay > 0:
+            lines.extend(
+                [
+                    "",
+                    "Settlement:",
+                    f"  Delay: T+{self.settlement_delay}",
+                ]
+            )
 
         return "\n".join(line for line in lines if line is not None)
 
@@ -791,6 +878,7 @@ class Mode(str, Enum):
         BACKTRADER: Match Backtrader behavior exactly
         VECTORBT: Match VectorBT behavior exactly
         ZIPLINE: Match Zipline behavior exactly
+        LEAN: Match QuantConnect LEAN behavior exactly
     """
 
     DEFAULT = "default"
@@ -799,6 +887,7 @@ class Mode(str, Enum):
     BACKTRADER = "backtrader"
     VECTORBT = "vectorbt"
     ZIPLINE = "zipline"
+    LEAN = "lean"
 
     def to_config(self) -> BacktestConfig:
         """Convert mode to a BacktestConfig instance."""

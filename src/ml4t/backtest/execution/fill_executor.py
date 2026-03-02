@@ -80,6 +80,7 @@ class FillExecutor:
             broker: The Broker instance whose state we'll modify
         """
         self.broker = broker
+        self._qty_zero_epsilon = 1e-12
 
     def execute(self, order: Order, base_price: float) -> bool:
         """Execute a fill and update positions.
@@ -178,11 +179,19 @@ class FillExecutor:
         cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
 
-        # Sync position to AccountState
-        self._sync_account_state(order.asset)
+        # Sync position to AccountState using execution price for this fill.
+        # In next-bar/open execution this avoids close-price mark-to-market
+        # leaking into same-cycle buying-power checks.
+        self._sync_account_state(order.asset, current_price=ctx.fill_price)
 
         # Update account cash
         broker.account.cash = broker.cash
+
+        # Settlement delay: hold sale proceeds until settlement completes
+        if broker.settlement_delay > 0 and cash_change > 0:
+            broker.account.add_settlement_hold(
+                broker._bar_index, broker.settlement_delay, cash_change
+            )
 
         # Cancel sibling bracket orders on full fill
         if order.parent_id and not is_partial:
@@ -212,6 +221,8 @@ class FillExecutor:
         else:
             old_qty = pos.quantity
             new_qty = old_qty + ctx.signed_qty
+            if abs(new_qty) < self._qty_zero_epsilon:
+                new_qty = 0.0
 
             if new_qty == 0:
                 self._close_position(ctx, pos, old_qty)
@@ -475,11 +486,13 @@ class FillExecutor:
 
         pos.quantity = new_qty
 
-    def _sync_account_state(self, asset: str) -> None:
+    def _sync_account_state(self, asset: str, current_price: float | None = None) -> None:
         """Sync broker position to AccountState.
 
         Args:
             asset: Asset to sync
+            current_price: Optional mark price for account sync; defaults to latest
+                broker close price when not provided.
         """
         broker = self.broker
         broker_pos = broker.positions.get(asset)
@@ -491,13 +504,17 @@ class FillExecutor:
         else:
             # Update or create position in account (include multiplier for correct valuation)
             account_pos = broker.account.positions.get(asset)
-            current_price = broker._current_prices.get(asset, broker_pos.entry_price)
+            mark_price = (
+                current_price
+                if current_price is not None
+                else broker._current_prices.get(asset, broker_pos.entry_price)
+            )
             if account_pos is None:
                 broker.account.positions[asset] = Position(
                     asset=broker_pos.asset,
                     quantity=broker_pos.quantity,
                     entry_price=broker_pos.entry_price,
-                    current_price=current_price,
+                    current_price=mark_price,
                     entry_time=broker_pos.entry_time,
                     bars_held=broker_pos.bars_held,
                     multiplier=broker_pos.multiplier,
@@ -505,7 +522,7 @@ class FillExecutor:
             else:
                 account_pos.quantity = broker_pos.quantity
                 account_pos.entry_price = broker_pos.entry_price
-                account_pos.current_price = current_price
+                account_pos.current_price = mark_price
                 account_pos.entry_time = broker_pos.entry_time
                 account_pos.bars_held = broker_pos.bars_held
                 account_pos.multiplier = broker_pos.multiplier

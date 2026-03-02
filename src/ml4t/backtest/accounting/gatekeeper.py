@@ -54,10 +54,15 @@ class Gatekeeper:
         self.cash_buffer_pct = cash_buffer_pct
 
     def _available_cash(self) -> float:
-        """Cash available for new orders after applying buffer reserve."""
-        if self.cash_buffer_pct > 0:
-            return self.account.cash * (1.0 - self.cash_buffer_pct)
-        return self.account.cash
+        """Cash available for new orders after applying buffer reserve and settlement holds."""
+        spendable = self.account.policy.get_spendable_cash(
+            self.account.cash, self.account.positions
+        )
+        # Subtract unsettled sale proceeds (T+N settlement)
+        spendable -= self.account.unsettled_cash
+        if self.cash_buffer_pct > 0 and spendable > 0:
+            return spendable * (1.0 - self.cash_buffer_pct)
+        return spendable
 
     def validate_order(self, order: Order, price: float) -> tuple[bool, str]:
         """Validate order before execution.
@@ -112,6 +117,8 @@ class Gatekeeper:
         """
         # Get current position quantity (0 if no position)
         current_qty = self.account.get_position_quantity(order.asset)
+        if abs(current_qty) < 1e-12:
+            current_qty = 0.0
 
         # Determine order direction (positive=buy, negative=sell)
         order_qty_delta = self._calculate_quantity_delta(order.side, order.quantity)

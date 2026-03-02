@@ -4,6 +4,8 @@ This module provides the AccountState class that tracks cash, positions, and
 delegates validation to the appropriate AccountPolicy.
 """
 
+from collections import deque
+
 from ..types import Position
 from .policy import AccountPolicy
 
@@ -37,6 +39,10 @@ class AccountState:
         self.cash = initial_cash
         self.positions: dict[str, Position] = {}
         self.policy = policy
+
+        # Settlement tracking: holds are (settle_bar, amount) pairs
+        self._settlement_holds: deque[tuple[int, float]] = deque()
+        self._total_held: float = 0.0
 
     @property
     def total_equity(self) -> float:
@@ -109,6 +115,38 @@ class AccountState:
         """
         pos = self.positions.get(asset)
         return pos.quantity if pos else 0.0
+
+    @property
+    def unsettled_cash(self) -> float:
+        """Total cash held in unsettled transactions."""
+        return self._total_held
+
+    def add_settlement_hold(self, bar_index: int, delay: int, amount: float) -> None:
+        """Hold cash from a sale until settlement completes.
+
+        Args:
+            bar_index: Current bar index when the fill occurred.
+            delay: Number of bars until proceeds are spendable.
+            amount: Positive cash amount to hold.
+        """
+        if amount <= 0 or delay <= 0:
+            return
+        settle_bar = bar_index + delay
+        self._settlement_holds.append((settle_bar, amount))
+        self._total_held += amount
+
+    def release_settled(self, current_bar: int) -> None:
+        """Release holds whose settlement bar has been reached.
+
+        Args:
+            current_bar: Current bar index.
+        """
+        while self._settlement_holds and self._settlement_holds[0][0] <= current_bar:
+            _, amount = self._settlement_holds.popleft()
+            self._total_held -= amount
+        # Guard against floating-point drift
+        if not self._settlement_holds:
+            self._total_held = 0.0
 
     def apply_fill(self, asset: str, quantity_delta: float, fill_price: float, timestamp) -> float:
         """Apply a fill to the account, updating position and cash.

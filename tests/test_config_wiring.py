@@ -18,7 +18,14 @@ from ml4t.backtest import (
     Broker,
     ExecutionMode,
 )
-from ml4t.backtest.config import CommissionModel, FillOrdering, ShareType, SlippageModel
+from ml4t.backtest.config import (
+    CommissionModel,
+    EntryOrderPriority,
+    FillOrdering,
+    ShareType,
+    ShortCashPolicy,
+    SlippageModel,
+)
 from ml4t.backtest.models import (
     CombinedCommission,
     NoCommission,
@@ -27,7 +34,7 @@ from ml4t.backtest.models import (
     TieredCommission,
     VolumeShareSlippage,
 )
-from ml4t.backtest.types import OrderSide
+from ml4t.backtest.types import OrderSide, Position
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -142,11 +149,93 @@ class TestRejectOnInsufficientCash:
         rejected = [o for o in broker.orders if o.rejection_reason]
         assert len(rejected) == 0
 
+    def test_permissive_does_not_keep_unaffordable_order_pending_forever(self):
+        broker = _make_broker(
+            initial_cash=50.0,
+            reject_on_insufficient_cash=False,
+            partial_fills_allowed=True,
+            share_type=ShareType.INTEGER,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+
+        # Could not fill even a single share; order should be skipped and cleared.
+        assert broker.get_position("AAPL") is None
+        assert len(broker.pending_orders) == 0
+        # Still permissive: skipped orders are not marked rejected.
+        rejected = [o for o in broker.orders if o.rejection_reason]
+        assert len(rejected) == 0
+
     def test_from_config_propagates(self):
         config = BacktestConfig.from_preset("vectorbt")
         assert config.reject_on_insufficient_cash is False
         broker = Broker.from_config(config)
         assert broker.reject_on_insufficient_cash is False
+
+    def test_next_bar_submission_precheck_rejects_immediately(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        order = broker.submit_order("AAPL", 20, OrderSide.BUY)  # needs $2000
+        assert order is not None
+        assert order.status.value == "rejected"
+        assert "submission precheck" in (order.rejection_reason or "").lower()
+        assert len(broker.pending_orders) == 0
+
+    def test_next_bar_submission_precheck_uses_sequential_shadow_cash(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0, "MSFT": 100.0})
+
+        first = broker.submit_order("AAPL", 5, OrderSide.BUY)  # ~$500
+        second = broker.submit_order("MSFT", 6, OrderSide.BUY)  # ~$600 -> should fail after first
+
+        assert first is not None
+        assert second is not None
+        assert first.status.value != "rejected"
+        assert second.status.value == "rejected"
+
+    def test_margin_submission_precheck_allows_reversal_after_close_proceeds(self):
+        broker = _make_broker(
+            initial_cash=1_000_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            next_bar_simple_cash_check=False,
+            allow_short_selling=True,
+            allow_leverage=True,
+            reject_on_insufficient_cash=True,
+            share_type=ShareType.INTEGER,
+        )
+        ts = datetime(2024, 1, 2)
+        _set_prices(broker, {"AAPL": 1000.0}, ts=ts)
+        broker.cash = -500_000.0
+        broker.positions["AAPL"] = Position(
+            asset="AAPL",
+            quantity=15_000.0,
+            entry_price=100.0,
+            entry_time=ts,
+            current_price=1000.0,
+        )
+
+        # Long 15k -> submit sell 30k (close + reverse). Reversal precheck must
+        # account for close proceeds before validating the new short leg.
+        order = broker.submit_order("AAPL", 30_000, OrderSide.SELL)
+        assert order is not None
+        assert order.status.value != "rejected"
+        assert order.rejection_reason is None
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +287,109 @@ class TestCashBufferPct:
         broker = Broker.from_config(config)
         assert broker.cash_buffer_pct == 0.02
         assert broker.gatekeeper.cash_buffer_pct == 0.02
+
+
+class TestShortCashPolicy:
+    """short_cash_policy controls whether short proceeds are spendable."""
+
+    def test_credit_policy_reuses_short_proceeds(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.CREDIT,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"SHORT": 100.0, "LONG": 100.0})
+
+        # Open short: should credit cash under CREDIT mode.
+        broker.submit_order("SHORT", 10, OrderSide.SELL)
+        broker._process_orders()
+        assert broker.get_position("SHORT") is not None
+
+        # Reuse proceeds for long entry.
+        broker.submit_order("LONG", 15, OrderSide.BUY)  # $1500
+        broker._process_orders()
+        assert broker.get_position("LONG") is not None
+
+    def test_lock_notional_policy_blocks_reuse_of_short_proceeds(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"SHORT": 100.0, "LONG": 100.0})
+
+        broker.submit_order("SHORT", 10, OrderSide.SELL)
+        broker._process_orders()
+        assert broker.get_position("SHORT") is not None
+
+        broker.submit_order("LONG", 15, OrderSide.BUY)  # $1500
+        broker._process_orders()
+        assert broker.get_position("LONG") is None
+
+    def test_credit_proceeds_policy_allows_short_without_full_notional_cash(self):
+        broker = _make_broker(
+            initial_cash=250.0,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.CREDIT_PROCEEDS,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"SHORT": 100.0})
+        broker.submit_order("SHORT", 10, OrderSide.SELL)
+        broker._process_orders()
+        pos = broker.get_position("SHORT")
+        assert pos is not None
+        assert pos.quantity == -10.0
+
+    def test_vectorbt_strict_profile_sets_lock_notional(self):
+        config = BacktestConfig.from_preset("vectorbt_strict")
+        assert config.short_cash_policy == ShortCashPolicy.LOCK_NOTIONAL
+        assert config.fill_ordering == FillOrdering.FIFO
+        assert config.entry_order_priority == EntryOrderPriority.SUBMISSION
+
+    def test_zipline_strict_profile_uses_credit(self):
+        config = BacktestConfig.from_preset("zipline_strict")
+        assert config.short_cash_policy == ShortCashPolicy.CREDIT
+        assert config.allow_leverage is False
+
+    def test_backtrader_strict_profile_enables_submission_precheck(self):
+        config = BacktestConfig.from_preset("backtrader_strict")
+        assert config.next_bar_submission_precheck is True
+        assert config.next_bar_simple_cash_check is True
+
+    def test_lean_strict_profile_uses_margin_submission_precheck(self):
+        config = BacktestConfig.from_preset("lean_strict")
+        assert config.next_bar_submission_precheck is True
+        assert config.next_bar_simple_cash_check is False
+        assert config.fill_ordering == FillOrdering.EXIT_FIRST
+
+    def test_lock_notional_reversal_obeys_partial_cash_cap(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 10, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 150.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 20, OrderSide.BUY)
+        broker._process_orders()
+
+        pos = broker.get_position("A")
+        assert pos is not None
+        assert pos.quantity == pytest.approx(3.333333333333334)
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +480,28 @@ class TestFillOrdering:
         # EXIT_FIRST: AAPL sell frees $10k, then GOOG buy succeeds
         assert broker.get_position("AAPL") is None
         assert broker.get_position("GOOG") is not None
+
+
+class TestEntryOrderPriority:
+    """entry_order_priority controls constrained entry sequencing."""
+
+    def test_notional_asc_prioritizes_smaller_entries(self):
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            fill_ordering=FillOrdering.EXIT_FIRST,
+            entry_order_priority=EntryOrderPriority.NOTIONAL_ASC,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"BIG": 100.0, "SMALL": 100.0})
+
+        # Submitted BIG first, but NOTIONAL_ASC should fill SMALL first.
+        broker.submit_order("BIG", 100, OrderSide.BUY)  # $10k
+        broker.submit_order("SMALL", 50, OrderSide.BUY)  # $5k
+        broker._process_orders()
+
+        assert broker.get_position("SMALL") is not None
+        assert broker.get_position("BIG") is None
 
     def test_fifo_processes_in_submission_order(self):
         """FIFO processes orders in submission order."""

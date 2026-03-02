@@ -108,6 +108,7 @@ comparison = [
     "vectorbt>=0.24.0",
     "backtrader>=1.9.0",
     "zipline-reloaded>=2.4.0",
+    "pyfolio-reloaded>=0.9.9",
 ]
 
 # Development dependencies

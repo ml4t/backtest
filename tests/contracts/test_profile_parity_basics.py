@@ -41,7 +41,7 @@ class _BuyOnce(Strategy):
 
 
 def test_profile_registry_has_expected_core_profiles() -> None:
-    assert list_profiles() == ["backtrader", "default", "realistic", "vectorbt", "zipline"]
+    assert list_profiles() == ["backtrader", "default", "lean", "realistic", "vectorbt", "zipline"]
 
 
 def test_string_preset_and_explicit_preset_config_match() -> None:
@@ -84,3 +84,35 @@ def test_zipline_profile_parity_order_knobs() -> None:
     assert cfg.rebalance_headroom_pct == 0.998
     assert cfg.missing_price_policy.value == "use_last"
     assert cfg.late_asset_policy.value == "allow"
+
+
+def test_zipline_strict_uses_credit_short_cash_policy() -> None:
+    """Zipline_strict must use 'credit' so longs and shorts are cash-checked equally."""
+    cfg = BacktestConfig.from_preset("zipline_strict")
+    assert cfg.short_cash_policy.value == "credit"
+
+
+def test_profile_registry_has_lean_profile() -> None:
+    """LEAN profile must be a core profile, not just a strict variant."""
+    cfg = BacktestConfig.from_preset("lean")
+    assert cfg.preset_name == "lean"
+    assert cfg.fill_ordering.value == "exit_first"
+    assert cfg.commission_per_share == 0.005
+    assert cfg.commission_minimum == 1.0
+
+
+def test_lean_profile_is_independent_of_backtrader() -> None:
+    """LEAN profile must NOT inherit from Backtrader (allow_leverage differs)."""
+    lean = BacktestConfig.from_preset("lean")
+    bt = BacktestConfig.from_preset("backtrader")
+    assert lean.allow_leverage is False
+    assert bt.allow_leverage is True
+
+
+def test_quantconnect_alias_resolves_to_lean() -> None:
+    """The 'quantconnect' alias must resolve to the lean profile."""
+    cfg = BacktestConfig.from_preset("quantconnect")
+    assert cfg.preset_name == "quantconnect"
+    lean = BacktestConfig.from_preset("lean")
+    assert cfg.fill_ordering == lean.fill_ordering
+    assert cfg.allow_leverage == lean.allow_leverage
