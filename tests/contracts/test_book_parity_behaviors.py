@@ -6,12 +6,11 @@ import polars as pl
 
 from ml4t.backtest.config import (
     BacktestConfig,
-    CommissionModel,
+    CommissionType,
     FillOrdering,
-    FillTiming,
     RebalanceMode,
     ShareType,
-    SlippageModel,
+    SlippageType,
 )
 from ml4t.backtest.engine import run_backtest
 from ml4t.backtest.execution import RebalanceConfig, TargetWeightExecutor
@@ -75,13 +74,12 @@ def test_snapshot_value_freezes_targets_vs_incremental_recompute() -> None:
     )
     cfg = BacktestConfig(
         initial_cash=200_000.0,
-        fill_timing=FillTiming.SAME_BAR,
         execution_mode=ExecutionMode.SAME_BAR,
         share_type=ShareType.INTEGER,
         fill_ordering=FillOrdering.FIFO,
-        commission_model=CommissionModel.PERCENTAGE,
+        commission_type=CommissionType.PERCENTAGE,
         commission_rate=0.01,
-        slippage_model=SlippageModel.NONE,
+        slippage_type=SlippageType.NONE,
     )
 
     snapshot_strategy = _RebalanceByMode(RebalanceMode.SNAPSHOT)
@@ -116,12 +114,11 @@ def test_sell_before_buy_rotation_works_under_tight_cash() -> None:
     )
     cfg = BacktestConfig(
         initial_cash=10_000.0,
-        fill_timing=FillTiming.SAME_BAR,
         execution_mode=ExecutionMode.SAME_BAR,
         share_type=ShareType.INTEGER,
         fill_ordering=FillOrdering.FIFO,
-        commission_model=CommissionModel.NONE,
-        slippage_model=SlippageModel.NONE,
+        commission_type=CommissionType.NONE,
+        slippage_type=SlippageType.NONE,
     )
     result = run_backtest(prices=prices, strategy=_RotateSellThenBuy(), config=cfg)
 
@@ -157,12 +154,11 @@ def test_missing_bar_skips_orders_for_unpriced_asset() -> None:
     strategy = _MissingBarsRebalance()
     cfg = BacktestConfig(
         initial_cash=20_000.0,
-        fill_timing=FillTiming.SAME_BAR,
         execution_mode=ExecutionMode.SAME_BAR,
         share_type=ShareType.INTEGER,
         fill_ordering=FillOrdering.FIFO,
-        commission_model=CommissionModel.NONE,
-        slippage_model=SlippageModel.NONE,
+        commission_type=CommissionType.NONE,
+        slippage_type=SlippageType.NONE,
     )
     run_backtest(prices=prices, strategy=strategy, config=cfg)
 
@@ -190,12 +186,11 @@ def test_late_asset_start_only_trades_after_first_price() -> None:
     )
     cfg = BacktestConfig(
         initial_cash=10_000.0,
-        fill_timing=FillTiming.SAME_BAR,
         execution_mode=ExecutionMode.SAME_BAR,
         share_type=ShareType.INTEGER,
         fill_ordering=FillOrdering.FIFO,
-        commission_model=CommissionModel.NONE,
-        slippage_model=SlippageModel.NONE,
+        commission_type=CommissionType.NONE,
+        slippage_type=SlippageType.NONE,
     )
     result = run_backtest(prices=prices, strategy=_LateAssetRebalance(), config=cfg)
 

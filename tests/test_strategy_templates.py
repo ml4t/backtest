@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import polars as pl
 
-from ml4t.backtest import DataFeed, Engine, Mode
+from ml4t.backtest import BacktestConfig, DataFeed, Engine
 from ml4t.backtest.strategies import (
     LongShortStrategy,
     MeanReversionStrategy,
@@ -74,7 +74,7 @@ class TestSignalFollowingStrategy:
             signals_df=df.select(["timestamp", "asset", "signal"]),
         )
 
-        engine = Engine.from_mode(feed, SimpleLongStrategy(), Mode.FAST)
+        engine = Engine.from_config(feed,SimpleLongStrategy(), BacktestConfig.from_preset("fast"))
         result = engine.run()
 
         # Should have some trades
@@ -108,7 +108,7 @@ class TestSignalFollowingStrategy:
             signals_df=df.select(["timestamp", "asset", "signal"]),
         )
 
-        engine = Engine.from_mode(feed, LongShortSignalStrategy(), Mode.FAST)
+        engine = Engine.from_config(feed,LongShortSignalStrategy(), BacktestConfig.from_preset("fast"))
         result = engine.run()
 
         # Should have trades
@@ -141,7 +141,7 @@ class TestMomentumStrategy:
         )
 
         feed = DataFeed(prices_df=df)
-        engine = Engine.from_mode(feed, SimpleMomentum(), Mode.FAST)
+        engine = Engine.from_config(feed,SimpleMomentum(), BacktestConfig.from_preset("fast"))
         result = engine.run()
 
         # Should complete without error
@@ -194,7 +194,7 @@ class TestMeanReversionStrategy:
         )
 
         feed = DataFeed(prices_df=df)
-        engine = Engine.from_mode(feed, SimpleMeanReversion(), Mode.FAST)
+        engine = Engine.from_config(feed,SimpleMeanReversion(), BacktestConfig.from_preset("fast"))
         result = engine.run()
 
         # Should complete without error
@@ -261,7 +261,7 @@ class TestLongShortStrategy:
             signals_df=df.select(["timestamp", "asset", "signal"]),
         )
 
-        engine = Engine.from_mode(feed, SimpleLongShort(), Mode.FAST)
+        engine = Engine.from_config(feed,SimpleLongShort(), BacktestConfig.from_preset("fast"))
         result = engine.run()
 
         # Should complete without error

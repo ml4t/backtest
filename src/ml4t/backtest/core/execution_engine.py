@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType
+from .shared import is_exit_order
 
 
 class ExecutionEngine:
@@ -22,20 +23,7 @@ class ExecutionEngine:
 
     def _is_exit_order(self, order) -> bool:
         """Check if an order reduces an existing position without reversing."""
-        broker = self.broker
-        pos = broker.positions.get(order.asset)
-        if pos is None or pos.quantity == 0:
-            return False
-
-        signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
-
-        if pos.quantity > 0 and signed_qty < 0:
-            new_qty = pos.quantity + signed_qty
-            return new_qty >= 0
-        if pos.quantity < 0 and signed_qty > 0:
-            new_qty = pos.quantity + signed_qty
-            return new_qty <= 0
-        return False
+        return is_exit_order(order, self.broker.positions)
 
     def _process_orders_exit_first(self, use_open: bool = False):
         broker = self.broker
@@ -338,53 +326,6 @@ class ExecutionEngine:
             broker._orders_this_bar = [
                 o for o in broker._orders_this_bar if o.order_id in broker._orders_this_bar_ids
             ]
-
-    def _precheck_next_bar_orders_fifo(self, orders: list, use_open: bool) -> list:
-        """Apply submission-price cash precheck for NEXT_BAR FIFO processing.
-
-        This emulates frameworks that reject some next-bar market orders based on
-        signal-bar pricing before open-price execution.
-        """
-        broker = self.broker
-        fill = broker._fill_engine
-        shadow_cash = broker.cash
-        accepted: list = []
-
-        for order in orders:
-            if order.order_type is not OrderType.MARKET:
-                accepted.append(order)
-                continue
-
-            if broker.share_type.value == "integer":
-                order.quantity = float(int(order.quantity))
-            if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
-                continue
-
-            signal_price = getattr(order, "_signal_price", None)
-            check_price = (
-                signal_price
-                if signal_price is not None
-                else fill.get_fill_price_for_order(order, use_open)
-            )
-            if check_price is None:
-                accepted.append(order)
-                continue
-
-            signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
-            commission = broker.commission_model.calculate(order.asset, order.quantity, check_price)
-            projected_cash = shadow_cash - signed_qty * check_price - commission
-
-            if projected_cash < 0.0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Insufficient cash (submission precheck)"
-                continue
-
-            shadow_cash = projected_cash
-            accepted.append(order)
-
-        return accepted
 
     def _sort_entry_orders(self, orders: list, use_open: bool) -> list:
         """Sort entry orders under EXIT_FIRST based on configured priority."""

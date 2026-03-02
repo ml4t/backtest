@@ -14,7 +14,7 @@ from typing import Any
 import polars as pl
 import pytest
 
-from ml4t.backtest import DataFeed, Engine, Mode, Strategy
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
 
 
 class _LegacyDataFeed:
@@ -134,7 +134,7 @@ def _build_benchmark_data(n_bars: int, n_assets: int) -> tuple[pl.DataFrame, pl.
 
 def _run_engine(feed_cls, prices: pl.DataFrame, signals: pl.DataFrame) -> float:
     feed = feed_cls(prices_df=prices, signals_df=signals)
-    engine = Engine.from_mode(feed, _NoopStrategy(), Mode.FAST)
+    engine = Engine.from_config(feed, _NoopStrategy(), BacktestConfig.from_preset("fast"))
     start = perf_counter()
     _ = engine.run()
     return perf_counter() - start

@@ -81,6 +81,7 @@ class Broker:
         next_bar_submission_precheck: bool = False,
         next_bar_simple_cash_check: bool = False,
         buying_power_reservation: bool = False,
+        immediate_fill: bool = False,
         reject_on_insufficient_cash: bool = True,
         skip_cash_validation: bool = False,
         cash_buffer_pct: float = 0.0,
@@ -121,6 +122,7 @@ class Broker:
         self.next_bar_submission_precheck = next_bar_submission_precheck
         self.next_bar_simple_cash_check = next_bar_simple_cash_check
         self.buying_power_reservation = buying_power_reservation
+        self.immediate_fill = immediate_fill
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
         self.skip_cash_validation = skip_cash_validation
         self.cash_buffer_pct = cash_buffer_pct
@@ -250,8 +252,7 @@ class Broker:
             config = BacktestConfig.from_preset("backtrader")
             broker = Broker.from_config(config)
         """
-        from .config import CommissionModel as CommModelEnum
-        from .config import SlippageModel as SlipModelEnum
+        from .config import CommissionType, SlippageType
         from .models import (
             CombinedCommission,
             FixedSlippage,
@@ -266,31 +267,31 @@ class Broker:
 
         # Build commission model from config
         commission_model = None
-        if config.commission_model == CommModelEnum.PERCENTAGE:
+        if config.commission_type == CommissionType.PERCENTAGE:
             commission_model = PercentageCommission(rate=config.commission_rate)
-        elif config.commission_model == CommModelEnum.PER_SHARE:
+        elif config.commission_type == CommissionType.PER_SHARE:
             commission_model = PerShareCommission(
                 per_share=config.commission_per_share,
                 minimum=config.commission_minimum,
             )
-        elif config.commission_model == CommModelEnum.PER_TRADE:
+        elif config.commission_type == CommissionType.PER_TRADE:
             commission_model = CombinedCommission(fixed=config.commission_per_trade)
-        elif config.commission_model == CommModelEnum.TIERED:
+        elif config.commission_type == CommissionType.TIERED:
             commission_model = TieredCommission(
                 tiers=[(float("inf"), config.commission_rate)],
             )
-        elif config.commission_model == CommModelEnum.NONE:
+        elif config.commission_type == CommissionType.NONE:
             commission_model = NoCommission()
 
         # Build slippage model from config
         slippage_model = None
-        if config.slippage_model == SlipModelEnum.PERCENTAGE:
+        if config.slippage_type == SlippageType.PERCENTAGE:
             slippage_model = PercentageSlippage(rate=config.slippage_rate)
-        elif config.slippage_model == SlipModelEnum.FIXED:
+        elif config.slippage_type == SlippageType.FIXED:
             slippage_model = FixedSlippage(amount=config.slippage_fixed)
-        elif config.slippage_model == SlipModelEnum.VOLUME_BASED:
+        elif config.slippage_type == SlippageType.VOLUME_BASED:
             slippage_model = VolumeShareSlippage(impact_factor=config.slippage_rate)
-        elif config.slippage_model == SlipModelEnum.NONE:
+        elif config.slippage_type == SlippageType.NONE:
             slippage_model = NoSlippage()
 
         return cls(
@@ -321,6 +322,7 @@ class Broker:
             next_bar_submission_precheck=config.next_bar_submission_precheck,
             next_bar_simple_cash_check=config.next_bar_simple_cash_check,
             buying_power_reservation=config.buying_power_reservation,
+            immediate_fill=config.immediate_fill,
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
             skip_cash_validation=config.skip_cash_validation,
             cash_buffer_pct=config.cash_buffer_pct,
@@ -445,7 +447,6 @@ class Broker:
         self,
         asset: str,
         pnl: float,
-        is_partial: bool = False,
     ) -> None:
         """Record a P&L realization event (internal use).
 
@@ -455,7 +456,6 @@ class Broker:
         Args:
             asset: Asset symbol
             pnl: Realized P&L from the exit
-            is_partial: True if this was a partial exit (scale down)
         """
         if not self._stats_config.enabled:
             return
@@ -864,6 +864,68 @@ class Broker:
 
         return self.submit_order(asset, exit_qty, side, order_type, limit_price)
 
+    def _submit_side_order(
+        self,
+        side: OrderSide,
+        asset: str,
+        shares: float | None = None,
+        contracts: int | None = None,
+        amount: float | None = None,
+        dollars: float | None = None,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Resolve quantity parameters and submit an order for the given side.
+
+        Exactly one of shares/contracts/amount/dollars must be provided.
+
+        Args:
+            side: BUY or SELL
+            asset: Asset symbol
+            shares: Number of shares (equities)
+            contracts: Number of contracts (futures)
+            amount: Base currency amount (crypto)
+            dollars: Dollar value (converted to quantity at current price)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Order object if submitted, None if no current price or invalid params
+
+        Raises:
+            ValueError: If zero or more than one quantity parameter is provided
+        """
+        # Count non-None parameters
+        qty_params = [shares, contracts, amount, dollars]
+        provided = sum(1 for p in qty_params if p is not None)
+
+        if provided == 0:
+            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
+        if provided > 1:
+            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
+
+        # Determine quantity
+        quantity: float
+        if shares is not None:
+            quantity = shares
+        elif contracts is not None:
+            quantity = float(contracts)
+        elif amount is not None:
+            quantity = amount
+        elif dollars is not None:
+            price = self._current_prices.get(asset)
+            if price is None or price <= 0:
+                return None
+            multiplier = self.get_multiplier(asset)
+            quantity = dollars / (price * multiplier)
+        else:
+            return None  # Should not reach here
+
+        if quantity <= 0:
+            return None
+
+        return self.submit_order(asset, quantity, side, order_type, limit_price)
+
     def buy(
         self,
         asset: str,
@@ -912,36 +974,16 @@ class Broker:
             # Buy 0.5 BTC
             broker.buy("BTC", amount=0.5)
         """
-        # Count non-None parameters
-        qty_params = [shares, contracts, amount, dollars]
-        provided = sum(1 for p in qty_params if p is not None)
-
-        if provided == 0:
-            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
-        if provided > 1:
-            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
-
-        # Determine quantity
-        quantity: float
-        if shares is not None:
-            quantity = shares
-        elif contracts is not None:
-            quantity = float(contracts)
-        elif amount is not None:
-            quantity = amount
-        elif dollars is not None:
-            price = self._current_prices.get(asset)
-            if price is None or price <= 0:
-                return None
-            multiplier = self.get_multiplier(asset)
-            quantity = dollars / (price * multiplier)
-        else:
-            return None  # Should not reach here
-
-        if quantity <= 0:
-            return None
-
-        return self.submit_order(asset, quantity, OrderSide.BUY, order_type, limit_price)
+        return self._submit_side_order(
+            OrderSide.BUY,
+            asset,
+            shares,
+            contracts,
+            amount,
+            dollars,
+            order_type,
+            limit_price,
+        )
 
     def sell(
         self,
@@ -988,36 +1030,16 @@ class Broker:
             # Sell $2500 worth of position
             broker.sell("BTC", dollars=2500)
         """
-        # Count non-None parameters
-        qty_params = [shares, contracts, amount, dollars]
-        provided = sum(1 for p in qty_params if p is not None)
-
-        if provided == 0:
-            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
-        if provided > 1:
-            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
-
-        # Determine quantity
-        quantity: float
-        if shares is not None:
-            quantity = shares
-        elif contracts is not None:
-            quantity = float(contracts)
-        elif amount is not None:
-            quantity = amount
-        elif dollars is not None:
-            price = self._current_prices.get(asset)
-            if price is None or price <= 0:
-                return None
-            multiplier = self.get_multiplier(asset)
-            quantity = dollars / (price * multiplier)
-        else:
-            return None  # Should not reach here
-
-        if quantity <= 0:
-            return None
-
-        return self.submit_order(asset, quantity, OrderSide.SELL, order_type, limit_price)
+        return self._submit_side_order(
+            OrderSide.SELL,
+            asset,
+            shares,
+            contracts,
+            amount,
+            dollars,
+            order_type,
+            limit_price,
+        )
 
     # === Trade History Access (P1 Features) ===
 
@@ -1025,7 +1047,6 @@ class Broker:
         self,
         asset: str | None = None,
         last_n: int | None = None,
-        since_bar: int | None = None,
     ) -> list[Trade]:
         """Get completed trades, optionally filtered.
 
@@ -1036,7 +1057,6 @@ class Broker:
         Args:
             asset: Filter to only this asset's trades. If None, returns all trades.
             last_n: Return only the last N trades (after other filters)
-            since_bar: Return trades with entry_bar >= since_bar
 
         Returns:
             List of Trade objects matching the filters, ordered by exit time
@@ -1059,11 +1079,6 @@ class Broker:
         # Filter by asset
         if asset is not None:
             result = [t for t in result if t.symbol == asset]
-
-        # Filter by entry bar (if we had bar info - using entry_time as proxy)
-        # Note: Trade doesn't have entry_bar, but bars_held is available
-        # For now, since_bar is not fully implementable without entry_bar
-        # but we keep the parameter for API consistency with spec
 
         # Apply last_n limit
         if last_n is not None and last_n > 0:

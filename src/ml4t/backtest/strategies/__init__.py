@@ -11,7 +11,7 @@ Available Templates:
     LongShortStrategy: Long winners, short losers based on ranking
 
 Example:
-    >>> from ml4t.backtest import Engine, Mode, DataFeed
+    >>> from ml4t.backtest import Engine, BacktestConfig, DataFeed
     >>> from ml4t.backtest.strategies import SignalFollowingStrategy
     >>>
     >>> class MyMLStrategy(SignalFollowingStrategy):
@@ -24,7 +24,8 @@ Example:
     ...     def should_exit(self, signal):
     ...         return signal < 0.3
     >>>
-    >>> engine = Engine.from_mode(feed, MyMLStrategy(), Mode.REALISTIC)
+    >>> config = BacktestConfig.from_preset("realistic")
+    >>> engine = Engine.from_config(feed, MyMLStrategy(), config)
     >>> result = engine.run()
 """
 

@@ -80,7 +80,7 @@ class CombinedCommission:
 
 
 class FuturesCommission:
-    """PySystemTrade-compatible futures commission model.
+    """PySystemTrade-compatible futures commission cost calculator.
 
     Calculates commission as the MAX of three cost components:
     1. per_trade: Fixed cost per trade (regardless of size)
@@ -89,6 +89,10 @@ class FuturesCommission:
 
     This matches PySystemTrade's formula:
         total = max(per_trade, per_block * abs(qty), percentage * notional)
+
+    Note: When used without explicit multiplier (default=1.0), the per_block
+    and per_trade components work correctly. The percentage component requires
+    the actual contract multiplier for accurate notional-based commission.
 
     Reference: sysobjects/instruments.py in PySystemTrade
 
@@ -198,25 +202,24 @@ class VolumeShareSlippage:
 
 
 class FuturesSlippage:
-    """PySystemTrade-compatible futures slippage model.
+    """Futures slippage cost calculator.
 
-    Calculates slippage in currency units based on price slippage points
-    and contract multiplier. This matches PySystemTrade's formula:
+    Calculates total slippage cost in currency units for portfolio cost
+    analysis and position sizing. Based on PySystemTrade's formula:
         slippage = abs(qty) * price_slippage_points * multiplier
 
-    Reference: sysobjects/instruments.py in PySystemTrade
-
-    Note: Unlike equity slippage models that return per-share adjustments,
-    this returns TOTAL slippage in currency for the entire trade.
+    Note: This returns TOTAL cost, not per-unit price adjustment. It is
+    designed for direct cost analysis, not for use as a FillExecutor
+    slippage model (which expects per-unit returns). For fill-time
+    slippage on futures, use PercentageSlippage or FixedSlippage.
 
     Args:
         slippage_points: Slippage in price points per contract (default 0.0)
 
     Example:
-        # ES futures with 0.25 tick slippage
         slip = FuturesSlippage(slippage_points=0.25)
-        # 1 contract: 1 * 0.25 * 50 = $12.50
-        cost = slip.calculate("ES", 1, 4000.0, multiplier=50.0)
+        # 2 ES contracts: 2 * 0.25 * 50 = $25 total cost
+        cost = slip.calculate("ES", 2, 4000.0, multiplier=50.0)
     """
 
     def __init__(self, slippage_points: float = 0.0):
@@ -230,13 +233,13 @@ class FuturesSlippage:
         volume: float | None = None,
         multiplier: float = 1.0,
     ) -> float:
-        """Calculate slippage for a futures trade.
+        """Calculate total slippage cost for a futures trade.
 
         Args:
-            asset: Asset symbol (unused, for protocol compatibility)
-            quantity: Number of contracts (signed, will use absolute value)
+            asset: Asset symbol (unused, for signature compatibility)
+            quantity: Number of contracts (signed, uses absolute value)
             price: Contract price (unused in this model)
-            volume: Bar volume (unused, for protocol compatibility)
+            volume: Bar volume (unused, for signature compatibility)
             multiplier: Contract multiplier (point value)
 
         Returns:

@@ -171,6 +171,4 @@ class TestSettlementDelayIntegration:
             config=config,
         )
         # With no settlement delay, bar-3 buy should succeed
-        trades = [t for t in result.trades if t.status != "open" or True]
-        # Should have at least the initial buy and a second buy
         assert len(result.trades) >= 2

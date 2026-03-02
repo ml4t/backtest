@@ -19,6 +19,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from ..core.shared import CASH_TOLERANCE
+
 if TYPE_CHECKING:
     from ..config import BacktestConfig
     from ..types import Position
@@ -482,8 +484,6 @@ class UnifiedAccountPolicy(AccountPolicy):
             # Crypto: check cash covers new position
             if self.short_cash_policy == "credit_proceeds" and new_qty < 0:
                 return True, ""
-            # Floating-point tolerance for cash comparison ($0.01 = 1 cent)
-            CASH_TOLERANCE = 0.01
             if new_position_cost > cash_after_close + CASH_TOLERANCE:
                 return (
                     False,
@@ -506,11 +506,6 @@ class UnifiedAccountPolicy(AccountPolicy):
             return False, "Short selling not allowed in cash account"
 
         order_cost = abs(quantity * price)
-
-        # Floating-point tolerance for cash comparison ($0.01 = 1 cent)
-        # This prevents rejections due to floating-point arithmetic rounding
-        # e.g., when equity/price * price != equity exactly
-        CASH_TOLERANCE = 0.01
 
         if (
             not self.allow_leverage
@@ -608,9 +603,6 @@ class UnifiedAccountPolicy(AccountPolicy):
         else:
             # Adding to position
             order_cost = abs(quantity_delta * price)
-
-        # Floating-point tolerance for cash comparison ($0.01 = 1 cent)
-        CASH_TOLERANCE = 0.01
 
         if self.allow_leverage:
             # Margin: check buying power

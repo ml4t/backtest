@@ -17,11 +17,10 @@ from ml4t.backtest import (
 )
 from ml4t.backtest.config import (
     BacktestConfig,
-    CommissionModel,
-    FillTiming,
-    SlippageModel,
+    CommissionType,
+    SlippageType,
 )
-from ml4t.backtest.models import PercentageCommission, PerShareCommission, VolumeShareSlippage
+from ml4t.backtest.models import PercentageCommission, VolumeShareSlippage
 
 # === Test Data Generators ===
 
@@ -417,7 +416,7 @@ class TestEngine:
         feed = DataFeed(prices_df=prices)
         strategy = BuyAndHoldStrategy("AAPL")
 
-        engine = Engine(feed, strategy, initial_cash=100000)
+        engine = Engine(feed, strategy)
         results = engine.run()
 
         assert results.metrics["num_trades"] == 0  # Still holding
@@ -430,7 +429,7 @@ class TestEngine:
         feed = DataFeed(prices_df=prices, signals_df=signals)
 
         strategy = SignalBasedStrategy(threshold_buy=0.6, threshold_sell=0.4)
-        engine = Engine(feed, strategy, initial_cash=100000)
+        engine = Engine(feed, strategy)
         results = engine.run()
 
         # Should have some trades
@@ -444,7 +443,7 @@ class TestEngine:
         feed = DataFeed(prices_df=prices, signals_df=signals, context_df=context)
 
         strategy = VIXFilterStrategy(vix_threshold=18)
-        engine = Engine(feed, strategy, initial_cash=100000)
+        engine = Engine(feed, strategy)
         results = engine.run()
 
         assert len(results.equity_curve) == 20
@@ -454,8 +453,12 @@ class TestEngine:
         feed = DataFeed(prices_df=prices)
         strategy = BuyAndHoldStrategy("AAPL")
 
-        commission = PerShareCommission(per_share=0.01, minimum=1.0)
-        engine = Engine(feed, strategy, initial_cash=100000, commission_model=commission)
+        config = BacktestConfig(
+            commission_type=CommissionType.PER_SHARE,
+            commission_per_share=0.01,
+            commission_minimum=1.0,
+        )
+        engine = Engine(feed, strategy, config)
         results = engine.run()
 
         assert results.metrics["total_commission"] >= 1.0
@@ -464,10 +467,15 @@ class TestEngine:
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10)
         strategy = BuyAndHoldStrategy("AAPL")
 
+        config = BacktestConfig(
+            initial_cash=50000,
+            commission_type=CommissionType.NONE,
+            slippage_type=SlippageType.NONE,
+        )
         results = run_backtest(
             prices=prices,
             strategy=strategy,
-            initial_cash=50000,
+            config=config,
         )
 
         assert results.metrics["initial_cash"] == 50000
@@ -494,7 +502,7 @@ class TestTradeRecording:
                     self.state = "done"
 
         feed = DataFeed(prices_df=prices, signals_df=signals)
-        engine = Engine(feed, QuickTrade(), initial_cash=100000)
+        engine = Engine(feed, QuickTrade())
         results = engine.run()
 
         assert len(results.trades) == 1
@@ -521,7 +529,7 @@ class TestMultiAsset:
                         broker.submit_order(asset, 10)
 
         feed = DataFeed(prices_df=prices, signals_df=signals)
-        engine = Engine(feed, MultiAssetStrategy(), initial_cash=100000)
+        engine = Engine(feed, MultiAssetStrategy())
         engine.run()
 
         assert len(engine.broker.positions) == 4
@@ -539,7 +547,7 @@ class TestEngineFromConfig:
         strategy = BuyAndHoldStrategy("AAPL")
 
         config = BacktestConfig(
-            commission_model=CommissionModel.PERCENTAGE,
+            commission_type=CommissionType.PERCENTAGE,
             commission_rate=0.001,  # 0.1%
         )
         engine = Engine.from_config(feed, strategy, config)
@@ -555,7 +563,7 @@ class TestEngineFromConfig:
         strategy = BuyAndHoldStrategy("AAPL")
 
         config = BacktestConfig(
-            commission_model=CommissionModel.PER_SHARE,
+            commission_type=CommissionType.PER_SHARE,
             commission_per_share=0.01,
             commission_minimum=1.0,
         )
@@ -571,7 +579,7 @@ class TestEngineFromConfig:
         feed = DataFeed(prices_df=prices)
         strategy = BuyAndHoldStrategy("AAPL")
 
-        config = BacktestConfig(commission_model=CommissionModel.NONE)
+        config = BacktestConfig(commission_type=CommissionType.NONE)
         engine = Engine.from_config(feed, strategy, config)
         results = engine.run()
 
@@ -584,7 +592,7 @@ class TestEngineFromConfig:
         strategy = BuyAndHoldStrategy("AAPL")
 
         config = BacktestConfig(
-            slippage_model=SlippageModel.PERCENTAGE,
+            slippage_type=SlippageType.PERCENTAGE,
             slippage_rate=0.001,  # 0.1%
         )
         engine = Engine.from_config(feed, strategy, config)
@@ -599,7 +607,7 @@ class TestEngineFromConfig:
         strategy = BuyAndHoldStrategy("AAPL")
 
         config = BacktestConfig(
-            slippage_model=SlippageModel.FIXED,
+            slippage_type=SlippageType.FIXED,
             slippage_fixed=0.05,  # $0.05 per share
         )
         engine = Engine.from_config(feed, strategy, config)
@@ -628,20 +636,6 @@ class TestEngineFromConfig:
         engine = Engine.from_config(feed, strategy, config)
 
         assert engine.execution_mode == ExecutionMode.NEXT_BAR
-
-    def test_from_config_execution_mode_takes_precedence_over_fill_timing(self):
-        """execution_mode is authoritative even if fill_timing is inconsistent."""
-        prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 10, {"AAPL": 100})
-        feed = DataFeed(prices_df=prices)
-        strategy = BuyAndHoldStrategy("AAPL")
-
-        config = BacktestConfig(
-            execution_mode=ExecutionMode.SAME_BAR,
-            fill_timing=FillTiming.NEXT_BAR_OPEN,
-        )
-        engine = Engine.from_config(feed, strategy, config)
-
-        assert engine.execution_mode == ExecutionMode.SAME_BAR
 
     def test_from_config_margin_account(self):
         """Test from_config with margin account."""
@@ -687,7 +681,8 @@ class TestNextBarExecutionMode:
         feed = DataFeed(prices_df=prices)
         strategy = TrackingStrategy()
 
-        engine = Engine(feed, strategy, initial_cash=100000, execution_mode=ExecutionMode.NEXT_BAR)
+        config = BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR)
+        engine = Engine(feed, strategy, config)
         engine.run()
 
         # Order placed on bar 2, should fill on bar 3
@@ -705,8 +700,8 @@ class TestRunBacktestWithConfig:
 
         config = BacktestConfig(
             initial_cash=50000,
-            commission_model=CommissionModel.NONE,
-            slippage_model=SlippageModel.NONE,  # Must disable slippage too
+            commission_type=CommissionType.NONE,
+            slippage_type=SlippageType.NONE,  # Must disable slippage too
         )
         results = run_backtest(prices=prices, strategy=strategy, config=config)
 
@@ -743,7 +738,7 @@ class TestEmptyDataFeed:
 
         feed = DataFeed(prices_df=empty_prices)
         strategy = BuyAndHoldStrategy("AAPL")
-        engine = Engine(feed, strategy, initial_cash=100000)
+        engine = Engine(feed, strategy)
         results = engine.run()
 
         # Should return empty or minimal results without error

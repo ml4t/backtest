@@ -428,29 +428,21 @@ class TestConfigValidation:
 
     def test_same_bar_mode_warns(self):
         """SAME_BAR mode should generate look-ahead bias warning."""
-        from ml4t.backtest.config import BacktestConfig, FillTiming
+        from ml4t.backtest.config import BacktestConfig
+        from ml4t.backtest.types import ExecutionMode
 
-        config = BacktestConfig(fill_timing=FillTiming.SAME_BAR)
+        config = BacktestConfig(execution_mode=ExecutionMode.SAME_BAR)
         issues = config.validate(warn=False)
 
         assert any("look-ahead" in issue.lower() for issue in issues)
 
     def test_zero_costs_warns(self):
         """Zero commission and slippage should warn."""
-        from ml4t.backtest.config import BacktestConfig, CommissionModel, SlippageModel
+        from ml4t.backtest.config import BacktestConfig, CommissionType, SlippageType
 
         config = BacktestConfig(
-            commission_model=CommissionModel.NONE, slippage_model=SlippageModel.NONE
+            commission_type=CommissionType.NONE, slippage_type=SlippageType.NONE
         )
         issues = config.validate(warn=False)
 
         assert any("commission" in issue.lower() or "slippage" in issue.lower() for issue in issues)
-
-    def test_high_position_size_warns(self):
-        """High default position size should warn."""
-        from ml4t.backtest.config import BacktestConfig
-
-        config = BacktestConfig(default_position_pct=0.50)  # 50%
-        issues = config.validate(warn=False)
-
-        assert any("position" in issue.lower() and "25%" in issue for issue in issues)

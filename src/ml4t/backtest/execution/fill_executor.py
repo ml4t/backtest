@@ -364,7 +364,7 @@ class FillExecutor:
         del broker.positions[order.asset]
 
         # Record P&L event for trading stats
-        broker._record_pnl_event(order.asset, pnl, is_partial=False)
+        broker._record_pnl_event(order.asset, pnl)
 
     def _flip_position(
         self, ctx: FillContext, pos: Position, old_qty: float, new_qty: float
@@ -415,7 +415,7 @@ class FillExecutor:
         broker.trades.append(trade)
 
         # Record P&L event for trading stats (flip = close old position)
-        broker._record_pnl_event(order.asset, pnl, is_partial=False)
+        broker._record_pnl_event(order.asset, pnl)
 
         # Create new position in opposite direction
         initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
@@ -477,7 +477,7 @@ class FillExecutor:
             pnl -= total_commission
 
             # Record P&L event for trading stats
-            broker._record_pnl_event(ctx.order.asset, pnl, is_partial=True)
+            broker._record_pnl_event(ctx.order.asset, pnl)
 
         elif abs(new_qty) > abs(old_qty):
             # Scaling up - recalculate average entry price

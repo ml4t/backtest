@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
-from .shared import SubmitOrderOptions
+from .shared import SubmitOrderOptions, is_exit_order
 
 
 class OrderBook:
@@ -66,6 +66,13 @@ class OrderBook:
 
         broker.orders.append(order)
 
+        # Immediate fill: same-bar market orders fill during submit_order()
+        # instead of being queued for later _process_orders(). Each order
+        # validates against real cash (no shadow), matching LEAN's atomic
+        # SetHoldings() model.
+        if self._should_fill_immediately(order, options):
+            return self._fill_immediately(order)
+
         if self._should_apply_submission_precheck(order) and not self._passes_submission_precheck(
             order
         ):
@@ -91,6 +98,90 @@ class OrderBook:
             broker._orders_this_bar_ids.add(order.order_id)
 
         return order
+
+    def _should_fill_immediately(self, order: Order, options: SubmitOrderOptions | None) -> bool:
+        """Check if an order qualifies for immediate fill.
+
+        Immediate fill applies to same-bar market orders when the broker has
+        immediate_fill enabled. Limit/stop orders still queue for later fill
+        checks. Risk exits (from evaluate_position_rules) are not submitted
+        through this path — they go through _process_orders() directly.
+        """
+        broker = self.broker
+        return (
+            broker.immediate_fill
+            and broker.execution_mode is ExecutionMode.SAME_BAR
+            and order.order_type is OrderType.MARKET
+        )
+
+    def _fill_immediately(self, order: Order) -> Order:
+        """Fill a same-bar market order immediately during submit_order().
+
+        Validates entries against real cash via the gatekeeper (single
+        validation, no shadow), then executes the fill. Exits always pass.
+
+        Returns the order with status FILLED or REJECTED.
+        """
+        broker = self.broker
+        fill = broker._fill_engine
+
+        # Apply share rounding
+        fill.apply_share_rounding(order)
+        if order.quantity <= 0:
+            order.status = OrderStatus.REJECTED
+            order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+            return order
+
+        # Get fill price (close price for same-bar)
+        price = fill.get_fill_price_for_order(order, use_open=False)
+        if price is None:
+            order.status = OrderStatus.REJECTED
+            order.rejection_reason = "No price available"
+            return order
+
+        fill_price = fill.check_fill(order, price)
+        if fill_price is None:
+            order.status = OrderStatus.REJECTED
+            order.rejection_reason = "Fill check failed"
+            return order
+
+        # Determine if this is an exit (reduces existing position)
+        is_exit = self._is_exit_order(order)
+
+        if is_exit:
+            # Exits always fill (they free capital)
+            fully_filled = fill.execute_fill(order, fill_price)
+            if fully_filled:
+                broker._partial_orders.pop(order.order_id, None)
+            else:
+                fill.update_partial_order(order)
+        else:
+            # Entries: validate against real cash via gatekeeper
+            if not broker.skip_cash_validation:
+                valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
+                if not valid:
+                    if broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
+                        if not fill.try_partial_fill(order, fill_price):
+                            order.status = OrderStatus.REJECTED
+                            order.rejection_reason = rejection_reason
+                            return order
+                        broker._partial_orders.pop(order.order_id, None)
+                        return order
+                    order.status = OrderStatus.REJECTED
+                    order.rejection_reason = rejection_reason
+                    return order
+
+            fully_filled = fill.execute_fill(order, fill_price)
+            if fully_filled:
+                broker._partial_orders.pop(order.order_id, None)
+            else:
+                fill.update_partial_order(order)
+
+        return order
+
+    def _is_exit_order(self, order: Order) -> bool:
+        """Check if an order reduces an existing position without reversing."""
+        return is_exit_order(order, self.broker.positions)
 
     def update_order(self, order_id: str, **kwargs) -> bool:
         invalid_fields = set(kwargs.keys()) - self._UPDATABLE_ORDER_FIELDS
@@ -229,10 +320,7 @@ class OrderBook:
         shadow_cash = self._submission_shadow_cash
 
         if closed != 0.0:
-            closed_value = (-closed) * signal_price
-            close_cash = closed_value
-            if closed_value > 0.0:
-                close_cash /= 1.0
+            close_cash = (-closed) * signal_price
             shadow_cash += close_cash
             closed_commission = broker.commission_model.calculate(
                 order.asset, abs(closed), signal_price
@@ -240,10 +328,7 @@ class OrderBook:
             shadow_cash -= closed_commission
 
         if opened != 0.0:
-            opened_value = opened * signal_price
-            open_cash = opened_value
-            if opened_value > 0.0:
-                open_cash /= 1.0
+            open_cash = opened * signal_price
             shadow_cash -= open_cash
             opened_commission = broker.commission_model.calculate(
                 order.asset, abs(opened), signal_price

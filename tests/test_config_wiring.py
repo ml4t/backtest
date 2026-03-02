@@ -19,12 +19,12 @@ from ml4t.backtest import (
     ExecutionMode,
 )
 from ml4t.backtest.config import (
-    CommissionModel,
+    CommissionType,
     EntryOrderPriority,
     FillOrdering,
     ShareType,
     ShortCashPolicy,
-    SlippageModel,
+    SlippageType,
 )
 from ml4t.backtest.models import (
     CombinedCommission,
@@ -652,13 +652,176 @@ class TestPresetRoundTrip:
         assert not hasattr(config, "allow_negative_cash")
 
 
+# ---------------------------------------------------------------------------
+# immediate_fill
+# ---------------------------------------------------------------------------
+
+
+class TestImmediateFill:
+    """immediate_fill=True fills same-bar market orders at submit time."""
+
+    def test_immediate_fill_fills_during_submit(self):
+        """Order is filled immediately when submit_order() is called."""
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        order = broker.submit_order("AAPL", 50, OrderSide.BUY)
+        assert order is not None
+        assert order.status.value == "filled"
+
+        # Position is created immediately (no _process_orders needed)
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity == 50
+
+    def test_immediate_fill_rejects_entry_on_insufficient_cash(self):
+        """Entries validate against real cash via gatekeeper."""
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        order = broker.submit_order("AAPL", 100, OrderSide.BUY)  # costs $10k
+        assert order is not None
+        assert order.status.value == "rejected"
+        assert broker.get_position("AAPL") is None
+
+    def test_immediate_fill_exit_always_fills(self):
+        """Exit orders always fill (free capital)."""
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        # Create position first (also via immediate fill)
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        assert broker.get_position("AAPL") is not None
+        assert broker.cash == 0.0
+
+        # Exit should fill immediately
+        order = broker.submit_order("AAPL", 100, OrderSide.SELL)
+        assert order is not None
+        assert order.status.value == "filled"
+        assert broker.get_position("AAPL") is None
+        assert broker.cash == 10_000.0
+
+    def test_immediate_fill_sequential_cash_tracking(self):
+        """Each fill updates cash before the next submit sees it."""
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0, "GOOG": 100.0})
+
+        # Buy AAPL uses all cash
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        assert broker.cash == 0.0
+
+        # Sell AAPL frees cash
+        broker.submit_order("AAPL", 100, OrderSide.SELL)
+        assert broker.cash == 10_000.0
+
+        # Buy GOOG now succeeds because AAPL sale freed cash
+        order = broker.submit_order("GOOG", 100, OrderSide.BUY)
+        assert order is not None
+        assert order.status.value == "filled"
+        assert broker.get_position("GOOG") is not None
+
+    def test_immediate_fill_partial_fill_on_insufficient_cash(self):
+        """Partial fills work with immediate fill mode."""
+        broker = _make_broker(
+            initial_cash=5_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            partial_fills_allowed=True,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        order = broker.submit_order("AAPL", 100, OrderSide.BUY)  # wants $10k, has $5k
+        assert order is not None
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity <= 50
+        assert pos.quantity > 0
+
+    def test_immediate_fill_integer_share_rounding(self):
+        """Integer share rounding applies during immediate fill."""
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            share_type=ShareType.INTEGER,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 10.7, OrderSide.BUY)
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity == 10.0
+
+    def test_immediate_fill_not_added_to_pending(self):
+        """Immediately filled orders are NOT added to pending_orders."""
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 50, OrderSide.BUY)
+        assert len(broker.pending_orders) == 0
+
+    def test_immediate_fill_disabled_queues_normally(self):
+        """With immediate_fill=False, orders queue as before."""
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=False,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 50, OrderSide.BUY)
+        assert len(broker.pending_orders) == 1
+        assert broker.get_position("AAPL") is None  # not yet filled
+
+    def test_from_config_propagates(self):
+        config = BacktestConfig(immediate_fill=True)
+        broker = Broker.from_config(config)
+        assert broker.immediate_fill is True
+
+    def test_lean_strict_profile_uses_buying_power_reservation(self):
+        config = BacktestConfig.from_preset("lean_strict")
+        assert config.buying_power_reservation is True
+        assert config.immediate_fill is False
+        assert config.settlement_delay == 2
+
+    def test_to_dict_from_dict_roundtrip(self):
+        config = BacktestConfig(immediate_fill=True)
+        d = config.to_dict()
+        assert d["orders"]["immediate_fill"] is True
+        restored = BacktestConfig.from_dict(d)
+        assert restored.immediate_fill is True
+
+
 class TestConfigModelWiring:
     """All commission/slippage enum choices should map to model instances."""
 
     def test_per_trade_commission_maps_to_combined_commission(self):
         broker = Broker.from_config(
             BacktestConfig(
-                commission_model=CommissionModel.PER_TRADE,
+                commission_type=CommissionType.PER_TRADE,
                 commission_per_trade=2.5,
             )
         )
@@ -668,7 +831,7 @@ class TestConfigModelWiring:
     def test_tiered_commission_maps_to_tiered_commission(self):
         broker = Broker.from_config(
             BacktestConfig(
-                commission_model=CommissionModel.TIERED,
+                commission_type=CommissionType.TIERED,
                 commission_rate=0.0012,
             )
         )
@@ -678,7 +841,7 @@ class TestConfigModelWiring:
     def test_volume_based_slippage_maps_to_volume_share_slippage(self):
         broker = Broker.from_config(
             BacktestConfig(
-                slippage_model=SlippageModel.VOLUME_BASED,
+                slippage_type=SlippageType.VOLUME_BASED,
                 slippage_rate=0.25,
             )
         )
@@ -688,7 +851,7 @@ class TestConfigModelWiring:
     def test_per_share_commission_still_maps_correctly(self):
         broker = Broker.from_config(
             BacktestConfig(
-                commission_model=CommissionModel.PER_SHARE,
+                commission_type=CommissionType.PER_SHARE,
                 commission_per_share=0.01,
                 commission_minimum=1.0,
             )
