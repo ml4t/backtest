@@ -69,25 +69,10 @@ requires-python = ">=3.11"
 
 # Core dependencies
 dependencies = [
-    # ML4T shared style
-    "ml4t-style>=0.1.0",
-    # Data processing
     "polars>=0.20.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
-    "pyarrow>=14.0.0",
-    "tables>=3.8.0",  # PyTables for HDF5 support
-    # Event system
-    "sortedcontainers>=2.4.0", # Efficient priority queue
-    # Performance optimization
-    "numba>=0.57.0",
-    # Configuration and validation
-    "pydantic>=1.10.0,<3.0.0",  # Configuration schema and validation
-    "PyYAML>=6.0.0",  # YAML configuration support
-    # Utilities
-    "structlog>=23.0.0",
-    "python-dateutil>=2.8.0",
-    # Market calendars (needed for clock module)
+    "PyYAML>=6.0.0",
     "pandas-market-calendars>=4.0.0",
 ]
 
@@ -263,6 +248,5 @@ exclude_lines = [
 ]
 
 [tool.uv.sources]
-ml4t-style = { path = "../ml4t-style", editable = true }
 # Sibling package for optional tearsheet integration
 ml4t-diagnostic = { path = "../ml4t-diagnostic", editable = true }

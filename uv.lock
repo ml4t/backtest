@@ -1811,19 +1811,11 @@ wheels = [
 name = "ml4t-backtest"
 source = { editable = "." }
 dependencies = [
-    { name = "ml4t-style" },
-    { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pandas-market-calendars" },
     { name = "polars" },
-    { name = "pyarrow" },
-    { name = "pydantic" },
-    { name = "python-dateutil" },
     { name = "pyyaml" },
-    { name = "sortedcontainers" },
-    { name = "structlog" },
-    { name = "tables" },
 ]
 
 [package.optional-dependencies]
@@ -1914,14 +1906,12 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.7.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", editable = "../ml4t-diagnostic" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", editable = "../ml4t-diagnostic" },
-    { name = "ml4t-style", editable = "../ml4t-style" },
     { name = "myst-parser", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "nbsphinx", marker = "extra == 'all'", specifier = ">=0.9.0" },
     { name = "nbsphinx", marker = "extra == 'docs'", specifier = ">=0.9.0" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
-    { name = "numba", specifier = ">=0.57.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pandas-market-calendars", specifier = ">=4.0.0" },
@@ -1930,8 +1920,6 @@ requires-dist = [
     { name = "polars", specifier = ">=0.20.0" },
     { name = "pre-commit", marker = "extra == 'all'", specifier = ">=3.3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pydantic", specifier = ">=1.10.0,<3.0.0" },
     { name = "pyfolio-reloaded", marker = "extra == 'comparison'", specifier = ">=0.9.9" },
     { name = "pytest", marker = "extra == 'all'", specifier = ">=7.4.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
@@ -1945,19 +1933,15 @@ requires-dist = [
     { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
     { name = "pytest-xdist", marker = "extra == 'all'", specifier = ">=3.3.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "python-dateutil", specifier = ">=2.8.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "ruff", marker = "extra == 'all'", specifier = ">=0.8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "sortedcontainers", specifier = ">=2.4.0" },
     { name = "sphinx", marker = "extra == 'all'", specifier = ">=7.0.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'all'", specifier = ">=1.24.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=1.24.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'all'", specifier = ">=1.3.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=1.3.0" },
-    { name = "structlog", specifier = ">=23.0.0" },
-    { name = "tables", specifier = ">=3.8.0" },
     { name = "ty", marker = "extra == 'all'" },
     { name = "ty", marker = "extra == 'dev'" },
     { name = "vectorbt", marker = "extra == 'comparison'", specifier = ">=0.24.0" },
@@ -2096,28 +2080,6 @@ dev = [
     { name = "seaborn", specifier = ">=0.12.0" },
     { name = "twine", specifier = ">=6.0.0" },
     { name = "ty" },
-]
-
-[[package]]
-name = "ml4t-style"
-source = { editable = "../ml4t-style" }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "plotly", marker = "extra == 'plotly'", specifier = ">=5.15.0" },
-]
-provides-extras = ["plotly"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=7.4.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
 ]
 
 [[package]]
@@ -4138,15 +4100,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/34/0e/2408735aca9e764643196212f9069912100151414dd617d39ffc72d77eee/statsmodels-0.14.6-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3414e40c073d725007a6603a18247ab7af3467e1af4a5e5a24e4c27bc26673b4", size = 10337587, upload-time = "2025-12-05T23:13:37.597Z" },
     { url = "https://files.pythonhosted.org/packages/0f/36/4d44f7035ab3c0b2b6a4c4ebb98dedf36246ccbc1b3e2f51ebcd7ac83abb/statsmodels-0.14.6-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:a518d3f9889ef920116f9fa56d0338069e110f823926356946dae83bc9e33e19", size = 10363350, upload-time = "2025-12-05T23:13:53.08Z" },
     { url = "https://files.pythonhosted.org/packages/26/33/f1652d0c59fa51de18492ee2345b65372550501ad061daa38f950be390b6/statsmodels-0.14.6-cp314-cp314-win_amd64.whl", hash = "sha256:151b73e29f01fe619dbce7f66d61a356e9d1fe5e906529b78807df9189c37721", size = 9588010, upload-time = "2025-12-05T23:14:07.28Z" },
-]
-
-[[package]]
-name = "structlog"
-version = "25.5.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
 ]
 
 [[package]]
