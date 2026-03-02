@@ -117,10 +117,19 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quickstart: getting-started/quickstart.md
+  - Concepts:
+    - How It Works: concepts/how-it-works.md
   - User Guide:
     - Strategies: user-guide/strategies.md
     - Order Types: user-guide/orders.md
+    - Execution Semantics: user-guide/execution-semantics.md
+    - Configuration: user-guide/configuration.md
+    - Profiles: user-guide/profiles.md
+    - Risk Management: user-guide/risk-management.md
     - Account Policies: user-guide/accounts.md
+    - Rebalancing: user-guide/rebalancing.md
+    - Data Feed: user-guide/data-feed.md
+    - Results & Analysis: user-guide/results.md
   - API Reference:
     - api/index.md
 
