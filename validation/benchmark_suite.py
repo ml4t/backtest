@@ -127,12 +127,15 @@ def _get_trailing_nyse_sessions(n_bars: int, end_date: pd.Timestamp | datetime |
     lookback_days = max(366, int(n_bars * 2.2))
     sessions = pd.DatetimeIndex([], dtype="datetime64[ns]")
 
+    min_date = pd.Timestamp("1970-01-02")
     for _ in range(8):
-        start_session = end_session - pd.Timedelta(days=lookback_days)
+        start_session = end_session - pd.DateOffset(days=lookback_days)
+        if start_session < min_date:
+            start_session = min_date
         sessions = _get_nyse_sessions(start_session, end_session)
         if len(sessions) >= n_bars:
             return sessions[-n_bars:]
-        lookback_days *= 2
+        lookback_days = min(lookback_days * 2, (end_session - min_date).days)
 
     return sessions
 

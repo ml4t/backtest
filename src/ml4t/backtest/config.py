@@ -496,6 +496,7 @@ class BacktestConfig:
 
     # === Order Handling ===
     reject_on_insufficient_cash: bool = True
+    skip_cash_validation: bool = False  # True = bypass gatekeeper (Zipline-like unconstrained fills)
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
     entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION
@@ -570,6 +571,7 @@ class BacktestConfig:
             },
             "orders": {
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
+                "skip_cash_validation": self.skip_cash_validation,
                 "partial_fills_allowed": self.partial_fills_allowed,
                 "fill_ordering": self.fill_ordering.value,
                 "entry_order_priority": self.entry_order_priority.value,
@@ -640,6 +642,7 @@ class BacktestConfig:
                 "settlement": {"delay"},
                 "orders": {
                     "reject_on_insufficient_cash",
+                    "skip_cash_validation",
                     "partial_fills_allowed",
                     "fill_ordering",
                     "entry_order_priority",
@@ -720,6 +723,7 @@ class BacktestConfig:
             settlement_delay=settle_cfg.get("delay", 0),
             # Orders
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
+            skip_cash_validation=order_cfg.get("skip_cash_validation", False),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
             fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
             entry_order_priority=EntryOrderPriority(
@@ -837,6 +841,7 @@ class BacktestConfig:
                 f"  Late asset policy: {self.late_asset_policy.value}",
                 f"  Late asset min bars: {self.late_asset_min_bars}",
                 f"  Reject insufficient: {self.reject_on_insufficient_cash}",
+                f"  Skip cash validation: {self.skip_cash_validation}",
                 f"  Partial fills: {self.partial_fills_allowed}",
                 "",
                 "Cash:",

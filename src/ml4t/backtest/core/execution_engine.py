@@ -105,7 +105,10 @@ class ExecutionEngine:
         if price is None:
             return
 
-        use_simple_cash_check = self._use_simple_next_bar_cash_check(order, use_open)
+        skip_cash = broker.skip_cash_validation
+        use_simple_cash_check = (
+            not skip_cash and self._use_simple_next_bar_cash_check(order, use_open)
+        )
 
         is_exit = self._is_exit_order(order)
 
@@ -184,7 +187,7 @@ class ExecutionEngine:
                         order.rejection_reason = "Insufficient cash for reversal"
                         return
 
-            if use_simple_cash_check:
+            if skip_cash or use_simple_cash_check:
                 valid, rejection_reason = True, ""
             else:
                 valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)

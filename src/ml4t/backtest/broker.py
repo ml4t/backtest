@@ -79,6 +79,7 @@ class Broker:
         next_bar_submission_precheck: bool = False,
         next_bar_simple_cash_check: bool = False,
         reject_on_insufficient_cash: bool = True,
+        skip_cash_validation: bool = False,
         cash_buffer_pct: float = 0.0,
         partial_fills_allowed: bool = False,
         rebalance_headroom_pct: float = 1.0,
@@ -115,6 +116,7 @@ class Broker:
         self.next_bar_submission_precheck = next_bar_submission_precheck
         self.next_bar_simple_cash_check = next_bar_simple_cash_check
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
+        self.skip_cash_validation = skip_cash_validation
         self.cash_buffer_pct = cash_buffer_pct
         self.partial_fills_allowed = partial_fills_allowed
         self.rebalance_headroom_pct = rebalance_headroom_pct
@@ -308,6 +310,7 @@ class Broker:
             next_bar_submission_precheck=config.next_bar_submission_precheck,
             next_bar_simple_cash_check=config.next_bar_simple_cash_check,
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
+            skip_cash_validation=config.skip_cash_validation,
             cash_buffer_pct=config.cash_buffer_pct,
             partial_fills_allowed=config.partial_fills_allowed,
             rebalance_headroom_pct=config.rebalance_headroom_pct,

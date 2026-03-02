@@ -358,6 +358,7 @@ class TestShortCashPolicy:
         config = BacktestConfig.from_preset("zipline_strict")
         assert config.short_cash_policy == ShortCashPolicy.CREDIT
         assert config.allow_leverage is False
+        assert config.skip_cash_validation is True
 
     def test_backtrader_strict_profile_enables_submission_precheck(self):
         config = BacktestConfig.from_preset("backtrader_strict")

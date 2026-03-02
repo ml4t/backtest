@@ -276,6 +276,7 @@ BACKTRADER_STRICT_PROFILE["orders"]["next_bar_simple_cash_check"] = True
 ZIPLINE_STRICT_PROFILE = deepcopy(ZIPLINE_PROFILE)
 ZIPLINE_STRICT_PROFILE["account"]["allow_short_selling"] = True
 ZIPLINE_STRICT_PROFILE["account"]["short_cash_policy"] = "credit"
+ZIPLINE_STRICT_PROFILE["orders"]["skip_cash_validation"] = True
 ZIPLINE_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 
 LEAN_PROFILE = {
