@@ -69,6 +69,8 @@ requires-python = ">=3.11"
 
 # Core dependencies
 dependencies = [
+    # ML4T shared style
+    "ml4t-style>=0.1.0",
     # Data processing
     "polars>=0.20.0",
     "pandas>=2.0.0",
@@ -276,5 +278,6 @@ exclude_lines = [
 ]
 
 [tool.uv.sources]
+ml4t-style = { path = "../ml4t-style", editable = true }
 # Sibling package for optional tearsheet integration
 ml4t-diagnostic = { path = "../ml4t-diagnostic", editable = true }

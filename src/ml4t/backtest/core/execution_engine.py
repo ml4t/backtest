@@ -106,8 +106,8 @@ class ExecutionEngine:
             return
 
         skip_cash = broker.skip_cash_validation
-        use_simple_cash_check = (
-            not skip_cash and self._use_simple_next_bar_cash_check(order, use_open)
+        use_simple_cash_check = not skip_cash and self._use_simple_next_bar_cash_check(
+            order, use_open
         )
 
         is_exit = self._is_exit_order(order)

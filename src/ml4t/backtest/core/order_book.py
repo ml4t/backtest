@@ -74,6 +74,14 @@ class OrderBook:
                 order.rejection_reason = "Insufficient cash (submission precheck)"
             return order
 
+        if self._should_apply_buying_power_reservation(
+            order
+        ) and not self._passes_buying_power_check(order):
+            order.status = OrderStatus.REJECTED
+            if not order.rejection_reason:
+                order.rejection_reason = "Insufficient buying power"
+            return order
+
         broker.pending_orders.append(order)
 
         if broker.execution_mode is ExecutionMode.NEXT_BAR and (
@@ -263,6 +271,75 @@ class OrderBook:
             ts = broker._current_time.date()
             counts = trace_counts.setdefault(ts, {"accepted": 0, "rejected": 0})
             counts["accepted"] += 1
+        return True
+
+    def _should_apply_buying_power_reservation(self, order: Order) -> bool:
+        broker = self.broker
+        return broker.buying_power_reservation and order.order_type is OrderType.MARKET
+
+    def _passes_buying_power_check(self, order: Order) -> bool:
+        """LEAN-style buying power reservation at submission time.
+
+        Unlike Backtrader precheck, rejected orders do NOT consume shadow
+        buying power — only accepted orders update the shadow pool.
+
+        When allow_leverage is True, delegates to the margin-aware precheck
+        that uses policy validation (matching LEAN's margin-mode buying power
+        model). When False, uses simple cash accounting.
+        """
+        broker = self.broker
+
+        if broker.share_type.value == "integer":
+            order.quantity = float(int(order.quantity))
+            if order.quantity <= 0:
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                return False
+
+        signal_price = getattr(order, "_signal_price", None)
+        if signal_price is None:
+            signal_price = broker._current_prices.get(order.asset)
+        if signal_price is None:
+            return True
+
+        self._reset_submission_shadow_if_needed()
+
+        size = order.quantity if order.side is OrderSide.BUY else -order.quantity
+        old_qty, old_price = self._submission_shadow_positions.get(order.asset, (0.0, signal_price))
+        new_qty, new_price, opened, closed = self._simulate_position_update(
+            old_qty, old_price, size, signal_price
+        )
+
+        shadow_cash = self._submission_shadow_cash
+
+        if closed != 0.0:
+            closed_value = (-closed) * signal_price
+            shadow_cash += closed_value
+            closed_commission = broker.commission_model.calculate(
+                order.asset, abs(closed), signal_price
+            )
+            shadow_cash -= closed_commission
+
+        if opened != 0.0:
+            # LEAN semantics: both longs and shorts consume buying power.
+            # Longs cost notional; shorts also require notional (not credit).
+            # This prevents credit-model inflation where short proceeds
+            # artificially inflate shadow cash.
+            shadow_cash -= abs(opened) * signal_price
+            opened_commission = broker.commission_model.calculate(
+                order.asset, abs(opened), signal_price
+            )
+            shadow_cash -= opened_commission
+
+        if shadow_cash < 0.0:
+            # Rejected — do NOT update shadow state (LEAN semantics)
+            return False
+
+        # Accepted — commit shadow changes
+        self._submission_shadow_cash = shadow_cash
+        if abs(new_qty) <= self._QTY_EPS:
+            self._submission_shadow_positions.pop(order.asset, None)
+        else:
+            self._submission_shadow_positions[order.asset] = (new_qty, new_price)
         return True
 
     def _passes_margin_submission_precheck(self, order: Order, signal_price: float) -> bool:

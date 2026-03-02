@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from .config import (
     EntryOrderPriority,
+    ExecutionPrice,
     FillOrdering,
     InitialHwmSource,
     LateAssetPolicy,
@@ -58,6 +59,7 @@ class Broker:
         slippage_model: SlippageModel | None = None,
         stop_slippage_rate: float = 0.0,
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+        execution_price: ExecutionPrice = ExecutionPrice.CLOSE,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE,
@@ -78,6 +80,7 @@ class Broker:
         entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION,
         next_bar_submission_precheck: bool = False,
         next_bar_simple_cash_check: bool = False,
+        buying_power_reservation: bool = False,
         reject_on_insufficient_cash: bool = True,
         skip_cash_validation: bool = False,
         cash_buffer_pct: float = 0.0,
@@ -105,6 +108,7 @@ class Broker:
         self.slippage_model = slippage_model or NoSlippage()
         self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
+        self.execution_price = execution_price
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
         self.trail_hwm_source = trail_hwm_source
@@ -115,6 +119,7 @@ class Broker:
         self.entry_order_priority = entry_order_priority
         self.next_bar_submission_precheck = next_bar_submission_precheck
         self.next_bar_simple_cash_check = next_bar_simple_cash_check
+        self.buying_power_reservation = buying_power_reservation
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
         self.skip_cash_validation = skip_cash_validation
         self.cash_buffer_pct = cash_buffer_pct
@@ -289,6 +294,7 @@ class Broker:
             slippage_model=slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
             execution_mode=config.execution_mode,
+            execution_price=config.execution_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
             trail_hwm_source=config.trail_hwm_source,
@@ -309,6 +315,7 @@ class Broker:
             entry_order_priority=config.entry_order_priority,
             next_bar_submission_precheck=config.next_bar_submission_precheck,
             next_bar_simple_cash_check=config.next_bar_simple_cash_check,
+            buying_power_reservation=config.buying_power_reservation,
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
             skip_cash_validation=config.skip_cash_validation,
             cash_buffer_pct=config.cash_buffer_pct,

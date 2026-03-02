@@ -2585,7 +2585,7 @@ def run_scenario(
                     price_data,
                     signals,
                     dates,
-                    execution_mode="next_bar",
+                    execution_mode="same_bar",
                     profile_override="lean_strict",
                 )
             elif framework == "vbt-pro":

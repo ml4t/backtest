@@ -1887,6 +1887,7 @@ wheels = [
 name = "ml4t-backtest"
 source = { editable = "." }
 dependencies = [
+    { name = "ml4t-style" },
     { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
@@ -1997,6 +1998,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.7.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", editable = "../ml4t-diagnostic" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", editable = "../ml4t-diagnostic" },
+    { name = "ml4t-style", editable = "../ml4t-style" },
     { name = "mypy", marker = "extra == 'all'", specifier = ">=1.5.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.0" },
     { name = "myst-parser", marker = "extra == 'all'", specifier = ">=2.0.0" },
@@ -2068,6 +2070,7 @@ dependencies = [
     { name = "arch" },
     { name = "jinja2" },
     { name = "joblib" },
+    { name = "ml4t-style" },
     { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
@@ -2109,6 +2112,7 @@ requires-dist = [
     { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
+    { name = "ml4t-style", editable = "../ml4t-style" },
     { name = "myst-parser", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "nbsphinx", marker = "extra == 'all'", specifier = ">=0.9.0" },
     { name = "numba", specifier = ">=0.57.0" },
@@ -2164,15 +2168,42 @@ provides-extras = ["advanced", "all", "all-ml", "dashboard", "deep", "dev", "doc
 [package.metadata.requires-dev]
 dev = [
     { name = "hypothesis", specifier = ">=6.80.0" },
+    { name = "kaleido", specifier = ">=0.2.0" },
+    { name = "matplotlib", specifier = ">=3.7.0" },
+    { name = "plotly", specifier = ">=5.15.0" },
     { name = "pre-commit", specifier = ">=3.3.0" },
+    { name = "pypdf", specifier = ">=5.0.0" },
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pytest-benchmark", specifier = ">=4.0.0" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
     { name = "pytest-timeout", specifier = ">=2.1.0" },
     { name = "pytest-xdist", specifier = ">=3.3.0" },
     { name = "ruff", specifier = ">=0.8.0" },
+    { name = "seaborn", specifier = ">=0.12.0" },
     { name = "twine", specifier = ">=6.0.0" },
     { name = "ty" },
+]
+
+[[package]]
+name = "ml4t-style"
+source = { editable = "../ml4t-style" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "matplotlib", specifier = ">=3.7.0" },
+    { name = "numpy", specifier = ">=1.24.0" },
+    { name = "plotly", marker = "extra == 'plotly'", specifier = ">=5.15.0" },
+]
+provides-extras = ["plotly"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=7.4.0" },
+    { name = "ruff", specifier = ">=0.8.0" },
 ]
 
 [[package]]

@@ -496,12 +496,15 @@ class BacktestConfig:
 
     # === Order Handling ===
     reject_on_insufficient_cash: bool = True
-    skip_cash_validation: bool = False  # True = bypass gatekeeper (Zipline-like unconstrained fills)
+    skip_cash_validation: bool = (
+        False  # True = bypass gatekeeper (Zipline-like unconstrained fills)
+    )
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
     entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION
     next_bar_submission_precheck: bool = False
     next_bar_simple_cash_check: bool = False
+    buying_power_reservation: bool = False  # Reserve cash at submission (LEAN-style)
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
     rebalance_headroom_pct: float = 1.0
     missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP
@@ -577,6 +580,7 @@ class BacktestConfig:
                 "entry_order_priority": self.entry_order_priority.value,
                 "next_bar_submission_precheck": self.next_bar_submission_precheck,
                 "next_bar_simple_cash_check": self.next_bar_simple_cash_check,
+                "buying_power_reservation": self.buying_power_reservation,
                 "rebalance_mode": self.rebalance_mode.value,
                 "rebalance_headroom_pct": self.rebalance_headroom_pct,
                 "missing_price_policy": self.missing_price_policy.value,
@@ -648,6 +652,7 @@ class BacktestConfig:
                     "entry_order_priority",
                     "next_bar_submission_precheck",
                     "next_bar_simple_cash_check",
+                    "buying_power_reservation",
                     "rebalance_mode",
                     "rebalance_headroom_pct",
                     "missing_price_policy",
@@ -731,6 +736,7 @@ class BacktestConfig:
             ),
             next_bar_submission_precheck=order_cfg.get("next_bar_submission_precheck", False),
             next_bar_simple_cash_check=order_cfg.get("next_bar_simple_cash_check", False),
+            buying_power_reservation=order_cfg.get("buying_power_reservation", False),
             rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
             rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
             missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),

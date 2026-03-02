@@ -286,9 +286,9 @@ LEAN_PROFILE = {
         "short_cash_policy": "credit",
     },
     "execution": {
-        "fill_timing": "next_bar_open",
-        "execution_price": "open",
-        "execution_mode": "next_bar",
+        "fill_timing": "same_bar",
+        "execution_price": "close",
+        "execution_mode": "same_bar",
     },
     "stops": {
         "stop_fill_mode": "stop_price",
@@ -332,7 +332,8 @@ LEAN_PROFILE = {
 }
 
 LEAN_STRICT_PROFILE = deepcopy(LEAN_PROFILE)
-LEAN_STRICT_PROFILE["orders"]["next_bar_submission_precheck"] = True
+LEAN_STRICT_PROFILE["orders"]["buying_power_reservation"] = True
+LEAN_STRICT_PROFILE["settlement"] = {"delay": 2}  # T+2 for US equities
 
 _PROFILES = {
     "default": DEFAULT_PROFILE,

@@ -365,11 +365,10 @@ class TestShortCashPolicy:
         assert config.next_bar_submission_precheck is True
         assert config.next_bar_simple_cash_check is True
 
-    def test_lean_strict_profile_uses_margin_submission_precheck(self):
+    def test_lean_strict_profile_uses_buying_power_settlement(self):
         config = BacktestConfig.from_preset("lean_strict")
-        assert config.next_bar_submission_precheck is True
-        assert config.next_bar_simple_cash_check is False
-        assert config.fill_ordering == FillOrdering.EXIT_FIRST
+        assert config.buying_power_reservation is True
+        assert config.settlement_delay == 2
 
     def test_lock_notional_reversal_obeys_partial_cash_cap(self):
         broker = _make_broker(
