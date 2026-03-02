@@ -72,6 +72,7 @@ dependencies = [
     "polars>=0.20.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
+    "pyarrow>=14.0.0",
     "PyYAML>=6.0.0",
     "pandas-market-calendars>=4.0.0",
 ]
