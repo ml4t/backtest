@@ -107,7 +107,8 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, exits: np.nd
     """Run backtest using ml4t.backtest."""
     import polars as pl
 
-    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
+    from ml4t.backtest._validation_imports import BacktestConfig, DataFeed, Engine, ExecutionMode, Strategy
+    from ml4t.backtest.config import CommissionType, ExecutionPrice, SlippageType
 
     # Convert to polars format
     prices_pl = pl.DataFrame(
@@ -151,15 +152,15 @@ def run_ml4t_backtest(prices_df: pd.DataFrame, entries: np.ndarray, exits: np.nd
     feed = DataFeed(prices_df=prices_pl, signals_df=signals_pl)
     strategy = SignalStrategy()
 
-    engine = Engine(
-        feed,
-        strategy,
+    config = BacktestConfig(
         initial_cash=100_000.0,
         allow_short_selling=False,
-        commission_model=NoCommission(),
-        slippage_model=NoSlippage(),
+        commission_type=CommissionType.NONE,
+        slippage_type=SlippageType.NONE,
         execution_mode=ExecutionMode.SAME_BAR,  # Match VectorBT default
+        execution_price=ExecutionPrice.CLOSE,  # VectorBT fills at close
     )
+    engine = Engine(feed, strategy, config)
 
     results = engine.run()
 

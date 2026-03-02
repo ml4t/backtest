@@ -9,12 +9,12 @@ Understanding these helps set realistic expectations for backtest results.
 - **Assumption**: All trades settle immediately (T+0)
 - **Reality**: US equities settle T+2, futures T+1
 - **Impact**: Buying power is available immediately after a sale
-- **Workaround**: Use `cash_buffer_pct` in BacktestConfig to reserve liquidity
+- **Workaround**: Use `settlement_delay=2` in BacktestConfig for T+2 settlement, or `cash_buffer_pct` to reserve liquidity
 
-### No Settlement Queue
-- There is no modeling of pending settlements
-- Cash from sales is immediately available for new purchases
-- This can overestimate trading capacity in high-turnover strategies
+### Settlement Delay (Optional)
+- `settlement_delay` models T+N settlement (proceeds unavailable for N bars)
+- Used by the `lean_strict` profile (T+2 for US equities)
+- Does not model partial settlement or settlement failure
 
 ## Corporate Actions
 
@@ -167,49 +167,48 @@ The following real-world factors are **not** simulated:
 
 ## Validation Status
 
-ml4t-backtest has been validated against:
+### Scenario-Level Validation (16 scenarios x 4 frameworks)
 
-| Framework | Trade Count | Match Rate | Notes |
-|-----------|-------------|------------|-------|
-| VectorBT Pro | 119,000+ | 100% | Full feature coverage |
-| Backtrader | 119,577 | 100% | LONG positions only for risk rules |
-| Zipline | 119,577 | 100% | LONG positions only for risk rules |
-| VectorBT OSS | 114,607 | 100% | LONG positions only for risk rules |
+| Framework | Scenarios | Status |
+|-----------|-----------|--------|
+| VectorBT Pro | 16/16 | PASS (exact match) |
+| VectorBT OSS | 16/16 | PASS (exact match) |
+| Backtrader | 16/16 | PASS (exact match) |
+| Zipline | 15/15 | PASS (exact match) |
+
+Scenarios cover: long-only, long/short, stop-loss, take-profit, commission models,
+slippage models, trailing stops, bracket orders, short selling, rule combinations,
+and 1500-bar stress tests across 9 market regimes.
+
+### Large-Scale Parity (250 assets x 20 years, real data)
+
+| Profile | Trades | Gap | Value Gap |
+|---------|--------|-----|-----------|
+| zipline_strict | 225,583 | 0 trades (0.00%) | $19 (0.0001%) |
+| backtrader_strict | 216,980 | 1 trade (0.0005%) | $503 (0.004%) |
+| vectorbt_strict | 210,352 | 91 trades (0.04%) | $0 (0.00%) |
+| lean_strict | 226,172 | 589 trades (0.26%) | $7,200 (0.66%) |
 
 ### What's Validated
 
-**Core Execution** (119k+ trades across 500 assets × 10 years):
-- Entry/exit timing
-- Fill prices
-- Position tracking
-- P&L calculations
-- Multi-asset portfolio management
-- Cash constraints and margin
+**Core Execution** (210k+ trades per profile on real data):
+- Entry/exit timing and fill prices (open, close, stop price)
+- Position tracking (long and short)
+- P&L calculations and multi-asset portfolio management
+- Cash constraints, margin, and buying power
 
-**Risk Rules - LONG Positions** (Scenario tests):
-- Stop-loss triggers
-- Take-profit triggers
-- Trailing stop (close-based HWM)
-- Bracket orders
+**Risk Rules** (16 scenario tests per framework):
+- Stop-loss and take-profit (long and short)
+- Trailing stop with close-based HWM (long and short)
+- Bracket orders (SL + TP)
+- Rule combinations (TSL+TP, TSL+SL, TSL+TP+SL)
+- 1500-bar stress test across 9 market regimes with gap events
 
-### What's NOT Validated (Gaps)
+### Remaining Gaps
 
-**SHORT Position Risk Rules** (VBT Pro only):
-- SHORT stop-loss triggers - VBT Pro validated, others untested
-- SHORT take-profit triggers - VBT Pro validated, others untested
-- SHORT trailing stop - VBT Pro validated, others untested
-- SHORT bracket orders - VBT Pro validated, others untested
-
-**Rule Combinations** (Not tested anywhere):
-- TSL + TP when both trigger same bar
-- TSL + SL when both trigger same bar
-- TSL + TP + SL (triple rule interaction)
-- Rule priority in simultaneous breach
-
-**Stress Conditions** (Limited testing):
-- Gap openings through stop levels
-- High volatility periods
-- Extended (1000+ bar) trailing stop tracking
+- LEAN parity gap (+589 trades) under investigation (buying power reservation model)
+- Per-share commission and volume-based slippage not cross-validated
+- VWAP and MID execution prices not cross-validated
 
 ## Recommendations
 

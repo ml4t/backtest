@@ -122,10 +122,8 @@ dev = [
     "pytest-benchmark>=4.0.0",
     "pytest-asyncio>=0.21.0",
     "hypothesis>=6.80.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5.0",
-    "ipython>=8.14.0",
-    "ipdb>=0.13.0",
+    "ruff>=0.8.0",
+    "ty",
     "pre-commit>=3.3.0",
     "ml4t-diagnostic",  # Sibling package for tearsheet integration tests
 ]
@@ -229,19 +227,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ARG001", "ARG002", "F841", "SIM102"]  # Test patterns
-
-[tool.mypy]
-python_version = "3.11"
-strict = false
-warn_return_any = false  # numpy/pandas return Any, too many false positives
-warn_unused_ignores = true
-disallow_untyped_defs = false
-disallow_any_unimported = false
-no_implicit_optional = true
-check_untyped_defs = true
-show_error_codes = true
-warn_redundant_casts = true
-ignore_missing_imports = true
 
 [tool.ty.environment]
 python-version = "3.11"

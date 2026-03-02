@@ -1,20 +1,20 @@
-# risk/ - 1.9k Lines
+# risk/ - 1,876 Lines
 
-Position sizing and risk management.
+Position-level and portfolio-level risk management.
 
 ## Subpackages
 
 | Directory | Lines | Purpose |
 |-----------|-------|---------|
-| position/ | 864 | Position sizers |
-| portfolio/ | 858 | Portfolio limits |
+| position/ | 909 | Stop-loss, trailing stop, take-profit, rule chains |
+| portfolio/ | 816 | Exposure limits, drawdown limits, position counts |
 
 ## Modules
 
-| File | Purpose |
-|------|---------|
-| types.py | Risk types |
+| File | Lines | Purpose |
+|------|-------|---------|
+| types.py | 150 | Risk configuration types |
 
 ## Key
 
-`PositionSizer`, `PortfolioLimits`, `RiskManager`
+`StopLoss`, `TrailingStop`, `TakeProfit`, `RuleChain`, `PortfolioLimits`

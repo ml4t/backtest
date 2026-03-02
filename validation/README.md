@@ -19,21 +19,26 @@ This approach was adopted after struggling with dependency conflicts between Vec
 4. **Identical signals** - Test with pre-computed signals to eliminate strategy variance
 5. **Configuration-based matching** - Document what config produces matching results
 
-## Test Coverage Matrix (Updated 2026-01-18)
+## Test Coverage Matrix (Updated 2026-03-02)
 
 | Feature | VectorBT Pro | VectorBT OSS | Backtrader | Zipline |
 |---------|--------------|--------------|------------|---------|
-| Long only | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
-| Long/Short | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
-| Multi-asset (500 assets) | ✅ **100% match** | ✅ **100% match** | ✅ **100% match** | ✅ **100% match** |
-| % Commission | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
-| Per-share commission | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
-| Fixed slippage | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
-| % Slippage | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
-| Stop-loss | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
-| Take-profit | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) | ✅ PASS (exact) |
-| Trailing stop | ✅ PASS (exact) | ⬜ pending | ⬜ pending | ⬜ pending |
-| Bracket order | ⬜ needs re-run | ⬜ pending | ⬜ pending | ⬜ N/A |
+| Long only | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Long/Short | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Stop-loss | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Take-profit | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| % Commission | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Per-share commission | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Fixed slippage | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| % Slippage | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Trailing stop | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Bracket order | ✅ PASS | ✅ PASS | ✅ PASS | N/A |
+| Short only | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Short trailing stop | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| TSL + TP combo | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| TSL + SL combo | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Triple rule (TSL+TP+SL) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
+| Stress (1500 bars) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
 
 **Note on exact match**: Stop/take-profit now achieves **EXACT MATCH** (0.0000% diff) using configurable fill modes:
 
@@ -668,113 +673,89 @@ Scripts exist for each framework:
 |----------|---------|---------|------------|---------|
 | 01: Long Only | ✅ | ✅ | ✅ | ✅ |
 | 02: Long/Short | ✅ | ✅ | ✅ | ✅ |
-| 03: Stop Loss (LONG) | ✅ | ✅ | ✅ | ✅ |
-| 04: Take Profit (LONG) | ✅ | ✅ | ✅ | ✅ |
+| 03: Stop Loss | ✅ | ✅ | ✅ | ✅ |
+| 04: Take Profit | ✅ | ✅ | ✅ | ✅ |
 | 05: Commission (Pct) | ✅ | ✅ | ✅ | ✅ |
 | 06: Commission (Per-Share) | ✅ | ✅ | ✅ | ✅ |
 | 07: Slippage (Fixed) | ✅ | ✅ | ✅ | ✅ |
 | 08: Slippage (Pct) | ✅ | ✅ | ✅ | ✅ |
-| 09: Trailing Stop (LONG) | ✅ | ✅ | ✅ | ✅ |
-| 10: Bracket Order (LONG) | ✅ | ✅ | ✅ | - |
+| 09: Trailing Stop | ✅ | ✅ | ✅ | ✅ |
+| 10: Bracket Order | ✅ | ✅ | ✅ | - |
 | 11: Short Only | ✅ | ✅ | ✅ | ✅ |
 | 12: Short TSL | ✅ | ✅ | ✅ | ✅ |
-| 13: TSL + TP Combo | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
-| 14: TSL + SL Combo | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
-| 15: Triple Rule | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
-| 16: Stress Test (1500 bars) | ✅ NEW | ✅ NEW | ✅ NEW | ✅ NEW |
+| 13: TSL + TP Combo | ✅ | ✅ | ✅ | ✅ |
+| 14: TSL + SL Combo | ✅ | ✅ | ✅ | ✅ |
+| 15: Triple Rule | ✅ | ✅ | ✅ | ✅ |
+| 16: Stress Test (1500 bars) | ✅ | ✅ | ✅ | ✅ |
 
-## Known Validation Gaps (2026-01-20)
+## Large-Scale Parity (Updated 2026-03-02)
 
-**IMPORTANT**: The validation suite has coverage gaps that should be understood:
+Real-data benchmarks using 250 US equities over 20 years (5,040 bars each).
+Strategy: long top 25, short bottom 25 by momentum. Each profile sets all behavioral
+knobs to match the target framework exactly.
 
-### 1. SHORT Position Risk Rules (Updated 2026-01-20)
+| Profile | ml4t Trades | Reference Trades | Trade Gap | Value Gap |
+|---------|-------------|------------------|-----------|-----------|
+| zipline_strict | 225,583 | 225,583 | **0 (0.00%)** | $19 (0.0001%) |
+| backtrader_strict | 216,980 | 216,981 | 1 (0.0005%) | $503 (0.004%) |
+| vectorbt_strict | 210,352 | 210,261 | 91 (0.04%) | $0 (0.00%) |
+| lean_strict | 226,172 | 225,583 | 589 (0.26%) | $7,200 (0.66%) |
 
-| Feature | VBT Pro | VBT OSS | Backtrader | Zipline |
-|---------|---------|---------|------------|---------|
-| SHORT Stop Loss | ✅ | ⏳ pending | ⏳ pending | ⏳ pending |
-| SHORT Take Profit | ✅ | ⏳ pending | ⏳ pending | ⏳ pending |
-| SHORT Trailing Stop | ✅ | ✅ NEW | ✅ NEW | ✅ NEW |
-| SHORT Bracket Order | ✅ | ⏳ pending | ⏳ pending | ⏳ N/A |
+### About the Large-Scale Validation
 
-**Status**: SHORT trailing stop scenarios (scenario_12) added for all frameworks.
-SHORT stop-loss and take-profit scenarios still pending (scenarios 13-14).
+The ranking strategy (`benchmark_suite.py`) tests core execution mechanics:
+- Entry/exit timing and fill prices
+- Position tracking (long and short)
+- Multi-asset portfolio management
+- Cash constraints and buying power
 
-### 2. Rule Combination Testing (Updated 2026-01-20)
+Risk management rules (stops, brackets) are validated separately in the 16 scenario tests.
 
-| Combination | Tested | Notes |
-|-------------|--------|-------|
-| TSL + TP | ✅ NEW | Scenario 13: Tests which triggers first |
-| TSL + SL | ✅ NEW | Scenario 14: Tests rule priority |
-| TSL + TP + SL | ✅ NEW | Scenario 15: Triple rule interactions |
-| SL + TP (Bracket) | ✅ | Only LONG tested |
+### Remaining Gaps
 
-**Status**: Rule combination scenarios (13-15) created for ALL 4 frameworks.
-Run scenarios to verify rule priority behavior matches between frameworks.
+- **LEAN** (+589 trades): Buying power reservation model approximates LEAN's SetHoldings()
+  but shadow-vs-gatekeeper ordering mismatch causes extra accepts. Under investigation.
+- **VBT** (+91 trades): Minor discrepancy under investigation.
+- **Backtrader** (-1 trade): Single trade timing difference.
+- Per-share commission and volume-based slippage not cross-validated at scale.
 
-### 3. Scenario Depth (Updated 2026-01-20)
+## File Organization
 
-| Metric | Basic Scenarios (01-15) | Stress Test (16) |
-|--------|-------------------------|------------------|
-| Bars per scenario | ~50-100 | **1500** |
-| Trend reversals | 2-3 | **9** |
-| Gap events | 0 | **~15** (10% random) |
-| Volatile periods | 1 | **5+** |
+Active validation infrastructure:
 
-**Status**: Scenario 16 (Stress Test) now tests extended market conditions with 1500 bars across 9 market regimes.
-
-### 4. About the "119k Trades" Claim
-
-The 119,000+ trade validation comes from the multi-asset ranking strategy (`benchmark_suite.py`),
-which tests:
-- Entry/exit timing
-- Fill prices
-- Position tracking
-- Basic P&L
-
-This validation does **NOT** test:
-- Trailing stop logic (ranking strategy doesn't use TSL)
-- Stop loss / take profit (ranking strategy exits on signal)
-- Bracket orders (ranking strategy uses simple orders)
-- Rule combinations (single rule or no rules)
-
-The 119k trades validate **core execution mechanics**, not risk management rules.
+```
+validation/
+├── README.md                  # This file
+├── benchmark_suite.py         # Large-scale benchmark runner
+├── run_all_benchmarks.py      # Framework benchmark loop
+├── run_all_correctness.py     # Scenario correctness runner
+├── run_full_validation.py     # Complete validation pipeline
+├── backtrader/                # 16 scenario scripts
+├── vectorbt_pro/              # 16 scenario scripts
+├── vectorbt_oss/              # 16 scenario scripts
+├── zipline/                   # 15 scenario scripts (no bracket order)
+├── lean/                      # LEAN integration (README + scenario)
+├── trade_logs/                # Golden file CSVs (gitignored)
+└── archived/                  # Debug and one-off scripts (see archived/README.md)
+```
 
 ## Validation Changelog
 
-**2026-01-20**: Validation Audit - Phase 4 Complete (Stress Testing)
-- Added scenario_16_stress_1000bars.py to ALL 4 frameworks
-- Tests 1500 bars across 9 market regimes (uptrend, crash, recovery, choppy, bull, flash crash, downtrend, volatile, final recovery)
-- Includes gap events (~10% probability) and extreme volatility periods
-- Total stress test scenarios: 4 files (1 scenario × 4 frameworks)
+**2026-03-02**: Large-scale parity benchmarks (250 assets x 20 years, real data)
+- zipline_strict: 0 trade gap, $19 value gap
+- backtrader_strict: 1 trade gap, $503 value gap
+- vectorbt_strict: 91 trade gap, $0 value gap
+- lean_strict: 589 trade gap, $7,200 value gap
+- Archived 35 debug/comparison/scale scripts to validation/archived/
 
-**2026-01-20**: Validation Audit - Phase 3 Complete (Rule Combination Scenarios)
-- Added scenario_13_tsl_tp_combo.py to ALL 4 frameworks (TSL + TP priority)
-- Added scenario_14_tsl_sl_combo.py to ALL 4 frameworks (TSL + SL priority)
-- Added scenario_15_triple_rule.py to ALL 4 frameworks (TSL + TP + SL)
-- Total new scenarios: 12 files (3 scenarios × 4 frameworks)
-- Rule combination behavior now documented across all frameworks
-
-**2026-01-20**: Validation Audit - Documentation Honesty Update
-- Documented known validation gaps (SHORT risk rules, rule combinations)
-- Clarified that trailing stop scenarios are LONG-only except for VBT Pro
-- Added "Known Validation Gaps" section with specific coverage matrix
-- Clarified that 119k trades validates core execution, not risk rules
-- Added scenario depth limitations (100 bars vs recommended 1000+)
+**2026-01-20**: Validation audit complete (Phases 1-4)
+- Added scenarios 13-16 to all frameworks (rule combos + stress test)
+- SHORT trailing stop validated across all frameworks
+- 1500-bar stress test with 9 market regimes
+- Documentation honesty update for coverage gaps
 
 **2026-01-18**: Fixed VBT Pro scenarios 09 and 10 (trailing stop, bracket order)
-- Issue: `trades["Status"]` column access failed with pandas KeyError
-- Fix: Added robust column name detection with fallback
-- Status: Scripts now handle VBT Pro API version differences
+- Added robust column name detection for VBT Pro API version differences
 
 **2026-01-01**: Initial correctness validation suite
 - VBT Pro scenarios 01-08: ALL PASS
-- Scenarios 09-10: FAIL due to pandas KeyError (now fixed)
-
-## Future Work
-
-Additional scenarios to validate:
-- Tiered commission models
-- Volume-based slippage
-- VWAP execution price
-- MID execution price
-- Stop breach buffer (configurable slippage for gap-through scenarios)

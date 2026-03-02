@@ -1,12 +1,12 @@
-# strategies/ - 438 Lines
+# strategies/ - 417 Lines
 
-Strategy templates and examples.
+Reusable strategy templates.
 
 ## Modules
 
-| File | Purpose |
-|------|---------|
-| templates.py | Reusable strategy patterns |
+| File | Lines | Purpose |
+|------|-------|---------|
+| templates.py | 417 | SignalStrategy, RebalanceStrategy, MomentumTemplate |
 
 ## Key
 

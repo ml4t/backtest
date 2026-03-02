@@ -23,7 +23,8 @@ Backtesting requires accurate simulation of order execution, position tracking, 
 - Configurable execution modes (same-bar or next-bar fills)
 - Position-level risk rules (stop-loss, take-profit, trailing stops)
 - Portfolio-level constraints (max positions, drawdown limits)
-- Cash and margin account policies
+- Cash, margin, and crypto account policies
+- 40+ behavioral knobs for framework-specific parity
 
 The same Strategy class used in backtesting works unchanged in ml4t-live for production deployment.
 
@@ -93,6 +94,31 @@ Portfolio-level controls:
 from ml4t.backtest.risk import MaxPositions, MaxDrawdown, DailyLossLimit
 ```
 
+## Framework Profiles
+
+Built-in profiles replicate the behavioral semantics of major backtesting frameworks:
+
+```python
+from ml4t.backtest import BacktestConfig
+
+# Match VectorBT behavior (same-bar close fills, fractional shares)
+config = BacktestConfig.from_preset("vectorbt")
+
+# Match Backtrader behavior (next-bar open fills, integer shares)
+config = BacktestConfig.from_preset("backtrader")
+
+# Match Zipline behavior (next-bar open fills, integer shares, per-share commission)
+config = BacktestConfig.from_preset("zipline")
+
+# Match QuantConnect LEAN behavior (same-bar close fills, integer shares)
+config = BacktestConfig.from_preset("lean")
+
+# Conservative production settings (higher costs, cash buffer)
+config = BacktestConfig.from_preset("realistic")
+```
+
+Each profile sets 40+ behavioral knobs (fill timing, execution price, share type, commission model, order processing, etc.) to match the target framework exactly.
+
 ## Execution Modes
 
 ```python
@@ -136,15 +162,27 @@ class RankingStrategy(Strategy):
                 broker.submit_order(asset, quantity=100, side="BUY")
 ```
 
-## Validation
+## Cross-Framework Validation
 
-The library is validated against VectorBT Pro, Backtrader, and Zipline:
+ml4t-backtest is validated by configuring profiles to match each framework's behavior exactly:
 
-- 119,000+ trades verified trade-by-trade across frameworks
-- 500 assets x 10 years (2,520 bars) stress testing
-- 100% PnL match on common execution scenarios
+| Framework | Scenarios | Trade Match | Notes |
+|-----------|-----------|-------------|-------|
+| VectorBT Pro | 16/16 | 100% | Full feature coverage |
+| VectorBT OSS | 16/16 | 100% | Open-source subset |
+| Backtrader | 16/16 | 100% | Next-bar execution |
+| Zipline | 15/15 | 100% | NYSE calendar alignment |
 
-See [validation/README.md](validation/README.md) for test methodology.
+Large-scale validation (250 assets x 20 years, real data):
+
+| Profile | Trades | Value | Gap |
+|---------|--------|-------|-----|
+| zipline_strict | 225,583 | match | 0 trades, $19 (0.0001%) |
+| backtrader_strict | 216,980 | match | 1 trade (0.0005%) |
+| vectorbt_strict | 210,352 | match | 91 trades (0.04%) |
+| lean_strict | 226,172 | match | 589 trades (0.26%) |
+
+See [validation/README.md](validation/README.md) for methodology and detailed results.
 
 Release-gate commands:
 
@@ -158,12 +196,26 @@ python validation/run_all_correctness.py --framework backtrader --scenarios 01,0
 python validation/run_all_correctness.py --framework zipline --scenarios 01,03,05,09
 ```
 
+## Performance
+
+Benchmark on 250 assets x 20 years daily data (1.26M bars):
+
+| Metric | Value |
+|--------|-------|
+| Runtime | ~30s |
+| Speed | ~40,000 bars/sec |
+| Memory | ~290 MB |
+| vs Backtrader | 19x faster |
+| vs Zipline | 8x faster |
+| vs LEAN | 5x faster |
+
 ## Technical Characteristics
 
 - **Event-driven**: Each bar processes sequentially with exit-first logic
 - **Point-in-time**: No access to future data within strategy callbacks
 - **Configurable fills**: Match behavior of different backtesting frameworks
 - **Parquet export**: Results serializable for analysis with ml4t-diagnostic
+- **Type-safe**: 0 type diagnostics (ty/Astral), full type annotations
 
 ## Related Libraries
 
@@ -175,7 +227,7 @@ python validation/run_all_correctness.py --framework zipline --scenarios 01,03,0
 ## Development
 
 ```bash
-git clone https://github.com/applied-ai/ml4t-backtest.git
+git clone https://github.com/ml4t/ml4t-backtest.git
 cd ml4t-backtest
 uv sync
 uv run pytest tests/ -q
@@ -186,9 +238,9 @@ uv run ty check
 
 See [LIMITATIONS.md](LIMITATIONS.md) for documented assumptions:
 
-- Partial fills not supported (all-or-nothing)
 - No intrabar stop simulation (uses bar OHLC)
 - Calendar overnight sessions require configuration
+- See LIMITATIONS.md for full list
 
 ## License
 
