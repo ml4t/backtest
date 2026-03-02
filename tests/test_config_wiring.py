@@ -601,6 +601,43 @@ class TestEntryOrderPriority:
 # ---------------------------------------------------------------------------
 
 
+class TestNumericalRobustness:
+    """Small floating-point residuals should not leave ghost positions."""
+
+    def test_closing_0p1_plus_0p2_does_not_leave_ghost_position(self):
+        broker = _make_broker()
+        _set_prices(broker, {"AAPL": 100.0}, ts=datetime(2024, 1, 1))
+        broker.submit_order("AAPL", 0.3, OrderSide.BUY)
+        broker._process_orders()
+
+        _set_prices(broker, {"AAPL": 100.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("AAPL", 0.1, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"AAPL": 100.0}, ts=datetime(2024, 1, 3))
+        broker.submit_order("AAPL", 0.2, OrderSide.SELL)
+        broker._process_orders()
+
+        assert broker.get_position("AAPL") is None
+
+    def test_short_to_long_reversal_blocks_unaffordable_reverse_size(self):
+        broker = _make_broker(initial_cash=1_000.0)
+        _set_prices(broker, {"AAPL": 100.0}, ts=datetime(2024, 1, 1))
+        broker.submit_order("AAPL", 10, OrderSide.SELL)
+        broker._process_orders()
+
+        # Reverse with size that would require cash not available in a
+        # non-levered account: close short 10, then open long 30.
+        _set_prices(broker, {"AAPL": 100.0}, ts=datetime(2024, 1, 2))
+        order = broker.submit_order("AAPL", 40, OrderSide.BUY)
+        broker._process_orders()
+
+        assert order is not None
+        assert order.status.value == "rejected"
+        assert broker.get_position("AAPL") is not None
+        assert broker.get_position("AAPL").quantity == -10
+
+
 class TestPresetRoundTrip:
     """Presets should produce correct field values."""
 
