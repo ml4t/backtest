@@ -11,7 +11,6 @@ def test_root_api_contains_only_intended_core_surface() -> None:
         "Engine",
         "run_backtest",
         "BacktestConfig",
-        "Mode",
         "BacktestResult",
         "OrderType",
         "OrderSide",
@@ -25,6 +24,7 @@ def test_root_api_contains_only_intended_core_surface() -> None:
         "Fill",
         "Trade",
         "StopLoss",
+        "TakeProfit",
         "TrailingStop",
         "RuleChain",
     }

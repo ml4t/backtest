@@ -17,7 +17,7 @@ import json
 from datetime import datetime, timedelta
 
 from ml4t.backtest import DataFeed, Engine, Strategy
-from ml4t.backtest.models import NoCommission, NoSlippage, PercentageCommission, PercentageSlippage
+from ml4t.backtest.config import BacktestConfig, CommissionType, SlippageType
 from ml4t.backtest.risk import StopLoss
 from ml4t.backtest.types import ExecutionMode, OrderSide
 
@@ -227,14 +227,12 @@ class TestGoldenBuyAndHold:
         df = pl.DataFrame(data)
         feed = DataFeed(prices_df=df)
 
-        engine = Engine(
-            feed=feed,
-            strategy=BuyAndHoldStrategy(),
-            initial_cash=100000.0,
-            commission_model=NoCommission(),
-            slippage_model=NoSlippage(),
+        config = BacktestConfig(
+            commission_type=CommissionType.NONE,
+            slippage_type=SlippageType.NONE,
             execution_mode=ExecutionMode.SAME_BAR,
         )
+        engine = Engine(feed=feed, strategy=BuyAndHoldStrategy(), config=config)
 
         result = engine.run()
 
@@ -265,14 +263,14 @@ class TestGoldenMovingAverage:
         df = pl.DataFrame(data)
         feed = DataFeed(prices_df=df)
 
-        engine = Engine(
-            feed=feed,
-            strategy=SimpleMovingAverageStrategy(),
-            initial_cash=100000.0,
-            commission_model=PercentageCommission(0.001),
-            slippage_model=PercentageSlippage(0.001),
+        config = BacktestConfig(
+            commission_type=CommissionType.PERCENTAGE,
+            commission_rate=0.001,
+            slippage_type=SlippageType.PERCENTAGE,
+            slippage_rate=0.001,
             execution_mode=ExecutionMode.SAME_BAR,
         )
+        engine = Engine(feed=feed, strategy=SimpleMovingAverageStrategy(), config=config)
 
         result = engine.run()
 
@@ -293,14 +291,12 @@ class TestGoldenStopLoss:
         df = pl.DataFrame(data)
         feed = DataFeed(prices_df=df)
 
-        engine = Engine(
-            feed=feed,
-            strategy=StopLossStrategy(),
-            initial_cash=100000.0,
-            commission_model=NoCommission(),
-            slippage_model=NoSlippage(),
+        config = BacktestConfig(
+            commission_type=CommissionType.NONE,
+            slippage_type=SlippageType.NONE,
             execution_mode=ExecutionMode.SAME_BAR,
         )
+        engine = Engine(feed=feed, strategy=StopLossStrategy(), config=config)
 
         result = engine.run()
 
@@ -326,17 +322,16 @@ class TestDeterministicOutput:
 
         df = pl.DataFrame(data)
 
+        config = BacktestConfig(
+            commission_type=CommissionType.NONE,
+            slippage_type=SlippageType.NONE,
+            execution_mode=ExecutionMode.SAME_BAR,
+        )
+
         results = []
         for _ in range(2):
             feed = DataFeed(prices_df=df.clone())
-            engine = Engine(
-                feed=feed,
-                strategy=BuyAndHoldStrategy(),
-                initial_cash=100000.0,
-                commission_model=NoCommission(),
-                slippage_model=NoSlippage(),
-                execution_mode=ExecutionMode.SAME_BAR,
-            )
+            engine = Engine(feed=feed, strategy=BuyAndHoldStrategy(), config=config)
             results.append(engine.run())
 
         # All metrics should be identical
@@ -368,14 +363,15 @@ class TestRegressionMarker:
         df = pl.DataFrame(data)
         feed = DataFeed(prices_df=df)
 
-        engine = Engine(
-            feed=feed,
-            strategy=BuyAndHoldStrategy(),
+        config = BacktestConfig(
             initial_cash=10000.0,
-            commission_model=PercentageCommission(0.001),
-            slippage_model=PercentageSlippage(0.001),
+            commission_type=CommissionType.PERCENTAGE,
+            commission_rate=0.001,
+            slippage_type=SlippageType.PERCENTAGE,
+            slippage_rate=0.001,
             execution_mode=ExecutionMode.SAME_BAR,
         )
+        engine = Engine(feed=feed, strategy=BuyAndHoldStrategy(), config=config)
 
         result = engine.run()
 

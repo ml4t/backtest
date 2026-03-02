@@ -4,28 +4,29 @@
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| engine.py | 471 | Event loop orchestration |
-| broker.py | 1180 | Order execution, positions |
-| datafeed.py | 147 | Price/signal iteration |
+| engine.py | 491 | Event loop orchestration |
+| broker.py | 1,438 | Order execution, positions, risk eval |
+| config.py | 937 | BacktestConfig, 40+ behavioral knobs |
+| result.py | 1,025 | BacktestResult container |
+| types.py | 578 | Order, Position, Fill, Trade |
+| profiles.py | 375 | 6 core + 4 strict framework profiles |
+| calendar.py | 786 | Trading calendar, overnight sessions |
+| datafeed.py | 224 | Price/signal iteration |
 | strategy.py | 28 | Strategy base class |
-| types.py | 377 | Order, Position, Fill, Trade |
-| models.py | 134 | Commission/slippage models |
-| config.py | 554 | BacktestConfig, presets |
-| result.py | 764 | BacktestResult container |
-| calendar.py | 773 | Trading calendar |
+| models.py | 245 | Commission/slippage models |
 | sessions.py | 279 | Session handling |
-| analysis.py | 414 | Performance analysis |
-| export.py | 312 | Result export |
+| export.py | 312 | Result export (Parquet, YAML, JSON) |
 
 ## Subpackages
 
 | Directory | Lines | Purpose |
 |-----------|-------|---------|
-| accounting/ | 1.2k | Cash/margin policies |
-| analytics/ | 951 | Metrics calculation |
-| execution/ | 1.3k | Fill execution, impact |
-| risk/ | 1.9k | Position sizing, limits |
-| strategies/ | 438 | Strategy templates |
+| core/ | 1,365 | Order book, execution engine, fill engine, risk engine |
+| accounting/ | 1,180 | Cash/margin/crypto policies, gatekeeper |
+| analytics/ | 917 | Metrics, equity, trades, diagnostic bridge |
+| execution/ | 1,328 | Fill executor, rebalancer, impact, limits |
+| risk/ | 1,876 | Position rules (stop/trail/TP), portfolio limits |
+| strategies/ | 417 | Strategy templates |
 
 ## Key
 

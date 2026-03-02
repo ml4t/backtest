@@ -1,16 +1,16 @@
-# execution/ - 1.3k Lines
+# execution/ - 1,328 Lines
 
 Order fill execution and market impact.
 
 ## Modules
 
-| File | Purpose |
-|------|---------|
-| fill_executor.py | Fill simulation |
-| rebalancer.py | Portfolio rebalancing |
-| impact.py | Market impact models |
-| limits.py | Order limits |
-| result.py | Execution results |
+| File | Lines | Purpose |
+|------|-------|---------|
+| fill_executor.py | 528 | Fill simulation, slippage, commission |
+| rebalancer.py | 389 | Portfolio rebalancing |
+| impact.py | 185 | Market impact models |
+| limits.py | 186 | Order limits validation |
+| result.py | 40 | Execution result types |
 
 ## Key
 

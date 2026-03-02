@@ -1,17 +1,17 @@
-# risk/position/ - 864 Lines
+# risk/position/ - 909 Lines
 
-Position sizing strategies.
+Position-level risk rules (stop-loss, trailing stop, take-profit).
 
 ## Modules
 
-| File | Purpose |
-|------|---------|
-| static.py | Fixed position sizes |
-| dynamic.py | ATR/volatility-based |
-| signal.py | Signal-based sizing |
-| composite.py | Combined sizers |
-| protocol.py | Sizer protocol |
+| File | Lines | Purpose |
+|------|-------|---------|
+| dynamic.py | 474 | Trailing stop, dynamic stop-loss |
+| static.py | 246 | Take-profit, fixed stop-loss |
+| composite.py | 103 | Rule composition (RuleChain) |
+| signal.py | 48 | Signal-based exit rules |
+| protocol.py | 38 | Rule interface protocol |
 
 ## Key
 
-`StaticSizer`, `VolatilitySizer`, `SignalSizer`
+`TrailingStop`, `StopLoss`, `TakeProfit`, `RuleChain`

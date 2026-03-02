@@ -132,7 +132,7 @@ class TradeAnalyzer:
 
     def by_side(self, side: str) -> "TradeAnalyzer":
         """Filter trades by side ('long' or 'short')."""
-        filtered = [t for t in self.trades if t.side == side]
+        filtered = [t for t in self.trades if t.direction == side]
         return TradeAnalyzer(filtered)
 
     def by_symbol(self, symbol: str) -> "TradeAnalyzer":

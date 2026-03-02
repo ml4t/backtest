@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
+from ml4t.backtest.config import BacktestConfig, CommissionType, SlippageType
 from ml4t.backtest.engine import run_backtest
 from ml4t.backtest.strategy import Strategy
 
@@ -44,8 +45,13 @@ class _SingleRoundTrip(Strategy):
             broker.close_position("AAPL")
 
 
+_ZERO_COST = BacktestConfig(commission_type=CommissionType.NONE, slippage_type=SlippageType.NONE)
+
+
 def test_no_trade_preserves_cash_and_equity() -> None:
-    result = run_backtest(prices=_prices([100.0, 101.0, 102.0]), strategy=_NoopStrategy())
+    result = run_backtest(
+        prices=_prices([100.0, 101.0, 102.0]), strategy=_NoopStrategy(), config=_ZERO_COST
+    )
 
     assert result.metrics["initial_cash"] == 100000.0
     assert result.metrics["final_value"] == 100000.0
@@ -56,7 +62,9 @@ def test_no_trade_preserves_cash_and_equity() -> None:
 
 
 def test_closed_trade_pnl_reconciles_to_final_value() -> None:
-    result = run_backtest(prices=_prices([100.0, 110.0, 120.0, 130.0]), strategy=_SingleRoundTrip())
+    result = run_backtest(
+        prices=_prices([100.0, 110.0, 120.0, 130.0]), strategy=_SingleRoundTrip(), config=_ZERO_COST
+    )
 
     closed_trades = [t for t in result.trades if t.status == "closed"]
     assert len(closed_trades) == 1

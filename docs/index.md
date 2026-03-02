@@ -1,50 +1,59 @@
 # ML4T Backtest
 
-Event-driven backtesting engine with point-in-time correctness, validated against VectorBT Pro.
-
-## Overview
-
-ML4T Backtest provides a minimal, high-performance backtesting engine that:
-
-- Processes **100,000+ events per second**
-- Uses **exit-first order processing** matching real broker behavior
-- Is **validated against VectorBT Pro** for exact result matching
-- Supports **cash and margin accounts** with configurable leverage
+Event-driven backtesting engine with configurable execution semantics, validated against four independent frameworks.
 
 ## Quick Example
 
 ```python
-from ml4t.backtest import Engine, Strategy, BacktestConfig
+import polars as pl
+from ml4t.backtest import Engine, DataFeed, Strategy, BacktestConfig
 
-class MyStrategy(Strategy):
-    def on_bar(self, bar):
-        if self.position == 0:
-            self.buy(size=100)
+class BuyAndHold(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        for asset, bar in data.items():
+            if broker.get_position(asset) is None:
+                broker.submit_order(asset, 100)
 
-config = BacktestConfig(initial_cash=100_000)
-engine = Engine(data, MyStrategy(), config)
+feed = DataFeed(prices_df=prices)
+engine = Engine(feed=feed, strategy=BuyAndHold())
 result = engine.run()
 
-print(f"Total Return: {result.total_return:.2%}")
+print(f"Total Return: {result.metrics['total_return_pct']:.1f}%")
 print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 ```
 
-## Key Features
+Or use the convenience function:
+
+```python
+from ml4t.backtest import run_backtest
+
+result = run_backtest(prices, BuyAndHold(), config="backtrader")
+```
+
+## Why ML4T Backtest?
+
+**Configurable execution semantics.** Every behavioral difference between backtesting frameworks (fill ordering, stop modes, cash policies, settlement) is a named config parameter. Switch profiles to replicate any framework exactly.
+
+**Validated at scale.** 225,000+ trades verified trade-by-trade against VectorBT Pro, Backtrader, Zipline, and LEAN on real market data (250 assets x 20 years).
+
+**Fast.** 19x faster than Backtrader, 8x faster than Zipline, 5x faster than LEAN on identical workloads. Processes 40,000+ bars/second across 250 assets.
 
 | Feature | Description |
 |---------|-------------|
-| Event-Driven | Point-in-time correctness, no look-ahead bias |
-| Exit-First | Processes exits before entries, matching real brokers |
-| VectorBT Validated | Results match VectorBT Pro exactly |
-| High Performance | 100,000+ events/second |
-| Minimal Core | ~2,800 lines of focused code |
+| Event-driven | Point-in-time correctness, no look-ahead bias |
+| 40+ behavioral knobs | Every execution detail is configurable |
+| 10 framework profiles | Match VectorBT, Backtrader, Zipline, LEAN exactly |
+| Risk management | Stop-loss, take-profit, trailing stops, portfolio limits |
+| Multi-asset | Rebalancing, weight targets, exit-first ordering |
 
-## Order Types
+## Parity Validation
 
-- `MARKET` - Execute at next bar open
-- `LIMIT` - Execute if price crosses limit
-- `STOP` - Trigger market order at stop price
-- `STOP_LIMIT` - Trigger limit order at stop price
+| Profile | Trades Compared | Trade Gap | Value Gap |
+|---------|----------------|-----------|-----------|
+| `zipline_strict` | 225,583 | 0 (0.00%) | $19 (0.0001%) |
+| `backtrader_strict` | 216,980 | 1 (0.0005%) | $503 (0.004%) |
+| `vectorbt_strict` | 210,352 | 91 (0.04%) | $0 (0.00%) |
+| `lean_strict` | 226,172 | 589 (0.26%) | $7.2K (0.66%) |
 
 ## Installation
 
@@ -52,19 +61,22 @@ print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 pip install ml4t-backtest
 ```
 
-## Next Steps
+## Documentation
 
-- [Installation Guide](getting-started/installation.md) - Setup instructions
-- [Quickstart](getting-started/quickstart.md) - Build your first strategy
-- [Strategy Guide](user-guide/strategies.md) - Advanced strategy patterns
-- [API Reference](api/index.md) - Complete API documentation
+- [Installation](getting-started/installation.md) -- setup and verification
+- [Quickstart](getting-started/quickstart.md) -- your first backtest in 5 minutes
+- [How It Works](concepts/how-it-works.md) -- architecture and execution flow
+- [Execution Semantics](user-guide/execution-semantics.md) -- fill ordering, stops, timing
+- [Configuration](user-guide/configuration.md) -- all 40+ knobs explained
+- [Profiles](user-guide/profiles.md) -- framework parity and presets
+- [Strategies](user-guide/strategies.md) -- writing strategies and templates
+- [Risk Management](user-guide/risk-management.md) -- stops, trails, portfolio limits
+- [API Reference](api/index.md) -- full API documentation
 
-## Part of the ML4T Library Suite
-
-ML4T Backtest integrates seamlessly with other ML4T libraries:
+## Part of the ML4T Ecosystem
 
 ```
-ml4t-data → ml4t-engineer → ml4t-diagnostic → ml4t-backtest → ml4t-live
+ml4t-data --> ml4t-engineer --> ml4t-diagnostic --> ml4t-backtest --> ml4t-live
 ```
 
-The same Strategy class works in both backtest and live trading via ml4t-live.
+The same `Strategy` class works in both backtest and live trading via `ml4t-live`.

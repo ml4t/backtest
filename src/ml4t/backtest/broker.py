@@ -7,11 +7,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .config import (
+    EntryOrderPriority,
+    ExecutionPrice,
     FillOrdering,
     InitialHwmSource,
     LateAssetPolicy,
     MissingPricePolicy,
     ShareType,
+    ShortCashPolicy,
     StatsConfig,
     TrailStopTiming,
     WaterMarkSource,
@@ -56,6 +59,7 @@ class Broker:
         slippage_model: SlippageModel | None = None,
         stop_slippage_rate: float = 0.0,
         execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
+        execution_price: ExecutionPrice = ExecutionPrice.CLOSE,
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE,
@@ -67,18 +71,27 @@ class Broker:
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
+        short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT,
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
         share_type: ShareType = ShareType.FRACTIONAL,
         fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST,
+        entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION,
+        next_bar_submission_precheck: bool = False,
+        next_bar_simple_cash_check: bool = False,
+        buying_power_reservation: bool = False,
+        immediate_fill: bool = False,
         reject_on_insufficient_cash: bool = True,
+        skip_cash_validation: bool = False,
         cash_buffer_pct: float = 0.0,
         partial_fills_allowed: bool = False,
         rebalance_headroom_pct: float = 1.0,
         missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP,
         late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW,
         late_asset_min_bars: int = 1,
+        settlement_delay: int = 0,
+        settlement_reduces_buying_power: bool = True,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -97,6 +110,7 @@ class Broker:
         self.slippage_model = slippage_model or NoSlippage()
         self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
+        self.execution_price = execution_price
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
         self.trail_hwm_source = trail_hwm_source
@@ -104,13 +118,22 @@ class Broker:
         self.trail_stop_timing = trail_stop_timing
         self.share_type = share_type
         self.fill_ordering = fill_ordering
+        self.entry_order_priority = entry_order_priority
+        self.next_bar_submission_precheck = next_bar_submission_precheck
+        self.next_bar_simple_cash_check = next_bar_simple_cash_check
+        self.buying_power_reservation = buying_power_reservation
+        self.immediate_fill = immediate_fill
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
+        self.skip_cash_validation = skip_cash_validation
         self.cash_buffer_pct = cash_buffer_pct
         self.partial_fills_allowed = partial_fills_allowed
         self.rebalance_headroom_pct = rebalance_headroom_pct
         self.missing_price_policy = missing_price_policy
         self.late_asset_policy = late_asset_policy
         self.late_asset_min_bars = late_asset_min_bars
+        self.settlement_delay = settlement_delay
+        self.settlement_reduces_buying_power = settlement_reduces_buying_power
+        self._bar_index: int = 0
 
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
@@ -120,6 +143,7 @@ class Broker:
             long_maintenance_margin=long_maintenance_margin,
             short_maintenance_margin=short_maintenance_margin,
             fixed_margin_schedule=fixed_margin_schedule,
+            short_cash_policy=short_cash_policy.value,
         )
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
@@ -136,10 +160,14 @@ class Broker:
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
         self.fixed_margin_schedule = fixed_margin_schedule or {}
+        self.short_cash_policy = short_cash_policy
 
         # Create Gatekeeper for order validation
         self.gatekeeper = Gatekeeper(
-            self.account, self.commission_model, cash_buffer_pct=self.cash_buffer_pct
+            self.account,
+            self.commission_model,
+            cash_buffer_pct=self.cash_buffer_pct,
+            settlement_reduces_buying_power=self.settlement_reduces_buying_power,
         )
 
         self.positions: dict[str, Position] = {}
@@ -158,6 +186,7 @@ class Broker:
         self._last_prices: dict[str, float] = {}
         self._asset_bars_seen: dict[str, int] = {}
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
+        self._orders_this_bar_ids: set[str] = set()
 
         # Risk management
         self._position_rules: Any = None  # Global position rules
@@ -223,8 +252,7 @@ class Broker:
             config = BacktestConfig.from_preset("backtrader")
             broker = Broker.from_config(config)
         """
-        from .config import CommissionModel as CommModelEnum
-        from .config import SlippageModel as SlipModelEnum
+        from .config import CommissionType, SlippageType
         from .models import (
             CombinedCommission,
             FixedSlippage,
@@ -239,31 +267,31 @@ class Broker:
 
         # Build commission model from config
         commission_model = None
-        if config.commission_model == CommModelEnum.PERCENTAGE:
+        if config.commission_type == CommissionType.PERCENTAGE:
             commission_model = PercentageCommission(rate=config.commission_rate)
-        elif config.commission_model == CommModelEnum.PER_SHARE:
+        elif config.commission_type == CommissionType.PER_SHARE:
             commission_model = PerShareCommission(
                 per_share=config.commission_per_share,
                 minimum=config.commission_minimum,
             )
-        elif config.commission_model == CommModelEnum.PER_TRADE:
+        elif config.commission_type == CommissionType.PER_TRADE:
             commission_model = CombinedCommission(fixed=config.commission_per_trade)
-        elif config.commission_model == CommModelEnum.TIERED:
+        elif config.commission_type == CommissionType.TIERED:
             commission_model = TieredCommission(
                 tiers=[(float("inf"), config.commission_rate)],
             )
-        elif config.commission_model == CommModelEnum.NONE:
+        elif config.commission_type == CommissionType.NONE:
             commission_model = NoCommission()
 
         # Build slippage model from config
         slippage_model = None
-        if config.slippage_model == SlipModelEnum.PERCENTAGE:
+        if config.slippage_type == SlippageType.PERCENTAGE:
             slippage_model = PercentageSlippage(rate=config.slippage_rate)
-        elif config.slippage_model == SlipModelEnum.FIXED:
+        elif config.slippage_type == SlippageType.FIXED:
             slippage_model = FixedSlippage(amount=config.slippage_fixed)
-        elif config.slippage_model == SlipModelEnum.VOLUME_BASED:
+        elif config.slippage_type == SlippageType.VOLUME_BASED:
             slippage_model = VolumeShareSlippage(impact_factor=config.slippage_rate)
-        elif config.slippage_model == SlipModelEnum.NONE:
+        elif config.slippage_type == SlippageType.NONE:
             slippage_model = NoSlippage()
 
         return cls(
@@ -272,6 +300,7 @@ class Broker:
             slippage_model=slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
             execution_mode=config.execution_mode,
+            execution_price=config.execution_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
             trail_hwm_source=config.trail_hwm_source,
@@ -283,18 +312,27 @@ class Broker:
             long_maintenance_margin=config.long_maintenance_margin,
             short_maintenance_margin=config.short_maintenance_margin,
             fixed_margin_schedule=config.fixed_margin_schedule,
+            short_cash_policy=config.short_cash_policy,
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,
             contract_specs=contract_specs,
             share_type=config.share_type,
             fill_ordering=config.fill_ordering,
+            entry_order_priority=config.entry_order_priority,
+            next_bar_submission_precheck=config.next_bar_submission_precheck,
+            next_bar_simple_cash_check=config.next_bar_simple_cash_check,
+            buying_power_reservation=config.buying_power_reservation,
+            immediate_fill=config.immediate_fill,
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
+            skip_cash_validation=config.skip_cash_validation,
             cash_buffer_pct=config.cash_buffer_pct,
             partial_fills_allowed=config.partial_fills_allowed,
             rebalance_headroom_pct=config.rebalance_headroom_pct,
             missing_price_policy=config.missing_price_policy,
             late_asset_policy=config.late_asset_policy,
             late_asset_min_bars=config.late_asset_min_bars,
+            settlement_delay=config.settlement_delay,
+            settlement_reduces_buying_power=config.settlement_reduces_buying_power,
         )
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
@@ -409,7 +447,6 @@ class Broker:
         self,
         asset: str,
         pnl: float,
-        is_partial: bool = False,
     ) -> None:
         """Record a P&L realization event (internal use).
 
@@ -419,7 +456,6 @@ class Broker:
         Args:
             asset: Asset symbol
             pnl: Realized P&L from the exit
-            is_partial: True if this was a partial exit (scale down)
         """
         if not self._stats_config.enabled:
             return
@@ -828,6 +864,68 @@ class Broker:
 
         return self.submit_order(asset, exit_qty, side, order_type, limit_price)
 
+    def _submit_side_order(
+        self,
+        side: OrderSide,
+        asset: str,
+        shares: float | None = None,
+        contracts: int | None = None,
+        amount: float | None = None,
+        dollars: float | None = None,
+        order_type: OrderType = OrderType.MARKET,
+        limit_price: float | None = None,
+    ) -> Order | None:
+        """Resolve quantity parameters and submit an order for the given side.
+
+        Exactly one of shares/contracts/amount/dollars must be provided.
+
+        Args:
+            side: BUY or SELL
+            asset: Asset symbol
+            shares: Number of shares (equities)
+            contracts: Number of contracts (futures)
+            amount: Base currency amount (crypto)
+            dollars: Dollar value (converted to quantity at current price)
+            order_type: Order type (default MARKET)
+            limit_price: Limit price for LIMIT orders
+
+        Returns:
+            Order object if submitted, None if no current price or invalid params
+
+        Raises:
+            ValueError: If zero or more than one quantity parameter is provided
+        """
+        # Count non-None parameters
+        qty_params = [shares, contracts, amount, dollars]
+        provided = sum(1 for p in qty_params if p is not None)
+
+        if provided == 0:
+            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
+        if provided > 1:
+            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
+
+        # Determine quantity
+        quantity: float
+        if shares is not None:
+            quantity = shares
+        elif contracts is not None:
+            quantity = float(contracts)
+        elif amount is not None:
+            quantity = amount
+        elif dollars is not None:
+            price = self._current_prices.get(asset)
+            if price is None or price <= 0:
+                return None
+            multiplier = self.get_multiplier(asset)
+            quantity = dollars / (price * multiplier)
+        else:
+            return None  # Should not reach here
+
+        if quantity <= 0:
+            return None
+
+        return self.submit_order(asset, quantity, side, order_type, limit_price)
+
     def buy(
         self,
         asset: str,
@@ -876,36 +974,16 @@ class Broker:
             # Buy 0.5 BTC
             broker.buy("BTC", amount=0.5)
         """
-        # Count non-None parameters
-        qty_params = [shares, contracts, amount, dollars]
-        provided = sum(1 for p in qty_params if p is not None)
-
-        if provided == 0:
-            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
-        if provided > 1:
-            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
-
-        # Determine quantity
-        quantity: float
-        if shares is not None:
-            quantity = shares
-        elif contracts is not None:
-            quantity = float(contracts)
-        elif amount is not None:
-            quantity = amount
-        elif dollars is not None:
-            price = self._current_prices.get(asset)
-            if price is None or price <= 0:
-                return None
-            multiplier = self.get_multiplier(asset)
-            quantity = dollars / (price * multiplier)
-        else:
-            return None  # Should not reach here
-
-        if quantity <= 0:
-            return None
-
-        return self.submit_order(asset, quantity, OrderSide.BUY, order_type, limit_price)
+        return self._submit_side_order(
+            OrderSide.BUY,
+            asset,
+            shares,
+            contracts,
+            amount,
+            dollars,
+            order_type,
+            limit_price,
+        )
 
     def sell(
         self,
@@ -952,36 +1030,16 @@ class Broker:
             # Sell $2500 worth of position
             broker.sell("BTC", dollars=2500)
         """
-        # Count non-None parameters
-        qty_params = [shares, contracts, amount, dollars]
-        provided = sum(1 for p in qty_params if p is not None)
-
-        if provided == 0:
-            raise ValueError("Must provide one of: shares, contracts, amount, dollars")
-        if provided > 1:
-            raise ValueError("Must provide only one of: shares, contracts, amount, dollars")
-
-        # Determine quantity
-        quantity: float
-        if shares is not None:
-            quantity = shares
-        elif contracts is not None:
-            quantity = float(contracts)
-        elif amount is not None:
-            quantity = amount
-        elif dollars is not None:
-            price = self._current_prices.get(asset)
-            if price is None or price <= 0:
-                return None
-            multiplier = self.get_multiplier(asset)
-            quantity = dollars / (price * multiplier)
-        else:
-            return None  # Should not reach here
-
-        if quantity <= 0:
-            return None
-
-        return self.submit_order(asset, quantity, OrderSide.SELL, order_type, limit_price)
+        return self._submit_side_order(
+            OrderSide.SELL,
+            asset,
+            shares,
+            contracts,
+            amount,
+            dollars,
+            order_type,
+            limit_price,
+        )
 
     # === Trade History Access (P1 Features) ===
 
@@ -989,7 +1047,6 @@ class Broker:
         self,
         asset: str | None = None,
         last_n: int | None = None,
-        since_bar: int | None = None,
     ) -> list[Trade]:
         """Get completed trades, optionally filtered.
 
@@ -1000,7 +1057,6 @@ class Broker:
         Args:
             asset: Filter to only this asset's trades. If None, returns all trades.
             last_n: Return only the last N trades (after other filters)
-            since_bar: Return trades with entry_bar >= since_bar
 
         Returns:
             List of Trade objects matching the filters, ordered by exit time
@@ -1023,11 +1079,6 @@ class Broker:
         # Filter by asset
         if asset is not None:
             result = [t for t in result if t.symbol == asset]
-
-        # Filter by entry bar (if we had bar info - using entry_time as proxy)
-        # Note: Trade doesn't have entry_bar, but bars_held is available
-        # For now, since_bar is not fully implementable without entry_bar
-        # but we keep the parameter for API consistency with spec
 
         # Apply last_n limit
         if last_n is not None and last_n > 0:
@@ -1319,6 +1370,11 @@ class Broker:
         self._current_lows = lows
         self._current_volumes = volumes
         self._current_signals = signals
+        self._bar_index += 1
+
+        # Release settled holds at bar start
+        if self.settlement_delay > 0:
+            self.account.release_settled(self._bar_index)
 
         for asset, price in prices.items():
             if price > 0:
@@ -1339,6 +1395,7 @@ class Broker:
             pass  # They're already in pending_orders
             # Clear orders placed this bar (will be processed next bar)
             self._orders_this_bar = []
+            self._orders_this_bar_ids.clear()
 
         for _asset, pos in self.positions.items():
             pos.bars_held += 1

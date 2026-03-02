@@ -69,23 +69,11 @@ requires-python = ">=3.11"
 
 # Core dependencies
 dependencies = [
-    # Data processing
     "polars>=0.20.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "pyarrow>=14.0.0",
-    "tables>=3.8.0",  # PyTables for HDF5 support
-    # Event system
-    "sortedcontainers>=2.4.0", # Efficient priority queue
-    # Performance optimization
-    "numba>=0.57.0",
-    # Configuration and validation
-    "pydantic>=1.10.0,<3.0.0",  # Configuration schema and validation
-    "PyYAML>=6.0.0",  # YAML configuration support
-    # Utilities
-    "structlog>=23.0.0",
-    "python-dateutil>=2.8.0",
-    # Market calendars (needed for clock module)
+    "PyYAML>=6.0.0",
     "pandas-market-calendars>=4.0.0",
 ]
 
@@ -108,6 +96,7 @@ comparison = [
     "vectorbt>=0.24.0",
     "backtrader>=1.9.0",
     "zipline-reloaded>=2.4.0",
+    "pyfolio-reloaded>=0.9.9",
 ]
 
 # Development dependencies
@@ -119,10 +108,8 @@ dev = [
     "pytest-benchmark>=4.0.0",
     "pytest-asyncio>=0.21.0",
     "hypothesis>=6.80.0",
-    "ruff>=0.1.0",
-    "mypy>=1.5.0",
-    "ipython>=8.14.0",
-    "ipdb>=0.13.0",
+    "ruff>=0.8.0",
+    "ty",
     "pre-commit>=3.3.0",
     "ml4t-diagnostic",  # Sibling package for tearsheet integration tests
 ]
@@ -226,19 +213,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ARG001", "ARG002", "F841", "SIM102"]  # Test patterns
-
-[tool.mypy]
-python_version = "3.11"
-strict = false
-warn_return_any = false  # numpy/pandas return Any, too many false positives
-warn_unused_ignores = true
-disallow_untyped_defs = false
-disallow_any_unimported = false
-no_implicit_optional = true
-check_untyped_defs = true
-show_error_codes = true
-warn_redundant_casts = true
-ignore_missing_imports = true
 
 [tool.ty.environment]
 python-version = "3.11"

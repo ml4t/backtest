@@ -4,6 +4,8 @@ This module provides the AccountState class that tracks cash, positions, and
 delegates validation to the appropriate AccountPolicy.
 """
 
+from collections import deque
+
 from ..types import Position
 from .policy import AccountPolicy
 
@@ -37,6 +39,10 @@ class AccountState:
         self.cash = initial_cash
         self.positions: dict[str, Position] = {}
         self.policy = policy
+
+        # Settlement tracking: holds are (settle_bar, amount) pairs
+        self._settlement_holds: deque[tuple[int, float]] = deque()
+        self._total_held: float = 0.0
 
     @property
     def total_equity(self) -> float:
@@ -110,101 +116,37 @@ class AccountState:
         pos = self.positions.get(asset)
         return pos.quantity if pos else 0.0
 
-    def apply_fill(self, asset: str, quantity_delta: float, fill_price: float, timestamp) -> float:
-        """Apply a fill to the account, updating position and cash.
+    @property
+    def unsettled_cash(self) -> float:
+        """Total cash held in unsettled transactions."""
+        return self._total_held
 
-        This method handles both long and short positions correctly:
-        - Long positions (quantity > 0): Cash decreases when buying, increases when selling
-        - Short positions (quantity < 0): Cash increases when shorting, decreases when covering
+    def add_settlement_hold(self, bar_index: int, delay: int, amount: float) -> None:
+        """Hold cash from a sale until settlement completes.
 
         Args:
-            asset: Asset identifier
-            quantity_delta: Signed quantity change (positive=buy, negative=sell/short)
-            fill_price: Fill price per unit
-            timestamp: Fill timestamp
-
-        Returns:
-            Cash change (positive=cash in, negative=cash out)
-
-        Examples:
-            Open long (buy 100 @ $150):
-                quantity_delta=+100, fill_price=$150
-                cash_change = -$15,000 (paid to buy)
-
-            Close long (sell 100 @ $160):
-                quantity_delta=-100, fill_price=$160
-                cash_change = +$16,000 (received from sale)
-
-            Open short (sell 100 @ $150):
-                quantity_delta=-100, fill_price=$150
-                cash_change = +$15,000 (proceeds from short sale)
-
-            Close short (buy 100 @ $145):
-                quantity_delta=+100, fill_price=$145
-                cash_change = -$14,500 (paid to cover short)
-
-        Note:
-            Commission should be handled separately by the caller.
-            This method only handles the asset position and base cash flow.
+            bar_index: Current bar index when the fill occurred.
+            delay: Number of bars until proceeds are spendable.
+            amount: Positive cash amount to hold.
         """
+        if amount <= 0 or delay <= 0:
+            return
+        settle_bar = bar_index + delay
+        self._settlement_holds.append((settle_bar, amount))
+        self._total_held += amount
 
-        # Calculate cash flow: negative for buys, positive for sells/shorts
-        # Formula: cash_change = -quantity_delta × fill_price
-        # Works for both longs and shorts:
-        #   - Buy (quantity_delta > 0): cash decreases (negative change)
-        #   - Sell/Short (quantity_delta < 0): cash increases (positive change)
-        cash_change = -quantity_delta * fill_price
+    def release_settled(self, current_bar: int) -> None:
+        """Release holds whose settlement bar has been reached.
 
-        # Update cash balance
-        self.cash += cash_change
-
-        # Update position
-        pos = self.positions.get(asset)
-        if pos is None:
-            # New position (long or short)
-            if quantity_delta != 0:
-                self.positions[asset] = Position(
-                    asset=asset,
-                    quantity=quantity_delta,
-                    entry_price=fill_price,
-                    current_price=fill_price,
-                    entry_time=timestamp,
-                    bars_held=0,
-                )
-        else:
-            # Existing position - update quantity and cost basis
-            old_qty = pos.quantity
-            new_qty = old_qty + quantity_delta
-
-            if new_qty == 0:
-                # Position fully closed
-                del self.positions[asset]
-            elif (old_qty > 0 and new_qty < 0) or (old_qty < 0 and new_qty > 0):
-                # Position reversal (long → short or short → long)
-                # Close old position, open new position in opposite direction
-                del self.positions[asset]
-                self.positions[asset] = Position(
-                    asset=asset,
-                    quantity=new_qty,
-                    entry_price=fill_price,
-                    current_price=fill_price,
-                    entry_time=timestamp,
-                    bars_held=0,
-                )
-            elif abs(new_qty) > abs(old_qty):
-                # Adding to existing position (same direction)
-                # Update weighted average entry price
-                old_cost = abs(old_qty) * pos.entry_price
-                new_cost = abs(quantity_delta) * fill_price
-                total_cost = old_cost + new_cost
-                pos.entry_price = total_cost / abs(new_qty)
-                pos.quantity = new_qty
-            else:
-                # Partial close (reducing position size)
-                # Entry price remains unchanged for partial closes
-                pos.quantity = new_qty
-
-        return cash_change
+        Args:
+            current_bar: Current bar index.
+        """
+        while self._settlement_holds and self._settlement_holds[0][0] <= current_bar:
+            _, amount = self._settlement_holds.popleft()
+            self._total_held -= amount
+        # Guard against floating-point drift
+        if not self._settlement_holds:
+            self._total_held = 0.0
 
     def __repr__(self) -> str:
         """String representation for debugging."""

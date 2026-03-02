@@ -14,7 +14,7 @@ except ImportError:
     __version__ = "0.0.0.dev0"
 
 from .broker import Broker
-from .config import BacktestConfig, Mode
+from .config import BacktestConfig
 from .datafeed import DataFeed
 from .engine import Engine, run_backtest
 from .result import BacktestResult
@@ -22,7 +22,7 @@ from .result import BacktestResult
 # Risk management rules (position-level)
 from .risk.position.composite import RuleChain
 from .risk.position.dynamic import TrailingStop
-from .risk.position.static import StopLoss
+from .risk.position.static import StopLoss, TakeProfit
 from .strategy import Strategy
 from .types import (
     ExecutionMode,
@@ -46,7 +46,6 @@ __all__ = [
     "Engine",
     "run_backtest",
     "BacktestConfig",
-    "Mode",
     "BacktestResult",
     # Canonical domain types
     "OrderType",
@@ -62,6 +61,7 @@ __all__ = [
     "Trade",
     # Risk rules
     "StopLoss",
+    "TakeProfit",
     "TrailingStop",
     "RuleChain",
 ]

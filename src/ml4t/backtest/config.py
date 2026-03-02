@@ -31,14 +31,6 @@ import yaml
 from .types import ExecutionMode, StopFillMode, StopLevelBasis
 
 
-class FillTiming(str, Enum):
-    """When orders are filled relative to signal generation."""
-
-    SAME_BAR = "same_bar"  # Fill on same bar as signal (look-ahead bias risk)
-    NEXT_BAR_OPEN = "next_bar_open"  # Fill at next bar's open (most realistic)
-    NEXT_BAR_CLOSE = "next_bar_close"  # Fill at next bar's close
-
-
 class ExecutionPrice(str, Enum):
     """Price used for order execution."""
 
@@ -69,10 +61,56 @@ class FillOrdering(str, Enum):
         Orders process in submission order with sequential cash updates.
         Each order's gatekeeper check sees cash from all prior fills.
         Matches Backtrader's submission-order processing.
+
+    SEQUENTIAL:
+        Orders process in submission order (typically alphabetical by asset)
+        without exit/entry separation. Cash updates after each individual fill.
+        Unlike EXIT_FIRST, exits do not pre-free cash for later entries.
+        Matches LEAN's per-order sequential buying-power model.
     """
 
     EXIT_FIRST = "exit_first"
     FIFO = "fifo"
+    SEQUENTIAL = "sequential"
+
+
+class EntryOrderPriority(str, Enum):
+    """Priority for sequencing entry orders under cash constraints.
+
+    Applied when ``fill_ordering=EXIT_FIRST`` after exits are processed.
+
+    SUBMISSION:
+        Keep strategy submission order.
+
+    NOTIONAL_DESC:
+        Process larger notional entries first.
+
+    NOTIONAL_ASC:
+        Process smaller notional entries first.
+    """
+
+    SUBMISSION = "submission"
+    NOTIONAL_DESC = "notional_desc"
+    NOTIONAL_ASC = "notional_asc"
+
+
+class ShortCashPolicy(str, Enum):
+    """How short-sale proceeds affect spendable cash in non-levered accounts.
+
+    CREDIT:
+        Legacy behavior: short entries are cash-checked by notional.
+
+    CREDIT_PROCEEDS:
+        Short proceeds are immediately spendable for new entries/reversals.
+
+    LOCK_NOTIONAL:
+        Lock short notional as collateral from spendable cash.
+        This emulates engines that reserve short proceeds under constraints.
+    """
+
+    CREDIT = "credit"
+    CREDIT_PROCEEDS = "credit_proceeds"
+    LOCK_NOTIONAL = "lock_notional"
 
 
 class RebalanceMode(str, Enum):
@@ -121,14 +159,7 @@ class LateAssetPolicy(str, Enum):
     REQUIRE_HISTORY = "require_history"
 
 
-class SignalProcessing(str, Enum):
-    """How signals are processed relative to existing positions."""
-
-    CHECK_POSITION = "check_position"  # Only act if no existing position (event-driven)
-    PROCESS_ALL = "process_all"  # Process all signals regardless (vectorized)
-
-
-class CommissionModel(str, Enum):
+class CommissionType(str, Enum):
     """Commission calculation method."""
 
     NONE = "none"  # No commission
@@ -138,7 +169,7 @@ class CommissionModel(str, Enum):
     TIERED = "tiered"  # Volume-based tiers
 
 
-class SlippageModel(str, Enum):
+class SlippageType(str, Enum):
     """Slippage calculation method."""
 
     NONE = "none"  # No slippage
@@ -282,11 +313,11 @@ class BacktestConfig:
     long_maintenance_margin: float = 0.25  # Reg T standard for longs
     short_maintenance_margin: float = 0.30  # Reg T standard for shorts (higher!)
     fixed_margin_schedule: dict[str, tuple[float, float]] | None = None  # For futures
+    short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT
 
     # === Execution Timing ===
-    fill_timing: FillTiming = FillTiming.NEXT_BAR_OPEN
-    execution_price: ExecutionPrice = ExecutionPrice.CLOSE
-    execution_mode: ExecutionMode = ExecutionMode.SAME_BAR  # Order execution timing
+    execution_price: ExecutionPrice = ExecutionPrice.OPEN
+    execution_mode: ExecutionMode = ExecutionMode.NEXT_BAR  # Order execution timing
 
     # === Stop Configuration ===
     stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE
@@ -308,7 +339,7 @@ class BacktestConfig:
             List of warning message strings (empty if no issues found).
 
         Example:
-            config = BacktestConfig(fill_timing=FillTiming.SAME_BAR)
+            config = BacktestConfig(execution_mode=ExecutionMode.SAME_BAR)
             warnings = config.validate()
             # ["SAME_BAR execution has look-ahead bias risk..."]
         """
@@ -317,31 +348,20 @@ class BacktestConfig:
         issues: list[str] = []
 
         # Look-ahead bias warning
-        if self.fill_timing == FillTiming.SAME_BAR:
+        if self.execution_mode == ExecutionMode.SAME_BAR:
             issues.append(
                 "SAME_BAR execution has look-ahead bias risk. "
-                "Use NEXT_BAR_OPEN for realistic backtesting."
+                "Use NEXT_BAR execution mode for realistic backtesting."
             )
 
         # Zero cost warning
-        if (
-            self.commission_model == CommissionModel.NONE
-            and self.slippage_model == SlippageModel.NONE
-        ):
+        if self.commission_type == CommissionType.NONE and self.slippage_type == SlippageType.NONE:
             issues.append(
-                "Both commission and slippage are disabled. "
-                "Results may be overly optimistic. Consider using Mode.REALISTIC."
-            )
-
-        # High position concentration
-        if self.default_position_pct > 0.25:
-            issues.append(
-                f"Default position size ({self.default_position_pct:.0%}) exceeds 25%. "
-                "High concentration increases single-stock risk."
+                "Both commission and slippage are disabled. Results may be overly optimistic."
             )
 
         # Volume-based slippage without partial fills
-        if self.slippage_model == SlippageModel.VOLUME_BASED and not self.partial_fills_allowed:
+        if self.slippage_type == SlippageType.VOLUME_BASED and not self.partial_fills_allowed:
             issues.append(
                 "Volume-based slippage without partial_fills_allowed may cause "
                 "orders to be rejected in low-volume conditions."
@@ -385,6 +405,12 @@ class BacktestConfig:
                     f"initial_margin ({self.initial_margin})"
                 )
 
+        if self.settlement_delay < 0 or self.settlement_delay > 5:
+            issues.append(
+                f"settlement_delay ({self.settlement_delay}) should be 0-5. "
+                "Common values: 0 (instant), 1 (T+1), 2 (T+2 US equities)."
+            )
+
         if not 0.0 < self.rebalance_headroom_pct <= 1.0:
             issues.append(
                 f"rebalance_headroom_pct ({self.rebalance_headroom_pct}) must be in (0.0, 1.0]"
@@ -422,21 +448,16 @@ class BacktestConfig:
 
     # === Position Sizing ===
     share_type: ShareType = ShareType.FRACTIONAL
-    default_position_pct: float = 0.10  # 10% of portfolio per position
-
-    # === Signal Processing ===
-    signal_processing: SignalProcessing = SignalProcessing.CHECK_POSITION
-    accumulate_positions: bool = False  # Allow adding to existing positions
 
     # === Commission ===
-    commission_model: CommissionModel = CommissionModel.PERCENTAGE
+    commission_type: CommissionType = CommissionType.PERCENTAGE
     commission_rate: float = 0.001  # 0.1% per trade
     commission_per_share: float = 0.0  # $ per share (if per_share model)
     commission_per_trade: float = 0.0  # $ per trade (if per_trade model)
     commission_minimum: float = 0.0  # Minimum commission per trade
 
     # === Slippage ===
-    slippage_model: SlippageModel = SlippageModel.PERCENTAGE
+    slippage_type: SlippageType = SlippageType.PERCENTAGE
     slippage_rate: float = 0.001  # 0.1%
     slippage_fixed: float = 0.0  # $ per share (if fixed model)
     stop_slippage_rate: float = 0.0  # Additional slippage for stop/risk exits (on top of normal)
@@ -445,11 +466,23 @@ class BacktestConfig:
     initial_cash: float = 100000.0
     cash_buffer_pct: float = 0.0  # Reserve this % of cash (0 = use all)
 
+    # === Settlement ===
+    settlement_delay: int = 0  # Bars until sale proceeds are spendable (T+0 default)
+    settlement_reduces_buying_power: bool = True  # Unsettled cash reduces buying power
+
     # === Order Handling ===
     reject_on_insufficient_cash: bool = True
+    skip_cash_validation: bool = (
+        False  # True = bypass gatekeeper (Zipline-like unconstrained fills)
+    )
     partial_fills_allowed: bool = False
     fill_ordering: FillOrdering = FillOrdering.EXIT_FIRST
-    rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
+    entry_order_priority: EntryOrderPriority = EntryOrderPriority.SUBMISSION
+    next_bar_submission_precheck: bool = False
+    next_bar_simple_cash_check: bool = False
+    buying_power_reservation: bool = False  # Reserve cash at submission (LEAN-style)
+    immediate_fill: bool = False  # Fill same-bar market orders at submit time (LEAN-style)
+    rebalance_mode: RebalanceMode = RebalanceMode.INCREMENTAL
     rebalance_headroom_pct: float = 1.0
     missing_price_policy: MissingPricePolicy = MissingPricePolicy.SKIP
     late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW
@@ -474,9 +507,9 @@ class BacktestConfig:
                 "long_maintenance_margin": self.long_maintenance_margin,
                 "short_maintenance_margin": self.short_maintenance_margin,
                 "fixed_margin_schedule": self.fixed_margin_schedule,
+                "short_cash_policy": self.short_cash_policy.value,
             },
             "execution": {
-                "fill_timing": self.fill_timing.value,
                 "execution_price": self.execution_price.value,
                 "execution_mode": self.execution_mode.value,
             },
@@ -489,21 +522,16 @@ class BacktestConfig:
             },
             "position_sizing": {
                 "share_type": self.share_type.value,
-                "default_position_pct": self.default_position_pct,
-            },
-            "signals": {
-                "signal_processing": self.signal_processing.value,
-                "accumulate_positions": self.accumulate_positions,
             },
             "commission": {
-                "model": self.commission_model.value,
+                "model": self.commission_type.value,
                 "rate": self.commission_rate,
                 "per_share": self.commission_per_share,
                 "per_trade": self.commission_per_trade,
                 "minimum": self.commission_minimum,
             },
             "slippage": {
-                "model": self.slippage_model.value,
+                "model": self.slippage_type.value,
                 "rate": self.slippage_rate,
                 "fixed": self.slippage_fixed,
                 "stop_rate": self.stop_slippage_rate,
@@ -512,15 +540,31 @@ class BacktestConfig:
                 "initial": self.initial_cash,
                 "buffer_pct": self.cash_buffer_pct,
             },
+            "settlement": {
+                "delay": self.settlement_delay,
+                "reduces_buying_power": self.settlement_reduces_buying_power,
+            },
             "orders": {
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
+                "skip_cash_validation": self.skip_cash_validation,
                 "partial_fills_allowed": self.partial_fills_allowed,
                 "fill_ordering": self.fill_ordering.value,
+                "entry_order_priority": self.entry_order_priority.value,
+                "next_bar_submission_precheck": self.next_bar_submission_precheck,
+                "next_bar_simple_cash_check": self.next_bar_simple_cash_check,
+                "buying_power_reservation": self.buying_power_reservation,
+                "immediate_fill": self.immediate_fill,
                 "rebalance_mode": self.rebalance_mode.value,
                 "rebalance_headroom_pct": self.rebalance_headroom_pct,
                 "missing_price_policy": self.missing_price_policy.value,
                 "late_asset_policy": self.late_asset_policy.value,
                 "late_asset_min_bars": self.late_asset_min_bars,
+            },
+            "calendar": {
+                "calendar": self.calendar,
+                "timezone": self.timezone,
+                "data_frequency": self.data_frequency.value,
+                "enforce_sessions": self.enforce_sessions,
             },
         }
 
@@ -544,11 +588,12 @@ class BacktestConfig:
                 "execution",
                 "stops",
                 "position_sizing",
-                "signals",
                 "commission",
                 "slippage",
                 "cash",
+                "settlement",
                 "orders",
+                "calendar",
             }
             unknown_sections = set(data) - allowed_sections
             if unknown_sections:
@@ -562,8 +607,9 @@ class BacktestConfig:
                     "long_maintenance_margin",
                     "short_maintenance_margin",
                     "fixed_margin_schedule",
+                    "short_cash_policy",
                 },
-                "execution": {"fill_timing", "execution_price", "execution_mode"},
+                "execution": {"execution_price", "execution_mode"},
                 "stops": {
                     "stop_fill_mode",
                     "stop_level_basis",
@@ -571,20 +617,32 @@ class BacktestConfig:
                     "initial_hwm_source",
                     "trail_stop_timing",
                 },
-                "position_sizing": {"share_type", "default_position_pct"},
-                "signals": {"signal_processing", "accumulate_positions"},
+                "position_sizing": {"share_type"},
                 "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
                 "slippage": {"model", "rate", "fixed", "stop_rate"},
                 "cash": {"initial", "buffer_pct"},
+                "settlement": {"delay", "reduces_buying_power"},
                 "orders": {
                     "reject_on_insufficient_cash",
+                    "skip_cash_validation",
                     "partial_fills_allowed",
                     "fill_ordering",
+                    "entry_order_priority",
+                    "next_bar_submission_precheck",
+                    "next_bar_simple_cash_check",
+                    "buying_power_reservation",
+                    "immediate_fill",
                     "rebalance_mode",
                     "rebalance_headroom_pct",
                     "missing_price_policy",
                     "late_asset_policy",
                     "late_asset_min_bars",
+                },
+                "calendar": {
+                    "calendar",
+                    "timezone",
+                    "data_frequency",
+                    "enforce_sessions",
                 },
             }
             for section, cfg in data.items():
@@ -600,11 +658,12 @@ class BacktestConfig:
         exec_cfg = data.get("execution", {})
         stops_cfg = data.get("stops", {})
         sizing_cfg = data.get("position_sizing", {})
-        signal_cfg = data.get("signals", {})
         comm_cfg = data.get("commission", {})
         slip_cfg = data.get("slippage", {})
         cash_cfg = data.get("cash", {})
+        settle_cfg = data.get("settlement", {})
         order_cfg = data.get("orders", {})
+        cal_cfg = data.get("calendar", {})
 
         allow_short_selling = acct_cfg.get("allow_short_selling", False)
         allow_leverage = acct_cfg.get("allow_leverage", False)
@@ -617,8 +676,8 @@ class BacktestConfig:
             long_maintenance_margin=acct_cfg.get("long_maintenance_margin", 0.25),
             short_maintenance_margin=acct_cfg.get("short_maintenance_margin", 0.30),
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
+            short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
             # Execution
-            fill_timing=FillTiming(exec_cfg.get("fill_timing", "next_bar_open")),
             execution_price=ExecutionPrice(exec_cfg.get("execution_price", "close")),
             execution_mode=ExecutionMode(exec_cfg.get("execution_mode", "same_bar")),
             # Stops
@@ -629,35 +688,45 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming(stops_cfg.get("trail_stop_timing", "lagged")),
             # Sizing
             share_type=ShareType(sizing_cfg.get("share_type", "fractional")),
-            default_position_pct=sizing_cfg.get("default_position_pct", 0.10),
-            # Signals
-            signal_processing=SignalProcessing(
-                signal_cfg.get("signal_processing", "check_position")
-            ),
-            accumulate_positions=signal_cfg.get("accumulate_positions", False),
             # Commission
-            commission_model=CommissionModel(comm_cfg.get("model", "percentage")),
+            commission_type=CommissionType(comm_cfg.get("model", "percentage")),
             commission_rate=comm_cfg.get("rate", 0.001),
             commission_per_share=comm_cfg.get("per_share", 0.0),
             commission_per_trade=comm_cfg.get("per_trade", 0.0),
             commission_minimum=comm_cfg.get("minimum", 0.0),
             # Slippage
-            slippage_model=SlippageModel(slip_cfg.get("model", "percentage")),
+            slippage_type=SlippageType(slip_cfg.get("model", "percentage")),
             slippage_rate=slip_cfg.get("rate", 0.001),
             slippage_fixed=slip_cfg.get("fixed", 0.0),
             stop_slippage_rate=slip_cfg.get("stop_rate", 0.0),
             # Cash
             initial_cash=cash_cfg.get("initial", 100000.0),
             cash_buffer_pct=cash_cfg.get("buffer_pct", 0.0),
+            # Settlement
+            settlement_delay=settle_cfg.get("delay", 0),
+            settlement_reduces_buying_power=settle_cfg.get("reduces_buying_power", True),
             # Orders
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
+            skip_cash_validation=order_cfg.get("skip_cash_validation", False),
             partial_fills_allowed=order_cfg.get("partial_fills_allowed", False),
             fill_ordering=FillOrdering(order_cfg.get("fill_ordering", "exit_first")),
+            entry_order_priority=EntryOrderPriority(
+                order_cfg.get("entry_order_priority", "submission")
+            ),
+            next_bar_submission_precheck=order_cfg.get("next_bar_submission_precheck", False),
+            next_bar_simple_cash_check=order_cfg.get("next_bar_simple_cash_check", False),
+            buying_power_reservation=order_cfg.get("buying_power_reservation", False),
+            immediate_fill=order_cfg.get("immediate_fill", False),
             rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
             rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
             missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),
             late_asset_policy=LateAssetPolicy(order_cfg.get("late_asset_policy", "allow")),
             late_asset_min_bars=order_cfg.get("late_asset_min_bars", 1),
+            # Calendar
+            calendar=cal_cfg.get("calendar"),
+            timezone=cal_cfg.get("timezone", "UTC"),
+            data_frequency=DataFrequency(cal_cfg.get("data_frequency", "daily")),
+            enforce_sessions=cal_cfg.get("enforce_sessions", False),
             # Metadata
             preset_name=preset_name,
         )
@@ -686,6 +755,7 @@ class BacktestConfig:
         - "backtrader": Match Backtrader's default behavior
         - "vectorbt": Match VectorBT's default behavior
         - "zipline": Match Zipline's default behavior
+        - "lean": Match QuantConnect LEAN's default behavior
         - "realistic": Conservative settings for realistic simulation
         """
         from .profiles import get_profile_config
@@ -721,7 +791,6 @@ class BacktestConfig:
             [
                 "",
                 "Execution:",
-                f"  Fill timing: {self.fill_timing.value}",
                 f"  Execution mode: {self.execution_mode.value}",
                 f"  Execution price: {self.execution_price.value}",
                 "",
@@ -733,15 +802,10 @@ class BacktestConfig:
                 "",
                 "Position Sizing:",
                 f"  Share type: {self.share_type.value}",
-                f"  Default position: {self.default_position_pct:.1%}",
-                "",
-                "Signal Processing:",
-                f"  Processing: {self.signal_processing.value}",
-                f"  Accumulate: {self.accumulate_positions}",
                 "",
                 "Costs:",
-                f"  Commission: {self.commission_model.value} @ {self.commission_rate:.2%}",
-                f"  Slippage: {self.slippage_model.value} @ {self.slippage_rate:.2%}",
+                f"  Commission: {self.commission_type.value} @ {self.commission_rate:.2%}",
+                f"  Slippage: {self.slippage_type.value} @ {self.slippage_rate:.2%}",
             ]
         )
 
@@ -753,12 +817,16 @@ class BacktestConfig:
                 "",
                 "Orders:",
                 f"  Fill ordering: {self.fill_ordering.value}",
+                f"  Entry priority: {self.entry_order_priority.value}",
+                f"  Next-bar precheck: {self.next_bar_submission_precheck}",
+                f"  Next-bar cash check: {self.next_bar_simple_cash_check}",
                 f"  Rebalance mode: {self.rebalance_mode.value}",
                 f"  Rebalance headroom: {self.rebalance_headroom_pct:.3f}",
                 f"  Missing price policy: {self.missing_price_policy.value}",
                 f"  Late asset policy: {self.late_asset_policy.value}",
                 f"  Late asset min bars: {self.late_asset_min_bars}",
                 f"  Reject insufficient: {self.reject_on_insufficient_cash}",
+                f"  Skip cash validation: {self.skip_cash_validation}",
                 f"  Partial fills: {self.partial_fills_allowed}",
                 "",
                 "Cash:",
@@ -767,57 +835,13 @@ class BacktestConfig:
             ]
         )
 
-        return "\n".join(line for line in lines if line is not None)
-
-
-# Export presets directory path for users who want to load custom YAML files
-PRESETS_DIR = Path(__file__).parent / "presets"
-
-
-class Mode(str, Enum):
-    """Simplified mode selection for Engine initialization.
-
-    A Mode is a convenient shorthand for BacktestConfig presets.
-    Use this when you want sensible defaults without configuring every detail.
-
-    Example:
-        >>> from ml4t.backtest import Engine, Mode
-        >>> engine = Engine.from_mode(feed, strategy, mode=Mode.REALISTIC)
-
-    Available modes:
-        DEFAULT: Balanced defaults (fractional shares, 0.1% costs)
-        REALISTIC: Conservative for production use (integer shares, 0.2% costs)
-        FAST: Minimal friction for quick prototyping (no costs)
-        BACKTRADER: Match Backtrader behavior exactly
-        VECTORBT: Match VectorBT behavior exactly
-        ZIPLINE: Match Zipline behavior exactly
-    """
-
-    DEFAULT = "default"
-    REALISTIC = "realistic"
-    FAST = "fast"
-    BACKTRADER = "backtrader"
-    VECTORBT = "vectorbt"
-    ZIPLINE = "zipline"
-
-    def to_config(self) -> BacktestConfig:
-        """Convert mode to a BacktestConfig instance."""
-        if self == Mode.FAST:
-            # Special case: fast mode minimizes friction for rapid prototyping
-            return BacktestConfig(
-                # Account: permissive (shorts allowed for flexibility)
-                allow_short_selling=True,
-                allow_leverage=False,
-                # Execution: same-bar for speed
-                fill_timing=FillTiming.SAME_BAR,
-                execution_price=ExecutionPrice.CLOSE,
-                execution_mode=ExecutionMode.SAME_BAR,
-                # Sizing
-                share_type=ShareType.FRACTIONAL,
-                # Costs: none for frictionless testing
-                commission_model=CommissionModel.NONE,
-                slippage_model=SlippageModel.NONE,
-                preset_name="fast",
+        if self.settlement_delay > 0:
+            lines.extend(
+                [
+                    "",
+                    "Settlement:",
+                    f"  Delay: T+{self.settlement_delay}",
+                ]
             )
-        # All other modes map directly to presets
-        return BacktestConfig.from_preset(self.value)
+
+        return "\n".join(line for line in lines if line is not None)

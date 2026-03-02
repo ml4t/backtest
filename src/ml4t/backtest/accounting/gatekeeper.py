@@ -41,6 +41,7 @@ class Gatekeeper:
         account: AccountState,
         commission_model: CommissionModel,
         cash_buffer_pct: float = 0.0,
+        settlement_reduces_buying_power: bool = True,
     ):
         """Initialize gatekeeper with account and commission model.
 
@@ -48,16 +49,26 @@ class Gatekeeper:
             account: AccountState instance to validate against
             commission_model: CommissionModel for calculating transaction costs
             cash_buffer_pct: Fraction of cash to reserve (0.02 = keep 2% as buffer)
+            settlement_reduces_buying_power: If True (default), unsettled sale proceeds
+                are subtracted from available cash. Set to False for frameworks like
+                LEAN where settlement does not reduce fill-time buying power.
         """
         self.account = account
         self.commission_model = commission_model
         self.cash_buffer_pct = cash_buffer_pct
+        self.settlement_reduces_buying_power = settlement_reduces_buying_power
 
     def _available_cash(self) -> float:
-        """Cash available for new orders after applying buffer reserve."""
-        if self.cash_buffer_pct > 0:
-            return self.account.cash * (1.0 - self.cash_buffer_pct)
-        return self.account.cash
+        """Cash available for new orders after applying buffer reserve and settlement holds."""
+        spendable = self.account.policy.get_spendable_cash(
+            self.account.cash, self.account.positions
+        )
+        # Subtract unsettled sale proceeds (T+N settlement) unless disabled
+        if self.settlement_reduces_buying_power:
+            spendable -= self.account.unsettled_cash
+        if self.cash_buffer_pct > 0 and spendable > 0:
+            return spendable * (1.0 - self.cash_buffer_pct)
+        return spendable
 
     def validate_order(self, order: Order, price: float) -> tuple[bool, str]:
         """Validate order before execution.

@@ -10,11 +10,9 @@ import polars as pl
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio, sharpe_ratio, sortino_ratio
 from .broker import Broker
-from .config import InitialHwmSource, Mode, TrailStopTiming, WaterMarkSource
 from .datafeed import DataFeed
-from .models import CommissionModel, SlippageModel
 from .strategy import Strategy
-from .types import ContractSpec, ExecutionMode, StopFillMode, StopLevelBasis
+from .types import ExecutionMode
 
 if TYPE_CHECKING:
     from .config import BacktestConfig
@@ -45,11 +43,11 @@ class Engine:
         feed: DataFeed providing price and signal data
         strategy: Strategy implementing trading logic
         broker: Broker handling order execution and positions
-        execution_mode: Order execution timing (SAME_BAR or NEXT_BAR)
+        config: BacktestConfig with all behavioral settings
         equity_curve: List of (timestamp, equity) tuples
 
     Example:
-        >>> from ml4t.backtest import Engine, DataFeed, Strategy
+        >>> from ml4t.backtest import Engine, DataFeed, Strategy, BacktestConfig
         >>>
         >>> class MyStrategy(Strategy):
         ...     def on_data(self, timestamp, data, context, broker):
@@ -67,54 +65,18 @@ class Engine:
         self,
         feed: DataFeed,
         strategy: Strategy,
-        initial_cash: float = 100000.0,
-        commission_model: CommissionModel | None = None,
-        slippage_model: SlippageModel | None = None,
-        stop_slippage_rate: float = 0.0,
-        execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
-        stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
-        stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
-        trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE,
-        initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE,
-        trail_stop_timing: TrailStopTiming = TrailStopTiming.LAGGED,
-        allow_short_selling: bool = False,
-        allow_leverage: bool = False,
-        initial_margin: float = 0.5,
-        long_maintenance_margin: float = 0.25,
-        short_maintenance_margin: float = 0.30,
-        fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
         config: BacktestConfig | None = None,
-        execution_limits=None,
-        market_impact_model=None,
-        contract_specs: dict[str, ContractSpec] | None = None,
     ):
+        from .config import BacktestConfig as ConfigCls
+
+        if config is None:
+            config = ConfigCls()
+
         self.feed = feed
         self.strategy = strategy
-        self.execution_mode = execution_mode
-        self.stop_fill_mode = stop_fill_mode
-        self.stop_level_basis = stop_level_basis
-        self.config = config  # Store config for strategy access
-        self.broker = Broker(
-            initial_cash=initial_cash,
-            commission_model=commission_model,
-            slippage_model=slippage_model,
-            stop_slippage_rate=stop_slippage_rate,
-            execution_mode=execution_mode,
-            stop_fill_mode=stop_fill_mode,
-            stop_level_basis=stop_level_basis,
-            trail_hwm_source=trail_hwm_source,
-            initial_hwm_source=initial_hwm_source,
-            trail_stop_timing=trail_stop_timing,
-            allow_short_selling=allow_short_selling,
-            allow_leverage=allow_leverage,
-            initial_margin=initial_margin,
-            long_maintenance_margin=long_maintenance_margin,
-            short_maintenance_margin=short_maintenance_margin,
-            fixed_margin_schedule=fixed_margin_schedule,
-            execution_limits=execution_limits,
-            market_impact_model=market_impact_model,
-            contract_specs=contract_specs,
-        )
+        self.config = config
+        self.execution_mode = config.execution_mode
+        self.broker = Broker.from_config(config)
         self.equity_curve: list[tuple[datetime, float]] = []
 
         # Calendar session enforcement (lazy initialized in run())
@@ -165,12 +127,27 @@ class Engine:
                         self._skipped_bars += 1
                         continue
 
-            prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
-            opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
-            highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
-            lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
-            volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
-            signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
+            prices = getattr(assets_data, "_prices", None)
+            opens = getattr(assets_data, "_opens", None)
+            highs = getattr(assets_data, "_highs", None)
+            lows = getattr(assets_data, "_lows", None)
+            volumes = getattr(assets_data, "_volumes", None)
+            signals = getattr(assets_data, "_signals", None)
+
+            if (
+                prices is None
+                or opens is None
+                or highs is None
+                or lows is None
+                or volumes is None
+                or signals is None
+            ):
+                prices = {a: d["close"] for a, d in assets_data.items() if d.get("close")}
+                opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
+                highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
+                lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
+                volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
+                signals = {a: d.get("signals", {}) for a, d in assets_data.items()}
 
             self.broker._update_time(timestamp, prices, opens, highs, lows, volumes, signals)
 
@@ -321,22 +298,10 @@ class Engine:
         strategy: Strategy,
         config: BacktestConfig,
     ) -> Engine:
-        """
-        Create an Engine instance from a BacktestConfig.
+        """Create an Engine instance from a BacktestConfig.
 
-        This is the recommended way to create an engine when you want
-        to replicate specific framework behavior (Backtrader, VectorBT, etc.).
-
-        All configuration is handled by BacktestConfig and Broker.from_config(),
-        ensuring consistent behavior across the system.
-
-        Example:
-            from ml4t.backtest import Engine, BacktestConfig, DataFeed, Strategy
-
-            # Use Backtrader-compatible settings
-            config = BacktestConfig.from_preset("backtrader")
-            engine = Engine.from_config(feed, strategy, config)
-            results = engine.run()
+        Equivalent to ``Engine(feed, strategy, config)``. Kept as a convenience
+        for code that reads more clearly with a named constructor.
 
         Args:
             feed: DataFeed with price data
@@ -346,59 +311,7 @@ class Engine:
         Returns:
             Configured Engine instance
         """
-        # Create broker from config (handles all commission/slippage/account setup)
-        broker = Broker.from_config(config)
-
-        # Create engine with pre-configured broker
-        engine = cls.__new__(cls)
-        engine.feed = feed
-        engine.strategy = strategy
-        engine.execution_mode = config.execution_mode
-        engine.stop_fill_mode = broker.stop_fill_mode
-        engine.stop_level_basis = broker.stop_level_basis
-        engine.config = config
-        engine.broker = broker
-        engine.equity_curve = []
-        engine._calendar = None
-        engine._skipped_bars = 0
-
-        return engine
-
-    @classmethod
-    def from_mode(
-        cls,
-        feed: DataFeed,
-        strategy: Strategy,
-        mode: Mode,
-    ) -> Engine:
-        """
-        Create an Engine instance from a Mode enum.
-
-        This is the simplest way to create an engine when you want sensible
-        defaults without configuring every detail.
-
-        Example:
-            from ml4t.backtest import Engine, Mode, DataFeed
-
-            # Quick prototype with no transaction costs
-            engine = Engine.from_mode(feed, strategy, Mode.FAST)
-
-            # Production-ready conservative settings
-            engine = Engine.from_mode(feed, strategy, Mode.REALISTIC)
-
-            # Match VectorBT behavior exactly
-            engine = Engine.from_mode(feed, strategy, Mode.VECTORBT)
-
-        Args:
-            feed: DataFeed with price data
-            strategy: Strategy to execute
-            mode: Mode enum specifying desired behavior
-
-        Returns:
-            Configured Engine instance
-        """
-        config = mode.to_config()
-        return cls.from_config(feed, strategy, config)
+        return cls(feed, strategy, config)
 
 
 # === Convenience Function ===
@@ -410,41 +323,27 @@ def run_backtest(
     signals: pl.DataFrame | str | None = None,
     context: pl.DataFrame | str | None = None,
     config: BacktestConfig | str | None = None,
-    # Legacy parameters (used if config is None)
-    initial_cash: float = 100000.0,
-    commission_model: CommissionModel | None = None,
-    slippage_model: SlippageModel | None = None,
-    execution_mode: ExecutionMode = ExecutionMode.SAME_BAR,
 ) -> BacktestResult:
-    """
-    Run a backtest with minimal setup.
+    """Run a backtest with minimal setup.
 
     Args:
         prices: Price DataFrame or path to parquet file
         strategy: Strategy instance to execute
         signals: Optional signals DataFrame or path
         context: Optional context DataFrame or path
-        config: BacktestConfig instance, preset name (str), or None for legacy params
-        initial_cash: Starting cash (legacy, ignored if config provided)
-        commission_model: Commission model (legacy, ignored if config provided)
-        slippage_model: Slippage model (legacy, ignored if config provided)
-        execution_mode: Execution mode (legacy, ignored if config provided)
+        config: BacktestConfig instance, preset name (str), or None for defaults
 
     Returns:
         BacktestResult with metrics, trades, equity curve, and export methods.
-        Call .to_dict() for backward-compatible dictionary output.
 
     Example:
         # Using config preset
         result = run_backtest(prices_df, strategy, config="backtrader")
         print(result.metrics["sharpe"])
 
-        # Export to Parquet
-        result.to_parquet("./results")
-
         # Using custom config
         config = BacktestConfig.from_preset("backtrader")
-        config.commission_rate = 0.002  # Higher commission
+        config.commission_rate = 0.002
         result = run_backtest(prices_df, strategy, config=config)
     """
     feed = DataFeed(
@@ -456,21 +355,9 @@ def run_backtest(
         context_df=context if isinstance(context, pl.DataFrame) else None,
     )
 
-    # Handle config parameter
-    if config is not None:
+    if isinstance(config, str):
         from .config import BacktestConfig as ConfigCls
 
-        if isinstance(config, str):
-            config = ConfigCls.from_preset(config)
-        return Engine.from_config(feed, strategy, config).run()
+        config = ConfigCls.from_preset(config)
 
-    # Legacy path: use individual parameters
-    engine = Engine(
-        feed,
-        strategy,
-        initial_cash,
-        commission_model=commission_model,
-        slippage_model=slippage_model,
-        execution_mode=execution_mode,
-    )
-    return engine.run()
+    return Engine(feed, strategy, config).run()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..config import ShareType
+from ..config import ExecutionPrice, ShareType
 from ..types import ExecutionMode, OrderSide, OrderType
 
 
@@ -14,26 +14,78 @@ class FillEngine:
 
     def get_available_cash(self) -> float:
         broker = self.broker
+        spendable = broker.account.policy.get_spendable_cash(
+            broker.account.cash, broker.account.positions
+        )
         if broker.cash_buffer_pct > 0:
-            return broker.account.cash * (1.0 - broker.cash_buffer_pct)
-        return broker.account.cash
+            return spendable * (1.0 - broker.cash_buffer_pct)
+        return spendable
 
     def apply_share_rounding(self, order) -> None:
         if self.broker.share_type == ShareType.INTEGER:
             order.quantity = float(int(order.quantity))
 
-    def try_partial_fill(self, order, fill_price: float) -> bool:
+    def _commission_rate(self, order, fill_price: float) -> float:
+        if fill_price <= 0:
+            return 0.0
+        test_commission = self.broker.commission_model.calculate(order.asset, 1.0, fill_price)
+        return test_commission / fill_price
+
+    def get_max_affordable_quantity(self, order, fill_price: float) -> float:
+        """Return max fillable quantity under current cash constraints."""
         broker = self.broker
+        commission_rate = self._commission_rate(order, fill_price)
+        gross_per_share = fill_price * (1.0 + commission_rate)
+        if gross_per_share <= 0:
+            return 0.0
+
         available = self.get_available_cash()
-        commission_rate = 0.0
-        test_commission = broker.commission_model.calculate(order.asset, 1.0, fill_price)
-        if fill_price > 0:
-            commission_rate = test_commission / fill_price
+        current_qty = broker.account.get_position_quantity(order.asset)
+        short_policy = getattr(broker.short_cash_policy, "value", "")
 
-        max_value = available / (1.0 + commission_rate) if commission_rate > 0 else available
-        max_shares = max_value / fill_price if fill_price > 0 else 0
+        if order.side == OrderSide.BUY and current_qty < 0 and short_policy == "lock_notional":
+            # VectorBT lock_cash-style cap for covering/reversing short positions.
+            position = broker.account.get_position(order.asset)
+            if position is None:
+                return max(0.0, available / gross_per_share)
 
-        if broker.share_type == ShareType.INTEGER:
+            debt = abs(position.quantity) * position.entry_price * position.multiplier
+            cover_req_cash = abs(position.quantity) * gross_per_share
+            cover_free_cash = available + 2.0 * debt - cover_req_cash
+
+            if cover_free_cash > 0:
+                cash_limit = available + 2.0 * debt
+            elif cover_free_cash < 0:
+                avg_entry_price = position.entry_price * position.multiplier
+                denom = gross_per_share - 2.0 * avg_entry_price
+                if denom <= 0:
+                    cash_limit = 0.0
+                else:
+                    max_short_size = available / denom
+                    cash_limit = max(0.0, max_short_size * gross_per_share)
+            else:
+                cash_limit = broker.account.cash
+
+            return max(0.0, cash_limit / gross_per_share)
+
+        if order.side == OrderSide.SELL and short_policy == "lock_notional":
+            # VectorBT lock_cash-style cap for short selling with locked free cash.
+            long_qty = max(current_qty, 0.0)
+            long_cash = long_qty * fill_price * max(0.0, 1.0 - commission_rate)
+            total_free_cash = available + long_cash
+
+            if total_free_cash <= 0:
+                return max(0.0, long_qty)
+
+            max_short_qty = total_free_cash / gross_per_share
+            return max(0.0, long_qty + max_short_qty)
+
+        return max(0.0, available / gross_per_share)
+
+    def try_partial_fill(self, order, fill_price: float) -> bool:
+        max_shares = self.get_max_affordable_quantity(order, fill_price)
+
+        if self.broker.share_type == ShareType.INTEGER:
             max_shares = float(int(max_shares))
 
         if max_shares <= 0:
@@ -46,6 +98,20 @@ class FillEngine:
         broker = self.broker
         if use_open and broker.execution_mode == ExecutionMode.NEXT_BAR:
             return broker._current_opens.get(order.asset)
+        # Dispatch on execution_price setting
+        ep = broker.execution_price
+        if ep == ExecutionPrice.OPEN:
+            return broker._current_opens.get(order.asset)
+        if ep == ExecutionPrice.MID:
+            h = broker._current_highs.get(order.asset)
+            lo = broker._current_lows.get(order.asset)
+            if h is not None and lo is not None:
+                return (h + lo) / 2.0
+            return broker._current_prices.get(order.asset)
+        if ep == ExecutionPrice.VWAP:
+            # VWAP not available at bar level; fall back to close
+            return broker._current_prices.get(order.asset)
+        # Default: CLOSE
         return broker._current_prices.get(order.asset)
 
     def get_effective_quantity(self, order) -> float:

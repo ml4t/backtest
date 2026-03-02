@@ -1,85 +1,133 @@
 # Order Types
 
-ML4T Backtest supports multiple order types for realistic simulation.
-
-Orders are submitted from a strategy using `broker.submit_order(...)`.
+Orders are submitted from a strategy via `broker.submit_order()`. The default order type is `MARKET`.
 
 ## Market Orders
 
-```python
-from ml4t.backtest.types import OrderType
-```
-
-Execute at market according to the configured execution mode/profile:
+Execute at the configured execution price (open or close, depending on profile):
 
 ```python
-broker.submit_order("AAPL", 100, order_type=OrderType.MARKET)   # buy
-broker.submit_order("AAPL", -100, order_type=OrderType.MARKET)  # sell
+# Buy 100 shares (positive quantity = buy)
+broker.submit_order("AAPL", 100)
+
+# Sell/short 100 shares (negative quantity = sell)
+broker.submit_order("AAPL", -100)
 ```
+
+In NEXT_BAR mode (default), market orders fill at the next bar's open. In SAME_BAR mode, they fill at the current bar's close.
 
 ## Limit Orders
 
-Execute only if price reaches the limit:
+Execute only if price reaches the limit level:
 
 ```python
-broker.submit_order(
-    "AAPL",
-    100,
-    order_type=OrderType.LIMIT,
-    limit_price=99.50,
-)
+from ml4t.backtest.types import OrderType
+
+# Buy limit: fills if price drops to $149.50 or below
+broker.submit_order("AAPL", 100, order_type=OrderType.LIMIT, limit_price=149.50)
+
+# Sell limit: fills if price rises to $155.00 or above
+broker.submit_order("AAPL", -100, order_type=OrderType.LIMIT, limit_price=155.00)
 ```
 
-- **Buy limit**: Fills if price drops to or below limit
-- **Sell limit**: Fills if price rises to or above limit
+Limit orders remain pending until filled or cancelled.
 
 ## Stop Orders
 
-Trigger a market order when stop price is reached:
+Trigger a market order when the stop price is reached:
 
 ```python
+# Sell stop: triggers when price falls to $145.00 (protective stop)
+broker.submit_order("AAPL", -100, order_type=OrderType.STOP, stop_price=145.00)
+
+# Buy stop: triggers when price rises to $160.00 (breakout entry)
+broker.submit_order("AAPL", 100, order_type=OrderType.STOP, stop_price=160.00)
+```
+
+## Stop-Limit Orders
+
+Trigger a limit order when the stop price is reached:
+
+```python
+# When price falls to $145, place a limit sell at $144
 broker.submit_order(
-    "AAPL",
-    -100,
-    order_type=OrderType.STOP,
-    stop_price=95.00,
+    "AAPL", -100,
+    order_type=OrderType.STOP_LIMIT,
+    stop_price=145.00,
+    limit_price=144.00,
 )
 ```
 
-- **Buy stop**: Triggers when price rises to stop (breakout entry)
-- **Sell stop**: Triggers when price falls to stop (stop loss)
-
 ## Trailing Stop Orders
 
-Trailing stops dynamically update the stop level as price moves favorably.
+Dynamic stop that follows price movement:
 
 ```python
+# Trail $2.50 below current price
 broker.submit_order(
-    "AAPL",
-    -100,
+    "AAPL", -100,
     order_type=OrderType.TRAILING_STOP,
     trail_amount=2.50,
 )
 ```
 
-## Order Processing
+## Bracket Orders
 
-Orders are processed in **exit-first** order:
-
-1. Stop losses and take profits (exits)
-2. New position entries
-
-This matches real broker behavior and prevents unrealistic fills.
-
-## Order Management
+Submit an entry with automatic take-profit and stop-loss exits:
 
 ```python
-broker.get_order(order_id)
-broker.get_pending_orders()
-broker.update_order(order_id, limit_price=100.0)
-broker.cancel_order(order_id)
+result = broker.submit_bracket(
+    asset="AAPL",
+    quantity=100,
+    take_profit=165.00,
+    stop_loss=145.00,
+)
+
+if result is not None:
+    entry_order, tp_order, sl_order = result
+```
+
+The exit side is automatically determined from the entry direction. Price validation warns if take-profit is below entry (for longs) or stop-loss is above entry.
+
+## Order Lifecycle
+
+1. **Submitted** -- order is queued in the OrderBook
+2. **Validated** -- Gatekeeper checks cash/margin constraints
+3. **Filled** -- FillExecutor applies slippage and commission
+4. **Rejected** -- insufficient cash, short selling not allowed, etc.
+
+Check rejected orders:
+
+```python
+rejected = broker.get_rejected_orders()
+for order in rejected:
+    print(f"{order.asset}: {order.rejection_reason}")
+```
+
+## Order Processing Sequence
+
+On each bar, pending orders are processed based on the `fill_ordering` config:
+
+| Mode | Sequence |
+|------|----------|
+| `EXIT_FIRST` | All exits, then all entries (default) |
+| `FIFO` | Submission order |
+| `SEQUENTIAL` | Submission order, no exit/entry separation |
+
+See [Execution Semantics](execution-semantics.md#fill-ordering) for details.
+
+## Closing Positions
+
+```python
+# Close a single position
 broker.close_position("AAPL")
 
-# Bracket order helper: entry + take profit + stop loss
-broker.submit_bracket("AAPL", quantity=100, take_profit=110, stop_loss=95)
+# Cancel a pending order by ID
+broker.cancel_order(order.id)
 ```
+
+## Next Steps
+
+- [Execution Semantics](execution-semantics.md) -- how orders fill and at what price
+- [Risk Management](risk-management.md) -- automatic stop-loss and trailing stop rules
+- [Strategies](strategies.md) -- order patterns in strategy code

@@ -315,6 +315,60 @@ class TestCashAccountPolicyPositionChangeValidation:
         assert valid is True  # No-op is allowed
 
 
+class TestCreditProceedsCashReservation:
+    """Tests for credit_proceeds short notional reservation."""
+
+    def test_credit_proceeds_reserves_short_notional(self):
+        """Short proceeds should NOT inflate budget for long entries."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            short_cash_policy="credit_proceeds",
+        )
+        # Start with $100k, short 100 shares at $100 -> cash becomes $110k
+        # (short proceeds credited). But spendable should subtract $10k
+        # short notional, leaving $100k spendable for longs.
+        positions = {
+            "AAPL": Position(
+                asset="AAPL",
+                quantity=-100.0,
+                entry_price=100.0,
+                current_price=100.0,
+                entry_time=datetime.now(),
+            )
+        }
+        # Cash is $110k (initial $100k + $10k short proceeds)
+        spendable = policy.get_spendable_cash(cash=110000.0, positions=positions)
+        # Should reserve 1x short notional ($10k), leaving $100k
+        assert spendable == 100000.0
+
+    def test_credit_proceeds_no_shorts_returns_cash(self):
+        """With no short positions, spendable equals raw cash."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            short_cash_policy="credit_proceeds",
+        )
+        spendable = policy.get_spendable_cash(cash=100000.0, positions={})
+        assert spendable == 100000.0
+
+    def test_credit_policy_returns_raw_cash(self):
+        """Under 'credit' policy, spendable equals raw cash regardless of shorts."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            short_cash_policy="credit",
+        )
+        positions = {
+            "AAPL": Position(
+                asset="AAPL",
+                quantity=-100.0,
+                entry_price=100.0,
+                current_price=100.0,
+                entry_time=datetime.now(),
+            )
+        }
+        spendable = policy.get_spendable_cash(cash=110000.0, positions=positions)
+        assert spendable == 110000.0
+
+
 class TestCashAccountPolicyEdgeCases:
     """Tests for edge cases and boundary conditions."""
 

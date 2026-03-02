@@ -30,7 +30,7 @@ htmlcov/
 .tox/
 .nox/
 
-# mypy
+# Type checking
 .mypy_cache/
 
 # Jupyter
@@ -44,3 +44,8 @@ CLAUDE.md
 # Validation-generated local artifacts
 validation/.zipline/
 validation/CORRECTNESS_RESULTS.md
+validation/BENCHMARK_RESULTS.md
+validation/trade_logs/
+validation/lean/workspace/
+validation/nautilus/.venv-nautilus/
+validation/nautilus/catalog/

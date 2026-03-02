@@ -119,9 +119,9 @@ class BacktestResult:
         """Convert trades to Polars DataFrame.
 
         Returns DataFrame with columns:
-            asset, entry_time, exit_time, entry_price, exit_price,
+            symbol, entry_time, exit_time, entry_price, exit_price,
             quantity, direction, pnl, pnl_percent, bars_held,
-            commission, slippage, mfe, mae, exit_reason, status
+            fees, slippage, mfe, mae, exit_reason, status
 
         The status column indicates "closed" (actually exited) or "open"
         (mark-to-market at end of backtest).

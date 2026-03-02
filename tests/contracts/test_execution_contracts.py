@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
+from ml4t.backtest.config import BacktestConfig, CommissionType, ExecutionPrice, SlippageType
 from ml4t.backtest.engine import run_backtest
 from ml4t.backtest.strategy import Strategy
 from ml4t.backtest.types import ExecutionMode
@@ -44,15 +45,21 @@ class _BuyOnce(Strategy):
             self.done = True
 
 
-def _entry_price(mode: ExecutionMode) -> float:
-    result = run_backtest(prices=_prices(), strategy=_BuyOnce(), execution_mode=mode)
+def _entry_price(mode: ExecutionMode, price: ExecutionPrice) -> float:
+    config = BacktestConfig(
+        execution_mode=mode,
+        execution_price=price,
+        commission_type=CommissionType.NONE,
+        slippage_type=SlippageType.NONE,
+    )
+    result = run_backtest(prices=_prices(), strategy=_BuyOnce(), config=config)
     assert result.trades
     return result.trades[0].entry_price
 
 
 def test_same_bar_fills_at_signal_bar_close() -> None:
-    assert _entry_price(ExecutionMode.SAME_BAR) == 100.0
+    assert _entry_price(ExecutionMode.SAME_BAR, ExecutionPrice.CLOSE) == 100.0
 
 
 def test_next_bar_fills_at_following_bar_open() -> None:
-    assert _entry_price(ExecutionMode.NEXT_BAR) == 110.0
+    assert _entry_price(ExecutionMode.NEXT_BAR, ExecutionPrice.OPEN) == 110.0

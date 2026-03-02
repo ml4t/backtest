@@ -110,13 +110,13 @@ Configure commission and slippage:
 
 ```python
 from ml4t.backtest import BacktestConfig
-from ml4t.backtest.config import CommissionModel, SlippageModel
+from ml4t.backtest.config import CommissionType, SlippageType
 
 config = BacktestConfig(
     initial_cash=100_000,
-    commission_model=CommissionModel.PERCENTAGE,
+    commission_type=CommissionType.PERCENTAGE,
     commission_rate=0.001,     # 0.1% per trade
-    slippage_model=SlippageModel.PERCENTAGE,
+    slippage_type=SlippageType.PERCENTAGE,
     slippage_rate=0.0005,      # 0.05% slippage
 )
 ```
@@ -128,15 +128,31 @@ Use presets for common scenarios:
 ```python
 from ml4t.backtest import BacktestConfig
 
+# Sensible defaults for general use
+config = BacktestConfig.from_preset("default")
+
+# Fast iteration (no costs, simplified execution)
+config = BacktestConfig.from_preset("fast")
+
 # Backtrader-compatible settings
 config = BacktestConfig.from_preset("backtrader")
 
 # VectorBT-compatible settings
 config = BacktestConfig.from_preset("vectorbt")
 
+# Zipline-compatible settings
+config = BacktestConfig.from_preset("zipline")
+
+# QuantConnect LEAN-compatible settings
+config = BacktestConfig.from_preset("lean")
+
 # Conservative production settings
 config = BacktestConfig.from_preset("realistic")
 ```
+
+Each preset sets all 40+ behavioral knobs to match the target framework's behavior.
+Strict variants (`backtrader_strict`, `vectorbt_strict`, `zipline_strict`, `lean_strict`)
+are also available for exact parity testing.
 
 ## Insufficient Funds
 

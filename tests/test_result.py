@@ -480,10 +480,10 @@ class TestEnrichTradesWithSignals:
 
     @pytest.fixture
     def trades_df(self) -> pl.DataFrame:
-        """Create sample trades DataFrame."""
+        """Create sample trades DataFrame matching to_trades_dataframe() output."""
         return pl.DataFrame(
             {
-                "asset": ["AAPL", "AAPL", "MSFT"],
+                "symbol": ["AAPL", "AAPL", "MSFT"],
                 "entry_time": [
                     datetime(2024, 1, 1, 10, 0),
                     datetime(2024, 1, 2, 10, 0),
@@ -562,7 +562,7 @@ class TestEnrichTradesWithSignals:
         """Test enrichment with multi-asset signals."""
         trades_df = pl.DataFrame(
             {
-                "asset": ["AAPL", "MSFT"],
+                "symbol": ["AAPL", "MSFT"],
                 "entry_time": [
                     datetime(2024, 1, 1, 10, 0),
                     datetime(2024, 1, 1, 10, 0),
@@ -593,8 +593,8 @@ class TestEnrichTradesWithSignals:
         )
 
         # AAPL entry momentum should be 0.5, MSFT should be 0.3
-        aapl_row = enriched.filter(pl.col("asset") == "AAPL")
-        msft_row = enriched.filter(pl.col("asset") == "MSFT")
+        aapl_row = enriched.filter(pl.col("symbol") == "AAPL")
+        msft_row = enriched.filter(pl.col("symbol") == "MSFT")
 
         assert aapl_row["entry_momentum"][0] == 0.5
         assert msft_row["entry_momentum"][0] == 0.3
@@ -646,6 +646,39 @@ class TestEnrichTradesWithSignals:
                 asset_col="asset",
                 trades_asset_col="ticker",
             )
+
+    def test_enrich_from_to_trades_dataframe(self, backtest_result: BacktestResult):
+        """Integration: chain to_trades_dataframe() into enrich_trades_with_signals()."""
+        trades_df = backtest_result.to_trades_dataframe()
+
+        # Build signals covering both AAPL and MSFT entry/exit times
+        signals_df = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 1, 1, 10, 0),
+                    datetime(2024, 1, 1, 10, 0),
+                    datetime(2024, 1, 1, 12, 0),
+                    datetime(2024, 1, 1, 12, 0),
+                    datetime(2024, 1, 1, 16, 0),
+                    datetime(2024, 1, 1, 16, 0),
+                ],
+                "asset": ["AAPL", "MSFT", "AAPL", "MSFT", "AAPL", "MSFT"],
+                "score": [0.8, 0.6, 0.9, 0.5, 0.7, 0.4],
+            }
+        )
+
+        enriched = enrich_trades_with_signals(
+            trades_df,
+            signals_df,
+            signal_columns=["score"],
+            asset_col="asset",
+        )
+
+        assert "entry_score" in enriched.columns
+        assert "exit_score" in enriched.columns
+        assert len(enriched) == len(trades_df)
+        # Verify the auto-detected trades_asset_col="symbol" worked
+        assert "symbol" in enriched.columns
 
 
 class TestBacktestResultMetrics:
