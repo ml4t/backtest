@@ -90,6 +90,7 @@ class Broker:
         late_asset_policy: LateAssetPolicy = LateAssetPolicy.ALLOW,
         late_asset_min_bars: int = 1,
         settlement_delay: int = 0,
+        settlement_reduces_buying_power: bool = True,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -129,6 +130,7 @@ class Broker:
         self.late_asset_policy = late_asset_policy
         self.late_asset_min_bars = late_asset_min_bars
         self.settlement_delay = settlement_delay
+        self.settlement_reduces_buying_power = settlement_reduces_buying_power
         self._bar_index: int = 0
 
         # Create AccountState with UnifiedAccountPolicy
@@ -160,7 +162,10 @@ class Broker:
 
         # Create Gatekeeper for order validation
         self.gatekeeper = Gatekeeper(
-            self.account, self.commission_model, cash_buffer_pct=self.cash_buffer_pct
+            self.account,
+            self.commission_model,
+            cash_buffer_pct=self.cash_buffer_pct,
+            settlement_reduces_buying_power=self.settlement_reduces_buying_power,
         )
 
         self.positions: dict[str, Position] = {}
@@ -325,6 +330,7 @@ class Broker:
             late_asset_policy=config.late_asset_policy,
             late_asset_min_bars=config.late_asset_min_bars,
             settlement_delay=config.settlement_delay,
+            settlement_reduces_buying_power=config.settlement_reduces_buying_power,
         )
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift

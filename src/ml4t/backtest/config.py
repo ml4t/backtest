@@ -69,10 +69,17 @@ class FillOrdering(str, Enum):
         Orders process in submission order with sequential cash updates.
         Each order's gatekeeper check sees cash from all prior fills.
         Matches Backtrader's submission-order processing.
+
+    SEQUENTIAL:
+        Orders process in submission order (typically alphabetical by asset)
+        without exit/entry separation. Cash updates after each individual fill.
+        Unlike EXIT_FIRST, exits do not pre-free cash for later entries.
+        Matches LEAN's per-order sequential buying-power model.
     """
 
     EXIT_FIRST = "exit_first"
     FIFO = "fifo"
+    SEQUENTIAL = "sequential"
 
 
 class EntryOrderPriority(str, Enum):
@@ -493,6 +500,7 @@ class BacktestConfig:
 
     # === Settlement ===
     settlement_delay: int = 0  # Bars until sale proceeds are spendable (T+0 default)
+    settlement_reduces_buying_power: bool = True  # Unsettled cash reduces buying power
 
     # === Order Handling ===
     reject_on_insufficient_cash: bool = True
@@ -571,6 +579,7 @@ class BacktestConfig:
             },
             "settlement": {
                 "delay": self.settlement_delay,
+                "reduces_buying_power": self.settlement_reduces_buying_power,
             },
             "orders": {
                 "reject_on_insufficient_cash": self.reject_on_insufficient_cash,
@@ -643,7 +652,7 @@ class BacktestConfig:
                 "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
                 "slippage": {"model", "rate", "fixed", "stop_rate"},
                 "cash": {"initial", "buffer_pct"},
-                "settlement": {"delay"},
+                "settlement": {"delay", "reduces_buying_power"},
                 "orders": {
                     "reject_on_insufficient_cash",
                     "skip_cash_validation",
@@ -726,6 +735,7 @@ class BacktestConfig:
             cash_buffer_pct=cash_cfg.get("buffer_pct", 0.0),
             # Settlement
             settlement_delay=settle_cfg.get("delay", 0),
+            settlement_reduces_buying_power=settle_cfg.get("reduces_buying_power", True),
             # Orders
             reject_on_insufficient_cash=order_cfg.get("reject_on_insufficient_cash", True),
             skip_cash_validation=order_cfg.get("skip_cash_validation", False),

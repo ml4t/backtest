@@ -537,6 +537,64 @@ class TestEntryOrderPriority:
         config = BacktestConfig.from_preset("default")
         assert config.fill_ordering == FillOrdering.EXIT_FIRST
 
+    def test_sequential_interleaves_exits_and_entries(self):
+        """SEQUENTIAL processes orders in submission order without exit/entry separation."""
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            fill_ordering=FillOrdering.SEQUENTIAL,
+        )
+        _set_prices(broker, {"AAPL": 100.0, "GOOG": 100.0})
+
+        # Buy AAPL first (use all cash)
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+        assert broker.get_position("AAPL") is not None
+
+        # Submit sell AAPL + buy GOOG (exit before entry in submission order)
+        _set_prices(broker, {"AAPL": 100.0, "GOOG": 100.0})
+        broker.submit_order("AAPL", 100, OrderSide.SELL)
+        broker.submit_order("GOOG", 100, OrderSide.BUY)
+        broker._process_orders()
+
+        # Sequential: sell AAPL frees cash, then buy GOOG succeeds
+        assert broker.get_position("AAPL") is None
+        assert broker.get_position("GOOG") is not None
+
+    def test_sequential_entry_before_exit_rejects(self):
+        """SEQUENTIAL rejects entry when exit hasn't freed cash yet."""
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            fill_ordering=FillOrdering.SEQUENTIAL,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 100.0, "GOOG": 100.0})
+
+        # Buy AAPL first
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+
+        # Submit buy GOOG (entry) BEFORE sell AAPL (exit)
+        _set_prices(broker, {"AAPL": 100.0, "GOOG": 100.0})
+        broker.submit_order("GOOG", 100, OrderSide.BUY)  # entry first — no cash
+        broker.submit_order("AAPL", 100, OrderSide.SELL)  # exit after
+        broker._process_orders()
+
+        # Sequential: GOOG entry rejected (no cash), AAPL exit succeeds
+        assert broker.get_position("AAPL") is None
+        goog = broker.get_position("GOOG")
+        assert goog is None  # rejected because exit hadn't freed cash yet
+
+    def test_settlement_reduces_buying_power_flag(self):
+        """settlement_reduces_buying_power controls whether unsettled cash is deducted."""
+        config = BacktestConfig.from_preset("default")
+        assert config.settlement_reduces_buying_power is True  # default
+
+        # Round-trip through dict
+        d = config.to_dict()
+        d["settlement"]["reduces_buying_power"] = False
+        config2 = BacktestConfig.from_dict(d)
+        assert config2.settlement_reduces_buying_power is False
+
 
 # ---------------------------------------------------------------------------
 # Preset round-trip

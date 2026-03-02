@@ -12,8 +12,11 @@ class ExecutionEngine:
         self.broker = broker
 
     def process_orders(self, use_open: bool = False):
-        if self.broker.fill_ordering.value == "exit_first":
+        ordering = self.broker.fill_ordering.value
+        if ordering == "exit_first":
             self._process_orders_exit_first(use_open)
+        elif ordering == "sequential":
+            self._process_orders_sequential(use_open)
         else:
             self._process_orders_fifo(use_open)
 
@@ -93,6 +96,71 @@ class ExecutionEngine:
 
         for order in eligible_orders:
             self._process_single_order(order, use_open, filled_orders)
+            if filled_orders and filled_orders[-1] is order:
+                broker.account.mark_to_market(mark_prices)
+
+        self._cleanup_filled_orders(filled_orders)
+
+    def _process_orders_sequential(self, use_open: bool = False):
+        """Process orders in submission order without exit/entry separation.
+
+        Each order is processed individually with mark-to-market after each fill,
+        interleaving exits and entries in their original submission order.  This
+        matches LEAN's per-order sequential buying-power model where alphabetical
+        order determines which orders see freed cash from prior exits.
+
+        When buying_power_reservation is enabled, orders have already been validated
+        at submission time by the shadow cash pool.  In that case entries fill
+        directly (skipping the gatekeeper) since the shadow IS the validation.
+        This avoids double-validation that causes discrepancies between the shadow's
+        sequential accounting and the gatekeeper's point-in-time accounting.
+        """
+        broker = self.broker
+        fill = broker._fill_engine
+        mark_prices = broker._current_opens if use_open else broker._current_prices
+        eligible_orders = []
+        orders_this_bar_ids = broker._orders_this_bar_ids
+        for order in broker.pending_orders[:]:
+            if (
+                broker.execution_mode is ExecutionMode.NEXT_BAR
+                and order.order_id in orders_this_bar_ids
+            ):
+                continue
+            eligible_orders.append(order)
+
+        filled_orders: list = []
+        # When buying_power_reservation is on, the shadow already validated
+        # these orders at submission time — skip gatekeeper at fill time.
+        shadow_validated = broker.buying_power_reservation
+
+        for order in eligible_orders:
+            price = fill.get_fill_price_for_order(order, use_open)
+            if price is None:
+                continue
+
+            is_exit = self._is_exit_order(order)
+
+            if is_exit or shadow_validated:
+                # Exits always fill (they free capital).
+                # Entries fill directly when shadow-validated at submission.
+                fill.apply_share_rounding(order)
+                if order.quantity <= 0:
+                    order.status = OrderStatus.REJECTED
+                    order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                    continue
+                fill_price = fill.check_fill(order, price)
+                if fill_price is not None:
+                    fully_filled = fill.execute_fill(order, fill_price)
+                    if fully_filled:
+                        filled_orders.append(order)
+                        broker._partial_orders.pop(order.order_id, None)
+                    else:
+                        fill.update_partial_order(order)
+            else:
+                # No shadow validation — use full gatekeeper path
+                self._process_single_order(order, use_open, filled_orders)
+
+            # Mark-to-market after every fill so the next order sees updated cash
             if filled_orders and filled_orders[-1] is order:
                 broker.account.mark_to_market(mark_prices)
 
