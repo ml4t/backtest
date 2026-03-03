@@ -96,8 +96,12 @@ def run(
         pf_kwargs["sl_stop"] = trail_pct
         pf_kwargs["sl_trail"] = True
 
-    # Short-only adjustments
-    if scenario.strategy_type == "short_only":
+    # Short direction detection
+    is_short = scenario.strategy_type == "short_only" or (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
+    if is_short:
         # VBT OSS uses short_entries/short_exits params
         if "entries" in pf_kwargs:
             pf_kwargs["short_entries"] = pf_kwargs.pop("entries")

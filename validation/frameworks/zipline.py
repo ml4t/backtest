@@ -54,7 +54,10 @@ def run(
     }
     shares = scenario.shares
     risk_rules = scenario.risk_rules
-    is_short = scenario.strategy_type == "short_only"
+    is_short = scenario.strategy_type == "short_only" or (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
 
     def initialize(context):
         from zipline.api import set_commission as set_comm
@@ -97,29 +100,32 @@ def run(
 
         current_pos = context.portfolio.positions[context.asset].amount
         current_price = data.current(context.asset, "close")
+        bar_high = data.current(context.asset, "high")
+        bar_low = data.current(context.asset, "low")
 
         # Risk rule evaluation for manual stop/take-profit (Zipline has no built-in rules)
+        # Use OHLC for intrabar detection: bar_low triggers long stops, bar_high triggers short stops
         if current_pos != 0 and context.entry_price is not None:
             should_exit = False
 
             for rule in risk_rules:
                 if rule["type"] == "StopLoss":
                     if current_pos > 0:
-                        loss_pct = (current_price - context.entry_price) / context.entry_price
+                        loss_pct = (bar_low - context.entry_price) / context.entry_price
                         if loss_pct <= -rule["pct"]:
                             should_exit = True
                     elif current_pos < 0:
-                        loss_pct = (context.entry_price - current_price) / context.entry_price
+                        loss_pct = (context.entry_price - bar_high) / context.entry_price
                         if loss_pct <= -rule["pct"]:
                             should_exit = True
 
                 elif rule["type"] == "TakeProfit":
                     if current_pos > 0:
-                        gain_pct = (current_price - context.entry_price) / context.entry_price
+                        gain_pct = (bar_high - context.entry_price) / context.entry_price
                         if gain_pct >= rule["pct"]:
                             should_exit = True
                     elif current_pos < 0:
-                        gain_pct = (context.entry_price - current_price) / context.entry_price
+                        gain_pct = (context.entry_price - bar_low) / context.entry_price
                         if gain_pct >= rule["pct"]:
                             should_exit = True
 
@@ -127,13 +133,15 @@ def run(
                     if context.high_water_mark is None:
                         context.high_water_mark = current_price
                     if current_pos > 0:
-                        context.high_water_mark = max(context.high_water_mark, current_price)
-                        drawdown = (context.high_water_mark - current_price) / context.high_water_mark
+                        # HWM tracks from bar_high, trigger from bar_low
+                        context.high_water_mark = max(context.high_water_mark, bar_high)
+                        drawdown = (context.high_water_mark - bar_low) / context.high_water_mark
                         if drawdown >= rule["pct"]:
                             should_exit = True
                     elif current_pos < 0:
-                        context.high_water_mark = min(context.high_water_mark, current_price)
-                        drawup = (current_price - context.high_water_mark) / context.high_water_mark
+                        # LWM tracks from bar_low, trigger from bar_high
+                        context.high_water_mark = min(context.high_water_mark, bar_low)
+                        drawup = (bar_high - context.high_water_mark) / context.high_water_mark
                         if drawup >= rule["pct"]:
                             should_exit = True
 

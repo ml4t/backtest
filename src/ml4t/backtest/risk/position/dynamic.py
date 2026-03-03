@@ -77,12 +77,18 @@ class TrailingStop:
         bar_open = state.bar_open if state.bar_open is not None else state.current_price
         bar_close = state.current_price  # current_price is the close
 
+        from ml4t.backtest.types import StopFillMode
+
         if trail_timing == TrailStopTiming.VBT_PRO:
             # VBT_PRO mode: Two-pass algorithm matching VectorBT Pro exactly
             #
             # Pass 1: Check with LAGGED water mark against LOW
             lagged_stop = state.high_water_mark * (1 - self.pct)
             if bar_low <= lagged_stop or bar_open < lagged_stop:
+                if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                    return PositionAction.exit_full(
+                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                    )
                 fill_price = self._get_fill_price_long(
                     lagged_stop, bar_close, bar_low, bar_open, fill_mode
                 )
@@ -96,6 +102,10 @@ class TrailingStop:
             live_stop = live_hwm * (1 - self.pct)
             # VBT Pro's second pass can only use CLOSE (can_use_ohlc=False)
             if bar_close <= live_stop:
+                if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                    return PositionAction.exit_full(
+                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                    )
                 # Fill at close price since that's what triggered it
                 return PositionAction.exit_full(
                     f"trailing_stop_{self.pct:.1%}",
@@ -120,6 +130,10 @@ class TrailingStop:
         triggered = bar_low <= stop_price or bar_open < stop_price
 
         if triggered:
+            if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                )
             fill_price = self._get_fill_price_long(
                 stop_price, bar_close, bar_low, bar_open, fill_mode
             )
@@ -133,6 +147,7 @@ class TrailingStop:
     def _evaluate_short(self, state: PositionState, fill_mode, trail_timing) -> PositionAction:
         """Evaluate trailing stop for SHORT position."""
         from ml4t.backtest.config import TrailStopTiming
+        from ml4t.backtest.types import StopFillMode
 
         bar_low = state.bar_low if state.bar_low is not None else state.current_price
         bar_high = state.bar_high if state.bar_high is not None else state.current_price
@@ -148,6 +163,10 @@ class TrailingStop:
             # Pass 1: Check with LAGGED water mark against HIGH
             lagged_stop = state.low_water_mark * (1 + self.pct)
             if bar_high >= lagged_stop or bar_open > lagged_stop:
+                if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                    return PositionAction.exit_full(
+                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                    )
                 fill_price = self._get_fill_price_short(
                     lagged_stop, bar_close, bar_high, bar_open, fill_mode
                 )
@@ -161,6 +180,10 @@ class TrailingStop:
             live_stop = live_lwm * (1 + self.pct)
             # VBT Pro's second pass can only use CLOSE (can_use_ohlc=False)
             if bar_close >= live_stop:
+                if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                    return PositionAction.exit_full(
+                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                    )
                 # Fill at close price since that's what triggered it
                 return PositionAction.exit_full(
                     f"trailing_stop_{self.pct:.1%}",
@@ -185,6 +208,10 @@ class TrailingStop:
         triggered = bar_high >= stop_price or bar_open > stop_price
 
         if triggered:
+            if fill_mode == StopFillMode.NEXT_BAR_OPEN:
+                return PositionAction.exit_full(
+                    f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                )
             fill_price = self._get_fill_price_short(
                 stop_price, bar_close, bar_high, bar_open, fill_mode
             )
