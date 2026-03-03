@@ -143,6 +143,7 @@ def _signal_strategy(scenario: ScenarioConfig, bt: Any) -> type:
             self.bar_count = 0
             self.trade_log = []
             self.total_commission = 0.0
+            self.pending_trade = None
 
         def next(self):
             idx = self.bar_count
@@ -161,17 +162,28 @@ def _signal_strategy(scenario: ScenarioConfig, bt: Any) -> type:
             self.bar_count += 1
 
         def notify_trade(self, trade):
-            if trade.isclosed:
-                self.trade_log.append({
+            if trade.justopened:
+                self.pending_trade = {
                     "entry_time": bt.num2date(trade.dtopen),
-                    "exit_time": bt.num2date(trade.dtclose),
                     "entry_price": trade.price,
+                    "entry_size": trade.size,
+                }
+            elif trade.isclosed and self.pending_trade:
+                entry_size = self.pending_trade["entry_size"]
+                exit_price = self.pending_trade["entry_price"] + trade.pnl / abs(entry_size)
+
+                self.trade_log.append({
+                    "entry_time": self.pending_trade["entry_time"],
+                    "exit_time": bt.num2date(trade.dtclose),
+                    "entry_price": self.pending_trade["entry_price"],
+                    "exit_price": exit_price,
                     "pnl": trade.pnl,
                     "pnlcomm": trade.pnlcomm,
                     "commission": trade.commission,
-                    "size": abs(trade.size),
+                    "size": abs(entry_size),
                     "direction": "Long",
                 })
+                self.pending_trade = None
 
         def notify_order(self, order):
             if order.status == order.Completed:
@@ -241,9 +253,12 @@ def _short_strategy(scenario: ScenarioConfig, bt: Any) -> type:
 
 
 def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
-    """Entry-only strategy with risk-rule exits."""
+    """Entry-only strategy with risk-rule exits.
+
+    Handles all rule combinations (TSL, SL, TP, TSL+TP, TSL+SL, SL+TP, TSL+SL+TP)
+    using Backtrader's OCO (One-Cancels-Other) for automatic cancellation.
+    """
     shares = scenario.shares
-    constants = scenario.constants
     single_entry = scenario.strategy_type == "single_entry"
 
     # Determine risk rule setup
@@ -255,7 +270,10 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
     tp_pct = next((r["pct"] for r in scenario.risk_rules if r["type"] == "TakeProfit"), None)
     trail_pct = next((r["pct"] for r in scenario.risk_rules if r["type"] == "TrailingStop"), None)
 
-    is_short = scenario.ml4t_config.get("allow_short_selling", False) and "short" in scenario.data_generator.lower()
+    is_short = (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
 
     class RiskEntryStrategy(bt.Strategy):
         params = (("entries", None), ("exits", None), ("scenario", None))
@@ -264,8 +282,61 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
             self.bar_count = 0
             self.trade_log = []
             self.entered_once = False
-            self.stop_order = None
+            self.entry_order = None
+            self.exit_orders = []
             self.pending_trade = None
+            self.needs_trail = False  # Defer trailing stop to notify_order
+
+        def _submit_fixed_exits(self, ref_price):
+            """Submit non-trailing exit orders at entry time, using signal close as ref.
+
+            Returns list of submitted orders (for OCO linking with deferred trail).
+            """
+            orders = []
+            if is_short:
+                if has_stop_loss:
+                    sl_price = ref_price * (1 + sl_pct)
+                    orders.append(self.buy(
+                        exectype=bt.Order.Stop, price=sl_price, size=shares,
+                    ))
+                if has_take_profit:
+                    tp_price = ref_price * (1 - tp_pct)
+                    orders.append(self.buy(
+                        exectype=bt.Order.Limit, price=tp_price, size=shares,
+                        oco=orders[0] if orders else None,
+                    ))
+            else:
+                if has_stop_loss:
+                    sl_price = ref_price * (1 - sl_pct)
+                    orders.append(self.sell(
+                        exectype=bt.Order.Stop, price=sl_price, size=shares,
+                    ))
+                if has_take_profit:
+                    tp_price = ref_price * (1 + tp_pct)
+                    orders.append(self.sell(
+                        exectype=bt.Order.Limit, price=tp_price, size=shares,
+                        oco=orders[0] if orders else None,
+                    ))
+            return orders
+
+        def _submit_trail(self):
+            """Submit trailing stop AFTER entry fills (deferred via notify_order).
+
+            This ensures the trail initializes from the fill bar, not the signal bar.
+            Links via OCO to any existing fixed exit orders.
+            """
+            first_existing = self.exit_orders[0] if self.exit_orders else None
+            if is_short:
+                trail = self.buy(
+                    exectype=bt.Order.StopTrail, trailpercent=trail_pct,
+                    size=shares, oco=first_existing,
+                )
+            else:
+                trail = self.sell(
+                    exectype=bt.Order.StopTrail, trailpercent=trail_pct,
+                    size=shares, oco=first_existing,
+                )
+            self.exit_orders.append(trail)
 
         def next(self):
             idx = self.bar_count
@@ -282,74 +353,18 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                     self.bar_count += 1
                     return
 
+                # Submit entry order
                 if is_short:
-                    # Short entry
-                    self.sell(size=shares)
-                    if has_trailing_stop:
-                        self.stop_order = self.buy(
-                            exectype=bt.Order.StopTrail,
-                            trailpercent=trail_pct,
-                            size=shares,
-                        )
-                    elif has_stop_loss and has_take_profit:
-                        # Bracket order
-                        entry_price = self.data.close[0]
-                        sl_price = entry_price * (1 + sl_pct)  # SL above for short
-                        tp_price = entry_price * (1 - tp_pct)  # TP below for short
-                        self.sell(
-                            size=shares,
-                            exectype=bt.Order.Stop,
-                            price=sl_price,
-                        )
-                    elif has_stop_loss:
-                        entry_price = self.data.close[0]
-                        sl_price = entry_price * (1 + sl_pct)
-                        self.buy(
-                            size=shares,
-                            exectype=bt.Order.Stop,
-                            price=sl_price,
-                        )
+                    self.entry_order = self.sell(size=shares)
                 else:
-                    # Long entry
-                    self.buy(size=shares)
-                    if has_trailing_stop:
-                        self.stop_order = self.sell(
-                            exectype=bt.Order.StopTrail,
-                            trailpercent=trail_pct,
-                            size=shares,
-                        )
-                    elif has_stop_loss and has_take_profit:
-                        # Bracket order (OCO)
-                        entry_price = self.data.close[0]
-                        sl_price = entry_price * (1 - sl_pct)
-                        tp_price = entry_price * (1 + tp_pct)
-                        self.sell(
-                            size=shares,
-                            exectype=bt.Order.Stop,
-                            price=sl_price,
-                        )
-                        self.sell(
-                            size=shares,
-                            exectype=bt.Order.Limit,
-                            price=tp_price,
-                        )
-                    elif has_stop_loss:
-                        entry_price = self.data.close[0]
-                        sl_price = entry_price * (1 - sl_pct)
-                        self.sell(
-                            size=shares,
-                            exectype=bt.Order.Stop,
-                            price=sl_price,
-                        )
-                    elif has_take_profit:
-                        entry_price = self.data.close[0]
-                        tp_price = entry_price * (1 + tp_pct)
-                        self.sell(
-                            size=shares,
-                            exectype=bt.Order.Limit,
-                            price=tp_price,
-                        )
+                    self.entry_order = self.buy(size=shares)
 
+                # Submit fixed exit orders now (SL/TP from signal close)
+                ref_price = self.data.close[0]
+                self.exit_orders = self._submit_fixed_exits(ref_price)
+
+                # Defer trailing stop to after entry fills
+                self.needs_trail = has_trailing_stop
                 self.entered_once = True
 
             self.bar_count += 1
@@ -378,10 +393,14 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                     "direction": "Short" if entry_size < 0 else "Long",
                 })
                 self.pending_trade = None
+                self.exit_orders = []
 
         def notify_order(self, order):
-            if order.status == order.Completed:
-                if order == self.stop_order:
-                    self.stop_order = None
+            if order.status == order.Completed and order == self.entry_order:
+                # Entry filled — now submit deferred trailing stop
+                self.entry_order = None
+                if self.needs_trail:
+                    self._submit_trail()
+                    self.needs_trail = False
 
     return RiskEntryStrategy

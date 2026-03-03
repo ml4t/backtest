@@ -141,8 +141,15 @@ def _get_asset_name(scenario: ScenarioConfig, framework: str) -> str:
 def _build_strategy(scenario: ScenarioConfig, asset: str):
     """Build the ml4t Strategy for this scenario."""
     from ml4t.backtest._validation_imports import OrderSide, Strategy
+    from ml4t.backtest.risk import RuleChain
 
     risk_rules = _build_risk_rules(scenario)
+
+    # Detect short direction from config and data generator name
+    is_short = (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
 
     class ValidationStrategy(Strategy):
         def __init__(self):
@@ -150,7 +157,10 @@ def _build_strategy(scenario: ScenarioConfig, asset: str):
 
         def on_start(self, broker):
             if risk_rules:
-                broker.set_position_rules(*risk_rules)
+                if len(risk_rules) == 1:
+                    broker.set_position_rules(risk_rules[0])
+                else:
+                    broker.set_position_rules(RuleChain(risk_rules))
 
         def on_data(self, timestamp, data, context, broker):
             if asset not in data:
@@ -187,13 +197,15 @@ def _build_strategy(scenario: ScenarioConfig, asset: str):
                 # Entry only on first signal, exits handled by risk rules
                 if signals.get("entry") and current_qty == 0:
                     if not self._entered or scenario.constants.get("allow_reentry", True):
-                        broker.submit_order(asset, scenario.shares)
+                        side = OrderSide.SELL if is_short else OrderSide.BUY
+                        broker.submit_order(asset, scenario.shares, side)
                         self._entered = True
 
             elif scenario.strategy_type == "single_entry":
                 # One-time entry, exits handled by risk rules
                 if not self._entered and current_qty == 0:
-                    broker.submit_order(asset, scenario.shares)
+                    side = OrderSide.SELL if is_short else OrderSide.BUY
+                    broker.submit_order(asset, scenario.shares, side)
                     self._entered = True
 
     return ValidationStrategy()
@@ -224,7 +236,13 @@ def _build_config(scenario: ScenarioConfig, framework: str):
         StopFillMode,
         StopLevelBasis,
     )
-    from ml4t.backtest.config import CommissionType, ExecutionPrice, SlippageType
+    from ml4t.backtest.config import (
+        CommissionType,
+        ExecutionPrice,
+        SlippageType,
+        TrailStopTiming,
+        WaterMarkSource,
+    )
 
     # Start with scenario base config
     config_kwargs: dict[str, Any] = {
@@ -263,7 +281,7 @@ def _build_config(scenario: ScenarioConfig, framework: str):
         config_kwargs["commission_per_share"] = constants["per_share_rate"]
     if "slippage_fixed" in constants:
         config_kwargs["slippage_type"] = SlippageType.FIXED
-        config_kwargs["slippage_amount"] = constants["slippage_fixed"]
+        config_kwargs["slippage_fixed"] = constants["slippage_fixed"]
     if "slippage_rate" in constants:
         config_kwargs["slippage_type"] = SlippageType.PERCENTAGE
         config_kwargs["slippage_rate"] = constants["slippage_rate"]
@@ -277,5 +295,9 @@ def _build_config(scenario: ScenarioConfig, framework: str):
                 config_kwargs[key] = StopFillMode[val.upper()]
             elif key == "stop_level_basis" and hasattr(StopLevelBasis, val.upper()):
                 config_kwargs[key] = StopLevelBasis[val.upper()]
+            elif key == "trail_hwm_source" and hasattr(WaterMarkSource, val.upper()):
+                config_kwargs[key] = WaterMarkSource[val.upper()]
+            elif key == "trail_stop_timing" and hasattr(TrailStopTiming, val.upper()):
+                config_kwargs[key] = TrailStopTiming[val.upper()]
 
     return BacktestConfig(**config_kwargs)

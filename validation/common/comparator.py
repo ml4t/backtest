@@ -78,16 +78,18 @@ def compare_results(
 
     # Extra checks
     if "commission" in scenario.extra_checks:
-        fw_comm = framework_result.extra.get("total_commission", 0)
-        ml4t_comm = ml4t_result.extra.get("total_commission", 0)
-        comm_diff = abs(fw_comm - ml4t_comm)
-        checks.append(CheckResult(
-            name="total_commission",
-            passed=comm_diff < tolerance.commission_abs,
-            message=f"{framework_result.framework}=${fw_comm:.2f}, ML4T=${ml4t_comm:.2f} (diff=${comm_diff:.2f})",
-            expected=fw_comm,
-            actual=ml4t_comm,
-        ))
+        fw_comm = framework_result.extra.get("total_commission")
+        ml4t_comm = ml4t_result.extra.get("total_commission")
+        # Only compare if the framework provides commission data
+        if fw_comm is not None and ml4t_comm is not None:
+            comm_diff = abs(fw_comm - ml4t_comm)
+            checks.append(CheckResult(
+                name="total_commission",
+                passed=comm_diff < tolerance.commission_abs,
+                message=f"{framework_result.framework}=${fw_comm:.2f}, ML4T=${ml4t_comm:.2f} (diff=${comm_diff:.2f})",
+                expected=fw_comm,
+                actual=ml4t_comm,
+            ))
 
     if "exit_price" in scenario.extra_checks:
         fw_exit = framework_result.extra.get("exit_price")

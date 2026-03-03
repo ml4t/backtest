@@ -38,7 +38,7 @@ def generate_random_walk(
         all_sessions = nyse.sessions_in_range(start, start + pd.Timedelta(days=n_bars * 2))
         dates = pd.DatetimeIndex(all_sessions[:n_bars]).tz_localize("UTC")
     else:
-        dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+        dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
 
     df = pd.DataFrame(
         {
@@ -78,7 +78,7 @@ def generate_short_signals(
     """
     np.random.seed(seed)
 
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
 
     base_price = 100.0
     returns = np.random.randn(n_bars) * 0.02
@@ -111,7 +111,7 @@ def generate_short_signals(
     return df, entries, exits
 
 
-def generate_stop_loss_data(seed: int = 42) -> pd.DataFrame:
+def generate_stop_loss_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]:
     """Deterministic declining price path to trigger stop-loss.
 
     Used by: scenario 03. Entry at bar 0 ($100), stop triggers at bar 5 ($94.50).
@@ -126,12 +126,12 @@ def generate_stop_loss_data(seed: int = 42) -> pd.DataFrame:
         84.0, 83.0, 82.0, 81.0, 80.0,
     ])
 
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
     opens = closes + 0.5
     highs = opens + 0.5
     lows = closes - 0.5
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "open": opens,
             "high": highs,
@@ -142,8 +142,13 @@ def generate_stop_loss_data(seed: int = 42) -> pd.DataFrame:
         index=dates,
     )
 
+    entries = np.zeros(n_bars, dtype=bool)
+    entries[0] = True
 
-def generate_take_profit_data(seed: int = 42) -> pd.DataFrame:
+    return df, entries
+
+
+def generate_take_profit_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]:
     """Deterministic rising price path to trigger take-profit.
 
     Used by: scenario 04. Entry at bar 0 ($100), TP triggers around bar 6 ($111).
@@ -158,12 +163,12 @@ def generate_take_profit_data(seed: int = 42) -> pd.DataFrame:
         120.0, 121.0, 122.0, 123.0, 124.0,
     ])
 
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
     opens = closes - 0.5
     highs = closes + 0.5
     lows = opens - 0.5
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "open": opens,
             "high": highs,
@@ -173,6 +178,11 @@ def generate_take_profit_data(seed: int = 42) -> pd.DataFrame:
         },
         index=dates,
     )
+
+    entries = np.zeros(n_bars, dtype=bool)
+    entries[0] = True
+
+    return df, entries
 
 
 def generate_trending_data(
@@ -203,7 +213,7 @@ def generate_trending_data(
         prices.append(prices[-1] * (1 + change))
 
     prices = np.array(prices)
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
 
     df = pd.DataFrame(
         {
@@ -258,7 +268,7 @@ def generate_bracket_data(
         prices.append(prices[-1] * (1 + change))
 
     prices = np.array(prices)
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
 
     df = pd.DataFrame(
         {
@@ -311,7 +321,7 @@ def generate_short_trending_data(
         prices.append(prices[-1] * (1 + change))
 
     prices = np.array(prices)
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
 
     df = pd.DataFrame(
         {
@@ -387,7 +397,7 @@ def generate_rule_combo_data(
     else:
         raise ValueError(f"Unknown scenario: {scenario}")
 
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
     opens = closes - 0.3
     highs = closes + 0.5
     lows = closes - 0.5
@@ -447,7 +457,7 @@ def generate_stress_data(
         prices.append(max(prices[-1] * (1 + change), 1.0))
 
     prices = np.array(prices)
-    dates = pd.date_range(start="2020-01-01", periods=n_bars, freq="D")
+    dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
 
     df = pd.DataFrame(
         {

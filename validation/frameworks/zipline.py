@@ -57,14 +57,35 @@ def run(
     is_short = scenario.strategy_type == "short_only"
 
     def initialize(context):
+        from zipline.api import set_commission as set_comm
+        from zipline.finance import commission as zipline_commission
+
         context.asset = symbol("TEST")
         context.signal_data = signal_data
         context.bar_count = 0
         context.in_position = False
         context.entry_price = None
         context.high_water_mark = None
-        # Use custom slippage to fill at open price
-        set_slippage(_create_open_price_slippage())
+
+        # Commission setup
+        if "commission_rate" in constants:
+            set_comm(zipline_commission.PerDollar(cost=constants["commission_rate"]))
+            context.commission_mode = "pct"
+        elif "per_share_rate" in constants:
+            set_comm(zipline_commission.PerShare(cost=constants["per_share_rate"]))
+            context.commission_mode = "per_share"
+        else:
+            set_comm(zipline_commission.PerShare(cost=0.0))
+            context.commission_mode = "none"
+
+        # Slippage: fill at open price (Zipline always fills next-bar)
+        # For slippage scenarios, the slippage is added on top of the open price
+        if "slippage_fixed" in constants:
+            set_slippage(_create_slippage_model(fixed=constants["slippage_fixed"]))
+        elif "slippage_rate" in constants:
+            set_slippage(_create_slippage_model(pct=constants["slippage_rate"]))
+        else:
+            set_slippage(_create_open_price_slippage())
 
     def handle_data(context, data):
         idx = context.bar_count
@@ -151,12 +172,19 @@ def run(
     # Setup bundle
     bundle_name = _setup_bundle(prices_df)
 
-    # Run
+    # Run — snap to valid NYSE sessions (data may include holidays)
+    import exchange_calendars as xcals
+
+    nyse = xcals.get_calendar("XNYS")
     start = prices_df.index[0]
     end = prices_df.index[-1]
     if start.tz is not None:
         start = start.tz_convert(None)
         end = end.tz_convert(None)
+    if not nyse.is_session(start):
+        start = nyse.date_to_session(start, direction="next")
+    if not nyse.is_session(end):
+        end = nyse.date_to_session(end, direction="previous")
 
     results = run_algorithm(
         start=start,
@@ -179,16 +207,21 @@ def run(
             num_trades += len(txn_list)
     num_trades = num_trades // 2  # Entry + exit = 1 round trip
 
+    extra = {}
+    # Note: Zipline doesn't reliably report per-transaction commission totals.
+    # Commission correctness is validated via final_value parity instead.
+
     return FrameworkResult(
         framework="Zipline",
         final_value=final_value,
         total_pnl=final_value - scenario.initial_cash,
         num_trades=num_trades,
+        extra=extra,
     )
 
 
 def _create_open_price_slippage():
-    """Create a custom slippage model that fills at open price."""
+    """Create a custom slippage model that fills at open price (zero slippage)."""
     from zipline.finance.slippage import SlippageModel
 
     class OpenPriceSlippage(SlippageModel):
@@ -197,6 +230,27 @@ def _create_open_price_slippage():
             return (data.current(order.asset, "open"), order.amount)
 
     return OpenPriceSlippage()
+
+
+def _create_slippage_model(fixed: float = 0.0, pct: float = 0.0):
+    """Create a slippage model that fills at open price +/- slippage."""
+    from zipline.finance.slippage import SlippageModel
+
+    class OpenPriceWithSlippage(SlippageModel):
+        def process_order(self, data, order):
+            price = data.current(order.asset, "open")
+            if pct > 0:
+                slip = price * pct
+            else:
+                slip = fixed
+            # Buys get worse (higher) price, sells get worse (lower) price
+            if order.amount > 0:
+                price += slip
+            else:
+                price -= slip
+            return (price, order.amount)
+
+    return OpenPriceWithSlippage()
 
 
 def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation") -> str:
@@ -240,11 +294,21 @@ def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation")
 
         return ingest_func
 
+    import exchange_calendars as xcals
+
+    nyse = xcals.get_calendar("XNYS")
+
     start_session = prices_df.index[0]
     end_session = prices_df.index[-1]
     if start_session.tz is not None:
         start_session = start_session.tz_convert(None)
         end_session = end_session.tz_convert(None)
+
+    # Snap to valid NYSE trading sessions (data may include weekends/holidays)
+    if not nyse.is_session(start_session):
+        start_session = nyse.date_to_session(start_session, direction="next")
+    if not nyse.is_session(end_session):
+        end_session = nyse.date_to_session(end_session, direction="previous")
 
     register(
         bundle_name,
