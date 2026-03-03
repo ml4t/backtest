@@ -362,18 +362,37 @@ class TestTargetWeightExecutorCashTargeting:
         total_value = sum(o.quantity * sample_data[o.asset]["close"] for o in orders)
         assert 89000 < total_value < 91000  # ~$90k (90% of $100k)
 
-    def test_scale_down_over_100_percent(self, broker, sample_data):
-        """Test that weights > 100% are scaled down."""
-        executor = TargetWeightExecutor()
+    def test_max_gross_leverage_scales_down(self, broker, sample_data):
+        """Test that weights > max_gross_leverage are scaled down."""
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(max_gross_leverage=1.0)
+        )
 
-        # Target 120% invested (impossible without leverage)
+        # Target 120% invested — exceeds max_gross_leverage=1.0
         target_weights = {"AAPL": 0.7, "GOOG": 0.5}  # = 120%
         orders = executor.execute(target_weights, sample_data, broker)
 
-        # Should scale to 100% max
+        # Should scale to 100% max: AAPL=58.3%, GOOG=41.7%
         total_value = sum(o.quantity * sample_data[o.asset]["close"] for o in orders)
-        # After scaling: AAPL=58.3%, GOOG=41.7%
         assert total_value < 101000  # Should not exceed equity
+
+    def test_no_cap_allows_over_100_percent(self, broker, sample_data):
+        """Without max_gross_leverage, weights > 1.0 pass through to gatekeeper."""
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(allow_fractional=True)
+        )
+
+        # Target 120% — no cap, gatekeeper will constrain based on buying power
+        target_weights = {"AAPL": 0.7, "GOOG": 0.5}  # = 120%
+        orders = executor.execute(target_weights, sample_data, broker)
+
+        # Orders should be submitted for the full requested amounts
+        # (gatekeeper may reject some, but executor doesn't scale)
+        assert len(orders) >= 1  # At least some orders submitted
+        order_map = {o.asset: o for o in orders}
+        if "AAPL" in order_map:
+            # AAPL: 0.7 * $100k / $150 = 466.67 shares (not scaled to 58.3%)
+            assert order_map["AAPL"].quantity > 400
 
 
 class TestTargetWeightExecutorPreview:

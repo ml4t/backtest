@@ -164,7 +164,8 @@ class CommissionType(str, Enum):
 
     NONE = "none"  # No commission
     PERCENTAGE = "percentage"  # % of trade value
-    PER_SHARE = "per_share"  # Fixed amount per share
+    PER_SHARE = "per_share"  # Fixed amount per share/contract
+    PER_CONTRACT = "per_share"  # Alias for PER_SHARE (futures convention)
     PER_TRADE = "per_trade"  # Fixed amount per trade
     TIERED = "tiered"  # Volume-based tiers
 

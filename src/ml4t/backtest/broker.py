@@ -135,6 +135,16 @@ class Broker:
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
         self._bar_index: int = 0
 
+        # Auto-populate fixed_margin_schedule from ContractSpec.margin
+        # This lets users specify margin once on ContractSpec rather than duplicating
+        # it in both ContractSpec and BacktestConfig.fixed_margin_schedule.
+        effective_margin_schedule = dict(fixed_margin_schedule or {})
+        if contract_specs:
+            for symbol, spec in contract_specs.items():
+                if spec.margin is not None and symbol not in effective_margin_schedule:
+                    # Use spec.margin as initial margin, 50% as maintenance (industry standard)
+                    effective_margin_schedule[symbol] = (spec.margin, spec.margin * 0.5)
+
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
             allow_short_selling=allow_short_selling,
@@ -142,7 +152,7 @@ class Broker:
             initial_margin=initial_margin,
             long_maintenance_margin=long_maintenance_margin,
             short_maintenance_margin=short_maintenance_margin,
-            fixed_margin_schedule=fixed_margin_schedule,
+            fixed_margin_schedule=effective_margin_schedule or None,
             short_cash_policy=short_cash_policy.value,
         )
 
@@ -1127,11 +1137,14 @@ class Broker:
         """Order to achieve target portfolio weight.
 
         Calculates the order quantity needed to reach the target percentage
-        of total portfolio value for this asset.
+        of total portfolio value for this asset. Weights can exceed 1.0 for
+        leveraged portfolios (e.g., futures, margin accounts). The gatekeeper
+        validates whether the account has sufficient buying power.
 
         Args:
             asset: Asset symbol
-            target_percent: Target weight as decimal (0.10 = 10% of portfolio)
+            target_percent: Target weight as decimal (0.10 = 10% of portfolio).
+                Can exceed 1.0 for leveraged positions if allow_leverage=True.
             order_type: Order type (default MARKET)
             limit_price: Limit price for LIMIT orders
 
@@ -1144,10 +1157,10 @@ class Broker:
 
             # Target 0% (close position)
             broker.order_target_percent("AAPL", 0.0)
+
+            # Leveraged: target 150% in ES futures (requires allow_leverage=True)
+            broker.order_target_percent("ES", 1.50)
         """
-        if target_percent < -1.0 or target_percent > 1.0:
-            # Allow up to 100% long or 100% short
-            return None
 
         portfolio_value = self.get_account_value()
         if portfolio_value <= 0:

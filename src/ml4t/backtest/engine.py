@@ -66,6 +66,10 @@ class Engine:
         feed: DataFeed,
         strategy: Strategy,
         config: BacktestConfig | None = None,
+        *,
+        contract_specs: dict[str, Any] | None = None,
+        market_impact_model: Any | None = None,
+        execution_limits: Any | None = None,
     ):
         from .config import BacktestConfig as ConfigCls
 
@@ -76,7 +80,12 @@ class Engine:
         self.strategy = strategy
         self.config = config
         self.execution_mode = config.execution_mode
-        self.broker = Broker.from_config(config)
+        self.broker = Broker.from_config(
+            config,
+            contract_specs=contract_specs,
+            market_impact_model=market_impact_model,
+            execution_limits=execution_limits,
+        )
         self.equity_curve: list[tuple[datetime, float]] = []
 
         # Calendar session enforcement (lazy initialized in run())
@@ -297,6 +306,10 @@ class Engine:
         feed: DataFeed,
         strategy: Strategy,
         config: BacktestConfig,
+        *,
+        contract_specs: dict[str, Any] | None = None,
+        market_impact_model: Any | None = None,
+        execution_limits: Any | None = None,
     ) -> Engine:
         """Create an Engine instance from a BacktestConfig.
 
@@ -307,11 +320,21 @@ class Engine:
             feed: DataFeed with price data
             strategy: Strategy to execute
             config: BacktestConfig with all behavioral settings
+            contract_specs: Per-asset contract specifications (futures multipliers, etc.)
+            market_impact_model: Market impact model for fill simulation
+            execution_limits: Execution limits (max order size, etc.)
 
         Returns:
             Configured Engine instance
         """
-        return cls(feed, strategy, config)
+        return cls(
+            feed,
+            strategy,
+            config,
+            contract_specs=contract_specs,
+            market_impact_model=market_impact_model,
+            execution_limits=execution_limits,
+        )
 
 
 # === Convenience Function ===
@@ -323,6 +346,10 @@ def run_backtest(
     signals: pl.DataFrame | str | None = None,
     context: pl.DataFrame | str | None = None,
     config: BacktestConfig | str | None = None,
+    *,
+    contract_specs: dict[str, Any] | None = None,
+    market_impact_model: Any | None = None,
+    execution_limits: Any | None = None,
 ) -> BacktestResult:
     """Run a backtest with minimal setup.
 
@@ -332,6 +359,9 @@ def run_backtest(
         signals: Optional signals DataFrame or path
         context: Optional context DataFrame or path
         config: BacktestConfig instance, preset name (str), or None for defaults
+        contract_specs: Per-asset contract specifications (futures multipliers, etc.)
+        market_impact_model: Market impact model for fill simulation
+        execution_limits: Execution limits (max order size, etc.)
 
     Returns:
         BacktestResult with metrics, trades, equity curve, and export methods.
@@ -345,6 +375,11 @@ def run_backtest(
         config = BacktestConfig.from_preset("backtrader")
         config.commission_rate = 0.002
         result = run_backtest(prices_df, strategy, config=config)
+
+        # Futures with contract specs
+        from ml4t.backtest import ContractSpec, AssetClass
+        specs = {"ES": ContractSpec(symbol="ES", asset_class=AssetClass.FUTURE, multiplier=50.0)}
+        result = run_backtest(prices_df, strategy, config=config, contract_specs=specs)
     """
     feed = DataFeed(
         prices_path=prices if isinstance(prices, str) else None,
@@ -360,4 +395,11 @@ def run_backtest(
 
         config = ConfigCls.from_preset(config)
 
-    return Engine(feed, strategy, config).run()
+    return Engine(
+        feed,
+        strategy,
+        config,
+        contract_specs=contract_specs,
+        market_impact_model=market_impact_model,
+        execution_limits=execution_limits,
+    ).run()
