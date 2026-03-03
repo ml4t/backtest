@@ -1,466 +1,111 @@
-# ml4t.backtest Validation Strategy
+# ml4t.backtest Validation Suite
 
 ## Related Documents
 
-- [Known Limitations and Assumptions](../LIMITATIONS.md) — edge cases, what's not modeled, recommendations
-- [SHORT Trailing Stop Validation](vectorbt_pro/README_SHORT_TSL_VALIDATION.md) — detailed SHORT TSL results vs VBT Pro
+- [Validation Methodology](METHODOLOGY.md) -- philosophy, behavioral matrix, profile system
+- [Known Limitations](../LIMITATIONS.md) -- edge cases, what's not modeled
 
 ## Overview
 
-Framework validation is performed **per-framework** in **isolated environments**, NOT through a unified pytest suite.
+ml4t-backtest validates correctness by being **configurable enough to perfectly replicate** every
+major external backtester through profiles. See [METHODOLOGY.md](METHODOLOGY.md) for the full
+approach.
+
+Validation is performed per-framework in **isolated virtual environments** due to dependency
+conflicts between frameworks (VBT Pro, Backtrader, Zipline).
+
+## Test Coverage Matrix
+
+16 scenarios x 4 frameworks (all pass):
+
+| Feature | VBT Pro | VBT OSS | Backtrader | Zipline |
+|---------|---------|---------|------------|---------|
+| 01: Long only | PASS | PASS | PASS | PASS |
+| 02: Long/Short | PASS | PASS | PASS | PASS |
+| 03: Stop-loss | PASS | PASS | PASS | PASS |
+| 04: Take-profit | PASS | PASS | PASS | PASS |
+| 05: % Commission | PASS | PASS | PASS | PASS |
+| 06: Per-share commission | PASS | PASS | PASS | PASS |
+| 07: Fixed slippage | PASS | PASS | PASS | PASS |
+| 08: % Slippage | PASS | PASS | PASS | PASS |
+| 09: Trailing stop | PASS | PASS | PASS | PASS |
+| 10: Bracket order | PASS | PASS | PASS | N/A |
+| 11: Short only | PASS | PASS | PASS | PASS |
+| 12: Short trailing stop | PASS | PASS | PASS | PASS |
+| 13: TSL + TP combo | PASS | PASS | PASS | PASS |
+| 14: TSL + SL combo | PASS | PASS | PASS | PASS |
+| 15: Triple rule | PASS | PASS | PASS | PASS |
+| 16: Stress (1500 bars) | PASS | PASS | PASS | PASS |
+
+## Large-Scale Parity (250 assets x 20 years, real data)
+
+Data: `us_equities.parquet` (250 US equities, 1998-2018). Strategy: long top 25, short bottom 25.
+
+| Profile | ml4t Trades | Ref Trades | Trade Gap | Value Gap | Speed |
+|---------|-------------|------------|-----------|-----------|-------|
+| **zipline_strict** | 226,723 | 226,723 | **0 (0.00%)** | $19 (0.0001%) | **8.4x faster** |
+| **backtrader_strict** | 216,980 | 216,981 | 1 (0.0005%) | $503 (0.004%) | **19.3x faster** |
+| **vectorbt_strict** | 210,352 | 210,261 | 91 (0.04%) | $0 (0.00%) | 0.04x |
+| **lean_strict** | 226,246 | 225,583 | 663 (0.29%) | $13,150 (1.2%) | **5.3x faster** |
+
+## How to Run
+
+### Parameterized runner (new)
 
-This approach was adopted after struggling with dependency conflicts between VectorBT Pro, Backtrader, and Zipline-Reloaded in a single environment.
-
-## Key Principles
-
-1. **Separate venvs per framework** - Each framework has its own virtual environment
-2. **VectorBT Pro is internal only** - Cannot be distributed to users
-3. **Validation scripts, not pytest** - Manual verification with clear outputs
-4. **Identical signals** - Test with pre-computed signals to eliminate strategy variance
-5. **Configuration-based matching** - Document what config produces matching results
-
-## Test Coverage Matrix (Updated 2026-03-02)
-
-| Feature | VectorBT Pro | VectorBT OSS | Backtrader | Zipline |
-|---------|--------------|--------------|------------|---------|
-| Long only | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Long/Short | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Stop-loss | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Take-profit | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| % Commission | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Per-share commission | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Fixed slippage | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| % Slippage | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Trailing stop | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Bracket order | ✅ PASS | ✅ PASS | ✅ PASS | N/A |
-| Short only | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Short trailing stop | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| TSL + TP combo | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| TSL + SL combo | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Triple rule (TSL+TP+SL) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-| Stress (1500 bars) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS |
-
-**Note on exact match**: Stop/take-profit now achieves **EXACT MATCH** (0.0000% diff) using configurable fill modes:
-
-```python
-# VectorBT Pro/OSS (same-bar execution)
-engine = Engine(
-    feed, strategy,
-    execution_mode=ExecutionMode.SAME_BAR,
-    stop_fill_mode=StopFillMode.STOP_PRICE,      # Fill at exact stop/target price
-    stop_level_basis=StopLevelBasis.FILL_PRICE,  # Calculate level from fill price
-)
-
-# Backtrader (next-bar execution)
-engine = Engine(
-    feed, strategy,
-    execution_mode=ExecutionMode.NEXT_BAR,
-    stop_fill_mode=StopFillMode.STOP_PRICE,       # Fill at exact stop/target price
-    stop_level_basis=StopLevelBasis.SIGNAL_PRICE, # Calculate level from signal close
-)
-```
-
-**Zipline Note**: Zipline validation uses strategy-level stop/take-profit (in `handle_data()`), which exits at next bar open. ml4t.backtest now supports `StopFillMode.NEXT_BAR_OPEN` which replicates this behavior exactly. Results now achieve **EXACT MATCH** ($0.00 difference).
-
-**Note**: Multi-asset validation (500 assets × 10 years) confirmed **exact PnL match** between:
-- ML4T (same-bar mode) ↔ VBT Pro: 119,591 common trades with 100% PnL match
-- ML4T (next-bar mode) ↔ Backtrader: 119,577 trades with 100% PnL match
-- VBT OSS ↔ VBT Pro: 114,607 trades with 100% PnL match (requires `lock_cash=True`)
-- Zipline ↔ Backtrader: 119,577 trades with 100% match (requires NYSE calendar alignment)
-
-See "Large-Scale Trade Matching" section for details.
-
-## Validation Results
-
-### Scenario 01: Long-Only
-
-**VectorBT Pro** (vectorbt_pro/scenario_01_long_only.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $98,778.90 = $98,778.90 (0.0000% diff)
-- Total P&L: -$1,221.10 = -$1,221.10 (exact match)
-- **Result: PASS**
-
-**VectorBT OSS** (vectorbt_oss/scenario_01_long_only.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $98,778.90 = $98,778.90 (0.0000% diff)
-- Total P&L: -$1,221.10 = -$1,221.10 (exact match)
-- **Result: PASS**
-
-**Backtrader** (backtrader/scenario_01_long_only.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $98,208.51 = $98,208.51 (0.0000% diff)
-- Total P&L: -$1,791.49 = -$1,791.49 (exact match)
-- **Result: PASS**
-
-**Zipline** (zipline/scenario_01_long_only.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $98,206.50 = $98,208.51 (0.0020% diff)
-- Total P&L: -$1,793.50 = -$1,791.49 ($2.01 diff)
-- **Result: PASS** (near-exact with NYSE calendar + open-price slippage)
-
-### Scenario 02: Long/Short
-
-**VectorBT Pro** (vectorbt_pro/scenario_02_long_short.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $100,187.36 = $100,187.36 (0.0000% diff)
-- Total P&L: $187.36 = $187.36 (exact match)
-- **Result: PASS**
-
-**VectorBT OSS** (vectorbt_oss/scenario_02_long_short.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $100,187.36 = $100,187.36 (0.0000% diff)
-- Total P&L: $187.36 = $187.36 (exact match)
-- **Result: PASS**
-
-**Backtrader** (backtrader/scenario_02_long_short.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $101,307.64 = $101,307.64 (0.0000% diff)
-- Total P&L: $1,307.64 = $1,307.64 (exact match)
-- **Result: PASS**
-
-**Zipline** (zipline/scenario_02_long_short.py):
-- Trade count: 10 = 10 (exact match)
-- Final value: $101,305.70 = $101,307.64 (0.0019% diff)
-- Total P&L: $1,305.70 = $1,307.64 ($1.94 diff)
-- **Result: PASS** (near-exact with NYSE calendar + open-price slippage)
-
-### Scenario 03: Stop-Loss (5%)
-
-**VectorBT Pro** (vectorbt_pro/scenario_03_stop_loss.py):
-- Trade count: 1 = 1 (exact match)
-- Entry price: $100.00 = $100.00 (exact)
-- Exit price: $94.50 = $94.50 (exact)
-- Total P&L: -$550.00 = -$550.00 (0.0000% diff)
-- **Result: PASS (EXACT MATCH)**
-
-**VectorBT OSS** (vectorbt_oss/scenario_03_stop_loss.py):
-- Trade count: 1 = 1 (exact match)
-- Entry price: $100.00 = $100.00 (exact)
-- Exit price: $94.50 = $94.50 (exact)
-- Total P&L: -$550.00 = -$550.00 (0.0000% diff)
-- **Result: PASS (EXACT MATCH)**
-
-**Backtrader** (backtrader/scenario_03_stop_loss.py):
-- Trade count: 1 = 1 (exact match)
-- Entry price: $100.00 = $100.00 (exact)
-- Exit price: $95.00 = $95.00 (exact)
-- Total P&L: -$500.00 = -$500.00 (0.0000% diff)
-- **Result: PASS (EXACT MATCH)**
-
-### Scenario 04: Take-Profit (10%)
-
-**VectorBT Pro** (vectorbt_pro/scenario_04_take_profit.py):
-- Trade count: 1 = 1 (exact match)
-- Entry price: $100.00 = $100.00 (exact)
-- Exit price: $111.00 = $111.00 (exact)
-- Total P&L: $1,100.00 = $1,100.00 (0.0000% diff)
-- **Result: PASS (EXACT MATCH)**
-
-**VectorBT OSS** (vectorbt_oss/scenario_04_take_profit.py):
-- Trade count: 1 = 1 (exact match)
-- Entry price: $100.00 = $100.00 (exact)
-- Exit price: $111.00 = $111.00 (exact)
-- Total P&L: $1,100.00 = $1,100.00 (0.0000% diff)
-- **Result: PASS (EXACT MATCH)**
-
-**Backtrader** (backtrader/scenario_04_take_profit.py):
-- Trade count: 1 = 1 (exact match)
-- Entry price: $100.00 = $100.00 (exact)
-- Exit price: $110.00 = $110.00 (exact)
-- Total P&L: $1,000.00 = $1,000.00 (0.0000% diff)
-- **Result: PASS (EXACT MATCH)**
-
-**Zipline** (zipline/scenario_03_stop_loss.py):
-- Trade count: 1 = 1 (exact match)
-- Entry: Bar 1 open ($99.00), Exit: Bar 6 open ($93.00)
-- Final value: $99,400.00 = $99,400.00 (0.0000% diff)
-- Total P&L: -$600.00 = -$600.00 (exact match)
-- Mode: `StopFillMode.NEXT_BAR_OPEN` (deferred exit fills at next bar's open)
-- **Result: PASS (EXACT MATCH)**
-
-**Zipline** (zipline/scenario_04_take_profit.py):
-- Trade count: 1 = 1 (exact match)
-- Entry: Bar 1 open ($101.00), Exit: Bar 7 open ($113.00)
-- Final value: $101,200.00 = $101,200.00 (0.0000% diff)
-- Total P&L: $1,200.00 = $1,200.00 (exact match)
-- Mode: `StopFillMode.NEXT_BAR_OPEN` (deferred exit fills at next bar's open)
-- **Result: PASS (EXACT MATCH)**
-
-## Configuration Mapping
-
-### VectorBT Pro Configuration
-
-To match VectorBT Pro behavior in ml4t.backtest:
-
-```python
-from ml4t.backtest import Engine, ExecutionMode, NoCommission, NoSlippage
-
-engine = Engine(
-    feed,
-    strategy,
-    initial_cash=100_000.0,
-    allow_short_selling=True, allow_leverage=True,  # For short selling support
-    commission_model=NoCommission(),
-    slippage_model=NoSlippage(),
-    execution_mode=ExecutionMode.SAME_BAR,  # Fill at close price
-)
-```
-
-**Key differences from VectorBT Pro defaults:**
-| VectorBT Pro | ml4t.backtest |
-|--------------|---------------|
-| `fees=0.0` | `NoCommission()` |
-| `slippage=0.0` | `NoSlippage()` |
-| Fills at close | `ExecutionMode.SAME_BAR` |
-| `accumulate=False` | Default (no accumulation) |
-
-### Backtrader Configuration
-
-To match Backtrader behavior in ml4t.backtest:
-
-```python
-from ml4t.backtest import Engine, ExecutionMode, NoCommission, NoSlippage
-
-engine = Engine(
-    feed,
-    strategy,
-    initial_cash=100_000.0,
-    allow_short_selling=True, allow_leverage=True,  # For short selling support
-    commission_model=NoCommission(),
-    slippage_model=NoSlippage(),
-    execution_mode=ExecutionMode.NEXT_BAR,  # Fill at next bar's open
-)
-```
-
-**Key differences from Backtrader defaults:**
-| Backtrader | ml4t.backtest |
-|------------|---------------|
-| `commission=0.0` | `NoCommission()` |
-| COO (Cheat-On-Open) disabled | `ExecutionMode.NEXT_BAR` |
-| COC (Cheat-On-Close) disabled | Default |
-| `broker.setcash(100000)` | `initial_cash=100_000.0` |
-
-### VectorBT OSS Configuration
-
-To match VectorBT OSS behavior in ml4t.backtest:
-
-```python
-from ml4t.backtest import Engine, ExecutionMode, NoCommission, NoSlippage
-
-engine = Engine(
-    feed,
-    strategy,
-    initial_cash=100_000.0,
-    allow_short_selling=True, allow_leverage=True,  # For short selling support
-    commission_model=NoCommission(),
-    slippage_model=NoSlippage(),
-    execution_mode=ExecutionMode.SAME_BAR,  # Fill at close price
-)
-```
-
-**VectorBT OSS Critical Setting:**
-
-```python
-# CRITICAL: VBT OSS default lock_cash=False allows unconstrained short selling!
-# This causes 3x inflated returns. Always use lock_cash=True for realistic results.
-pf = vbt.Portfolio.from_orders(
-    close=close_df,
-    size=target_shares,
-    size_type="targetamount",
-    init_cash=1_000_000.0,
-    cash_sharing=True,
-    lock_cash=True,  # CRITICAL: enforce cash constraints (OSS default is False!)
-)
-```
-
-**Root Cause (Fixed 2025-11-22):**
-- VBT OSS `lock_cash` defaults to `False` (found in `_settings.py:490`)
-- VBT Pro has `leverage` controls that limit position sizes
-- Without `lock_cash=True`, VBT OSS allows shorting $5M+ positions with only $1M cash
-- This causes ~3x inflated returns due to unrealistic leverage
-
-**Note**: With `lock_cash=True`, VectorBT OSS and Pro produce **100% identical results** (114,607 trades, $377,918.93 PnL sum).
-
-### Zipline Configuration
-
-To match Zipline behavior in ml4t.backtest:
-
-```python
-from ml4t.backtest import Engine, ExecutionMode, StopFillMode, StopLevelBasis, NoCommission, NoSlippage
-
-engine = Engine(
-    feed,
-    strategy,
-    initial_cash=100_000.0,
-    allow_short_selling=True, allow_leverage=True,  # For short selling support
-    commission_model=NoCommission(),
-    slippage_model=NoSlippage(),
-    execution_mode=ExecutionMode.NEXT_BAR,  # Fill at next bar's open
-    stop_fill_mode=StopFillMode.NEXT_BAR_OPEN,  # NEW: Match Zipline stop behavior
-    stop_level_basis=StopLevelBasis.SIGNAL_PRICE,  # Use signal close for stop level
-)
-```
-
-**Key differences from Zipline:**
-| Zipline | ml4t.backtest |
-|---------|---------------|
-| Bundle data system | DataFeed with DataFrame |
-| NYSE calendar | NYSE calendar (exchange_calendars) |
-| `order()` / `order_target()` | `broker.submit_order()` |
-| `capital_base=100000` | `initial_cash=100_000.0` |
-| Strategy-level stop in `handle_data()` | `StopLoss/TakeProfit` with `NEXT_BAR_OPEN` mode |
-
-**NEXT_BAR_OPEN Mode** (NEW - achieves EXACT MATCH with Zipline):
-
-When a stop/take-profit triggers in Zipline's `handle_data()`, it places an exit order that fills at the *next* bar's open. This is different from VectorBT/Backtrader which fill at the exact stop price.
-
-ml4t.backtest now supports this via `StopFillMode.NEXT_BAR_OPEN`:
-1. Stop condition checked at current bar's close
-2. If triggered, exit is deferred to next bar
-3. Exit fills at next bar's open price (not the stop price)
-
-**Note**: For exact matching, use `exchange_calendars` to generate NYSE trading days (not `freq="B"`), and set `NoCommission()` in Zipline via `set_commission(NoCommission())`. See validation scripts for implementation.
-
-### Stop-Loss / Take-Profit Configuration
-
-**ml4t.backtest with VectorBT Pro** (SAME_BAR execution, exact match):
-
-```python
-from ml4t.backtest import Engine, Strategy, ExecutionMode
-from ml4t.backtest.risk import StopLoss, TakeProfit, RuleChain
-
-class MyStrategy(Strategy):
-    def on_start(self, broker):
-        # Set position-level exit rules
-        broker.set_position_rules(RuleChain([
-            StopLoss(pct=0.05),    # 5% stop-loss
-            TakeProfit(pct=0.10),  # 10% take-profit
-        ]))
-
-    def on_data(self, timestamp, data, context, broker):
-        # Entry logic only - exits handled by rules
-        pass
-
-engine = Engine(
-    feed, strategy,
-    execution_mode=ExecutionMode.SAME_BAR,  # Match VBT Pro
-)
-```
-
-**VectorBT Pro equivalent:**
-```python
-pf = vbt.Portfolio.from_signals(
-    close=prices["close"],
-    entries=entries,
-    sl_stop=0.05,   # 5% stop-loss
-    tp_stop=0.10,   # 10% take-profit
-)
-```
-
-**ml4t.backtest with Backtrader** (NEXT_BAR execution):
-
-Same strategy code, but use `ExecutionMode.NEXT_BAR`. ml4t.backtest now uses the standard stop order model:
-- Checks OHLC for intrabar stop triggers (bar_low <= stop_price for long positions)
-- Once triggered, fills at exact stop/target price + slippage
-- Matches Backtrader's stop order semantics closely
-
-## How to Run Validation
-
-All commands assume you are in the repository root directory.
-
-### VectorBT Pro
 ```bash
+# Single scenario
+python validation/run_scenario.py --scenario 01 --framework backtrader
+
+# All scenarios for one framework
+python validation/run_scenario.py --framework vectorbt_oss
+
+# Full matrix
+python validation/run_scenario.py --all
+
+# Dry run (list combinations)
+python validation/run_scenario.py --dry-run
+```
+
+### Individual scripts (legacy, in archived/scenarios_v1/)
+
+Each framework has 16 standalone scripts that can be run individually:
+
+```bash
+# VectorBT Pro
 source .venv-vectorbt-pro/bin/activate
-python validation/vectorbt_pro/scenario_01_long_only.py
-python validation/vectorbt_pro/scenario_02_long_short.py
-python validation/vectorbt_pro/scenario_03_stop_loss.py
-python validation/vectorbt_pro/scenario_04_take_profit.py
+python validation/archived/scenarios_v1/vectorbt_pro/scenario_01_long_only.py
+
+# Backtrader
+.venv-backtrader/bin/python3 validation/archived/scenarios_v1/backtrader/scenario_01_long_only.py
+
+# VectorBT OSS
+.venv-vectorbt/bin/python3 validation/archived/scenarios_v1/vectorbt_oss/scenario_01_long_only.py
+
+# Zipline
+.venv-zipline/bin/python3 validation/archived/scenarios_v1/zipline/scenario_01_long_only.py
 ```
 
-### VectorBT OSS
+### Large-scale benchmarks
+
 ```bash
-.venv-vectorbt/bin/python3 validation/vectorbt_oss/scenario_01_long_only.py
-.venv-vectorbt/bin/python3 validation/vectorbt_oss/scenario_02_long_short.py
+# Framework benchmark
+python validation/benchmark_suite.py --profile backtrader_strict --framework backtrader
+
+# All correctness scenarios
+python validation/run_all_correctness.py
+
+# Full validation (correctness + benchmarks)
+python validation/run_full_validation.py
 ```
-
-### Backtrader
-```bash
-.venv-backtrader/bin/python3 validation/backtrader/scenario_01_long_only.py
-.venv-backtrader/bin/python3 validation/backtrader/scenario_02_long_short.py
-.venv-backtrader/bin/python3 validation/backtrader/scenario_03_stop_loss.py
-.venv-backtrader/bin/python3 validation/backtrader/scenario_04_take_profit.py
-```
-
-### Zipline
-```bash
-.venv-zipline/bin/python3 validation/zipline/scenario_01_long_only.py
-.venv-zipline/bin/python3 validation/zipline/scenario_02_long_short.py
-```
-
-### Risk Management Validation (internal)
-```bash
-source .venv/bin/activate
-python validation/risk_validation.py
-```
-
-## Success Criteria
-
-For each framework, we aim for:
-- **Trade count**: Exact match
-- **Fill prices**: Exact match (within floating point tolerance)
-- **Final P&L**: Exact match (within $1)
-
-**Results by framework:**
-- VectorBT Pro: Exact match (0.0000% variance)
-- VectorBT OSS: Exact match (0.0000% variance)
-- Backtrader: Exact match (0.0000% variance)
-- Zipline: Near-exact match (0.002% variance with NYSE calendar + open-price slippage)
-
-All **8 validation scenarios** (2 per framework) PASS within their respective tolerances.
-
-## Framework-Specific Notes
-
-### VectorBT Pro
-- **Environment**: `.venv-vectorbt-pro`
-- **Execution**: Same-bar fills at close price
-- **License**: Commercial (internal validation only)
-- **Conflict**: Cannot coexist with VectorBT OSS (both register `.vbt` accessor)
-- **Result**: Exact match (0.0000% variance)
-
-### VectorBT OSS
-- **Environment**: `.venv-vectorbt`
-- **Execution**: Same-bar fills at close price (identical to Pro)
-- **License**: MIT (open source)
-- **Conflict**: Cannot coexist with VectorBT Pro (both register `.vbt` accessor)
-- **Result**: Exact match (0.0000% variance)
-
-### Backtrader
-- **Environment**: `.venv-backtrader`
-- **Execution**: Next-bar fills at open price (default, COO=False)
-- **License**: GPL v3 (open source)
-- **Note**: Python 3.12 produces syntax warnings (invalid escape sequences)
-- **Result**: Exact match (0.0000% variance)
-
-### Zipline
-- **Environment**: `.venv-zipline`
-- **Execution**: Next-bar fills at open price (OpenPriceSlippage model)
-- **License**: Apache 2.0 (open source, zipline-reloaded)
-- **Note**: Uses custom bundle for validation (not quandl)
-- **Calendar**: NYSE calendar (use `exchange_calendars`, not `freq="B"`)
-- **Slippage**: Custom open-price slippage model (default fills at close)
-- **Result**: Exact match (100% PnL match with Backtrader, 119,577 trades)
 
 ## Virtual Environment Setup
 
 ```bash
-# VectorBT Pro (commercial, internal only)
-source .venv-vectorbt-pro/bin/activate
-
 # VectorBT OSS
 python3 -m venv .venv-vectorbt
 .venv-vectorbt/bin/pip install vectorbt pandas numpy polars pyyaml pydantic numba
 
-# Backtrader (CRITICAL: include exchange_calendars for NYSE calendar alignment)
+# Backtrader
 python3 -m venv .venv-backtrader
 .venv-backtrader/bin/pip install backtrader pandas numpy polars pyyaml pydantic numba exchange_calendars
 
@@ -468,294 +113,36 @@ python3 -m venv .venv-backtrader
 python3 -m venv .venv-zipline
 .venv-zipline/bin/pip install zipline-reloaded pandas numpy polars pyyaml pydantic numba exchange_calendars
 
-# CRITICAL: Never mix VectorBT OSS and Pro in the same environment!
-# Both register the .vbt pandas accessor which will conflict.
+# Never mix VBT OSS and Pro in the same environment
 ```
-
-## Performance Benchmarks (2025-11-22)
-
-### VectorBT Pro vs ml4t.backtest
-
-| Config (bars x assets) | VBT Pro (s) | ml4t (s) | Winner | Speedup |
-|------------------------|-------------|----------|--------|---------|
-| 100 x 1 | 0.131 | 0.054 | ml4t | 2.4x |
-| 1,000 x 1 | 0.053 | 0.386 | VBT | 7.3x |
-| 10,000 x 1 | 0.059 | 4.533 | VBT | 77x |
-| 1,000 x 10 | 13.180 | 0.615 | ml4t | 21x |
-| 10,000 x 10 | 0.076 | 6.276 | VBT | 83x |
-| 1,000 x 100 | 0.074 | 2.037 | VBT | 28x |
-
-**Analysis**: VectorBT Pro uses vectorized NumPy operations with O(1) overhead per bar, making it extremely fast for large single-asset datasets. ml4t.backtest is event-driven with O(n) overhead per bar but handles complex multi-asset logic more naturally.
-
-### Backtrader vs ml4t.backtest
-
-| Config (bars x assets) | Backtrader (s) | ml4t (s) | Winner | Speedup |
-|------------------------|----------------|----------|--------|---------|
-| 100 x 1 | 0.028 | 0.052 | BT | 1.9x |
-| 1,000 x 1 | 0.283 | 0.376 | BT | 1.3x |
-| 10,000 x 1 | 2.735 | 3.989 | BT | 1.5x |
-| 1,000 x 10 | 2.168 | 0.535 | ml4t | 4.1x |
-| 1,000 x 50 | 10.494 | 1.241 | ml4t | 8.5x |
-
-**Analysis**: Both are event-driven frameworks. Backtrader is slightly faster for single-asset strategies, but ml4t.backtest is **4-8x faster** for multi-asset strategies due to more efficient data handling.
-
-### Zipline vs ml4t.backtest
-
-| Config | ml4t Time | Zipline Time | ml4t Faster By |
-|--------|-----------|--------------|----------------|
-| 100x1 | 0.008s | 0.260s | **32x** |
-| 500x1 | 0.033s | 0.627s | **19x** |
-| 1000x1 | 0.062s | 1.120s | **18x** |
-| 500x5 | 0.059s | 0.739s | **12x** |
-| 1000x10 | 0.170s | 1.658s | **10x** |
-
-**Analysis**: Zipline's bundle-based architecture adds significant overhead. ml4t.backtest is **10-32x faster** across all tested configurations.
-
-### Framework Selection Guide
-
-| Use Case | Recommended Framework |
-|----------|----------------------|
-| Single asset, many bars (>10k) | VectorBT Pro |
-| Multi-asset portfolios | ml4t.backtest |
-| Simple vectorized signals | VectorBT Pro |
-| Complex stateful logic | ml4t.backtest / Backtrader |
-| ML strategy integration | ml4t.backtest |
-| Quick prototyping | VectorBT Pro |
-
-### Running Benchmarks
-
-```bash
-# VectorBT Pro benchmark
-source .venv-vectorbt-pro/bin/activate
-python validation/vectorbt_pro/benchmark_performance.py
-
-# Backtrader benchmark
-.venv-backtrader/bin/python3 validation/backtrader/benchmark_performance.py
-```
-
-## Large-Scale Trade Matching (2025-11-22)
-
-### VectorBT Pro vs ml4t.backtest - 500 Assets × 10 Years
-
-Comprehensive trade-by-trade validation using the benchmark suite:
-
-**Methodology**:
-- Strategy: Top-25/Bottom-25 ranking (long top, short bottom)
-- Data: 500 synthetic assets × 2,520 daily bars (10 years)
-- Initial cash: $1M (realistic) and $1e15 (unlimited, for fair comparison)
-- Seed: 42 (deterministic)
-
-**Results with Unlimited Cash**:
-
-| Metric | ML4T | VBT Pro | Match |
-|--------|------|---------|-------|
-| Total trades | 119,626 | 119,676 | ~50 diff |
-| Common trades | 119,591 | 119,591 | **100%** |
-| PnL mismatches | 0 | 0 | **EXACT** |
-
-**Explained Differences**:
-
-1. **End-of-Simulation (49-50 trades)**:
-   - VBT Pro closes all open positions on last bar
-   - ML4T leaves positions open at end of simulation
-   - These are design choices, not bugs
-
-2. **Cash Constraints (36-41 trades with $1M cash)**:
-   - VBT Pro skips orders exceeding buying power
-   - ML4T Gatekeeper rejects orders exceeding buying power
-   - Both handle cash correctly, different rejection mechanisms
-
-**Conclusion**: Trade logic is **functionally identical** with exact PnL match on all 119,591 common trades.
-
-### Backtrader vs ml4t.backtest - 500 Assets × 10 Years (2025-11-22)
-
-Comprehensive trade-by-trade validation using next-bar execution mode:
-
-**Methodology**:
-- Strategy: Top-25/Bottom-25 ranking (long top, short bottom)
-- Data: 500 synthetic assets × 2,520 daily bars (10 years)
-- Execution: NEXT_BAR mode (orders execute at next bar's open price)
-- Initial cash: $1e15 (unlimited, to eliminate margin rejection differences)
-- Seed: 42 (deterministic)
-
-**Results**:
-
-| Metric | ML4T (backtrader-mode) | Backtrader | Match |
-|--------|------------------------|------------|-------|
-| Total trades | 119,577 | 119,577 | **EXACT** |
-| Entry price match | 119,577 | 119,577 | **100%** |
-| Exit price match | 119,577 | 119,577 | **100%** |
-| Exit date match | 119,577 | 119,577 | **100%** |
-| PnL match (<$1) | 119,577 | 119,577 | **100%** |
-
-**Key Finding - Margin Constraints**:
-
-With limited cash ($1M), Backtrader rejects orders due to insufficient margin. This causes trades to be delayed by 1+ days, resulting in different exit prices. With unlimited cash, both frameworks produce **identical results**.
-
-**Investigation Notes**:
-- Trade extraction via PyFolio analyzer: `cerebro.addanalyzer(bt.analyzers.PyFolio)`
-- Transactions converted to trades by tracking position changes
-- Exit-first order processing confirmed matching between frameworks
-
-**Conclusion**: ML4T with `ExecutionMode.NEXT_BAR` produces **100% identical results** to Backtrader when using unlimited cash.
-
-### Zipline vs Backtrader - 500 Assets × 10 Years (2025-11-22)
-
-Comprehensive trade-by-trade validation with NYSE calendar alignment:
-
-**Methodology**:
-- Strategy: Top-25/Bottom-25 ranking (long top, short bottom)
-- Data: 500 synthetic assets × 2,520 daily bars (10 years)
-- Execution: NEXT_BAR mode with OpenPriceSlippage (fills at next bar's open)
-- Initial cash: $1e15 (unlimited)
-- Seed: 42 (deterministic)
-- **CRITICAL**: Both venvs must have `exchange_calendars` installed for NYSE calendar
-
-**Results**:
-
-| Metric | Backtrader | Zipline | Match |
-|--------|------------|---------|-------|
-| Total trades | 119,577 | 119,577 | **EXACT** |
-| Date range | 2013-01-03 to 2023-01-03 | 2013-01-03 to 2023-01-03 | **EXACT** |
-| Common keys (asset+date) | 119,577 | 119,577 | **100%** |
-| Side matches | 119,577 | 119,577 | **100%** |
-| PnL matches (<$1) | 119,577 | 119,577 | **100%** |
-
-**Root Cause of Previous Mismatch**:
-
-Without `exchange_calendars`, Backtrader's data generation falls back to `freq="B"` (Python business days) which includes US holidays like MLK Day, Presidents Day, Good Friday, etc. Zipline's bundle uses NYSE calendar which excludes these 87 days, causing cumulative date drift.
-
-**Solution**: Install `exchange_calendars` in ALL venvs that run benchmark_suite.py.
-
-**Conclusion**: Zipline produces **100% identical results** to Backtrader when using proper NYSE calendar alignment.
-
-### Running Large-Scale Validation
-
-```bash
-# ML4T benchmark (same-bar execution, matches VBT Pro)
-source .venv/bin/activate
-python validation/benchmark_suite.py --framework ml4t --scenario daily_baseline --save-trades
-
-# ML4T benchmark (next-bar execution, matches Backtrader)
-source .venv/bin/activate
-python validation/benchmark_suite.py --framework ml4t-backtrader --scenario daily_baseline --save-trades
-
-# VBT Pro benchmark
-source .venv-vectorbt-pro/bin/activate
-python validation/benchmark_suite.py --framework vbt-pro --scenario daily_baseline --save-trades
-
-# Backtrader benchmark
-.venv-backtrader/bin/python validation/benchmark_suite.py --framework backtrader --scenario daily_baseline --save-trades
-
-# Zipline benchmark
-.venv-zipline/bin/python validation/benchmark_suite.py --framework zipline --scenario daily_baseline --save-trades
-
-# Compare trade logs
-python3 << 'EOF'
-import pandas as pd
-ml4t = pd.read_csv("validation/trade_logs/ml4t.backtest_daily_(500x10yr_daily).csv")
-vbt = pd.read_csv("validation/trade_logs/vectorbt_pro_daily_(500x10yr_daily).csv")
-print(f"ML4T: {len(ml4t)}, VBT: {len(vbt)}")
-
-# Create keys for matching
-ml4t['key'] = ml4t['asset'] + '_' + ml4t['entry_date'].astype(str)
-vbt['key'] = vbt['asset'] + '_' + vbt['entry_date'].astype(str)
-common = set(ml4t['key']) & set(vbt['key'])
-print(f"Common trades: {len(common)}")
-EOF
-```
-
-## Scenario Coverage per Framework
-
-Scripts exist for each framework:
-
-| Scenario | VBT Pro | VBT OSS | Backtrader | Zipline |
-|----------|---------|---------|------------|---------|
-| 01: Long Only | ✅ | ✅ | ✅ | ✅ |
-| 02: Long/Short | ✅ | ✅ | ✅ | ✅ |
-| 03: Stop Loss | ✅ | ✅ | ✅ | ✅ |
-| 04: Take Profit | ✅ | ✅ | ✅ | ✅ |
-| 05: Commission (Pct) | ✅ | ✅ | ✅ | ✅ |
-| 06: Commission (Per-Share) | ✅ | ✅ | ✅ | ✅ |
-| 07: Slippage (Fixed) | ✅ | ✅ | ✅ | ✅ |
-| 08: Slippage (Pct) | ✅ | ✅ | ✅ | ✅ |
-| 09: Trailing Stop | ✅ | ✅ | ✅ | ✅ |
-| 10: Bracket Order | ✅ | ✅ | ✅ | - |
-| 11: Short Only | ✅ | ✅ | ✅ | ✅ |
-| 12: Short TSL | ✅ | ✅ | ✅ | ✅ |
-| 13: TSL + TP Combo | ✅ | ✅ | ✅ | ✅ |
-| 14: TSL + SL Combo | ✅ | ✅ | ✅ | ✅ |
-| 15: Triple Rule | ✅ | ✅ | ✅ | ✅ |
-| 16: Stress Test (1500 bars) | ✅ | ✅ | ✅ | ✅ |
-
-## Large-Scale Parity (Updated 2026-03-02)
-
-Real-data benchmarks using 250 US equities over 20 years (5,040 bars each).
-Strategy: long top 25, short bottom 25 by momentum. Each profile sets all behavioral
-knobs to match the target framework exactly.
-
-| Profile | ml4t Trades | Reference Trades | Trade Gap | Value Gap |
-|---------|-------------|------------------|-----------|-----------|
-| zipline_strict | 225,583 | 225,583 | **0 (0.00%)** | $19 (0.0001%) |
-| backtrader_strict | 216,980 | 216,981 | 1 (0.0005%) | $503 (0.004%) |
-| vectorbt_strict | 210,352 | 210,261 | 91 (0.04%) | $0 (0.00%) |
-| lean_strict | 226,172 | 225,583 | 589 (0.26%) | $7,200 (0.66%) |
-
-### About the Large-Scale Validation
-
-The ranking strategy (`benchmark_suite.py`) tests core execution mechanics:
-- Entry/exit timing and fill prices
-- Position tracking (long and short)
-- Multi-asset portfolio management
-- Cash constraints and buying power
-
-Risk management rules (stops, brackets) are validated separately in the 16 scenario tests.
-
-### Remaining Gaps
-
-- **LEAN** (+589 trades): Buying power reservation model approximates LEAN's SetHoldings()
-  but shadow-vs-gatekeeper ordering mismatch causes extra accepts. Under investigation.
-- **VBT** (+91 trades): Minor discrepancy under investigation.
-- **Backtrader** (-1 trade): Single trade timing difference.
-- Per-share commission and volume-based slippage not cross-validated at scale.
 
 ## File Organization
-
-Active validation infrastructure:
 
 ```
 validation/
 ├── README.md                  # This file
-├── benchmark_suite.py         # Large-scale benchmark runner
+├── METHODOLOGY.md             # Validation philosophy and behavioral matrix
+├── common/                    # Shared infrastructure (types, data generators, comparator)
+├── scenarios/                 # Declarative scenario definitions (16 configs)
+├── frameworks/                # Parameterized framework drivers (4 modules)
+├── run_scenario.py            # Unified CLI runner
+├── run_all_correctness.py     # Legacy scenario correctness runner
 ├── run_all_benchmarks.py      # Framework benchmark loop
-├── run_all_correctness.py     # Scenario correctness runner
+├── benchmark_suite.py         # Large-scale benchmark runner
 ├── run_full_validation.py     # Complete validation pipeline
-├── backtrader/                # 16 scenario scripts
-├── vectorbt_pro/              # 16 scenario scripts
-├── vectorbt_oss/              # 16 scenario scripts
-├── zipline/                   # 15 scenario scripts (no bracket order)
-├── lean/                      # LEAN integration (README + scenario)
+├── archived/
+│   ├── scenarios_v1/          # Original 64 standalone scripts (by framework)
+│   └── *.py                   # Debug/comparison one-offs
+├── lean/                      # LEAN integration
 ├── trade_logs/                # Golden file CSVs (gitignored)
-└── archived/                  # Debug and one-off scripts (see archived/README.md)
+└── nautilus/                  # Nautilus Trader evaluation
 ```
 
-## Validation Changelog
+## Remaining Gaps
 
-**2026-03-02**: Large-scale parity benchmarks (250 assets x 20 years, real data)
-- zipline_strict: 0 trade gap, $19 value gap
-- backtrader_strict: 1 trade gap, $503 value gap
-- vectorbt_strict: 91 trade gap, $0 value gap
-- lean_strict: 589 trade gap, $7,200 value gap
-- Archived 35 debug/comparison/scale scripts to validation/archived/
-
-**2026-01-20**: Validation audit complete (Phases 1-4)
-- Added scenarios 13-16 to all frameworks (rule combos + stress test)
-- SHORT trailing stop validated across all frameworks
-- 1500-bar stress test with 9 market regimes
-- Documentation honesty update for coverage gaps
-
-**2026-01-18**: Fixed VBT Pro scenarios 09 and 10 (trailing stop, bracket order)
-- Added robust column name detection for VBT Pro API version differences
-
-**2026-01-01**: Initial correctness validation suite
-- VBT Pro scenarios 01-08: ALL PASS
+| Profile | Gap | Root Cause | Next Step |
+|---------|-----|------------|-----------|
+| zipline_strict | 0 trades, $19 | Floating point | **DONE** |
+| backtrader_strict | 1 trade, $503 | Unknown | Per-bar investigation |
+| vectorbt_strict | 91 trades, $0 | Unknown | Signal processing audit |
+| lean_strict | 663 trades, $13K | Buying-power reservation | Add `buying_power_reservation` knob |
