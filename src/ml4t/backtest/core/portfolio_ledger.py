@@ -14,6 +14,8 @@ class PortfolioLedger:
         for asset, pos in self.broker.positions.items():
             price = self.broker._current_prices.get(asset)
             if price is None:
+                price = self.broker._last_prices.get(asset)
+            if price is None:
                 continue
             multiplier = self.broker.get_multiplier(asset)
             value += pos.quantity * price * multiplier
