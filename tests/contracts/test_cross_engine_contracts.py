@@ -66,6 +66,24 @@ def _run_scenario_inproc(scenario_id: str, framework: str) -> bool:
         prices_df, entries = data_result
         exits = None
 
+    # Align to NYSE calendar for Zipline (which only operates on NYSE sessions)
+    if framework == "zipline":
+        import exchange_calendars as xcals
+
+        nyse = xcals.get_calendar("XNYS")
+        start_ts = prices_df.index[0]
+        end_ts = prices_df.index[-1]
+        if start_ts.tz is not None:
+            start_ts = start_ts.tz_convert(None)
+            end_ts = end_ts.tz_convert(None)
+        sessions = nyse.sessions_in_range(start_ts, end_ts)
+        naive_idx = prices_df.index.tz_localize(None) if prices_df.index.tz else prices_df.index
+        valid_mask = naive_idx.isin(sessions)
+        prices_df = prices_df[valid_mask].copy()
+        entries = entries[valid_mask]
+        if exits is not None:
+            exits = exits[valid_mask]
+
     # Run external framework
     fw_module_name = f"frameworks.{framework}"
     fw_module = importlib.import_module(fw_module_name)
