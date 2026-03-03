@@ -13,6 +13,7 @@ from datetime import datetime
 from ml4t.backtest import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageSlippage
 from ml4t.backtest.risk import StopLoss, TakeProfit, TrailingStop
+from ml4t.backtest.config import WaterMarkSource
 from ml4t.backtest.types import ExecutionMode, OrderSide
 
 
@@ -185,7 +186,12 @@ class TestConsecutiveGaps:
 
     def test_trailing_stop_updates_through_gaps(self):
         """Trailing stop should properly update HWM through gap-up days."""
-        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker = Broker(
+            100000.0,
+            NoCommission(),
+            NoSlippage(),
+            trail_hwm_source=WaterMarkSource.BAR_EXTREME,
+        )
 
         broker._update_time(
             timestamp=datetime(2024, 1, 1, 9, 30),

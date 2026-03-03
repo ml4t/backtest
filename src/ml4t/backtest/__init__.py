@@ -17,6 +17,9 @@ from .broker import Broker
 from .config import BacktestConfig, CommissionType
 from .datafeed import DataFeed
 from .engine import Engine, run_backtest
+
+# Execution: rebalancing
+from .execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from .result import BacktestResult
 
 # Risk management rules (position-level)
@@ -65,6 +68,9 @@ __all__ = [
     # Asset specifications
     "AssetClass",
     "ContractSpec",
+    # Execution: rebalancing
+    "RebalanceConfig",
+    "TargetWeightExecutor",
     # Risk rules
     "StopLoss",
     "TakeProfit",
