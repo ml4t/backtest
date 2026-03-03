@@ -7,13 +7,10 @@ contract multipliers. Without this fix, a 30% target weight in ES futures
 
 from datetime import datetime
 
-import pytest
-
 from ml4t.backtest import Broker, OrderSide
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.models import NoCommission, NoSlippage
 from ml4t.backtest.types import AssetClass, ContractSpec
-
 
 # --- Fixtures ---
 
@@ -43,7 +40,7 @@ def _init_prices(broker: Broker, prices: dict[str, float]) -> None:
         prices,  # open
         prices,  # high
         prices,  # low
-        {a: 100_000 for a in prices},  # volume
+        dict.fromkeys(prices, 100000),  # volume
         {},
     )
 
@@ -246,9 +243,7 @@ class TestFuturesShortPositions:
         _init_prices(broker, {"ES": 5000.0})
 
         executor = TargetWeightExecutor(
-            config=RebalanceConfig(
-                allow_fractional=True, allow_short=True, min_weight_change=0.001
-            )
+            config=RebalanceConfig(allow_fractional=True, allow_short=True, min_weight_change=0.001)
         )
         orders = executor.execute({"ES": -0.25}, data, broker)
 

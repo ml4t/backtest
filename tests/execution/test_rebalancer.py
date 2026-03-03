@@ -364,9 +364,7 @@ class TestTargetWeightExecutorCashTargeting:
 
     def test_max_gross_leverage_scales_down(self, broker, sample_data):
         """Test that weights > max_gross_leverage are scaled down."""
-        executor = TargetWeightExecutor(
-            config=RebalanceConfig(max_gross_leverage=1.0)
-        )
+        executor = TargetWeightExecutor(config=RebalanceConfig(max_gross_leverage=1.0))
 
         # Target 120% invested — exceeds max_gross_leverage=1.0
         target_weights = {"AAPL": 0.7, "GOOG": 0.5}  # = 120%
@@ -378,9 +376,7 @@ class TestTargetWeightExecutorCashTargeting:
 
     def test_no_cap_allows_over_100_percent(self, broker, sample_data):
         """Without max_gross_leverage, weights > 1.0 pass through to gatekeeper."""
-        executor = TargetWeightExecutor(
-            config=RebalanceConfig(allow_fractional=True)
-        )
+        executor = TargetWeightExecutor(config=RebalanceConfig(allow_fractional=True))
 
         # Target 120% — no cap, gatekeeper will constrain based on buying power
         target_weights = {"AAPL": 0.7, "GOOG": 0.5}  # = 120%

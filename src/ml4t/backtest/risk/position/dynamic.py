@@ -87,7 +87,8 @@ class TrailingStop:
             if bar_low <= lagged_stop or bar_open < lagged_stop:
                 if fill_mode == StopFillMode.NEXT_BAR_OPEN:
                     return PositionAction.exit_full(
-                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                        f"trailing_stop_{self.pct:.1%}",
+                        defer_fill=True,
                     )
                 fill_price = self._get_fill_price_long(
                     lagged_stop, bar_close, bar_low, bar_open, fill_mode
@@ -104,7 +105,8 @@ class TrailingStop:
             if bar_close <= live_stop:
                 if fill_mode == StopFillMode.NEXT_BAR_OPEN:
                     return PositionAction.exit_full(
-                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                        f"trailing_stop_{self.pct:.1%}",
+                        defer_fill=True,
                     )
                 # Fill at close price since that's what triggered it
                 return PositionAction.exit_full(
@@ -132,7 +134,8 @@ class TrailingStop:
         if triggered:
             if fill_mode == StopFillMode.NEXT_BAR_OPEN:
                 return PositionAction.exit_full(
-                    f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                    f"trailing_stop_{self.pct:.1%}",
+                    defer_fill=True,
                 )
             fill_price = self._get_fill_price_long(
                 stop_price, bar_close, bar_low, bar_open, fill_mode
@@ -165,7 +168,8 @@ class TrailingStop:
             if bar_high >= lagged_stop or bar_open > lagged_stop:
                 if fill_mode == StopFillMode.NEXT_BAR_OPEN:
                     return PositionAction.exit_full(
-                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                        f"trailing_stop_{self.pct:.1%}",
+                        defer_fill=True,
                     )
                 fill_price = self._get_fill_price_short(
                     lagged_stop, bar_close, bar_high, bar_open, fill_mode
@@ -182,7 +186,8 @@ class TrailingStop:
             if bar_close >= live_stop:
                 if fill_mode == StopFillMode.NEXT_BAR_OPEN:
                     return PositionAction.exit_full(
-                        f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                        f"trailing_stop_{self.pct:.1%}",
+                        defer_fill=True,
                     )
                 # Fill at close price since that's what triggered it
                 return PositionAction.exit_full(
@@ -210,7 +215,8 @@ class TrailingStop:
         if triggered:
             if fill_mode == StopFillMode.NEXT_BAR_OPEN:
                 return PositionAction.exit_full(
-                    f"trailing_stop_{self.pct:.1%}", defer_fill=True,
+                    f"trailing_stop_{self.pct:.1%}",
+                    defer_fill=True,
                 )
             fill_price = self._get_fill_price_short(
                 stop_price, bar_close, bar_high, bar_open, fill_mode

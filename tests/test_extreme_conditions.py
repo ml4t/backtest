@@ -11,9 +11,9 @@ These tests verify correct behavior during:
 from datetime import datetime
 
 from ml4t.backtest import Broker
+from ml4t.backtest.config import WaterMarkSource
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageSlippage
 from ml4t.backtest.risk import StopLoss, TakeProfit, TrailingStop
-from ml4t.backtest.config import WaterMarkSource
 from ml4t.backtest.types import ExecutionMode, OrderSide
 
 
