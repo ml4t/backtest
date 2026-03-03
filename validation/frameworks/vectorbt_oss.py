@@ -41,8 +41,11 @@ def run(
 
     constants = scenario.constants
 
-    # Build portfolio kwargs
+    # Build portfolio kwargs — pass OHLC so VBT uses intrabar stop checks
     pf_kwargs = {
+        "open": prices_df["open"],
+        "high": prices_df["high"],
+        "low": prices_df["low"],
         "close": prices_df["close"],
         "entries": entries,
         "init_cash": scenario.initial_cash,
@@ -93,8 +96,12 @@ def run(
         pf_kwargs["sl_stop"] = trail_pct
         pf_kwargs["sl_trail"] = True
 
-    # Short-only adjustments
-    if scenario.strategy_type == "short_only":
+    # Short direction detection
+    is_short = scenario.strategy_type == "short_only" or (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
+    if is_short:
         # VBT OSS uses short_entries/short_exits params
         if "entries" in pf_kwargs:
             pf_kwargs["short_entries"] = pf_kwargs.pop("entries")
@@ -114,9 +121,9 @@ def run(
     normalized_trades = []
     for t in trade_list:
         normalized = {
-            "entry_price": t.get("Entry Price", t.get("Avg Entry Price", 0)),
-            "exit_price": t.get("Exit Price", t.get("Avg Exit Price", 0)),
-            "pnl": t.get("PnL", t.get("P&L", 0)),
+            "entry_price": t.get("Avg Entry Price", t.get("Entry Price", 0)),
+            "exit_price": t.get("Avg Exit Price", t.get("Exit Price", 0)),
+            "pnl": t.get("PnL", 0),
             "size": t.get("Size", scenario.shares),
             "direction": t.get("Direction", "Long"),
         }
@@ -124,8 +131,11 @@ def run(
 
     extra = {}
     if "commission" in scenario.extra_checks:
-        # VBT OSS includes fees in PnL, extract total fees
-        fees = sum(abs(t.get("Fees Paid", t.get("Fees", 0))) for t in trade_list)
+        # VBT OSS tracks entry/exit fees separately
+        fees = sum(
+            abs(t.get("Entry Fees", 0)) + abs(t.get("Exit Fees", 0))
+            for t in trade_list
+        )
         extra["total_commission"] = fees
     if "exit_price" in scenario.extra_checks and normalized_trades:
         extra["exit_price"] = normalized_trades[0].get("exit_price")

@@ -48,6 +48,10 @@ class RebalanceConfig:
         lot_size: Lot size for rounding (only used if round_lots=True).
         allow_short: Allow short positions via negative weights.
         max_single_weight: Maximum weight allowed for any single asset.
+        max_gross_leverage: Maximum gross leverage (sum of abs weights). None means
+            no cap — the gatekeeper's buying power check is the constraint. For cash
+            accounts, the gatekeeper naturally prevents over-allocation. For margin
+            accounts, set this as a risk guardrail (e.g., 5.0 for a CTA portfolio).
         cancel_before_rebalance: Cancel pending orders before rebalancing (safest).
         account_for_pending: Consider pending orders when calculating current weights.
         rebalance_mode: How portfolio value is computed during rebalancing.
@@ -68,6 +72,7 @@ class RebalanceConfig:
     # Position constraints
     allow_short: bool = False
     max_single_weight: float = 1.0
+    max_gross_leverage: float | None = None  # None = no cap, gatekeeper decides
 
     # Order handling
     cancel_before_rebalance: bool = True
@@ -148,12 +153,13 @@ class TargetWeightExecutor:
         else:
             current_weights = self._get_current_weights(broker, data)
 
-        # 3. Validate total weight <= 1.0 (allow cash targeting)
-        total_target = sum(target_weights.values())
-        if total_target > 1.0 + 1e-6:
-            # Scale down to prevent over-allocation
-            scale = 1.0 / total_target
-            target_weights = {k: v * scale for k, v in target_weights.items()}
+        # 3. Apply gross leverage cap if configured (safety guardrail)
+        # Without a cap, the gatekeeper's buying power check is the constraint.
+        if self.config.max_gross_leverage is not None:
+            gross_weight = sum(abs(w) for w in target_weights.values())
+            if gross_weight > self.config.max_gross_leverage + 1e-6:
+                scale = self.config.max_gross_leverage / gross_weight
+                target_weights = {k: v * scale for k, v in target_weights.items()}
 
         # 4. Process each target asset
         for asset, target_wt in target_weights.items():
@@ -227,8 +233,9 @@ class TargetWeightExecutor:
         if abs(delta_value) < self.config.min_trade_value:
             return None
 
-        # Compute shares
-        shares = delta_value / price
+        # Compute shares (account for contract multiplier for futures)
+        multiplier = broker.get_multiplier(asset)
+        shares = delta_value / (price * multiplier)
 
         # Apply share rounding
         # Resolve fractional setting: explicit config > broker.share_type > default
@@ -267,7 +274,8 @@ class TargetWeightExecutor:
         weights = {}
         for asset, pos in broker.positions.items():
             price = data.get(asset, {}).get("close", pos.entry_price)
-            value = pos.quantity * price
+            multiplier = broker.get_multiplier(asset)
+            value = pos.quantity * price * multiplier
             weights[asset] = value / equity
 
         return weights
@@ -293,15 +301,17 @@ class TargetWeightExecutor:
         effective_value: dict[str, float] = {}
         for asset, pos in broker.positions.items():
             price = data.get(asset, {}).get("close", pos.entry_price)
-            effective_value[asset] = pos.quantity * price
+            multiplier = broker.get_multiplier(asset)
+            effective_value[asset] = pos.quantity * price * multiplier
 
         # Add net value of pending orders
         for order in broker.pending_orders:
             price = order.limit_price or data.get(order.asset, {}).get("close")
             if price:
+                multiplier = broker.get_multiplier(order.asset)
                 # BUY adds value, SELL subtracts
                 sign = 1 if order.side == OrderSide.BUY else -1
-                delta = order.quantity * price * sign
+                delta = order.quantity * price * sign * multiplier
                 effective_value[order.asset] = effective_value.get(order.asset, 0) + delta
 
         return {k: v / equity for k, v in effective_value.items()}
@@ -342,8 +352,9 @@ class TargetWeightExecutor:
             weight_delta = target_wt - current_wt
 
             if price > 0:
+                multiplier = broker.get_multiplier(asset)
                 delta_value = equity * weight_delta
-                shares = delta_value / price
+                shares = delta_value / (price * multiplier)
 
                 # Determine if would be skipped
                 skip_reason = None
@@ -372,6 +383,7 @@ class TargetWeightExecutor:
                 pos = broker.get_position(asset)
                 if pos and pos.quantity != 0:
                     price = data.get(asset, {}).get("close", pos.entry_price)
+                    multiplier = broker.get_multiplier(asset)
                     current_wt = current_weights.get(asset, 0.0)
                     previews.append(
                         {
@@ -380,7 +392,7 @@ class TargetWeightExecutor:
                             "target_weight": 0.0,
                             "weight_delta": -current_wt,
                             "shares": -pos.quantity,
-                            "value": -pos.quantity * price,
+                            "value": -pos.quantity * price * multiplier,
                             "skip_reason": None,
                             "action": "close_position",
                         }

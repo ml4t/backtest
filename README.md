@@ -39,37 +39,35 @@ pip install ml4t-backtest
 ## Quick Start
 
 ```python
+import polars as pl
 from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed
-from ml4t.backtest.risk import StopLoss, TakeProfit, RuleChain
 
-class TrendFollowing(Strategy):
-    def __init__(self, fast=10, slow=30):
-        self.fast = fast
-        self.slow = slow
-
+class SignalStrategy(Strategy):
     def on_data(self, timestamp, data, context, broker):
-        close = data["close"]
-        fast_ma = close.rolling(self.fast).mean().iloc[-1]
-        slow_ma = close.rolling(self.slow).mean().iloc[-1]
+        for asset, bar in data.items():
+            signal = bar.get("signals", {}).get("prediction", 0)
+            price = bar.get("close", 0)
+            position = broker.get_position(asset)
 
-        position = broker.get_position("SPY")
-
-        if fast_ma > slow_ma and position is None:
-            broker.submit_order("SPY", quantity=100, side="BUY")
-        elif fast_ma < slow_ma and position is not None:
-            broker.close_position("SPY")
+            if position is None and signal > 0.5:
+                shares = (broker.get_account_value() * 0.10) / price
+                if shares > 0:
+                    broker.submit_order(asset, shares)
+            elif position is not None and signal < -0.5:
+                broker.close_position(asset)
 
 config = BacktestConfig(
     initial_cash=100_000,
     commission_rate=0.001,
+    slippage_rate=0.0005,
 )
 
-feed = DataFeed(price_data)
-engine = Engine(feed, TrendFollowing(), config)
+feed = DataFeed(prices_df=prices, signals_df=signals)
+engine = Engine(feed, SignalStrategy(), config)
 result = engine.run()
 
-print(f"Total Return: {result.total_return:.2%}")
-print(f"Sharpe Ratio: {result.metrics['sharpe_ratio']:.2f}")
+print(f"Total Return: {result.metrics['total_return_pct']:.2f}%")
+print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 ```
 
 ## Risk Management
@@ -77,7 +75,7 @@ print(f"Sharpe Ratio: {result.metrics['sharpe_ratio']:.2f}")
 Position-level exit rules:
 
 ```python
-from ml4t.backtest.risk import StopLoss, TakeProfit, TrailingStop, RuleChain
+from ml4t.backtest import Strategy, StopLoss, TakeProfit, TrailingStop, RuleChain
 
 class MyStrategy(Strategy):
     def on_start(self, broker):
@@ -91,7 +89,7 @@ class MyStrategy(Strategy):
 Portfolio-level controls:
 
 ```python
-from ml4t.backtest.risk import MaxPositions, MaxDrawdown, DailyLossLimit
+from ml4t.backtest.risk.portfolio.limits import MaxDrawdownLimit, DailyLossLimit
 ```
 
 ## Framework Profiles
@@ -140,26 +138,50 @@ config = BacktestConfig(
 ## Commission and Slippage
 
 ```python
-from ml4t.backtest import PercentCommission, PercentSlippage
+from ml4t.backtest import BacktestConfig, CommissionType
 
 config = BacktestConfig(
-    commission_model=PercentCommission(rate=0.001),
-    slippage_model=PercentSlippage(rate=0.0005),
+    commission_rate=0.001,         # 10 bps percentage
+    slippage_rate=0.0005,          # 5 bps slippage
+    stop_slippage_rate=0.001,      # Additional slippage for stop exits
+)
+
+# Or per-share (Interactive Brokers style)
+config = BacktestConfig(
+    commission_type=CommissionType.PER_SHARE,
+    commission_per_share=0.005,
+    commission_minimum=1.0,
 )
 ```
 
-## Multi-Asset Support
+## Multi-Asset Rebalancing
 
 ```python
-class RankingStrategy(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        returns = data["close"].pct_change(20)
-        ranked = returns.iloc[-1].sort_values(ascending=False)
+from ml4t.backtest import Strategy, TargetWeightExecutor, RebalanceConfig
 
-        # Long top 10
-        for asset in ranked.head(10).index:
-            if broker.get_position(asset) is None:
-                broker.submit_order(asset, quantity=100, side="BUY")
+class WeightStrategy(Strategy):
+    def __init__(self):
+        self.executor = TargetWeightExecutor(RebalanceConfig(
+            min_trade_value=100,
+            min_weight_change=0.01,
+        ))
+        self.bar_count = 0
+
+    def on_data(self, timestamp, data, context, broker):
+        self.bar_count += 1
+        if self.bar_count % 21 != 1:  # Monthly rebalance
+            return
+
+        # ML predictions → portfolio weights
+        weights = {}
+        for asset, bar in data.items():
+            signal = bar.get("signals", {}).get("prediction", 0)
+            if signal and signal > 0:
+                weights[asset] = signal
+        if weights:
+            total = sum(weights.values())
+            weights = {a: w / total for a, w in weights.items()}
+            self.executor.execute(weights, data, broker)
 ```
 
 ## Cross-Framework Validation
@@ -208,6 +230,18 @@ Benchmark on 250 assets x 20 years daily data (1.26M bars):
 | vs Backtrader | 19x faster |
 | vs Zipline | 8x faster |
 | vs LEAN | 5x faster |
+
+## Documentation
+
+- [Getting Started](docs/getting-started/quickstart.md) — your first backtest
+- [Strategies](docs/user-guide/strategies.md) — strategy interface and templates
+- [Stateful Strategies](docs/user-guide/stateful-strategies.md) — advanced event-driven patterns (Kelly sizing, pairs trading, circuit breakers)
+- [Execution Semantics](docs/user-guide/execution-semantics.md) — fill timing, ordering, stops
+- [Configuration](docs/user-guide/configuration.md) — 40+ behavioral knobs
+- [Risk Management](docs/user-guide/risk-management.md) — stops, trails, portfolio limits
+- [Rebalancing](docs/user-guide/rebalancing.md) — weight-based portfolio management
+- [Market Impact](docs/user-guide/market-impact.md) — commission, slippage, and impact models
+- [Profiles](docs/user-guide/profiles.md) — framework parity presets
 
 ## Technical Characteristics
 

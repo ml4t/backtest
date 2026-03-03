@@ -14,9 +14,12 @@ except ImportError:
     __version__ = "0.0.0.dev0"
 
 from .broker import Broker
-from .config import BacktestConfig
+from .config import BacktestConfig, CommissionType
 from .datafeed import DataFeed
 from .engine import Engine, run_backtest
+
+# Execution: rebalancing
+from .execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from .result import BacktestResult
 
 # Risk management rules (position-level)
@@ -25,6 +28,8 @@ from .risk.position.dynamic import TrailingStop
 from .risk.position.static import StopLoss, TakeProfit
 from .strategy import Strategy
 from .types import (
+    AssetClass,
+    ContractSpec,
     ExecutionMode,
     ExitReason,
     Fill,
@@ -47,6 +52,7 @@ __all__ = [
     "run_backtest",
     "BacktestConfig",
     "BacktestResult",
+    "CommissionType",
     # Canonical domain types
     "OrderType",
     "OrderSide",
@@ -59,6 +65,12 @@ __all__ = [
     "Position",
     "Fill",
     "Trade",
+    # Asset specifications
+    "AssetClass",
+    "ContractSpec",
+    # Execution: rebalancing
+    "RebalanceConfig",
+    "TargetWeightExecutor",
     # Risk rules
     "StopLoss",
     "TakeProfit",

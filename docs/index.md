@@ -70,7 +70,14 @@ pip install ml4t-backtest
 - [Configuration](user-guide/configuration.md) -- all 40+ knobs explained
 - [Profiles](user-guide/profiles.md) -- framework parity and presets
 - [Strategies](user-guide/strategies.md) -- writing strategies and templates
+- [Stateful Strategies](user-guide/stateful-strategies.md) -- advanced event-driven patterns
 - [Risk Management](user-guide/risk-management.md) -- stops, trails, portfolio limits
+- [Rebalancing](user-guide/rebalancing.md) -- weight-based portfolio management
+- [Data Feed](user-guide/data-feed.md) -- preparing price and signal data
+- [Results & Analysis](user-guide/results.md) -- metrics, trades, equity export
+- [Market Impact](user-guide/market-impact.md) -- commission, slippage, and impact models
+- [Orders](user-guide/orders.md) -- order types and bracket orders
+- [Accounts](user-guide/accounts.md) -- cash, crypto, and margin accounts
 - [API Reference](api/index.md) -- full API documentation
 
 ## Part of the ML4T Ecosystem

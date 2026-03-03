@@ -100,7 +100,7 @@ SCENARIO_03 = ScenarioConfig(
             "stop_level_basis": "FILL_PRICE",
         },
         "zipline": {
-            "stop_fill_mode": "STOP_PRICE",
+            "stop_fill_mode": "NEXT_BAR_OPEN",
             "stop_level_basis": "FILL_PRICE",
         },
     },
@@ -141,7 +141,7 @@ SCENARIO_04 = ScenarioConfig(
             "stop_level_basis": "FILL_PRICE",
         },
         "zipline": {
-            "stop_fill_mode": "STOP_PRICE",
+            "stop_fill_mode": "NEXT_BAR_OPEN",
             "stop_level_basis": "FILL_PRICE",
         },
     },
@@ -185,6 +185,8 @@ SCENARIO_06 = ScenarioConfig(
     strategy_type="long_signal",
     constants={"per_share_rate": 0.005},
     extra_checks=["commission"],
+    # VBT OSS only supports percentage fees, not per-share
+    supported_frameworks=["vectorbt_pro", "backtrader", "zipline"],
     tolerances=_fw_tolerances(),
 )
 
@@ -234,11 +236,29 @@ SCENARIO_09 = ScenarioConfig(
     strategy_type="risk_entry_only",
     risk_rules=[{"type": "TrailingStop", "pct": 0.05}],
     constants={"trail_pct": 0.05},
+    ml4t_overrides={
+        "vectorbt_oss": {
+            "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+        },
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+        },
+        "backtrader": {
+            "stop_fill_mode": "STOP_PRICE",
+            "stop_level_basis": "SIGNAL_PRICE",
+        },
+        "zipline": {
+            "stop_fill_mode": "NEXT_BAR_OPEN",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "INTRABAR",
+        },
+    },
     tolerances={
         "vectorbt_pro": Tolerance(trade_count=0, value_pct=0.5, pnl_abs=50.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.5, pnl_abs=50.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
-        "zipline": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "zipline": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=5.0),
     },
 )
 
@@ -260,10 +280,22 @@ SCENARIO_10 = ScenarioConfig(
     ],
     constants={"sl_pct": 0.05, "tp_pct": 0.10},
     supported_frameworks=NO_ZIPLINE,
+    ml4t_overrides={
+        "vectorbt_oss": {
+            "stop_fill_mode": "STOP_PRICE",
+        },
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+        },
+        "backtrader": {
+            "stop_fill_mode": "STOP_PRICE",
+            "stop_level_basis": "SIGNAL_PRICE",
+        },
+    },
     tolerances={
         "vectorbt_pro": Tolerance(trade_count=0, value_pct=0.5, pnl_abs=50.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.5, pnl_abs=50.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
     },
 )
 
@@ -306,11 +338,29 @@ SCENARIO_12 = ScenarioConfig(
         "allow_short_selling": True,
         "allow_leverage": True,
     },
+    ml4t_overrides={
+        "vectorbt_oss": {
+            "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+        },
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+        },
+        "backtrader": {
+            "stop_fill_mode": "STOP_PRICE",
+            "stop_level_basis": "SIGNAL_PRICE",
+        },
+        "zipline": {
+            "stop_fill_mode": "NEXT_BAR_OPEN",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "INTRABAR",
+        },
+    },
     tolerances={
         "vectorbt_pro": Tolerance(trade_count=0, value_pct=0.5, pnl_abs=50.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.5, pnl_abs=50.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
-        "zipline": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "zipline": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=5.0),
     },
 )
 
@@ -331,11 +381,17 @@ SCENARIO_13 = ScenarioConfig(
         {"type": "TakeProfit", "pct": 0.08},
     ],
     constants={"trail_pct": 0.05, "tp_pct": 0.08},
+    ml4t_overrides={
+        "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
+        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
+        "zipline": {"stop_fill_mode": "NEXT_BAR_OPEN", "trail_hwm_source": "BAR_EXTREME", "trail_stop_timing": "INTRABAR"},
+    },
     tolerances={
-        "vectorbt_pro": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=100.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=100.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
-        "zipline": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
+        "vectorbt_pro": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "zipline": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=5.0),
     },
 )
 
@@ -356,11 +412,17 @@ SCENARIO_14 = ScenarioConfig(
         {"type": "StopLoss", "pct": 0.08},
     ],
     constants={"trail_pct": 0.05, "sl_pct": 0.08},
+    ml4t_overrides={
+        "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
+        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
+        "zipline": {"stop_fill_mode": "NEXT_BAR_OPEN", "trail_hwm_source": "BAR_EXTREME", "trail_stop_timing": "INTRABAR"},
+    },
     tolerances={
-        "vectorbt_pro": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=100.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=100.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
-        "zipline": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
+        "vectorbt_pro": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "zipline": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=5.0),
     },
 )
 
@@ -382,11 +444,18 @@ SCENARIO_15 = ScenarioConfig(
         {"type": "StopLoss", "pct": 0.05},
     ],
     constants={"trail_pct": 0.03, "tp_pct": 0.10, "sl_pct": 0.05},
+    ml4t_overrides={
+        "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
+        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
+        "zipline": {"stop_fill_mode": "NEXT_BAR_OPEN", "trail_hwm_source": "BAR_EXTREME", "trail_stop_timing": "INTRABAR"},
+    },
     tolerances={
-        "vectorbt_pro": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=100.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=100.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
-        "zipline": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=200.0),
+        "vectorbt_pro": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        # Zipline SL reference from signal close vs ml4t from fill price = ~$9.46 diff
+        "zipline": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=10.0),
     },
 )
 
@@ -404,11 +473,17 @@ SCENARIO_16 = ScenarioConfig(
     strategy_type="risk_entry_only",
     risk_rules=[{"type": "TrailingStop", "pct": 0.05}],
     constants={"trail_pct": 0.05, "allow_reentry": True},
+    ml4t_overrides={
+        "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
+        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
+        "zipline": {"stop_fill_mode": "NEXT_BAR_OPEN", "trail_hwm_source": "BAR_EXTREME", "trail_stop_timing": "INTRABAR"},
+    },
     tolerances={
         "vectorbt_pro": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=200.0),
-        "vectorbt_oss": Tolerance(trade_count=0, value_pct=1.0, pnl_abs=200.0),
-        "backtrader": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=500.0),
-        "zipline": Tolerance(trade_count=0, value_pct=2.0, pnl_abs=500.0),
+        "vectorbt_oss": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "backtrader": Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0),
+        "zipline": Tolerance(trade_count=0, value_pct=0.1, pnl_abs=50.0),
     },
 )
 

@@ -238,6 +238,16 @@ config = BacktestConfig(
 )
 ```
 
+## See It in Action
+
+The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses BacktestConfig across all case studies:
+
+- **Ch16 case studies** — each case study loads config from `setup.yaml` via `get_backtest_config()`, setting initial_cash, commission_rate, slippage_rate, and execution_mode
+- **Ch16 / NB13** (`futures_backtesting`) — ContractSpec with CommissionType.PER_CONTRACT for CME futures
+- **Ch19 case studies** — risk management config (stop fill modes, trailing stop timing)
+
+The book pattern: `BacktestConfig()` with 4 overrides (initial_cash, commission_rate, slippage_rate, execution_mode), loaded from YAML. Costs come from `setup.yaml` via a utility function. This covers the vast majority of use cases.
+
 ## Next Steps
 
 - [Profiles](profiles.md) -- pre-built configs for each framework

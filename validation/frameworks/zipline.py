@@ -54,17 +54,41 @@ def run(
     }
     shares = scenario.shares
     risk_rules = scenario.risk_rules
-    is_short = scenario.strategy_type == "short_only"
+    is_short = scenario.strategy_type == "short_only" or (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
 
     def initialize(context):
+        from zipline.api import set_commission as set_comm
+        from zipline.finance import commission as zipline_commission
+
         context.asset = symbol("TEST")
         context.signal_data = signal_data
         context.bar_count = 0
         context.in_position = False
         context.entry_price = None
         context.high_water_mark = None
-        # Use custom slippage to fill at open price
-        set_slippage(_create_open_price_slippage())
+
+        # Commission setup
+        if "commission_rate" in constants:
+            set_comm(zipline_commission.PerDollar(cost=constants["commission_rate"]))
+            context.commission_mode = "pct"
+        elif "per_share_rate" in constants:
+            set_comm(zipline_commission.PerShare(cost=constants["per_share_rate"]))
+            context.commission_mode = "per_share"
+        else:
+            set_comm(zipline_commission.PerShare(cost=0.0))
+            context.commission_mode = "none"
+
+        # Slippage: fill at open price (Zipline always fills next-bar)
+        # For slippage scenarios, the slippage is added on top of the open price
+        if "slippage_fixed" in constants:
+            set_slippage(_create_slippage_model(fixed=constants["slippage_fixed"]))
+        elif "slippage_rate" in constants:
+            set_slippage(_create_slippage_model(pct=constants["slippage_rate"]))
+        else:
+            set_slippage(_create_open_price_slippage())
 
     def handle_data(context, data):
         idx = context.bar_count
@@ -76,29 +100,32 @@ def run(
 
         current_pos = context.portfolio.positions[context.asset].amount
         current_price = data.current(context.asset, "close")
+        bar_high = data.current(context.asset, "high")
+        bar_low = data.current(context.asset, "low")
 
         # Risk rule evaluation for manual stop/take-profit (Zipline has no built-in rules)
+        # Use OHLC for intrabar detection: bar_low triggers long stops, bar_high triggers short stops
         if current_pos != 0 and context.entry_price is not None:
             should_exit = False
 
             for rule in risk_rules:
                 if rule["type"] == "StopLoss":
                     if current_pos > 0:
-                        loss_pct = (current_price - context.entry_price) / context.entry_price
+                        loss_pct = (bar_low - context.entry_price) / context.entry_price
                         if loss_pct <= -rule["pct"]:
                             should_exit = True
                     elif current_pos < 0:
-                        loss_pct = (context.entry_price - current_price) / context.entry_price
+                        loss_pct = (context.entry_price - bar_high) / context.entry_price
                         if loss_pct <= -rule["pct"]:
                             should_exit = True
 
                 elif rule["type"] == "TakeProfit":
                     if current_pos > 0:
-                        gain_pct = (current_price - context.entry_price) / context.entry_price
+                        gain_pct = (bar_high - context.entry_price) / context.entry_price
                         if gain_pct >= rule["pct"]:
                             should_exit = True
                     elif current_pos < 0:
-                        gain_pct = (context.entry_price - current_price) / context.entry_price
+                        gain_pct = (context.entry_price - bar_low) / context.entry_price
                         if gain_pct >= rule["pct"]:
                             should_exit = True
 
@@ -106,13 +133,15 @@ def run(
                     if context.high_water_mark is None:
                         context.high_water_mark = current_price
                     if current_pos > 0:
-                        context.high_water_mark = max(context.high_water_mark, current_price)
-                        drawdown = (context.high_water_mark - current_price) / context.high_water_mark
+                        # HWM tracks from bar_high, trigger from bar_low
+                        context.high_water_mark = max(context.high_water_mark, bar_high)
+                        drawdown = (context.high_water_mark - bar_low) / context.high_water_mark
                         if drawdown >= rule["pct"]:
                             should_exit = True
                     elif current_pos < 0:
-                        context.high_water_mark = min(context.high_water_mark, current_price)
-                        drawup = (current_price - context.high_water_mark) / context.high_water_mark
+                        # LWM tracks from bar_low, trigger from bar_high
+                        context.high_water_mark = min(context.high_water_mark, bar_low)
+                        drawup = (bar_high - context.high_water_mark) / context.high_water_mark
                         if drawup >= rule["pct"]:
                             should_exit = True
 
@@ -151,12 +180,19 @@ def run(
     # Setup bundle
     bundle_name = _setup_bundle(prices_df)
 
-    # Run
+    # Run — snap to valid NYSE sessions (data may include holidays)
+    import exchange_calendars as xcals
+
+    nyse = xcals.get_calendar("XNYS")
     start = prices_df.index[0]
     end = prices_df.index[-1]
     if start.tz is not None:
         start = start.tz_convert(None)
         end = end.tz_convert(None)
+    if not nyse.is_session(start):
+        start = nyse.date_to_session(start, direction="next")
+    if not nyse.is_session(end):
+        end = nyse.date_to_session(end, direction="previous")
 
     results = run_algorithm(
         start=start,
@@ -179,16 +215,21 @@ def run(
             num_trades += len(txn_list)
     num_trades = num_trades // 2  # Entry + exit = 1 round trip
 
+    extra = {}
+    # Note: Zipline doesn't reliably report per-transaction commission totals.
+    # Commission correctness is validated via final_value parity instead.
+
     return FrameworkResult(
         framework="Zipline",
         final_value=final_value,
         total_pnl=final_value - scenario.initial_cash,
         num_trades=num_trades,
+        extra=extra,
     )
 
 
 def _create_open_price_slippage():
-    """Create a custom slippage model that fills at open price."""
+    """Create a custom slippage model that fills at open price (zero slippage)."""
     from zipline.finance.slippage import SlippageModel
 
     class OpenPriceSlippage(SlippageModel):
@@ -197,6 +238,27 @@ def _create_open_price_slippage():
             return (data.current(order.asset, "open"), order.amount)
 
     return OpenPriceSlippage()
+
+
+def _create_slippage_model(fixed: float = 0.0, pct: float = 0.0):
+    """Create a slippage model that fills at open price +/- slippage."""
+    from zipline.finance.slippage import SlippageModel
+
+    class OpenPriceWithSlippage(SlippageModel):
+        def process_order(self, data, order):
+            price = data.current(order.asset, "open")
+            if pct > 0:
+                slip = price * pct
+            else:
+                slip = fixed
+            # Buys get worse (higher) price, sells get worse (lower) price
+            if order.amount > 0:
+                price += slip
+            else:
+                price -= slip
+            return (price, order.amount)
+
+    return OpenPriceWithSlippage()
 
 
 def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation") -> str:
@@ -240,11 +302,21 @@ def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation")
 
         return ingest_func
 
+    import exchange_calendars as xcals
+
+    nyse = xcals.get_calendar("XNYS")
+
     start_session = prices_df.index[0]
     end_session = prices_df.index[-1]
     if start_session.tz is not None:
         start_session = start_session.tz_convert(None)
         end_session = end_session.tz_convert(None)
+
+    # Snap to valid NYSE trading sessions (data may include weekends/holidays)
+    if not nyse.is_session(start_session):
+        start_session = nyse.date_to_session(start_session, direction="next")
+    if not nyse.is_session(end_session):
+        end_session = nyse.date_to_session(end_session, direction="previous")
 
     register(
         bundle_name,

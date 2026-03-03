@@ -139,6 +139,14 @@ result = run_backtest("data/prices.parquet", strategy, signals="data/signals.par
 
 DataFeed pre-partitions data by timestamp at initialization and pre-extracts column indices for O(1) per-bar access. For 1M bars, this uses roughly 100 MB (10x less than converting everything to Python dicts upfront).
 
+## See It in Action
+
+The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book prepares DataFeed inputs in every Engine case study:
+
+- **Ch16 case studies** — each case study loads OHLCV from Parquet, constructs a signals DataFrame from ML predictions, and passes both to DataFeed
+- **Ch16 / NB13** (`futures_backtesting`) — multi-contract futures data with session boundaries and overnight gaps
+- The common pattern: `prices_df` is a stacked multi-asset OHLCV DataFrame, `signals_df` contains prediction columns aligned by (timestamp, asset)
+
 ## Next Steps
 
 - [Quickstart](../getting-started/quickstart.md) -- end-to-end examples

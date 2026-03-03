@@ -15,7 +15,7 @@ from datetime import datetime
 
 import pytest
 
-from ml4t.backtest.config import TrailStopTiming
+from ml4t.backtest.config import TrailStopTiming, WaterMarkSource
 from ml4t.backtest.risk.position.dynamic import TrailingStop
 from ml4t.backtest.risk.types import ActionType, PositionState
 from ml4t.backtest.types import StopFillMode
@@ -168,10 +168,10 @@ class TestShortTrailingStopIntrabar:
     """SHORT trailing stop intrabar detection via bar_high."""
 
     def test_intrabar_trigger_via_bar_high(self):
-        """Stop triggered when bar_high touches stop level."""
+        """Stop triggered when bar_high touches stop level (BAR_EXTREME mode)."""
         rule = TrailingStop(pct=0.05)  # 5% trail
         # SHORT at 100, LWM at 90, trail at 94.5
-        # Close at 92 (safe), but high touched 95 (triggers)
+        # Close at 92 (safe), but high touched 95 (triggers in BAR_EXTREME mode)
         state = make_short_position(
             entry_price=100.0,
             current_price=92.0,
@@ -179,12 +179,13 @@ class TestShortTrailingStopIntrabar:
             bar_open=91.0,
             bar_high=95.0,  # Touches above trail
             bar_low=90.0,
+            context={"trail_hwm_source": WaterMarkSource.BAR_EXTREME},
         )
         action = rule.evaluate(state)
         assert action.action == ActionType.EXIT_FULL
 
     def test_no_intrabar_trigger_high_below_stop(self):
-        """No trigger when bar_high is below stop level."""
+        """No trigger when bar_high is below stop level (BAR_EXTREME mode)."""
         rule = TrailingStop(pct=0.05)  # 5% trail
         # SHORT at 100, LWM at 90, trail at 94.5
         # High at 93 is below trail
@@ -195,6 +196,7 @@ class TestShortTrailingStopIntrabar:
             bar_open=90.0,
             bar_high=93.0,  # Below trail
             bar_low=89.0,
+            context={"trail_hwm_source": WaterMarkSource.BAR_EXTREME},
         )
         action = rule.evaluate(state)
         assert action.action == ActionType.HOLD
@@ -413,7 +415,10 @@ class TestShortTrailingStopTimingModes:
             current_price=93.0,
             low_water_mark=90.0,  # From previous bar
             bar_high=95.0,  # Crosses trail at 94.5
-            context={"trail_stop_timing": TrailStopTiming.LAGGED},
+            context={
+                "trail_stop_timing": TrailStopTiming.LAGGED,
+                "trail_hwm_source": WaterMarkSource.BAR_EXTREME,
+            },
         )
         action = rule.evaluate(state)
         assert action.action == ActionType.EXIT_FULL
@@ -429,7 +434,10 @@ class TestShortTrailingStopTimingModes:
             low_water_mark=90.0,
             bar_high=95.0,
             bar_low=88.0,  # Would update LWM in pass 2
-            context={"trail_stop_timing": TrailStopTiming.VBT_PRO},
+            context={
+                "trail_stop_timing": TrailStopTiming.VBT_PRO,
+                "trail_hwm_source": WaterMarkSource.BAR_EXTREME,
+            },
         )
         action = rule.evaluate(state)
         assert action.action == ActionType.EXIT_FULL

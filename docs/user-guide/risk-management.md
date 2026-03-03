@@ -287,6 +287,17 @@ Each limit check returns a `LimitResult` with an action:
 | `reduce` | Reduce position sizes by a percentage |
 | `halt` | Stop opening new positions |
 
+## See It in Action
+
+The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates risk management in Ch19 case studies:
+
+- **ETFs** — RuleChain with StopLoss + TrailingStop on multi-asset ETF portfolios
+- **FX Pairs** — StopLoss + TakeProfit + TrailingStop for currency strategies
+- **CME Futures** — Risk rules with ContractSpec and per-contract commission
+- **US Equities** — MaxDrawdownLimit and DailyLossLimit portfolio protection
+
+The case studies show progressive complexity: basic stop-loss → trailing stops → rule chains → portfolio limits.
+
 ## Next Steps
 
 - [Execution Semantics](execution-semantics.md) -- stop fill modes and trailing stop timing
