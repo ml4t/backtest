@@ -166,6 +166,14 @@ print(result.config.describe())
 print(result.config.preset_name)
 ```
 
+## See It in Action
+
+The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses BacktestResult in every case study:
+
+- **Ch16 / NB05** (`performance_reporting`) — comprehensive metrics extraction, equity curve visualization, trade analysis
+- **Ch16 case studies** — all cases call `result.to_daily_returns(calendar="NYSE")` for integration with ml4t-diagnostic signal analysis
+- **Ch16 / NB06** (`sharpe_ratio_inference`) — statistical inference on backtest results
+
 ## Next Steps
 
 - [Quickstart](../getting-started/quickstart.md) -- end-to-end examples

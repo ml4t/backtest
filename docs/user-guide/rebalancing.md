@@ -94,6 +94,15 @@ class MyOptimizer:
         return {"AAPL": 0.3, "MSFT": 0.3, "GOOG": 0.4}
 ```
 
+## See It in Action
+
+The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses TargetWeightExecutor extensively:
+
+- **Ch16 case studies** — all 6 Engine-based cases (ETFs, FX, equities, crypto, futures, options) use TargetWeightExecutor for ML prediction → portfolio weight → rebalance
+- **Ch17** (`portfolio_construction`) — portfolio optimization with weight constraints
+
+The common pattern: ML model generates predictions, predictions are converted to portfolio weights, TargetWeightExecutor handles the order generation and execution.
+
 ## Next Steps
 
 - [Strategies](strategies.md) -- strategy patterns and templates
