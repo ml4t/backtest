@@ -71,8 +71,26 @@ class EquityCurve:
 
     @property
     def years(self) -> float:
-        """Duration in years based on trading days."""
+        """Duration in years based on elapsed wall-clock time."""
+        if len(self.timestamps) >= 2:
+            elapsed_seconds = (self.timestamps[-1] - self.timestamps[0]).total_seconds()
+            if elapsed_seconds > 0:
+                return elapsed_seconds / (365.25 * 24 * 60 * 60)
         return len(self.values) / TRADING_DAYS_PER_YEAR if self.values else 0.0
+
+    @property
+    def periods_per_year(self) -> float:
+        """Infer annualization factor from observed bar frequency."""
+        if len(self.values) < 2 or len(self.timestamps) < 2:
+            return float(TRADING_DAYS_PER_YEAR)
+        elapsed_seconds = (self.timestamps[-1] - self.timestamps[0]).total_seconds()
+        if elapsed_seconds <= 0:
+            return float(TRADING_DAYS_PER_YEAR)
+        periods = len(self.values) - 1
+        inferred = periods * 365.25 * 24 * 60 * 60 / elapsed_seconds
+        if not np.isfinite(inferred) or inferred <= 0:
+            return float(TRADING_DAYS_PER_YEAR)
+        return float(inferred)
 
     def max_drawdown_info(self) -> tuple[float, int, int]:
         """Maximum drawdown with peak/trough indices."""
@@ -92,7 +110,28 @@ class EquityCurve:
     @property
     def volatility(self) -> float:
         """Annualized volatility."""
-        return volatility(self.returns)
+        if len(self.returns) < 2:
+            return 0.0
+        base_vol = volatility(self.returns, annualize=False)
+        return float(base_vol * np.sqrt(self.periods_per_year))
+
+    @property
+    def sharpe(self) -> float:
+        """Annualized Sharpe ratio using inferred bar frequency."""
+        if len(self.returns) < 2:
+            return 0.0
+        base_sharpe = sharpe_ratio(self.returns, annualize=False)
+        return float(base_sharpe * np.sqrt(self.periods_per_year))
+
+    @property
+    def sortino(self) -> float:
+        """Annualized Sortino ratio using inferred bar frequency."""
+        if len(self.returns) < 2:
+            return 0.0
+        base_sortino = sortino_ratio(self.returns, annualize=False)
+        if np.isinf(base_sortino):
+            return float("inf")
+        return float(base_sortino * np.sqrt(self.periods_per_year))
 
     def drawdown_series(self) -> np.ndarray:
         """Drawdown at each point (for underwater chart)."""
@@ -109,8 +148,8 @@ class EquityCurve:
             "final_value": self.final_value,
             "total_return": self.total_return,
             "cagr": self.cagr,
-            "sharpe": sharpe_ratio(self.returns),
-            "sortino": sortino_ratio(self.returns),
+            "sharpe": self.sharpe,
+            "sortino": self.sortino,
             "max_drawdown": self.max_dd,
             "calmar": calmar_ratio(self.cagr, self.max_dd),
             "volatility": self.volatility,

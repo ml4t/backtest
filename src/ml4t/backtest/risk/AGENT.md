@@ -1,4 +1,4 @@
-# risk/ - 1,876 Lines
+# risk/ - 1,906 Lines
 
 Position-level and portfolio-level risk management.
 
@@ -6,7 +6,7 @@ Position-level and portfolio-level risk management.
 
 | Directory | Lines | Purpose |
 |-----------|-------|---------|
-| position/ | 909 | Stop-loss, trailing stop, take-profit, rule chains |
+| position/ | 940 | Stop-loss, trailing stop, take-profit, rule chains |
 | portfolio/ | 816 | Exposure limits, drawdown limits, position counts |
 
 ## Modules

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from .analytics import EquityCurve, TradeAnalyzer
-from .analytics.metrics import calmar_ratio, sharpe_ratio, sortino_ratio
+from .analytics.metrics import calmar_ratio
 from .broker import Broker
 from .datafeed import DataFeed
 from .strategy import Strategy
@@ -230,9 +230,14 @@ class Engine:
                 # Get last known price for this asset
                 last_price = self.broker._current_prices.get(asset, pos.entry_price)
 
-                # Calculate mark-to-market PnL
-                pnl = (last_price - pos.entry_price) * pos.quantity - pos.entry_commission
-                pnl_pct = (last_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
+                # Calculate mark-to-market PnL (include multiplier for futures)
+                pnl = (
+                    last_price - pos.entry_price
+                ) * pos.quantity * pos.multiplier - pos.entry_commission
+                raw_pct = (
+                    (last_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
+                )
+                pnl_pct = raw_pct if pos.quantity > 0 else -raw_pct
 
                 open_trade = Trade(
                     symbol=asset,  # Asset identifier (Position.asset -> Trade.symbol)
@@ -250,6 +255,8 @@ class Engine:
                     status="open",
                     mfe=pos.max_favorable_excursion,
                     mae=pos.max_adverse_excursion,
+                    entry_slippage=pos.entry_slippage,
+                    multiplier=pos.multiplier,
                 )
                 all_trades.append(open_trade)
 
@@ -274,18 +281,25 @@ class Engine:
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(f.slippage for f in self.broker.fills),
             # Additional metrics
-            "sharpe": sharpe_ratio(equity.returns),
-            "sortino": sortino_ratio(equity.returns),
+            "sharpe": equity.sharpe,
+            "sortino": equity.sortino,
             "calmar": calmar_ratio(equity.cagr, equity.max_dd),
             "cagr": equity.cagr,
             "volatility": equity.volatility,
             "profit_factor": trade_analyzer.profit_factor,
+            # Per-trade return metrics (percentage-based, direction-aware)
             "expectancy": trade_analyzer.expectancy,
             "avg_trade": trade_analyzer.avg_trade,
             "avg_win": trade_analyzer.avg_win,
             "avg_loss": trade_analyzer.avg_loss,
             "largest_win": trade_analyzer.largest_win,
             "largest_loss": trade_analyzer.largest_loss,
+            "payoff_ratio": trade_analyzer.payoff_ratio,
+            # Cost decomposition
+            "total_gross_pnl": trade_analyzer.total_gross_pnl,
+            "total_costs": trade_analyzer.total_costs,
+            "avg_cost_drag": trade_analyzer.avg_cost_drag,
+            "gross_profit_factor": trade_analyzer.gross_profit_factor,
             # Calendar enforcement
             "skipped_bars": self._skipped_bars,
         }

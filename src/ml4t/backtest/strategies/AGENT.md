@@ -6,8 +6,8 @@ Reusable strategy templates.
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| templates.py | 417 | SignalStrategy, RebalanceStrategy, MomentumTemplate |
+| templates.py | 417 | Strategy templates for common patterns |
 
 ## Key
 
-`SignalStrategy`, `RebalanceStrategy`, `MomentumTemplate`
+`SignalFollowingStrategy`, `MomentumStrategy`, `MeanReversionStrategy`, `LongShortStrategy`

@@ -202,6 +202,7 @@ class Position:
     context: dict = field(default_factory=dict)  # Strategy-provided context
     multiplier: float = 1.0  # Contract multiplier (for futures)
     entry_commission: float = 0.0  # Commission paid on entry (for Trade PnL)
+    entry_slippage: float = 0.0  # Per-unit slippage on entry (for cost decomposition)
 
     def __post_init__(self):
         # Initialize water marks to entry price
@@ -242,7 +243,10 @@ class Position:
         return (price - self.entry_price) * self.quantity * self.multiplier
 
     def pnl_percent(self, current_price: float | None = None) -> float:
-        """Calculate percentage return on position.
+        """Calculate direction-aware percentage return on position.
+
+        For long positions: (price - entry) / entry
+        For short positions: (entry - price) / entry
 
         Args:
             current_price: Price to calculate return at. If None, uses self.current_price.
@@ -252,7 +256,8 @@ class Position:
             price = self.entry_price
         if self.entry_price == 0:
             return 0.0
-        return (price - self.entry_price) / self.entry_price
+        raw = (price - self.entry_price) / self.entry_price
+        return raw if self.quantity >= 0 else -raw
 
     def notional_value(self, current_price: float | None = None) -> float:
         """Calculate notional value of position.
@@ -340,6 +345,9 @@ class Fill:
     timestamp: datetime
     commission: float = 0.0
     slippage: float = 0.0
+    order_type: str = ""  # OrderType.value string (for fill-level invariants)
+    limit_price: float | None = None  # For limit bound checking
+    stop_price: float | None = None  # For stop bound checking
 
 
 @dataclass
@@ -377,6 +385,9 @@ class Trade:
     # MFE/MAE preserved from Position for trade analysis (shorter field names)
     mfe: float = 0.0  # Max favorable excursion (best unrealized return)
     mae: float = 0.0  # Max adverse excursion (worst unrealized return)
+    # Cost decomposition fields
+    entry_slippage: float = 0.0  # Per-unit slippage on entry
+    multiplier: float = 1.0  # Contract multiplier (for futures)
     # Optional metadata extension point
     metadata: dict[str, Any] | None = None
 
@@ -394,6 +405,42 @@ class Trade:
     def commission(self) -> float:
         """Backward-compat alias for validation scripts expecting `commission`."""
         return self.fees
+
+    @property
+    def gross_pnl(self) -> float:
+        """Price-move P&L before fees: (exit - entry) * quantity * multiplier."""
+        return (self.exit_price - self.entry_price) * self.quantity * self.multiplier
+
+    @property
+    def net_pnl(self) -> float:
+        """P&L after all costs. Alias for self.pnl."""
+        return self.pnl
+
+    @property
+    def gross_return(self) -> float:
+        """Direction-aware gross return. Same as pnl_percent."""
+        return self.pnl_percent
+
+    @property
+    def net_return(self) -> float:
+        """Direction-aware net return including fees."""
+        notional = self.entry_price * abs(self.quantity) * self.multiplier
+        if notional == 0:
+            return 0.0
+        return self.pnl / notional
+
+    @property
+    def total_slippage_cost(self) -> float:
+        """Total slippage cost in dollars (entry + exit)."""
+        return (self.entry_slippage + self.slippage) * abs(self.quantity) * self.multiplier
+
+    @property
+    def cost_drag(self) -> float:
+        """Total cost as fraction of notional: (fees + slippage) / notional."""
+        notional = self.entry_price * abs(self.quantity) * self.multiplier
+        if notional == 0:
+            return 0.0
+        return (self.fees + self.total_slippage_cost) / notional
 
 
 @dataclass

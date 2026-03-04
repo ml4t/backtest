@@ -8,6 +8,7 @@ from ml4t.backtest import (
     Broker,
     OrderSide,
 )
+from ml4t.backtest.config import RebalanceMode
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.models import NoCommission, NoSlippage
 
@@ -734,3 +735,45 @@ class TestTargetWeightExecutorIntegration:
 
         # Should have AAPL buy, GOOG buy, MSFT sell (close)
         assert len(orders2) >= 2
+
+
+class TestTargetWeightExecutorModes:
+    """Tests for rebalancing behavior in sequential fill modes."""
+
+    def test_incremental_mode_processes_sells_before_buys(self):
+        """Incremental mode should free cash before submitting buy-side reallocations."""
+        broker = Broker(
+            initial_cash=100.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"A": 100.0, "B": 100.0},
+            {"A": 100.0, "B": 100.0},
+            {"A": 100.0, "B": 100.0},
+            {"A": 100.0, "B": 100.0},
+            {"A": 1_000_000, "B": 1_000_000},
+            {},
+        )
+        broker.submit_order("B", 1.0, OrderSide.BUY)
+        broker._process_orders()
+
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                min_trade_value=0.0,
+                min_weight_change=0.0,
+                allow_fractional=True,
+                rebalance_mode=RebalanceMode.INCREMENTAL,
+            )
+        )
+        data = {"A": {"close": 100.0}, "B": {"close": 100.0}}
+
+        orders = executor.execute({"A": 1.0, "B": 0.0}, data, broker)
+
+        assert len(orders) == 2
+        assert all(order.rejection_reason is None for order in orders)
+        pos_a = broker.get_position("A")
+        pos_b = broker.get_position("B")
+        assert pos_a is not None and pos_a.quantity == pytest.approx(1.0)
+        assert pos_b is None

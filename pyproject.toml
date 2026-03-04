@@ -170,6 +170,7 @@ markers = [
     "unit: marks unit tests",
     "private: requires commercial dependencies (vectorbtpro) - excluded by default",
     "requires_comparison: requires optional comparison frameworks (vectorbt, backtrader, zipline)",
+    "no_invariant_check: skip autouse accounting invariant check for this test",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
@@ -212,7 +213,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG001", "ARG002", "F841", "SIM102"]  # Test patterns
+"tests/*" = ["ARG001", "ARG002", "F841", "SIM102", "SIM108"]  # Test patterns
 
 [tool.ty.environment]
 python-version = "3.11"

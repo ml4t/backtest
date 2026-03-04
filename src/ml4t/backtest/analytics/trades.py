@@ -68,44 +68,51 @@ class TradeAnalyzer:
             return float("inf") if self.gross_profit > 0 else 0.0
         return self.gross_profit / abs(self.gross_loss)
 
+    # --- Per-trade return metrics (percentage-based) ---
+    # All per-trade metrics use pnl_percent (direction-aware return),
+    # not dollar P&L. Dollar extremes are misleading when equity changes:
+    # a -5% trade at high equity is a larger dollar loss than -30% at low equity.
+
     @property
     def avg_win(self) -> float:
-        """Average winning trade PnL."""
-        winners = self._pnls[self._pnls > 0]
-        return float(np.mean(winners)) if len(winners) > 0 else 0.0
+        """Average winning trade return (as decimal)."""
+        winner_returns = self._returns[self._returns > 0]
+        return float(np.mean(winner_returns)) if len(winner_returns) > 0 else 0.0
 
     @property
     def avg_loss(self) -> float:
-        """Average losing trade PnL (negative)."""
-        losers = self._pnls[self._pnls < 0]
-        return float(np.mean(losers)) if len(losers) > 0 else 0.0
+        """Average losing trade return (as decimal, negative)."""
+        loser_returns = self._returns[self._returns < 0]
+        return float(np.mean(loser_returns)) if len(loser_returns) > 0 else 0.0
 
     @property
     def avg_trade(self) -> float:
-        """Average trade PnL (expectancy per trade)."""
-        return float(np.mean(self._pnls)) if len(self._pnls) > 0 else 0.0
+        """Average trade return (as decimal)."""
+        return float(np.mean(self._returns)) if len(self._returns) > 0 else 0.0
 
     @property
     def expectancy(self) -> float:
-        """Mathematical expectancy: (win_rate * avg_win) + ((1 - win_rate) * avg_loss)."""
+        """Expected return per trade: (win_rate * avg_win) + ((1 - win_rate) * avg_loss)."""
         return self.win_rate * self.avg_win + (1 - self.win_rate) * self.avg_loss
 
     @property
     def largest_win(self) -> float:
-        """Largest single winning trade."""
-        winners = self._pnls[self._pnls > 0]
-        return float(np.max(winners)) if len(winners) > 0 else 0.0
+        """Best single trade return (as decimal)."""
+        winner_returns = self._returns[self._returns > 0]
+        return float(np.max(winner_returns)) if len(winner_returns) > 0 else 0.0
 
     @property
     def largest_loss(self) -> float:
-        """Largest single losing trade (most negative)."""
-        losers = self._pnls[self._pnls < 0]
-        return float(np.min(losers)) if len(losers) > 0 else 0.0
+        """Worst single trade return (as decimal, most negative)."""
+        loser_returns = self._returns[self._returns < 0]
+        return float(np.min(loser_returns)) if len(loser_returns) > 0 else 0.0
 
     @property
-    def avg_return(self) -> float:
-        """Average return per trade (as decimal)."""
-        return float(np.mean(self._returns)) if len(self._returns) > 0 else 0.0
+    def payoff_ratio(self) -> float:
+        """avg_win / |avg_loss|. Size-normalized reward-to-risk."""
+        if self.avg_loss == 0:
+            return float("inf") if self.avg_win > 0 else 0.0
+        return self.avg_win / abs(self.avg_loss)
 
     @property
     def avg_bars_held(self) -> float:
@@ -127,8 +134,42 @@ class TradeAnalyzer:
 
     @property
     def total_slippage(self) -> float:
-        """Total slippage cost across all trades."""
-        return sum(t.slippage for t in self.trades)
+        """Total slippage cost across all trades (entry + exit)."""
+        return sum(t.total_slippage_cost for t in self.trades)
+
+    # --- Cost Decomposition Metrics ---
+
+    @property
+    def total_gross_pnl(self) -> float:
+        """Total gross P&L (price moves only, before all costs)."""
+        return sum(t.gross_pnl for t in self.trades)
+
+    @property
+    def total_costs(self) -> float:
+        """Total transaction costs (fees + slippage)."""
+        return self.total_fees + self.total_slippage
+
+    @property
+    def avg_cost_drag(self) -> float:
+        """Average cost drag across trades (costs as fraction of notional)."""
+        if not self.trades:
+            return 0.0
+        drags = [t.cost_drag for t in self.trades]
+        return float(np.mean(drags))
+
+    @property
+    def gross_profit_factor(self) -> float:
+        """Profit factor using gross P&L (before costs).
+
+        Compares raw price-move profits to losses, isolating strategy
+        edge from execution costs.
+        """
+        gross_pnls = np.array([t.gross_pnl for t in self.trades]) if self.trades else np.array([])
+        gross_wins = float(np.sum(gross_pnls[gross_pnls > 0])) if len(gross_pnls) > 0 else 0.0
+        gross_losses = float(np.sum(gross_pnls[gross_pnls < 0])) if len(gross_pnls) > 0 else 0.0
+        if gross_losses == 0:
+            return float("inf") if gross_wins > 0 else 0.0
+        return gross_wins / abs(gross_losses)
 
     def by_side(self, side: str) -> "TradeAnalyzer":
         """Filter trades by side ('long' or 'short')."""
@@ -190,7 +231,7 @@ class TradeAnalyzer:
         for t in self.trades:
             if t.mae < 0 and t.pnl_percent < 0:
                 # Both negative: MAE was -10%, final was -5% = recovered 50%
-                recovery = (t.mae - t.pnl_percent) / abs(t.mae)
+                recovery = (t.pnl_percent - t.mae) / abs(t.mae)
                 ratios.append(recovery)
         return float(np.mean(ratios)) if ratios else 0.0
 
@@ -211,10 +252,15 @@ class TradeAnalyzer:
             "expectancy": self.expectancy,
             "largest_win": self.largest_win,
             "largest_loss": self.largest_loss,
-            "avg_return": self.avg_return,
+            "payoff_ratio": self.payoff_ratio,
             "avg_bars_held": self.avg_bars_held,
             "total_commission": self.total_commission,
             "total_slippage": self.total_slippage,
+            # Cost decomposition
+            "total_gross_pnl": self.total_gross_pnl,
+            "total_costs": self.total_costs,
+            "avg_cost_drag": self.avg_cost_drag,
+            "gross_profit_factor": self.gross_profit_factor,
             # MFE/MAE metrics
             "avg_mfe": self.avg_mfe,
             "avg_mae": self.avg_mae,

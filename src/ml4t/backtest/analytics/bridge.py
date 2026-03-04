@@ -54,7 +54,14 @@ def to_trade_record(trade: Trade) -> dict[str, Any]:
         "status": trade.status,
         "mfe": trade.mfe,
         "mae": trade.mae,
+        "entry_slippage": trade.entry_slippage,
+        "multiplier": trade.multiplier,
         "metadata": trade.metadata,
+        # Computed cost decomposition fields
+        "gross_pnl": trade.gross_pnl,
+        "net_return": trade.net_return,
+        "total_slippage_cost": trade.total_slippage_cost,
+        "cost_drag": trade.cost_drag,
         # Diagnostic-specific computed fields
         "duration": trade.exit_time - trade.entry_time,
         # Legacy field (diagnostic still expects this)

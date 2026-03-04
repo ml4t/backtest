@@ -473,6 +473,22 @@ class TestGenerateTradingMinutes:
         with pytest.raises(ValueError):
             generate_trading_minutes("NYSE", date(2024, 6, 3), date(2024, 6, 3), freq="2m")
 
+    def test_generate_trading_minutes_excludes_breaks(self):
+        """Test minute generation skips intraday exchange break windows."""
+        minutes = generate_trading_minutes(
+            "XTKS",
+            date(2025, 1, 6),
+            date(2025, 1, 6),
+            freq="30m",
+            include_close=False,
+        )
+        minute_set = set(minutes.to_list())
+
+        # XTKS lunch break is 11:30-12:30 JST (02:30-03:30 UTC)
+        assert datetime(2025, 1, 6, 3, 0, tzinfo=UTC) not in minute_set
+        assert datetime(2025, 1, 6, 2, 0, tzinfo=UTC) in minute_set
+        assert datetime(2025, 1, 6, 3, 30, tzinfo=UTC) in minute_set
+
 
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""

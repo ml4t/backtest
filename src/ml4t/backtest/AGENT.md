@@ -4,28 +4,28 @@
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| engine.py | 491 | Event loop orchestration |
-| broker.py | 1,438 | Order execution, positions, risk eval |
-| config.py | 937 | BacktestConfig, 40+ behavioral knobs |
-| result.py | 1,025 | BacktestResult container |
-| types.py | 578 | Order, Position, Fill, Trade |
-| profiles.py | 375 | 6 core + 4 strict framework profiles |
+| broker.py | 1,463 | Order execution, positions, risk eval |
+| result.py | 1,047 | BacktestResult container |
+| config.py | 848 | BacktestConfig, 40+ behavioral knobs |
 | calendar.py | 786 | Trading calendar, overnight sessions |
+| types.py | 625 | Order, Position, Fill, Trade, cost decomposition |
+| engine.py | 419 | Event loop orchestration |
+| profiles.py | 384 | 6 core + 4 strict framework profiles |
+| export.py | 312 | Result export (Parquet, YAML, JSON) |
+| sessions.py | 279 | Session handling |
+| models.py | 248 | Commission/slippage models |
 | datafeed.py | 224 | Price/signal iteration |
 | strategy.py | 28 | Strategy base class |
-| models.py | 245 | Commission/slippage models |
-| sessions.py | 279 | Session handling |
-| export.py | 312 | Result export (Parquet, YAML, JSON) |
 
 ## Subpackages
 
 | Directory | Lines | Purpose |
 |-----------|-------|---------|
-| core/ | 1,365 | Order book, execution engine, fill engine, risk engine |
-| accounting/ | 1,180 | Cash/margin/crypto policies, gatekeeper |
-| analytics/ | 917 | Metrics, equity, trades, diagnostic bridge |
-| execution/ | 1,328 | Fill executor, rebalancer, impact, limits |
-| risk/ | 1,876 | Position rules (stop/trail/TP), portfolio limits |
+| execution/ | 1,351 | Fill executor, rebalancer, impact, limits |
+| core/ | 1,314 | Order book, execution engine, fill engine, risk engine |
+| accounting/ | 1,076 | Unified account policy, gatekeeper |
+| analytics/ | 970 | Metrics, equity, trades, cost decomposition, diagnostic bridge |
+| risk/ | 1,906 | Position rules (stop/trail/TP), portfolio limits |
 | strategies/ | 417 | Strategy templates |
 
 ## Key

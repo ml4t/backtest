@@ -225,7 +225,7 @@ and 1500-bar stress tests across 9 market regimes.
 3. Focus on relative performance, not absolute returns
 
 ### For Production Readiness
-1. Validate with `Mode.REALISTIC` preset
+1. Validate with `BacktestConfig.from_preset("realistic")`
 2. Run with historical crisis periods (2008, 2020, 2022)
 3. Test with varied slippage and commission assumptions
 4. Paper trade before live deployment

@@ -717,11 +717,17 @@ def generate_trading_minutes(
         market_open = row["market_open"]
         market_close = row["market_close"]
 
-        # Generate minute timestamps
-        current = market_open
-        while current < market_close:
-            all_timestamps.append(current)
-            current = current + pd.Timedelta(minutes=freq_minutes)
+        segments = [(market_open, market_close)]
+        break_start = row.get("break_start")
+        break_end = row.get("break_end")
+        if pd.notna(break_start) and pd.notna(break_end) and market_open < break_start < break_end:
+            segments = [(market_open, break_start), (break_end, market_close)]
+
+        for segment_open, segment_close in segments:
+            current = segment_open
+            while current < segment_close:
+                all_timestamps.append(current)
+                current = current + pd.Timedelta(minutes=freq_minutes)
 
         # Optionally include close
         if include_close and (not all_timestamps or all_timestamps[-1] != market_close):

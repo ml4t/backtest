@@ -145,6 +145,12 @@ class TestBacktestResultTradesDataFrame:
             "slippage",
             "mfe",
             "mae",
+            "entry_slippage",
+            "multiplier",
+            "gross_pnl",
+            "net_return",
+            "total_slippage_cost",
+            "cost_drag",
             "exit_reason",
             "status",
         ]
@@ -740,16 +746,53 @@ class TestBacktestResultMetrics:
             num_trades=7,
             win_rate=0.57,
             profit_factor=1.8,
-            expectancy=12.0,
-            avg_trade=9.0,
-            avg_win=21.0,
-            avg_loss=-8.0,
+            expectancy=0.012,
+            avg_trade=0.009,
+            avg_win=0.021,
+            avg_loss=-0.008,
             total_fees=34.0,
         )
 
         metrics = backtest_result.compute_metrics(calendar="NYSE")
         assert metrics["num_trades"] == 7
         assert metrics["total_fees"] == 34.0
+
+    def test_to_portfolio_analysis_cme_uses_session_aligned_returns(self, monkeypatch):
+        """Portfolio analysis should use the same daily alignment logic as daily returns."""
+        import builtins
+        from datetime import UTC
+
+        from ml4t.backtest.config import BacktestConfig
+
+        class FakePortfolioAnalysis:
+            def __init__(self, returns, **kwargs):
+                self.returns = returns
+                self.kwargs = kwargs
+
+        real_import = builtins.__import__
+
+        def _import(name, *args, **kwargs):
+            if name == "ml4t.diagnostic.evaluation":
+                return SimpleNamespace(PortfolioAnalysis=FakePortfolioAnalysis)
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _import)
+
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[
+                (datetime(2025, 1, 6, 22, 30, tzinfo=UTC), 100.0),
+                (datetime(2025, 1, 6, 23, 30, tzinfo=UTC), 110.0),
+                (datetime(2025, 1, 7, 21, 0, tzinfo=UTC), 120.0),
+                (datetime(2025, 1, 7, 23, 30, tzinfo=UTC), 130.0),
+            ],
+            fills=[],
+            metrics={},
+            config=BacktestConfig(calendar="CME_Equity", timezone="America/Chicago"),
+        )
+        expected = result.to_daily_returns(calendar="CME_Equity").to_list()
+        analysis = result.to_portfolio_analysis(calendar="CME_Equity")
+        assert list(analysis.returns) == pytest.approx(expected)
 
 
 class TestBacktestResultSchemas:
@@ -796,3 +839,47 @@ class TestBacktestResultTearsheet:
             ImportError, match="ml4t-diagnostic is required for tearsheet generation"
         ):
             result.to_tearsheet()
+
+    def test_to_tearsheet_fallback_uses_total_slippage_cost(self, monkeypatch):
+        """Fallback metric extraction should report slippage in dollar cost units."""
+        import builtins
+
+        captured: dict[str, object] = {}
+
+        def _generate_backtest_tearsheet(**kwargs):
+            captured.update(kwargs)
+            return "<html></html>"
+
+        real_import = builtins.__import__
+
+        def _import(name, *args, **kwargs):
+            if name == "ml4t.diagnostic.visualization.backtest":
+                return SimpleNamespace(generate_backtest_tearsheet=_generate_backtest_tearsheet)
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _import)
+
+        trade = Trade(
+            symbol="AAPL",
+            entry_time=datetime(2024, 1, 1, 9, 30),
+            exit_time=datetime(2024, 1, 2, 9, 30),
+            entry_price=100.0,
+            exit_price=101.0,
+            quantity=10.0,
+            pnl=10.0,
+            pnl_percent=0.01,
+            bars_held=1,
+            slippage=0.20,
+            entry_slippage=0.10,
+        )
+        result = BacktestResult(
+            trades=[trade],
+            equity_curve=[(datetime(2024, 1, 1, 9, 30), 100000.0)],
+            fills=[],
+            metrics={},
+        )
+        result.to_tearsheet()
+
+        metrics = captured["metrics"]
+        assert isinstance(metrics, dict)
+        assert metrics["total_slippage"] == pytest.approx(trade.total_slippage_cost)
