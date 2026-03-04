@@ -1,4 +1,4 @@
-# risk/position/ - 909 Lines
+# risk/position/ - 940 Lines
 
 Position-level risk rules (stop-loss, trailing stop, take-profit).
 
@@ -6,7 +6,7 @@ Position-level risk rules (stop-loss, trailing stop, take-profit).
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| dynamic.py | 474 | Trailing stop, dynamic stop-loss |
+| dynamic.py | 505 | Trailing stop, dynamic stop-loss |
 | static.py | 246 | Take-profit, fixed stop-loss |
 | composite.py | 103 | Rule composition (RuleChain) |
 | signal.py | 48 | Signal-based exit rules |

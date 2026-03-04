@@ -121,7 +121,15 @@ class BacktestResult:
         Returns DataFrame with columns:
             symbol, entry_time, exit_time, entry_price, exit_price,
             quantity, direction, pnl, pnl_percent, bars_held,
-            fees, slippage, mfe, mae, exit_reason, status
+            fees, slippage, mfe, mae, entry_slippage, multiplier,
+            gross_pnl, net_return, total_slippage_cost, cost_drag,
+            exit_reason, status
+
+        Cost decomposition columns:
+            gross_pnl: Price-move P&L before fees
+            net_return: Direction-aware net return including fees
+            total_slippage_cost: Entry + exit slippage in dollars
+            cost_drag: Total cost as fraction of notional
 
         The status column indicates "closed" (actually exited) or "open"
         (mark-to-market at end of backtest).
@@ -155,6 +163,10 @@ class BacktestResult:
                     "mae": t.mae,
                     "entry_slippage": t.entry_slippage,
                     "multiplier": t.multiplier,
+                    "gross_pnl": t.gross_pnl,
+                    "net_return": t.net_return,
+                    "total_slippage_cost": t.total_slippage_cost,
+                    "cost_drag": t.cost_drag,
                     "exit_reason": t.exit_reason,
                     "status": t.status,
                 }
@@ -737,6 +749,10 @@ class BacktestResult:
             "mae": pl.Float64(),
             "entry_slippage": pl.Float64(),
             "multiplier": pl.Float64(),
+            "gross_pnl": pl.Float64(),
+            "net_return": pl.Float64(),
+            "total_slippage_cost": pl.Float64(),
+            "cost_drag": pl.Float64(),
             "exit_reason": pl.String(),
             "status": pl.String(),  # "closed" or "open"
         }

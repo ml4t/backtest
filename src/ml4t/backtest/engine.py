@@ -287,12 +287,19 @@ class Engine:
             "cagr": equity.cagr,
             "volatility": equity.volatility,
             "profit_factor": trade_analyzer.profit_factor,
+            # Per-trade return metrics (percentage-based, direction-aware)
             "expectancy": trade_analyzer.expectancy,
             "avg_trade": trade_analyzer.avg_trade,
             "avg_win": trade_analyzer.avg_win,
             "avg_loss": trade_analyzer.avg_loss,
             "largest_win": trade_analyzer.largest_win,
             "largest_loss": trade_analyzer.largest_loss,
+            "payoff_ratio": trade_analyzer.payoff_ratio,
+            # Cost decomposition
+            "total_gross_pnl": trade_analyzer.total_gross_pnl,
+            "total_costs": trade_analyzer.total_costs,
+            "avg_cost_drag": trade_analyzer.avg_cost_drag,
+            "gross_profit_factor": trade_analyzer.gross_profit_factor,
             # Calendar enforcement
             "skipped_bars": self._skipped_bars,
         }

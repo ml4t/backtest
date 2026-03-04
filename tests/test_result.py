@@ -147,6 +147,10 @@ class TestBacktestResultTradesDataFrame:
             "mae",
             "entry_slippage",
             "multiplier",
+            "gross_pnl",
+            "net_return",
+            "total_slippage_cost",
+            "cost_drag",
             "exit_reason",
             "status",
         ]
@@ -742,10 +746,10 @@ class TestBacktestResultMetrics:
             num_trades=7,
             win_rate=0.57,
             profit_factor=1.8,
-            expectancy=12.0,
-            avg_trade=9.0,
-            avg_win=21.0,
-            avg_loss=-8.0,
+            expectancy=0.012,
+            avg_trade=0.009,
+            avg_win=0.021,
+            avg_loss=-0.008,
             total_fees=34.0,
         )
 

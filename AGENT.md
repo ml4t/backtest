@@ -6,31 +6,36 @@ Event-driven backtesting engine with cross-framework parity validation.
 
 | Directory | Purpose |
 |-----------|---------|
-| src/ml4t/backtest/ | Package root (~14.3k lines, 40 modules) |
-| tests/ | 1,083 tests |
+| src/ml4t/backtest/ | Package root (~13.8k lines, 40 modules) |
+| tests/ | 1,367 tests |
 | validation/ | Cross-framework parity (VBT, Backtrader, Zipline, LEAN) |
 
 ## Key Modules
 
 | Module | Lines | Purpose |
 |--------|-------|---------|
-| engine.py | 491 | Event loop orchestration |
-| broker.py | 1,438 | Order execution, positions |
-| config.py | 937 | BacktestConfig (40+ knobs) |
-| result.py | 1,025 | BacktestResult container |
-| types.py | 578 | Order, Position, Fill, Trade |
-| profiles.py | 375 | 6 core + 4 strict profiles |
+| broker.py | 1,463 | Order execution, positions |
+| result.py | 1,047 | BacktestResult container |
+| config.py | 848 | BacktestConfig (40+ knobs) |
 | calendar.py | 786 | Trading calendar, sessions |
+| types.py | 625 | Order, Position, Fill, Trade, cost decomposition |
+| engine.py | 419 | Event loop orchestration |
+| profiles.py | 384 | 6 core + 4 strict profiles |
+| export.py | 312 | Result export (Parquet, YAML, JSON) |
+| sessions.py | 279 | Session handling |
+| models.py | 248 | Commission/slippage models |
+| datafeed.py | 224 | Price/signal iteration |
+| strategy.py | 28 | Strategy base class |
 
 ## Subpackages
 
 | Directory | Lines | Purpose |
 |-----------|-------|---------|
-| core/ | 1,365 | Order book, execution engine, fill engine, risk engine |
-| accounting/ | 1,180 | Cash/margin policies, gatekeeper |
-| analytics/ | 917 | Metrics, equity, trades, diagnostic bridge |
-| execution/ | 1,328 | Fill executor, rebalancer, impact |
-| risk/ | 1,876 | Position rules, portfolio limits |
+| execution/ | 1,351 | Fill executor, rebalancer, impact |
+| core/ | 1,314 | Order book, execution engine, fill engine, risk engine |
+| accounting/ | 1,076 | Cash/margin policies, gatekeeper |
+| analytics/ | 970 | Metrics, equity, trades, cost decomposition, diagnostic bridge |
+| risk/ | 1,906 | Position rules, portfolio limits |
 | strategies/ | 417 | Strategy templates |
 
 ## Entry Point
