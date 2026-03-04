@@ -679,8 +679,8 @@ class BacktestConfig:
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
             short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
             # Execution
-            execution_price=ExecutionPrice(exec_cfg.get("execution_price", "close")),
-            execution_mode=ExecutionMode(exec_cfg.get("execution_mode", "same_bar")),
+            execution_price=ExecutionPrice(exec_cfg.get("execution_price", "open")),
+            execution_mode=ExecutionMode(exec_cfg.get("execution_mode", "next_bar")),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),
@@ -718,7 +718,7 @@ class BacktestConfig:
             next_bar_simple_cash_check=order_cfg.get("next_bar_simple_cash_check", False),
             buying_power_reservation=order_cfg.get("buying_power_reservation", False),
             immediate_fill=order_cfg.get("immediate_fill", False),
-            rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "snapshot")),
+            rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "incremental")),
             rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
             missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),
             late_asset_policy=LateAssetPolicy(order_cfg.get("late_asset_policy", "allow")),
