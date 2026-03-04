@@ -161,25 +161,31 @@ class TargetWeightExecutor:
                 scale = self.config.max_gross_leverage / gross_weight
                 target_weights = {k: v * scale for k, v in target_weights.items()}
 
-        # 4. Process each target asset
+        # 4. Build deterministic execution order:
+        # first reduce exposure (sells), then add exposure (buys).
+        reducing_assets: list[str] = []
+        increasing_assets: list[str] = []
         for asset, target_wt in target_weights.items():
-            order: Order | None = self._process_asset(
-                asset, target_wt, current_weights, equity, data, broker
-            )
+            current_wt = current_weights.get(asset, 0.0)
+            if target_wt - current_wt < 0:
+                reducing_assets.append(asset)
+            else:
+                increasing_assets.append(asset)
+
+        # 5. Process reductions for target assets first (frees cash for buys).
+        for asset in reducing_assets:
+            target_wt = target_weights[asset]
+            order = self._process_asset(asset, target_wt, current_weights, equity, data, broker)
             if order is not None:
                 orders.append(order)
-
-            # INCREMENTAL / HYBRID: fill after each asset
             if mode in (RebalanceMode.INCREMENTAL, RebalanceMode.HYBRID) and order is not None:
                 broker._process_orders()
-
-                # INCREMENTAL: recompute equity and weights from updated state
                 if mode == RebalanceMode.INCREMENTAL:
                     equity = broker.get_account_value()
                     current_weights = self._get_current_weights(broker, data)
 
-        # 5. Close positions not in target
-        for asset in current_weights:
+        # 6. Close positions not in target before processing buy-side targets.
+        for asset in list(current_weights):
             if asset not in target_weights:
                 pos = broker.get_position(asset)
                 if pos and pos.quantity != 0:
@@ -192,6 +198,19 @@ class TargetWeightExecutor:
                         broker._process_orders()
                         if mode == RebalanceMode.INCREMENTAL:
                             equity = broker.get_account_value()
+                            current_weights = self._get_current_weights(broker, data)
+
+        # 7. Process increases for target assets.
+        for asset in increasing_assets:
+            target_wt = target_weights[asset]
+            order = self._process_asset(asset, target_wt, current_weights, equity, data, broker)
+            if order is not None:
+                orders.append(order)
+            if mode in (RebalanceMode.INCREMENTAL, RebalanceMode.HYBRID) and order is not None:
+                broker._process_orders()
+                if mode == RebalanceMode.INCREMENTAL:
+                    equity = broker.get_account_value()
+                    current_weights = self._get_current_weights(broker, data)
 
         return orders
 
@@ -223,7 +242,7 @@ class TargetWeightExecutor:
 
         # Get price
         price = data.get(asset, {}).get("close")
-        if not price or price <= 0:
+        if price is None or price <= 0:
             return None
 
         # Compute trade value
@@ -307,7 +326,7 @@ class TargetWeightExecutor:
         # Add net value of pending orders
         for order in broker.pending_orders:
             price = order.limit_price or data.get(order.asset, {}).get("close")
-            if price:
+            if price is not None and price > 0:
                 multiplier = broker.get_multiplier(order.asset)
                 # BUY adds value, SELL subtracts
                 sign = 1 if order.side == OrderSide.BUY else -1

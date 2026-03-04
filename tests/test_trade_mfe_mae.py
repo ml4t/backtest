@@ -124,15 +124,9 @@ class TestTradeAnalyzerMfeMae:
         """Test MAE recovery ratio for losing trades."""
         analyzer = TradeAnalyzer(sample_trades)
         # Only losing trade (GOOG): MAE=-0.08, final=-0.05
-        # Recovery = (-0.08 - -0.05) / |-0.08| = -0.03 / 0.08 = -0.375
-        # Wait, that formula gives negative. Let me recalculate.
-        # Recovery = (MAE - final_loss) / |MAE| = (-0.08 - (-0.05)) / 0.08 = -0.03/0.08 = -0.375
-        # This means the loss got worse from MAE. Hmm, the formula may need adjustment.
-        # Actually MAE is the worst point, so final should be >= MAE (less negative)
-        # Let's check: MAE=-0.08 (worst), final=-0.05 (better)
-        # Recovery should be positive: recovered 3% out of 8% drawdown
+        # Recovery = (final - MAE) / |MAE| = (-0.05 - -0.08) / 0.08 = 0.375
         ratio = analyzer.mae_recovery_ratio
-        assert ratio is not None  # At least it computes
+        assert ratio == pytest.approx(0.375)
 
     def test_empty_trades(self):
         """Test MFE/MAE methods with empty trades."""

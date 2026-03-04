@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 from ml4t.backtest.broker import Broker
-from ml4t.backtest.models import NoCommission, NoSlippage
+from ml4t.backtest.models import NoCommission, NoSlippage, PercentageCommission
 from ml4t.backtest.types import (
     ExecutionMode,
     Order,
@@ -758,6 +758,55 @@ class TestBrokerEdgeCases:
         # Entry price should be weighted average: (100*150 + 50*160) / 150 = 153.33
         expected_entry = (100 * 150.0 + 50 * 160.0) / 150
         assert abs(pos.entry_price - expected_entry) < 0.01
+
+    def test_position_scaling_up_accumulates_entry_commission(self):
+        """Scale-ins should include all entry-side commissions in final trade PnL."""
+        broker = Broker(
+            initial_cash=1000.0,
+            commission_model=PercentageCommission(0.01),
+            slippage_model=NoSlippage(),
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 10.0},
+            opens={"AAPL": 10.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 10.0},
+            lows={"AAPL": 10.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 10.0, OrderSide.BUY)
+        broker._process_orders()
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 10.0},
+            opens={"AAPL": 10.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 10.0},
+            lows={"AAPL": 10.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 10.0, OrderSide.BUY)
+        broker._process_orders()
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3, 9, 30),
+            prices={"AAPL": 10.0},
+            opens={"AAPL": 10.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 10.0},
+            lows={"AAPL": 10.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 20.0, OrderSide.SELL)
+        broker._process_orders()
+
+        assert len(broker.trades) == 1
+        trade = broker.trades[0]
+        assert trade.fees == pytest.approx(4.0)
+        assert trade.pnl == pytest.approx(-4.0)
 
     def test_position_scaling_down_short(self):
         """Test adding to short position (scaling down)."""

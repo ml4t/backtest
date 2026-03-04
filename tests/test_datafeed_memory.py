@@ -230,3 +230,22 @@ class TestDataFeedEdgeCases:
         ts, data, ctx = next(iter(feed))
         assert ts == datetime(2020, 1, 1)
         assert data["AAPL"]["close"] == 100.5
+
+    def test_zero_close_is_kept_in_price_view(self):
+        """A valid zero close should still be available to broker price views."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "asset": ["AAPL"],
+                "open": [0.0],
+                "high": [0.0],
+                "low": [0.0],
+                "close": [0.0],
+                "volume": [1_000_000],
+            }
+        )
+        feed = DataFeed(prices_df=prices)
+
+        _ts, data, _ctx = next(iter(feed))
+        assert data["AAPL"]["close"] == 0.0
+        assert data._prices["AAPL"] == 0.0

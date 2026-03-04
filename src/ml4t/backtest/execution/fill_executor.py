@@ -494,6 +494,13 @@ class FillExecutor:
             # Scaling up - recalculate average entry price
             total_cost = pos.entry_price * abs(old_qty) + ctx.fill_price * abs(ctx.signed_qty)
             pos.entry_price = total_cost / abs(new_qty)
+            # Accumulate entry-side costs so eventual close trade includes all entry legs.
+            pos.entry_commission += ctx.commission
+            if abs(new_qty) > 0:
+                total_entry_slippage = pos.entry_slippage * abs(old_qty) + ctx.slippage * abs(
+                    ctx.signed_qty
+                )
+                pos.entry_slippage = total_entry_slippage / abs(new_qty)
 
         pos.quantity = new_qty
 

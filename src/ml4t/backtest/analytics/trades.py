@@ -231,7 +231,7 @@ class TradeAnalyzer:
         for t in self.trades:
             if t.mae < 0 and t.pnl_percent < 0:
                 # Both negative: MAE was -10%, final was -5% = recovered 50%
-                recovery = (t.mae - t.pnl_percent) / abs(t.mae)
+                recovery = (t.pnl_percent - t.mae) / abs(t.mae)
                 ratios.append(recovery)
         return float(np.mean(ratios)) if ratios else 0.0
 

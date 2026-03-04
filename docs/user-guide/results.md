@@ -239,6 +239,47 @@ result = BacktestResult.from_parquet("./results/my_backtest")
 
 ## Integration with ml4t-diagnostic
 
+### Portfolio Analysis (Recommended)
+
+The simplest way to bridge backtest results into ml4t-diagnostic is `to_portfolio_analysis()`:
+
+```python
+from ml4t.backtest import Engine
+
+result = engine.run()
+
+# One-liner bridge to ml4t-diagnostic
+analysis = result.to_portfolio_analysis(calendar="NYSE")
+
+# Now use PortfolioAnalysis methods
+print(f"Sharpe: {analysis.sharpe_ratio():.2f}")
+print(f"Max DD: {analysis.max_drawdown():.2%}")
+monthly = analysis.compute_monthly_returns()
+```
+
+The method extracts daily returns via `to_daily_pnl()` and sets `periods_per_year` from the calendar (252 for NYSE, 365 for crypto, etc.). If no calendar is passed, it uses the config's calendar.
+
+```python
+# Crypto backtest
+analysis = result.to_portfolio_analysis(calendar="crypto")
+
+# With benchmark
+analysis = result.to_portfolio_analysis(
+    calendar="NYSE",
+    benchmark=spy_returns,  # numpy array or Polars Series
+)
+
+# Gross vs net comparison
+analysis_gross = results_gross.to_portfolio_analysis(calendar="crypto")
+analysis_net = results_net.to_portfolio_analysis(calendar="crypto")
+```
+
+!!! note "Requires ml4t-diagnostic"
+    Install with `pip install ml4t-diagnostic`. The import is deferred so ml4t-backtest
+    works standalone without ml4t-diagnostic installed.
+
+### Trade Records
+
 Convert trades to TradeRecord format for the diagnostic library:
 
 ```python
@@ -251,6 +292,40 @@ records = to_trade_records(result.trades)
 ```
 
 The bridge exports all cost decomposition fields (`gross_pnl`, `net_return`, `total_slippage_cost`, `cost_drag`) for diagnostic analysis.
+
+### Full Tearsheet
+
+Pass all result data for the richest tearsheet (up to 24 sections):
+
+```python
+from ml4t.diagnostic.visualization.backtest import generate_backtest_tearsheet
+
+html = generate_backtest_tearsheet(
+    trades=result.to_trades_dataframe(),
+    returns=analysis.returns,
+    equity_curve=result.to_equity_dataframe(),
+    metrics=result.metrics,
+    template="full",
+    title="My Strategy — Full Report",
+    output_path="tearsheet.html",
+)
+```
+
+#### Metrics Keys That Enable Tearsheet Sections
+
+The `metrics` dict controls which tearsheet sections render. Sections gracefully degrade when keys are missing.
+
+| Section | Required Metrics Keys |
+|---------|----------------------|
+| Executive Summary | `sharpe_ratio`, `max_drawdown`, `win_rate`, `profit_factor`, `n_trades`, `cagr`, `volatility`, `expectancy` |
+| Cost Attribution | `gross_pnl`, `commission`, `slippage` |
+| Statistical Validity (DSR) | `dsr_probability`, `dsr_significant`, `min_trl`, `current_trl`, `trl_sufficient` |
+| RAS Adjustment | `ras_adjusted_ic`, `ras_significant`, `original_ic`, `rademacher_complexity` |
+| Confidence Intervals | `sharpe_ratio`, `sharpe_ratio_lower_95`, `sharpe_ratio_upper_95` (similarly for other metrics) |
+| Haircut Sharpe | `sharpe`, `n_periods` or `n_observations` |
+| Expected Max Sharpe | `expected_max_sharpe` |
+
+Sections that depend only on `trades` (trade analysis, MFE/MAE, exit reasons) or `returns` (drawdown, monthly heatmap, rolling Sharpe) require no special metrics keys.
 
 ## Config Preservation
 
@@ -265,8 +340,8 @@ print(result.config.preset_name)
 
 The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses BacktestResult in every case study:
 
-- **Ch16 / NB05** (`performance_reporting`) — comprehensive metrics extraction, equity curve visualization, trade analysis
-- **Ch16 case studies** — all cases call `result.to_daily_returns(calendar="NYSE")` for integration with ml4t-diagnostic signal analysis
+- **Ch16 / NB05** (`performance_reporting`) — `to_portfolio_analysis()`, MFE/MAE analysis, gross vs net comparison, full 24-section tearsheet
+- **Ch16 case studies** — all cases save trade artifacts via `to_parquet()` and pass trades/metrics/equity to tearsheet generation
 - **Ch16 / NB06** (`sharpe_ratio_inference`) — statistical inference on backtest results
 
 ## Next Steps

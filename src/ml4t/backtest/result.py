@@ -377,6 +377,72 @@ class BacktestResult:
 
         return to_trade_records(self.trades)
 
+    def to_portfolio_analysis(
+        self,
+        calendar: str | None = None,
+        benchmark: Any = None,
+    ) -> Any:
+        """Create a PortfolioAnalysis with properly aligned dates.
+
+        This is the recommended bridge from backtest results to
+        ml4t-diagnostic analysis. It extracts daily returns with dates
+        and creates a PortfolioAnalysis with the correct annualization.
+
+        Args:
+            calendar: Trading calendar for annualization and session alignment.
+                - "crypto": 365 days/year (24/7)
+                - "NYSE", "NASDAQ": 252 days/year
+                - Any pandas_market_calendars calendar
+                If None, uses config calendar or defaults to 252.
+            benchmark: Optional benchmark returns (pl.Series, np.ndarray,
+                or list) for alpha/beta calculation.
+
+        Returns:
+            PortfolioAnalysis instance from ml4t.diagnostic
+
+        Raises:
+            ImportError: If ml4t-diagnostic is not installed
+
+        Example:
+            >>> result = engine.run()
+            >>> analysis = result.to_portfolio_analysis(calendar="crypto")
+            >>> stats = analysis.compute_summary_stats()
+            >>> print(f"Sharpe: {stats.sharpe_ratio:.2f}")
+        """
+        try:
+            from ml4t.diagnostic.evaluation import PortfolioAnalysis
+        except ImportError as e:
+            raise ImportError(
+                "ml4t-diagnostic is required for to_portfolio_analysis(). "
+                "Install with: pip install ml4t-diagnostic"
+            ) from e
+
+        # Determine calendar and annualization
+        cal = calendar or (self.config.calendar if self.config else None)
+        periods_per_year = _get_annualization_factor(cal)
+        session_aligned = cal is not None and "CME" in str(cal).upper()
+
+        # Extract daily returns with dates
+        daily_df = self.to_daily_pnl(session_aligned=session_aligned)
+        if daily_df.is_empty():
+            import numpy as np
+
+            return PortfolioAnalysis(
+                returns=np.array([]),
+                periods_per_year=periods_per_year,
+            )
+
+        date_col = "date" if "date" in daily_df.columns else "session_date"
+        dates = daily_df[date_col].to_list()
+        returns = daily_df["return_pct"].to_numpy()
+
+        return PortfolioAnalysis(
+            returns=returns,
+            dates=dates,
+            benchmark=benchmark,
+            periods_per_year=periods_per_year,
+        )
+
     def compute_metrics(
         self,
         calendar: str | None = None,
@@ -852,7 +918,7 @@ class BacktestResult:
         if "total_commission" not in tearsheet_metrics and self.trades:
             tearsheet_metrics["total_commission"] = sum(t.fees for t in self.trades)
         if "total_slippage" not in tearsheet_metrics and self.trades:
-            tearsheet_metrics["total_slippage"] = sum(t.slippage for t in self.trades)
+            tearsheet_metrics["total_slippage"] = sum(t.total_slippage_cost for t in self.trades)
 
         # Extract equity curve for portfolio-level charts
         equity_df = self.to_equity_dataframe() if self.equity_curve else None

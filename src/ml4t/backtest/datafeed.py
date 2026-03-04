@@ -192,7 +192,7 @@ class DataFeed:
                     "volume": volume,
                     "signals": {},
                 }
-                if close:
+                if close is not None:
                     assets_data._prices[asset] = close
                 assets_data._opens[asset] = open_
                 assets_data._highs[asset] = high

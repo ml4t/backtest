@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from .analytics import EquityCurve, TradeAnalyzer
-from .analytics.metrics import calmar_ratio, sharpe_ratio, sortino_ratio
+from .analytics.metrics import calmar_ratio
 from .broker import Broker
 from .datafeed import DataFeed
 from .strategy import Strategy
@@ -281,8 +281,8 @@ class Engine:
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(f.slippage for f in self.broker.fills),
             # Additional metrics
-            "sharpe": sharpe_ratio(equity.returns),
-            "sortino": sortino_ratio(equity.returns),
+            "sharpe": equity.sharpe,
+            "sortino": equity.sortino,
             "calmar": calmar_ratio(equity.cagr, equity.max_dd),
             "cagr": equity.cagr,
             "volatility": equity.volatility,
