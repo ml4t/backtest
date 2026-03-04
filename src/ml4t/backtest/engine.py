@@ -230,9 +230,14 @@ class Engine:
                 # Get last known price for this asset
                 last_price = self.broker._current_prices.get(asset, pos.entry_price)
 
-                # Calculate mark-to-market PnL
-                pnl = (last_price - pos.entry_price) * pos.quantity - pos.entry_commission
-                pnl_pct = (last_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
+                # Calculate mark-to-market PnL (include multiplier for futures)
+                pnl = (
+                    last_price - pos.entry_price
+                ) * pos.quantity * pos.multiplier - pos.entry_commission
+                raw_pct = (
+                    (last_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
+                )
+                pnl_pct = raw_pct if pos.quantity > 0 else -raw_pct
 
                 open_trade = Trade(
                     symbol=asset,  # Asset identifier (Position.asset -> Trade.symbol)
@@ -250,6 +255,8 @@ class Engine:
                     status="open",
                     mfe=pos.max_favorable_excursion,
                     mae=pos.max_adverse_excursion,
+                    entry_slippage=pos.entry_slippage,
+                    multiplier=pos.multiplier,
                 )
                 all_trades.append(open_trade)
 

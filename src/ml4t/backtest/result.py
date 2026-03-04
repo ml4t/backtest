@@ -153,6 +153,8 @@ class BacktestResult:
                     "slippage": t.slippage,
                     "mfe": t.mfe,
                     "mae": t.mae,
+                    "entry_slippage": t.entry_slippage,
+                    "multiplier": t.multiplier,
                     "exit_reason": t.exit_reason,
                     "status": t.status,
                 }
@@ -664,6 +666,8 @@ class BacktestResult:
                         exit_reason=row.get("exit_reason", "signal"),
                         mfe=row["mfe"],
                         mae=row["mae"],
+                        entry_slippage=row.get("entry_slippage", 0.0),
+                        multiplier=row.get("multiplier", 1.0),
                     )
                 )
 
@@ -731,6 +735,8 @@ class BacktestResult:
             "slippage": pl.Float64(),
             "mfe": pl.Float64(),
             "mae": pl.Float64(),
+            "entry_slippage": pl.Float64(),
+            "multiplier": pl.Float64(),
             "exit_reason": pl.String(),
             "status": pl.String(),  # "closed" or "open"
         }

@@ -145,6 +145,8 @@ class TestBacktestResultTradesDataFrame:
             "slippage",
             "mfe",
             "mae",
+            "entry_slippage",
+            "multiplier",
             "exit_reason",
             "status",
         ]

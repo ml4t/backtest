@@ -322,6 +322,7 @@ class FillExecutor:
             context=context,
             multiplier=broker.get_multiplier(order.asset),
             entry_commission=ctx.commission,
+            entry_slippage=ctx.slippage,
             high_water_mark=initial_hwm,
             low_water_mark=initial_lwm,
         )
@@ -342,7 +343,8 @@ class FillExecutor:
         # PnL includes both entry and exit commission, and multiplier for futures
         total_commission = pos.entry_commission + ctx.commission
         pnl = (ctx.fill_price - pos.entry_price) * old_qty * pos.multiplier - total_commission
-        pnl_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
+        raw_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
+        pnl_pct = raw_pct if old_qty > 0 else -raw_pct
 
         trade = Trade(
             symbol=order.asset,  # Order.asset -> Trade.symbol
@@ -359,6 +361,8 @@ class FillExecutor:
             exit_reason=_get_exit_reason(order),
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
+            entry_slippage=pos.entry_slippage,
+            multiplier=pos.multiplier,
         )
         broker.trades.append(trade)
         del broker.positions[order.asset]
@@ -394,7 +398,8 @@ class FillExecutor:
         # Close the old position (include multiplier for futures)
         total_close_commission = pos.entry_commission + close_commission
         pnl = (ctx.fill_price - pos.entry_price) * old_qty * pos.multiplier - total_close_commission
-        pnl_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0
+        raw_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
+        pnl_pct = raw_pct if old_qty > 0 else -raw_pct
 
         trade = Trade(
             symbol=order.asset,  # Order.asset -> Trade.symbol
@@ -411,6 +416,8 @@ class FillExecutor:
             exit_reason=_get_exit_reason(order),
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
+            entry_slippage=pos.entry_slippage,
+            multiplier=pos.multiplier,
         )
         broker.trades.append(trade)
 
@@ -430,6 +437,7 @@ class FillExecutor:
             context=context,
             multiplier=broker.get_multiplier(order.asset),
             entry_commission=open_commission,
+            entry_slippage=ctx.slippage * (open_qty / ctx.fill_quantity),
             high_water_mark=initial_hwm,
             low_water_mark=initial_lwm,
         )

@@ -127,8 +127,8 @@ class TradeAnalyzer:
 
     @property
     def total_slippage(self) -> float:
-        """Total slippage cost across all trades."""
-        return sum(t.slippage for t in self.trades)
+        """Total slippage cost across all trades (entry + exit)."""
+        return sum(t.total_slippage_cost for t in self.trades)
 
     def by_side(self, side: str) -> "TradeAnalyzer":
         """Filter trades by side ('long' or 'short')."""
