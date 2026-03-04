@@ -89,7 +89,7 @@ def _run_ml4t_scenario(scenario_config):
 
     gen_result = gen_fn(**scenario_config.data_kwargs)
     prices_df = gen_result[0]  # pandas DataFrame
-    entries = gen_result[1]     # numpy boolean array
+    entries = gen_result[1]  # numpy boolean array
     exits = gen_result[2] if len(gen_result) > 2 else None
 
     asset = "ASSET"
@@ -102,15 +102,17 @@ def _run_ml4t_scenario(scenario_config):
         else:
             timestamps.append(ts)
 
-    prices_pl = pl.DataFrame({
-        "timestamp": timestamps,
-        "asset": [asset] * len(prices_df),
-        "open": prices_df["open"].tolist(),
-        "high": prices_df["high"].tolist(),
-        "low": prices_df["low"].tolist(),
-        "close": prices_df["close"].tolist(),
-        "volume": prices_df["volume"].astype(float).tolist(),
-    })
+    prices_pl = pl.DataFrame(
+        {
+            "timestamp": timestamps,
+            "asset": [asset] * len(prices_df),
+            "open": prices_df["open"].tolist(),
+            "high": prices_df["high"].tolist(),
+            "low": prices_df["low"].tolist(),
+            "close": prices_df["close"].tolist(),
+            "volume": prices_df["volume"].astype(float).tolist(),
+        }
+    )
 
     # Build signals
     signals_dict = {
@@ -172,7 +174,11 @@ def _run_ml4t_scenario(scenario_config):
                     broker.submit_order(asset, scenario_config.shares, side)
                     if strategy_type == "single_entry":
                         self._entered = True
-                if strategy_type == "single_entry" and sigs.get("exit") and broker.get_position(asset):
+                if (
+                    strategy_type == "single_entry"
+                    and sigs.get("exit")
+                    and broker.get_position(asset)
+                ):
                     broker.close_position(asset)
 
     # Build config

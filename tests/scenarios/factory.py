@@ -15,6 +15,7 @@ import polars as pl
 @dataclass(frozen=True)
 class ExpectedResult:
     """Analytically computed expected values for a round-trip trade."""
+
     direction: str
     entry_price: float
     exit_price: float
@@ -29,6 +30,7 @@ class ExpectedResult:
 @dataclass
 class Scenario:
     """Complete test scenario with prices and expected results."""
+
     name: str
     prices_df: pl.DataFrame
     expected: ExpectedResult
@@ -105,15 +107,17 @@ def make_round_trip(
     # All bars at entry_price except exit bar at exit_price
     closes = [entry_price, (entry_price + exit_price) / 2, exit_price]
 
-    prices_df = pl.DataFrame({
-        "timestamp": timestamps,
-        "asset": [asset] * 3,
-        "open": closes,
-        "high": closes,
-        "low": closes,
-        "close": closes,
-        "volume": [1_000_000.0] * 3,
-    })
+    prices_df = pl.DataFrame(
+        {
+            "timestamp": timestamps,
+            "asset": [asset] * 3,
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": [1_000_000.0] * 3,
+        }
+    )
 
     expected = ExpectedResult(
         direction=direction,

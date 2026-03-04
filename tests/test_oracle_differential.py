@@ -29,11 +29,11 @@ from .oracle.engine import OracleBar, OracleFillRule, OracleSignal, run_oracle
 
 DIRECTIONS = ["long", "short"]
 PRICE_PAIRS = [
-    (100.0, 110.0),   # Up 10%
-    (100.0, 90.0),    # Down 10%
-    (100.0, 100.0),   # Flat
-    (50.0, 75.0),     # Up 50%
-    (200.0, 180.0),   # Down 10%
+    (100.0, 110.0),  # Up 10%
+    (100.0, 90.0),  # Down 10%
+    (100.0, 100.0),  # Flat
+    (50.0, 75.0),  # Up 50%
+    (200.0, 180.0),  # Down 10%
 ]
 COMMISSION_RATES = [0.0, 0.001, 0.005]
 QUANTITIES = [100.0]
@@ -92,7 +92,11 @@ def test_round_trip_matches_oracle(direction, price_pair, commission_rate):
     )
     feed = DataFeed(prices_df=prices_df)
     strategy = RoundTripStrategy(
-        asset="TEST", qty=qty, entry_bar=0, exit_bar=2, direction=direction,
+        asset="TEST",
+        qty=qty,
+        entry_bar=0,
+        exit_bar=2,
+        direction=direction,
     )
     engine = Engine(feed, strategy, config)
     sut_result = engine.run()

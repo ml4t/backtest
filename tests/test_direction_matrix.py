@@ -62,7 +62,11 @@ def _run_round_trip(
 
     feed = DataFeed(prices_df=prices_df)
     strategy = RoundTripStrategy(
-        asset="TEST", qty=qty, entry_bar=entry_bar, exit_bar=exit_bar, direction=direction,
+        asset="TEST",
+        qty=qty,
+        entry_bar=entry_bar,
+        exit_bar=exit_bar,
+        direction=direction,
     )
 
     engine = Engine(feed, strategy, config)
@@ -245,14 +249,14 @@ class TestRiskRulesDirectional:
             # Entry at 100, drops to 90 (10% loss)
             bars = [
                 (100.0, 100.0, 100.0, 100.0),  # Entry bar
-                (99.0, 99.0, 89.0, 92.0),       # SL triggers (low=89 < 95)
-                (92.0, 93.0, 91.0, 92.5),       # Should already be out
+                (99.0, 99.0, 89.0, 92.0),  # SL triggers (low=89 < 95)
+                (92.0, 93.0, 91.0, 92.5),  # Should already be out
             ]
         else:
             # Entry at 100, rises to 110 (10% loss for short)
             bars = [
                 (100.0, 100.0, 100.0, 100.0),
-                (101.0, 111.0, 101.0, 108.0),   # SL triggers (high=111 > 105)
+                (101.0, 111.0, 101.0, 108.0),  # SL triggers (high=111 > 105)
                 (108.0, 109.0, 107.0, 107.5),
             ]
 
@@ -261,7 +265,11 @@ class TestRiskRulesDirectional:
         sl = StopLoss(pct=0.05)
 
         result = _run_round_trip(
-            prices, direction, exit_bar=99, risk_rules=[sl], config=config,
+            prices,
+            direction,
+            exit_bar=99,
+            risk_rules=[sl],
+            config=config,
         )
 
         closed = [t for t in result.trades if t.status == "closed"]
@@ -276,13 +284,13 @@ class TestRiskRulesDirectional:
         if direction == "long":
             bars = [
                 (100.0, 100.0, 100.0, 100.0),
-                (101.0, 112.0, 101.0, 108.0),   # TP triggers (high=112 > 110)
+                (101.0, 112.0, 101.0, 108.0),  # TP triggers (high=112 > 110)
                 (108.0, 109.0, 107.0, 108.0),
             ]
         else:
             bars = [
                 (100.0, 100.0, 100.0, 100.0),
-                (99.0, 99.0, 88.0, 92.0),       # TP triggers (low=88 < 90)
+                (99.0, 99.0, 88.0, 92.0),  # TP triggers (low=88 < 90)
                 (92.0, 93.0, 91.0, 92.0),
             ]
 
@@ -291,7 +299,11 @@ class TestRiskRulesDirectional:
         tp = TakeProfit(pct=0.10)
 
         result = _run_round_trip(
-            prices, direction, exit_bar=99, risk_rules=[tp], config=config,
+            prices,
+            direction,
+            exit_bar=99,
+            risk_rules=[tp],
+            config=config,
         )
 
         closed = [t for t in result.trades if t.status == "closed"]
@@ -305,15 +317,15 @@ class TestRiskRulesDirectional:
         """Trailing stop should track HWM/LWM and trigger on reversal."""
         if direction == "long":
             bars = [
-                (100.0, 100.0, 100.0, 100.0),   # Entry
-                (101.0, 112.0, 101.0, 110.0),   # HWM = 110 (close)
-                (109.0, 109.0, 103.0, 104.0),   # Trail triggers: 103 < 110*(1-0.05)=104.5
+                (100.0, 100.0, 100.0, 100.0),  # Entry
+                (101.0, 112.0, 101.0, 110.0),  # HWM = 110 (close)
+                (109.0, 109.0, 103.0, 104.0),  # Trail triggers: 103 < 110*(1-0.05)=104.5
             ]
         else:
             bars = [
-                (100.0, 100.0, 100.0, 100.0),   # Entry
-                (99.0, 99.0, 88.0, 90.0),       # LWM = 90 (close)
-                (91.0, 97.0, 91.0, 96.0),       # Trail triggers: 97 > 90*(1+0.05)=94.5
+                (100.0, 100.0, 100.0, 100.0),  # Entry
+                (99.0, 99.0, 88.0, 90.0),  # LWM = 90 (close)
+                (91.0, 97.0, 91.0, 96.0),  # Trail triggers: 97 > 90*(1+0.05)=94.5
             ]
 
         config = _short_config()
@@ -321,7 +333,11 @@ class TestRiskRulesDirectional:
         ts = TrailingStop(pct=0.05)
 
         result = _run_round_trip(
-            prices, direction, exit_bar=99, risk_rules=[ts], config=config,
+            prices,
+            direction,
+            exit_bar=99,
+            risk_rules=[ts],
+            config=config,
         )
 
         closed = [t for t in result.trades if t.status == "closed"]
@@ -418,14 +434,14 @@ class TestStopFillModeDirectional:
         if direction == "long":
             bars = [
                 (100.0, 100.0, 100.0, 100.0),
-                (99.0, 99.0, 93.0, 95.0),       # SL triggers
-                (95.0, 95.0, 94.0, 94.5),       # Next bar for NEXT_BAR_OPEN
+                (99.0, 99.0, 93.0, 95.0),  # SL triggers
+                (95.0, 95.0, 94.0, 94.5),  # Next bar for NEXT_BAR_OPEN
                 (94.5, 95.0, 94.0, 94.5),
             ]
         else:
             bars = [
                 (100.0, 100.0, 100.0, 100.0),
-                (101.0, 107.0, 101.0, 105.0),   # SL triggers
+                (101.0, 107.0, 101.0, 105.0),  # SL triggers
                 (105.0, 106.0, 104.0, 105.5),
                 (105.5, 106.0, 105.0, 105.5),
             ]
@@ -435,7 +451,11 @@ class TestStopFillModeDirectional:
         sl = StopLoss(pct=0.05)
 
         result = _run_round_trip(
-            prices, direction, exit_bar=99, risk_rules=[sl], config=config,
+            prices,
+            direction,
+            exit_bar=99,
+            risk_rules=[sl],
+            config=config,
         )
 
         closed = [t for t in result.trades if t.status == "closed"]

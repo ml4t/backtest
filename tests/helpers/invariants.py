@@ -100,9 +100,7 @@ def _check_equity_terminal(
     # can diverge slightly from cash-based equity tracking, especially with
     # multi-asset rebalancing and integer share rounding.
     if open_trades:
-        open_notional = sum(
-            abs(t.quantity) * t.exit_price * t.multiplier for t in open_trades
-        )
+        open_notional = sum(abs(t.quantity) * t.exit_price * t.multiplier for t in open_trades)
         tol = max(tol, open_notional * 1e-4)  # 0.01% of open notional
 
     assert diff <= tol, (
@@ -171,12 +169,10 @@ def _check_cost_non_negativity(closed_trades: list) -> None:
     """Verify: fees >= 0, multiplier > 0."""
     for i, t in enumerate(closed_trades):
         assert t.fees >= -_ABS_TOL, (
-            f"Fees non-negativity violated for trade {i} ({t.symbol}): "
-            f"fees={t.fees:.6f}"
+            f"Fees non-negativity violated for trade {i} ({t.symbol}): fees={t.fees:.6f}"
         )
         assert t.multiplier > 0, (
-            f"Multiplier must be positive for trade {i} ({t.symbol}): "
-            f"multiplier={t.multiplier}"
+            f"Multiplier must be positive for trade {i} ({t.symbol}): multiplier={t.multiplier}"
         )
 
 
@@ -194,19 +190,24 @@ def _check_fill_temporal_order(result: BacktestResult) -> None:
 def _check_no_nan(result: BacktestResult) -> None:
     """Verify: no NaN in numeric Trade fields."""
     numeric_fields = [
-        "entry_price", "exit_price", "quantity", "pnl", "pnl_percent",
-        "fees", "slippage", "mfe", "mae", "entry_slippage", "multiplier",
+        "entry_price",
+        "exit_price",
+        "quantity",
+        "pnl",
+        "pnl_percent",
+        "fees",
+        "slippage",
+        "mfe",
+        "mae",
+        "entry_slippage",
+        "multiplier",
     ]
 
     for i, t in enumerate(result.trades):
         for field in numeric_fields:
             val = getattr(t, field)
-            assert not math.isnan(val), (
-                f"NaN found in trade {i} ({t.symbol}).{field}"
-            )
-            assert math.isfinite(val), (
-                f"Infinite value in trade {i} ({t.symbol}).{field}={val}"
-            )
+            assert not math.isnan(val), f"NaN found in trade {i} ({t.symbol}).{field}"
+            assert math.isfinite(val), f"Infinite value in trade {i} ({t.symbol}).{field}={val}"
 
 
 def _check_exit_reason_consistency(trades: list) -> None:

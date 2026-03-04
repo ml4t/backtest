@@ -23,21 +23,24 @@ from enum import Enum
 
 class FillTiming(Enum):
     """When orders fill relative to the signal bar."""
-    SAME_BAR = "same_bar"    # Fill at signal bar's close
-    NEXT_BAR = "next_bar"    # Fill at next bar's open
+
+    SAME_BAR = "same_bar"  # Fill at signal bar's close
+    NEXT_BAR = "next_bar"  # Fill at next bar's open
 
 
 @dataclass(frozen=True)
 class OracleFillRule:
     """Configuration for how fills are processed."""
+
     timing: FillTiming = FillTiming.SAME_BAR
-    commission_rate: float = 0.0   # Fraction (0.001 = 0.1%)
-    slippage_rate: float = 0.0     # Fraction (0.001 = 0.1%)
+    commission_rate: float = 0.0  # Fraction (0.001 = 0.1%)
+    slippage_rate: float = 0.0  # Fraction (0.001 = 0.1%)
 
 
 @dataclass(frozen=True)
 class OracleBar:
     """Single price bar."""
+
     open: float
     high: float
     low: float
@@ -47,24 +50,26 @@ class OracleBar:
 @dataclass(frozen=True)
 class OracleSignal:
     """Trade signal."""
+
     bar_index: int
-    direction: str   # "long" or "short"
-    action: str      # "entry" or "exit"
-    quantity: float   # Unsigned
+    direction: str  # "long" or "short"
+    action: str  # "entry" or "exit"
+    quantity: float  # Unsigned
 
 
 @dataclass
 class OracleTrade:
     """Completed round-trip trade computed by the oracle."""
+
     direction: str
     entry_price: float
     exit_price: float
-    quantity: float     # Unsigned
-    gross_pnl: float    # Price-move PnL before costs
-    fees: float         # Total fees (entry + exit commission)
-    net_pnl: float      # gross_pnl - fees
+    quantity: float  # Unsigned
+    gross_pnl: float  # Price-move PnL before costs
+    fees: float  # Total fees (entry + exit commission)
+    net_pnl: float  # gross_pnl - fees
     pnl_percent: float  # Direction-aware return on notional (gross, before fees)
-    net_return: float   # net_pnl / notional
+    net_return: float  # net_pnl / notional
     entry_slippage_cost: float
     exit_slippage_cost: float
 
@@ -72,6 +77,7 @@ class OracleTrade:
 @dataclass
 class OracleResult:
     """Result of running the oracle."""
+
     trades: list[OracleTrade]
     final_cash: float
     initial_cash: float
@@ -164,8 +170,12 @@ def run_oracle(
             # Open new position
             is_long = signal.direction == "long"
             fill_price = _compute_fill_price(
-                bar, fill_rule.timing, is_entry=True, is_long=is_long,
-                slippage_rate=fill_rule.slippage_rate, next_bar=next_bar,
+                bar,
+                fill_rule.timing,
+                is_entry=True,
+                is_long=is_long,
+                slippage_rate=fill_rule.slippage_rate,
+                next_bar=next_bar,
             )
             if fill_price < 0:
                 continue  # Cannot fill (no next bar)
@@ -194,8 +204,12 @@ def run_oracle(
             # Close position
             is_long = position_direction == "long"
             fill_price = _compute_fill_price(
-                bar, fill_rule.timing, is_entry=False, is_long=is_long,
-                slippage_rate=fill_rule.slippage_rate, next_bar=next_bar,
+                bar,
+                fill_rule.timing,
+                is_entry=False,
+                is_long=is_long,
+                slippage_rate=fill_rule.slippage_rate,
+                next_bar=next_bar,
             )
             if fill_price < 0:
                 continue
@@ -227,19 +241,21 @@ def run_oracle(
             pnl_percent = gross_pnl / notional if notional > 0 else 0.0
             net_return = net_pnl / notional if notional > 0 else 0.0
 
-            trades.append(OracleTrade(
-                direction=position_direction,
-                entry_price=position_entry_price,
-                exit_price=fill_price,
-                quantity=position_qty,
-                gross_pnl=gross_pnl,
-                fees=total_fees,
-                net_pnl=net_pnl,
-                pnl_percent=pnl_percent,
-                net_return=net_return,
-                entry_slippage_cost=entry_slippage_cost,
-                exit_slippage_cost=exit_slippage_cost,
-            ))
+            trades.append(
+                OracleTrade(
+                    direction=position_direction,
+                    entry_price=position_entry_price,
+                    exit_price=fill_price,
+                    quantity=position_qty,
+                    gross_pnl=gross_pnl,
+                    fees=total_fees,
+                    net_pnl=net_pnl,
+                    pnl_percent=pnl_percent,
+                    net_return=net_return,
+                    entry_slippage_cost=entry_slippage_cost,
+                    exit_slippage_cost=exit_slippage_cost,
+                )
+            )
 
             position_direction = None
             position_entry_price = 0.0

@@ -67,9 +67,7 @@ def test_limit_buy_never_fills_above_limit(limit: float, bar_high: float, bar_lo
 
     limit_fills = [f for f in broker.fills if f.order_type == "limit"]
     for fill in limit_fills:
-        assert fill.price <= limit + 1e-8, (
-            f"Limit BUY filled at {fill.price} > limit {limit}"
-        )
+        assert fill.price <= limit + 1e-8, f"Limit BUY filled at {fill.price} > limit {limit}"
 
 
 @settings(max_examples=200)
@@ -78,9 +76,7 @@ def test_limit_buy_never_fills_above_limit(limit: float, bar_high: float, bar_lo
     bar_high=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
     bar_low=st.floats(min_value=10.0, max_value=150.0, allow_nan=False, allow_infinity=False),
 )
-def test_limit_sell_never_fills_below_limit(
-    limit: float, bar_high: float, bar_low: float
-) -> None:
+def test_limit_sell_never_fills_below_limit(limit: float, bar_high: float, bar_low: float) -> None:
     """A limit SELL must never fill below the limit price."""
     if bar_low > bar_high:
         bar_low, bar_high = bar_high, bar_low
@@ -95,9 +91,7 @@ def test_limit_sell_never_fills_below_limit(
 
     limit_fills = [f for f in broker.fills if f.order_type == "limit"]
     for fill in limit_fills:
-        assert fill.price >= limit - 1e-8, (
-            f"Limit SELL filled at {fill.price} < limit {limit}"
-        )
+        assert fill.price >= limit - 1e-8, f"Limit SELL filled at {fill.price} < limit {limit}"
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +122,7 @@ def test_stop_buy_never_fills_below_stop(
 
     stop_fills = [f for f in broker.fills if f.order_type == "stop"]
     for fill in stop_fills:
-        assert fill.price >= stop - 1e-8, (
-            f"Stop BUY filled at {fill.price} < stop {stop}"
-        )
+        assert fill.price >= stop - 1e-8, f"Stop BUY filled at {fill.price} < stop {stop}"
 
 
 @settings(max_examples=200)
@@ -156,9 +148,7 @@ def test_stop_sell_never_fills_above_stop(
 
     stop_fills = [f for f in broker.fills if f.order_type == "stop"]
     for fill in stop_fills:
-        assert fill.price <= stop + 1e-8, (
-            f"Stop SELL filled at {fill.price} > stop {stop}"
-        )
+        assert fill.price <= stop + 1e-8, f"Stop SELL filled at {fill.price} > stop {stop}"
 
 
 # ---------------------------------------------------------------------------
@@ -168,21 +158,11 @@ def test_stop_sell_never_fills_above_stop(
 
 @settings(max_examples=100)
 @given(
-    entry_price=st.floats(
-        min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False
-    ),
-    tp_offset=st.floats(
-        min_value=1.0, max_value=20.0, allow_nan=False, allow_infinity=False
-    ),
-    sl_offset=st.floats(
-        min_value=1.0, max_value=20.0, allow_nan=False, allow_infinity=False
-    ),
-    exit_high=st.floats(
-        min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False
-    ),
-    exit_low=st.floats(
-        min_value=10.0, max_value=150.0, allow_nan=False, allow_infinity=False
-    ),
+    entry_price=st.floats(min_value=50.0, max_value=150.0, allow_nan=False, allow_infinity=False),
+    tp_offset=st.floats(min_value=1.0, max_value=20.0, allow_nan=False, allow_infinity=False),
+    sl_offset=st.floats(min_value=1.0, max_value=20.0, allow_nan=False, allow_infinity=False),
+    exit_high=st.floats(min_value=50.0, max_value=200.0, allow_nan=False, allow_infinity=False),
+    exit_low=st.floats(min_value=10.0, max_value=150.0, allow_nan=False, allow_infinity=False),
 )
 def test_bracket_exactly_one_exit(
     entry_price: float,

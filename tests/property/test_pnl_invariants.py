@@ -110,7 +110,10 @@ def test_cash_conservation(entry: float, exit_: float, qty: float, direction: st
     direction=st.sampled_from(["long", "short"]),
 )
 def test_pnl_sign_matches_pnl_percent_sign(
-    entry: float, exit_: float, qty: float, direction: str,
+    entry: float,
+    exit_: float,
+    qty: float,
+    direction: str,
 ) -> None:
     """sign(pnl) must equal sign(pnl_percent) for non-zero PnL."""
     if abs(entry - exit_) < 0.01:
@@ -169,7 +172,11 @@ def test_pnl_sign_matches_pnl_percent_sign(
     comm_rate=st.floats(min_value=0.0, max_value=0.01, allow_nan=False, allow_infinity=False),
 )
 def test_gross_minus_fees_equals_net(
-    entry: float, exit_: float, qty: float, direction: str, comm_rate: float,
+    entry: float,
+    exit_: float,
+    qty: float,
+    direction: str,
+    comm_rate: float,
 ) -> None:
     """gross_pnl - fees == pnl for any commission rate."""
     initial_cash = 500_000.0
@@ -216,7 +223,11 @@ def test_gross_minus_fees_equals_net(
     direction=st.sampled_from(["long", "short"]),
 )
 def test_price_scale_invariance(
-    base_entry: float, base_exit: float, qty: float, scale: float, direction: str,
+    base_entry: float,
+    base_exit: float,
+    qty: float,
+    scale: float,
+    direction: str,
 ) -> None:
     """Percentage returns should be the same regardless of price scale."""
     if abs(base_entry - base_exit) < 0.01:

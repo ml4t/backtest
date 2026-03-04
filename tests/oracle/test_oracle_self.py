@@ -26,7 +26,7 @@ class TestOracleLongRoundTrips:
         assert t.gross_pnl == pytest.approx(1000.0)  # (110-100)*100
         assert t.fees == 0.0
         assert t.net_pnl == pytest.approx(1000.0)
-        assert t.pnl_percent == pytest.approx(0.10)   # 10%
+        assert t.pnl_percent == pytest.approx(0.10)  # 10%
         assert result.final_cash == pytest.approx(101_000.0)
 
     def test_losing_long_no_costs(self):
@@ -53,7 +53,7 @@ class TestOracleLongRoundTrips:
 
         t = result.trades[0]
         entry_comm = 0.001 * 100 * 100  # 10
-        exit_comm = 0.001 * 110 * 100   # 11
+        exit_comm = 0.001 * 110 * 100  # 11
         assert t.fees == pytest.approx(entry_comm + exit_comm)
         assert t.gross_pnl == pytest.approx(1000.0)
         assert t.net_pnl == pytest.approx(1000.0 - 21.0)
@@ -112,7 +112,7 @@ class TestOracleShortRoundTrips:
 
         t = result.trades[0]
         entry_comm = 0.001 * 100 * 100  # 10
-        exit_comm = 0.001 * 90 * 100    # 9
+        exit_comm = 0.001 * 90 * 100  # 9
         assert t.fees == pytest.approx(entry_comm + exit_comm)
         assert t.gross_pnl == pytest.approx(1000.0)
         assert t.net_pnl == pytest.approx(1000.0 - 19.0)

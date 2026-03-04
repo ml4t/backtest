@@ -90,13 +90,13 @@ def test_round_trip_matches_expected(scenario: Scenario):
 SLIPPAGE_SCENARIOS: list[Scenario] = []
 for direction, (ep, xp) in product(DIRECTIONS, [(100.0, 110.0), (100.0, 90.0)]):
     for slip in [0.001, 0.005]:
-        SLIPPAGE_SCENARIOS.append(
-            make_round_trip(ep, xp, 100.0, direction, slippage_rate=slip)
-        )
+        SLIPPAGE_SCENARIOS.append(make_round_trip(ep, xp, 100.0, direction, slippage_rate=slip))
 
 
 @pytest.mark.parametrize(
-    "scenario", SLIPPAGE_SCENARIOS, ids=[s.name for s in SLIPPAGE_SCENARIOS],
+    "scenario",
+    SLIPPAGE_SCENARIOS,
+    ids=[s.name for s in SLIPPAGE_SCENARIOS],
 )
 def test_slippage_scenario_matches_expected(scenario: Scenario):
     """Verify slippage scenarios match expected results."""
