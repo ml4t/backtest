@@ -852,6 +852,43 @@ class TestImmediateFill:
         assert restored.immediate_fill is True
 
 
+class TestFromDictDefaultParity:
+    """from_dict({}) must produce the same defaults as BacktestConfig()."""
+
+    def test_empty_dict_matches_constructor_defaults(self):
+        default = BacktestConfig()
+        from_empty = BacktestConfig.from_dict({}, strict=False)
+
+        # Core execution fields that were previously mismatched
+        assert from_empty.execution_mode == default.execution_mode
+        assert from_empty.execution_price == default.execution_price
+        assert from_empty.rebalance_mode == default.rebalance_mode
+
+        # Verify all enum fields match
+        assert from_empty.stop_fill_mode == default.stop_fill_mode
+        assert from_empty.stop_level_basis == default.stop_level_basis
+        assert from_empty.trail_hwm_source == default.trail_hwm_source
+        assert from_empty.initial_hwm_source == default.initial_hwm_source
+        assert from_empty.trail_stop_timing == default.trail_stop_timing
+        assert from_empty.share_type == default.share_type
+        assert from_empty.commission_type == default.commission_type
+        assert from_empty.slippage_type == default.slippage_type
+        assert from_empty.fill_ordering == default.fill_ordering
+        assert from_empty.entry_order_priority == default.entry_order_priority
+        assert from_empty.short_cash_policy == default.short_cash_policy
+        assert from_empty.data_frequency == default.data_frequency
+        assert from_empty.missing_price_policy == default.missing_price_policy
+        assert from_empty.late_asset_policy == default.late_asset_policy
+
+        # Verify key numeric/bool fields match
+        assert from_empty.initial_cash == default.initial_cash
+        assert from_empty.commission_rate == default.commission_rate
+        assert from_empty.slippage_rate == default.slippage_rate
+        assert from_empty.allow_short_selling == default.allow_short_selling
+        assert from_empty.allow_leverage == default.allow_leverage
+        assert from_empty.settlement_delay == default.settlement_delay
+
+
 class TestConfigModelWiring:
     """All commission/slippage enum choices should map to model instances."""
 
