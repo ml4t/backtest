@@ -145,6 +145,9 @@ class FillExecutor:
             timestamp=current_time,
             commission=commission,
             slippage=slippage,
+            order_type=order.order_type.value,
+            limit_price=order.limit_price,
+            stop_price=order.stop_price,
         )
         broker.fills.append(fill)
 

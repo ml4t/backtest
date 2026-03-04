@@ -345,6 +345,9 @@ class Fill:
     timestamp: datetime
     commission: float = 0.0
     slippage: float = 0.0
+    order_type: str = ""  # OrderType.value string (for fill-level invariants)
+    limit_price: float | None = None  # For limit bound checking
+    stop_price: float | None = None  # For stop bound checking
 
 
 @dataclass
