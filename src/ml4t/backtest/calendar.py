@@ -55,6 +55,8 @@ CALENDAR_ALIASES = {
     "NYSE": "XNYS",
     "NASDAQ": "NASDAQ",  # pandas_market_calendars uses "NASDAQ" directly
     "AMEX": "NYSE",  # AMEX follows NYSE calendar
+    # FX (OTC, 24/5 — use CME Globex FX calendar for holidays/weekends)
+    "FX": "CMEGlobex_FX",
     # US Futures (product-specific via pandas_market_calendars)
     "CME": "CME_Equity",  # Default to equity futures
     "CME_EQUITY": "CME_Equity",
