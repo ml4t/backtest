@@ -249,3 +249,119 @@ class TestDataFeedEdgeCases:
         _ts, data, _ctx = next(iter(feed))
         assert data["AAPL"]["close"] == 0.0
         assert data._prices["AAPL"] == 0.0
+
+
+class TestDataFeedEntityColumn:
+    """Tests for configurable entity column detection."""
+
+    def test_auto_detect_symbol(self):
+        """DataFeed should auto-detect 'symbol' column."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "symbol": ["SPY"],
+                "close": [300.0],
+            }
+        )
+        feed = DataFeed(prices_df=prices)
+        assert feed._entity_col == "symbol"
+        _ts, data, _ctx = next(iter(feed))
+        assert "SPY" in data
+        assert data["SPY"]["close"] == 300.0
+
+    def test_auto_detect_asset(self):
+        """DataFeed should auto-detect 'asset' column (backward compat)."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "asset": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+        feed = DataFeed(prices_df=prices)
+        assert feed._entity_col == "asset"
+
+    def test_auto_detect_product(self):
+        """DataFeed should auto-detect 'product' column (futures)."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "product": ["ES"],
+                "close": [4500.0],
+            }
+        )
+        feed = DataFeed(prices_df=prices)
+        assert feed._entity_col == "product"
+        _ts, data, _ctx = next(iter(feed))
+        assert "ES" in data
+
+    def test_symbol_preferred_over_asset(self):
+        """When both 'symbol' and 'asset' exist, prefer 'symbol'."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "symbol": ["SPY"],
+                "asset": ["SPY_LEGACY"],
+                "close": [300.0],
+            }
+        )
+        feed = DataFeed(prices_df=prices)
+        assert feed._entity_col == "symbol"
+
+    def test_explicit_entity_col(self):
+        """DataFeed should accept explicit entity_col parameter."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "ticker": ["MSFT"],
+                "close": [350.0],
+            }
+        )
+        feed = DataFeed(prices_df=prices, entity_col="ticker")
+        assert feed._entity_col == "ticker"
+        _ts, data, _ctx = next(iter(feed))
+        assert "MSFT" in data
+
+    def test_explicit_entity_col_not_found(self):
+        """DataFeed should raise if explicit entity_col doesn't exist."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "symbol": ["SPY"],
+                "close": [300.0],
+            }
+        )
+        with pytest.raises(ValueError, match="entity_col='isin'"):
+            DataFeed(prices_df=prices, entity_col="isin")
+
+    def test_no_entity_col_detected(self):
+        """DataFeed should raise if no entity column can be detected."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "identifier": ["SPY"],
+                "close": [300.0],
+            }
+        )
+        with pytest.raises(ValueError, match="Cannot detect entity column"):
+            DataFeed(prices_df=prices)
+
+    def test_symbol_with_signals(self):
+        """DataFeed should handle 'symbol' column in both prices and signals."""
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "symbol": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+        signals = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1)],
+                "symbol": ["AAPL"],
+                "momentum": [0.5],
+            }
+        )
+        feed = DataFeed(prices_df=prices, signals_df=signals)
+        _ts, data, _ctx = next(iter(feed))
+        assert data["AAPL"]["signals"]["momentum"] == 0.5

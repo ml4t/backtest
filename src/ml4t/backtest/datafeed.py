@@ -44,6 +44,9 @@ class DataFeed:
             process(timestamp, assets_data)
     """
 
+    #: Column names checked (in order) when auto-detecting the entity column.
+    ENTITY_COL_CANDIDATES = ("symbol", "asset", "product", "ticker")
+
     def __init__(
         self,
         prices_path: str | None = None,
@@ -52,6 +55,8 @@ class DataFeed:
         prices_df: pl.DataFrame | None = None,
         signals_df: pl.DataFrame | None = None,
         context_df: pl.DataFrame | None = None,
+        *,
+        entity_col: str | None = None,
     ):
         self.prices = (
             prices_df
@@ -72,6 +77,9 @@ class DataFeed:
         if self.prices is None:
             raise ValueError("prices_path or prices_df required")
 
+        # Resolve entity column name
+        self._entity_col = self._resolve_entity_col(entity_col, self.prices.columns)
+
         # Pre-partition data by timestamp for O(1) lookups
         # Store DataFrames (memory efficient) instead of dicts (memory explosion)
         self._prices_by_ts = self._partition_by_timestamp(self.prices)
@@ -85,7 +93,7 @@ class DataFeed:
         self._timestamps = self._get_timestamps()
         self._idx = 0
         self._signal_columns = (
-            [c for c in self.signals.columns if c not in ("timestamp", "asset")]
+            [c for c in self.signals.columns if c not in ("timestamp", self._entity_col)]
             if self.signals is not None
             else []
         )
@@ -96,7 +104,7 @@ class DataFeed:
         )
 
         price_cols = self.prices.columns
-        self._price_asset_idx = price_cols.index("asset")
+        self._price_asset_idx = price_cols.index(self._entity_col)
         self._price_open_idx = price_cols.index("open") if "open" in price_cols else -1
         self._price_high_idx = price_cols.index("high") if "high" in price_cols else -1
         self._price_low_idx = price_cols.index("low") if "low" in price_cols else -1
@@ -105,7 +113,7 @@ class DataFeed:
 
         if self.signals is not None:
             signal_cols = self.signals.columns
-            self._signal_asset_idx = signal_cols.index("asset")
+            self._signal_asset_idx = signal_cols.index(self._entity_col)
             self._signal_col_indices = [signal_cols.index(c) for c in self._signal_columns]
         else:
             self._signal_asset_idx = -1
@@ -116,6 +124,27 @@ class DataFeed:
             self._context_col_indices = [context_cols.index(c) for c in self._context_columns]
         else:
             self._context_col_indices = []
+
+    @classmethod
+    def _resolve_entity_col(cls, explicit: str | None, columns: list[str]) -> str:
+        """Determine the entity identifier column.
+
+        If *explicit* is given, validate it exists.  Otherwise auto-detect by
+        checking ``ENTITY_COL_CANDIDATES`` in order.
+        """
+        if explicit is not None:
+            if explicit not in columns:
+                raise ValueError(
+                    f"entity_col={explicit!r} not found in columns {columns}"
+                )
+            return explicit
+        for candidate in cls.ENTITY_COL_CANDIDATES:
+            if candidate in columns:
+                return candidate
+        raise ValueError(
+            f"Cannot detect entity column. Expected one of "
+            f"{cls.ENTITY_COL_CANDIDATES}, got columns {columns}"
+        )
 
     def _partition_by_timestamp(self, df: pl.DataFrame) -> dict[datetime, pl.DataFrame]:
         """Partition DataFrame into dict keyed by timestamp for O(1) access.
