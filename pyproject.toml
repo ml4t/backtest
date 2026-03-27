@@ -102,6 +102,7 @@ comparison = [
 
 # Development dependencies
 dev = [
+    "ml4t-diagnostic>=0.1.0b4",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",
@@ -135,6 +136,7 @@ Changelog = "https://github.com/ml4t/backtest/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
+    "ml4t-diagnostic>=0.1.0b4",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",
@@ -250,4 +252,5 @@ exclude_lines = [
 [tool.uv.sources]
 ml4t-data = { path = "../ml4t-data", editable = true }
 ml4t-engineer = { path = "../ml4t-engineer", editable = true }
+ml4t-diagnostic = { path = "../ml4t-diagnostic", editable = true }
 # Sibling package for optional tearsheet integration
