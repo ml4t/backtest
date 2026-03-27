@@ -512,5 +512,6 @@ The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-lear
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- notebook and case-study map for reporting workflows
 - [Quickstart](../getting-started/quickstart.md) -- end-to-end examples
 - [Profiles](profiles.md) -- compare results across framework profiles

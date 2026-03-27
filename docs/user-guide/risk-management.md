@@ -300,6 +300,7 @@ The case studies show progressive complexity: basic stop-loss → trailing stops
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- risk-management chapter and case-study mapping
 - [Execution Semantics](execution-semantics.md) -- stop fill modes and trailing stop timing
 - [Strategies](strategies.md) -- integrating risk rules into strategies
 - [Configuration](configuration.md) -- stop-related config parameters

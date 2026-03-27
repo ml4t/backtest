@@ -386,5 +386,6 @@ The book pattern: `BacktestConfig()` with 4 overrides (initial_cash, commission_
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- find the matching notebook or case-study configuration pattern
 - [Profiles](profiles.md) -- pre-built configs for each framework
 - [Execution Semantics](execution-semantics.md) -- deep dive into each parameter's behavior

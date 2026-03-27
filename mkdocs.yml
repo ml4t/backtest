@@ -130,6 +130,10 @@ nav:
     - Rebalancing: user-guide/rebalancing.md
     - Data Feed: user-guide/data-feed.md
     - Results & Analysis: user-guide/results.md
+    - Market Impact: user-guide/market-impact.md
+    - Stateful Strategies: user-guide/stateful-strategies.md
+  - Book Guide:
+    - book-guide/index.md
   - API Reference:
     - api/index.md
 

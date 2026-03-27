@@ -198,6 +198,7 @@ The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-lear
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- where cost realism and quote-aware execution appear in the book
 - [Execution Semantics](execution-semantics.md) — fill timing, ordering, and stop modes
 - [Configuration](configuration.md) — all commission and slippage parameters
 - [Rebalancing](rebalancing.md) — how costs interact with weight-based rebalancing

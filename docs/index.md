@@ -2,6 +2,24 @@
 
 Event-driven backtesting engine with configurable execution semantics, validated against four independent frameworks.
 
+## Overview
+
+`ml4t-backtest` is the simulation layer in the ML4T stack. It sits between research and
+deployment:
+
+- `ml4t-data` prepares canonical market datasets
+- `ml4t-engineer` produces labels and features
+- `ml4t-diagnostic` validates signals, models, and portfolio behavior
+- `ml4t-backtest` simulates execution with explicit, configurable semantics
+- `ml4t-live` reuses the same strategy surface for paper and live rollout
+
+The docs are structured as one integrated site:
+
+1. Getting Started for installation and first runs
+2. User Guide for execution semantics and workflows
+3. API Reference for exact public interfaces
+4. [Book Guide](book-guide/index.md) for chapter, notebook, and case-study mapping
+
 ## Quick Example
 
 ```python
@@ -69,6 +87,7 @@ pip install ml4t-backtest
 
 - [Installation](getting-started/installation.md) -- setup and verification
 - [Quickstart](getting-started/quickstart.md) -- your first backtest in 5 minutes
+- [Book Guide](book-guide/index.md) -- map the book and case studies to reusable APIs
 - [How It Works](concepts/how-it-works.md) -- architecture and execution flow
 - [Execution Semantics](user-guide/execution-semantics.md) -- fill ordering, stops, timing
 - [Configuration](user-guide/configuration.md) -- all 40+ knobs explained
@@ -83,6 +102,18 @@ pip install ml4t-backtest
 - [Orders](user-guide/orders.md) -- order types and bracket orders
 - [Accounts](user-guide/accounts.md) -- cash, crypto, and margin accounts
 - [API Reference](api/index.md) -- full API documentation
+
+## From Book to Library
+
+If you are reading *Machine Learning for Trading, Third Edition*, use the docs in this order:
+
+1. learn the execution or reporting concept in the notebook
+2. use the [Book Guide](book-guide/index.md) to find the matching production workflow
+3. move to the relevant user-guide page for the reusable API
+4. finish in the [API Reference](api/index.md) for exact call signatures
+
+This is especially important for quote-aware execution, realistic reporting, rebalancing,
+and strategy portability into `ml4t-live`.
 
 ## Part of the ML4T Ecosystem
 

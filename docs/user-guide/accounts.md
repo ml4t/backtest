@@ -1,10 +1,41 @@
 # Account Policies
 
-Configure account behavior for your backtests using simple boolean flags.
+Account policy determines what the broker is allowed to do with cash, leverage, and
+short sale proceeds. Use this page when you need to decide whether your strategy
+should behave like a long-only cash account, a short-enabled crypto-style account,
+or a Reg T margin account.
+
+The configuration is intentionally simple: instead of switching between account
+"types", you set the policy flags directly and let the broker enforce the resulting
+buying-power rules.
+
+## Quick Example
+
+```python
+from ml4t.backtest import BacktestConfig
+
+config = BacktestConfig(
+    initial_cash=100_000,
+    allow_short_selling=True,
+    allow_leverage=True,
+    initial_margin=0.5,
+    long_maintenance_margin=0.25,
+    short_maintenance_margin=0.30,
+)
+```
+
+Use this pattern when you want realistic shorting and leverage constraints instead
+of long-only cash-account behavior.
+
+## When to Use Which Policy
+
+- use a cash account for long-only equity strategies with no borrowing
+- use a crypto-style account when you want shorting but no leverage
+- use a margin account when leverage, short maintenance, and buying-power checks matter
 
 ## Account Types
 
-ml4t-backtest uses a **unified configuration** approach with two key flags:
+`ml4t-backtest` uses a unified configuration model with two main flags:
 
 | Flag | Description |
 |------|-------------|
@@ -21,7 +52,8 @@ These flags map to traditional account types:
 
 ## Cash Account (Default)
 
-Long-only with no leverage - simplest and safest:
+Use the default cash-account policy for long-only strategies where proceeds from sales
+must settle back into cash before they can be reused:
 
 ```python
 from ml4t.backtest import BacktestConfig, Engine
@@ -38,7 +70,7 @@ config = BacktestConfig(initial_cash=100_000)
 
 ## Crypto Account
 
-Short selling allowed, but no leverage:
+Use this combination when shorting is allowed but leverage is not:
 
 ```python
 config = BacktestConfig(
@@ -50,7 +82,8 @@ config = BacktestConfig(
 
 ## Margin Account
 
-Full margin trading with short selling and leverage:
+Use a margin account when you need borrowing capacity, leverage, and maintenance
+constraints:
 
 ```python
 config = BacktestConfig(
@@ -73,7 +106,7 @@ Common margin configurations:
 
 ## Using Engine Directly
 
-You can also pass account settings directly to Engine:
+You can also pass account policy directly to `Engine`:
 
 ```python
 from ml4t.backtest import Engine, DataFeed
@@ -90,7 +123,7 @@ engine = Engine(
 
 ## Using Broker.from_config()
 
-For advanced use cases, create a broker from config:
+For advanced workflows, create the broker from a resolved config:
 
 ```python
 from ml4t.backtest import Broker, BacktestConfig
@@ -106,7 +139,8 @@ broker = Broker.from_config(config)
 
 ## Transaction Costs
 
-Configure commission and slippage:
+Account policy often interacts with trading costs, especially when leverage or high
+turnover magnifies drag:
 
 ```python
 from ml4t.backtest import BacktestConfig
@@ -123,7 +157,8 @@ config = BacktestConfig(
 
 ## Presets
 
-Use presets for common scenarios:
+Presets are useful when you want framework-style account and execution behavior
+without configuring each knob by hand:
 
 ```python
 from ml4t.backtest import BacktestConfig
@@ -156,7 +191,8 @@ are also available for exact parity testing.
 
 ## Insufficient Funds
 
-Orders that exceed available buying power will be rejected. Use the Gatekeeper to check orders before submission:
+Orders that exceed available buying power are rejected by the gatekeeper. Use this
+directly when you want to inspect why an order would fail:
 
 ```python
 from ml4t.backtest.accounting import Gatekeeper
@@ -167,9 +203,10 @@ if not is_valid:
     print(f"Order rejected: {reason}")
 ```
 
-## Migration from `account_type` (Pre-1.0)
+## Migration from `account_type`
 
-If you were using the old `account_type` string parameter, update as follows:
+If you still have older code using an `account_type` string, migrate to explicit
+policy flags:
 
 ```python
 # Old API (deprecated)
@@ -182,3 +219,26 @@ broker = Broker(allow_short_selling=True, allow_leverage=True)
 config = BacktestConfig(allow_short_selling=True, allow_leverage=True)
 broker = Broker.from_config(config)
 ```
+
+## See It in Action
+
+The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading)
+materials use account policy most clearly in these workflows:
+
+- **Ch16 case studies** — reusable `BacktestConfig` objects control cash use, leverage, and
+  portfolio behavior across equities, futures, crypto, and options examples
+- **Ch17** (`portfolio_construction`) — allocator comparisons depend on explicit account and
+  turnover assumptions instead of hidden notebook defaults
+- **Ch19** (`risk_management`) — leverage, shorting, and maintenance rules interact directly
+  with position sizing and portfolio limits
+
+Use the [Book Guide](../book-guide/index.md) when you want to jump from a notebook or
+case-study path to the production account-policy workflow.
+
+## Next Steps
+
+- [Book Guide](../book-guide/index.md) -- chapter and case-study map for account and portfolio workflows
+- [Configuration](configuration.md) -- full account, margin, and cash-management parameter reference
+- [Risk Management](risk-management.md) -- position rules and portfolio limits that interact with buying power
+- [Rebalancing](rebalancing.md) -- portfolio-weight execution under explicit account constraints
+- [Results & Analysis](results.md) -- inspect turnover, fills, and portfolio-state effects of account policy

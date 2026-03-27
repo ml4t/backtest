@@ -117,11 +117,27 @@ Auto-generated from source docstrings.
     options:
       show_root_heading: true
       members:
+        - to_fills_dataframe
+        - to_portfolio_state_dataframe
         - to_predictions_dataframe
         - to_trades_dataframe
         - to_equity_dataframe
         - to_dict
         - to_parquet
+
+## Execution: Market Impact
+
+::: ml4t.backtest.execution.impact.LinearImpact
+    options:
+      show_root_heading: true
+
+::: ml4t.backtest.execution.impact.SquareRootImpact
+    options:
+      show_root_heading: true
+
+::: ml4t.backtest.execution.impact.PowerLawImpact
+    options:
+      show_root_heading: true
 
 ## Risk: Position Rules
 

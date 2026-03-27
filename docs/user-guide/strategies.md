@@ -283,6 +283,7 @@ The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-lear
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- chapter and case-study map for strategy workflows
 - [Stateful Strategies](stateful-strategies.md) -- advanced patterns that require event-driven execution
 - [Risk Management](risk-management.md) -- full rule catalog and composition
 - [Order Types](orders.md) -- limit, stop, bracket orders in detail

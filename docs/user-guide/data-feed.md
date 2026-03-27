@@ -222,6 +222,7 @@ The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-lear
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- chapter and case-study map for data preparation patterns
 - [Quickstart](../getting-started/quickstart.md) -- end-to-end examples
 - [Strategies](strategies.md) -- how to use data in strategy callbacks
 - [Rebalancing](rebalancing.md) -- multi-asset weight-based strategies

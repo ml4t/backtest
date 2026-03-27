@@ -338,6 +338,7 @@ The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-lear
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- chapter and case-study map for execution workflows
 - [Configuration](configuration.md) -- complete reference for all 40+ parameters
 - [Profiles](profiles.md) -- pre-configured settings for each framework
 - [Risk Management](risk-management.md) -- position rules and portfolio limits

@@ -105,6 +105,7 @@ The common pattern: ML model generates predictions, predictions are converted to
 
 ## Next Steps
 
+- [Book Guide](../book-guide/index.md) -- portfolio-construction and case-study mapping
 - [Strategies](strategies.md) -- strategy patterns and templates
 - [Configuration](configuration.md) -- rebalance-related config parameters
 - [Results & Analysis](results.md) -- analyze portfolio outcomes
