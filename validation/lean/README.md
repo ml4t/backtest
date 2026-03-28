@@ -1,138 +1,181 @@
-# Lean CLI Validation
+# LEAN Validation Workflow
 
-**Status**: Setup In Progress
-**Date**: January 2026
+## Status
 
-## Overview
+LEAN is part of the validation/parity workflow, but not through the old static
+`scenario_01_long_only/` project in this directory.
 
-QuantConnect LEAN is an open-source C# algorithmic trading engine. The `lean-cli` provides
-a command-line interface for running LEAN locally via Docker.
+What actually runs today is the LEAN adapter in
+[`validation/benchmark_suite.py`](../benchmark_suite.py), which:
 
-## Installation
+- supports the benchmark/parity workflow, not the old scenario matrix
+- supports daily-data scenarios only
+- generates a temporary LEAN project and LEAN-format data on the fly
+- runs LEAN through the CLI in Docker
 
-```bash
-# Install lean-cli
-pip install lean
+The old `scenario_01_long_only/` folder is legacy scaffolding, not the current
+source of truth.
 
-# Verify installation
-lean --version  # 1.0.221
-```
+## What Made It Work
 
-## Setup Challenges
+These are the pieces that mattered in practice:
 
-### 1. QuantConnect Account Required
+1. We used the Dockerized LEAN CLI path, not a direct `.NET` launcher workflow.
+2. We did not require a permanently installed `lean` binary.
+   The adapter falls back to:
 
-The `lean init` command requires QuantConnect API credentials:
+   ```bash
+   uvx --python 3.12 --with setuptools<81 lean
+   ```
 
-```
-$ lean init
-Your user id and API token are needed to make authenticated requests to the QuantConnect API
-You can request these credentials on https://www.quantconnect.com/account
-```
+3. We required a machine-local LEAN workspace config at:
 
-**Impact**: Cannot run `lean backtest` without completing `lean init`.
+   ```text
+   validation/lean/workspace/lean.json
+   ```
 
-### 2. CLI vs Direct Engine
+4. We let `benchmark_suite.py` generate the LEAN project, algorithm, target
+   file, and LEAN-format equity data for each run.
+5. Docker had to be running before invoking the benchmark.
 
-**Two approaches to run LEAN locally:**
+## One-Time Bootstrap
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| `lean-cli` | Easy setup, Docker-based | Requires QuantConnect account |
-| Direct LEAN | No account needed | Requires .NET, manual setup |
-
-### 3. Data Requirements
-
-LEAN expects data in a specific format:
-- Location: `./data/equity/usa/daily/` (for daily equity data)
-- Format: CSV with timestamp, OHLCV columns
-- Or: Custom data class for arbitrary formats
-
-## Workarounds
-
-### Option A: Create QuantConnect Account (Free)
-
-1. Register at https://www.quantconnect.com/account
-2. Get User ID and API Token
-3. Run `lean init` with credentials
-4. Use `lean backtest` normally
-
-### Option B: Direct LEAN Engine (No Account)
+From the repository root:
 
 ```bash
-# Install .NET 6.0+
-# Clone LEAN repository
-git clone https://github.com/QuantConnect/Lean.git
-
-# Build
-cd Lean
-dotnet build QuantConnect.Lean.sln
-
-# Configure
-# Edit Launcher/config.json for your algorithm
-
-# Run
-cd Launcher/bin/Debug
-dotnet QuantConnect.Lean.Launcher.dll
+cd /home/stefan/ml4t/libraries/ml4t-backtest
+mkdir -p validation/lean/workspace
+cd validation/lean/workspace
+uvx --python 3.12 --with setuptools<81 lean init
 ```
 
-### Option C: Docker Direct (Partial)
+If `lean` is already installed on `PATH`, this also works:
 
 ```bash
-# Pull LEAN image
-docker pull quantconnect/lean:latest
-
-# Run with mounted data and algorithm
-docker run -v $(pwd)/data:/Lean/Data \
-           -v $(pwd)/algorithm:/Lean/Algorithm.Python \
-           quantconnect/lean:latest
+lean init
 ```
 
-## Comparison with ml4t-backtest
+The important outcome is that `validation/lean/workspace/lean.json` exists and
+is valid on the local machine. That file is not committed in the repo.
 
-| Aspect | LEAN | ml4t-backtest |
-|--------|------|---------------|
-| Language | C# (Python bindings) | Python (Rust planned) |
-| Setup | Complex (Docker/.NET) | Simple (pip install) |
-| Data Format | Proprietary | Polars DataFrame |
-| Account Req | For CLI | None |
-| Speed | Fast | Fast (faster with Rust) |
-| Event-Driven | Yes | Yes |
-| Vectorized | No | Hybrid |
+## Runtime Prerequisites
 
-## Project Structure
+- Docker daemon available
+- either `lean` on `PATH` or `uvx` on `PATH`
+- Python 3.12 available for the `uvx` fallback path
+- initialized LEAN workspace config at
+  `validation/lean/workspace/lean.json`
 
-```
-validation/lean/
-├── README.md                  # This file
-├── scenario_01_long_only/     # Long-only momentum strategy
-│   ├── main.py               # LEAN algorithm
-│   └── config.json           # Project config
-└── data/                      # Local data (if using direct approach)
+The adapter itself also sets:
+
+```text
+UV_CACHE_DIR=/tmp/uv-cache
+UV_TOOL_DIR=/tmp/uv-tools
 ```
 
-## Validation Scenarios
+to keep the transient LEAN CLI tool environment out of the repo.
 
-Planned scenarios to port from ml4t-backtest:
+## Exact Command We Run
 
-1. **scenario_01_long_only**: Simple long-only momentum
-2. **scenario_02_long_short**: Long/short with stops
-3. **scenario_05_take_profit**: Take-profit targets
+Use the benchmark suite, not the legacy `run_all_correctness.py` LEAN path.
 
-## References
+Typical invocation:
 
-- [Lean CLI Documentation](https://www.quantconnect.com/docs/v2/lean-cli)
-- [LEAN GitHub Repository](https://github.com/QuantConnect/Lean)
-- [Using LEAN Offline (Forum)](https://www.quantconnect.com/forum/discussion/18614/using-lean-completely-offline-without-quantconnect-in-2025-still-a-thing/)
+```bash
+cd /home/stefan/ml4t/libraries/ml4t-backtest
+python validation/benchmark_suite.py \
+  --framework lean \
+  --scenario daily_baseline \
+  --data-source real \
+  --real-data-path /path/to/us_equities.parquet
+```
 
-## Conclusion
+To compare the ml4t side using the LEAN-style profile:
 
-**Recommendation**: For ml4t-backtest validation purposes:
+```bash
+cd /home/stefan/ml4t/libraries/ml4t-backtest
+python validation/benchmark_suite.py \
+  --framework ml4t-lean-strict \
+  --scenario daily_baseline \
+  --data-source real \
+  --real-data-path /path/to/us_equities.parquet
+```
 
-1. **Skip LEAN CLI validation** for now - setup overhead too high
-2. **Focus on VectorBT Pro comparison** - already validated, exact match achieved
-3. **Pursue Rust backend** - better ROI than LEAN integration
+Notes:
 
-LEAN is a valid reference but the setup friction makes it less practical for quick
-cross-validation. The Rust backend approach documented in `docs/rust-backend-feasibility.md`
-offers a clearer path to high-performance backtesting with Python-native workflow.
+- `--framework lean` invokes the LEAN adapter.
+- `--framework ml4t-lean-strict` runs `ml4t-backtest` with the LEAN-strict
+  parity profile.
+- LEAN currently returns an error for non-daily scenarios.
+
+## What The Adapter Generates
+
+For each run, `benchmark_suite.py` writes a generated LEAN project under:
+
+```text
+validation/lean/workspace/ml4t_benchmark/
+```
+
+Key generated files:
+
+- `main.py`: generated QCAlgorithm using canonical target shares
+- `config.json`: minimal LEAN project config
+- `symbols.csv`: generated synthetic tickers for the selected assets
+- `targets.csv`: daily target share instructions
+
+It also exports LEAN-format daily equity data under:
+
+```text
+validation/lean/workspace/data/equity/usa/
+```
+
+including:
+
+- `daily/*.zip`
+- `map_files/*.csv`
+- `factor_files/*.csv`
+
+To avoid re-exporting identical daily data every run, it maintains:
+
+```text
+validation/lean/workspace/data/equity/usa/ml4t_manifest.json
+```
+
+and uses a signature-based cache check.
+
+## The Exact LEAN Invocation
+
+Once the generated project and data are in place, the adapter runs:
+
+```bash
+lean backtest validation/lean/workspace/ml4t_benchmark \
+  --lean-config validation/lean/workspace/lean.json \
+  --no-update \
+  --output <generated-output-dir>
+```
+
+If `lean` is not installed, the code uses the `uvx` form instead.
+
+Results are read back from the generated LEAN summary JSON in the output
+directory.
+
+## Source Of Truth In Code
+
+The working implementation lives here:
+
+- [`validation/benchmark_suite.py`](../benchmark_suite.py): LEAN adapter,
+  project generation, data export, CLI invocation, result parsing
+
+These files are legacy and should not be treated as the primary workflow:
+
+- [`validation/lean/scenario_01_long_only/main.py`](scenario_01_long_only/main.py)
+- [`validation/run_all_correctness.py`](../run_all_correctness.py)
+
+## Practical Caveats
+
+- LEAN is currently benchmark/parity coverage, not full scenario-matrix coverage.
+- The adapter currently supports daily data only.
+- The local `lean.json` is a manual prerequisite and is intentionally not
+  committed.
+- Docker startup and LEAN container initialization make LEAN slower and more
+  operationally fragile than the Python-native backtest validation paths.

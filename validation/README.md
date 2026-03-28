@@ -4,6 +4,7 @@
 
 - [Validation Methodology](METHODOLOGY.md) -- philosophy, behavioral matrix, profile system
 - [Known Limitations](../LIMITATIONS.md) -- edge cases, what's not modeled
+- [LEAN Validation Workflow](lean/README.md) -- exact LEAN setup used in parity/benchmark runs
 
 ## Overview
 
