@@ -75,7 +75,7 @@ result = run_backtest(prices, BuyAndHold(), config="backtrader")
 | `zipline_strict` | 225,583 | 0 (0.00%) | $19 (0.0001%) |
 | `backtrader_strict` | 216,980 | 1 (0.0005%) | $503 (0.004%) |
 | `vectorbt_strict` | 210,352 | 91 (0.04%) | $0 (0.00%) |
-| `lean_strict` | 226,172 | 589 (0.26%) | $7.2K (0.66%) |
+| `lean` | 428,459 fills | 0 (0.00%) | $1.55 (0.0002%) |
 
 ## Installation
 

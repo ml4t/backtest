@@ -102,11 +102,13 @@ def test_profile_registry_has_lean_profile() -> None:
 
 
 def test_lean_profile_is_independent_of_backtrader() -> None:
-    """LEAN profile must NOT inherit from Backtrader (allow_leverage differs)."""
+    """LEAN profile must remain distinct from Backtrader on execution semantics."""
     lean = BacktestConfig.from_preset("lean")
     bt = BacktestConfig.from_preset("backtrader")
-    assert lean.allow_leverage is False
-    assert bt.allow_leverage is True
+    assert lean.fill_ordering.value == "exit_first"
+    assert bt.fill_ordering.value == "fifo"
+    assert lean.commission_per_share == 0.005
+    assert bt.commission_rate == 0.001
 
 
 def test_quantconnect_alias_resolves_to_lean() -> None:

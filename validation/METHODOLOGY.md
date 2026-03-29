@@ -38,7 +38,7 @@ replicate that framework's behavior:
 | `vectorbt` / `vectorbt_strict` | VectorBT Pro/OSS | 0% trade gap, 0% value gap |
 | `backtrader` / `backtrader_strict` | Backtrader | 0% trade gap, 0% value gap |
 | `zipline` / `zipline_strict` | Zipline Reloaded | 0% trade gap, 0% value gap |
-| `lean` / `lean_strict` | QuantConnect LEAN | 0% trade gap, 0% value gap |
+| `lean` | QuantConnect LEAN | 0% fill gap, near-0% value gap |
 | `default` | ml4t's own opinion | Best-practice defaults |
 | `realistic` | Conservative simulation | Adds costs, integer shares |
 
@@ -209,15 +209,18 @@ previous close.
 
 ### "Strict" Profile Additions (for validation parity)
 
-| Knob | vbt_strict | bt_strict | zip_strict | lean_strict |
+| Knob | vbt_strict | bt_strict | zip_strict | lean |
 |------|-----------|-----------|------------|-------------|
 | `short_cash_policy` | **lock_notional** | credit | **credit** | credit |
 | `skip_cash_validation` | false | false | **true** | false |
 | `reject_on_insufficient_cash` | **true** | true | true | true |
 | `fill_ordering` | **fifo** | fifo | exit_first | **exit_first** |
-| `next_bar_submission_precheck` | -- | **true** | -- | **true** |
-| `next_bar_simple_cash_check` | -- | **true** | -- | **false** |
-| `allow_short_selling` | -- | -- | **true** | -- |
+| `next_bar_submission_precheck` | -- | **true** | -- | false |
+| `next_bar_simple_cash_check` | -- | **true** | -- | false |
+| `allow_short_selling` | -- | -- | **true** | **true** |
+| `allow_leverage` | -- | -- | -- | **true** |
+| `execution_mode` | -- | **next_bar** | **next_bar** | **next_bar** |
+| `execution_price` | -- | **open** | **open** | **open** |
 
 ---
 
@@ -229,17 +232,17 @@ Validated on both synthetic and **real market data** (250 US equities, 1998-2018
 
 | Profile | ml4t Trades | Ext Trades | Trade Gap | ml4t Value | Ext Value | Value Gap | Speedup |
 |---------|-------------|------------|-----------|------------|-----------|-----------|---------|
-| **zipline_strict** | 226,723 | 226,723 | **0 (0.00%)** | -$18,846,482 | -$18,846,501 | **$19 (0.0001%)** | **8.4x** |
-| **backtrader_strict** | 216,980 | 216,981 | -1 (0.0005%) | $13,880,796 | $13,881,298 | $503 (0.004%) | **19.3x** |
+| **zipline_strict** | 226,723 | 226,723 | **0 (0.00%)** | $720,044.00 | $720,033.70 | **$10.30 (0.0014%)** | **8.0x** |
+| **backtrader_strict** | 226,535 | 226,535 | **0 (0.00%)** | $746,797.21 | $746,797.21 | **float noise** | **7.7x** |
 | **vectorbt_strict** | 210,352 | 210,261 | +91 (0.04%) | $135,539 | $135,539 | $0 (0.00%) | 0.04x |
-| **lean_strict** | 226,246 | 225,583 | +663 (0.29%) | $1,106,708 | $1,093,558 | $13,150 (1.2%) | **5.3x** |
+| **lean** | 428,459 fills | 428,459 fills | **0 (0.00%)** | $720,044.00 | $720,042.45 | **$1.55 (0.0002%)** | **3.4x** |
 
 ### Parity Confidence
 
 | Framework | Trade Diff (real) | Value Diff (real) | Confidence | Status |
 |-----------|-------------------|-------------------|------------|--------|
-| Zipline | **0 (0.00%)** | **$19 (0.0001%)** | **99.9%+** | DONE |
-| Backtrader | **-1 (0.0005%)** | $503 (0.004%) | **99%+** | Production |
+| Zipline | **0 (0.00%)** | **$10.30 (0.0014%)** | **99.9%+** | DONE |
+| Backtrader | **0 (0.00%)** | float noise | **99.9%+** | DONE |
 | VBT OSS | +91 (0.04%) | $0 (0.00%) | **99%+** | Production |
 | LEAN | +663 (0.29%) | $13K (1.2%) | **97%+** | Buying-power reservation gap |
 

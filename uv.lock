@@ -2092,6 +2092,8 @@ requires-dist = [
     { name = "ml4t-backtest", marker = "extra == 'all'", editable = "." },
     { name = "ml4t-backtest", marker = "extra == 'backtest'", editable = "." },
     { name = "ml4t-data", editable = "../ml4t-data" },
+    { name = "ml4t-data", marker = "extra == 'all'", editable = "../ml4t-data" },
+    { name = "ml4t-data", marker = "extra == 'factors'", editable = "../ml4t-data" },
     { name = "ml4t-engineer", editable = "../ml4t-engineer" },
     { name = "numba", specifier = ">=0.57.0" },
     { name = "numpy", specifier = ">=1.24.0" },
@@ -2127,7 +2129,7 @@ requires-dist = [
     { name = "xgboost", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "xgboost", marker = "extra == 'ml'", specifier = ">=2.0.0" },
 ]
-provides-extras = ["all", "backtest", "dashboard", "dev", "docs", "gpu", "ml", "tracking", "viz"]
+provides-extras = ["all", "backtest", "dashboard", "dev", "docs", "factors", "gpu", "ml", "tracking", "viz"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -186,7 +186,7 @@ config = BacktestConfig.from_preset("realistic")
 ```
 
 Each preset sets all 40+ behavioral knobs to match the target framework's behavior.
-Strict variants (`backtrader_strict`, `vectorbt_strict`, `zipline_strict`, `lean_strict`)
+Strict variants (`backtrader_strict`, `vectorbt_strict`, `zipline_strict`)
 are also available for exact parity testing.
 
 ## Insufficient Funds

@@ -12,6 +12,7 @@ Validates that BacktestConfig fields actually affect execution:
 from datetime import datetime
 
 import pytest
+from ml4t.data.artifacts.market_data import FeedSpec
 
 from ml4t.backtest import (
     BacktestConfig,
@@ -37,7 +38,6 @@ from ml4t.backtest.models import (
     VolumeShareSlippage,
 )
 from ml4t.backtest.types import OrderSide, Position
-from ml4t.data.artifacts.market_data import FeedSpec
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -368,10 +368,11 @@ class TestShortCashPolicy:
         assert config.next_bar_submission_precheck is True
         assert config.next_bar_simple_cash_check is True
 
-    def test_lean_strict_profile_uses_buying_power_settlement(self):
-        config = BacktestConfig.from_preset("lean_strict")
-        assert config.buying_power_reservation is True
-        assert config.settlement_delay == 2
+    def test_lean_profile_uses_margin_next_bar_open(self):
+        config = BacktestConfig.from_preset("lean")
+        assert config.allow_leverage is True
+        assert config.execution_mode == ExecutionMode.NEXT_BAR
+        assert config.execution_price == ExecutionPrice.OPEN
 
     def test_lock_notional_reversal_obeys_partial_cash_cap(self):
         broker = _make_broker(
@@ -483,6 +484,58 @@ class TestFillOrdering:
         # EXIT_FIRST: AAPL sell frees $10k, then GOOG buy succeeds
         assert broker.get_position("AAPL") is None
         assert broker.get_position("GOOG") is not None
+
+    def test_exit_first_reclassifies_later_reversal_as_entry(self):
+        """Later same-asset orders must stop being exits once flat."""
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            fill_ordering=FillOrdering.EXIT_FIRST,
+            allow_short_selling=False,
+            allow_leverage=False,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+        assert broker.get_position("AAPL") is not None
+
+        _set_prices(broker, {"AAPL": 100.0})
+        broker.submit_order("AAPL", 80, OrderSide.SELL)
+        broker.submit_order("AAPL", 80, OrderSide.SELL)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity == 20.0
+        rejected = [o for o in broker.orders if o.rejection_reason]
+        assert len(rejected) == 1
+
+    def test_exit_first_preserves_submission_order_for_deferred_entries(self):
+        """Deferred same-asset entries must keep their original submission order."""
+        broker = _make_broker(
+            initial_cash=20_000.0,
+            fill_ordering=FillOrdering.EXIT_FIRST,
+            entry_order_priority=EntryOrderPriority.SUBMISSION,
+            allow_short_selling=False,
+            allow_leverage=False,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+        assert broker.get_position("AAPL") is not None
+        assert broker.cash == 10_000.0
+
+        _set_prices(broker, {"AAPL": 100.0})
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker.submit_order("AAPL", 100, OrderSide.SELL)
+        broker.submit_order("AAPL", 100, OrderSide.SELL)
+        broker._process_orders()
+
+        # Submission order must be: older buy first, then deferred sell.
+        assert broker.get_position("AAPL") is None
+        rejected = [o for o in broker.orders if o.rejection_reason]
+        assert rejected == []
 
 
 class TestEntryOrderPriority:
@@ -671,6 +724,12 @@ class TestPresetRoundTrip:
         assert config.share_type == ShareType.INTEGER
         assert config.cash_buffer_pct == 0.02
 
+    def test_lean_preset_values(self):
+        config = BacktestConfig.from_preset("lean")
+        assert config.share_type == ShareType.INTEGER
+        assert config.fill_ordering == FillOrdering.EXIT_FIRST
+        assert config.next_bar_queue_shadow_validation is True
+
     def test_to_dict_from_dict_roundtrip(self):
         config = BacktestConfig.from_preset("backtrader")
         d = config.to_dict()
@@ -680,6 +739,7 @@ class TestPresetRoundTrip:
         assert restored.cash_buffer_pct == config.cash_buffer_pct
         assert restored.reject_on_insufficient_cash == config.reject_on_insufficient_cash
         assert restored.partial_fills_allowed == config.partial_fills_allowed
+        assert restored.next_bar_queue_shadow_validation == config.next_bar_queue_shadow_validation
 
     def test_sizing_method_removed_from_fields(self):
         """sizing_method was removed from BacktestConfig fields."""
@@ -840,12 +900,6 @@ class TestImmediateFill:
         config = BacktestConfig(immediate_fill=True)
         broker = Broker.from_config(config)
         assert broker.immediate_fill is True
-
-    def test_lean_strict_profile_uses_buying_power_reservation(self):
-        config = BacktestConfig.from_preset("lean_strict")
-        assert config.buying_power_reservation is True
-        assert config.immediate_fill is False
-        assert config.settlement_delay == 2
 
     def test_to_dict_from_dict_roundtrip(self):
         config = BacktestConfig(immediate_fill=True, mark_price=ExecutionPrice.QUOTE_MID)

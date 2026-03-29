@@ -83,6 +83,7 @@ class Broker:
         next_bar_submission_precheck: bool = False,
         next_bar_simple_cash_check: bool = False,
         buying_power_reservation: bool = False,
+        next_bar_queue_shadow_validation: bool = False,
         immediate_fill: bool = False,
         reject_on_insufficient_cash: bool = True,
         skip_cash_validation: bool = False,
@@ -125,6 +126,7 @@ class Broker:
         self.next_bar_submission_precheck = next_bar_submission_precheck
         self.next_bar_simple_cash_check = next_bar_simple_cash_check
         self.buying_power_reservation = buying_power_reservation
+        self.next_bar_queue_shadow_validation = next_bar_queue_shadow_validation
         self.immediate_fill = immediate_fill
         self.reject_on_insufficient_cash = reject_on_insufficient_cash
         self.skip_cash_validation = skip_cash_validation
@@ -343,6 +345,7 @@ class Broker:
             next_bar_submission_precheck=config.next_bar_submission_precheck,
             next_bar_simple_cash_check=config.next_bar_simple_cash_check,
             buying_power_reservation=config.buying_power_reservation,
+            next_bar_queue_shadow_validation=config.next_bar_queue_shadow_validation,
             immediate_fill=config.immediate_fill,
             reject_on_insufficient_cash=config.reject_on_insufficient_cash,
             skip_cash_validation=config.skip_cash_validation,

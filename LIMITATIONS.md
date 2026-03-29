@@ -13,7 +13,6 @@ Understanding these helps set realistic expectations for backtest results.
 
 ### Settlement Delay (Optional)
 - `settlement_delay` models T+N settlement (proceeds unavailable for N bars)
-- Used by the `lean_strict` profile (T+2 for US equities)
 - Does not model partial settlement or settlement failure
 
 ## Corporate Actions
@@ -187,7 +186,7 @@ and 1500-bar stress tests across 9 market regimes.
 | zipline_strict | 225,583 | 0 trades (0.00%) | $19 (0.0001%) |
 | backtrader_strict | 216,980 | 1 trade (0.0005%) | $503 (0.004%) |
 | vectorbt_strict | 210,352 | 91 trades (0.04%) | $0 (0.00%) |
-| lean_strict | 226,172 | 589 trades (0.26%) | $7,200 (0.66%) |
+| lean | 428,459 fills | 0 fills (0.00%) | $1.55 (0.0002%) |
 
 ### What's Validated
 

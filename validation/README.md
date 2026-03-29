@@ -43,10 +43,10 @@ Data: `us_equities.parquet` (250 US equities, 1998-2018). Strategy: long top 25,
 
 | Profile | ml4t Trades | Ref Trades | Trade Gap | Value Gap | Speed |
 |---------|-------------|------------|-----------|-----------|-------|
-| **zipline_strict** | 226,723 | 226,723 | **0 (0.00%)** | $19 (0.0001%) | **8.4x faster** |
-| **backtrader_strict** | 216,980 | 216,981 | 1 (0.0005%) | $503 (0.004%) | **19.3x faster** |
+| **zipline_strict** | 226,723 | 226,723 | **0 (0.00%)** | $10.30 (0.0014%) | **8.0x faster** |
+| **backtrader_strict** | 226,535 | 226,535 | **0 (0.00%)** | ~$0 (float noise) | **7.7x faster** |
 | **vectorbt_strict** | 210,352 | 210,261 | 91 (0.04%) | $0 (0.00%) | 0.04x |
-| **lean_strict** | 226,246 | 225,583 | 663 (0.29%) | $13,150 (1.2%) | **5.3x faster** |
+| **lean** | 428,459 fills | 428,459 fills | **0 (0.00%)** | $1.55 (0.0002%) | **3.4x faster** |
 
 ## How to Run
 
@@ -142,7 +142,7 @@ validation/
 
 | Profile | Gap | Root Cause | Next Step |
 |---------|-----|------------|-----------|
-| zipline_strict | 0 trades, $19 | Floating point | **DONE** |
-| backtrader_strict | 1 trade, $503 | Unknown | Per-bar investigation |
+| zipline_strict | 0 trades, $10.30 | Small terminal-value residual | **DONE** |
+| backtrader_strict | 0 trades, float noise | Floating point | **DONE** |
 | vectorbt_strict | 91 trades, $0 | Unknown | Signal processing audit |
-| lean_strict | 663 trades, $13K | Buying-power reservation | Add `buying_power_reservation` knob |
+| lean | 0 fills, $1.55 | Price precision / mark-to-market rounding | **DONE** |
