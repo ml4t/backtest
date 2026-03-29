@@ -192,14 +192,18 @@ class ExecutionEngine:
         broker = self.broker
         policy = broker.account.policy
         qty_delta = order.quantity if order.side is OrderSide.BUY else -order.quantity
-        current_qty = shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
+        current_qty = (
+            shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
+        )
         new_qty = current_qty + qty_delta
         is_reversal = (
             abs(current_qty) > 1e-12
             and abs(new_qty) > 1e-12
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
-        commission = broker.commission_model.calculate(order.asset, order.quantity, validation_price)
+        commission = broker.commission_model.calculate(
+            order.asset, order.quantity, validation_price
+        )
 
         if abs(current_qty) <= 1e-12:
             return policy.validate_new_position(
@@ -238,7 +242,9 @@ class ExecutionEngine:
     ) -> float:
         broker = self.broker
         qty_delta = order.quantity if order.side is OrderSide.BUY else -order.quantity
-        current_qty = shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
+        current_qty = (
+            shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
+        )
         new_qty = current_qty + qty_delta
         commission = broker.commission_model.calculate(order.asset, order.quantity, fill_price)
         shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission

@@ -100,7 +100,11 @@ def transactions_to_trade_log(transactions: pd.DataFrame) -> pd.DataFrame | None
         if "asset" in transactions.columns
         else None
     )
-    if symbol_col is None or amount_col not in transactions.columns or price_col not in transactions.columns:
+    if (
+        symbol_col is None
+        or amount_col not in transactions.columns
+        or price_col not in transactions.columns
+    ):
         return None
 
     trade_records: list[dict[str, object]] = []
@@ -361,7 +365,9 @@ def run_zipline_target_shares(
     transactions = flatten_result_column(results, "transactions")
     orders = flatten_result_column(results, "orders")
     trades_df = transactions_to_trade_log(transactions)
-    num_trades = len(trades_df) if trades_df is not None else int(len(orders)) if not orders.empty else 0
+    num_trades = (
+        len(trades_df) if trades_df is not None else int(len(orders)) if not orders.empty else 0
+    )
 
     return ZiplineRunResult(
         final_value=float(results["portfolio_value"].iloc[-1]),
