@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import polars as pl
 import pytest
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.config import BacktestConfig
 from ml4t.backtest.result import (

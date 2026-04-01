@@ -69,7 +69,7 @@ requires-python = ">=3.12"
 
 # Core dependencies
 dependencies = [
-    "ml4t-data>=0.1.0b7",
+    "ml4t-specs>=0.1.0b0",
     "polars>=0.20.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
@@ -250,6 +250,7 @@ exclude_lines = [
 ]
 
 [tool.uv.sources]
+ml4t-specs = { path = "../ml4t-specs", editable = true }
 ml4t-data = { path = "../ml4t-data", editable = true }
 ml4t-engineer = { path = "../ml4t-engineer", editable = true }
 ml4t-diagnostic = { path = "../ml4t-diagnostic", editable = true }

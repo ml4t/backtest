@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.0b13 - 2026-04-01
+
+### Changed
+
+- `ml4t-backtest` now depends on `ml4t-specs` for shared market-data artifact contracts
+  instead of importing `FeedSpec`, `MarketDataSpec`, and serialization helpers from
+  `ml4t-data`.
+- Runtime config, data-feed, result, annualization, and rebalance-schedule code now import
+  shared contract types from `ml4t.specs`.
+- `spec_bridge.market_data_spec_to_feed_spec()` now delegates to `FeedSpec.from_any()` so
+  spec-to-runtime projection stays aligned with the canonical contract package.
+- Contract, feed, broker, result, rebalancer, schedule, and artifact-spec tests now validate
+  the `ml4t-specs` path directly.
+- User docs now show `FeedSpec` imports from `ml4t.specs`.
+
+### Validation
+
+- `uv run pytest tests/ -q`
+- `uv run ty check`
+- `uv run python -m mkdocs build --strict`
+
 ## 0.1.0b12 - 2026-03-29
 
 ### Added

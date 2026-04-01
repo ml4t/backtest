@@ -3,7 +3,7 @@
 from datetime import datetime
 
 import pytest
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.broker import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageCommission

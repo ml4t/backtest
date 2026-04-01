@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from ml4t.data.artifacts.base import serialize_artifact_value
-from ml4t.data.artifacts.market_data import FeedSpec, TimestampSemantics
+from ml4t.specs.base import serialize_artifact_value
+from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
 from .types import ExecutionMode, StopFillMode, StopLevelBasis
 

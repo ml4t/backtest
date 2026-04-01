@@ -9,7 +9,7 @@ from typing import Any
 
 import polars as pl
 
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs.market_data import FeedSpec
 
 
 class _AssetsData(dict[str, dict[str, Any]]):

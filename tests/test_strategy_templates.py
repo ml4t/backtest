@@ -13,7 +13,7 @@ from ml4t.backtest.strategies import (
     MomentumStrategy,
     SignalFollowingStrategy,
 )
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs.market_data import FeedSpec
 
 
 def make_price_data(
