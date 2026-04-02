@@ -248,10 +248,3 @@ exclude_lines = [
     "except ImportError:",
     "@abstractmethod",
 ]
-
-[tool.uv.sources]
-ml4t-specs = { path = "../ml4t-specs", editable = true }
-ml4t-data = { path = "../ml4t-data", editable = true }
-ml4t-engineer = { path = "../ml4t-engineer", editable = true }
-ml4t-diagnostic = { path = "../ml4t-diagnostic", editable = true }
-# Sibling package for optional tearsheet integration
