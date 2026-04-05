@@ -532,6 +532,10 @@ class BacktestConfig:
     next_bar_submission_precheck: bool = False
     next_bar_simple_cash_check: bool = False
     buying_power_reservation: bool = False  # Reserve cash at submission (LEAN-style)
+    # TODO(parity): consider an explicit profile/knob for "commit basket at close,
+    # fill reserved orders at next open" semantics. Keep it separate from the
+    # default next-bar/open path, which currently revalidates affordability at
+    # the actual open.
     next_bar_queue_shadow_validation: bool = False
     immediate_fill: bool = False  # Fill same-bar market orders at submit time (LEAN-style)
     rebalance_mode: RebalanceMode = RebalanceMode.INCREMENTAL

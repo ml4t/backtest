@@ -6,6 +6,7 @@ import pytest
 from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.broker import Broker
+from ml4t.backtest.config import ShareType
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageCommission
 from ml4t.backtest.types import (
     ExecutionMode,
@@ -2028,6 +2029,58 @@ class TestNextBarExecutionMode:
         # Find exit fill (second fill)
         exit_fill = [f for f in broker.fills if f.order_id == exit_order.order_id][0]
         assert exit_fill.price == 107.0
+
+    def test_next_bar_rebalance_exit_rounds_integer_quantity(self):
+        """Rebalance exits in NEXT_BAR mode should honor integer share rounding."""
+        from ml4t.backtest.types import ExecutionMode
+
+        broker = Broker(1000.0, NoCommission(), NoSlippage(), share_type=ShareType.INTEGER)
+        broker.execution_mode = ExecutionMode.NEXT_BAR
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0, "MSFT": 100.0},
+            opens={"AAPL": 100.0, "MSFT": 100.0},
+            volumes={"AAPL": 1_000_000, "MSFT": 1_000_000},
+            highs={"AAPL": 100.0, "MSFT": 100.0},
+            lows={"AAPL": 100.0, "MSFT": 100.0},
+            signals={},
+        )
+        broker.rebalance_to_weights({"AAPL": 0.6, "MSFT": 0.4})
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 110.0, "MSFT": 90.0},
+            opens={"AAPL": 100.0, "MSFT": 100.0},
+            volumes={"AAPL": 1_000_000, "MSFT": 1_000_000},
+            highs={"AAPL": 110.0, "MSFT": 90.0},
+            lows={"AAPL": 110.0, "MSFT": 90.0},
+            signals={},
+        )
+        broker._orders_this_bar.clear()
+        broker._process_orders(use_open=True)
+
+        broker.rebalance_to_weights({"AAPL": 0.2, "MSFT": 0.8})
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3, 9, 30),
+            prices={"AAPL": 120.0, "MSFT": 80.0},
+            opens={"AAPL": 120.0, "MSFT": 80.0},
+            volumes={"AAPL": 1_000_000, "MSFT": 1_000_000},
+            highs={"AAPL": 120.0, "MSFT": 80.0},
+            lows={"AAPL": 120.0, "MSFT": 80.0},
+            signals={},
+        )
+        broker._orders_this_bar.clear()
+        broker._process_orders(use_open=True)
+
+        exit_fill = next(
+            fill
+            for fill in broker.fills
+            if fill.asset == "AAPL" and fill.side == OrderSide.SELL and fill.timestamp.date().isoformat() == "2024-01-03"
+        )
+
+        assert exit_fill.quantity == 4.0
 
 
 class TestBracketOrderParentCancellation:

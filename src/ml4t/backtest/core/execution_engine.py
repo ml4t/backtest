@@ -64,6 +64,14 @@ class ExecutionEngine:
             if not self._is_exit_order(order):
                 deferred_entries.append(order)
                 continue
+            # Exit-first processing needs the same integer-share quantization as
+            # the generic per-order path; rebalance deltas often arrive as
+            # fractional target values even when the broker disallows them.
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                continue
             price = fill.get_fill_price_for_order(order, use_open)
             if price is None:
                 continue
@@ -382,6 +390,15 @@ class ExecutionEngine:
         is_exit = self._is_exit_order(order)
 
         if is_exit:
+            # Exit orders can originate from fractional target-value deltas during
+            # rebalances. Integer-share brokers must still quantize queued next-bar
+            # exits before fill, just like entry orders and immediate fills.
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                return
+
             fill_price = fill.check_fill(order, price)
             if fill_price is not None:
                 if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):
