@@ -25,7 +25,7 @@ These are the pieces that mattered in practice:
    The adapter falls back to:
 
    ```bash
-   uvx --python 3.12 --with setuptools<81 lean
+   uvx --python 3.12 --with "setuptools<81" lean
    ```
 
 3. We required a machine-local LEAN workspace config at:
@@ -43,10 +43,9 @@ These are the pieces that mattered in practice:
 From the repository root:
 
 ```bash
-cd /home/stefan/ml4t/libraries/ml4t-backtest
 mkdir -p validation/lean/workspace
 cd validation/lean/workspace
-uvx --python 3.12 --with setuptools<81 lean init
+uvx --python 3.12 --with "setuptools<81" lean init
 ```
 
 If `lean` is already installed on `PATH`, this also works:
@@ -82,7 +81,6 @@ Use the benchmark suite, not the legacy `run_all_correctness.py` LEAN path.
 Typical invocation:
 
 ```bash
-cd /home/stefan/ml4t/libraries/ml4t-backtest
 python validation/benchmark_suite.py \
   --framework lean \
   --scenario daily_baseline \
@@ -93,7 +91,6 @@ python validation/benchmark_suite.py \
 To compare the ml4t side using the LEAN-style profile:
 
 ```bash
-cd /home/stefan/ml4t/libraries/ml4t-backtest
 python validation/benchmark_suite.py \
   --framework ml4t-lean-strict \
   --scenario daily_baseline \
