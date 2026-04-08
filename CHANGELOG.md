@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.1.0b13 - 2026-04-01
+
+### Changed
+
+- `ml4t-backtest` now depends on `ml4t-specs` for shared market-data artifact contracts
+  instead of importing `FeedSpec`, `MarketDataSpec`, and serialization helpers from
+  `ml4t-data`.
+- Runtime config, data-feed, result, annualization, and rebalance-schedule code now import
+  shared contract types from `ml4t.specs`.
+- `spec_bridge.market_data_spec_to_feed_spec()` now delegates to `FeedSpec.from_any()` so
+  spec-to-runtime projection stays aligned with the canonical contract package.
+- Contract, feed, broker, result, rebalancer, schedule, and artifact-spec tests now validate
+  the `ml4t-specs` path directly.
+- User docs now show `FeedSpec` imports from `ml4t.specs`.
+
+### Validation
+
+- `uv run pytest tests/ -q`
+- `uv run ty check`
+- `uv run python -m mkdocs build --strict`
+
+## 0.1.0b12 - 2026-03-29
+
+### Added
+
+- Internal shipped validation helpers under `ml4t.backtest._validation`, including:
+  - `lean_runner.py` for shared LEAN CLI orchestration, data export, and artifact parsing
+  - `vectorbt_runner.py` for shared VectorBT matrix prep, execution, and result extraction
+  - `backtrader_runner.py` for shared Backtrader target-share execution and PyFolio parsing
+  - `zipline_runner.py` for shared Zipline bundle orchestration and transaction parsing
+
+### Changed
+
+- The library validation harness now uses the shared `_validation` helpers instead of
+  carrying duplicate LEAN, VectorBT, Backtrader, and Zipline integration logic inside
+  `validation/benchmark_suite.py`.
+- Chapter 16 book parity code can now rely on the released `ml4t-backtest` package for
+  shared cross-engine validation machinery instead of vendoring those heavy helpers.
+
+### Validation
+
+- `uv run pytest tests/benchmark/test_lean_adapter.py tests/benchmark/test_backtrader_zipline_runners.py tests/test_config_wiring.py -q`
+- `uv run python -m py_compile src/ml4t/backtest/_validation/lean_runner.py src/ml4t/backtest/_validation/vectorbt_runner.py src/ml4t/backtest/_validation/backtrader_runner.py src/ml4t/backtest/_validation/zipline_runner.py validation/benchmark_suite.py`
+
 ## 0.1.0b11 - 2026-03-24
 
 ### Added

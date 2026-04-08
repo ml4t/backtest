@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ml4t.diagnostic.artifacts import dump_spec, load_market_data_spec, load_spec
+from ml4t.engineer.artifacts import FeatureSpec, LabelSpec, PredictionSpec
+from ml4t.specs import ArtifactKind, FeedSpec, MarketDataSpec, TimestampSemantics
+
 from ml4t.backtest.spec_bridge import (
     market_data_spec_to_feed_spec,
     market_data_spec_to_runtime_metadata,
 )
-from ml4t.data.artifacts import ArtifactKind, FeedSpec, MarketDataSpec, TimestampSemantics
-from ml4t.diagnostic.artifacts import dump_spec, load_market_data_spec, load_spec
-from ml4t.engineer.artifacts import FeatureSpec, LabelSpec, PredictionSpec
 
 
 def test_market_data_spec_from_mapping_normalizes_timestamp_semantics() -> None:
@@ -18,7 +19,7 @@ def test_market_data_spec_from_mapping_normalizes_timestamp_semantics() -> None:
             "kind": "market_data",
             "schema": {
                 "timestamp_col": "ts",
-                "entity_col": "symbol",
+                "entity_col": "asset",
                 "close_col": "last_trade_price",
                 "bid_col": "close_bid_price",
                 "ask_col": "close_ask_price",
@@ -48,7 +49,7 @@ def test_market_data_spec_to_feed_spec_preserves_quote_and_temporal_fields() -> 
             "kind": "market_data",
             "schema": {
                 "timestamp_col": "timestamp",
-                "entity_col": "symbol",
+                "entity_col": "asset",
                 "price_col": "mid_close",
                 "open_col": "open",
                 "high_col": "high",
@@ -173,11 +174,6 @@ def test_load_spec_dispatches_label_spec() -> None:
         {
             "artifact_id": "us_equities_fwd_ret_1d_v1",
             "kind": "labels",
-            "schema": {
-                "timestamp_col": "timestamp",
-                "entity_col": "symbol",
-                "label_col": "fwd_ret_1d",
-            },
             "definition": {
                 "family": "forward_return",
                 "task_type": "regression",
@@ -190,7 +186,8 @@ def test_load_spec_dispatches_label_spec() -> None:
 
     assert isinstance(spec, LabelSpec)
     assert spec.definition.buffer == "1D"
-    assert spec.schema.label_col == "fwd_ret_1d"
+    assert spec.schema.entity_col == "asset"
+    assert spec.schema.label_col == "label_value"
 
 
 def test_load_spec_dispatches_feature_spec() -> None:
@@ -200,18 +197,18 @@ def test_load_spec_dispatches_feature_spec() -> None:
             "kind": "features",
             "schema": {
                 "timestamp_col": "timestamp",
-                "entity_col": "symbol",
                 "feature_columns": ["mom_21", "vol_21"],
             },
             "definition": {
                 "family": "financial",
-                "join_keys": ["timestamp", "symbol"],
+                "join_keys": ["timestamp", "asset"],
                 "source_artifacts": ["us_equities_daily_bars_v1"],
             },
         }
     )
 
     assert isinstance(spec, FeatureSpec)
+    assert spec.schema.entity_col == "asset"
     assert spec.schema.feature_columns == ("mom_21", "vol_21")
     assert spec.definition.source_artifacts == ("us_equities_daily_bars_v1",)
 
@@ -221,11 +218,6 @@ def test_load_spec_dispatches_prediction_spec() -> None:
         {
             "artifact_id": "us_equities_preds_v1",
             "kind": "predictions",
-            "schema": {
-                "timestamp_col": "timestamp",
-                "entity_col": "symbol",
-                "prediction_col": "prediction",
-            },
             "definition": {
                 "split_protocol": "walk_forward_oos",
                 "label_artifact": "us_equities_fwd_ret_1d_v1",
@@ -236,5 +228,7 @@ def test_load_spec_dispatches_prediction_spec() -> None:
     )
 
     assert isinstance(spec, PredictionSpec)
+    assert spec.schema.entity_col == "asset"
+    assert spec.schema.prediction_col == "prediction_value"
     assert spec.definition.feature_artifacts == ("us_equities_financial_features_v1",)
     assert spec.definition.training_hash == "abc123"

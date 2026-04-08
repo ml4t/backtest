@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType
+import copy
+
+from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType, Position
 from .shared import is_exit_order
 
 
@@ -13,6 +15,10 @@ class ExecutionEngine:
         self.broker = broker
 
     def process_orders(self, use_open: bool = False):
+        if self._should_use_next_bar_queue_shadow_validation(use_open):
+            self._process_orders_next_bar_queue_shadow(use_open)
+            return
+
         ordering = self.broker.fill_ordering.value
         if ordering == "exit_first":
             self._process_orders_exit_first(use_open)
@@ -30,6 +36,7 @@ class ExecutionEngine:
         fill = broker._fill_engine
         exit_orders = []
         entry_orders = []
+        eligible_orders = []
         orders_this_bar_ids = broker._orders_this_bar_ids
 
         for order in broker.pending_orders[:]:
@@ -38,14 +45,33 @@ class ExecutionEngine:
                 and order.order_id in orders_this_bar_ids
             ):
                 continue
+            eligible_orders.append(order)
             if self._is_exit_order(order):
                 exit_orders.append(order)
             else:
                 entry_orders.append(order)
 
         filled_orders: list = []
+        deferred_entries: list = []
 
         for order in exit_orders:
+            if order.status is not OrderStatus.PENDING:
+                continue
+            # Exit classification must be re-evaluated at fill time. Multiple
+            # queued orders for the same asset can exhaust the current
+            # position; later orders then become reversals/new entries and must
+            # go through the normal entry validation path.
+            if not self._is_exit_order(order):
+                deferred_entries.append(order)
+                continue
+            # Exit-first processing needs the same integer-share quantization as
+            # the generic per-order path; rebalance deltas often arrive as
+            # fractional target values even when the broker disallows them.
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                continue
             price = fill.get_fill_price_for_order(order, use_open)
             if price is None:
                 continue
@@ -59,12 +85,205 @@ class ExecutionEngine:
                     fill.update_partial_order(order)
 
         broker.mark_account_positions(use_open=use_open)
+        if deferred_entries:
+            entry_order_ids = {order.order_id for order in entry_orders}
+            entry_order_ids.update(order.order_id for order in deferred_entries)
+            entry_orders = [order for order in eligible_orders if order.order_id in entry_order_ids]
         entry_orders = self._sort_entry_orders(entry_orders, use_open=use_open)
 
         for order in entry_orders:
             self._process_single_order(order, use_open, filled_orders)
 
         self._cleanup_filled_orders(filled_orders)
+
+    def _should_use_next_bar_queue_shadow_validation(self, use_open: bool) -> bool:
+        broker = self.broker
+        if not (
+            use_open
+            and broker.execution_mode is ExecutionMode.NEXT_BAR
+            and broker.next_bar_queue_shadow_validation
+        ):
+            return False
+
+        current_bar_index = broker._bar_index
+        for order in broker.pending_orders:
+            if order.order_id in broker._orders_this_bar_ids:
+                continue
+            if getattr(order, "_created_bar_index", current_bar_index) < current_bar_index - 1:
+                return True
+
+        return False
+
+    def _process_orders_next_bar_queue_shadow(self, use_open: bool = False):
+        broker = self.broker
+        fill = broker._fill_engine
+        eligible_orders = []
+        orders_this_bar_ids = broker._orders_this_bar_ids
+
+        for order in broker.pending_orders[:]:
+            if (
+                broker.execution_mode is ExecutionMode.NEXT_BAR
+                and order.order_id in orders_this_bar_ids
+            ):
+                continue
+            eligible_orders.append(order)
+
+        if not eligible_orders:
+            return
+
+        shadow_cash = broker.account.cash
+        shadow_positions = {
+            asset: copy.deepcopy(position) for asset, position in broker.account.positions.items()
+        }
+        for asset, position in shadow_positions.items():
+            mark = broker._current_prices.get(asset)
+            if mark is not None:
+                position.current_price = mark
+
+        accepted_orders: list[tuple[object, float]] = []
+        filled_orders: list = []
+
+        for order in eligible_orders:
+            price = fill.get_fill_price_for_order(order, use_open)
+            if price is None:
+                continue
+
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                continue
+
+            fill_price = fill.check_fill(order, price)
+            if fill_price is None:
+                continue
+
+            validation_price = broker._current_prices.get(order.asset, fill_price)
+            valid, rejection_reason = self._validate_shadow_queue_order(
+                order=order,
+                validation_price=validation_price,
+                shadow_cash=shadow_cash,
+                shadow_positions=shadow_positions,
+            )
+            if not valid:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = rejection_reason
+                continue
+
+            accepted_orders.append((order, fill_price))
+            shadow_cash = self._commit_shadow_queue_fill(
+                order=order,
+                fill_price=fill_price,
+                shadow_cash=shadow_cash,
+                shadow_positions=shadow_positions,
+            )
+
+        for order, fill_price in accepted_orders:
+            fully_filled = fill.execute_fill(order, fill_price)
+            if fully_filled:
+                filled_orders.append(order)
+                broker._partial_orders.pop(order.order_id, None)
+            else:
+                fill.update_partial_order(order)
+            broker.mark_account_positions(use_open=False)
+
+        self._cleanup_filled_orders(filled_orders)
+
+    def _validate_shadow_queue_order(
+        self,
+        *,
+        order,
+        validation_price: float,
+        shadow_cash: float,
+        shadow_positions: dict[str, Position],
+    ) -> tuple[bool, str]:
+        broker = self.broker
+        policy = broker.account.policy
+        qty_delta = order.quantity if order.side is OrderSide.BUY else -order.quantity
+        current_qty = (
+            shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
+        )
+        new_qty = current_qty + qty_delta
+        is_reversal = (
+            abs(current_qty) > 1e-12
+            and abs(new_qty) > 1e-12
+            and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
+        )
+        commission = broker.commission_model.calculate(
+            order.asset, order.quantity, validation_price
+        )
+
+        if abs(current_qty) <= 1e-12:
+            return policy.validate_new_position(
+                asset=order.asset,
+                quantity=qty_delta,
+                price=validation_price,
+                current_positions=shadow_positions,
+                cash=shadow_cash - commission,
+            )
+        if is_reversal:
+            return policy.handle_reversal(
+                asset=order.asset,
+                current_quantity=current_qty,
+                order_quantity_delta=qty_delta,
+                price=validation_price,
+                current_positions=shadow_positions,
+                cash=shadow_cash,
+                commission=commission,
+            )
+        return policy.validate_position_change(
+            asset=order.asset,
+            current_quantity=current_qty,
+            quantity_delta=qty_delta,
+            price=validation_price,
+            current_positions=shadow_positions,
+            cash=shadow_cash - commission,
+        )
+
+    def _commit_shadow_queue_fill(
+        self,
+        *,
+        order,
+        fill_price: float,
+        shadow_cash: float,
+        shadow_positions: dict[str, Position],
+    ) -> float:
+        broker = self.broker
+        qty_delta = order.quantity if order.side is OrderSide.BUY else -order.quantity
+        current_qty = (
+            shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
+        )
+        new_qty = current_qty + qty_delta
+        commission = broker.commission_model.calculate(order.asset, order.quantity, fill_price)
+        shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
+
+        if abs(new_qty) <= 1e-12:
+            shadow_positions.pop(order.asset, None)
+            return shadow_cash
+
+        position = shadow_positions.get(order.asset)
+        if position is None:
+            shadow_positions[order.asset] = Position(
+                asset=order.asset,
+                quantity=new_qty,
+                entry_price=fill_price,
+                entry_time=broker._current_time,
+                current_price=broker._current_prices.get(order.asset, fill_price),
+                multiplier=broker.get_multiplier(order.asset),
+            )
+            return shadow_cash
+
+        is_reversal = (
+            abs(current_qty) > 1e-12
+            and abs(new_qty) > 1e-12
+            and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
+        )
+        position.quantity = new_qty
+        position.current_price = broker._current_prices.get(order.asset, fill_price)
+        if abs(current_qty) <= 1e-12 or is_reversal:
+            position.entry_price = fill_price
+
+        return shadow_cash
 
     def _process_orders_fifo(self, use_open: bool = False):
         broker = self.broker
@@ -119,6 +338,9 @@ class ExecutionEngine:
         shadow_validated = broker.buying_power_reservation
 
         for order in eligible_orders:
+            if order.status is not OrderStatus.PENDING:
+                continue
+
             price = fill.get_fill_price_for_order(order, use_open)
             if price is None:
                 continue
@@ -154,6 +376,8 @@ class ExecutionEngine:
     def _process_single_order(self, order, use_open: bool, filled_orders: list) -> None:
         broker = self.broker
         fill = broker._fill_engine
+        if order.status is not OrderStatus.PENDING:
+            return
         price = fill.get_fill_price_for_order(order, use_open)
         if price is None:
             return
@@ -166,6 +390,15 @@ class ExecutionEngine:
         is_exit = self._is_exit_order(order)
 
         if is_exit:
+            # Exit orders can originate from fractional target-value deltas during
+            # rebalances. Integer-share brokers must still quantize queued next-bar
+            # exits before fill, just like entry orders and immediate fills.
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                return
+
             fill_price = fill.check_fill(order, price)
             if fill_price is not None:
                 if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):

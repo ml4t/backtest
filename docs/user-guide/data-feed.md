@@ -60,7 +60,7 @@ Use `FeedSpec` or explicit keyword overrides when your schema differs from OHLCV
 
 ```python
 from ml4t.backtest import DataFeed
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs import FeedSpec
 
 feed = DataFeed(
     prices_df=quotes,

@@ -178,6 +178,7 @@ ZIPLINE_PROFILE = {
         "partial_fills_allowed": True,
         "fill_ordering": "exit_first",
         "entry_order_priority": "submission",
+        "next_bar_queue_shadow_validation": True,
         "rebalance_mode": "snapshot",
         "rebalance_headroom_pct": 0.998,
         "missing_price_policy": "use_last",
@@ -252,12 +253,15 @@ ZIPLINE_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 LEAN_PROFILE = {
     "account": {
         "allow_short_selling": True,
-        "allow_leverage": False,
+        "allow_leverage": True,
+        "initial_margin": 0.5,
+        "long_maintenance_margin": 0.25,
+        "short_maintenance_margin": 0.30,
         "short_cash_policy": "credit",
     },
     "execution": {
-        "execution_price": "close",
-        "execution_mode": "same_bar",
+        "execution_price": "open",
+        "execution_mode": "next_bar",
     },
     "stops": {
         "stop_fill_mode": "stop_price",
@@ -287,6 +291,7 @@ LEAN_PROFILE = {
         "partial_fills_allowed": False,
         "fill_ordering": "exit_first",
         "entry_order_priority": "submission",
+        "next_bar_queue_shadow_validation": True,
         "rebalance_mode": "snapshot",
         "rebalance_headroom_pct": 1.0,
         "missing_price_policy": "use_last",
@@ -294,10 +299,6 @@ LEAN_PROFILE = {
         "late_asset_min_bars": 1,
     },
 }
-
-LEAN_STRICT_PROFILE = deepcopy(LEAN_PROFILE)
-LEAN_STRICT_PROFILE["orders"]["buying_power_reservation"] = True
-LEAN_STRICT_PROFILE["settlement"] = {"delay": 2}  # T+2 for US equities
 
 FAST_PROFILE = {
     "account": {
@@ -354,7 +355,6 @@ _PROFILES = {
     "vectorbt_strict": VECTORBT_STRICT_PROFILE,
     "backtrader_strict": BACKTRADER_STRICT_PROFILE,
     "zipline_strict": ZIPLINE_STRICT_PROFILE,
-    "lean_strict": LEAN_STRICT_PROFILE,
 }
 
 _ALIASES = {
@@ -364,7 +364,7 @@ _ALIASES = {
     "vectorbt_compare": "vectorbt_strict",
     "backtrader_compare": "backtrader_strict",
     "zipline_compare": "zipline_strict",
-    "lean_compare": "lean_strict",
+    "lean_compare": "lean",
 }
 
 _CORE_PROFILE_NAMES = ["backtrader", "default", "lean", "realistic", "vectorbt", "zipline"]

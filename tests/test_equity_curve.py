@@ -7,7 +7,7 @@ import polars as pl
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
 from ml4t.backtest.analytics.equity import EquityCurve
 from ml4t.backtest.config import DataFrequency
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs.market_data import FeedSpec
 
 
 class TestEquityCurveAnnualization:

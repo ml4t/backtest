@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from ml4t.data.artifacts.base import serialize_artifact_value
-from ml4t.data.artifacts.market_data import FeedSpec, TimestampSemantics
+from ml4t.specs.base import serialize_artifact_value
+from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
 from .types import ExecutionMode, StopFillMode, StopLevelBasis
 
@@ -532,6 +532,11 @@ class BacktestConfig:
     next_bar_submission_precheck: bool = False
     next_bar_simple_cash_check: bool = False
     buying_power_reservation: bool = False  # Reserve cash at submission (LEAN-style)
+    # TODO(parity): consider an explicit profile/knob for "commit basket at close,
+    # fill reserved orders at next open" semantics. Keep it separate from the
+    # default next-bar/open path, which currently revalidates affordability at
+    # the actual open.
+    next_bar_queue_shadow_validation: bool = False
     immediate_fill: bool = False  # Fill same-bar market orders at submit time (LEAN-style)
     rebalance_mode: RebalanceMode = RebalanceMode.INCREMENTAL
     rebalance_headroom_pct: float = 1.0
@@ -701,6 +706,7 @@ class BacktestConfig:
                 "next_bar_submission_precheck": self.next_bar_submission_precheck,
                 "next_bar_simple_cash_check": self.next_bar_simple_cash_check,
                 "buying_power_reservation": self.buying_power_reservation,
+                "next_bar_queue_shadow_validation": self.next_bar_queue_shadow_validation,
                 "immediate_fill": self.immediate_fill,
                 "rebalance_mode": self.rebalance_mode.value,
                 "rebalance_headroom_pct": self.rebalance_headroom_pct,
@@ -783,6 +789,7 @@ class BacktestConfig:
                     "next_bar_submission_precheck",
                     "next_bar_simple_cash_check",
                     "buying_power_reservation",
+                    "next_bar_queue_shadow_validation",
                     "immediate_fill",
                     "rebalance_mode",
                     "rebalance_headroom_pct",
@@ -903,6 +910,9 @@ class BacktestConfig:
             next_bar_submission_precheck=order_cfg.get("next_bar_submission_precheck", False),
             next_bar_simple_cash_check=order_cfg.get("next_bar_simple_cash_check", False),
             buying_power_reservation=order_cfg.get("buying_power_reservation", False),
+            next_bar_queue_shadow_validation=order_cfg.get(
+                "next_bar_queue_shadow_validation", False
+            ),
             immediate_fill=order_cfg.get("immediate_fill", False),
             rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "incremental")),
             rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
@@ -1010,6 +1020,7 @@ class BacktestConfig:
                 f"  Entry priority: {self.entry_order_priority.value}",
                 f"  Next-bar precheck: {self.next_bar_submission_precheck}",
                 f"  Next-bar cash check: {self.next_bar_simple_cash_check}",
+                f"  Next-bar queue shadow validation: {self.next_bar_queue_shadow_validation}",
                 f"  Rebalance mode: {self.rebalance_mode.value}",
                 f"  Rebalance headroom: {self.rebalance_headroom_pct:.3f}",
                 f"  Missing price policy: {self.missing_price_policy.value}",

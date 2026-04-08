@@ -12,7 +12,7 @@ from ml4t.backtest.config import RebalanceMode
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.execution.schedule import RebalanceSchedule
 from ml4t.backtest.models import NoCommission, NoSlippage
-from ml4t.data.artifacts.market_data import FeedSpec
+from ml4t.specs.market_data import FeedSpec
 
 
 class TestRebalanceConfig:

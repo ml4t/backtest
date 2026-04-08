@@ -139,6 +139,9 @@ nav:
 
 # Extra configuration
 extra:
+  ml4t_docs_hub_url: /docs/
+  ml4t_libraries_url: /libraries/
+  ml4t_chapters_url: /chapters/
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/stefan-jansen

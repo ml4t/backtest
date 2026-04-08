@@ -40,15 +40,15 @@ wheels = [
 
 [[package]]
 name = "anyio"
-version = "4.12.1"
+version = "4.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/f0/5eb65b2bb0d09ac6776f2eb54adee6abe8228ea05b20a5ad0e4945de8aac/anyio-4.12.1.tar.gz", hash = "sha256:41cfcc3a4c85d3f05c932da7c26d0201ac36f72abd4435ba90d0464a3ffed703", size = 228685, upload-time = "2026-01-06T11:45:21.246Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/14/2c5dd9f512b66549ae92767a9c7b330ae88e1932ca57876909410251fe13/anyio-4.13.0.tar.gz", hash = "sha256:334b70e641fd2221c1505b3890c69882fe4a2df910cba14d97019b90b24439dc", size = 231622, upload-time = "2026-03-24T12:59:09.671Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl", hash = "sha256:d405828884fc140aa80a3c667b8beed277f1dfedec42ba031bd6ac3db606ab6c", size = 113592, upload-time = "2026-01-06T11:45:19.497Z" },
+    { url = "https://files.pythonhosted.org/packages/da/42/e921fccf5015463e32a3cf6ee7f980a6ed0f395ceeaa45060b61d86486c2/anyio-4.13.0-py3-none-any.whl", hash = "sha256:08b310f9e24a9594186fd75b4f73f4a4152069e3853f1ed8bfbf58369f4ad708", size = 114353, upload-time = "2026-03-24T12:59:08.246Z" },
 ]
 
 [[package]]
@@ -1781,7 +1781,7 @@ wheels = [
 name = "ml4t-backtest"
 source = { editable = "." }
 dependencies = [
-    { name = "ml4t-data" },
+    { name = "ml4t-specs" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pandas-market-calendars" },
@@ -1879,9 +1879,9 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'all'", specifier = ">=0.24.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "ml4t-data", editable = "../ml4t-data" },
-    { name = "ml4t-diagnostic", marker = "extra == 'all'", editable = "../ml4t-diagnostic" },
-    { name = "ml4t-diagnostic", marker = "extra == 'dev'", editable = "../ml4t-diagnostic" },
+    { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
+    { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
+    { name = "ml4t-specs", specifier = ">=0.1.0b0" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=1.24.0" },
@@ -1919,7 +1919,7 @@ provides-extras = ["advanced", "all", "comparison", "dev", "docs", "viz"]
 [package.metadata.requires-dev]
 dev = [
     { name = "hypothesis", specifier = ">=6.80.0" },
-    { name = "ml4t-diagnostic", editable = "../ml4t-diagnostic" },
+    { name = "ml4t-diagnostic", specifier = ">=0.1.0b4" },
     { name = "pre-commit", specifier = ">=3.3.0" },
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pytest-benchmark", specifier = ">=4.0.0" },
@@ -1933,7 +1933,8 @@ dev = [
 
 [[package]]
 name = "ml4t-data"
-source = { editable = "../ml4t-data" }
+version = "0.1.0b10"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
     { name = "click" },
@@ -1941,6 +1942,7 @@ dependencies = [
     { name = "html5lib" },
     { name = "httpx" },
     { name = "lxml" },
+    { name = "ml4t-specs" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -1956,104 +1958,22 @@ dependencies = [
     { name = "structlog" },
     { name = "tenacity" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=23.0.0" },
-    { name = "click", specifier = ">=8.0.0" },
-    { name = "cot-reports", marker = "extra == 'all'", specifier = ">=0.1.0" },
-    { name = "cot-reports", marker = "extra == 'all-providers'", specifier = ">=0.1.0" },
-    { name = "cot-reports", marker = "extra == 'cot'", specifier = ">=0.1.0" },
-    { name = "databento", marker = "extra == 'all'", specifier = ">=0.38.0" },
-    { name = "databento", marker = "extra == 'all-providers'", specifier = ">=0.38.0" },
-    { name = "databento", marker = "extra == 'databento'", specifier = ">=0.38.0" },
-    { name = "filelock", specifier = ">=3.19.1" },
-    { name = "html5lib", specifier = ">=1.1" },
-    { name = "httpx", specifier = ">=0.25.0" },
-    { name = "hypothesis", marker = "extra == 'all'", specifier = ">=6.80.0" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.80.0" },
-    { name = "ipdb", marker = "extra == 'all'", specifier = ">=0.13.0" },
-    { name = "ipdb", marker = "extra == 'dev'", specifier = ">=0.13.0" },
-    { name = "ipython", marker = "extra == 'all'", specifier = ">=8.14.0" },
-    { name = "ipython", marker = "extra == 'dev'", specifier = ">=8.14.0" },
-    { name = "lxml", specifier = ">=6.0.2" },
-    { name = "mkdocs", marker = "extra == 'all'", specifier = ">=1.6.0" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
-    { name = "mkdocs-git-revision-date-localized-plugin", marker = "extra == 'all'", specifier = ">=1.2.0" },
-    { name = "mkdocs-git-revision-date-localized-plugin", marker = "extra == 'docs'", specifier = ">=1.2.0" },
-    { name = "mkdocs-material", marker = "extra == 'all'", specifier = ">=9.5.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'all'", specifier = ">=0.24.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "mypy", marker = "extra == 'all'", specifier = ">=1.5.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.0" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "oandapyv20", marker = "extra == 'all'", specifier = ">=0.7.0" },
-    { name = "oandapyv20", marker = "extra == 'all-providers'", specifier = ">=0.7.0" },
-    { name = "oandapyv20", marker = "extra == 'dev'", specifier = ">=0.7.0" },
-    { name = "oandapyv20", marker = "extra == 'oanda'", specifier = ">=0.7.0" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pandas", specifier = ">=2.0.0" },
-    { name = "pandas-market-calendars", specifier = ">=4.3.0" },
-    { name = "platformdirs", specifier = ">=4.0.0" },
-    { name = "polars", specifier = ">=0.20.0" },
-    { name = "pre-commit", marker = "extra == 'all'", specifier = ">=3.3.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pybreaker", specifier = ">=1.0.0" },
-    { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "pytest", marker = "extra == 'all'", specifier = ">=7.4.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-asyncio", marker = "extra == 'all'", specifier = ">=0.21.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
-    { name = "pytest-cov", marker = "extra == 'all'", specifier = ">=4.1.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'all'", specifier = ">=2.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", marker = "extra == 'all'", specifier = ">=3.3.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'all'", specifier = ">=0.1.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "structlog", specifier = ">=23.0.0" },
-    { name = "tenacity", specifier = ">=8.0.0" },
-    { name = "xlsxwriter", marker = "extra == 'all'", specifier = ">=3.1.0" },
-    { name = "xlsxwriter", marker = "extra == 'dev'", specifier = ">=3.1.0" },
-    { name = "yfinance", marker = "extra == 'all'", specifier = ">=0.2.0" },
-    { name = "yfinance", marker = "extra == 'all-providers'", specifier = ">=0.2.0" },
-    { name = "yfinance", marker = "extra == 'yahoo'", specifier = ">=0.2.0" },
-]
-provides-extras = ["all", "all-providers", "cot", "databento", "dev", "docs", "oanda", "yahoo"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "databento", specifier = ">=0.38.0" },
-    { name = "hypothesis", specifier = ">=6.80.0" },
-    { name = "oandapyv20", specifier = ">=0.7.0" },
-    { name = "pre-commit", specifier = ">=3.3.0" },
-    { name = "pytest", specifier = ">=7.4.0" },
-    { name = "pytest-asyncio", specifier = ">=0.21.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", specifier = ">=3.3.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "twine", specifier = ">=6.0.0" },
-    { name = "ty" },
-    { name = "xlsxwriter", specifier = ">=3.1.0" },
-    { name = "yfinance", specifier = ">=0.2.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/08/89/c0a3735cba7c29cdf969803d4672504db1854b09222677c683a9426c94a5/ml4t_data-0.1.0b10.tar.gz", hash = "sha256:49756b4708d1dfa933e3f611bda70cd8af8b25272fedf29a666d065e0bca08a5", size = 638237, upload-time = "2026-04-02T03:10:46.982Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0a/a3/34785136c0cca9b5f065b19ab6c67351a2e9230cc2ee1494bd5af3616d19/ml4t_data-0.1.0b10-py3-none-any.whl", hash = "sha256:de471ee6f494b89fa1e788fbb1fd9927ccab8170396590a6a62ffed2b82c788f", size = 422504, upload-time = "2026-04-02T03:10:44.967Z" },
 ]
 
 [[package]]
 name = "ml4t-diagnostic"
-source = { editable = "../ml4t-diagnostic" }
+version = "0.1.0b8"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "arch" },
     { name = "jinja2" },
     { name = "joblib" },
     { name = "ml4t-data" },
     { name = "ml4t-engineer" },
+    { name = "ml4t-specs" },
     { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
@@ -2068,95 +1988,18 @@ dependencies = [
     { name = "statsmodels" },
     { name = "tqdm" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "arch", specifier = ">=7.2.0" },
-    { name = "cupy-cuda11x", marker = "extra == 'gpu'", specifier = ">=11.0.0" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.80.0" },
-    { name = "ipdb", marker = "extra == 'dev'", specifier = ">=0.13.0" },
-    { name = "ipython", marker = "extra == 'dev'", specifier = ">=8.14.0" },
-    { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "joblib", specifier = ">=1.3.0" },
-    { name = "kaleido", marker = "extra == 'all'", specifier = ">=0.2.0" },
-    { name = "kaleido", marker = "extra == 'viz'", specifier = ">=0.2.0" },
-    { name = "lightgbm", marker = "extra == 'all'", specifier = ">=4.0.0" },
-    { name = "lightgbm", marker = "extra == 'ml'", specifier = ">=4.0.0" },
-    { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.7.0" },
-    { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.7.0" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
-    { name = "mkdocs-gen-files", marker = "extra == 'docs'", specifier = ">=0.5.0" },
-    { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "ml4t-backtest", marker = "extra == 'all'", editable = "." },
-    { name = "ml4t-backtest", marker = "extra == 'backtest'", editable = "." },
-    { name = "ml4t-data", editable = "../ml4t-data" },
-    { name = "ml4t-engineer", editable = "../ml4t-engineer" },
-    { name = "numba", specifier = ">=0.57.0" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "pandas", specifier = ">=2.0.0" },
-    { name = "pandas-market-calendars", specifier = ">=4.0.0" },
-    { name = "plotly", marker = "extra == 'all'", specifier = ">=5.15.0" },
-    { name = "plotly", marker = "extra == 'viz'", specifier = ">=5.15.0" },
-    { name = "polars", specifier = ">=0.20.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pypdf", marker = "extra == 'all'", specifier = ">=5.0.0" },
-    { name = "pypdf", marker = "extra == 'viz'", specifier = ">=5.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "scikit-learn", specifier = ">=1.3.0" },
-    { name = "scipy", specifier = ">=1.10.0" },
-    { name = "seaborn", marker = "extra == 'all'", specifier = ">=0.12.0" },
-    { name = "seaborn", marker = "extra == 'viz'", specifier = ">=0.12.0" },
-    { name = "shap", specifier = ">=0.41.0,<0.50.0" },
-    { name = "statsmodels", specifier = ">=0.14.0" },
-    { name = "streamlit", marker = "extra == 'all'", specifier = ">=1.28.0" },
-    { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.28.0" },
-    { name = "tqdm", specifier = ">=4.66.0" },
-    { name = "ty", marker = "extra == 'dev'" },
-    { name = "wandb", marker = "extra == 'all'", specifier = ">=0.16.0" },
-    { name = "wandb", marker = "extra == 'tracking'", specifier = ">=0.16.0" },
-    { name = "xgboost", marker = "extra == 'all'", specifier = ">=2.0.0" },
-    { name = "xgboost", marker = "extra == 'ml'", specifier = ">=2.0.0" },
-]
-provides-extras = ["all", "backtest", "dashboard", "dev", "docs", "gpu", "ml", "tracking", "viz"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "hypothesis", specifier = ">=6.80.0" },
-    { name = "kaleido", specifier = ">=0.2.0" },
-    { name = "lightgbm", specifier = ">=4.0.0" },
-    { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "ml4t-backtest", editable = "." },
-    { name = "plotly", specifier = ">=5.15.0" },
-    { name = "pre-commit", specifier = ">=3.3.0" },
-    { name = "pypdf", specifier = ">=5.0.0" },
-    { name = "pytest", specifier = ">=7.4.0" },
-    { name = "pytest-benchmark", specifier = ">=4.0.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", specifier = ">=3.3.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "seaborn", specifier = ">=0.12.0" },
-    { name = "twine", specifier = ">=6.0.0" },
-    { name = "ty" },
-    { name = "xgboost", specifier = ">=2.0.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/f1/8e/d70c7a275a17f267f1fb845277438cefa700171e0313a29c4b3b3a5c8e3e/ml4t_diagnostic-0.1.0b8.tar.gz", hash = "sha256:86e502e8e6da6b040266247b9445249530dee1fa030f1b42c0e60d02161f929f", size = 1346095, upload-time = "2026-04-01T23:48:26.849Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/03/50cff2a79aa5cbdf7f72e7ac8a76c368e661721d51572489fe24f3193fa3/ml4t_diagnostic-0.1.0b8-py3-none-any.whl", hash = "sha256:083037a1595cd91700257be716a332faa3d6c0d34c6bdb2feeeef03f18b4764c", size = 913074, upload-time = "2026-04-01T23:48:25.226Z" },
 ]
 
 [[package]]
 name = "ml4t-engineer"
-source = { editable = "../ml4t-engineer" }
+version = "0.1.0b3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
-    { name = "ml4t-data" },
+    { name = "ml4t-specs" },
     { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
@@ -2170,89 +2013,21 @@ dependencies = [
     { name = "statsmodels" },
     { name = "structlog" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "arch", marker = "extra == 'all'", specifier = ">=6.0.0" },
-    { name = "arch", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "duckdb", marker = "extra == 'all'", specifier = ">=0.9.0" },
-    { name = "duckdb", marker = "extra == 'dev'", specifier = ">=0.9.0" },
-    { name = "duckdb", marker = "extra == 'store'", specifier = ">=0.9.0" },
-    { name = "hypothesis", marker = "extra == 'all'", specifier = ">=6.80.0" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.80.0" },
-    { name = "ipdb", marker = "extra == 'all'", specifier = ">=0.13.0" },
-    { name = "ipdb", marker = "extra == 'dev'", specifier = ">=0.13.0" },
-    { name = "ipython", marker = "extra == 'all'", specifier = ">=8.14.0" },
-    { name = "ipython", marker = "extra == 'dev'", specifier = ">=8.14.0" },
-    { name = "lightgbm", marker = "extra == 'all'", specifier = ">=4.0.0" },
-    { name = "lightgbm", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "lightgbm", marker = "extra == 'ml'", specifier = ">=4.0.0" },
-    { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.7.0" },
-    { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.7.0" },
-    { name = "mkdocs", marker = "extra == 'all'", specifier = ">=1.6,<2" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6,<2" },
-    { name = "mkdocs-material", marker = "extra == 'all'", specifier = ">=9.5.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'all'", specifier = ">=0.24.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "ml4t-data", editable = "../ml4t-data" },
-    { name = "numba", specifier = ">=0.57.0" },
-    { name = "numpy", specifier = ">=1.24.0,<2.3" },
-    { name = "pandas", specifier = ">=2.0.0" },
-    { name = "pandas-market-calendars", marker = "extra == 'all'", specifier = ">=4.0.0" },
-    { name = "pandas-market-calendars", marker = "extra == 'calendars'", specifier = ">=4.0.0" },
-    { name = "pandas-market-calendars", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "plotly", marker = "extra == 'all'", specifier = ">=5.15.0" },
-    { name = "plotly", marker = "extra == 'viz'", specifier = ">=5.15.0" },
-    { name = "polars", specifier = ">=0.20.0" },
-    { name = "pre-commit", marker = "extra == 'all'", specifier = ">=3.3.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pytest", marker = "extra == 'all'", specifier = ">=7.4.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-benchmark", marker = "extra == 'all'", specifier = ">=4.0.0" },
-    { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest-cov", marker = "extra == 'all'", specifier = ">=4.1.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'all'", specifier = ">=2.1.0" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", marker = "extra == 'all'", specifier = ">=3.3.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "python-dateutil", specifier = ">=2.8.0" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "ruff", marker = "extra == 'all'", specifier = ">=0.1.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "scikit-learn", specifier = ">=1.3.0" },
-    { name = "scipy", specifier = ">=1.10.0" },
-    { name = "seaborn", marker = "extra == 'all'", specifier = ">=0.12.0" },
-    { name = "seaborn", marker = "extra == 'viz'", specifier = ">=0.12.0" },
-    { name = "shap", marker = "extra == 'all'", specifier = ">=0.44.0" },
-    { name = "shap", marker = "extra == 'dev'", specifier = ">=0.44.0" },
-    { name = "shap", marker = "extra == 'ml'", specifier = ">=0.44.0" },
-    { name = "statsmodels", specifier = ">=0.14.0" },
-    { name = "structlog", specifier = ">=23.0.0" },
-    { name = "ta-lib", marker = "extra == 'all'", specifier = ">=0.4.0" },
-    { name = "ta-lib", marker = "extra == 'dev'", specifier = ">=0.4.0" },
-    { name = "ta-lib", marker = "extra == 'ta'", specifier = ">=0.4.0" },
-    { name = "yfinance", marker = "extra == 'dev'", specifier = ">=0.2.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/37/8a/9cb90d998cb5a9261bb3b039b24a6877ef1c044b0eb5a0aa79d802d42d9f/ml4t_engineer-0.1.0b3.tar.gz", hash = "sha256:e16f3fa5f21acdc064dfc0ac59abefd9ff6f0fc62686159a59d2090b2577e016", size = 539475, upload-time = "2026-04-01T23:57:08.15Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/d2/e36ef886519b3d4809d8436c81eae6f99f8b6f20810d7f1e8e241d62f255/ml4t_engineer-0.1.0b3-py3-none-any.whl", hash = "sha256:3e0b2fe7b328815c4fc3b016eaf4ac3e51c6a6fbcdcda3bc8b9eed98c4a22c46", size = 363110, upload-time = "2026-04-01T23:57:06.167Z" },
 ]
-provides-extras = ["all", "calendars", "dev", "docs", "ml", "store", "ta", "viz"]
 
-[package.metadata.requires-dev]
-dev = [
-    { name = "hypothesis", specifier = ">=6.80.0" },
-    { name = "pandas-market-calendars", specifier = ">=4.0.0" },
-    { name = "pre-commit", specifier = ">=3.3.0" },
-    { name = "pytest", specifier = ">=7.4.0" },
-    { name = "pytest-benchmark", specifier = ">=4.0.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "pytest-timeout", specifier = ">=2.1.0" },
-    { name = "pytest-xdist", specifier = ">=3.3.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "twine", specifier = ">=6.0.0" },
-    { name = "ty" },
+[[package]]
+name = "ml4t-specs"
+version = "0.1.0b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/bb/35dfe733a7d7f57d426fcf38759acb70a8b56ff65e4e9ee60a4de30be397/ml4t_specs-0.1.0b0.tar.gz", hash = "sha256:2325a9a3ebf2f04ac369334dee14eec949d44b03d53a58ce8c7da598497c77e1", size = 5857, upload-time = "2026-04-02T03:14:18.552Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/1e/2d2ecb9ca0004731664569702e9dbc4779f50236408f94206329fd642a83/ml4t_specs-0.1.0b0-py3-none-any.whl", hash = "sha256:b45250fadd556f18181971e0dc88352eb235df0c56521eb63912e1c120ba0526", size = 6238, upload-time = "2026-04-02T03:14:17.456Z" },
 ]
 
 [[package]]

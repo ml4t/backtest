@@ -260,7 +260,7 @@ Large-scale validation (250 assets x 20 years, real data):
 | zipline_strict | 225,583 | match | 0 trades, $19 (0.0001%) |
 | backtrader_strict | 216,980 | match | 1 trade (0.0005%) |
 | vectorbt_strict | 210,352 | match | 91 trades (0.04%) |
-| lean_strict | 226,172 | match | 589 trades (0.26%) |
+| lean | 428,459 fills | match | 0 fills, $1.55 (0.0002%) |
 
 See [validation/README.md](validation/README.md) for methodology and detailed results.
 
