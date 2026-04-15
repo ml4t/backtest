@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ..config import InitialHwmSource
+from ..config import InitialHwmSource, ShareType
 from ..types import (
     ExitReason,
     Fill,
@@ -118,13 +118,20 @@ class FillExecutor:
             )
             fill_quantity = exec_result.fillable_quantity
 
+            if broker.share_type == ShareType.INTEGER:
+                fill_quantity = float(int(fill_quantity))
+
             if fill_quantity <= 0:
                 return False
 
             broker._filled_this_bar.add(order.order_id)
 
-            if exec_result.remaining_quantity > 0:
-                broker._partial_orders[order.order_id] = exec_result.remaining_quantity
+            remaining_quantity = max(0.0, effective_quantity - fill_quantity)
+            if broker.share_type == ShareType.INTEGER:
+                remaining_quantity = float(int(remaining_quantity))
+
+            if remaining_quantity > 0:
+                broker._partial_orders[order.order_id] = remaining_quantity
             else:
                 broker._partial_orders.pop(order.order_id, None)
 

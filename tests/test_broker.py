@@ -1795,6 +1795,65 @@ class TestExecutionLimitsIntegration:
         assert len(broker.fills) == 0
         assert order.status == OrderStatus.PENDING
 
+    def test_volume_participation_integer_share_rounding(self):
+        """Test capped fills stay integer-quantized for integer-share brokers."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            share_type=ShareType.INTEGER,
+            execution_limits=VolumeParticipationLimit(max_participation=0.10),
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 105.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        order = broker.submit_order("AAPL", 25.0, OrderSide.BUY)
+        broker._process_orders()
+
+        assert len(broker.fills) == 1
+        assert broker.fills[0].quantity == 10.0
+        assert broker._partial_orders[order.order_id] == 15.0
+
+    def test_volume_participation_integer_share_subunit_fill_stays_pending(self):
+        """Test sub-1-share participation caps do not create dust fills."""
+        from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            share_type=ShareType.INTEGER,
+            execution_limits=VolumeParticipationLimit(max_participation=0.10),
+        )
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 5.0},
+            highs={"AAPL": 101.0},
+            lows={"AAPL": 99.0},
+            signals={},
+        )
+
+        order = broker.submit_order("AAPL", 1.0, OrderSide.BUY)
+        broker._process_orders()
+
+        assert len(broker.fills) == 0
+        assert order.status == OrderStatus.PENDING
+        assert order.order_id not in broker._partial_orders
+        assert broker.positions == {}
+
     def test_execution_limits_no_double_fill(self):
         """Test order not filled twice in same bar."""
         from ml4t.backtest.execution.limits import VolumeParticipationLimit
