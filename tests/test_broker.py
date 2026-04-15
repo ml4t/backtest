@@ -2136,7 +2136,9 @@ class TestNextBarExecutionMode:
         exit_fill = next(
             fill
             for fill in broker.fills
-            if fill.asset == "AAPL" and fill.side == OrderSide.SELL and fill.timestamp.date().isoformat() == "2024-01-03"
+            if fill.asset == "AAPL"
+            and fill.side == OrderSide.SELL
+            and fill.timestamp.date().isoformat() == "2024-01-03"
         )
 
         assert exit_fill.quantity == 4.0

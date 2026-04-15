@@ -496,7 +496,11 @@ class ExecutionEngine:
                     # Permissive mode: silently skip unaffordable orders for this cycle
                     # by cancelling them instead of keeping them pending forever.
                     order.status = OrderStatus.CANCELLED
-            elif broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
+            elif broker.partial_fills_allowed and "insufficient" in rejection_reason.lower() or (
+                order.rebalance_id is not None
+                and broker.share_type.value == "integer"
+                and "insufficient" in rejection_reason.lower()
+            ):
                 if fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)

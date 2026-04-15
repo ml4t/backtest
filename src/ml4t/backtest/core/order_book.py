@@ -162,7 +162,17 @@ class OrderBook:
             if not broker.skip_cash_validation:
                 valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
                 if not valid:
+                    allow_rebalance_partial = (
+                        order.rebalance_id is not None and broker.share_type.value == "integer"
+                    )
                     if broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
+                        if not fill.try_partial_fill(order, fill_price):
+                            order.status = OrderStatus.REJECTED
+                            order.rejection_reason = rejection_reason
+                            return order
+                        broker._partial_orders.pop(order.order_id, None)
+                        return order
+                    if allow_rebalance_partial and "insufficient" in rejection_reason.lower():
                         if not fill.try_partial_fill(order, fill_price):
                             order.status = OrderStatus.REJECTED
                             order.rejection_reason = rejection_reason
