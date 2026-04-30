@@ -374,10 +374,10 @@ class OrderBook:
 
     def _should_apply_buying_power_reservation(self, order: Order) -> bool:
         broker = self.broker
-        return (
-            broker.buying_power_reservation
-            and order.order_type in {OrderType.MARKET, OrderType.MOC}
-        )
+        return broker.buying_power_reservation and order.order_type in {
+            OrderType.MARKET,
+            OrderType.MOC,
+        }
 
     def _passes_buying_power_check(self, order: Order) -> bool:
         """LEAN-style buying power reservation at submission time.
