@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ml4t.diagnostic.artifacts import dump_spec, load_market_data_spec, load_spec
-from ml4t.engineer.artifacts import FeatureSpec, LabelSpec, PredictionSpec
-from ml4t.specs import ArtifactKind, FeedSpec, MarketDataSpec, TimestampSemantics
-
 from ml4t.backtest.spec_bridge import (
     market_data_spec_to_feed_spec,
     market_data_spec_to_runtime_metadata,
 )
+from ml4t.diagnostic.artifacts import dump_spec, load_market_data_spec, load_spec
+from ml4t.engineer.artifacts import FeatureSpec, LabelSpec, PredictionSpec
+from ml4t.specs import ArtifactKind, FeedSpec, MarketDataSpec, TimestampSemantics
 
 
 def test_market_data_spec_from_mapping_normalizes_timestamp_semantics() -> None:

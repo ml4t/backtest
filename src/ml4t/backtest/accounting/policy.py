@@ -229,6 +229,7 @@ class UnifiedAccountPolicy(AccountPolicy):
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
+        margin_pct_schedule: dict[str, tuple[float, float]] | None = None,
         short_cash_policy: str = "credit",
     ) -> None:
         """Initialize unified account policy.
@@ -246,6 +247,10 @@ class UnifiedAccountPolicy(AccountPolicy):
             fixed_margin_schedule: Per-asset fixed dollar margin for futures.
                 - Dict mapping asset symbol to (initial, maintenance) tuple
                 - Example: {"ES": (12000, 6000)}
+            margin_pct_schedule: Per-asset percentage-of-notional margin schedule.
+                - Dict mapping asset symbol to (initial, maintenance) tuple
+                - Percentages are fractions of notional, not whole percents
+                - Example: {"ES": (0.05, 0.035)}
             short_cash_policy: How short proceeds affect spendable cash in
                 non-levered accounts. One of {"credit", "lock_notional"}.
 
@@ -258,12 +263,22 @@ class UnifiedAccountPolicy(AccountPolicy):
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
         self.fixed_margin_schedule = fixed_margin_schedule or {}
+        self.margin_pct_schedule = margin_pct_schedule or {}
         if short_cash_policy not in {"credit", "credit_proceeds", "lock_notional"}:
             raise ValueError(
                 "short_cash_policy must be 'credit', 'credit_proceeds', or "
                 f"'lock_notional', got {short_cash_policy}"
             )
         self.short_cash_policy = short_cash_policy
+
+        overlapping_margin_assets = sorted(
+            set(self.fixed_margin_schedule) & set(self.margin_pct_schedule)
+        )
+        if overlapping_margin_assets:
+            raise ValueError(
+                "fixed_margin_schedule and margin_pct_schedule cannot both define: "
+                f"{overlapping_margin_assets}"
+            )
 
         # Validate margin parameters if leverage is enabled
         if allow_leverage:
@@ -306,6 +321,7 @@ class UnifiedAccountPolicy(AccountPolicy):
             long_maintenance_margin=config.long_maintenance_margin,
             short_maintenance_margin=config.short_maintenance_margin,
             fixed_margin_schedule=config.fixed_margin_schedule,
+            margin_pct_schedule=config.margin_pct_schedule,
             short_cash_policy=config.short_cash_policy.value,
         )
 
@@ -384,7 +400,15 @@ class UnifiedAccountPolicy(AccountPolicy):
     ) -> float:
         """Calculate margin requirement for a position.
 
-        Uses fixed dollar margin for futures, percentage for equities.
+        Supports three margin models:
+
+        - ``margin_pct_schedule``: per-asset percentage-of-notional margin.
+          This is the preferred price-aware approximation for futures when only
+          a stable scan ratio is known.
+        - ``fixed_margin_schedule``: per-asset fixed dollar margin per contract.
+          This models a single historical SPAN snapshot.
+        - account-wide percentage margin: fallback for assets not covered by a
+          per-asset schedule.
 
         Args:
             asset: Asset symbol
@@ -395,6 +419,12 @@ class UnifiedAccountPolicy(AccountPolicy):
         Returns:
             Margin required in dollars
         """
+        # Price-aware per-asset percentage margin (preferred for futures)
+        if asset in self.margin_pct_schedule:
+            initial, maintenance = self.margin_pct_schedule[asset]
+            margin_rate = initial if for_initial else maintenance
+            return abs(quantity * price) * margin_rate
+
         # Check for fixed margin (futures)
         if asset in self.fixed_margin_schedule:
             initial, maintenance = self.fixed_margin_schedule[asset]

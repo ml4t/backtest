@@ -7,6 +7,8 @@ contract multipliers. Without this fix, a 30% target weight in ES futures
 
 from datetime import datetime
 
+import pytest
+
 from ml4t.backtest import Broker, OrderSide
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.models import NoCommission, NoSlippage
@@ -437,6 +439,64 @@ class TestContractSpecMarginWiring:
         assert orders[0].side == OrderSide.BUY
         # 2.0 * $100K / ($5000 * 50) = 0.8 contracts
         assert abs(orders[0].quantity - 0.8) < 0.01
+
+    def test_margin_pct_from_contract_spec(self):
+        """ContractSpec.margin_pct should be wired into the broker's pct schedule."""
+        es_spec = ContractSpec(
+            symbol="ES",
+            asset_class=AssetClass.FUTURE,
+            multiplier=50.0,
+            margin_pct=(0.05, 0.035),
+        )
+        broker = Broker(
+            initial_cash=100_000,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            contract_specs={"ES": es_spec},
+            allow_leverage=True,
+        )
+
+        policy = broker.account.policy
+        assert policy.margin_pct_schedule is not None
+        assert policy.margin_pct_schedule["ES"] == (0.05, 0.035)
+
+    def test_explicit_margin_pct_schedule_takes_precedence(self):
+        """Explicit margin_pct_schedule should override ContractSpec.margin_pct."""
+        es_spec = ContractSpec(
+            symbol="ES",
+            asset_class=AssetClass.FUTURE,
+            multiplier=50.0,
+            margin_pct=(0.05, 0.035),
+        )
+        broker = Broker(
+            initial_cash=100_000,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            contract_specs={"ES": es_spec},
+            margin_pct_schedule={"ES": (0.06, 0.04)},
+            allow_leverage=True,
+        )
+
+        policy = broker.account.policy
+        assert policy.margin_pct_schedule["ES"] == (0.06, 0.04)
+
+    def test_rejects_contract_spec_with_both_margin_models(self):
+        """A single asset must not activate both fixed and percentage margin paths."""
+        es_spec = ContractSpec(
+            symbol="ES",
+            asset_class=AssetClass.FUTURE,
+            multiplier=50.0,
+            margin=15_000.0,
+            margin_pct=(0.05, 0.035),
+        )
+        with pytest.raises(ValueError, match="cannot both define"):
+            Broker(
+                initial_cash=100_000,
+                commission_model=NoCommission(),
+                slippage_model=NoSlippage(),
+                contract_specs={"ES": es_spec},
+                allow_leverage=True,
+            )
 
 
 class TestMaxGrossLeverage:

@@ -9,10 +9,10 @@ from datetime import datetime, timedelta
 
 import polars as pl
 import pytest
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import BacktestConfig, DataFeed
 from ml4t.backtest.config import DataFrequency
+from ml4t.specs.market_data import FeedSpec
 
 
 class TestDataFeedMemoryEfficiency:

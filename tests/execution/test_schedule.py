@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import polars as pl
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.execution import (
     RebalanceCadence,
     RebalanceSchedule,
     resolve_rebalance_timestamps,
 )
+from ml4t.specs.market_data import FeedSpec
 
 
 def _make_weekday_series(start: str, end: str) -> pl.Series:

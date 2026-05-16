@@ -688,6 +688,74 @@ class TestMarginAccountPolicyFuturesMargin:
         assert bp > 0
 
 
+class TestMarginAccountPolicyFuturesMarginPct:
+    """Tests for price-aware percentage-of-notional futures margin."""
+
+    def test_futures_margin_pct_initial(self):
+        """Initial margin should scale with notional."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=True)
+        assert margin == 500.0
+
+    def test_futures_margin_pct_maintenance(self):
+        """Maintenance margin should use maintenance schedule rate."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=False)
+        assert margin == pytest.approx(350.0)
+
+    def test_futures_margin_pct_tracks_price(self):
+        """Percentage margin should move with price."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        margin_low = policy.get_margin_requirement("ES", 1, 4000.0, for_initial=True)
+        margin_high = policy.get_margin_requirement("ES", 1, 6000.0, for_initial=True)
+        assert margin_low == 200.0
+        assert margin_high == 300.0
+
+    def test_margin_pct_schedule_short_same_as_long(self):
+        """Percentage-based futures margin should be direction-agnostic."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        long_margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=True)
+        short_margin = policy.get_margin_requirement("ES", -2, 5000.0, for_initial=True)
+        assert long_margin == short_margin == 500.0
+
+    def test_margin_pct_schedule_takes_precedence_over_global_margin(self):
+        """Per-asset percentage schedule should override account-wide margin."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            initial_margin=0.5,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        margin = policy.get_margin_requirement("ES", 1, 5000.0, for_initial=True)
+        assert margin == 250.0
+
+    def test_reject_overlapping_fixed_and_percentage_margin(self):
+        """A symbol must not define both fixed and percentage margin models."""
+        with pytest.raises(ValueError, match="cannot both define"):
+            UnifiedAccountPolicy(
+                allow_short_selling=True,
+                allow_leverage=True,
+                fixed_margin_schedule={"ES": (12_000.0, 6_000.0)},
+                margin_pct_schedule={"ES": (0.05, 0.035)},
+            )
+
+
 class TestMarginAccountPolicyMarginCall:
     """Tests for margin call detection."""
 

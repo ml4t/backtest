@@ -10,7 +10,6 @@ from types import SimpleNamespace
 
 import polars as pl
 import pytest
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.config import BacktestConfig
 from ml4t.backtest.result import (
@@ -18,6 +17,7 @@ from ml4t.backtest.result import (
     enrich_trades_with_signals,
 )
 from ml4t.backtest.types import Fill, OrderSide, Trade
+from ml4t.specs.market_data import FeedSpec
 
 
 @pytest.fixture

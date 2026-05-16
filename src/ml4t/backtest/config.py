@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
 from ml4t.specs.base import serialize_artifact_value
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
@@ -402,6 +403,7 @@ class BacktestConfig:
     long_maintenance_margin: float = 0.25  # Reg T standard for longs
     short_maintenance_margin: float = 0.30  # Reg T standard for shorts (higher!)
     fixed_margin_schedule: dict[str, tuple[float, float]] | None = None  # For futures
+    margin_pct_schedule: dict[str, tuple[float, float]] | None = None  # Price-aware futures margin
     short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT
 
     # === Execution Timing ===
@@ -510,6 +512,15 @@ class BacktestConfig:
                     f"short_maintenance_margin ({self.short_maintenance_margin}) must be < "
                     f"initial_margin ({self.initial_margin})"
                 )
+
+        fixed_assets = set(self.fixed_margin_schedule or {})
+        pct_assets = set(self.margin_pct_schedule or {})
+        overlapping_margin_assets = sorted(fixed_assets & pct_assets)
+        if overlapping_margin_assets:
+            issues.append(
+                "fixed_margin_schedule and margin_pct_schedule cannot both define: "
+                f"{overlapping_margin_assets}"
+            )
 
         if self.settlement_delay < 0 or self.settlement_delay > 5:
             issues.append(
@@ -717,6 +728,7 @@ class BacktestConfig:
                 "long_maintenance_margin": self.long_maintenance_margin,
                 "short_maintenance_margin": self.short_maintenance_margin,
                 "fixed_margin_schedule": self.fixed_margin_schedule,
+                "margin_pct_schedule": self.margin_pct_schedule,
                 "short_cash_policy": self.short_cash_policy.value,
             },
             "execution": {
@@ -826,6 +838,7 @@ class BacktestConfig:
                     "long_maintenance_margin",
                     "short_maintenance_margin",
                     "fixed_margin_schedule",
+                    "margin_pct_schedule",
                     "short_cash_policy",
                 },
                 "execution": {"execution_price", "mark_price", "execution_mode"},
@@ -946,6 +959,7 @@ class BacktestConfig:
             long_maintenance_margin=acct_cfg.get("long_maintenance_margin", 0.25),
             short_maintenance_margin=acct_cfg.get("short_maintenance_margin", 0.30),
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
+            margin_pct_schedule=acct_cfg.get("margin_pct_schedule"),
             short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
             # Execution
             execution_price=ExecutionPrice(exec_cfg.get("execution_price", "open")),
@@ -1171,8 +1185,7 @@ class BacktestConfig:
             if node:
                 if not isinstance(node, dict):
                     raise TypeError(
-                        "Expected broker-specific override to be a mapping in "
-                        f"{assumptions_path}"
+                        f"Expected broker-specific override to be a mapping in {assumptions_path}"
                     )
                 merged_data = _deep_merge_dicts(merged_data, node)
         else:

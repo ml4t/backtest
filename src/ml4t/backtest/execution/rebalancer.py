@@ -362,7 +362,9 @@ class TargetWeightExecutor:
         """
         use_fractional = self.config.allow_fractional
         if use_fractional is None:
-            use_fractional = getattr(broker, "share_type", ShareType.INTEGER) == ShareType.FRACTIONAL
+            use_fractional = (
+                getattr(broker, "share_type", ShareType.INTEGER) == ShareType.FRACTIONAL
+            )
 
         if self.config.round_lots:
             rounded_lots = round(shares / self.config.lot_size) * self.config.lot_size

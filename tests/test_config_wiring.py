@@ -12,7 +12,6 @@ Validates that BacktestConfig fields actually affect execution:
 from datetime import datetime
 
 import pytest
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import (
     BacktestConfig,
@@ -42,6 +41,7 @@ from ml4t.backtest.models import (
     VolumeShareSlippage,
 )
 from ml4t.backtest.types import OrderSide, Position
+from ml4t.specs.market_data import FeedSpec
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -708,7 +708,15 @@ class TestPresetRoundTrip:
 
     @pytest.mark.parametrize(
         "preset_name",
-        ["default", "fast", "backtrader", "vectorbt", "zipline", "realistic", "ibkr_us_stocks_fixed"],
+        [
+            "default",
+            "fast",
+            "backtrader",
+            "vectorbt",
+            "zipline",
+            "realistic",
+            "ibkr_us_stocks_fixed",
+        ],
     )
     def test_preset_creates_valid_config(self, preset_name):
         config = BacktestConfig.from_preset(preset_name)
@@ -946,6 +954,19 @@ class TestImmediateFill:
         assert restored.immediate_fill is True
         assert restored.mark_price == ExecutionPrice.QUOTE_MID
 
+    def test_margin_pct_schedule_roundtrip(self):
+        config = BacktestConfig(margin_pct_schedule={"ES": (0.05, 0.035)})
+        restored = BacktestConfig.from_dict(config.to_dict())
+        assert restored.margin_pct_schedule == {"ES": (0.05, 0.035)}
+
+    def test_validate_rejects_overlapping_margin_models(self):
+        config = BacktestConfig(
+            fixed_margin_schedule={"ES": (12_000.0, 6_000.0)},
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        issues = config.validate(warn=False)
+        assert any("cannot both define" in issue for issue in issues)
+
 
 class TestFromDictDefaultParity:
     """from_dict({}) must produce the same defaults as BacktestConfig()."""
@@ -1011,7 +1032,6 @@ class TestFeedSpecConfigResolution:
         assert config.calendar == "NYSE"
         assert config.timezone == "America/New_York"
         assert config.data_frequency == DataFrequency.MINUTE_1
-
 
     def test_resolved_feed_spec_preserves_explicit_runtime_over_feed_metadata(self):
         config = BacktestConfig(
@@ -1146,10 +1166,7 @@ class TestStructuredAssumptions:
         config_dir = tmp_path / "ml4t"
         config_dir.mkdir()
         (config_dir / "defaults.yaml").write_text(
-            "cash:\n"
-            "  initial: 250000\n"
-            "calendar:\n"
-            "  timezone: America/New_York\n"
+            "cash:\n  initial: 250000\ncalendar:\n  timezone: America/New_York\n"
         )
         (config_dir / "assumptions.yaml").write_text(
             "default_assumptions:\n"
@@ -1172,10 +1189,7 @@ class TestStructuredAssumptions:
         config_dir = tmp_path / "ml4t"
         config_dir.mkdir()
         (config_dir / "defaults.yaml").write_text(
-            "commission:\n"
-            "  model: none\n"
-            "slippage:\n"
-            "  model: none\n"
+            "commission:\n  model: none\nslippage:\n  model: none\n"
         )
         (config_dir / "assumptions.yaml").write_text(
             "default_assumptions:\n"
@@ -1202,9 +1216,7 @@ class TestStructuredAssumptions:
         config_dir = tmp_path / "ml4t"
         config_dir.mkdir()
         (config_dir / "assumptions.yaml").write_text(
-            "default_assumptions:\n"
-            "  broker: ibkr\n"
-            "  region: us\n"
+            "default_assumptions:\n  broker: ibkr\n  region: us\n"
         )
 
         with pytest.raises(ValueError, match="broker, region, asset_class, and plan"):

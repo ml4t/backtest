@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 import polars as pl
 import pytest
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.config import (
     BacktestConfig,
@@ -16,6 +15,7 @@ from ml4t.backtest.config import (
 from ml4t.backtest.engine import run_backtest
 from ml4t.backtest.strategy import Strategy
 from ml4t.backtest.types import ExecutionMode
+from ml4t.specs.market_data import FeedSpec
 
 
 def _prices() -> pl.DataFrame:

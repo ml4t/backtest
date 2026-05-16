@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 import polars as pl
+
 from ml4t.specs.market_data import FeedSpec
 
 

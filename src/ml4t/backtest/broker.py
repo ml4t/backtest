@@ -73,6 +73,7 @@ class Broker:
         long_maintenance_margin: float = 0.25,
         short_maintenance_margin: float = 0.30,
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
+        margin_pct_schedule: dict[str, tuple[float, float]] | None = None,
         short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT,
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
@@ -144,11 +145,14 @@ class Broker:
         # This lets users specify margin once on ContractSpec rather than duplicating
         # it in both ContractSpec and BacktestConfig.fixed_margin_schedule.
         effective_margin_schedule = dict(fixed_margin_schedule or {})
+        effective_margin_pct_schedule = dict(margin_pct_schedule or {})
         if contract_specs:
             for symbol, spec in contract_specs.items():
                 if spec.margin is not None and symbol not in effective_margin_schedule:
                     # Use spec.margin as initial margin, 50% as maintenance (industry standard)
                     effective_margin_schedule[symbol] = (spec.margin, spec.margin * 0.5)
+                if spec.margin_pct is not None and symbol not in effective_margin_pct_schedule:
+                    effective_margin_pct_schedule[symbol] = spec.margin_pct
 
         # Create AccountState with UnifiedAccountPolicy
         policy: AccountPolicy = UnifiedAccountPolicy(
@@ -158,6 +162,7 @@ class Broker:
             long_maintenance_margin=long_maintenance_margin,
             short_maintenance_margin=short_maintenance_margin,
             fixed_margin_schedule=effective_margin_schedule or None,
+            margin_pct_schedule=effective_margin_pct_schedule or None,
             short_cash_policy=short_cash_policy.value,
         )
 
@@ -174,7 +179,8 @@ class Broker:
         self.initial_margin = initial_margin
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
-        self.fixed_margin_schedule = fixed_margin_schedule or {}
+        self.fixed_margin_schedule = effective_margin_schedule
+        self.margin_pct_schedule = effective_margin_pct_schedule
         self.short_cash_policy = short_cash_policy
 
         # Create Gatekeeper for order validation
@@ -360,6 +366,7 @@ class Broker:
             long_maintenance_margin=config.long_maintenance_margin,
             short_maintenance_margin=config.short_maintenance_margin,
             fixed_margin_schedule=config.fixed_margin_schedule,
+            margin_pct_schedule=config.margin_pct_schedule,
             short_cash_policy=config.short_cash_policy,
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,

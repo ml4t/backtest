@@ -84,6 +84,14 @@ class ContractSpec:
             margin=15000.0,       # Initial margin per contract
         )
 
+        # Price-aware margin approximation
+        nq_spec = ContractSpec(
+            symbol="NQ",
+            asset_class=AssetClass.FUTURE,
+            multiplier=20.0,
+            margin_pct=(0.05, 0.035),  # 5.0% initial, 3.5% maintenance
+        )
+
         # Apple stock
         aapl_spec = ContractSpec(
             symbol="AAPL",
@@ -98,6 +106,7 @@ class ContractSpec:
     multiplier: float = 1.0  # Point value ($ per point move)
     tick_size: float = 0.01  # Minimum price increment
     margin: float | None = None  # Initial margin per contract (overrides account default)
+    margin_pct: tuple[float, float] | None = None  # (initial, maintenance) fractions of notional
     currency: str = "USD"
 
 

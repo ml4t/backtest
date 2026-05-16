@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 import polars as pl
 import pytest
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import (
     Broker,
@@ -24,6 +23,7 @@ from ml4t.backtest.config import (
     SlippageType,
 )
 from ml4t.backtest.models import PercentageCommission, VolumeShareSlippage
+from ml4t.specs.market_data import FeedSpec
 
 # === Test Data Generators ===
 
