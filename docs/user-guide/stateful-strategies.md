@@ -366,7 +366,8 @@ Stateful strategies depend on querying execution state. Key broker methods:
 |--------|---------|---------|
 | `get_position(asset)` | Position or None | All patterns |
 | `get_positions()` | Dict of all positions | Multi-asset |
-| `get_account_value()` | Total portfolio value | Sizing |
+| `equity()` | Current marked account equity | Sizing |
+| `get_account_value()` | Same value as `equity()` | Existing code |
 | `get_cash()` | Available cash | Capital allocation |
 | `get_asset_stats(asset)` | Trade statistics | Kelly sizing |
 | `get_order(order_id)` | Order status | Grid trading |

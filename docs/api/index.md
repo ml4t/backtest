@@ -58,6 +58,7 @@ Auto-generated from source docstrings.
         - get_position
         - get_positions
         - get_cash
+        - equity
         - get_account_value
         - get_rejected_orders
         - set_position_rules
