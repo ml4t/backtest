@@ -55,6 +55,21 @@ class TestBrokerBasics:
         value = broker.get_account_value()
         assert value == 100000.0
 
+    def test_equity_uses_current_mark_prices(self, broker_with_position):
+        """Test equity returns cash plus current marked position value."""
+        broker_with_position._update_time(
+            datetime(2024, 1, 2, 9, 30),
+            {"AAPL": 155.0},
+            {"AAPL": 154.0},
+            {"AAPL": 156.0},
+            {"AAPL": 153.0},
+            {"AAPL": 1000.0},
+            {},
+        )
+
+        assert broker_with_position.equity() == 115500.0
+        assert broker_with_position.get_account_value() == broker_with_position.equity()
+
     def test_get_position_none(self, broker):
         """Test get_position returns None for no position."""
         assert broker.get_position("AAPL") is None

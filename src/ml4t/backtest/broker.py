@@ -736,9 +736,13 @@ class Broker:
         """
         return self.cash
 
+    def equity(self) -> float:
+        """Calculate current marked account equity."""
+        return self._portfolio_ledger.get_account_value()
+
     def get_account_value(self) -> float:
         """Calculate total account value (cash + position values)."""
-        return self._portfolio_ledger.get_account_value()
+        return self.equity()
 
     def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
         """Get all rejected orders, optionally filtered by asset.
