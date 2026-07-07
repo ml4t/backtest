@@ -1,13 +1,13 @@
-"""Case-study LEAN parity: actual LEAN vs ml4t-backtest[lean] on real book weights.
+"""Case-study LEAN parity: logged LEAN artifacts vs ml4t-backtest[lean].
 
 This reconstructs the case-study parity harness used by the Chapter 16
 ``16_case_study_lean_parity`` notebook. Each ``chapter16_<case_study>`` LEAN
 workspace is self-contained (``main.py`` + ``weights.csv`` + ``rebalance_dates.csv``
 + ``asset_symbols.csv`` + LEAN daily zips), so both sides reproduce from it:
 
-* **LEAN side** -- run the workspace project through actual LEAN (Docker) via
-  :func:`run_lean_backtest`; the algorithm logs its fills to ``ml4t_order_events.csv``
-  and equity to ``ml4t_daily_equity.csv``.
+* **LEAN side** -- load the committed artifacts produced by the workspace
+  algorithm: ``ml4t_order_events.csv`` and ``ml4t_daily_equity.csv``. Regenerate
+  them with :func:`validation.benchmark_suite.run_lean_backtest`.
 * **ml4t side** -- decode the workspace's own daily zips (so both engines consume
   byte-identical prices), then replay the identical target-weight strategy through
   the ``lean`` profile.
@@ -38,6 +38,8 @@ from ..datafeed import DataFeed
 from ..engine import Engine
 from ..strategy import Strategy
 
+_NUMBER = r"[-+]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][-+]?\d[\d_]*)?"
+
 
 def _csv_path(base_dir: Path, name: str) -> Path:
     for suffix in ("", ".xz", ".gz"):
@@ -65,13 +67,17 @@ def parse_workspace_params(workspace_dir: Path) -> dict:
         y, mo, d = (int(x) for x in m.groups())
         return f"{y:04d}-{mo:02d}-{d:02d}"
 
-    cash = re.search(r"set_cash\(([\d.]+)\)", text)
-    fee = re.search(r"Ml4tPercentFeeModel\(([\d.]+)\)", text)
+    def _number(pattern: str, name: str) -> float:
+        m = re.search(pattern, text)
+        if not m:
+            raise ValueError(f"no {name} in {workspace_dir / 'main.py'}")
+        return float(m.group(1).replace("_", ""))
+
     return {
         "start": _date("start"),
         "end": _date("end"),
-        "initial_cash": float(cash.group(1)) if cash else 1_000_000.0,
-        "fee": float(fee.group(1)) if fee else 0.0,
+        "initial_cash": _number(rf"set_cash\(\s*({_NUMBER})\s*\)", "set_cash"),
+        "fee": _number(rf"Ml4tPercentFeeModel\(\s*({_NUMBER})\s*\)", "fee model"),
     }
 
 

@@ -1094,6 +1094,7 @@ def benchmark_ml4t(
         cfg.slippage_rate = 0.0
         cfg.slippage_fixed = 0.0
         cfg.slippage_spread = 0.0
+        cfg.stop_slippage_rate = 0.0
         cfg.slippage_spread_by_asset = {}
 
     def build_ml4t_config(no_costs: bool) -> BacktestConfig:
@@ -2115,7 +2116,7 @@ class Ml4tBenchmark(QCAlgorithm):
     # trades, whereas every other engine in this suite reports individual
     # fills via len(trades_df). Using fills here keeps the parity surface
     # consistent (LEAN fills == ml4t fills on the canonical benchmark).
-    if trades_df is not None and not trades_df.empty:
+    if trades_df is not None:
         num_trades = int(len(trades_df))
 
     return BenchmarkResult(
