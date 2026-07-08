@@ -1076,28 +1076,45 @@ def benchmark_ml4t(
                             broker.cancel_order(pending_order.order_id)
                     broker.submit_order(asset_name, target_qty - current_qty)
 
+    def _disable_commission(cfg: BacktestConfig) -> None:
+        # Clear every direct commission field, not just type+rate. The broker
+        # auto-activates a cost model whenever any direct field (per_share /
+        # per_trade / rate) is non-zero, even when commission_type is NONE, so a
+        # partial reset would leave a preset's per-share/minimum commission live
+        # (e.g. zipline_strict carries per_share=0.005, minimum=1.0) and silently
+        # re-enable it — breaking parity against the zero-commission reference run.
+        cfg.commission_type = CommissionType.NONE
+        cfg.commission_rate = 0.0
+        cfg.commission_per_share = 0.0
+        cfg.commission_per_trade = 0.0
+        cfg.commission_minimum = 0.0
+
+    def _disable_slippage(cfg: BacktestConfig) -> None:
+        cfg.slippage_type = SlippageType.NONE
+        cfg.slippage_rate = 0.0
+        cfg.slippage_fixed = 0.0
+        cfg.slippage_spread = 0.0
+        cfg.stop_slippage_rate = 0.0
+        cfg.slippage_spread_by_asset = {}
+
     def build_ml4t_config(no_costs: bool) -> BacktestConfig:
         cfg = BacktestConfig.from_preset(profile_name)
         cfg.initial_cash = config.initial_cash
         cfg.allow_short_selling = True
         if no_costs:
-            cfg.commission_type = CommissionType.NONE
-            cfg.commission_rate = 0.0
-            cfg.slippage_type = SlippageType.NONE
-            cfg.slippage_rate = 0.0
+            _disable_commission(cfg)
+            _disable_slippage(cfg)
         else:
             if config.commission_pct > 0:
                 cfg.commission_type = CommissionType.PERCENTAGE
                 cfg.commission_rate = config.commission_pct
             else:
-                cfg.commission_type = CommissionType.NONE
-                cfg.commission_rate = 0.0
+                _disable_commission(cfg)
             if config.slippage_pct > 0:
                 cfg.slippage_type = SlippageType.PERCENTAGE
                 cfg.slippage_rate = config.slippage_pct
             else:
-                cfg.slippage_type = SlippageType.NONE
-                cfg.slippage_rate = 0.0
+                _disable_slippage(cfg)
         return cfg
 
     # Warm-up run (smaller data)
@@ -2092,6 +2109,15 @@ class Ml4tBenchmark(QCAlgorithm):
             error=str(exc),
             target_trace_df=target_trace,
         )
+
+    # Report the decoded fill count as num_trades for an apples-to-apples
+    # cross-engine comparison. load_lean_artifacts prefers LEAN's
+    # tradeStatistics.totalNumberOfTrades, which counts closed round-trip
+    # trades, whereas every other engine in this suite reports individual
+    # fills via len(trades_df). Using fills here keeps the parity surface
+    # consistent (LEAN fills == ml4t fills on the canonical benchmark).
+    if trades_df is not None:
+        num_trades = int(len(trades_df))
 
     return BenchmarkResult(
         framework="LEAN CLI",
