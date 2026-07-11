@@ -58,13 +58,13 @@ class TestBrokerBasics:
     def test_equity_uses_current_mark_prices(self, broker_with_position):
         """Test equity returns cash plus current marked position value."""
         broker_with_position._update_time(
-            datetime(2024, 1, 2, 9, 30),
-            {"AAPL": 155.0},
-            {"AAPL": 154.0},
-            {"AAPL": 156.0},
-            {"AAPL": 153.0},
-            {"AAPL": 1000.0},
-            {},
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 155.0},
+            opens={"AAPL": 154.0},
+            highs={"AAPL": 156.0},
+            lows={"AAPL": 153.0},
+            volumes={"AAPL": 1000.0},
+            signals={},
         )
 
         assert broker_with_position.equity() == 115500.0
