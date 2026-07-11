@@ -1020,6 +1020,26 @@ class TestImmediateFill:
         data = config.to_dict()
         assert data["account"]["margin_pct_schedule"] == {"ES": [0.05]}
 
+    def test_invalid_margin_pct_schedule_export_keeps_non_sequences_scalar(self):
+        def values():
+            yield "initial"
+            yield "maintenance"
+            yield "extra"
+
+        config = BacktestConfig(
+            margin_pct_schedule={
+                "DICT": {"initial": 0.05, "maintenance": 0.035},  # type: ignore[dict-item]
+                "GEN": values(),  # type: ignore[dict-item]
+                "STR": "im",  # type: ignore[dict-item]
+            }
+        )
+
+        data = config.to_dict()
+
+        assert isinstance(data["account"]["margin_pct_schedule"]["DICT"], str)
+        assert isinstance(data["account"]["margin_pct_schedule"]["GEN"], str)
+        assert data["account"]["margin_pct_schedule"]["STR"] == "im"
+
     def test_margin_pct_schedule_float_overflow_is_reported(self, tmp_path):
         class OverflowFloat:
             def __float__(self):

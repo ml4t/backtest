@@ -312,11 +312,9 @@ def _margin_schedule_to_dict(
 
 
 def _serialize_invalid_margin_schedule_value(value: Any) -> Any:
-    try:
-        values = list(value)
-    except TypeError:
+    if not isinstance(value, list | tuple):
         return _serialize_invalid_margin_scalar(value)
-    return [_serialize_invalid_margin_scalar(item) for item in values]
+    return [_serialize_invalid_margin_scalar(item) for item in value]
 
 
 def _serialize_invalid_margin_scalar(value: Any) -> Any:
