@@ -498,6 +498,22 @@ class TestPartialFills:
         assert pos.quantity == int(pos.quantity)
         assert pos.quantity == 52.0  # floor(5250/100)
 
+    def test_integer_partial_fill_preserves_exact_affordability_boundary(self):
+        broker = _make_broker(
+            initial_cash=5_200.0,
+            partial_fills_allowed=True,
+            share_type=ShareType.INTEGER,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity == 52.0
+        assert broker.cash == 0.0
+
     def test_partial_fill_accounts_for_commission_minimum(self):
         broker = _make_broker(
             initial_cash=5_005.0,

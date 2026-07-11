@@ -40,6 +40,22 @@ class FillEngine:
         if fill_price <= 0 or order.quantity <= 0:
             return 0.0
 
+        if self.broker.share_type == ShareType.INTEGER:
+            high_int = int(order.quantity)
+            if high_int <= 0:
+                return 0.0
+            if self._can_afford_quantity(order, fill_price, float(high_int)):
+                return float(high_int)
+
+            low_int = 0
+            while low_int < high_int:
+                mid_int = (low_int + high_int + 1) // 2
+                if self._can_afford_quantity(order, fill_price, float(mid_int)):
+                    low_int = mid_int
+                else:
+                    high_int = mid_int - 1
+            return float(low_int)
+
         high = order.quantity
         if self._can_afford_quantity(order, fill_price, high):
             return high
@@ -51,8 +67,6 @@ class FillEngine:
                 low = mid
             else:
                 high = mid
-        if self.broker.share_type == ShareType.INTEGER:
-            return low
         return max(0.0, low - CASH_TOLERANCE / fill_price)
 
     def try_partial_fill(self, order, fill_price: float) -> bool:
