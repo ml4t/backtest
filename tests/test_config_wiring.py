@@ -1008,6 +1008,18 @@ class TestImmediateFill:
         issues = config.validate(warn=False)
         assert any("margin_pct_schedule" in issue for issue in issues)
 
+    def test_validate_rejects_non_numeric_margin_pct_schedule(self):
+        config = BacktestConfig(
+            margin_pct_schedule={"ES": ("initial", "maintenance")}  # type: ignore[dict-item]
+        )
+        issues = config.validate(warn=False)
+        assert any("values must be numeric" in issue for issue in issues)
+
+    def test_invalid_margin_pct_schedule_export_does_not_raise(self):
+        config = BacktestConfig(margin_pct_schedule={"ES": (0.05,)})  # type: ignore[dict-item]
+        data = config.to_dict()
+        assert data["account"]["margin_pct_schedule"] == {"ES": [0.05]}
+
     def test_validate_rejects_invalid_margin_pct_rates(self):
         config = BacktestConfig(margin_pct_schedule={"ES": (0.03, 0.05)})
         issues = config.validate(warn=False)

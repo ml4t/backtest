@@ -283,26 +283,32 @@ def _feed_spec_to_dict(feed_spec: FeedSpec) -> dict[str, Any]:
 
 def _coerce_margin_schedule(
     schedule: dict[str, tuple[float, float]] | None,
-) -> dict[str, tuple[float, float]] | None:
+) -> dict[str, Any] | None:
     if schedule is None:
         return None
-    coerced: dict[str, tuple[float, float]] = {}
+    coerced: dict[str, Any] = {}
     for asset, value in schedule.items():
         try:
             initial, maintenance = value
+            coerced[asset] = (float(initial), float(maintenance))
         except (TypeError, ValueError):
             coerced[asset] = value
-            continue
-        coerced[asset] = (float(initial), float(maintenance))
     return coerced
 
 
 def _margin_schedule_to_dict(
     schedule: dict[str, tuple[float, float]] | None,
-) -> dict[str, list[float]] | None:
+) -> dict[str, Any] | None:
     if schedule is None:
         return None
-    return {asset: [initial, maintenance] for asset, (initial, maintenance) in schedule.items()}
+    serialized: dict[str, Any] = {}
+    for asset, value in schedule.items():
+        try:
+            initial, maintenance = value
+            serialized[asset] = [float(initial), float(maintenance)]
+        except (TypeError, ValueError):
+            serialized[asset] = serialize_artifact_value(value)
+    return serialized
 
 
 def _validate_margin_pct_schedule(
@@ -318,6 +324,12 @@ def _validate_margin_pct_schedule(
             issues.append(
                 f"margin_pct_schedule[{asset!r}] must be a two-item (initial, maintenance) sequence"
             )
+            continue
+        try:
+            initial = float(initial)
+            maintenance = float(maintenance)
+        except (TypeError, ValueError):
+            issues.append(f"margin_pct_schedule[{asset!r}] values must be numeric")
             continue
         if not 0.0 < initial <= 1.0:
             issues.append(
