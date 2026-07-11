@@ -1029,6 +1029,8 @@ class TestImmediateFill:
                 return self
 
             def __next__(self):
+                if self.read_count >= 5:
+                    raise StopIteration
                 self.read_count += 1
                 return f"value-{self.read_count}"
 
