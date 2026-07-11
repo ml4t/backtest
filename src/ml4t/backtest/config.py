@@ -288,6 +288,9 @@ def _coerce_margin_schedule(
         return None
     coerced: dict[str, Any] = {}
     for asset, value in schedule.items():
+        if not isinstance(value, list | tuple):
+            coerced[asset] = value
+            continue
         try:
             initial, maintenance = value
             coerced[asset] = (float(initial), float(maintenance))
@@ -303,6 +306,9 @@ def _margin_schedule_to_dict(
         return None
     serialized: dict[str, Any] = {}
     for asset, value in schedule.items():
+        if not isinstance(value, list | tuple):
+            serialized[asset] = _serialize_invalid_margin_scalar(value)
+            continue
         try:
             initial, maintenance = value
             serialized[asset] = [float(initial), float(maintenance)]
@@ -331,6 +337,11 @@ def _validate_margin_pct_schedule(
     if schedule is None:
         return issues
     for asset, value in schedule.items():
+        if not isinstance(value, list | tuple):
+            issues.append(
+                f"margin_pct_schedule[{asset!r}] must be a two-item (initial, maintenance) sequence"
+            )
+            continue
         try:
             initial, maintenance = value
         except (TypeError, ValueError):
