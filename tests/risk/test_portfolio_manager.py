@@ -14,7 +14,26 @@ from ml4t.backtest.risk.portfolio.limits import (
     PortfolioState,
 )
 from ml4t.backtest.risk.portfolio.manager import RiskManager
-from ml4t.backtest.types import ExitReason, Position
+from ml4t.backtest.types import ExitReason, OrderSide
+
+
+def mark_prices(broker: Broker, prices: dict[str, float]) -> None:
+    broker._update_time(
+        timestamp=datetime(2024, 1, 1, 9, 30),
+        prices=prices,
+        opens=prices,
+        highs=prices,
+        lows=prices,
+        volumes=dict.fromkeys(prices, 1000000.0),
+        signals={},
+    )
+
+
+def open_long_position(broker: Broker, asset: str, quantity: float, price: float) -> None:
+    mark_prices(broker, {asset: price})
+    broker.submit_order(asset, quantity, OrderSide.BUY)
+    broker._process_orders()
+    assert broker.positions[asset].quantity == quantity
 
 
 class TestRiskManagerInitialization:
@@ -141,12 +160,8 @@ class TestRiskManagerUpdate:
             commission_model=NoCommission(),
             slippage_model=NoSlippage(),
         )
-        broker.positions["AAPL"] = Position(
-            asset="AAPL",
-            quantity=100.0,
-            entry_price=150.0,
-            entry_time=datetime(2024, 1, 1, 9, 30),
-        )
+        open_long_position(broker, "AAPL", 100.0, 150.0)
+        mark_prices(broker, {"AAPL": 150.0})
 
         results = manager.update(
             equity=85000.0,
@@ -156,6 +171,26 @@ class TestRiskManagerUpdate:
 
         assert any(result.action == "liquidate" for result in results)
         assert manager.is_halted
+        pending = broker.get_pending_orders()
+        assert len(pending) == 1
+        assert pending[0]._exit_reason == ExitReason.RISK_LIQUIDATION
+
+    def test_update_liquidate_action_is_idempotent_with_broker(self):
+        """Persistent breaches should not queue duplicate liquidation orders."""
+        limits = [MaxDrawdownLimit(max_drawdown=0.10)]
+        manager = RiskManager(limits=limits)
+        manager.initialize(initial_equity=100000.0)
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+        open_long_position(broker, "AAPL", 100.0, 150.0)
+        mark_prices(broker, {"AAPL": 150.0})
+
+        manager.update(equity=85000.0, positions={"AAPL": 15000.0}, broker=broker)
+        manager.update(equity=84000.0, positions={"AAPL": 15000.0}, broker=broker)
+
         pending = broker.get_pending_orders()
         assert len(pending) == 1
         assert pending[0]._exit_reason == ExitReason.RISK_LIQUIDATION

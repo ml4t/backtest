@@ -43,6 +43,26 @@ def broker_with_position(broker):
     return broker
 
 
+def mark_prices(broker: Broker, prices: dict[str, float]) -> None:
+    broker._update_time(
+        timestamp=datetime(2024, 1, 1, 9, 30),
+        prices=prices,
+        opens=prices,
+        highs=prices,
+        lows=prices,
+        volumes=dict.fromkeys(prices, 1000000.0),
+        signals={},
+    )
+
+
+def open_position(broker: Broker, asset: str, quantity: float, price: float) -> None:
+    mark_prices(broker, {asset: price})
+    side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
+    broker.submit_order(asset, abs(quantity), side)
+    broker._process_orders()
+    assert broker.positions[asset].quantity == quantity
+
+
 class TestBrokerBasics:
     """Test basic broker methods."""
 
@@ -216,20 +236,17 @@ class TestClosePosition:
         assert order.side == OrderSide.BUY  # Buy to cover short
         assert order.quantity == 50.0
 
-    def test_flatten_all_positions_cancels_pending_and_marks_exits(self, broker):
+    def test_flatten_all_positions_cancels_pending_and_marks_exits(self):
         """Test flatten_all_positions cancels pending orders and tags exits."""
-        broker.positions["AAPL"] = Position(
-            asset="AAPL",
-            quantity=100.0,
-            entry_price=150.0,
-            entry_time=datetime(2024, 1, 1, 9, 30),
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            allow_short_selling=True,
         )
-        broker.positions["MSFT"] = Position(
-            asset="MSFT",
-            quantity=-25.0,
-            entry_price=300.0,
-            entry_time=datetime(2024, 1, 1, 9, 30),
-        )
+        open_position(broker, "AAPL", 100.0, 150.0)
+        open_position(broker, "MSFT", -25.0, 300.0)
+        mark_prices(broker, {"AAPL": 151.0, "MSFT": 299.0, "GOOG": 100.0})
         pending_entry = broker.submit_order("GOOG", 10.0, OrderSide.BUY)
 
         orders = broker.flatten_all_positions("max drawdown breached")
@@ -242,6 +259,11 @@ class TestClosePosition:
         assert all(order._exit_reason == ExitReason.RISK_LIQUIDATION for order in orders)
         assert all(order._risk_exit_reason == "max drawdown breached" for order in orders)
         assert broker.get_pending_orders() == orders
+
+    def test_flatten_all_positions_noop_without_positions_or_orders(self, broker):
+        """Test flatten_all_positions is safe when there is nothing to flatten."""
+        assert broker.flatten_all_positions("no positions") == []
+        assert broker.get_pending_orders() == []
 
 
 class TestIsExitOrder:

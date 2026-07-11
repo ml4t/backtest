@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -49,7 +50,9 @@ def reason_to_exit_reason(reason: str) -> ExitReason:
         return ExitReason.TRAILING_STOP
     elif "time" in reason_lower:
         return ExitReason.TIME_STOP
-    elif "risk_liquidation" in reason_lower or "liquidat" in reason_lower:
+    elif "risk_liquidation" in reason_lower or re.search(
+        r"\b(liquidation|liquidate)\b", reason_lower
+    ):
         return ExitReason.RISK_LIQUIDATION
     elif "end_of_data" in reason_lower:
         return ExitReason.END_OF_DATA

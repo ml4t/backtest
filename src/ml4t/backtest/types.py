@@ -469,7 +469,7 @@ class Trade:
 
     @property
     def cost_drag(self) -> float:
-        """Total cost as fraction of notional: (fees + slippage) / notional."""
+        """Total cost as fraction of notional: (fees + total slippage cost) / notional."""
         notional = self.entry_price * abs(self.quantity) * self.multiplier
         if notional == 0:
             return 0.0

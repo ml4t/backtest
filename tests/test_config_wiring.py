@@ -498,6 +498,23 @@ class TestPartialFills:
         assert pos.quantity == int(pos.quantity)
         assert pos.quantity == 52.0  # floor(5250/100)
 
+    def test_partial_fill_accounts_for_commission_minimum(self):
+        broker = _make_broker(
+            initial_cash=5_005.0,
+            commission_model=PerShareCommission(per_share=0.01, minimum=10.0),
+            partial_fills_allowed=True,
+            share_type=ShareType.INTEGER,
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+
+        pos = broker.get_position("AAPL")
+        assert pos is not None
+        assert pos.quantity == 49.0
+        assert broker.cash == 95.0
+
 
 # ---------------------------------------------------------------------------
 # fill_ordering
@@ -1087,40 +1104,9 @@ class TestFromDictDefaultParity:
 
     def test_empty_dict_matches_constructor_defaults(self):
         default = BacktestConfig()
-        from_empty = BacktestConfig.from_dict({}, strict=False)
+        from_empty = BacktestConfig.from_dict({})
 
-        # Core execution fields that were previously mismatched
-        assert from_empty.execution_mode == default.execution_mode
-        assert from_empty.execution_price == default.execution_price
-        assert from_empty.mark_price == default.mark_price
-        assert from_empty.rebalance_mode == default.rebalance_mode
-
-        # Verify all enum fields match
-        assert from_empty.stop_fill_mode == default.stop_fill_mode
-        assert from_empty.stop_level_basis == default.stop_level_basis
-        assert from_empty.trail_hwm_source == default.trail_hwm_source
-        assert from_empty.initial_hwm_source == default.initial_hwm_source
-        assert from_empty.trail_stop_timing == default.trail_stop_timing
-        assert from_empty.share_type == default.share_type
-        assert from_empty.commission_type == default.commission_type
-        assert from_empty.slippage_type == default.slippage_type
-        assert from_empty.slippage_spread == default.slippage_spread
-        assert from_empty.slippage_spread_by_asset == default.slippage_spread_by_asset
-        assert from_empty.slippage_spread_convention == default.slippage_spread_convention
-        assert from_empty.fill_ordering == default.fill_ordering
-        assert from_empty.entry_order_priority == default.entry_order_priority
-        assert from_empty.short_cash_policy == default.short_cash_policy
-        assert from_empty.data_frequency == default.data_frequency
-        assert from_empty.missing_price_policy == default.missing_price_policy
-        assert from_empty.late_asset_policy == default.late_asset_policy
-
-        # Verify key numeric/bool fields match
-        assert from_empty.initial_cash == default.initial_cash
-        assert from_empty.commission_rate == default.commission_rate
-        assert from_empty.slippage_rate == default.slippage_rate
-        assert from_empty.allow_short_selling == default.allow_short_selling
-        assert from_empty.allow_leverage == default.allow_leverage
-        assert from_empty.settlement_delay == default.settlement_delay
+        assert from_empty == default
 
     def test_constructor_defaults_to_integer_shares(self):
         config = BacktestConfig()
@@ -1130,6 +1116,10 @@ class TestFromDictDefaultParity:
         assert config.commission_minimum == 0.0
         assert config.slippage_type == SlippageType.NONE
         assert config.slippage_rate == 0.0
+
+    def test_per_contract_commission_alias_loads_from_dict(self):
+        config = BacktestConfig.from_dict({"commission": {"model": "per_contract"}})
+        assert config.commission_type == CommissionType.PER_SHARE
 
 
 class TestFeedSpecConfigResolution:

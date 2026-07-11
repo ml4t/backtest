@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ..config import ExecutionPrice, ShareType
 from ..types import OrderSide, OrderType
+from .shared import CASH_TOLERANCE
 
 
 class FillEngine:
@@ -25,62 +28,32 @@ class FillEngine:
         if self.broker.share_type == ShareType.INTEGER:
             order.quantity = float(int(order.quantity))
 
-    def _commission_rate(self, order, fill_price: float) -> float:
-        if fill_price <= 0:
-            return 0.0
-        test_commission = self.broker.commission_model.calculate(order.asset, 1.0, fill_price)
-        return test_commission / fill_price
+    def _can_afford_quantity(self, order, fill_price: float, quantity: float) -> bool:
+        if quantity <= 0:
+            return True
+        candidate = replace(order, quantity=quantity)
+        valid, _reason = self.broker.gatekeeper.validate_order(candidate, fill_price)
+        return valid
 
     def get_max_affordable_quantity(self, order, fill_price: float) -> float:
         """Return max fillable quantity under current cash constraints."""
-        broker = self.broker
-        commission_rate = self._commission_rate(order, fill_price)
-        gross_per_share = fill_price * (1.0 + commission_rate)
-        if gross_per_share <= 0:
+        if fill_price <= 0 or order.quantity <= 0:
             return 0.0
 
-        available = self.get_available_cash()
-        current_qty = broker.account.get_position_quantity(order.asset)
-        short_policy = getattr(broker.short_cash_policy, "value", "")
+        high = order.quantity
+        if self._can_afford_quantity(order, fill_price, high):
+            return high
 
-        if order.side == OrderSide.BUY and current_qty < 0 and short_policy == "lock_notional":
-            # VectorBT lock_cash-style cap for covering/reversing short positions.
-            position = broker.account.get_position(order.asset)
-            if position is None:
-                return max(0.0, available / gross_per_share)
-
-            debt = abs(position.quantity) * position.entry_price * position.multiplier
-            cover_req_cash = abs(position.quantity) * gross_per_share
-            cover_free_cash = available + 2.0 * debt - cover_req_cash
-
-            if cover_free_cash > 0:
-                cash_limit = available + 2.0 * debt
-            elif cover_free_cash < 0:
-                avg_entry_price = position.entry_price * position.multiplier
-                denom = gross_per_share - 2.0 * avg_entry_price
-                if denom <= 0:
-                    cash_limit = 0.0
-                else:
-                    max_short_size = available / denom
-                    cash_limit = max(0.0, max_short_size * gross_per_share)
+        low = 0.0
+        for _ in range(64):
+            mid = (low + high) / 2.0
+            if self._can_afford_quantity(order, fill_price, mid):
+                low = mid
             else:
-                cash_limit = broker.account.cash
-
-            return max(0.0, cash_limit / gross_per_share)
-
-        if order.side == OrderSide.SELL and short_policy == "lock_notional":
-            # VectorBT lock_cash-style cap for short selling with locked free cash.
-            long_qty = max(current_qty, 0.0)
-            long_cash = long_qty * fill_price * max(0.0, 1.0 - commission_rate)
-            total_free_cash = available + long_cash
-
-            if total_free_cash <= 0:
-                return max(0.0, long_qty)
-
-            max_short_qty = total_free_cash / gross_per_share
-            return max(0.0, long_qty + max_short_qty)
-
-        return max(0.0, available / gross_per_share)
+                high = mid
+        if self.broker.share_type == ShareType.INTEGER:
+            return low
+        return max(0.0, low - CASH_TOLERANCE / fill_price)
 
     def try_partial_fill(self, order, fill_price: float) -> bool:
         max_shares = self.get_max_affordable_quantity(order, fill_price)

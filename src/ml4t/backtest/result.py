@@ -525,8 +525,8 @@ class BacktestResult:
         Args:
             path: Directory path to write files
             include: Components to include. Default: all.
-                Options: ["trades", "fills", "predictions", "equity", "portfolio_state", "daily_pnl",
-                    "metrics", "config"]
+                Options: ["trades", "fills", "predictions", "equity", "portfolio_state",
+                    "daily_pnl", "metrics", "config", "spec"]
             compression: Parquet compression codec (default: "zstd")
 
         Returns:

@@ -156,9 +156,9 @@ body {
   overflow: hidden;
 }
 
-/* Tabs styled as integrated sub-navigation — same visual
+/* Tabs styled as integrated sub-navigation - same visual
    language as the chapter page tabs on the main website.
-   Uses px units because MkDocs sets html font-size: 125%. */
+   Uses px units to match the main website's navigation spacing. */
 .md-tabs {
   background: white;
   border-bottom: 2px solid var(--ml4t-silver-muted);
@@ -303,23 +303,23 @@ body {
   color: var(--ml4t-silver);
 }
 
-.md-footer-nav__link {
+.md-footer__link {
   opacity: 0.85;
   transition: opacity 0.15s;
 }
 
-.md-footer-nav__link:hover {
+.md-footer__link:hover {
   opacity: 1;
 }
 
-.md-footer-nav__direction {
+.md-footer__direction {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.6;
 }
 
-.md-footer-nav__title {
+.md-footer__title {
   font-family: "Source Serif 4", Georgia, serif;
   font-weight: 600;
 }

@@ -6,7 +6,6 @@
 - Polars
 - PyYAML
 - NumPy
-- Pydantic
 
 ## Install from PyPI
 
@@ -23,8 +22,8 @@ uv add ml4t-backtest
 ## Install from Source
 
 ```bash
-git clone https://github.com/ml4t/ml4t-backtest.git
-cd ml4t-backtest
+git clone https://github.com/ml4t/backtest.git
+cd backtest
 pip install -e .
 ```
 

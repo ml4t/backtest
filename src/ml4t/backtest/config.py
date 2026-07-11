@@ -209,6 +209,12 @@ class CommissionType(str, Enum):
     PER_TRADE = "per_trade"  # Fixed amount per trade
     TIERED = "tiered"  # Volume-based tiers
 
+    @classmethod
+    def _missing_(cls, value: object) -> CommissionType | None:
+        if value == "per_contract":
+            return cls.PER_SHARE
+        return None
+
 
 class SlippageType(str, Enum):
     """Slippage calculation method."""
@@ -1056,9 +1062,13 @@ class BacktestConfig:
             margin_pct_schedule=acct_cfg.get("margin_pct_schedule"),
             short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
             # Execution
-            execution_price=ExecutionPrice(exec_cfg.get("execution_price", "open")),
-            mark_price=ExecutionPrice(exec_cfg.get("mark_price", "price")),
-            execution_mode=ExecutionMode(exec_cfg.get("execution_mode", "next_bar")),
+            execution_price=ExecutionPrice(
+                exec_cfg.get("execution_price", ExecutionPrice.OPEN.value)
+            ),
+            mark_price=ExecutionPrice(exec_cfg.get("mark_price", ExecutionPrice.PRICE.value)),
+            execution_mode=ExecutionMode(
+                exec_cfg.get("execution_mode", ExecutionMode.NEXT_BAR.value)
+            ),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),
@@ -1106,7 +1116,9 @@ class BacktestConfig:
                 "next_bar_queue_shadow_validation", False
             ),
             immediate_fill=order_cfg.get("immediate_fill", False),
-            rebalance_mode=RebalanceMode(order_cfg.get("rebalance_mode", "incremental")),
+            rebalance_mode=RebalanceMode(
+                order_cfg.get("rebalance_mode", RebalanceMode.INCREMENTAL.value)
+            ),
             rebalance_headroom_pct=order_cfg.get("rebalance_headroom_pct", 1.0),
             missing_price_policy=MissingPricePolicy(order_cfg.get("missing_price_policy", "skip")),
             late_asset_policy=LateAssetPolicy(order_cfg.get("late_asset_policy", "allow")),

@@ -1,6 +1,6 @@
 """Polars-based multi-asset data feed with O(1) timestamp lookups.
 
-Memory-efficient implementation that stores the original DataFrames plus
+Memory-efficient implementation that stores normalized DataFrames plus
 timestamp-to-slice indexes, then converts only the current bar to dicts at
 iteration time.
 """
@@ -51,9 +51,11 @@ class DataFeed:
     """Polars-based multi-asset data feed with signals and context.
 
     Pre-indexes data by timestamp at initialization for O(1) lookups during
-    iteration. DataFrames are kept in their native format and converted to
-    dicts only for the active bar, avoiding the large memory overhead of
-    materializing one child DataFrame per timestamp.
+    iteration. Public ``prices``, ``signals``, and ``context`` attributes are
+    normalized copies sorted by timestamp when needed. DataFrames are kept in
+    their native format and converted to dicts only for the active bar,
+    avoiding the large memory overhead of materializing one child DataFrame per
+    timestamp.
 
     Memory Efficiency:
         - 1M bars: ~100 MB (was ~1 GB with pre-converted dicts)
@@ -171,7 +173,7 @@ class DataFeed:
         )
 
         price_cols = self.prices.columns
-        self._price_asset_idx = price_cols.index(self._entity_col)
+        self._price_entity_idx = price_cols.index(self._entity_col)
         self._price_open_idx = (
             price_cols.index(self._open_col) if self._open_col in price_cols else -1
         )
@@ -206,10 +208,10 @@ class DataFeed:
                 raise ValueError(
                     f"timestamp_col={self._timestamp_col!r} not found in signal columns {signal_cols}"
                 )
-            self._signal_asset_idx = signal_cols.index(self._entity_col)
+            self._signal_entity_idx = signal_cols.index(self._entity_col)
             self._signal_col_indices = [signal_cols.index(c) for c in self._signal_columns]
         else:
-            self._signal_asset_idx = -1
+            self._signal_entity_idx = -1
             self._signal_col_indices = []
 
         if self.context is not None:
@@ -253,15 +255,20 @@ class DataFeed:
         if not df[self._timestamp_col].is_sorted():
             df = df.sort(self._timestamp_col)
 
-        counts = df.group_by(self._timestamp_col, maintain_order=True).agg(
-            pl.len().alias("_row_count")
-        )
+        timestamps = df.get_column(self._timestamp_col)
         result: dict[datetime, tuple[int, int]] = {}
+        if len(timestamps) == 0:
+            return df, result
+
         offset = 0
-        for ts, row_count in counts.iter_rows(named=False):
-            count = int(row_count)
-            result[ts] = (offset, count)
-            offset += count
+        current_ts = timestamps[0]
+        for idx in range(1, len(timestamps)):
+            ts = timestamps[idx]
+            if ts != current_ts:
+                result[current_ts] = (offset, idx - offset)
+                offset = idx
+                current_ts = ts
+        result[current_ts] = (offset, len(timestamps) - offset)
         return df, result
 
     @staticmethod
@@ -312,7 +319,7 @@ class DataFeed:
 
         # O(1) lookup + lazy conversion to dicts (only for current bar)
         assets_data = _AssetsData()
-        price_asset_idx = self._price_asset_idx
+        price_entity_idx = self._price_entity_idx
         price_open_idx = self._price_open_idx
         price_high_idx = self._price_high_idx
         price_low_idx = self._price_low_idx
@@ -329,7 +336,7 @@ class DataFeed:
         price_df = self._slice_for_timestamp(self.prices, self._price_ranges_by_ts, ts)
         if price_df is not None:
             for row in price_df.iter_rows(named=False):
-                asset = row[price_asset_idx]
+                asset = row[price_entity_idx]
                 close = row[price_close_idx] if price_close_idx >= 0 else None
                 price = row[price_price_idx] if price_price_idx >= 0 else close
                 open_ = row[price_open_idx] if price_open_idx >= 0 else close
@@ -396,11 +403,11 @@ class DataFeed:
         # Add signals for each asset - lazy conversion
         signal_df = self._slice_for_timestamp(self.signals, self._signal_ranges_by_ts, ts)
         if signal_df is not None:
-            signal_asset_idx = self._signal_asset_idx
+            signal_entity_idx = self._signal_entity_idx
             signal_col_indices = self._signal_col_indices
             signal_columns = self._signal_columns
             for row in signal_df.iter_rows(named=False):
-                asset = row[signal_asset_idx]
+                asset = row[signal_entity_idx]
                 if asset in assets_data:
                     asset_signals = assets_data._signals[asset]
                     for i, col_idx in enumerate(signal_col_indices):

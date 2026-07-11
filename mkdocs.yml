@@ -128,9 +128,9 @@ nav:
 
 # Extra configuration
 extra:
-  ml4t_docs_hub_url: /docs/
-  ml4t_libraries_url: /libraries/
-  ml4t_chapters_url: /chapters/
+  ml4t_docs_hub_url: https://ml4trading.io/docs/
+  ml4t_libraries_url: https://ml4trading.io/libraries/
+  ml4t_chapters_url: https://ml4trading.io/chapters/
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/stefan-jansen
