@@ -28,8 +28,9 @@ from typing import TYPE_CHECKING, Any, Protocol
 import polars as pl
 
 if TYPE_CHECKING:
+    from ml4t.specs.market_data import FeedSpec
+
     from ..broker import Broker
-    from ..feed_spec import FeedSpec
     from ..types import Order
 
 from ..config import RebalanceMode, ShareType
@@ -42,7 +43,7 @@ class WeightProvider(Protocol):
     """Protocol for anything that produces target weights."""
 
     def get_weights(self, data: dict, broker: Broker) -> dict[str, float]:
-        """Return target weights (asset -> weight, should sum to <= 1.0)."""
+        """Return target weights (asset -> weight), including negative or levered weights."""
         ...
 
 
@@ -175,8 +176,10 @@ class TargetWeightExecutor:
           sequentially (cash constraints checked against live state).
 
         Args:
-            target_weights: Dict of asset -> target weight (0.0 to 1.0).
-                            Sum can be < 1.0 to hold cash.
+            target_weights: Dict of asset -> target weight. Negative weights
+                express shorts. Gross exposure may exceed 1.0 when leverage is
+                enabled; ``max_gross_leverage`` and broker/account validation
+                control the allowed exposure.
             data: Current bar data (for prices). Format: {asset: {'close': price, ...}}
             broker: Broker instance for order submission.
 

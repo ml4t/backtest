@@ -171,14 +171,21 @@ class Engine:
                     for a, d in assets_data.items()
                     if (price := d.get("price", d.get("close"))) is not None
                 }
-                opens = {a: d.get("open", d.get("close")) for a, d in assets_data.items()}
-                highs = {a: d.get("high", d.get("close")) for a, d in assets_data.items()}
-                lows = {a: d.get("low", d.get("close")) for a, d in assets_data.items()}
+                opens = {}
+                highs = {}
+                lows = {}
                 closes = {
                     a: close
                     for a, d in assets_data.items()
                     if (close := d.get("close", d.get("price"))) is not None
                 }
+                for asset, data in assets_data.items():
+                    base_price = data.get("close")
+                    if base_price is None:
+                        base_price = data.get("price")
+                    opens[asset] = data.get("open") if data.get("open") is not None else base_price
+                    highs[asset] = data.get("high") if data.get("high") is not None else base_price
+                    lows[asset] = data.get("low") if data.get("low") is not None else base_price
                 volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
                 bids = {a: d["bid"] for a, d in assets_data.items() if d.get("bid") is not None}
                 asks = {a: d["ask"] for a, d in assets_data.items() if d.get("ask") is not None}

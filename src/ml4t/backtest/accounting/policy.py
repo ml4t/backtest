@@ -291,7 +291,8 @@ class UnifiedAccountPolicy(AccountPolicy):
                 - Percentages are fractions of notional, not whole percents
                 - Example: {"ES": (0.05, 0.035)}
             short_cash_policy: How short proceeds affect spendable cash in
-                non-levered accounts. One of {"credit", "lock_notional"}.
+                non-levered accounts. One of {"credit", "credit_proceeds",
+                "lock_notional"}.
 
         Raises:
             ValueError: If margin parameters are invalid when leverage is enabled.

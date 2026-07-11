@@ -133,6 +133,62 @@ class TestDataFeedMemoryEfficiency:
         assert ctx["vix"] == 20.5
         assert ctx["spy_close"] == 300.0
 
+    def test_datafeed_iterates_signal_timestamps_without_prices(self):
+        """Signals can add timestamps while price slices remain optional."""
+        ts1 = datetime(2020, 1, 1)
+        ts2 = datetime(2020, 1, 2)
+        prices = pl.DataFrame(
+            {
+                "timestamp": [ts1],
+                "asset": ["AAPL"],
+                "open": [100.0],
+                "high": [101.0],
+                "low": [99.0],
+                "close": [100.5],
+                "volume": [1_000_000],
+            }
+        )
+        signals = pl.DataFrame(
+            {
+                "timestamp": [ts1, ts2],
+                "asset": ["AAPL", "AAPL"],
+                "signal": [0.5, 0.9],
+            }
+        )
+
+        rows = list(DataFeed(prices_df=prices, signals_df=signals))
+
+        assert [ts for ts, *_ in rows] == [ts1, ts2]
+        assert rows[0][1]["AAPL"]["signals"]["signal"] == 0.5
+        assert rows[1][1] == {}
+
+    def test_datafeed_mixed_slice_lengths_from_unsorted_input(self):
+        """Offset indexes handle interleaved one-row and multi-row bars."""
+        ts1 = datetime(2020, 1, 1)
+        ts2 = datetime(2020, 1, 2)
+        ts3 = datetime(2020, 1, 3)
+        prices = pl.DataFrame(
+            {
+                "timestamp": [ts2, ts1, ts3, ts1],
+                "asset": ["AAPL", "AAPL", "AAPL", "MSFT"],
+                "open": [200.0, 100.0, 300.0, 150.0],
+                "high": [201.0, 101.0, 301.0, 151.0],
+                "low": [199.0, 99.0, 299.0, 149.0],
+                "close": [200.5, 100.5, 300.5, 150.5],
+                "volume": [2_000_000, 1_000_000, 3_000_000, 1_500_000],
+            }
+        )
+
+        rows = list(DataFeed(prices_df=prices))
+
+        assert [ts for ts, *_ in rows] == [ts1, ts2, ts3]
+        assert set(rows[0][1]) == {"AAPL", "MSFT"}
+        assert rows[0][1]["MSFT"]["close"] == 150.5
+        assert set(rows[1][1]) == {"AAPL"}
+        assert rows[1][1]["AAPL"]["close"] == 200.5
+        assert set(rows[2][1]) == {"AAPL"}
+        assert rows[2][1]["AAPL"]["close"] == 300.5
+
     @pytest.mark.benchmark
     def test_datafeed_memory_benchmark(self):
         """Benchmark memory usage for medium-scale dataset.

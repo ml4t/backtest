@@ -466,7 +466,7 @@ class FillExecutor:
             pnl_percent=pnl_pct,
             bars_held=pos.bars_held,
             fees=total_close_commission,
-            exit_slippage=ctx.slippage * (close_qty / ctx.fill_quantity),
+            exit_slippage=ctx.slippage,
             exit_reason=_get_exit_reason(order),
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
@@ -501,7 +501,7 @@ class FillExecutor:
             context=context,
             multiplier=broker.get_multiplier(order.asset),
             entry_commission=open_commission,
-            entry_slippage=ctx.slippage * (open_qty / ctx.fill_quantity),
+            entry_slippage=ctx.slippage,
             high_water_mark=initial_hwm,
             low_water_mark=initial_lwm,
         )
