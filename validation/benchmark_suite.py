@@ -2038,13 +2038,6 @@ class Ml4tBenchmark(QCAlgorithm):
         ).encode()
     ).hexdigest()
     manifest_path = data_root / "ml4t_manifest.json"
-    cache_hit = False
-    if manifest_path.exists():
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            cache_hit = manifest.get("signature") == lean_data_sig
-        except Exception:
-            cache_hit = False
 
     prep_start = time.perf_counter()
     cache_hit = export_lean_daily_data(
