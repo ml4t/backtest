@@ -244,7 +244,7 @@ Validated on both synthetic and **real market data** (250 US equities, 1998-2018
 | Zipline | **0 (0.00%)** | **$10.30 (0.0014%)** | **99.9%+** | DONE |
 | Backtrader | **0 (0.00%)** | float noise | **99.9%+** | DONE |
 | VBT OSS | +91 (0.04%) | $0 (0.00%) | **99%+** | Production |
-| LEAN | +663 (0.29%) | $13K (1.2%) | **97%+** | Buying-power reservation gap |
+| LEAN | **0 (0.00%)** | **$1.55 (0.0002%)** | **99.9%+** | DONE |
 
 ---
 
