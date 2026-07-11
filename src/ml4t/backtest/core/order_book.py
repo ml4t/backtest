@@ -477,6 +477,7 @@ class OrderBook:
                 price=signal_price,
                 current_positions=shadow_positions,
                 cash=available_cash - commission,
+                multiplier=broker.get_multiplier(order.asset),
             )
         elif is_reversal:
             valid, reason = broker.account.policy.handle_reversal(
@@ -487,6 +488,7 @@ class OrderBook:
                 current_positions=shadow_positions,
                 cash=available_cash,
                 commission=commission,
+                multiplier=broker.get_multiplier(order.asset),
             )
         else:
             valid, reason = broker.account.policy.validate_position_change(
@@ -496,6 +498,7 @@ class OrderBook:
                 price=signal_price,
                 current_positions=shadow_positions,
                 cash=available_cash - commission,
+                multiplier=broker.get_multiplier(order.asset),
             )
 
         trace_counts = getattr(broker, "_trace_submission_precheck_counts", None)

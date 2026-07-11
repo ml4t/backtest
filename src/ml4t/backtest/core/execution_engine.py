@@ -71,6 +71,11 @@ class ExecutionEngine:
         )
 
         for order in eligible_orders:
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                continue
             if self._is_exit_order(order):
                 exit_orders.append(order)
             else:
@@ -88,14 +93,6 @@ class ExecutionEngine:
             # go through the normal entry validation path.
             if not self._is_exit_order(order):
                 deferred_entries.append(order)
-                continue
-            # Exit-first processing needs the same integer-share quantization as
-            # the generic per-order path; rebalance deltas often arrive as
-            # fractional target values even when the broker disallows them.
-            fill.apply_share_rounding(order)
-            if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
                 continue
             price = fill.get_fill_price_for_order(order, use_open)
             if price is None:
@@ -218,7 +215,7 @@ class ExecutionEngine:
                 broker._partial_orders.pop(order.order_id, None)
             else:
                 fill.update_partial_order(order)
-            broker.mark_account_positions(use_open=False)
+            broker.mark_account_positions(use_open=use_open)
 
         self._cleanup_filled_orders(filled_orders)
 
@@ -245,6 +242,7 @@ class ExecutionEngine:
         commission = broker.commission_model.calculate(
             order.asset, order.quantity, validation_price
         )
+        multiplier = broker.get_multiplier(order.asset)
 
         if abs(current_qty) <= 1e-12:
             return policy.validate_new_position(
@@ -253,6 +251,7 @@ class ExecutionEngine:
                 price=validation_price,
                 current_positions=shadow_positions,
                 cash=shadow_cash - commission,
+                multiplier=multiplier,
             )
         if is_reversal:
             return policy.handle_reversal(
@@ -263,6 +262,7 @@ class ExecutionEngine:
                 current_positions=shadow_positions,
                 cash=shadow_cash,
                 commission=commission,
+                multiplier=multiplier,
             )
         return policy.validate_position_change(
             asset=order.asset,
@@ -271,6 +271,7 @@ class ExecutionEngine:
             price=validation_price,
             current_positions=shadow_positions,
             cash=shadow_cash - commission,
+            multiplier=multiplier,
         )
 
     def _commit_shadow_queue_fill(
@@ -382,16 +383,17 @@ class ExecutionEngine:
             if price is None:
                 continue
 
+            fill.apply_share_rounding(order)
+            if order.quantity <= 0:
+                order.status = OrderStatus.REJECTED
+                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                continue
+
             is_exit = self._is_exit_order(order)
 
             if is_exit or shadow_validated:
                 # Exits always fill (they free capital).
                 # Entries fill directly when shadow-validated at submission.
-                fill.apply_share_rounding(order)
-                if order.quantity <= 0:
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
-                    continue
                 fill_price = fill.check_fill(order, price)
                 if fill_price is not None:
                     fully_filled = fill.execute_fill(order, fill_price)
@@ -424,18 +426,15 @@ class ExecutionEngine:
             order, use_open
         )
 
+        fill.apply_share_rounding(order)
+        if order.quantity <= 0:
+            order.status = OrderStatus.REJECTED
+            order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+            return
+
         is_exit = self._is_exit_order(order)
 
         if is_exit:
-            # Exit orders can originate from fractional target-value deltas during
-            # rebalances. Integer-share brokers must still quantize queued next-bar
-            # exits before fill, just like entry orders and immediate fills.
-            fill.apply_share_rounding(order)
-            if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
-                return
-
             fill_price = fill.check_fill(order, price)
             if fill_price is not None:
                 if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):
@@ -472,12 +471,6 @@ class ExecutionEngine:
                 else:
                     fill.update_partial_order(order)
         else:
-            fill.apply_share_rounding(order)
-            if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
-                return
-
             fill_price = fill.check_fill(order, price)
             if fill_price is None:
                 return
@@ -533,14 +526,9 @@ class ExecutionEngine:
                     # Permissive mode: silently skip unaffordable orders for this cycle
                     # by cancelling them instead of keeping them pending forever.
                     order.status = OrderStatus.CANCELLED
-            elif (
+            elif "insufficient" in rejection_reason.lower() and (
                 broker.partial_fills_allowed
-                and "insufficient" in rejection_reason.lower()
-                or (
-                    order.rebalance_id is not None
-                    and broker.share_type.value == "integer"
-                    and "insufficient" in rejection_reason.lower()
-                )
+                or (order.rebalance_id is not None and broker.share_type.value == "integer")
             ):
                 if fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)

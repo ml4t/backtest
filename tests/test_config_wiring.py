@@ -125,6 +125,42 @@ class TestShareType:
         broker = _make_broker()
         assert broker.share_type == ShareType.INTEGER
 
+    def test_exit_first_classifies_after_integer_rounding(self):
+        broker = _make_broker(
+            initial_cash=0.0,
+            allow_short_selling=False,
+            fill_ordering=FillOrdering.EXIT_FIRST,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+        )
+        ts = datetime(2024, 1, 2)
+        _set_prices(broker, {"AAPL": 100.0, "MSFT": 100.0}, ts=ts)
+        broker.positions["AAPL"] = Position(
+            asset="AAPL",
+            quantity=5.0,
+            entry_price=100.0,
+            entry_time=ts,
+            current_price=100.0,
+        )
+        broker.account.positions["AAPL"] = Position(
+            asset="AAPL",
+            quantity=5.0,
+            entry_price=100.0,
+            entry_time=ts,
+            current_price=100.0,
+        )
+
+        buy = broker.submit_order("MSFT", 5, OrderSide.BUY)
+        sell = broker.submit_order("AAPL", 5.4, OrderSide.SELL)
+
+        broker._process_orders()
+
+        assert buy is not None
+        assert sell is not None
+        assert broker.get_position("AAPL") is None
+        assert broker.get_position("MSFT") is not None
+        assert buy.status.value == "filled"
+
 
 # ---------------------------------------------------------------------------
 # reject_on_insufficient_cash
@@ -966,6 +1002,25 @@ class TestImmediateFill:
         )
         issues = config.validate(warn=False)
         assert any("cannot both define" in issue for issue in issues)
+
+    def test_validate_rejects_malformed_margin_pct_schedule(self):
+        config = BacktestConfig(margin_pct_schedule={"ES": (0.05,)})  # type: ignore[dict-item]
+        issues = config.validate(warn=False)
+        assert any("margin_pct_schedule" in issue for issue in issues)
+
+    def test_validate_rejects_invalid_margin_pct_rates(self):
+        config = BacktestConfig(margin_pct_schedule={"ES": (0.03, 0.05)})
+        issues = config.validate(warn=False)
+        assert any("maintenance" in issue and "initial" in issue for issue in issues)
+
+    def test_margin_pct_schedule_yaml_roundtrip_is_safe(self, tmp_path):
+        config = BacktestConfig(margin_pct_schedule={"ES": (0.05, 0.035)})
+        path = tmp_path / "config.yaml"
+
+        config.to_yaml(path)
+        restored = BacktestConfig.from_yaml(path)
+
+        assert restored.margin_pct_schedule == {"ES": (0.05, 0.035)}
 
 
 class TestFromDictDefaultParity:

@@ -4,6 +4,8 @@ This module provides the Gatekeeper class that validates orders before execution
 ensuring they meet account policy constraints and preventing invalid trades.
 """
 
+from collections.abc import Callable
+
 from ..models import CommissionModel
 from ..types import Order, OrderSide
 from .account import AccountState
@@ -42,6 +44,7 @@ class Gatekeeper:
         commission_model: CommissionModel,
         cash_buffer_pct: float = 0.0,
         settlement_reduces_buying_power: bool = True,
+        multiplier_resolver: Callable[[str], float] | None = None,
     ):
         """Initialize gatekeeper with account and commission model.
 
@@ -57,6 +60,7 @@ class Gatekeeper:
         self.commission_model = commission_model
         self.cash_buffer_pct = cash_buffer_pct
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
+        self.multiplier_resolver = multiplier_resolver or (lambda _asset: 1.0)
 
     def _available_cash(self) -> float:
         """Cash available for new orders after applying buffer reserve and settlement holds."""
@@ -128,6 +132,7 @@ class Gatekeeper:
 
         # Determine order direction (positive=buy, negative=sell)
         order_qty_delta = self._calculate_quantity_delta(order.side, order.quantity)
+        multiplier = self.multiplier_resolver(order.asset)
 
         # Check for position reversal (long→short or short→long)
         # Delegate to policy's handle_reversal() method
@@ -141,6 +146,7 @@ class Gatekeeper:
                 current_positions=self.account.positions,
                 cash=self.account.cash,
                 commission=commission,
+                multiplier=multiplier,
             )
 
         # Check if this is a reducing order (closing/reducing existing position)
@@ -165,6 +171,7 @@ class Gatekeeper:
                 price=price,
                 current_positions=self.account.positions,
                 cash=available - commission,
+                multiplier=multiplier,
             )
         else:
             # Adding to existing position - use validate_position_change
@@ -175,6 +182,7 @@ class Gatekeeper:
                 price=price,
                 current_positions=self.account.positions,
                 cash=available - commission,
+                multiplier=multiplier,
             )
 
     def _is_reversal(self, current_qty: float, order_qty_delta: float) -> bool:

@@ -26,6 +26,39 @@ if TYPE_CHECKING:
     from ..types import Position
 
 
+def _coerce_margin_pct_schedule(
+    schedule: dict[str, tuple[float, float]] | None,
+) -> dict[str, tuple[float, float]]:
+    if schedule is None:
+        return {}
+
+    coerced: dict[str, tuple[float, float]] = {}
+    for asset, value in schedule.items():
+        try:
+            initial, maintenance = value
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"margin_pct_schedule[{asset!r}] must be a two-item (initial, maintenance) sequence"
+            ) from exc
+        if not 0.0 < initial <= 1.0:
+            raise ValueError(
+                f"margin_pct_schedule[{asset!r}] initial margin must be in (0.0, 1.0], "
+                f"got {initial}"
+            )
+        if not 0.0 < maintenance <= 1.0:
+            raise ValueError(
+                f"margin_pct_schedule[{asset!r}] maintenance margin must be in (0.0, 1.0], "
+                f"got {maintenance}"
+            )
+        if maintenance >= initial:
+            raise ValueError(
+                f"margin_pct_schedule[{asset!r}] maintenance margin ({maintenance}) "
+                f"must be < initial margin ({initial})"
+            )
+        coerced[asset] = (float(initial), float(maintenance))
+    return coerced
+
+
 class AccountPolicy(ABC):
     """Abstract base class for account-specific trading constraints.
 
@@ -85,6 +118,8 @@ class AccountPolicy(ABC):
         price: float,
         current_positions: dict[str, Position],
         cash: float,
+        *,
+        multiplier: float = 1.0,
     ) -> tuple[bool, str]:
         """Validate whether a new position can be opened.
 
@@ -129,6 +164,8 @@ class AccountPolicy(ABC):
         current_positions: dict[str, Position],
         cash: float,
         commission: float,
+        *,
+        multiplier: float = 1.0,
     ) -> tuple[bool, str]:
         """Handle position reversal validation (long→short or short→long).
 
@@ -160,6 +197,8 @@ class AccountPolicy(ABC):
         price: float,
         current_positions: dict[str, Position],
         cash: float,
+        *,
+        multiplier: float = 1.0,
     ) -> tuple[bool, str]:
         """Validate a change to an existing position.
 
@@ -263,7 +302,7 @@ class UnifiedAccountPolicy(AccountPolicy):
         self.long_maintenance_margin = long_maintenance_margin
         self.short_maintenance_margin = short_maintenance_margin
         self.fixed_margin_schedule = fixed_margin_schedule or {}
-        self.margin_pct_schedule = margin_pct_schedule or {}
+        self.margin_pct_schedule = _coerce_margin_pct_schedule(margin_pct_schedule)
         if short_cash_policy not in {"credit", "credit_proceeds", "lock_notional"}:
             raise ValueError(
                 "short_cash_policy must be 'credit', 'credit_proceeds', or "
@@ -384,7 +423,11 @@ class UnifiedAccountPolicy(AccountPolicy):
         for pos in positions.values():
             price = pos.current_price if pos.current_price is not None else pos.entry_price
             required_initial_margin += self.get_margin_requirement(
-                pos.asset, pos.quantity, price, for_initial=True
+                pos.asset,
+                pos.quantity,
+                price,
+                for_initial=True,
+                multiplier=pos.multiplier,
             )
 
         # Buying power = excess equity / initial margin rate
@@ -397,6 +440,8 @@ class UnifiedAccountPolicy(AccountPolicy):
         quantity: float,
         price: float,
         for_initial: bool = True,
+        *,
+        multiplier: float = 1.0,
     ) -> float:
         """Calculate margin requirement for a position.
 
@@ -423,7 +468,7 @@ class UnifiedAccountPolicy(AccountPolicy):
         if asset in self.margin_pct_schedule:
             initial, maintenance = self.margin_pct_schedule[asset]
             margin_rate = initial if for_initial else maintenance
-            return abs(quantity * price) * margin_rate
+            return abs(quantity * price * multiplier) * margin_rate
 
         # Check for fixed margin (futures)
         if asset in self.fixed_margin_schedule:
@@ -432,7 +477,7 @@ class UnifiedAccountPolicy(AccountPolicy):
             return abs(quantity) * margin_per_contract
 
         # Percentage-based margin (equities)
-        market_value = abs(quantity * price)
+        market_value = abs(quantity * price * multiplier)
         if for_initial:
             return market_value * self.initial_margin
         else:
@@ -457,7 +502,11 @@ class UnifiedAccountPolicy(AccountPolicy):
         for pos in positions.values():
             price = pos.current_price if pos.current_price is not None else pos.entry_price
             required_maintenance += self.get_margin_requirement(
-                pos.asset, pos.quantity, price, for_initial=False
+                pos.asset,
+                pos.quantity,
+                price,
+                for_initial=False,
+                multiplier=pos.multiplier,
             )
 
         return nlv < required_maintenance
@@ -471,6 +520,8 @@ class UnifiedAccountPolicy(AccountPolicy):
         current_positions: dict[str, Position],
         cash: float,
         commission: float,
+        *,
+        multiplier: float = 1.0,
     ) -> tuple[bool, str]:
         """Handle position reversal validation (long→short or short→long)."""
         if not self.allow_short_selling:
@@ -478,7 +529,7 @@ class UnifiedAccountPolicy(AccountPolicy):
             return False, "Position reversal not allowed in cash account"
 
         # Simulate close: proceeds from closing the position
-        close_proceeds = abs(current_quantity * price)
+        close_proceeds = abs(current_quantity * price * multiplier)
 
         # Calculate cash after close (depends on leverage)
         if self.allow_leverage:
@@ -498,7 +549,7 @@ class UnifiedAccountPolicy(AccountPolicy):
 
         # Calculate the new opposite position
         new_qty = current_quantity + order_quantity_delta
-        new_position_cost = abs(new_qty * price)
+        new_position_cost = abs(new_qty * price * multiplier)
 
         if self.allow_leverage:
             # Margin: check buying power for new position
@@ -509,6 +560,7 @@ class UnifiedAccountPolicy(AccountPolicy):
                 price=price,
                 current_positions=positions_after_close,
                 cash=cash_after_close,
+                multiplier=multiplier,
             )
         else:
             # Crypto: check cash covers new position
@@ -529,13 +581,15 @@ class UnifiedAccountPolicy(AccountPolicy):
         price: float,
         current_positions: dict[str, Position],
         cash: float,
+        *,
+        multiplier: float = 1.0,
     ) -> tuple[bool, str]:
         """Validate whether a new position can be opened."""
         # Check short selling permission
         if quantity < 0 and not self.allow_short_selling:
             return False, "Short selling not allowed in cash account"
 
-        order_cost = abs(quantity * price)
+        order_cost = abs(quantity * price * multiplier)
 
         if (
             not self.allow_leverage
@@ -579,6 +633,8 @@ class UnifiedAccountPolicy(AccountPolicy):
         price: float,
         current_positions: dict[str, Position],
         cash: float,
+        *,
+        multiplier: float = 1.0,
     ) -> tuple[bool, str]:
         """Validate a change to an existing position."""
         new_quantity = current_quantity + quantity_delta
@@ -626,13 +682,13 @@ class UnifiedAccountPolicy(AccountPolicy):
         # Calculate order cost for validation
         if current_quantity == 0:
             # Opening new position
-            order_cost = abs(quantity_delta * price)
+            order_cost = abs(quantity_delta * price * multiplier)
         elif is_reversal:
             # Reversing: need resources for the new opposite portion
-            order_cost = abs(new_quantity * price)
+            order_cost = abs(new_quantity * price * multiplier)
         else:
             # Adding to position
-            order_cost = abs(quantity_delta * price)
+            order_cost = abs(quantity_delta * price * multiplier)
 
         if self.allow_leverage:
             # Margin: check buying power
