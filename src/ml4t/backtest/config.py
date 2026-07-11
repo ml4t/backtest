@@ -281,6 +281,61 @@ def _feed_spec_to_dict(feed_spec: FeedSpec) -> dict[str, Any]:
     return serialize_artifact_value(asdict(feed_spec))
 
 
+def _coerce_margin_schedule(
+    schedule: dict[str, tuple[float, float]] | None,
+) -> dict[str, tuple[float, float]] | None:
+    if schedule is None:
+        return None
+    coerced: dict[str, tuple[float, float]] = {}
+    for asset, value in schedule.items():
+        try:
+            initial, maintenance = value
+        except (TypeError, ValueError):
+            coerced[asset] = value
+            continue
+        coerced[asset] = (float(initial), float(maintenance))
+    return coerced
+
+
+def _margin_schedule_to_dict(
+    schedule: dict[str, tuple[float, float]] | None,
+) -> dict[str, list[float]] | None:
+    if schedule is None:
+        return None
+    return {asset: [initial, maintenance] for asset, (initial, maintenance) in schedule.items()}
+
+
+def _validate_margin_pct_schedule(
+    schedule: dict[str, tuple[float, float]] | None,
+) -> list[str]:
+    issues: list[str] = []
+    if schedule is None:
+        return issues
+    for asset, value in schedule.items():
+        try:
+            initial, maintenance = value
+        except (TypeError, ValueError):
+            issues.append(
+                f"margin_pct_schedule[{asset!r}] must be a two-item (initial, maintenance) sequence"
+            )
+            continue
+        if not 0.0 < initial <= 1.0:
+            issues.append(
+                f"margin_pct_schedule[{asset!r}] initial margin ({initial}) must be in (0.0, 1.0]"
+            )
+        if not 0.0 < maintenance <= 1.0:
+            issues.append(
+                f"margin_pct_schedule[{asset!r}] maintenance margin ({maintenance}) "
+                "must be in (0.0, 1.0]"
+            )
+        if 0.0 < maintenance <= 1.0 and 0.0 < initial <= 1.0 and maintenance >= initial:
+            issues.append(
+                f"margin_pct_schedule[{asset!r}] maintenance margin ({maintenance}) "
+                f"must be < initial margin ({initial})"
+            )
+    return issues
+
+
 def _to_backtest_frequency(value: DataFrequency | Any | None) -> DataFrequency | None:
     if value is None:
         return None
@@ -521,6 +576,7 @@ class BacktestConfig:
                 "fixed_margin_schedule and margin_pct_schedule cannot both define: "
                 f"{overlapping_margin_assets}"
             )
+        issues.extend(_validate_margin_pct_schedule(self.margin_pct_schedule))
 
         if self.settlement_delay < 0 or self.settlement_delay > 5:
             issues.append(
@@ -640,6 +696,8 @@ class BacktestConfig:
         self._explicit_data_frequency = "data_frequency" in provided
         if hasattr(self, "_provided_init_fields"):
             delattr(self, "_provided_init_fields")
+        self.fixed_margin_schedule = _coerce_margin_schedule(self.fixed_margin_schedule)
+        self.margin_pct_schedule = _coerce_margin_schedule(self.margin_pct_schedule)
         if self.feed_spec is None:
             return
 
@@ -727,8 +785,8 @@ class BacktestConfig:
                 "initial_margin": self.initial_margin,
                 "long_maintenance_margin": self.long_maintenance_margin,
                 "short_maintenance_margin": self.short_maintenance_margin,
-                "fixed_margin_schedule": self.fixed_margin_schedule,
-                "margin_pct_schedule": self.margin_pct_schedule,
+                "fixed_margin_schedule": _margin_schedule_to_dict(self.fixed_margin_schedule),
+                "margin_pct_schedule": _margin_schedule_to_dict(self.margin_pct_schedule),
                 "short_cash_policy": self.short_cash_policy.value,
             },
             "execution": {
@@ -1032,7 +1090,7 @@ class BacktestConfig:
         """Save config to YAML file."""
         path = Path(path)
         with open(path, "w") as f:
-            yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
+            yaml.safe_dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> BacktestConfig:

@@ -745,6 +745,38 @@ class TestMarginAccountPolicyFuturesMarginPct:
         margin = policy.get_margin_requirement("ES", 1, 5000.0, for_initial=True)
         assert margin == 250.0
 
+    def test_margin_pct_schedule_applies_contract_multiplier(self):
+        """Percentage-based futures margin should use full contract notional."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        margin = policy.get_margin_requirement("ES", 2, 5000.0, for_initial=True, multiplier=50.0)
+        assert margin == 25_000.0
+
+    def test_margin_pct_schedule_buying_power_uses_position_multiplier(self):
+        """Buying power should reserve percentage margin on full futures notional."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            margin_pct_schedule={"ES": (0.05, 0.035)},
+        )
+        positions = {
+            "ES": Position(
+                asset="ES",
+                quantity=2,
+                entry_price=5000.0,
+                entry_time=datetime(2024, 1, 2),
+                current_price=5000.0,
+                multiplier=50.0,
+            )
+        }
+
+        bp = policy.calculate_buying_power(100_000.0, positions)
+
+        assert bp == 1_150_000.0
+
     def test_reject_overlapping_fixed_and_percentage_margin(self):
         """A symbol must not define both fixed and percentage margin models."""
         with pytest.raises(ValueError, match="cannot both define"):

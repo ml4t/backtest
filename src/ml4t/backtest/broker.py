@@ -142,7 +142,7 @@ class Broker:
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
         self._bar_index: int = 0
 
-        # Auto-populate fixed_margin_schedule from ContractSpec.margin
+        # Auto-populate margin schedules from ContractSpec settings
         # This lets users specify margin once on ContractSpec rather than duplicating
         # it in both ContractSpec and BacktestConfig.fixed_margin_schedule.
         effective_margin_schedule = dict(fixed_margin_schedule or {})
@@ -190,6 +190,7 @@ class Broker:
             self.commission_model,
             cash_buffer_pct=self.cash_buffer_pct,
             settlement_reduces_buying_power=self.settlement_reduces_buying_power,
+            multiplier_resolver=self.get_multiplier,
         )
 
         self.positions: dict[str, Position] = {}
@@ -741,7 +742,7 @@ class Broker:
         return self._portfolio_ledger.get_account_value()
 
     def get_account_value(self) -> float:
-        """Calculate total account value (cash + position values)."""
+        """Alias for equity()."""
         return self.equity()
 
     def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
