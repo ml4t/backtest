@@ -508,6 +508,7 @@ class ExecutionEngine:
             else:
                 valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
 
+            insufficient_cash = "insufficient" in rejection_reason.lower()
             if valid:
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
@@ -515,10 +516,7 @@ class ExecutionEngine:
                     broker._partial_orders.pop(order.order_id, None)
                 else:
                     fill.update_partial_order(order)
-            elif (
-                not broker.reject_on_insufficient_cash
-                and "insufficient" in rejection_reason.lower()
-            ):
+            elif not broker.reject_on_insufficient_cash and insufficient_cash:
                 if broker.partial_fills_allowed and fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
@@ -526,7 +524,7 @@ class ExecutionEngine:
                     # Permissive mode: silently skip unaffordable orders for this cycle
                     # by cancelling them instead of keeping them pending forever.
                     order.status = OrderStatus.CANCELLED
-            elif "insufficient" in rejection_reason.lower() and (
+            elif insufficient_cash and (
                 broker.partial_fills_allowed
                 or (order.rebalance_id is not None and broker.share_type.value == "integer")
             ):

@@ -338,7 +338,7 @@ Benchmark on 250 assets x 20 years daily data (1.26M bars):
 
 ```bash
 git clone https://github.com/ml4t/backtest.git
-cd ml4t-backtest
+cd backtest
 uv sync
 uv run pytest tests/ -q
 uv run ty check
