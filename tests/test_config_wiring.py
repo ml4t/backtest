@@ -1020,6 +1020,22 @@ class TestImmediateFill:
         data = config.to_dict()
         assert data["account"]["margin_pct_schedule"] == {"ES": [0.05]}
 
+    def test_margin_pct_schedule_float_overflow_is_reported(self, tmp_path):
+        class OverflowFloat:
+            def __float__(self):
+                raise OverflowError("too large")
+
+        config = BacktestConfig(
+            margin_pct_schedule={"ES": (OverflowFloat(), 0.05)}  # type: ignore[dict-item]
+        )
+
+        issues = config.validate(warn=False)
+        data = config.to_dict()
+
+        assert any("values must be numeric" in issue for issue in issues)
+        assert isinstance(data["account"]["margin_pct_schedule"]["ES"][0], str)
+        config.to_yaml(tmp_path / "invalid.yaml")
+
     def test_validate_rejects_invalid_margin_pct_rates(self):
         config = BacktestConfig(margin_pct_schedule={"ES": (0.03, 0.05)})
         issues = config.validate(warn=False)

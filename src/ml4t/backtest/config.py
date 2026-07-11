@@ -291,7 +291,7 @@ def _coerce_margin_schedule(
         try:
             initial, maintenance = value
             coerced[asset] = (float(initial), float(maintenance))
-        except (TypeError, ValueError):
+        except (OverflowError, TypeError, ValueError):
             coerced[asset] = value
     return coerced
 
@@ -306,9 +306,24 @@ def _margin_schedule_to_dict(
         try:
             initial, maintenance = value
             serialized[asset] = [float(initial), float(maintenance)]
-        except (TypeError, ValueError):
-            serialized[asset] = serialize_artifact_value(value)
+        except (OverflowError, TypeError, ValueError):
+            serialized[asset] = _serialize_invalid_margin_schedule_value(value)
     return serialized
+
+
+def _serialize_invalid_margin_schedule_value(value: Any) -> Any:
+    try:
+        values = list(value)
+    except TypeError:
+        return _serialize_invalid_margin_scalar(value)
+    return [_serialize_invalid_margin_scalar(item) for item in values]
+
+
+def _serialize_invalid_margin_scalar(value: Any) -> Any:
+    serialized = serialize_artifact_value(value)
+    if isinstance(serialized, str | int | float | bool) or serialized is None:
+        return serialized
+    return repr(serialized)
 
 
 def _validate_margin_pct_schedule(
@@ -328,7 +343,7 @@ def _validate_margin_pct_schedule(
         try:
             initial = float(initial)
             maintenance = float(maintenance)
-        except (TypeError, ValueError):
+        except (OverflowError, TypeError, ValueError):
             issues.append(f"margin_pct_schedule[{asset!r}] values must be numeric")
             continue
         if not 0.0 < initial <= 1.0:
