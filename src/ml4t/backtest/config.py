@@ -512,6 +512,7 @@ class BacktestConfig:
     stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE
     stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE
     trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE
+    trail_include_entry_bar_extremes: bool = False
     initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE
     trail_stop_timing: TrailStopTiming = TrailStopTiming.LAGGED
 
@@ -840,6 +841,7 @@ class BacktestConfig:
                 "stop_fill_mode": self.stop_fill_mode.value,
                 "stop_level_basis": self.stop_level_basis.value,
                 "trail_hwm_source": self.trail_hwm_source.value,
+                "trail_include_entry_bar_extremes": self.trail_include_entry_bar_extremes,
                 "initial_hwm_source": self.initial_hwm_source.value,
                 "trail_stop_timing": self.trail_stop_timing.value,
             },
@@ -946,6 +948,7 @@ class BacktestConfig:
                     "stop_fill_mode",
                     "stop_level_basis",
                     "trail_hwm_source",
+                    "trail_include_entry_bar_extremes",
                     "initial_hwm_source",
                     "trail_stop_timing",
                 },
@@ -1073,6 +1076,9 @@ class BacktestConfig:
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),
             trail_hwm_source=WaterMarkSource(stops_cfg.get("trail_hwm_source", "close")),
+            trail_include_entry_bar_extremes=stops_cfg.get(
+                "trail_include_entry_bar_extremes", False
+            ),
             initial_hwm_source=InitialHwmSource(stops_cfg.get("initial_hwm_source", "fill_price")),
             trail_stop_timing=TrailStopTiming(stops_cfg.get("trail_stop_timing", "lagged")),
             # Sizing
@@ -1337,6 +1343,7 @@ class BacktestConfig:
                 f"  Fill mode: {self.stop_fill_mode.value}",
                 f"  Level basis: {self.stop_level_basis.value}",
                 f"  Trail HWM source: {self.trail_hwm_source.value}",
+                f"  Include entry-bar extremes: {self.trail_include_entry_bar_extremes}",
                 f"  Trail timing: {self.trail_stop_timing.value}",
                 "",
                 "Position Sizing:",

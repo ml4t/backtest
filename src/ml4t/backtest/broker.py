@@ -66,6 +66,7 @@ class Broker:
         stop_fill_mode: StopFillMode = StopFillMode.STOP_PRICE,
         stop_level_basis: StopLevelBasis = StopLevelBasis.FILL_PRICE,
         trail_hwm_source: WaterMarkSource = WaterMarkSource.CLOSE,
+        trail_include_entry_bar_extremes: bool = False,
         initial_hwm_source: InitialHwmSource = InitialHwmSource.FILL_PRICE,
         trail_stop_timing: TrailStopTiming = TrailStopTiming.LAGGED,
         allow_short_selling: bool = False,
@@ -120,6 +121,7 @@ class Broker:
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
         self.trail_hwm_source = trail_hwm_source
+        self.trail_include_entry_bar_extremes = trail_include_entry_bar_extremes
         self.initial_hwm_source = initial_hwm_source
         self.trail_stop_timing = trail_stop_timing
         self.share_type = share_type
@@ -360,6 +362,7 @@ class Broker:
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
             trail_hwm_source=config.trail_hwm_source,
+            trail_include_entry_bar_extremes=config.trail_include_entry_bar_extremes,
             initial_hwm_source=config.initial_hwm_source,
             trail_stop_timing=config.trail_stop_timing,
             allow_short_selling=config.allow_short_selling,
@@ -767,17 +770,26 @@ class Broker:
 
     # === Risk Management ===
 
-    def set_position_rules(self, rules: PositionRule, asset: str | None = None) -> None:
+    def set_position_rules(
+        self,
+        rules: PositionRule | None,
+        asset: str | None = None,
+    ) -> None:
         """Set position rules globally or per-asset.
 
         Args:
-            rules: PositionRule or RuleChain to apply
+            rules: PositionRule or RuleChain to apply. ``None`` explicitly
+                disables rules for the selected scope.
             asset: If provided, apply only to this asset; otherwise global
         """
-        if asset:
+        if asset is not None:
             self._position_rules_by_asset[asset] = rules
         else:
             self._position_rules = rules
+
+    def clear_position_rules(self, asset: str | None = None) -> None:
+        """Disable position rules globally or for one asset."""
+        self.set_position_rules(None, asset=asset)
 
     def update_position_context(self, asset: str, context: dict) -> None:
         """Update context data for a position (used by signal-based rules).
@@ -1725,6 +1737,8 @@ class Broker:
         Water mark source configuration:
         - trail_hwm_source == BAR_EXTREME: Update HWM from high, LWM from low (VBT Pro OHLC mode)
         - trail_hwm_source == CLOSE: Update HWM/LWM from close only (default)
+        - trail_include_entry_bar_extremes: Include a completed entry bar's
+          extreme in the watermark used from the next bar onward
         """
         for asset, pos in self.positions.items():
             if asset in self._current_prices:
@@ -1732,7 +1746,9 @@ class Broker:
                 # VBT Pro only updates water marks from bar extremes on the bar AFTER entry
                 is_new_position = asset in self._positions_created_this_bar
                 # BAR_EXTREME: use HIGH for HWM (longs), LOW for LWM (shorts)
-                use_extremes = self.trail_hwm_source.value == "bar_extreme" and not is_new_position
+                use_extremes = self.trail_hwm_source.value == "bar_extreme" and (
+                    not is_new_position or self.trail_include_entry_bar_extremes
+                )
                 pos.update_water_marks(
                     current_price=self._current_prices[asset],
                     bar_high=self._current_highs.get(asset),

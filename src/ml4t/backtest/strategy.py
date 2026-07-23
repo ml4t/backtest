@@ -9,6 +9,16 @@ from typing import Any
 class Strategy(ABC):
     """Base strategy class."""
 
+    def on_before_risk(
+        self,
+        timestamp: datetime,
+        data: dict[str, dict],
+        context: dict[str, Any],
+        broker: Any,
+    ) -> None:
+        """Called before position rules are evaluated for the current bar."""
+        return None
+
     @abstractmethod
     def on_data(
         self,
