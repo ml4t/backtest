@@ -1309,6 +1309,33 @@ class TestBrokerPositionRules:
         # Should apply to assets without explicit overrides
         assert broker._position_rules_by_asset.get("AAPL") is None
 
+    def test_clear_position_rules_for_one_asset(self):
+        """Clearing one asset disables its rule without changing other assets."""
+        from ml4t.backtest.risk.position.static import StopLoss
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        stop_rule = StopLoss(pct=0.05)
+        broker.set_position_rules(stop_rule, asset="AAPL")
+        broker.set_position_rules(stop_rule, asset="MSFT")
+
+        broker.clear_position_rules(asset="AAPL")
+
+        assert broker._risk_engine._get_position_rules("AAPL") is None
+        assert broker._risk_engine._get_position_rules("MSFT") == stop_rule
+
+    def test_asset_rule_can_explicitly_disable_global_rule(self):
+        """An explicit per-asset None overrides, rather than falls back to, a global rule."""
+        from ml4t.backtest.risk.position.static import StopLoss
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        stop_rule = StopLoss(pct=0.05)
+        broker.set_position_rules(stop_rule)
+
+        broker.set_position_rules(None, asset="AAPL")
+
+        assert broker._risk_engine._get_position_rules("AAPL") is None
+        assert broker._risk_engine._get_position_rules("MSFT") == stop_rule
+
     def test_update_position_context(self):
         """Test updating position context."""
         broker = Broker(100000.0, NoCommission(), NoSlippage())

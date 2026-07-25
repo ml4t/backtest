@@ -62,6 +62,9 @@ class OrderBook:
             order_id=f"ORD-{broker._order_counter}",
             created_at=broker._current_time,
             _created_bar_index=broker._bar_index,
+            _risk_exit_reason=options.risk_exit_reason if options is not None else None,
+            _exit_reason=options.exit_reason if options is not None else None,
+            _risk_fill_price=options.risk_fill_price if options is not None else None,
         )
 
         order._signal_price = broker._current_prices.get(asset)

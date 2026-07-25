@@ -42,12 +42,14 @@ class RiskEngine:
                         asset,
                         -pos.quantity,
                         order_type=OrderType.MARKET,
-                        _options=SubmitOrderOptions(eligible_in_next_bar_mode=True),
+                        _options=SubmitOrderOptions(
+                            eligible_in_next_bar_mode=True,
+                            risk_exit_reason=action.reason,
+                            exit_reason=reason_to_exit_reason(action.reason),
+                            risk_fill_price=action.fill_price,
+                        ),
                     )
                     if order:
-                        order._risk_exit_reason = action.reason
-                        order._exit_reason = reason_to_exit_reason(action.reason)
-                        order._risk_fill_price = action.fill_price
                         exit_orders.append(order)
                         broker._stop_exits_this_bar.add(asset)
 
@@ -69,19 +71,23 @@ class RiskEngine:
                             asset,
                             actual_qty,
                             order_type=OrderType.MARKET,
-                            _options=SubmitOrderOptions(eligible_in_next_bar_mode=True),
+                            _options=SubmitOrderOptions(
+                                eligible_in_next_bar_mode=True,
+                                risk_exit_reason=action.reason,
+                                exit_reason=reason_to_exit_reason(action.reason),
+                                risk_fill_price=action.fill_price,
+                            ),
                         )
                         if order:
-                            order._risk_exit_reason = action.reason
-                            order._exit_reason = reason_to_exit_reason(action.reason)
-                            order._risk_fill_price = action.fill_price
                             exit_orders.append(order)
 
         return exit_orders
 
     def _get_position_rules(self, asset: str):
         broker = self.broker
-        return broker._position_rules_by_asset.get(asset) or broker._position_rules
+        if asset in broker._position_rules_by_asset:
+            return broker._position_rules_by_asset[asset]
+        return broker._position_rules
 
     def _build_position_state(self, pos, current_price: float):
         broker = self.broker
@@ -144,12 +150,14 @@ class RiskEngine:
                 asset,
                 -exit_qty,
                 order_type=OrderType.MARKET,
-                _options=SubmitOrderOptions(eligible_in_next_bar_mode=True),
+                _options=SubmitOrderOptions(
+                    eligible_in_next_bar_mode=True,
+                    risk_exit_reason=pending["reason"],
+                    exit_reason=reason_to_exit_reason(pending["reason"]),
+                    risk_fill_price=fill_price,
+                ),
             )
             if order:
-                order._risk_exit_reason = pending["reason"]
-                order._exit_reason = reason_to_exit_reason(pending["reason"])
-                order._risk_fill_price = fill_price
                 exit_orders.append(order)
 
             del broker._pending_exits[asset]

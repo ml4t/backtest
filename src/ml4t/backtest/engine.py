@@ -222,6 +222,10 @@ class Engine:
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits
             self.broker._process_pending_exits()
 
+            # Optional strategy phase for opening orders that must receive risk
+            # protection during the current bar. Existing strategies inherit a no-op.
+            self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
+
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
             self.broker.evaluate_position_rules()
 
