@@ -1052,11 +1052,17 @@ class Broker:
 
         liquidations: list[Order] = []
         for asset in list(self.positions):
-            order = self.close_position(asset, order_type=order_type)
+            order = self.close_position(
+                asset,
+                order_type=order_type,
+                _options=SubmitOrderOptions(
+                    eligible_in_next_bar_mode=True,
+                    risk_exit_reason=reason,
+                    exit_reason=ExitReason.RISK_LIQUIDATION,
+                ),
+            )
             if order is None:
                 continue
-            order._exit_reason = ExitReason.RISK_LIQUIDATION
-            order._risk_exit_reason = reason
             liquidations.append(order)
 
         return liquidations

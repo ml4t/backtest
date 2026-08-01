@@ -221,6 +221,8 @@ class FillExecutor:
             bid_size=quote_context["bid_size"],
             ask_size=quote_context["ask_size"],
             available_size=quote_context["available_size"],
+            exit_reason=_get_exit_reason(order),
+            exit_reason_detail=order._risk_exit_reason,
         )
         broker.fills.append(fill)
 
@@ -461,6 +463,7 @@ class FillExecutor:
             fees=total_commission,
             exit_slippage=ctx.slippage,
             exit_reason=_get_exit_reason(order),
+            exit_reason_detail=order._risk_exit_reason,
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
             entry_slippage=pos.entry_slippage,
@@ -527,6 +530,7 @@ class FillExecutor:
             fees=total_close_commission,
             exit_slippage=ctx.slippage,
             exit_reason=_get_exit_reason(order),
+            exit_reason_detail=order._risk_exit_reason,
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
             entry_slippage=pos.entry_slippage,
@@ -628,6 +632,7 @@ class FillExecutor:
                     fees=total_commission,
                     exit_slippage=ctx.slippage,
                     exit_reason=_get_exit_reason(ctx.order),
+                    exit_reason_detail=ctx.order._risk_exit_reason,
                     mfe=pos.max_favorable_excursion,
                     mae=pos.max_adverse_excursion,
                     entry_slippage=pos.entry_slippage,

@@ -202,6 +202,7 @@ class TestBacktestResultTradesDataFrame:
             "total_slippage_cost",
             "cost_drag",
             "exit_reason",
+            "exit_reason_detail",
             "status",
         ]
 
@@ -336,6 +337,8 @@ class TestBacktestResultFillsDataFrame:
             "bid_size",
             "ask_size",
             "available_size",
+            "exit_reason",
+            "exit_reason_detail",
         ]
         assert df["rebalance_id"].to_list() == ["rebalance-1", "rebalance-1"]
 

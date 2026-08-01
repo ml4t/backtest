@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 
+from ml4t.backtest import BacktestResult
 from ml4t.backtest.broker import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage
 from ml4t.backtest.risk.portfolio.limits import (
@@ -194,6 +195,54 @@ class TestRiskManagerUpdate:
         pending = broker.get_pending_orders()
         assert len(pending) == 1
         assert pending[0]._exit_reason == ExitReason.RISK_LIQUIDATION
+
+    @pytest.mark.parametrize("immediate_fill", [True, False])
+    def test_liquidation_cause_survives_fill_trade_and_artifact(
+        self,
+        immediate_fill: bool,
+        tmp_path,
+    ):
+        manager = RiskManager(limits=[MaxDrawdownLimit(max_drawdown=0.10)])
+        manager.initialize(initial_equity=100000.0)
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            immediate_fill=immediate_fill,
+        )
+        open_long_position(broker, "AAPL", 100.0, 150.0)
+
+        manager.update(equity=85000.0, positions={"AAPL": 15000.0}, broker=broker)
+        manager.update(equity=84000.0, positions={"AAPL": 15000.0}, broker=broker)
+        if not immediate_fill:
+            broker._process_orders()
+
+        liquidation_orders = [
+            order for order in broker.orders if order._exit_reason == ExitReason.RISK_LIQUIDATION
+        ]
+        assert len(liquidation_orders) == 1
+        detail = liquidation_orders[0]._risk_exit_reason
+        assert detail and "drawdown" in detail.lower()
+
+        exit_fill = broker.fills[-1]
+        exit_trade = broker.trades[-1]
+        assert exit_fill.exit_reason == "risk_liquidation"
+        assert exit_fill.exit_reason_detail == detail
+        assert exit_trade.exit_reason == "risk_liquidation"
+        assert exit_trade.exit_reason_detail == detail
+
+        result = BacktestResult(
+            trades=broker.trades,
+            equity_curve=[],
+            fills=broker.fills,
+            metrics={},
+        )
+        result.to_parquet(tmp_path)
+        loaded = BacktestResult.from_parquet(tmp_path)
+        assert loaded.fills[-1].exit_reason == "risk_liquidation"
+        assert loaded.fills[-1].exit_reason_detail == detail
+        assert loaded.trades[-1].exit_reason == "risk_liquidation"
+        assert loaded.trades[-1].exit_reason_detail == detail
 
     def test_update_warn_action(self):
         """Test that warn action adds to warnings."""

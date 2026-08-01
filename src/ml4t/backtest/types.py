@@ -396,6 +396,8 @@ class Fill:
     bid_size: float | None = None
     ask_size: float | None = None
     available_size: float | None = None
+    exit_reason: str = ""
+    exit_reason_detail: str | None = None
 
 
 @dataclass
@@ -428,6 +430,7 @@ class Trade:
     exit_slippage: float = 0.0  # Per-unit slippage on exit
     # Exit reason for trade analysis (cross-library API field)
     exit_reason: str = "signal"  # ExitReason enum value as string
+    exit_reason_detail: str | None = None
     # Trade status: "closed" (actually exited) or "open" (mark-to-market at end)
     status: str = "closed"
     # MFE/MAE preserved from Position for trade analysis (shorter field names)

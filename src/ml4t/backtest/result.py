@@ -161,6 +161,7 @@ class BacktestResult:
                     "total_slippage_cost": t.total_slippage_cost,
                     "cost_drag": t.cost_drag,
                     "exit_reason": t.exit_reason,
+                    "exit_reason_detail": t.exit_reason_detail,
                     "status": t.status,
                 }
             )
@@ -201,6 +202,8 @@ class BacktestResult:
                     "bid_size": fill.bid_size,
                     "ask_size": fill.ask_size,
                     "available_size": fill.available_size,
+                    "exit_reason": fill.exit_reason,
+                    "exit_reason_detail": fill.exit_reason_detail,
                 }
             )
 
@@ -706,6 +709,8 @@ class BacktestResult:
                         fees=fees,
                         exit_slippage=row.get("exit_slippage", row.get("slippage", 0.0)),
                         exit_reason=row.get("exit_reason", "signal"),
+                        exit_reason_detail=row.get("exit_reason_detail"),
+                        status=row.get("status", "closed"),
                         mfe=row["mfe"],
                         mae=row["mae"],
                         entry_slippage=row.get("entry_slippage", 0.0),
@@ -766,6 +771,8 @@ class BacktestResult:
                         bid_size=row.get("bid_size"),
                         ask_size=row.get("ask_size"),
                         available_size=row.get("available_size"),
+                        exit_reason=row.get("exit_reason", ""),
+                        exit_reason_detail=row.get("exit_reason_detail"),
                     )
                 )
 
@@ -901,6 +908,7 @@ class BacktestResult:
             "total_slippage_cost": pl.Float64(),
             "cost_drag": pl.Float64(),
             "exit_reason": pl.String(),
+            "exit_reason_detail": pl.String(),
             "status": pl.String(),  # "closed" or "open"
         }
 
@@ -929,6 +937,8 @@ class BacktestResult:
             "bid_size": pl.Float64(),
             "ask_size": pl.Float64(),
             "available_size": pl.Float64(),
+            "exit_reason": pl.String(),
+            "exit_reason_detail": pl.String(),
         }
 
     @staticmethod
