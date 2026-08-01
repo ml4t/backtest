@@ -63,7 +63,6 @@ class _RebalanceByMode(Strategy):
                     self.msft_order_qty = order.quantity
 
 
-@pytest.mark.no_invariant_check  # Known: partial close during rebalance doesn't prorate entry commission
 def test_snapshot_value_freezes_targets_vs_incremental_recompute() -> None:
     start = datetime(2024, 1, 1)
     prices = pl.DataFrame(
@@ -86,10 +85,14 @@ def test_snapshot_value_freezes_targets_vs_incremental_recompute() -> None:
 
     snapshot_strategy = _RebalanceByMode(RebalanceMode.SNAPSHOT)
     incremental_strategy = _RebalanceByMode(RebalanceMode.INCREMENTAL)
-    run_backtest(prices=prices, strategy=snapshot_strategy, config=cfg)
-    run_backtest(prices=prices, strategy=incremental_strategy, config=cfg)
+    snapshot_result = run_backtest(prices=prices, strategy=snapshot_strategy, config=cfg)
+    incremental_result = run_backtest(prices=prices, strategy=incremental_strategy, config=cfg)
 
     assert snapshot_strategy.msft_order_qty > incremental_strategy.msft_order_qty
+    for result in (snapshot_result, incremental_result):
+        fill_costs = sum(fill.commission for fill in result.fills)
+        reported_costs = sum(trade.fees for trade in result.trades)
+        assert reported_costs == pytest.approx(fill_costs, abs=1e-9)
 
 
 class _RotateSellThenBuy(Strategy):

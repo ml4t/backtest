@@ -252,6 +252,7 @@ class FillExecutor:
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
+        fill.commission = actual_commission
 
         # Update cash (include multiplier for futures/derivatives)
         multiplier = broker.get_multiplier(order.asset)
@@ -598,13 +599,51 @@ class FillExecutor:
             else:  # Short position
                 pnl = (pos.entry_price - ctx.fill_price) * exited_qty * pos.multiplier
 
-            # Subtract proportional commission
-            # entry_commission is for the full position, so we take the proportional part
-            exit_portion_ratio = exited_qty / abs(pos.initial_quantity or old_qty)
+            # Allocate the current position's entry costs in proportion to the quantity
+            # removed. The residual cost remains attached to the residual position.
+            exit_portion_ratio = exited_qty / abs(old_qty)
             proportional_entry_commission = pos.entry_commission * exit_portion_ratio
+            pos.entry_commission -= proportional_entry_commission
             partial_exit_commission = ctx.commission
             total_commission = proportional_entry_commission + partial_exit_commission
             pnl -= total_commission
+
+            raw_pct = (
+                (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
+            )
+            pnl_pct = raw_pct if old_qty > 0 else -raw_pct
+            entry_quote = pos.context.get("entry_quote_context", {})
+            exit_quote = ctx.quote_context
+            broker.trades.append(
+                Trade(
+                    symbol=ctx.order.asset,
+                    entry_time=pos.entry_time,
+                    exit_time=ctx.current_time,
+                    entry_price=pos.entry_price,
+                    exit_price=ctx.fill_price,
+                    quantity=math.copysign(exited_qty, old_qty),
+                    pnl=pnl,
+                    pnl_percent=pnl_pct,
+                    bars_held=pos.bars_held,
+                    fees=total_commission,
+                    exit_slippage=ctx.slippage,
+                    exit_reason=_get_exit_reason(ctx.order),
+                    mfe=pos.max_favorable_excursion,
+                    mae=pos.max_adverse_excursion,
+                    entry_slippage=pos.entry_slippage,
+                    multiplier=pos.multiplier,
+                    entry_quote_mid_price=entry_quote.get("quote_mid_price"),
+                    entry_bid_price=entry_quote.get("bid_price"),
+                    entry_ask_price=entry_quote.get("ask_price"),
+                    entry_spread=entry_quote.get("spread"),
+                    entry_available_size=entry_quote.get("available_size"),
+                    exit_quote_mid_price=exit_quote.get("quote_mid_price"),
+                    exit_bid_price=exit_quote.get("bid_price"),
+                    exit_ask_price=exit_quote.get("ask_price"),
+                    exit_spread=exit_quote.get("spread"),
+                    exit_available_size=exit_quote.get("available_size"),
+                )
+            )
 
             # Record P&L event for trading stats
             broker._record_pnl_event(ctx.order.asset, pnl)

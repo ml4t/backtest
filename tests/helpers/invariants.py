@@ -34,6 +34,7 @@ def assert_result_invariants(
     check_no_nan: bool = True,
     check_exit_reason_consistency: bool = True,
     check_fill_order_type_bounds: bool = True,
+    check_commission_allocation: bool = True,
 ) -> None:
     """Assert universal invariants on a BacktestResult.
 
@@ -62,6 +63,14 @@ def assert_result_invariants(
         _check_exit_reason_consistency(result.trades)
     if check_fill_order_type_bounds:
         _check_fill_order_type_bounds(result)
+    if check_commission_allocation:
+        _check_commission_allocation(result)
+
+
+def _accounting_tolerance(*values: float, operations: int = 1) -> float:
+    """Bound rounding error by the represented values and arithmetic operation count."""
+    scale = max((abs(value) for value in values), default=0.0)
+    return max(1e-9, math.ulp(scale) * max(16, operations * 4))
 
 
 def _check_equity_terminal(
@@ -69,14 +78,7 @@ def _check_equity_terminal(
     initial_cash: float,
     closed_trades: list,
 ) -> None:
-    """Verify: initial_cash + sum(closed_pnl) + sum(open_pnl) ≈ final_value.
-
-    When open positions exist, the tolerance is expanded because the open trade
-    PnL is computed from Position state which may not perfectly capture all
-    intermediate costs (especially in rebalancing with integer shares and high
-    commission rates). Multi-asset rebalancing with integer shares also creates
-    small rounding discrepancies in position PnL vs. cash-based equity tracking.
-    """
+    """Verify: initial_cash + sum(closed_pnl) + sum(open_pnl) ≈ final_value."""
     if not result.equity_curve:
         return
 
@@ -88,20 +90,8 @@ def _check_equity_terminal(
     expected = initial_cash + closed_pnl + open_pnl
     diff = abs(expected - final_value)
 
-    # Base tolerance: relative to portfolio size
-    tol = max(_ABS_TOL, abs(final_value) * 1e-6)
-
-    # Expand tolerance for total fill costs (commission + slippage on all fills)
-    total_fill_costs = sum(f.commission + f.slippage for f in result.fills)
-    if total_fill_costs > 0:
-        tol = max(tol, total_fill_costs * 0.05)  # 5% of total costs
-
-    # Expand tolerance for open positions: mark-to-market PnL from Position state
-    # can diverge slightly from cash-based equity tracking, especially with
-    # multi-asset rebalancing and integer share rounding.
-    if open_trades:
-        open_notional = sum(abs(t.quantity) * t.exit_price * t.multiplier for t in open_trades)
-        tol = max(tol, open_notional * 1e-4)  # 0.01% of open notional
+    terms = [initial_cash, *(t.pnl for t in closed_trades), *(t.pnl for t in open_trades)]
+    tol = _accounting_tolerance(expected, final_value, *terms, operations=len(terms) + 1)
 
     assert diff <= tol, (
         f"Equity terminal invariant violated: "
@@ -118,7 +108,7 @@ def _check_pnl_decomposition(closed_trades: list) -> None:
         expected_net = gross - t.fees
         diff = abs(expected_net - t.pnl)
 
-        tol = max(_ABS_TOL, abs(gross) * 1e-6)
+        tol = _accounting_tolerance(gross, t.fees, expected_net, t.pnl, operations=2)
         assert diff <= tol, (
             f"PnL decomposition invariant violated for trade {i} ({t.symbol}): "
             f"gross_pnl({gross:.6f}) - fees({t.fees:.6f}) = {expected_net:.6f} "
@@ -295,3 +285,19 @@ def _check_fill_order_type_bounds(result: BacktestResult) -> None:
                     f"Fill order-type bound violated for fill {i} ({f.asset}): "
                     f"stop SELL filled at {f.price:.6f} > stop_price {stop_price:.6f}"
                 )
+
+
+def _check_commission_allocation(result: BacktestResult) -> None:
+    """Verify every charged fill commission is allocated to a realized or open trade."""
+    fill_commission = sum(fill.commission for fill in result.fills)
+    trade_commission = sum(trade.fees for trade in result.trades)
+    tol = _accounting_tolerance(
+        fill_commission,
+        trade_commission,
+        operations=len(result.fills) + len(result.trades),
+    )
+    assert abs(fill_commission - trade_commission) <= tol, (
+        "Commission allocation invariant violated: "
+        f"fills({fill_commission:.12f}) != trades({trade_commission:.12f}), "
+        f"diff={abs(fill_commission - trade_commission):.12f}, tol={tol:.12f}"
+    )
