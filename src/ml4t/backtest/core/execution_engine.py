@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 
+from ..models import calculate_commission
 from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType, Position
 from .shared import is_exit_order
 
@@ -239,8 +240,8 @@ class ExecutionEngine:
             and abs(new_qty) > 1e-12
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
-        commission = broker.commission_model.calculate(
-            order.asset, order.quantity, validation_price
+        commission = calculate_commission(
+            broker.commission_model, order.asset, order.quantity, validation_price
         )
         multiplier = broker.get_multiplier(order.asset)
 
@@ -288,7 +289,9 @@ class ExecutionEngine:
             shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
         )
         new_qty = current_qty + qty_delta
-        commission = broker.commission_model.calculate(order.asset, order.quantity, fill_price)
+        commission = calculate_commission(
+            broker.commission_model, order.asset, order.quantity, fill_price
+        )
         shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
 
         if abs(new_qty) <= 1e-12:
@@ -586,7 +589,9 @@ class ExecutionEngine:
             return True
 
         signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
-        commission = broker.commission_model.calculate(order.asset, order.quantity, fill_price)
+        commission = calculate_commission(
+            broker.commission_model, order.asset, order.quantity, fill_price
+        )
         projected_cash = broker.cash - signed_qty * fill_price - commission
         return projected_cash >= 0.0
 

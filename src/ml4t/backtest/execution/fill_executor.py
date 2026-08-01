@@ -7,11 +7,13 @@ with helper methods for position creation, closing, flipping, and scaling.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import InitialHwmSource, ShareType
+from ..models import calculate_commission, calculate_slippage
 from ..types import (
     ExitReason,
     Fill,
@@ -58,6 +60,8 @@ class FillContext:
     is_partial: bool
     price_source: str
     quote_context: dict[str, float | None]
+    close_commission: float | None = None
+    open_commission: float | None = None
 
 
 class FillExecutor:
@@ -100,6 +104,8 @@ class FillExecutor:
         current_time = broker._current_time
         assert current_time is not None, "Cannot execute fill without current time"
 
+        self._validate_execution_price(base_price, source="base execution price")
+
         available_size = broker.get_available_size(order.asset, order.side)
 
         # Get effective quantity (considering partial fills from previous bars)
@@ -107,6 +113,7 @@ class FillExecutor:
         fill_quantity = effective_quantity
 
         # Apply execution limits (volume participation)
+        remaining_quantity = 0.0
         if broker.execution_limits is not None:
             if order.order_id in broker._filled_this_bar:
                 return False
@@ -121,19 +128,17 @@ class FillExecutor:
             if broker.share_type == ShareType.INTEGER:
                 fill_quantity = float(int(fill_quantity))
 
-            if fill_quantity <= 0:
+            if not math.isfinite(fill_quantity) or fill_quantity < 0:
+                raise ValueError(
+                    "Invalid execution quantity from "
+                    f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}"
+                )
+            if fill_quantity == 0:
                 return False
-
-            broker._filled_this_bar.add(order.order_id)
 
             remaining_quantity = max(0.0, effective_quantity - fill_quantity)
             if broker.share_type == ShareType.INTEGER:
                 remaining_quantity = float(int(remaining_quantity))
-
-            if remaining_quantity > 0:
-                broker._partial_orders[order.order_id] = remaining_quantity
-            else:
-                broker._partial_orders.pop(order.order_id, None)
 
         # Apply market impact
         if broker.market_impact_model is not None:
@@ -144,20 +149,54 @@ class FillExecutor:
                 available_size,
                 is_buy,
             )
+            self._validate_market_impact(impact, is_buy=is_buy)
             base_price = base_price + impact
+            self._validate_execution_price(base_price, source="market-impact execution price")
 
         # Calculate slippage
-        slippage = broker.slippage_model.calculate(
+        slippage = calculate_slippage(
+            broker.slippage_model,
             order.asset,
             fill_quantity,
             base_price,
             available_size,
         )
         fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
+        self._validate_execution_price(fill_price, source="execution price")
 
         # Calculate commission
-        commission = broker.commission_model.calculate(order.asset, fill_quantity, fill_price)
+        commission = calculate_commission(
+            broker.commission_model, order.asset, fill_quantity, fill_price
+        )
         quote_context = broker.get_quote_context(order.asset, order.side)
+
+        signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
+        close_commission = None
+        open_commission = None
+        position = broker.positions.get(order.asset)
+        if position is not None:
+            new_qty = position.quantity + signed_qty
+            is_flip = position.quantity > 0 > new_qty or position.quantity < 0 < new_qty
+            if is_flip:
+                close_commission = calculate_commission(
+                    broker.commission_model,
+                    order.asset,
+                    abs(position.quantity),
+                    fill_price,
+                )
+                open_commission = calculate_commission(
+                    broker.commission_model,
+                    order.asset,
+                    abs(new_qty),
+                    fill_price,
+                )
+
+        if broker.execution_limits is not None:
+            broker._filled_this_bar.add(order.order_id)
+            if remaining_quantity > 0:
+                broker._partial_orders[order.order_id] = remaining_quantity
+            else:
+                broker._partial_orders.pop(order.order_id, None)
 
         # Create fill record
         fill = Fill(
@@ -196,7 +235,6 @@ class FillExecutor:
             order.filled_quantity = fill_quantity
 
         # Build fill context
-        signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
         ctx = FillContext(
             order=order,
             current_time=current_time,
@@ -208,6 +246,8 @@ class FillExecutor:
             is_partial=is_partial,
             price_source=broker.execution_price.value,
             quote_context=quote_context,
+            close_commission=close_commission,
+            open_commission=open_commission,
         )
 
         # Update position and get actual commission (may change for flips)
@@ -240,6 +280,25 @@ class FillExecutor:
                     broker.pending_orders.remove(o)
 
         return not is_partial
+
+    @staticmethod
+    def _validate_execution_price(value: float, *, source: str) -> None:
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError(f"Invalid {source}: expected a finite positive number, got {value!r}")
+
+    def _validate_market_impact(self, value: float, *, is_buy: bool) -> None:
+        model_name = type(self.broker.market_impact_model).__name__
+        if not math.isfinite(value):
+            raise ValueError(
+                f"Invalid market impact from {model_name}: expected a finite adverse value, "
+                f"got {value!r}"
+            )
+        wrong_direction = (is_buy and value < 0.0) or (not is_buy and value > 0.0)
+        if wrong_direction:
+            expected = ">= 0 for buys" if is_buy else "<= 0 for sells"
+            raise ValueError(
+                f"Invalid market impact from {model_name}: expected {expected}, got {value!r}"
+            )
 
     def _update_position(self, ctx: FillContext) -> float:
         """Update position based on fill.
@@ -439,12 +498,11 @@ class FillExecutor:
         broker = self.broker
         order = ctx.order
 
-        close_qty = abs(old_qty)
-        open_qty = abs(new_qty)
-
         # Calculate separate commissions for close and open portions
-        close_commission = broker.commission_model.calculate(order.asset, close_qty, ctx.fill_price)
-        open_commission = broker.commission_model.calculate(order.asset, open_qty, ctx.fill_price)
+        assert ctx.close_commission is not None
+        assert ctx.open_commission is not None
+        close_commission = ctx.close_commission
+        open_commission = ctx.open_commission
         total_commission = close_commission + open_commission
 
         # Close the old position (include multiplier for futures)

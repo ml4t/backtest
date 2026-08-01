@@ -298,6 +298,8 @@ class Broker:
             VolumeShareSlippage,
         )
 
+        config._validate_for_execution()
+
         effective_commission_type = config.commission_type
         if effective_commission_type == CommissionType.NONE:
             if config.commission_per_share > 0:

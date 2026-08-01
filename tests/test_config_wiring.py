@@ -12,6 +12,7 @@ Validates that BacktestConfig fields actually affect execution:
 from datetime import datetime
 
 import pytest
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import (
     BacktestConfig,
@@ -41,7 +42,6 @@ from ml4t.backtest.models import (
     VolumeShareSlippage,
 )
 from ml4t.backtest.types import OrderSide, Position
-from ml4t.specs.market_data import FeedSpec
 
 # ---------------------------------------------------------------------------
 # Helpers

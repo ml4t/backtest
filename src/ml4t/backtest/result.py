@@ -28,7 +28,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import polars as pl
-
 from ml4t.specs.market_data import FeedSpec
 
 try:

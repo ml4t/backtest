@@ -3,6 +3,7 @@
 from datetime import datetime
 
 import pytest
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.broker import Broker
 from ml4t.backtest.config import ShareType
@@ -16,7 +17,6 @@ from ml4t.backtest.types import (
     OrderType,
     Position,
 )
-from ml4t.specs.market_data import FeedSpec
 
 
 @pytest.fixture

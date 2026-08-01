@@ -1,5 +1,6 @@
 """Pluggable commission and slippage models."""
 
+import math
 from typing import Protocol, runtime_checkable
 
 # === Protocols ===
@@ -19,6 +20,44 @@ class SlippageModel(Protocol):
     def calculate(
         self, asset: str, quantity: float, price: float, volume: float | None
     ) -> float: ...
+
+
+def calculate_commission(
+    model: CommissionModel,
+    asset: str,
+    quantity: float,
+    price: float,
+) -> float:
+    value = model.calculate(asset, quantity, price)
+    return _validate_nonnegative_model_output("commission", model, value)
+
+
+def calculate_slippage(
+    model: SlippageModel,
+    asset: str,
+    quantity: float,
+    price: float,
+    volume: float | None,
+) -> float:
+    value = model.calculate(asset, quantity, price, volume)
+    return _validate_nonnegative_model_output("slippage", model, value)
+
+
+def _validate_nonnegative_model_output(kind: str, model: object, value: float) -> float:
+    model_name = type(model).__name__
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Invalid {kind} from {model_name}: expected a finite non-negative number, "
+            f"got {value!r}"
+        ) from exc
+    if not math.isfinite(numeric_value) or numeric_value < 0.0:
+        raise ValueError(
+            f"Invalid {kind} from {model_name}: expected a finite non-negative number, "
+            f"got {value!r}"
+        )
+    return numeric_value
 
 
 # === Commission Models ===

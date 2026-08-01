@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order
 
@@ -339,16 +340,16 @@ class OrderBook:
         if closed != 0.0:
             close_cash = (-closed) * signal_price
             shadow_cash += close_cash
-            closed_commission = broker.commission_model.calculate(
-                order.asset, abs(closed), signal_price
+            closed_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(closed), signal_price
             )
             shadow_cash -= closed_commission
 
         if opened != 0.0:
             open_cash = opened * signal_price
             shadow_cash -= open_cash
-            opened_commission = broker.commission_model.calculate(
-                order.asset, abs(opened), signal_price
+            opened_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(opened), signal_price
             )
             shadow_cash -= opened_commission
 
@@ -419,8 +420,8 @@ class OrderBook:
         if closed != 0.0:
             closed_value = (-closed) * signal_price
             shadow_cash += closed_value
-            closed_commission = broker.commission_model.calculate(
-                order.asset, abs(closed), signal_price
+            closed_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(closed), signal_price
             )
             shadow_cash -= closed_commission
 
@@ -430,8 +431,8 @@ class OrderBook:
             # This prevents credit-model inflation where short proceeds
             # artificially inflate shadow cash.
             shadow_cash -= abs(opened) * signal_price
-            opened_commission = broker.commission_model.calculate(
-                order.asset, abs(opened), signal_price
+            opened_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(opened), signal_price
             )
             shadow_cash -= opened_commission
 
@@ -461,7 +462,9 @@ class OrderBook:
             old_qty, old_price, size, signal_price
         )
 
-        commission = broker.commission_model.calculate(order.asset, order.quantity, signal_price)
+        commission = calculate_commission(
+            broker.commission_model, order.asset, order.quantity, signal_price
+        )
         available_cash = self._submission_shadow_cash
         if broker.cash_buffer_pct > 0 and available_cash > 0:
             available_cash *= 1.0 - broker.cash_buffer_pct

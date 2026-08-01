@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import polars as pl
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine
 from ml4t.backtest.execution.schedule import RebalanceSchedule
@@ -13,7 +14,6 @@ from ml4t.backtest.strategies import (
     MomentumStrategy,
     SignalFollowingStrategy,
 )
-from ml4t.specs.market_data import FeedSpec
 
 
 def make_price_data(
