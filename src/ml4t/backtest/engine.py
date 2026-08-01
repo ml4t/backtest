@@ -298,6 +298,8 @@ class Engine:
             )
             max_open_positions = max((state[5] for state in self.portfolio_state), default=0)
             return {
+                "num_orders": len(self.broker.orders),
+                "num_rejected_orders": len(self.broker.get_rejected_orders()),
                 "num_fills": 0,
                 "num_rebalance_events": 0,
                 "unique_symbols_traded": 0,
@@ -335,6 +337,8 @@ class Engine:
         max_open_positions = max((state[5] for state in self.portfolio_state), default=0)
 
         return {
+            "num_orders": len(self.broker.orders),
+            "num_rejected_orders": len(self.broker.get_rejected_orders()),
             "num_fills": len(fills),
             "num_rebalance_events": len(rebalance_events),
             "unique_symbols_traded": len(traded_symbols),
@@ -356,9 +360,14 @@ class Engine:
                 trades=[],
                 equity_curve=[],
                 fills=[],
+                rejected_orders=self.broker.get_rejected_orders(),
                 predictions=self.feed.signals,
                 portfolio_state=[],
-                metrics={"skipped_bars": self._skipped_bars},
+                metrics={
+                    "skipped_bars": self._skipped_bars,
+                    "num_orders": len(self.broker.orders),
+                    "num_rejected_orders": len(self.broker.get_rejected_orders()),
+                },
                 config=self.config,
             )
 
@@ -475,6 +484,7 @@ class Engine:
             trades=all_trades,  # Includes both closed and open trades
             equity_curve=self.equity_curve,
             fills=self.broker.fills,
+            rejected_orders=self.broker.get_rejected_orders(),
             predictions=self.feed.signals,
             portfolio_state=self.portfolio_state,
             metrics=metrics,

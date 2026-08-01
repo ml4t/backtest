@@ -35,7 +35,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for local editable edge cases
     __version__ = "0.0.0.dev0"
 from .analytics.annualization import should_session_align
-from .types import Fill, OrderSide, Trade
+from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
 
 if TYPE_CHECKING:
     from .analytics import EquityCurve, TradeAnalyzer
@@ -56,6 +56,7 @@ class BacktestResult:
         trades: List of completed Trade objects
         equity_curve: List of (timestamp, portfolio_value) tuples
         fills: List of Fill objects (all order fills)
+        rejected_orders: Orders that reached the rejected terminal state
         predictions: Raw prediction DataFrame passed into the backtest (optional)
         metrics: Dictionary of computed performance metrics
         config: BacktestConfig used for the backtest (optional)
@@ -74,12 +75,14 @@ class BacktestResult:
     portfolio_state: list[tuple[datetime, float, float, float, float, int]] = field(
         default_factory=list
     )
+    rejected_orders: list[Order] = field(default_factory=list)
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
     _equity_df: pl.DataFrame | None = field(default=None, repr=False)
     _fills_df: pl.DataFrame | None = field(default=None, repr=False)
     _portfolio_state_df: pl.DataFrame | None = field(default=None, repr=False)
+    _rejected_orders_df: pl.DataFrame | None = field(default=None, repr=False)
 
     def _feed_spec(self) -> FeedSpec | None:
         if self.config is None:
@@ -203,6 +206,38 @@ class BacktestResult:
 
         self._fills_df = pl.DataFrame(records, schema=self._fills_schema())
         return self._fills_df
+
+    def to_rejected_orders_dataframe(self) -> pl.DataFrame:
+        """Convert rejected orders to a stable, machine-readable DataFrame."""
+        if self._rejected_orders_df is not None:
+            return self._rejected_orders_df
+        if not self.rejected_orders:
+            return pl.DataFrame(schema=self._rejected_orders_schema())
+
+        records = [
+            {
+                "order_id": order.order_id,
+                "symbol": order.asset,
+                "timestamp": order.created_at,
+                "requested_quantity": order.requested_quantity,
+                "side": order.side.value,
+                "order_type": order.order_type.value,
+                "limit_price": order.limit_price,
+                "stop_price": order.stop_price,
+                "trail_amount": order.trail_amount,
+                "parent_id": order.parent_id,
+                "rebalance_id": order.rebalance_id,
+                "status": order.status.value,
+                "rejection_code": order.rejection_code,
+                "rejection_reason": order.rejection_reason,
+            }
+            for order in self.rejected_orders
+        ]
+        self._rejected_orders_df = pl.DataFrame(
+            records,
+            schema=self._rejected_orders_schema(),
+        )
+        return self._rejected_orders_df
 
     def to_predictions_dataframe(self) -> pl.DataFrame:
         """Return the raw prediction DataFrame used as backtest input."""
@@ -524,8 +559,8 @@ class BacktestResult:
         Args:
             path: Directory path to write files
             include: Components to include. Default: all.
-                Options: ["trades", "fills", "predictions", "equity", "portfolio_state",
-                    "daily_pnl", "metrics", "config", "spec"]
+                Options: ["trades", "fills", "rejected_orders", "predictions", "equity",
+                    "portfolio_state", "daily_pnl", "metrics", "config", "spec"]
             compression: Parquet compression codec (default: "zstd")
 
         Returns:
@@ -538,6 +573,7 @@ class BacktestResult:
             include = [
                 "trades",
                 "fills",
+                "rejected_orders",
                 "predictions",
                 "equity",
                 "portfolio_state",
@@ -558,6 +594,14 @@ class BacktestResult:
             fills_path = path / "fills.parquet"
             self.to_fills_dataframe().write_parquet(fills_path, compression=compression)
             written["fills"] = fills_path
+
+        if "rejected_orders" in include:
+            rejected_orders_path = path / "rejected_orders.parquet"
+            self.to_rejected_orders_dataframe().write_parquet(
+                rejected_orders_path,
+                compression=compression,
+            )
+            written["rejected_orders"] = rejected_orders_path
 
         if "predictions" in include and self.predictions is not None:
             predictions_path = path / "predictions.parquet"
@@ -725,6 +769,30 @@ class BacktestResult:
                     )
                 )
 
+        rejected_orders: list[Order] = []
+        rejected_orders_path = path / "rejected_orders.parquet"
+        if rejected_orders_path.exists():
+            rejected_orders_df = pl.read_parquet(rejected_orders_path)
+            for row in rejected_orders_df.iter_rows(named=True):
+                rejected_orders.append(
+                    Order(
+                        order_id=row["order_id"],
+                        asset=row["symbol"],
+                        created_at=row["timestamp"],
+                        requested_quantity=row["requested_quantity"],
+                        quantity=row["requested_quantity"],
+                        side=OrderSide(row["side"]),
+                        order_type=OrderType(row["order_type"]),
+                        limit_price=row.get("limit_price"),
+                        stop_price=row.get("stop_price"),
+                        trail_amount=row.get("trail_amount"),
+                        parent_id=row.get("parent_id"),
+                        rebalance_id=row.get("rebalance_id"),
+                        status=OrderStatus(row["status"]),
+                        rejection_reason=row.get("rejection_reason"),
+                    )
+                )
+
         predictions = None
         predictions_path = path / "predictions.parquet"
         if predictions_path.exists():
@@ -785,6 +853,7 @@ class BacktestResult:
             fills=fills,
             predictions=predictions,
             portfolio_state=portfolio_state,
+            rejected_orders=rejected_orders,
             metrics=metrics,
             config=config,
         )
@@ -860,6 +929,26 @@ class BacktestResult:
             "bid_size": pl.Float64(),
             "ask_size": pl.Float64(),
             "available_size": pl.Float64(),
+        }
+
+    @staticmethod
+    def _rejected_orders_schema() -> dict[str, pl.DataType]:
+        """Schema for rejected order records added compatibly in v0.1.0."""
+        return {
+            "order_id": pl.String(),
+            "symbol": pl.String(),
+            "timestamp": pl.Datetime(),
+            "requested_quantity": pl.Float64(),
+            "side": pl.String(),
+            "order_type": pl.String(),
+            "limit_price": pl.Float64(),
+            "stop_price": pl.Float64(),
+            "trail_amount": pl.Float64(),
+            "parent_id": pl.String(),
+            "rebalance_id": pl.String(),
+            "status": pl.String(),
+            "rejection_code": pl.String(),
+            "rejection_reason": pl.String(),
         }
 
     @staticmethod

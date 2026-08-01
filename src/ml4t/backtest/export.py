@@ -130,6 +130,8 @@ class BacktestExporter:
             record["total_commission"] = metrics.get("total_commission", 0.0)
             record["total_slippage"] = metrics.get("total_slippage", 0.0)
             record["num_fills"] = metrics.get("num_fills", 0)
+            record["num_orders"] = metrics.get("num_orders", 0)
+            record["num_rejected_orders"] = metrics.get("num_rejected_orders", 0)
             record["num_rebalance_events"] = metrics.get("num_rebalance_events", 0)
             record["unique_symbols_traded"] = metrics.get("unique_symbols_traded", 0)
             record["total_filled_notional"] = metrics.get("total_filled_notional", 0.0)
@@ -217,6 +219,8 @@ class BacktestExporter:
                     "win_rate": metrics.get("win_rate", 0.0),
                     "profit_factor": metrics.get("profit_factor", 0.0),
                     "final_value": metrics.get("final_value", 0.0),
+                    "num_orders": metrics.get("num_orders", 0),
+                    "num_rejected_orders": metrics.get("num_rejected_orders", 0),
                 }
             )
 

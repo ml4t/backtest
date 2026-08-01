@@ -175,6 +175,7 @@ def test_optimized_feed_matches_legacy_output():
 
 
 @pytest.mark.benchmark
+@pytest.mark.no_cover
 def test_optimized_feed_runtime_vs_legacy_baseline():
     prices, signals = _build_benchmark_data(n_bars=3000, n_assets=20)
 

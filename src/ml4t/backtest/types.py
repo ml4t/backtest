@@ -164,12 +164,37 @@ class Order:
     filled_price: float | None = None
     filled_quantity: float = 0.0
     rejection_reason: str | None = None  # Reason if order was rejected
+    requested_quantity: float | None = None
     # Internal risk management fields (set by broker)
     _created_bar_index: int = 0
     _signal_price: float | None = None  # Close price at order creation time
     _risk_exit_reason: str | None = None  # Human-readable reason (legacy, for logging)
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
+
+    def __post_init__(self) -> None:
+        if self.requested_quantity is None:
+            self.requested_quantity = self.quantity
+
+    @property
+    def rejection_code(self) -> str | None:
+        """Return a stable machine-readable category for the rejection reason."""
+        if self.status is not OrderStatus.REJECTED:
+            return None
+        reason = (self.rejection_reason or "").lower()
+        if "rounds to zero" in reason:
+            return "quantity_rounds_to_zero"
+        if "no price" in reason:
+            return "price_unavailable"
+        if "fill check" in reason:
+            return "fill_check_failed"
+        if "short" in reason or "reversal not allowed" in reason:
+            return "account_restriction"
+        if "buying power" in reason or "margin" in reason:
+            return "insufficient_buying_power"
+        if "cash" in reason or "insufficient" in reason:
+            return "insufficient_cash"
+        return "order_validation_failed"
 
 
 @dataclass
