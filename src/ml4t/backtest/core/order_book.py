@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
-from .shared import SubmitOrderOptions, is_exit_order
+from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
 
 
 class OrderBook:
@@ -15,7 +15,6 @@ class OrderBook:
         {"quantity", "limit_price", "stop_price", "trail_amount"}
     )
     _MIN_ORDER_SIZE: float = 1e-8
-    _QTY_EPS: float = 1e-12
 
     def __init__(self, broker):
         self.broker = broker
@@ -254,7 +253,7 @@ class OrderBook:
                 or pos.entry_price,
             )
             for asset, pos in broker.positions.items()
-            if abs(pos.quantity) > self._QTY_EPS
+            if abs(pos.quantity) > quantity_zero_tolerance(pos.quantity)
         }
 
     def _build_shadow_policy_positions(self) -> dict[str, Position]:
@@ -262,7 +261,7 @@ class OrderBook:
         ts = broker._current_time or datetime(1970, 1, 1)
         positions: dict[str, Position] = {}
         for asset, (qty, basis_price) in self._submission_shadow_positions.items():
-            if abs(qty) <= self._QTY_EPS:
+            if abs(qty) <= quantity_zero_tolerance(qty):
                 continue
             mark_price = broker.get_mark_price(asset, quantity=qty) or basis_price
             positions[asset] = Position(
@@ -281,10 +280,10 @@ class OrderBook:
     ) -> tuple[float, float, float, float]:
         """Mirror Backtrader Position.update for pseudo-exec prechecks."""
         new_qty = old_qty + size
-        if abs(new_qty) < OrderBook._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             return 0.0, 0.0, 0.0, size
 
-        if abs(old_qty) < OrderBook._QTY_EPS:
+        if abs(old_qty) <= quantity_zero_tolerance(old_qty):
             return new_qty, price, size, 0.0
 
         if old_qty > 0:
@@ -352,7 +351,7 @@ class OrderBook:
         # Keep shadow effects even for rejected orders to mirror Backtrader's
         # sequential submitted-queue pseudo-execution behavior.
         self._submission_shadow_cash = shadow_cash
-        if abs(new_qty) <= self._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)
@@ -438,7 +437,7 @@ class OrderBook:
 
         # Accepted — commit shadow changes
         self._submission_shadow_cash = shadow_cash
-        if abs(new_qty) <= self._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)
@@ -465,12 +464,12 @@ class OrderBook:
 
         shadow_positions = self._build_shadow_policy_positions()
         is_reversal = (
-            abs(old_qty) > self._QTY_EPS
-            and abs(new_qty) > self._QTY_EPS
+            abs(old_qty) > quantity_zero_tolerance(old_qty)
+            and abs(new_qty) > quantity_zero_tolerance(old_qty, size)
             and ((old_qty > 0 and new_qty < 0) or (old_qty < 0 and new_qty > 0))
         )
 
-        if abs(old_qty) <= self._QTY_EPS:
+        if abs(old_qty) <= quantity_zero_tolerance(old_qty):
             valid, reason = broker.account.policy.validate_new_position(
                 asset=order.asset,
                 quantity=size,
@@ -510,7 +509,7 @@ class OrderBook:
 
         multiplier = broker.get_multiplier(order.asset)
         self._submission_shadow_cash += -size * signal_price * multiplier - commission
-        if abs(new_qty) <= self._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)

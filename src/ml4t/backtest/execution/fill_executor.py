@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import InitialHwmSource, ShareType
+from ..core.shared import quantity_zero_tolerance
 from ..types import (
     ExitReason,
     Fill,
@@ -82,7 +83,6 @@ class FillExecutor:
             broker: The Broker instance whose state we'll modify
         """
         self.broker = broker
-        self._qty_zero_epsilon = 1e-12
 
     def execute(self, order: Order, base_price: float) -> bool:
         """Execute a fill and update positions.
@@ -260,7 +260,7 @@ class FillExecutor:
         else:
             old_qty = pos.quantity
             new_qty = old_qty + ctx.signed_qty
-            if abs(new_qty) < self._qty_zero_epsilon:
+            if abs(new_qty) <= quantity_zero_tolerance(old_qty, ctx.signed_qty):
                 new_qty = 0.0
 
             if new_qty == 0:

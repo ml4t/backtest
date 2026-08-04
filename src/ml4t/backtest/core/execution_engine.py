@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 
 from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType, Position
-from .shared import is_exit_order
+from .shared import is_exit_order, quantity_zero_tolerance
 
 
 class ExecutionEngine:
@@ -238,15 +238,15 @@ class ExecutionEngine:
         )
         new_qty = current_qty + qty_delta
         is_reversal = (
-            abs(current_qty) > 1e-12
-            and abs(new_qty) > 1e-12
+            abs(current_qty) > quantity_zero_tolerance(current_qty)
+            and abs(new_qty) > quantity_zero_tolerance(current_qty, qty_delta)
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
         commission = broker.commission_model.calculate(
             order.asset, order.quantity, validation_price
         )
 
-        if abs(current_qty) <= 1e-12:
+        if abs(current_qty) <= quantity_zero_tolerance(current_qty):
             return policy.validate_new_position(
                 asset=order.asset,
                 quantity=qty_delta,
@@ -290,7 +290,7 @@ class ExecutionEngine:
         commission = broker.commission_model.calculate(order.asset, order.quantity, fill_price)
         shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
 
-        if abs(new_qty) <= 1e-12:
+        if abs(new_qty) <= quantity_zero_tolerance(current_qty, qty_delta):
             shadow_positions.pop(order.asset, None)
             return shadow_cash
 
@@ -307,13 +307,13 @@ class ExecutionEngine:
             return shadow_cash
 
         is_reversal = (
-            abs(current_qty) > 1e-12
-            and abs(new_qty) > 1e-12
+            abs(current_qty) > quantity_zero_tolerance(current_qty)
+            and abs(new_qty) > quantity_zero_tolerance(current_qty, qty_delta)
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
         position.quantity = new_qty
         position.current_price = broker._current_prices.get(order.asset, fill_price)
-        if abs(current_qty) <= 1e-12 or is_reversal:
+        if abs(current_qty) <= quantity_zero_tolerance(current_qty) or is_reversal:
             position.entry_price = fill_price
 
         return shadow_cash

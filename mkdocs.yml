@@ -119,6 +119,7 @@ nav:
     - Quickstart: getting-started/quickstart.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
+    - Quantity-Zero Tolerance: concepts/quantity-zero-tolerance.md
   - User Guide:
     - Strategies: user-guide/strategies.md
     - Order Types: user-guide/orders.md

@@ -4,6 +4,7 @@ This module provides the Gatekeeper class that validates orders before execution
 ensuring they meet account policy constraints and preventing invalid trades.
 """
 
+from ..core.shared import quantity_zero_tolerance
 from ..models import CommissionModel
 from ..types import Order, OrderSide
 from .account import AccountState
@@ -123,7 +124,7 @@ class Gatekeeper:
         """
         # Get current position quantity (0 if no position)
         current_qty = self.account.get_position_quantity(order.asset)
-        if abs(current_qty) < 1e-12:
+        if abs(current_qty) <= quantity_zero_tolerance(current_qty):
             current_qty = 0.0
 
         # Determine order direction (positive=buy, negative=sell)
