@@ -224,17 +224,19 @@ class Engine:
 
             pre_risk_opened_assets: set[str] = set()
             if self.execution_mode == ExecutionMode.NEXT_BAR:
-                # Fill only flat-position entries submitted by this callback on a
-                # prior bar. Ordinary orders retain the configured exit-first batch.
+                # Fill only prior market entries submitted from a flat position by
+                # this callback. Other orders retain the configured ordered batch.
                 positions_before = set(self.broker.positions)
                 self.broker._process_orders(
                     use_open=True,
+                    order_types={OrderType.MARKET},
                     only_pre_risk_flat_entries=True,
+                    defer_policy_rejections=True,
                 )
                 pre_risk_opened_assets = set(self.broker.positions) - positions_before
 
-            # Optional strategy phase for opening orders that must receive risk
-            # protection during the current bar. Existing strategies inherit a no-op.
+            # Optional strategy phase. SAME_BAR immediate fills can receive current-bar
+            # risk; NEXT_BAR entries retain next-bar risk timing.
             self.broker._submitting_before_risk = True
             try:
                 self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)

@@ -189,7 +189,6 @@ class TestDataFeedMemoryEfficiency:
         assert set(rows[2][1]) == {"AAPL"}
         assert rows[2][1]["AAPL"]["close"] == 300.5
 
-    @pytest.mark.benchmark
     def test_datafeed_memory_benchmark(self):
         """Benchmark memory usage for medium-scale dataset.
 

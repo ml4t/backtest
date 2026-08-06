@@ -1772,6 +1772,7 @@ class Broker:
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
         only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
     ):
         """Process pending orders against current prices.
 
@@ -1791,4 +1792,5 @@ class Broker:
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
             only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+            defer_policy_rejections=defer_policy_rejections,
         )

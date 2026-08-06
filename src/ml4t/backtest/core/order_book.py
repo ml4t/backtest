@@ -529,8 +529,14 @@ class OrderBook:
             counts["accepted" if valid else "rejected"] += 1
 
         if not valid:
-            order.rejection_reason = reason or "Insufficient buying power (submission precheck)"
-            order._rejection_code = broker.gatekeeper.classify_rejection(old_qty + size)
+            rejection_code = broker.gatekeeper.classify_rejection(old_qty + size)
+            fallback_reason = {
+                "account_restriction": "Account restriction (submission precheck)",
+                "insufficient_cash": "Insufficient cash (submission precheck)",
+                "insufficient_buying_power": "Insufficient buying power (submission precheck)",
+            }[rejection_code]
+            order.rejection_reason = reason or fallback_reason
+            order._rejection_code = rejection_code
             return False
 
         multiplier = broker.get_multiplier(order.asset)

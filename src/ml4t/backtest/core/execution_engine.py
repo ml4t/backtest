@@ -22,6 +22,7 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
         only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
     ):
         if self._should_use_next_bar_queue_shadow_validation(
             use_open,
@@ -29,7 +30,13 @@ class ExecutionEngine:
             include_orders_this_bar=include_orders_this_bar,
             only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         ):
-            self._process_orders_next_bar_queue_shadow(use_open)
+            self._process_orders_next_bar_queue_shadow(
+                use_open,
+                order_types=order_types,
+                include_orders_this_bar=include_orders_this_bar,
+                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+                defer_policy_rejections=defer_policy_rejections,
+            )
             return
 
         ordering = self.broker.fill_ordering.value
@@ -39,6 +46,7 @@ class ExecutionEngine:
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
                 only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+                defer_policy_rejections=defer_policy_rejections,
             )
         elif ordering == "sequential":
             self._process_orders_sequential(
@@ -46,6 +54,7 @@ class ExecutionEngine:
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
                 only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+                defer_policy_rejections=defer_policy_rejections,
             )
         else:
             self._process_orders_fifo(
@@ -53,6 +62,7 @@ class ExecutionEngine:
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
                 only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+                defer_policy_rejections=defer_policy_rejections,
             )
 
     def _is_exit_order(self, order) -> bool:
@@ -66,6 +76,7 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
         only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
     ):
         broker = self.broker
         fill = broker._fill_engine
@@ -124,7 +135,12 @@ class ExecutionEngine:
         entry_orders = self._sort_entry_orders(entry_orders, use_open=use_open)
 
         for order in entry_orders:
-            self._process_single_order(order, use_open, filled_orders)
+            self._process_single_order(
+                order,
+                use_open,
+                filled_orders,
+                defer_policy_rejections=defer_policy_rejections,
+            )
 
         self._cleanup_filled_orders(filled_orders)
 
@@ -141,34 +157,41 @@ class ExecutionEngine:
             use_open
             and broker.execution_mode is ExecutionMode.NEXT_BAR
             and broker.next_bar_queue_shadow_validation
-            and not only_pre_risk_flat_entries
         ):
             return False
-        if order_types is not None or include_orders_this_bar:
+        if (order_types is not None or include_orders_this_bar) and not only_pre_risk_flat_entries:
             return False
 
         current_bar_index = broker._bar_index
-        for order in broker.pending_orders:
-            if order.order_id in broker._orders_this_bar_ids:
-                continue
+        eligible_orders = self._eligible_orders(
+            use_open,
+            order_types=order_types,
+            include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+        )
+        for order in eligible_orders:
             if getattr(order, "_created_bar_index", current_bar_index) < current_bar_index - 1:
                 return True
 
         return False
 
-    def _process_orders_next_bar_queue_shadow(self, use_open: bool = False):
+    def _process_orders_next_bar_queue_shadow(
+        self,
+        use_open: bool = False,
+        *,
+        order_types: set[OrderType] | None = None,
+        include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
+    ):
         broker = self.broker
         fill = broker._fill_engine
-        eligible_orders = []
-        orders_this_bar_ids = broker._orders_this_bar_ids
-
-        for order in broker.pending_orders[:]:
-            if (
-                broker.execution_mode is ExecutionMode.NEXT_BAR
-                and order.order_id in orders_this_bar_ids
-            ):
-                continue
-            eligible_orders.append(order)
+        eligible_orders = self._eligible_orders(
+            use_open,
+            order_types=order_types,
+            include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+        )
 
         if not eligible_orders:
             return
@@ -210,6 +233,8 @@ class ExecutionEngine:
                 shadow_positions=shadow_positions,
             )
             if not valid:
+                if defer_policy_rejections:
+                    continue
                 order.reject(
                     rejection_reason,
                     rejection_code or "order_validation_failed",
@@ -349,6 +374,7 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
         only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
     ):
         broker = self.broker
         eligible_orders = self._eligible_orders(
@@ -361,7 +387,12 @@ class ExecutionEngine:
         filled_orders: list = []
 
         for order in eligible_orders:
-            self._process_single_order(order, use_open, filled_orders)
+            self._process_single_order(
+                order,
+                use_open,
+                filled_orders,
+                defer_policy_rejections=defer_policy_rejections,
+            )
             if filled_orders and filled_orders[-1] is order:
                 broker.mark_account_positions(use_open=use_open)
 
@@ -374,6 +405,7 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
         only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
     ):
         """Process orders in submission order without exit/entry separation.
 
@@ -433,7 +465,12 @@ class ExecutionEngine:
                         fill.update_partial_order(order)
             else:
                 # No shadow validation — use full gatekeeper path
-                self._process_single_order(order, use_open, filled_orders)
+                self._process_single_order(
+                    order,
+                    use_open,
+                    filled_orders,
+                    defer_policy_rejections=defer_policy_rejections,
+                )
 
             # Mark-to-market after every fill so the next order sees updated cash
             if filled_orders and filled_orders[-1] is order:
@@ -441,7 +478,14 @@ class ExecutionEngine:
 
         self._cleanup_filled_orders(filled_orders)
 
-    def _process_single_order(self, order, use_open: bool, filled_orders: list) -> None:
+    def _process_single_order(
+        self,
+        order,
+        use_open: bool,
+        filled_orders: list,
+        *,
+        defer_policy_rejections: bool = False,
+    ) -> None:
         broker = self.broker
         fill = broker._fill_engine
         if order.status is not OrderStatus.PENDING:
@@ -504,6 +548,8 @@ class ExecutionEngine:
                 return
 
             if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):
+                if defer_policy_rejections:
+                    return
                 order.reject("Insufficient cash (open cash check)", "insufficient_cash")
                 return
 
@@ -536,6 +582,8 @@ class ExecutionEngine:
                     broker.gatekeeper.validate_order_with_code(order, fill_price)
                 )
 
+            if not valid and defer_policy_rejections:
+                return
             insufficient_cash = "insufficient" in rejection_reason.lower()
             if valid:
                 fully_filled = fill.execute_fill(order, fill_price)
@@ -596,7 +644,9 @@ class ExecutionEngine:
             if order_types is not None and order.order_type not in order_types:
                 continue
             if only_pre_risk_flat_entries and not (
-                order._submitted_before_risk and order._submitted_from_flat
+                order._submitted_before_risk
+                and order._submitted_from_flat
+                and broker.get_position(order.asset) is None
             ):
                 continue
             if (

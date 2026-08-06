@@ -19,7 +19,7 @@ from ml4t.backtest.config import ExecutionPrice, WaterMarkSource
 
 
 class OpeningTargetWithStop(Strategy):
-    """Enter at the session open and protect the new position on that bar."""
+    """Enter at the session open; SAME_BAR immediate mode protects the entry bar."""
 
     def on_before_risk(self, timestamp, data, context, broker) -> None:
         if broker.get_position("SPY") is None:
@@ -103,6 +103,65 @@ class ExitFundedEntry(Strategy):
             broker.submit_order("AAPL", 90)
         elif timestamp.day == 4:
             broker.submit_order("GOOGL", 90)
+
+
+class ExitFundedPreRiskEntry(Strategy):
+    """Keep an unaffordable pre-risk entry pending until a risk exit funds it."""
+
+    def on_before_risk(self, timestamp, data, context, broker) -> None:
+        if (
+            timestamp.day == 4
+            and broker.get_position("GOOGL") is None
+            and not broker.get_pending_orders("GOOGL")
+        ):
+            broker.submit_order("GOOGL", 90)
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if timestamp.day == 3:
+            broker.set_position_rules(StopLoss(pct=0.05), asset="AAPL")
+            broker.submit_order("AAPL", 90)
+
+
+class FlatLimitThenOrdinaryMarket(Strategy):
+    """Open through on_data while an older pre-risk limit remains pending."""
+
+    def __init__(self) -> None:
+        self.visible_quantities: list[tuple[int, float]] = []
+
+    def on_before_risk(self, timestamp, data, context, broker) -> None:
+        position = broker.get_position("SPY")
+        self.visible_quantities.append(
+            (timestamp.day, 0.0 if position is None else position.quantity)
+        )
+        if timestamp.day == 3:
+            broker.submit_order(
+                "SPY",
+                10,
+                order_type=OrderType.LIMIT,
+                limit_price=50.0,
+            )
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if timestamp.day == 3:
+            broker.submit_order("SPY", 10)
+
+
+class LatePricePreRiskEntry(Strategy):
+    """Keep a pre-risk market order pending until its asset first has a price."""
+
+    def __init__(self) -> None:
+        self.visible_quantities: list[tuple[int, float]] = []
+
+    def on_before_risk(self, timestamp, data, context, broker) -> None:
+        position = broker.get_position("SPY")
+        self.visible_quantities.append(
+            (timestamp.day, 0.0 if position is None else position.quantity)
+        )
+        if timestamp.day == 3:
+            broker.submit_order("SPY", 10)
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        pass
 
 
 def _daily_prices(days: int = 3) -> pl.DataFrame:
@@ -224,7 +283,10 @@ def test_next_bar_pre_risk_guard_sees_filled_open_order() -> None:
     result = Engine(
         DataFeed(prices_df=_daily_prices()),
         strategy,
-        BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR),
+        BacktestConfig(
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_queue_shadow_validation=True,
+        ),
     ).run()
 
     assert [(fill.timestamp.day, fill.quantity) for fill in result.fills] == [(4, 10.0)]
@@ -370,3 +432,94 @@ def test_next_bar_pending_limit_guard_does_not_duplicate_intent() -> None:
     assert result.fills == []
     assert len(engine.broker.orders) == 1
     assert len(engine.broker.get_pending_orders("SPY")) == 1
+
+
+def test_next_bar_pre_risk_entry_can_use_same_bar_exit_proceeds() -> None:
+    rows = []
+    for day in (3, 4, 5):
+        for asset in ("AAPL", "GOOGL"):
+            low = 94.0 if day == 5 and asset == "AAPL" else 100.0
+            rows.append(
+                {
+                    "timestamp": datetime(2026, 8, day),
+                    "asset": asset,
+                    "open": 100.0,
+                    "high": 100.0,
+                    "low": low,
+                    "close": 100.0,
+                    "volume": 1_000_000.0,
+                }
+            )
+
+    engine = Engine(
+        DataFeed(prices_df=pl.DataFrame(rows)),
+        ExitFundedPreRiskEntry(),
+        BacktestConfig(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+        ),
+    )
+    result = engine.run()
+
+    assert result.rejected_orders == []
+    assert [(fill.asset, fill.side.value, fill.timestamp.day) for fill in result.fills] == [
+        ("AAPL", "buy", 4),
+        ("AAPL", "sell", 5),
+        ("GOOGL", "buy", 5),
+    ]
+    assert engine.broker.get_position("GOOGL").quantity == 90.0
+
+
+def test_pre_risk_limit_is_rechecked_for_flatness_before_early_fill() -> None:
+    prices = pl.DataFrame(
+        {
+            "timestamp": [datetime(2026, 8, day) for day in (3, 4, 5)],
+            "asset": ["SPY"] * 3,
+            "open": [100.0, 100.0, 50.0],
+            "high": [100.0, 100.0, 50.0],
+            "low": [100.0, 100.0, 50.0],
+            "close": [100.0, 100.0, 50.0],
+            "volume": [1_000_000.0] * 3,
+        }
+    )
+    strategy = FlatLimitThenOrdinaryMarket()
+    engine = Engine(
+        DataFeed(prices_df=prices),
+        strategy,
+        BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR),
+    )
+
+    result = engine.run()
+
+    assert strategy.visible_quantities == [(3, 0.0), (4, 0.0), (5, 10.0)]
+    assert [(fill.timestamp.day, fill.quantity) for fill in result.fills] == [
+        (4, 10.0),
+        (5, 10.0),
+    ]
+    assert engine.broker.get_position("SPY").quantity == 20.0
+
+
+def test_aged_pre_risk_market_entry_uses_queue_shadow_validation() -> None:
+    prices = pl.DataFrame(
+        {
+            "timestamp": [datetime(2026, 8, day) for day in (3, 4, 5)],
+            "asset": ["AAPL", "AAPL", "SPY"],
+            "open": [100.0] * 3,
+            "high": [100.0] * 3,
+            "low": [100.0] * 3,
+            "close": [100.0] * 3,
+            "volume": [1_000_000.0] * 3,
+        }
+    )
+    strategy = LatePricePreRiskEntry()
+    result = Engine(
+        DataFeed(prices_df=prices),
+        strategy,
+        BacktestConfig(
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_queue_shadow_validation=True,
+        ),
+    ).run()
+
+    assert [(fill.asset, fill.timestamp.day) for fill in result.fills] == [("SPY", 5)]
+    assert strategy.visible_quantities == [(3, 0.0), (4, 0.0), (5, 10.0)]

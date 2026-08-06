@@ -908,6 +908,22 @@ class TestBacktestResultParquet:
                 for diagnostic in recovered.artifact_diagnostics
             )
 
+    def test_recovery_marks_daily_pnl_unverified_when_equity_is_missing(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "equity.parquet").unlink()
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            diagnostics = {
+                (diagnostic.code, diagnostic.component)
+                for diagnostic in recovered.artifact_diagnostics
+            }
+            assert ("component_unverified", "daily_pnl") in diagnostics
+            assert ("component_inconsistent", "daily_pnl") not in diagnostics
+
     def test_from_parquet_rejects_unsupported_schema(self, backtest_result: BacktestResult):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"

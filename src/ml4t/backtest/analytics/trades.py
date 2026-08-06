@@ -129,8 +129,7 @@ class TradeAnalyzer:
         """Average bars held across fully closed position lifecycles."""
         if not self._lifecycle_trades:
             return float("nan") if self.trades else 0.0
-        bars = [t.bars_held for t in self._lifecycle_trades if hasattr(t, "bars_held")]
-        return float(np.mean(bars)) if bars else 0.0
+        return float(np.mean([trade.bars_held for trade in self._lifecycle_trades]))
 
     @property
     def total_fees(self) -> float:

@@ -235,6 +235,8 @@ class TestRejectOnInsufficientCash:
         assert order is not None
         assert order.status.value == "rejected"
         assert "submission precheck" in (order.rejection_reason or "").lower()
+        assert "insufficient cash" in (order.rejection_reason or "").lower()
+        assert order.rejection_code == "insufficient_cash"
         assert len(broker.pending_orders) == 0
 
     def test_next_bar_submission_precheck_uses_sequential_shadow_cash(self):

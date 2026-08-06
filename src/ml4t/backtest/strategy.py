@@ -19,7 +19,7 @@ class Strategy(ABC):
         """Run strategy logic immediately before current-bar position risk.
 
         The broker has registered the current bar's prices before this callback.
-        In ``NEXT_BAR`` mode, a marketable flat-position entry submitted by this
+        In ``NEXT_BAR`` mode, a market flat-position entry submitted by this
         callback on a prior bar fills at the current open before the callback runs.
         Newly opened positions start risk evaluation on the following bar, preserving
         next-bar timing. Untriggered limit or stop orders remain pending, so guarded

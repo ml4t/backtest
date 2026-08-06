@@ -1271,13 +1271,22 @@ class BacktestResult:
             config = spec_config
 
         if daily_pnl is not None:
-            expected_daily_pnl = cls(
-                trades=[],
-                equity_curve=equity_curve,
-                fills=[],
-                metrics={},
-            ).to_daily_pnl()
-            if not daily_pnl.equals(expected_daily_pnl):
+            if not equity_curve and not daily_pnl.is_empty():
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="component_unverified",
+                        component="daily_pnl",
+                        message="daily_pnl.parquet could not be verified without equity.parquet",
+                    )
+                )
+            else:
+                expected_daily_pnl = cls(
+                    trades=[],
+                    equity_curve=equity_curve,
+                    fills=[],
+                    metrics={},
+                ).to_daily_pnl()
+            if equity_curve and not daily_pnl.equals(expected_daily_pnl):
                 message = "daily_pnl.parquet is inconsistent with equity.parquet"
                 if not recovery:
                     raise ArtifactReadError(message)
