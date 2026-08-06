@@ -32,14 +32,15 @@ position rules are evaluated. The state visible to the callback depends on execu
 
 | Mode | Positions visible to `on_before_risk()` | Ordinary orders submitted there |
 |------|------------------------------------------|----------------------------------|
-| `NEXT_BAR` | All open positions, plus market flat-position entries this callback submitted on a prior bar | Pending until the next bar |
+| `NEXT_BAR` | All open positions, plus any fills from priced, policy-valid prior market entries submitted by this callback | Pending until the next bar |
 | `SAME_BAR` | State before regular pending-order processing | Processed during the current bar |
 
 In `SAME_BAR`, set `immediate_fill=True` when a position opened in `on_before_risk()` must receive
 stop or trailing-rule evaluation on that same bar. In `NEXT_BAR`, newly opened positions start risk
 evaluation on the following bar, matching ordinary next-bar entry timing. A prior market entry
-fills before the callback. Limit and stop orders can remain pending, so a guarded entry checks both
-position and pending intent:
+fills before the callback only when a current price is available and policy and execution limits
+permit it. Partial fills are visible to the callback while the remaining quantity stays pending.
+Limit and stop orders can remain pending, so a guarded entry checks both position and pending intent:
 
 ```python
 def on_before_risk(self, timestamp, data, context, broker):

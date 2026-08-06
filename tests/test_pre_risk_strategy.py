@@ -16,6 +16,7 @@ from ml4t.backtest import (
     TrailingStop,
 )
 from ml4t.backtest.config import ExecutionPrice, WaterMarkSource
+from ml4t.backtest.execution.limits import VolumeParticipationLimit
 
 
 class OpeningTargetWithStop(Strategy):
@@ -45,7 +46,8 @@ class OpeningTargetWithTrailingStop(Strategy):
 class GuardedPreRiskEntry(Strategy):
     """Enter only while no position exists and record callback-visible state."""
 
-    def __init__(self) -> None:
+    def __init__(self, quantity: float = 10.0) -> None:
+        self.quantity = quantity
         self.trace: list[tuple[str, int, float, int]] = []
 
     def _record(self, phase: str, timestamp: datetime, broker: Broker) -> None:
@@ -62,7 +64,7 @@ class GuardedPreRiskEntry(Strategy):
     def on_before_risk(self, timestamp, data, context, broker) -> None:
         self._record("before_risk", timestamp, broker)
         if broker.get_position("SPY") is None and not broker.get_pending_orders("SPY"):
-            broker.submit_order("SPY", 10)
+            broker.submit_order("SPY", self.quantity)
 
     def on_data(self, timestamp, data, context, broker) -> None:
         self._record("on_data", timestamp, broker)
@@ -523,3 +525,27 @@ def test_aged_pre_risk_market_entry_uses_queue_shadow_validation() -> None:
 
     assert [(fill.asset, fill.timestamp.day) for fill in result.fills] == [("SPY", 5)]
     assert strategy.visible_quantities == [(3, 0.0), (4, 0.0), (5, 10.0)]
+
+
+def test_partially_filled_pre_risk_market_order_is_not_drained_before_risk() -> None:
+    prices = _daily_prices().with_columns(pl.lit(20.0).alias("volume"))
+    strategy = GuardedPreRiskEntry(quantity=20.0)
+    result = Engine(
+        DataFeed(prices_df=prices),
+        strategy,
+        BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR),
+        execution_limits=VolumeParticipationLimit(max_participation=0.5),
+    ).run()
+
+    assert [(fill.timestamp.day, fill.quantity) for fill in result.fills] == [
+        (4, 10.0),
+        (5, 10.0),
+    ]
+    assert strategy.trace == [
+        ("before_risk", 3, 0.0, 0),
+        ("on_data", 3, 0.0, 1),
+        ("before_risk", 4, 10.0, 1),
+        ("on_data", 4, 10.0, 1),
+        ("before_risk", 5, 10.0, 1),
+        ("on_data", 5, 20.0, 0),
+    ]

@@ -908,6 +908,22 @@ class TestBacktestResultParquet:
                 for diagnostic in recovered.artifact_diagnostics
             )
 
+    def test_from_parquet_compares_successfully_read_empty_equity(self, tmp_path: Path):
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[(datetime(2024, 1, 1), 100.0)],
+            fills=[],
+            metrics={},
+        )
+        path = tmp_path / "empty-equity"
+        result.to_parquet(path)
+        pl.DataFrame(schema={"timestamp": pl.Datetime, "equity": pl.Float64}).write_parquet(
+            path / "equity.parquet"
+        )
+
+        with pytest.raises(ArtifactReadError, match="inconsistent"):
+            BacktestResult.from_parquet(path)
+
     def test_recovery_marks_daily_pnl_unverified_when_equity_is_missing(
         self, backtest_result: BacktestResult
     ):

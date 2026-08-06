@@ -1084,13 +1084,19 @@ class BacktestResult:
                 )
                 components.pop(name)
 
+        component_read_ok: dict[str, bool] = {}
+
         def read_component(name: str, reader, default):
             filename = components.get(name)
             if filename is None:
+                component_read_ok[name] = False
                 return default
             try:
-                return reader(path / filename)
+                value = reader(path / filename)
+                component_read_ok[name] = True
+                return value
             except Exception as exc:
+                component_read_ok[name] = False
                 if not recovery:
                     raise ArtifactReadError(
                         f"Failed to read {filename}: {type(exc).__name__}: {exc}"
@@ -1271,7 +1277,7 @@ class BacktestResult:
             config = spec_config
 
         if daily_pnl is not None:
-            if not equity_curve and not daily_pnl.is_empty():
+            if not component_read_ok["equity"]:
                 diagnostics.append(
                     ArtifactDiagnostic(
                         code="component_unverified",
@@ -1286,7 +1292,7 @@ class BacktestResult:
                     fills=[],
                     metrics={},
                 ).to_daily_pnl()
-            if equity_curve and not daily_pnl.equals(expected_daily_pnl):
+            if component_read_ok["equity"] and not daily_pnl.equals(expected_daily_pnl):
                 message = "daily_pnl.parquet is inconsistent with equity.parquet"
                 if not recovery:
                     raise ArtifactReadError(message)
