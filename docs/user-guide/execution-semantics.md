@@ -25,6 +25,30 @@ config = BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR)  # default
 `OrderType.MOC` is the exception. In `NEXT_BAR` mode, `MOC` orders submitted during
 `on_data()` still fill on the current bar, at the close, after strategy logic runs.
 
+### Pre-Risk Callback State
+
+`Strategy.on_before_risk()` runs after the current bar has been registered and immediately before
+position rules are evaluated. The state visible to the callback depends on execution mode:
+
+| Mode | Positions visible to `on_before_risk()` | Ordinary orders submitted there |
+|------|------------------------------------------|----------------------------------|
+| `NEXT_BAR` | Includes fills from prior bars at the current open | Pending until the next bar |
+| `SAME_BAR` | State before regular pending-order processing | Processed during the current bar |
+
+In `SAME_BAR`, set `immediate_fill=True` when a position opened in `on_before_risk()` must receive
+stop or trailing-rule evaluation on that same bar. In `NEXT_BAR`, a position guard is deterministic
+because the prior opening order has filled before the callback:
+
+```python
+def on_before_risk(self, timestamp, data, context, broker):
+    if broker.get_position("SPY") is None:
+        broker.submit_order("SPY", 10)
+```
+
+Use `broker.get_pending_orders("SPY")` when the strategy's sizing decision depends on unfilled
+intent. Explicit pyramiding remains available by submitting an additional order without the
+position guard.
+
 ### SAME_BAR
 
 Orders fill at the **current bar's close** price, in the same bar they are submitted.

@@ -222,6 +222,11 @@ class Engine:
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits
             self.broker._process_pending_exits()
 
+            if self.execution_mode == ExecutionMode.NEXT_BAR:
+                # Fill orders submitted on prior bars before exposing state to the
+                # pre-risk callback. Orders submitted by the callback remain queued.
+                self.broker._process_orders(use_open=True)
+
             # Optional strategy phase for opening orders that must receive risk
             # protection during the current bar. Existing strategies inherit a no-op.
             self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
@@ -230,7 +235,8 @@ class Engine:
             self.broker.evaluate_position_rules()
 
             if self.execution_mode == ExecutionMode.NEXT_BAR:
-                # Next-bar mode: process pending orders at open price
+                # Process same-cycle risk exits. Ordinary orders created by
+                # on_before_risk remain ineligible until the next bar.
                 self.broker._process_orders(use_open=True)
                 # Strategy generates new orders
                 self.strategy.on_data(timestamp, assets_data, context, self.broker)
