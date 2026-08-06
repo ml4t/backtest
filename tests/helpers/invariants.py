@@ -43,18 +43,18 @@ def assert_result_invariants(
         initial_cash: The initial cash used for the backtest.
         check_*: Flags to selectively disable individual checks.
     """
-    closed_trades = [t for t in result.trades if t.status == "closed"]
+    realized_trades = [t for t in result.trades if t.status in {"closed", "partial"}]
 
     if check_equity_terminal:
-        _check_equity_terminal(result, initial_cash, closed_trades)
+        _check_equity_terminal(result, initial_cash, realized_trades)
     if check_pnl_decomposition:
-        _check_pnl_decomposition(closed_trades)
+        _check_pnl_decomposition(realized_trades)
     if check_direction_signs:
-        _check_direction_signs(closed_trades)
+        _check_direction_signs(realized_trades)
     if check_mfe_mae_bounds:
-        _check_mfe_mae_bounds(closed_trades)
+        _check_mfe_mae_bounds(realized_trades)
     if check_cost_non_negativity:
-        _check_cost_non_negativity(closed_trades)
+        _check_cost_non_negativity(realized_trades)
     if check_fill_temporal_order:
         _check_fill_temporal_order(result)
     if check_no_nan:
@@ -76,26 +76,34 @@ def _accounting_tolerance(*values: float, operations: int = 1) -> float:
 def _check_equity_terminal(
     result: BacktestResult,
     initial_cash: float,
-    closed_trades: list,
+    realized_trades: list,
 ) -> None:
-    """Verify: initial_cash + sum(closed_pnl) + sum(open_pnl) ≈ final_value."""
+    """Verify: initial_cash + sum(realized_pnl) + sum(open_pnl) ≈ final_value."""
     if not result.equity_curve:
         return
 
     final_value = result.equity_curve[-1][1]
-    closed_pnl = sum(t.pnl for t in closed_trades)
+    realized_pnl = sum(t.pnl for t in realized_trades)
     open_trades = [t for t in result.trades if t.status == "open"]
     open_pnl = sum(t.pnl for t in open_trades)
 
-    expected = initial_cash + closed_pnl + open_pnl
+    expected = initial_cash + realized_pnl + open_pnl
     diff = abs(expected - final_value)
 
-    terms = [initial_cash, *(t.pnl for t in closed_trades), *(t.pnl for t in open_trades)]
-    tol = _accounting_tolerance(expected, final_value, *terms, operations=len(terms) + 1)
+    reported_trades = [*realized_trades, *open_trades]
+    terms = [initial_cash, *(t.pnl for t in reported_trades)]
+    notionals = [abs(t.quantity) * t.exit_price * t.multiplier for t in reported_trades]
+    tol = _accounting_tolerance(
+        expected,
+        final_value,
+        *terms,
+        *notionals,
+        operations=len(terms) + 1,
+    )
 
     assert diff <= tol, (
         f"Equity terminal invariant violated: "
-        f"initial_cash({initial_cash}) + closed_pnl({closed_pnl:.6f}) + "
+        f"initial_cash({initial_cash}) + realized_pnl({realized_pnl:.6f}) + "
         f"open_pnl({open_pnl:.6f}) = {expected:.6f} != final_value({final_value:.6f}), "
         f"diff={diff:.10f}, tol={tol:.6f}"
     )

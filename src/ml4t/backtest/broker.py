@@ -1056,7 +1056,6 @@ class Broker:
                 asset,
                 order_type=order_type,
                 _options=SubmitOrderOptions(
-                    eligible_in_next_bar_mode=True,
                     risk_exit_reason=reason,
                     exit_reason=ExitReason.RISK_LIQUIDATION,
                 ),

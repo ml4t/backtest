@@ -165,6 +165,7 @@ class Order:
     filled_quantity: float = 0.0
     rejection_reason: str | None = None  # Reason if order was rejected
     requested_quantity: float | None = None
+    _rejection_code: str | None = None
     # Internal risk management fields (set by broker)
     _created_bar_index: int = 0
     _signal_price: float | None = None  # Close price at order creation time
@@ -181,6 +182,8 @@ class Order:
         """Return a stable machine-readable category for the rejection reason."""
         if self.status is not OrderStatus.REJECTED:
             return None
+        if self._rejection_code is not None:
+            return self._rejection_code
         reason = (self.rejection_reason or "").lower()
         if "rounds to zero" in reason:
             return "quantity_rounds_to_zero"
@@ -188,12 +191,12 @@ class Order:
             return "price_unavailable"
         if "fill check" in reason:
             return "fill_check_failed"
-        if "short" in reason or "reversal not allowed" in reason:
-            return "account_restriction"
         if "buying power" in reason or "margin" in reason:
             return "insufficient_buying_power"
         if "cash" in reason or "insufficient" in reason:
             return "insufficient_cash"
+        if "short" in reason or "reversal not allowed" in reason:
+            return "account_restriction"
         return "order_validation_failed"
 
 
@@ -402,13 +405,15 @@ class Fill:
 
 @dataclass
 class Trade:
-    """Round-trip trade (closed or open).
+    """Realized exit leg or open position mark.
 
     This dataclass is part of the cross-library API specification, designed to
     produce identical Parquet output across Python, Numba, and Rust implementations.
 
-    For open trades (status="open"), exit_time and exit_price represent
-    mark-to-market values at the end of the backtest period.
+    Fully closed positions use ``status="closed"``. Incremental reductions use
+    ``status="partial"`` so lifecycle analytics can exclude repeated position-level
+    excursion and holding-period values. Open positions use ``status="open"`` and
+    their exit fields represent end-of-backtest mark-to-market values.
 
     Schema Alignment (v0.1.0a6):
         - symbol: Asset identifier (was 'asset' in earlier versions)
@@ -431,7 +436,7 @@ class Trade:
     # Exit reason for trade analysis (cross-library API field)
     exit_reason: str = "signal"  # ExitReason enum value as string
     exit_reason_detail: str | None = None
-    # Trade status: "closed" (actually exited) or "open" (mark-to-market at end)
+    # Trade status: "closed", "partial", or "open"
     status: str = "closed"
     # MFE/MAE preserved from Position for trade analysis (shorter field names)
     mfe: float = 0.0  # Max favorable excursion (best unrealized return)
@@ -512,8 +517,9 @@ class PartialExit:
     strategies to access trade history during the backtest for stateful
     decision-making (e.g., adjusting position sizing based on recent wins/losses).
 
-    Unlike Trade which represents a fully closed round-trip, PartialExit
-    captures incremental reductions while the position remains open.
+    Trade also records partial reductions for result accounting, with
+    ``status="partial"``. PartialExit is the compact strategy-facing record used
+    by AssetTradingStats while the position remains open.
     """
 
     symbol: str  # Asset identifier

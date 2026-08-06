@@ -716,6 +716,8 @@ class TestBacktestResultParquet:
 
     def test_from_parquet_roundtrip(self, backtest_result: BacktestResult):
         """Test Parquet save and load roundtrip."""
+        backtest_result.trades[1].status = "open"
+        backtest_result.trades[1].exit_reason = "end_of_backtest"
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
             backtest_result.to_parquet(path)
@@ -729,6 +731,7 @@ class TestBacktestResultParquet:
             assert len(loaded.equity_curve) == len(backtest_result.equity_curve)
             assert len(loaded.portfolio_state) == len(backtest_result.portfolio_state)
             assert loaded.fills[0].rebalance_id == "rebalance-1"
+            assert [trade.status for trade in loaded.trades] == ["closed", "open"]
             assert loaded.metrics["sharpe"] == backtest_result.metrics["sharpe"]
 
     def test_to_parquet_compression(self, backtest_result: BacktestResult):

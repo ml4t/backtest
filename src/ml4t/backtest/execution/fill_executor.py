@@ -42,6 +42,11 @@ def _get_exit_reason(order: Order) -> str:
     return ExitReason.SIGNAL.value
 
 
+def _is_position_flip(old_quantity: float, new_quantity: float) -> bool:
+    """Return whether a position crosses through zero to the opposite side."""
+    return old_quantity > 0 > new_quantity or old_quantity < 0 < new_quantity
+
+
 @dataclass
 class FillContext:
     """Context for a single fill execution.
@@ -99,6 +104,10 @@ class FillExecutor:
 
         Returns:
             True if order is fully filled, False if partially filled
+
+        Raises:
+            ValueError: If an execution model returns a non-finite, non-positive,
+                negative, or directionally favorable value outside its contract.
         """
         broker = self.broker
         current_time = broker._current_time
@@ -125,14 +134,13 @@ class FillExecutor:
             )
             fill_quantity = exec_result.fillable_quantity
 
-            if broker.share_type == ShareType.INTEGER:
-                fill_quantity = float(int(fill_quantity))
-
             if not math.isfinite(fill_quantity) or fill_quantity < 0:
                 raise ValueError(
                     "Invalid execution quantity from "
                     f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}"
                 )
+            if broker.share_type == ShareType.INTEGER:
+                fill_quantity = float(int(fill_quantity))
             if fill_quantity == 0:
                 return False
 
@@ -176,8 +184,7 @@ class FillExecutor:
         position = broker.positions.get(order.asset)
         if position is not None:
             new_qty = position.quantity + signed_qty
-            is_flip = position.quantity > 0 > new_qty or position.quantity < 0 < new_qty
-            if is_flip:
+            if _is_position_flip(position.quantity, new_qty):
                 close_commission = calculate_commission(
                     broker.commission_model,
                     order.asset,
@@ -221,20 +228,18 @@ class FillExecutor:
             bid_size=quote_context["bid_size"],
             ask_size=quote_context["ask_size"],
             available_size=quote_context["available_size"],
-            exit_reason=_get_exit_reason(order),
+            exit_reason=order._exit_reason.value if order._exit_reason is not None else "",
             exit_reason_detail=order._risk_exit_reason,
         )
         broker.fills.append(fill)
 
         # Determine if partial fill
         is_partial = order.order_id in broker._partial_orders
-        if is_partial:
-            order.filled_quantity = (order.filled_quantity or 0) + fill_quantity
-        else:
+        order.filled_quantity += fill_quantity
+        if not is_partial:
             order.status = OrderStatus.FILLED
             order.filled_at = current_time
             order.filled_price = fill_price
-            order.filled_quantity = fill_quantity
 
         # Build fill context
         ctx = FillContext(
@@ -328,7 +333,7 @@ class FillExecutor:
             if new_qty == 0:
                 self._close_position(ctx, pos, old_qty)
                 return ctx.commission
-            elif (old_qty > 0) != (new_qty > 0):
+            elif _is_position_flip(old_qty, new_qty):
                 return self._flip_position(ctx, pos, old_qty, new_qty)
             else:
                 self._scale_position(ctx, pos, old_qty, new_qty)
@@ -503,8 +508,8 @@ class FillExecutor:
         order = ctx.order
 
         # Calculate separate commissions for close and open portions
-        assert ctx.close_commission is not None
-        assert ctx.open_commission is not None
+        if ctx.close_commission is None or ctx.open_commission is None:
+            raise RuntimeError("Position flip commissions were not calculated before mutation")
         close_commission = ctx.close_commission
         open_commission = ctx.open_commission
         total_commission = close_commission + open_commission
@@ -633,6 +638,7 @@ class FillExecutor:
                     exit_slippage=ctx.slippage,
                     exit_reason=_get_exit_reason(ctx.order),
                     exit_reason_detail=ctx.order._risk_exit_reason,
+                    status="partial",
                     mfe=pos.max_favorable_excursion,
                     mae=pos.max_adverse_excursion,
                     entry_slippage=pos.entry_slippage,

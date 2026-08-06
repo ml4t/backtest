@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import polars as pl
 import pytest
 
-from ml4t.backtest import AssetClass, Broker, ContractSpec, OrderSide, OrderStatus
-from ml4t.backtest.config import ShareType
+from ml4t.backtest import AssetClass, Broker, ContractSpec, OrderSide, OrderStatus, Strategy
+from ml4t.backtest.config import (
+    BacktestConfig,
+    CommissionType,
+    ExecutionMode,
+    ShareType,
+    SlippageType,
+)
+from ml4t.backtest.engine import run_backtest
 from ml4t.backtest.models import NoSlippage, PercentageCommission
 
 
@@ -60,6 +68,13 @@ def _execute(broker: Broker, *, day: int, price: float, quantity: float) -> None
         ),
         (
             ShareType.INTEGER,
+            None,
+            [(100.0, 10.0), (110.0, -4.0), (90.0, 3.0), (120.0, -12.0)],
+            2,
+            -3.0,
+        ),
+        (
+            ShareType.INTEGER,
             {"TEST": ContractSpec("TEST", AssetClass.FUTURE, multiplier=50.0)},
             [(4_000.0, 4.0), (4_010.0, -1.0)],
             1,
@@ -99,3 +114,43 @@ def test_fill_costs_are_conserved_across_realized_and_residual_positions(
 
     for trade in broker.trades:
         assert trade.gross_pnl - trade.fees == pytest.approx(trade.pnl, abs=1e-9)
+
+
+class _PartialScaleThenClose(Strategy):
+    def __init__(self) -> None:
+        self.steps = [10.0, -4.0, 3.0, -9.0]
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        quantity = self.steps.pop(0)
+        side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
+        broker.submit_order("TEST", abs(quantity), side)
+
+
+def test_partial_exit_scale_up_and_close_reconcile_end_to_end() -> None:
+    start = datetime(2024, 1, 1)
+    prices = pl.DataFrame(
+        {
+            "timestamp": [start + timedelta(days=day) for day in range(4)],
+            "asset": ["TEST"] * 4,
+            "open": [100.0, 110.0, 90.0, 120.0],
+            "high": [100.0, 110.0, 90.0, 120.0],
+            "low": [100.0, 110.0, 90.0, 120.0],
+            "close": [100.0, 110.0, 90.0, 120.0],
+            "volume": [1_000_000.0] * 4,
+        }
+    )
+    config = BacktestConfig(
+        initial_cash=1_000_000.0,
+        execution_mode=ExecutionMode.SAME_BAR,
+        commission_type=CommissionType.PERCENTAGE,
+        commission_rate=0.01,
+        slippage_type=SlippageType.NONE,
+    )
+
+    result = run_backtest(prices, _PartialScaleThenClose(), config=config)
+
+    assert [trade.status for trade in result.trades] == ["partial", "closed"]
+    assert sum(trade.fees for trade in result.trades) == pytest.approx(
+        sum(fill.commission for fill in result.fills)
+    )
+    assert result.metrics["num_trades"] == 1

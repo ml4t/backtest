@@ -226,6 +226,7 @@ class TestRiskManagerUpdate:
 
         exit_fill = broker.fills[-1]
         exit_trade = broker.trades[-1]
+        assert broker.fills[0].exit_reason == ""
         assert exit_fill.exit_reason == "risk_liquidation"
         assert exit_fill.exit_reason_detail == detail
         assert exit_trade.exit_reason == "risk_liquidation"

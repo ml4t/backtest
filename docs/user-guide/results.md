@@ -14,6 +14,8 @@ For reproducibility, `BacktestResult` also exposes:
 - `result.to_spec_dict()` for a richer runtime snapshot including library version and realized window
 - `result.to_predictions_dataframe()` for the raw prediction/input surface passed into the
   backtest, when available
+- `result.rejected_orders` and `result.to_rejected_orders_dataframe()` for orders that reached
+  the rejected terminal state
 - `result.to_parquet(...)`, which writes `config.yaml`, `spec.yaml`, and `predictions.parquet`
   when available
 
@@ -86,6 +88,8 @@ print(f"Net PF:        {m['profit_factor']:.2f}")
 | `sortino` | Sortino ratio |
 | `calmar` | Calmar ratio |
 | `num_trades` | Total completed trades |
+| `num_orders` | Total submitted orders |
+| `num_rejected_orders` | Orders that reached the rejected terminal state |
 | `num_fills` | Total execution events |
 | `num_rebalance_events` | Unique timestamps with at least one fill |
 | `unique_symbols_traded` | Number of symbols with at least one fill |
@@ -117,7 +121,7 @@ print(f"Net PF:        {m['profit_factor']:.2f}")
 
 `BacktestResult` now exposes three distinct raw reporting surfaces:
 
-- `trades`: flat-to-flat lifecycle summaries
+- `trades`: realized exit legs plus end-of-backtest open-position marks
 - `fills`: execution blotter rows
 - `portfolio_state`: end-of-bar portfolio snapshots
 
@@ -249,9 +253,12 @@ Returns a Polars DataFrame with columns:
 | `total_slippage_cost` | Float | Entry + exit slippage in dollars |
 | `cost_drag` | Float | Total cost as fraction of notional |
 | `exit_reason` | String | Why the trade exited |
-| `status` | String | "closed" or "open" |
+| `exit_reason_detail` | String | Detailed risk or liquidation cause, when available |
+| `status` | String | "closed", "partial", or "open" |
 
-Open positions at the end of the backtest are included with `status="open"` and mark-to-market values.
+Partial reductions use `status="partial"`; lifecycle metrics exclude them to avoid counting one
+position's holding period and excursions more than once. Open positions at the end of the backtest
+use `status="open"` and mark-to-market values.
 
 ## Equity DataFrame
 
@@ -352,6 +359,8 @@ Fill objects carry order-type metadata for audit:
 | `fill.spread` | Bid-ask spread |
 | `fill.bid_size` / `fill.ask_size` | Quote sizes |
 | `fill.available_size` | Side-aware size used for the fill context |
+| `fill.exit_reason` | Typed exit category; empty for entry fills |
+| `fill.exit_reason_detail` | Detailed risk or liquidation cause, when available |
 
 For quote-aware backtests, `fills.parquet` is the first place to look when you want
 to verify whether a result difference came from:
@@ -380,6 +389,7 @@ result.to_parquet("./results/my_backtest")
 # Creates:
 #   trades.parquet
 #   fills.parquet
+#   rejected_orders.parquet
 #   predictions.parquet  # if raw prediction inputs were supplied
 #   equity.parquet
 #   portfolio_state.parquet

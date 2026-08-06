@@ -1503,6 +1503,42 @@ class TestEvaluatePositionRules:
         assert len(exit_orders) == 1
         assert exit_orders[0].quantity == 100.0
         assert exit_orders[0]._risk_exit_reason == "stop_loss_5.0%"
+        broker._process_orders()
+        assert broker.fills[-1].exit_reason == "stop_loss"
+        assert broker.fills[-1].exit_reason_detail == "stop_loss_5.0%"
+        assert broker.trades[-1].exit_reason == "stop_loss"
+        assert broker.trades[-1].exit_reason_detail == "stop_loss_5.0%"
+
+    def test_partial_rule_exit_preserves_detailed_reason(self):
+        """Test risk metadata reaches the partial fill and realized leg."""
+        from ml4t.backtest.risk.position.dynamic import ScaledExit
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.set_position_rules(ScaledExit([(0.05, 0.25)]))
+
+        mark_prices(broker, {"AAPL": 100.0})
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+        assert broker.fills[0].exit_reason == ""
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2, 9, 30),
+            prices={"AAPL": 110.0},
+            opens={"AAPL": 110.0},
+            volumes={"AAPL": 1_000_000},
+            highs={"AAPL": 110.0},
+            lows={"AAPL": 110.0},
+            signals={},
+        )
+        exit_orders = broker.evaluate_position_rules()
+        assert len(exit_orders) == 1
+        broker._process_orders()
+
+        assert broker.fills[-1].exit_reason == "signal"
+        assert broker.fills[-1].exit_reason_detail == "scale_out_5%_25%"
+        assert broker.trades[-1].status == "partial"
+        assert broker.trades[-1].exit_reason == "signal"
+        assert broker.trades[-1].exit_reason_detail == "scale_out_5%_25%"
 
     def test_evaluate_position_rules_exit_full_deferred(self):
         """Test EXIT_FULL action with defer_fill=True (NEXT_BAR_OPEN mode)."""

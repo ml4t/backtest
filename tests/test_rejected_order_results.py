@@ -3,14 +3,23 @@ from __future__ import annotations
 from datetime import datetime
 
 import polars as pl
+import pytest
 
-from ml4t.backtest import BacktestConfig, Strategy, run_backtest
-from ml4t.backtest.types import ExecutionMode
+from ml4t.backtest import BacktestConfig, Order, Strategy, run_backtest
+from ml4t.backtest.config import ShareType
+from ml4t.backtest.execution.limits import VolumeParticipationLimit
+from ml4t.backtest.types import ExecutionMode, OrderSide, OrderStatus
 
 
 class _UnaffordableOrder(Strategy):
+    def __init__(self, quantity: float = 1_000_000.0) -> None:
+        self.quantity = quantity
+        self.submitted = False
+
     def on_data(self, timestamp, data, context, broker) -> None:
-        broker.submit_order("AAPL", 1_000_000.0)
+        if not self.submitted:
+            broker.submit_order("AAPL", self.quantity)
+            self.submitted = True
 
 
 class _NoOrders(Strategy):
@@ -28,6 +37,20 @@ def _prices() -> pl.DataFrame:
             "low": [100.0],
             "close": [100.0],
             "volume": [1_000_000.0],
+        }
+    )
+
+
+def _partial_then_unaffordable_prices() -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, 2), datetime(2024, 1, 3)],
+            "asset": ["AAPL", "AAPL"],
+            "open": [50.0, 1_000.0],
+            "high": [50.0, 1_000.0],
+            "low": [50.0, 1_000.0],
+            "close": [50.0, 1_000.0],
+            "volume": [5.0, 1_000.0],
         }
     )
 
@@ -81,6 +104,8 @@ def test_rejected_orders_round_trip_through_result_artifact(tmp_path) -> None:
             "symbol": "AAPL",
             "timestamp": datetime(2024, 1, 2),
             "requested_quantity": 1_000_000.0,
+            "filled_quantity": 0.0,
+            "remaining_quantity": 1_000_000.0,
             "side": "buy",
             "order_type": "market",
             "limit_price": None,
@@ -97,3 +122,53 @@ def test_rejected_orders_round_trip_through_result_artifact(tmp_path) -> None:
     result.to_parquet(tmp_path)
     loaded = type(result).from_parquet(tmp_path)
     assert loaded.to_rejected_orders_dataframe().to_dicts() == frame.to_dicts()
+
+    loaded.rejected_orders[0].rejection_reason = "Short selling not allowed"
+    assert loaded.rejected_orders[0].rejection_code == "insufficient_cash"
+
+
+def test_partially_filled_then_rejected_order_is_reconcilable() -> None:
+    result = run_backtest(
+        prices=_partial_then_unaffordable_prices(),
+        strategy=_UnaffordableOrder(15.5),
+        config=BacktestConfig(
+            initial_cash=1_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            share_type=ShareType.INTEGER,
+            partial_fills_allowed=True,
+        ),
+        execution_limits=VolumeParticipationLimit(max_participation=1.0),
+    )
+
+    assert len(result.fills) == 1
+    assert len(result.rejected_orders) == 1
+    rejected = result.rejected_orders[0]
+    assert rejected.requested_quantity == 15.5
+    assert rejected.filled_quantity == 5.0
+    assert rejected.quantity == 10.0
+
+    record = result.to_rejected_orders_dataframe().to_dicts()[0]
+    assert record["requested_quantity"] == 15.5
+    assert record["filled_quantity"] == 5.0
+    assert record["remaining_quantity"] == 10.0
+
+
+@pytest.mark.parametrize(
+    ("reason", "expected"),
+    [
+        ("Insufficient cash to cover short", "insufficient_cash"),
+        ("Insufficient buying power", "insufficient_buying_power"),
+        ("Short selling not allowed", "account_restriction"),
+        ("No price available", "price_unavailable"),
+    ],
+)
+def test_rejection_code_classification(reason: str, expected: str) -> None:
+    order = Order(
+        asset="AAPL",
+        side=OrderSide.BUY,
+        quantity=1.0,
+        status=OrderStatus.REJECTED,
+        rejection_reason=reason,
+    )
+
+    assert order.rejection_code == expected

@@ -56,7 +56,8 @@ class BacktestResult:
         trades: List of completed Trade objects
         equity_curve: List of (timestamp, portfolio_value) tuples
         fills: List of Fill objects (all order fills)
-        rejected_orders: Orders that reached the rejected terminal state
+        rejected_orders: Orders that reached the rejected terminal state. Orders
+            cancelled under permissive insufficient-cash handling are not included.
         predictions: Raw prediction DataFrame passed into the backtest (optional)
         metrics: Dictionary of computed performance metrics
         config: BacktestConfig used for the backtest (optional)
@@ -106,7 +107,7 @@ class BacktestResult:
             quantity, direction, pnl, pnl_percent, bars_held,
             fees, exit_slippage, mfe, mae, entry_slippage, multiplier,
             gross_pnl, net_return, total_slippage_cost, cost_drag,
-            exit_reason, status
+            exit_reason, exit_reason_detail, status
 
         Cost decomposition columns:
             gross_pnl: Price-move P&L before fees
@@ -114,8 +115,8 @@ class BacktestResult:
             total_slippage_cost: Entry + exit slippage in dollars
             cost_drag: Total cost as fraction of notional
 
-        The status column indicates "closed" (actually exited) or "open"
-        (mark-to-market at end of backtest).
+        The status column indicates "closed" (flat-to-flat completion), "partial"
+        (realized reduction), or "open" (mark-to-market at end of backtest).
 
         Returns:
             Polars DataFrame with one row per trade
@@ -223,6 +224,8 @@ class BacktestResult:
                 "symbol": order.asset,
                 "timestamp": order.created_at,
                 "requested_quantity": order.requested_quantity,
+                "filled_quantity": order.filled_quantity,
+                "remaining_quantity": order.quantity,
                 "side": order.side.value,
                 "order_type": order.order_type.value,
                 "limit_price": order.limit_price,
@@ -787,7 +790,8 @@ class BacktestResult:
                         asset=row["symbol"],
                         created_at=row["timestamp"],
                         requested_quantity=row["requested_quantity"],
-                        quantity=row["requested_quantity"],
+                        quantity=row.get("remaining_quantity", row["requested_quantity"]),
+                        filled_quantity=row.get("filled_quantity", 0.0),
                         side=OrderSide(row["side"]),
                         order_type=OrderType(row["order_type"]),
                         limit_price=row.get("limit_price"),
@@ -797,6 +801,7 @@ class BacktestResult:
                         rebalance_id=row.get("rebalance_id"),
                         status=OrderStatus(row["status"]),
                         rejection_reason=row.get("rejection_reason"),
+                        _rejection_code=row.get("rejection_code"),
                     )
                 )
 
@@ -909,7 +914,7 @@ class BacktestResult:
             "cost_drag": pl.Float64(),
             "exit_reason": pl.String(),
             "exit_reason_detail": pl.String(),
-            "status": pl.String(),  # "closed" or "open"
+            "status": pl.String(),  # "closed", "partial", or "open"
         }
 
     @staticmethod
@@ -949,6 +954,8 @@ class BacktestResult:
             "symbol": pl.String(),
             "timestamp": pl.Datetime(),
             "requested_quantity": pl.Float64(),
+            "filled_quantity": pl.Float64(),
+            "remaining_quantity": pl.Float64(),
             "side": pl.String(),
             "order_type": pl.String(),
             "limit_price": pl.Float64(),
