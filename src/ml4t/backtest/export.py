@@ -161,20 +161,25 @@ class BacktestExporter:
         return summary_df
 
     @staticmethod
-    def from_parquet(path: str | Path) -> BacktestResult:
+    def from_parquet(path: str | Path, *, recovery: bool = False) -> BacktestResult:
         """Load backtest result from Parquet directory.
 
         Delegates to BacktestResult.from_parquet().
 
         Args:
             path: Directory containing Parquet files
+            recovery: Permit manifest-free beta artifacts and report omissions on
+                the returned result.
 
         Returns:
             BacktestResult instance
+
+        Raises:
+            ArtifactError: If strict artifact validation or decoding fails.
         """
         from .result import BacktestResult
 
-        return BacktestResult.from_parquet(path)
+        return BacktestResult.from_parquet(path, recovery=recovery)
 
     @staticmethod
     def load_sweep_summary(base_path: str | Path) -> pl.DataFrame:

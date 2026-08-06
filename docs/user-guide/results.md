@@ -421,8 +421,9 @@ for diagnostic in result.artifact_diagnostics:
 
 Recovery reads supported components in a deterministic order and reports every missing, malformed,
 or ignored component. Unsupported manifest schema versions still fail because their interpretation
-is not defined. If `config` or `spec` is explicitly requested during export, its absence or a
-serialization failure raises `ArtifactWriteError` instead of omitting the file.
+is not defined. If an export selects `config` or `spec`, whether through the default component set
+or an explicit `include`, its absence or a serialization failure raises `ArtifactWriteError`
+instead of omitting the file. Component payloads are serialized before output files are created.
 
 ## Integration with ml4t-diagnostic
 

@@ -651,6 +651,36 @@ class TestBacktestResultParquet:
             assert "predictions" not in written
             assert "equity" not in written
             assert "portfolio_state" not in written
+            with pytest.raises(ArtifactIncompleteError, match="marks the export incomplete"):
+                BacktestResult.from_parquet(path)
+
+    def test_default_manifest_records_unavailable_optional_components(self):
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            result.to_parquet(path)
+            manifest = json.loads((path / "manifest.json").read_text())
+
+            assert manifest["omitted_components"] == {
+                "predictions": "result has no predictions",
+                "config": "result has no config",
+                "spec": "result has no config for a runtime spec",
+            }
+
+    def test_incomplete_write_marker_fails_strict_and_reports_recovery(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / ".artifact-incomplete").write_text("interrupted\n")
+
+            with pytest.raises(ArtifactIncompleteError, match="did not complete"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "incomplete_write"
 
     @pytest.mark.parametrize("component", ["config", "spec"])
     def test_to_parquet_config_write_failure_is_explicit(self, component: str):
@@ -671,8 +701,7 @@ class TestBacktestResultParquet:
             path = Path(tmpdir) / "test_backtest"
             with pytest.raises(ArtifactWriteError, match=component):
                 result.to_parquet(path, include=[component])
-            with pytest.raises(ArtifactIncompleteError, match="did not complete"):
-                BacktestResult.from_parquet(path)
+            assert not path.exists()
 
     @pytest.mark.parametrize("component", ["config", "spec"])
     def test_to_parquet_rejects_requested_config_without_config(self, component: str):
@@ -856,6 +885,26 @@ class TestBacktestResultParquet:
             recovered = BacktestResult.from_parquet(path, recovery=True)
             assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
 
+    def test_legacy_signals_component_loads_only_in_recovery(self):
+        predictions = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "score": [0.75],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "beta_result"
+            path.mkdir()
+            predictions.write_parquet(path / "signals.parquet")
+
+            with pytest.raises(ArtifactManifestError, match="manifest"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.predictions is not None
+            assert recovered.predictions.equals(predictions)
+
     def test_from_parquet_loads_config_from_spec_when_config_yaml_missing(self):
         """Test spec.yaml fallback restores replayable config."""
         config = BacktestConfig(
@@ -883,6 +932,8 @@ class TestBacktestResultParquet:
 
     def test_metrics_json_serialization(self, backtest_result: BacktestResult):
         """Test metrics JSON contains only serializable values."""
+        backtest_result.metrics["monthly_returns"] = [0.01, -0.02]
+        backtest_result.metrics["segments"] = {"train": (1, 2), "test": [3]}
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
             backtest_result.to_parquet(path)
@@ -892,6 +943,8 @@ class TestBacktestResultParquet:
 
             assert isinstance(metrics["sharpe"], float)
             assert isinstance(metrics["final_value"], float)
+            assert metrics["monthly_returns"] == [0.01, -0.02]
+            assert metrics["segments"] == {"train": [1, 2], "test": [3]}
 
     def test_metrics_json_rejects_unserializable_values(self):
         result = BacktestResult(

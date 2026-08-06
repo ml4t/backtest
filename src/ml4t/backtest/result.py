@@ -63,6 +63,33 @@ _REQUIRED_RESULT_COMPONENTS = frozenset(
 )
 
 
+def _serialize_metric_value(value: Any, *, path: str) -> Any:
+    """Convert a metric value to JSON-safe built-in containers and scalars."""
+    if isinstance(value, int | float | str | bool | type(None)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, list | tuple):
+        return [
+            _serialize_metric_value(item, path=f"{path}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise ArtifactWriteError(f"{path} contains a non-string mapping key")
+        return {
+            key: _serialize_metric_value(item, path=f"{path}.{key}") for key, item in value.items()
+        }
+    try:
+        import numpy as np
+
+        if isinstance(value, np.generic):
+            return _serialize_metric_value(value.item(), path=path)
+    except (ImportError, AttributeError):
+        pass
+    raise ArtifactWriteError(f"{path} has unsupported value type {type(value).__name__}")
+
+
 @dataclass(frozen=True)
 class ArtifactDiagnostic:
     """Structured description of one omission or recovery action."""
@@ -121,6 +148,8 @@ class BacktestResult:
         config: BacktestConfig used for the backtest (optional)
         equity: EquityCurve analytics object
         trade_analyzer: TradeAnalyzer analytics object
+        artifact_diagnostics: Structured omissions and recovery actions. Empty for
+            artifacts loaded successfully in strict mode.
     """
 
     trades: list[Trade]
@@ -631,7 +660,9 @@ class BacktestResult:
             compression: Parquet compression codec (default: "zstd")
 
         Returns:
-            Dict mapping component names to file paths
+            Dict mapping requested component names to file paths. The always-written
+            manifest is returned under the additional ``"manifest"`` key; it is not
+            a selectable component.
 
         Raises:
             ArtifactWriteError: If a requested component is unavailable or cannot be written.
@@ -655,6 +686,43 @@ class BacktestResult:
             raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
 
         selected = [name for name in requested if name not in unavailable]
+
+        metrics_payload: str | None = None
+        if "metrics" in selected:
+            try:
+                serializable_metrics = {
+                    key: _serialize_metric_value(value, path=f"metrics[{key!r}]")
+                    for key, value in self.metrics.items()
+                }
+                metrics_payload = json.dumps(serializable_metrics, indent=2)
+            except ArtifactWriteError:
+                raise
+            except Exception as exc:
+                raise ArtifactWriteError(f"Failed to serialize metrics: {exc}") from exc
+
+        config_payload: str | None = None
+        spec_payload: str | None = None
+        if "config" in selected or "spec" in selected:
+            try:
+                import yaml
+
+                if "config" in selected:
+                    config_payload = yaml.safe_dump(
+                        self.config.to_dict(),
+                        default_flow_style=False,
+                    )
+                if "spec" in selected:
+                    spec_payload = yaml.safe_dump(
+                        self.to_spec_dict(),
+                        default_flow_style=False,
+                        sort_keys=False,
+                    )
+            except Exception as exc:
+                components = [name for name in ("config", "spec") if name in selected]
+                raise ArtifactWriteError(
+                    f"Failed to serialize {' and '.join(components)} component: {exc}"
+                ) from exc
+
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         marker_path = path / _INCOMPLETE_MARKER
@@ -704,56 +772,21 @@ class BacktestResult:
 
         if "metrics" in selected:
             metrics_path = path / "metrics.json"
-            # Filter to JSON-serializable metrics
-            serializable = {}
-            for k, v in self.metrics.items():
-                if isinstance(v, int | float | str | bool | type(None)):
-                    serializable[k] = v
-                elif isinstance(v, datetime):
-                    serializable[k] = v.isoformat()
-                else:
-                    # Handle numpy scalars (np.float64, np.int64, etc.)
-                    try:
-                        import numpy as np
-
-                        if isinstance(v, np.generic):
-                            serializable[k] = v.item()
-                            continue
-                    except (ImportError, AttributeError):
-                        pass
-                    raise ArtifactWriteError(
-                        f"Metric {k!r} has unsupported value type {type(v).__name__}"
-                    )
-            with open(metrics_path, "w") as f:
-                json.dump(serializable, f, indent=2)
+            assert metrics_payload is not None
+            metrics_path.write_text(metrics_payload)
             written["metrics"] = metrics_path
 
         if "config" in selected:
             config_path = path / "config.yaml"
-            try:
-                import yaml
-
-                with open(config_path, "w") as f:
-                    yaml.safe_dump(self.config.to_dict(), f, default_flow_style=False)
-                written["config"] = config_path
-            except Exception as exc:
-                raise ArtifactWriteError(f"Failed to write config component: {exc}") from exc
+            assert config_payload is not None
+            config_path.write_text(config_payload)
+            written["config"] = config_path
 
         if "spec" in selected:
             spec_path = path / "spec.yaml"
-            try:
-                import yaml
-
-                with open(spec_path, "w") as f:
-                    yaml.safe_dump(
-                        self.to_spec_dict(),
-                        f,
-                        default_flow_style=False,
-                        sort_keys=False,
-                    )
-                written["spec"] = spec_path
-            except Exception as exc:
-                raise ArtifactWriteError(f"Failed to write spec component: {exc}") from exc
+            assert spec_payload is not None
+            spec_path.write_text(spec_payload)
+            written["spec"] = spec_path
 
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
@@ -835,7 +868,7 @@ class BacktestResult:
             return discovered
 
         manifest_path = path / _MANIFEST_FILE
-        components: dict[str, str]
+        components: dict[str, str] = {}
         manifest: dict[str, Any] | None = None
         if not manifest_path.exists():
             if not recovery:
@@ -1147,7 +1180,7 @@ class BacktestResult:
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
         metrics = read_component("metrics", read_metrics, {})
         predictions = read_component("predictions", pl.read_parquet, None)
-        read_component("daily_pnl", pl.read_parquet, None)
+        read_component("daily_pnl", lambda value: pl.scan_parquet(value).collect_schema(), None)
         config = read_component("config", read_config, None)
         spec_config = read_component("spec", read_spec_config, None)
         if config is None:
