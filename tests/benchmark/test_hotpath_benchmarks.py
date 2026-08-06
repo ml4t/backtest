@@ -158,6 +158,13 @@ def _legacy_view(assets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]
     }
 
 
+def _coverage_is_active() -> bool:
+    """Return whether coverage.py is currently tracing this process."""
+    from coverage import Coverage
+
+    return Coverage.current() is not None
+
+
 @pytest.mark.benchmark
 def test_optimized_feed_matches_legacy_output():
     prices, signals = _build_benchmark_data(n_bars=50, n_assets=5)
@@ -175,8 +182,10 @@ def test_optimized_feed_matches_legacy_output():
 
 
 @pytest.mark.benchmark
-@pytest.mark.no_cover
 def test_optimized_feed_runtime_vs_legacy_baseline():
+    if _coverage_is_active():
+        pytest.skip("Runtime benchmark requires coverage instrumentation to be disabled")
+
     prices, signals = _build_benchmark_data(n_bars=3000, n_assets=20)
 
     # Warm-up for consistent timing
