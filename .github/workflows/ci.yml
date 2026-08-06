@@ -77,6 +77,8 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
+        env:
+          ML4T_REQUIRE_RUNTIME_BENCHMARK: "1"
         run: uv run pytest tests/ -v --tb=short -x --no-cov
 
   contracts:

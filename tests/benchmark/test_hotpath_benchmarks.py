@@ -6,6 +6,7 @@ reference legacy implementation (captured from pre-optimization behavior).
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from statistics import median
 from time import perf_counter
@@ -158,9 +159,12 @@ def _legacy_view(assets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]
     }
 
 
-def _coverage_is_active() -> bool:
-    """Return whether coverage.py is currently tracing this process."""
-    from coverage import Coverage
+def _coverage_session_started() -> bool:
+    """Return whether a coverage.py session has started and not stopped."""
+    try:
+        from coverage import Coverage
+    except ImportError:
+        return False
 
     return Coverage.current() is not None
 
@@ -183,7 +187,9 @@ def test_optimized_feed_matches_legacy_output():
 
 @pytest.mark.benchmark
 def test_optimized_feed_runtime_vs_legacy_baseline():
-    if _coverage_is_active():
+    if _coverage_session_started():
+        if os.environ.get("ML4T_REQUIRE_RUNTIME_BENCHMARK") == "1":
+            pytest.fail("CI requires the runtime benchmark to run without coverage")
         pytest.skip("Runtime benchmark requires coverage instrumentation to be disabled")
 
     prices, signals = _build_benchmark_data(n_bars=3000, n_assets=20)
