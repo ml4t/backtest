@@ -422,9 +422,10 @@ for diagnostic in result.artifact_diagnostics:
 
 Recovery reads supported components in a deterministic order and reports every missing, malformed,
 or ignored component. Unsupported manifest schema versions still fail because their interpretation
-is not defined. If an export selects `config` or `spec`, whether through the default component set
-or an explicit `include`, its absence or a serialization failure raises `ArtifactWriteError`
-instead of omitting the file. Component payloads are serialized before output files are created.
+is not defined. Missing `config` or `spec` data raises only when an explicit `include` requests it;
+the default export records unavailable optional components in the manifest. A serialization failure
+raises `ArtifactWriteError` whether the component came from the default set or an explicit
+`include`. Component payloads are serialized before output files are created.
 Non-finite metric floats use a tagged JSON object and are restored on load, so `metrics.json`
 remains standards-compliant without losing `NaN` or infinity. The returned path mapping includes
 `manifest`; passing its keys back through `include` treats that key as a no-op because the manifest

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import polars as pl
 import pytest
 from ml4t.specs.market_data import FeedSpec
@@ -704,6 +705,23 @@ class TestBacktestResultParquet:
                 result.to_parquet(path, include=[component])
             assert not path.exists()
 
+    def test_default_export_names_only_the_component_that_failed(
+        self, backtest_result: BacktestResult, monkeypatch: pytest.MonkeyPatch
+    ):
+        backtest_result.config = BacktestConfig()
+
+        def fail_spec():
+            raise ValueError("bad spec")
+
+        monkeypatch.setattr(backtest_result, "to_spec_dict", fail_spec)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            with pytest.raises(ArtifactWriteError, match="spec component") as exc_info:
+                backtest_result.to_parquet(path)
+
+            assert "config and spec" not in str(exc_info.value)
+            assert not path.exists()
+
     @pytest.mark.parametrize("component", ["config", "spec"])
     def test_to_parquet_rejects_requested_config_without_config(self, component: str):
         result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
@@ -862,6 +880,15 @@ class TestBacktestResultParquet:
             with pytest.raises(ArtifactReadError, match="metrics.json"):
                 BacktestResult.from_parquet(path)
 
+    def test_from_parquet_rejects_corrupt_daily_pnl(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "daily_pnl.parquet").write_bytes(b"not parquet")
+
+            with pytest.raises(ArtifactReadError, match="daily_pnl.parquet"):
+                BacktestResult.from_parquet(path)
+
     def test_from_parquet_rejects_unsupported_schema(self, backtest_result: BacktestResult):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
@@ -975,6 +1002,8 @@ class TestBacktestResultParquet:
         """Test metrics JSON contains only serializable values."""
         backtest_result.metrics["monthly_returns"] = [0.01, -0.02]
         backtest_result.metrics["segments"] = {"train": (1, 2), "test": [3]}
+        backtest_result.metrics["array"] = np.array([1.0, 2.0])
+        backtest_result.metrics["series"] = pl.Series([3.0, 4.0])
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
             backtest_result.to_parquet(path)
@@ -986,6 +1015,8 @@ class TestBacktestResultParquet:
             assert isinstance(metrics["final_value"], float)
             assert metrics["monthly_returns"] == [0.01, -0.02]
             assert metrics["segments"] == {"train": [1, 2], "test": [3]}
+            assert metrics["array"] == [1.0, 2.0]
+            assert metrics["series"] == [3.0, 4.0]
 
     def test_nonfinite_metrics_use_portable_json_and_round_trip(
         self, backtest_result: BacktestResult

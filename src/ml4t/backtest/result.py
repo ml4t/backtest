@@ -99,6 +99,12 @@ def _serialize_metric_value(value: Any, *, path: str) -> Any:
             return _serialize_metric_value(value.item(), path=path)
     except (ImportError, AttributeError):
         pass
+    to_list = getattr(value, "to_list", None)
+    if callable(to_list):
+        return _serialize_metric_value(to_list(), path=path)
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        return _serialize_metric_value(tolist(), path=path)
     raise ArtifactWriteError(f"{path} has unsupported value type {type(value).__name__}")
 
 
@@ -719,41 +725,47 @@ class BacktestResult:
 
         selected = [name for name in requested if name not in unavailable]
 
-        metrics_payload: str | None = None
+        text_payloads: dict[str, str] = {}
         if "metrics" in selected:
             try:
                 serializable_metrics = {
                     key: _serialize_metric_value(value, path=f"metrics[{key!r}]")
                     for key, value in self.metrics.items()
                 }
-                metrics_payload = json.dumps(serializable_metrics, indent=2, allow_nan=False)
+                text_payloads["metrics"] = json.dumps(
+                    serializable_metrics,
+                    indent=2,
+                    allow_nan=False,
+                )
             except ArtifactWriteError:
                 raise
             except Exception as exc:
                 raise ArtifactWriteError(f"Failed to serialize metrics: {exc}") from exc
 
-        config_payload: str | None = None
-        spec_payload: str | None = None
         if "config" in selected or "spec" in selected:
             try:
                 import yaml
-
-                if "config" in selected:
-                    config_payload = yaml.safe_dump(
+            except ImportError as exc:
+                raise ArtifactWriteError("PyYAML is required to serialize config or spec") from exc
+            if "config" in selected:
+                try:
+                    text_payloads["config"] = yaml.safe_dump(
                         self.config.to_dict(),
                         default_flow_style=False,
                     )
-                if "spec" in selected:
-                    spec_payload = yaml.safe_dump(
+                except Exception as exc:
+                    raise ArtifactWriteError(
+                        f"Failed to serialize config component: {exc}"
+                    ) from exc
+            if "spec" in selected:
+                try:
+                    text_payloads["spec"] = yaml.safe_dump(
                         self.to_spec_dict(),
                         default_flow_style=False,
                         sort_keys=False,
                     )
-            except Exception as exc:
-                components = [name for name in ("config", "spec") if name in selected]
-                raise ArtifactWriteError(
-                    f"Failed to serialize {' and '.join(components)} component: {exc}"
-                ) from exc
+                except Exception as exc:
+                    raise ArtifactWriteError(f"Failed to serialize spec component: {exc}") from exc
 
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
@@ -804,23 +816,15 @@ class BacktestResult:
             self.to_daily_pnl().write_parquet(daily_path, compression=compression)
             written["daily_pnl"] = daily_path
 
-        if "metrics" in selected:
-            metrics_path = path / "metrics.json"
-            assert metrics_payload is not None
-            metrics_path.write_text(metrics_payload)
-            written["metrics"] = metrics_path
-
-        if "config" in selected:
-            config_path = path / "config.yaml"
-            assert config_payload is not None
-            config_path.write_text(config_payload)
-            written["config"] = config_path
-
-        if "spec" in selected:
-            spec_path = path / "spec.yaml"
-            assert spec_payload is not None
-            spec_path.write_text(spec_payload)
-            written["spec"] = spec_path
+        for name in ("metrics", "config", "spec"):
+            if name not in selected:
+                continue
+            component_path = path / _COMPONENT_FILES[name]
+            try:
+                component_path.write_text(text_payloads[name])
+            except Exception as exc:
+                raise ArtifactWriteError(f"Failed to write {name} component: {exc}") from exc
+            written[name] = component_path
 
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
@@ -1215,7 +1219,7 @@ class BacktestResult:
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
         metrics = read_component("metrics", read_metrics, {})
         predictions = read_component("predictions", pl.read_parquet, None)
-        read_component("daily_pnl", lambda value: pl.scan_parquet(value).collect_schema(), None)
+        read_component("daily_pnl", pl.read_parquet, None)
         config = read_component("config", read_config, None)
         spec_config = read_component("spec", read_spec_config, None)
         if config is None:
