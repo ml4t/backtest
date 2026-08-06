@@ -396,11 +396,33 @@ result.to_parquet("./results/my_backtest")
 #   daily_pnl.parquet
 #   metrics.json
 #   config.yaml  # when config is attached
+#   spec.yaml  # when config is attached
+#   manifest.json
 
 # Reload later
 from ml4t.backtest.result import BacktestResult
 result = BacktestResult.from_parquet("./results/my_backtest")
 ```
+
+`manifest.json` identifies artifact schema version 1 and every component written. Loading is
+strict by default. An empty directory, missing manifest or required component, interrupted write,
+malformed file, or unsupported schema version raises a specific `ArtifactError` subclass before a
+result is returned. Selective exports are valid component exports, but they are not complete result
+artifacts unless they contain all required components.
+
+Manifest-free beta artifacts require explicit recovery:
+
+```python
+result = BacktestResult.from_parquet("./results/beta_backtest", recovery=True)
+
+for diagnostic in result.artifact_diagnostics:
+    print(diagnostic.code, diagnostic.component, diagnostic.message)
+```
+
+Recovery reads supported components in a deterministic order and reports every missing, malformed,
+or ignored component. Unsupported manifest schema versions still fail because their interpretation
+is not defined. If `config` or `spec` is explicitly requested during export, its absence or a
+serialization failure raises `ArtifactWriteError` instead of omitting the file.
 
 ## Integration with ml4t-diagnostic
 
