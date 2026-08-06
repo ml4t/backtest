@@ -172,6 +172,8 @@ class Order:
     _risk_exit_reason: str | None = None  # Human-readable reason (legacy, for logging)
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
+    _submitted_before_risk: bool = False
+    _submitted_from_flat: bool = False
 
     def __post_init__(self) -> None:
         if self.requested_quantity is None:

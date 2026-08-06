@@ -32,22 +32,24 @@ position rules are evaluated. The state visible to the callback depends on execu
 
 | Mode | Positions visible to `on_before_risk()` | Ordinary orders submitted there |
 |------|------------------------------------------|----------------------------------|
-| `NEXT_BAR` | Includes fills from prior bars at the current open | Pending until the next bar |
+| `NEXT_BAR` | Includes marketable flat-position entries previously submitted by this callback | Pending until the next bar |
 | `SAME_BAR` | State before regular pending-order processing | Processed during the current bar |
 
 In `SAME_BAR`, set `immediate_fill=True` when a position opened in `on_before_risk()` must receive
-stop or trailing-rule evaluation on that same bar. In `NEXT_BAR`, a position guard is deterministic
-because the prior opening order has filled before the callback:
+stop or trailing-rule evaluation on that same bar. In `NEXT_BAR`, newly opened positions start risk
+evaluation on the following bar, matching ordinary next-bar entry timing. A marketable prior entry
+fills before the callback. Limit and stop orders can remain pending, so a guarded entry checks both
+position and pending intent:
 
 ```python
 def on_before_risk(self, timestamp, data, context, broker):
-    if broker.get_position("SPY") is None:
+    if broker.get_position("SPY") is None and not broker.get_pending_orders("SPY"):
         broker.submit_order("SPY", 10)
 ```
 
-Use `broker.get_pending_orders("SPY")` when the strategy's sizing decision depends on unfilled
-intent. Explicit pyramiding remains available by submitting an additional order without the
-position guard.
+Orders submitted by `on_data()` retain the configured within-bar fill ordering with risk exits.
+Explicit pyramiding remains available by submitting an additional order without the flat-position
+and pending-order guard.
 
 ### SAME_BAR
 

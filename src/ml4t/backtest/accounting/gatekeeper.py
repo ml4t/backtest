@@ -196,13 +196,15 @@ class Gatekeeper:
         current_qty = self.account.get_position_quantity(order.asset)
         quantity_delta = self._calculate_quantity_delta(order.side, order.quantity)
         resulting_qty = current_qty + quantity_delta
-        if resulting_qty < 0 and not self.account.policy.allows_short_selling():
-            code = "account_restriction"
-        elif getattr(self.account.policy, "allow_leverage", False):
-            code = "insufficient_buying_power"
-        else:
-            code = "insufficient_cash"
-        return False, reason, code
+        return False, reason, self.classify_rejection(resulting_qty)
+
+    def classify_rejection(self, resulting_quantity: float) -> str:
+        """Classify a policy rejection independently of its display text."""
+        if resulting_quantity < 0 and not self.account.policy.allows_short_selling():
+            return "account_restriction"
+        if getattr(self.account.policy, "allow_leverage", False):
+            return "insufficient_buying_power"
+        return "insufficient_cash"
 
     def _is_reversal(self, current_qty: float, order_qty_delta: float) -> bool:
         """Check if order reverses position (long → short or short → long).

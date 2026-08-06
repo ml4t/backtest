@@ -1554,6 +1554,26 @@ class TestEvaluatePositionRules:
         assert broker.fills[-1].exit_reason == "signal"
         assert broker.trades[-1].exit_reason == "signal"
 
+    def test_reversal_fill_records_signal_exit_reason(self):
+        broker = Broker(
+            100000.0,
+            NoCommission(),
+            NoSlippage(),
+            allow_short_selling=True,
+            allow_leverage=True,
+        )
+        mark_prices(broker, {"AAPL": 100.0})
+        broker.submit_order("AAPL", 10.0, OrderSide.BUY)
+        broker._process_orders()
+
+        mark_prices(broker, {"AAPL": 105.0})
+        broker.submit_order("AAPL", 15.0, OrderSide.SELL)
+        broker._process_orders()
+
+        assert broker.fills[-1].exit_reason == "signal"
+        assert broker.trades[-1].exit_reason == "signal"
+        assert broker.get_position("AAPL").quantity == -5.0
+
     def test_evaluate_position_rules_exit_full_deferred(self):
         """Test EXIT_FULL action with defer_fill=True (NEXT_BAR_OPEN mode)."""
         from ml4t.backtest.risk.position.static import StopLoss

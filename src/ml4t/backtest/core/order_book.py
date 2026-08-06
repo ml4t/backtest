@@ -66,6 +66,8 @@ class OrderBook:
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,
+            _submitted_before_risk=broker._submitting_before_risk,
+            _submitted_from_flat=broker.get_position(asset) is None,
         )
 
         order._signal_price = broker._current_prices.get(asset)
@@ -528,11 +530,7 @@ class OrderBook:
 
         if not valid:
             order.rejection_reason = reason or "Insufficient buying power (submission precheck)"
-            resulting_qty = old_qty + size
-            if resulting_qty < 0 and not broker.account.policy.allows_short_selling():
-                order._rejection_code = "account_restriction"
-            else:
-                order._rejection_code = "insufficient_buying_power"
+            order._rejection_code = broker.gatekeeper.classify_rejection(old_qty + size)
             return False
 
         multiplier = broker.get_multiplier(order.asset)

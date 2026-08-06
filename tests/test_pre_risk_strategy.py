@@ -10,6 +10,7 @@ from ml4t.backtest import (
     DataFeed,
     Engine,
     ExecutionMode,
+    OrderType,
     StopLoss,
     Strategy,
     TrailingStop,
@@ -60,7 +61,7 @@ class GuardedPreRiskEntry(Strategy):
 
     def on_before_risk(self, timestamp, data, context, broker) -> None:
         self._record("before_risk", timestamp, broker)
-        if broker.get_position("SPY") is None:
+        if broker.get_position("SPY") is None and not broker.get_pending_orders("SPY"):
             broker.submit_order("SPY", 10)
 
     def on_data(self, timestamp, data, context, broker) -> None:
@@ -75,6 +76,33 @@ class ExplicitPreRiskPyramiding(Strategy):
 
     def on_data(self, timestamp, data, context, broker) -> None:
         pass
+
+
+class PendingAwareLimitEntry(Strategy):
+    """Keep one untriggered limit order while the position remains flat."""
+
+    def on_before_risk(self, timestamp, data, context, broker) -> None:
+        if broker.get_position("SPY") is None and not broker.get_pending_orders("SPY"):
+            broker.submit_order(
+                "SPY",
+                10,
+                order_type=OrderType.LIMIT,
+                limit_price=50.0,
+            )
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        pass
+
+
+class ExitFundedEntry(Strategy):
+    """Exit one asset under risk before funding a prior-bar entry in another."""
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if timestamp.day == 3:
+            broker.set_position_rules(StopLoss(pct=0.05), asset="AAPL")
+            broker.submit_order("AAPL", 90)
+        elif timestamp.day == 4:
+            broker.submit_order("GOOGL", 90)
 
 
 def _daily_prices(days: int = 3) -> pl.DataFrame:
@@ -241,4 +269,104 @@ def test_next_bar_pre_risk_allows_explicit_pyramiding() -> None:
 
     assert sum(fill.quantity for fill in result.fills) == 20.0
     assert engine.broker.get_position("SPY").quantity == 20.0
+    assert len(engine.broker.get_pending_orders("SPY")) == 1
+
+
+def test_next_bar_pre_risk_does_not_evaluate_new_position_until_following_bar() -> None:
+    prices = pl.DataFrame(
+        {
+            "timestamp": [datetime(2026, 8, day) for day in (3, 4, 5)],
+            "asset": ["SPY"] * 3,
+            "open": [100.0] * 3,
+            "high": [101.0] * 3,
+            "low": [99.0, 94.0, 94.0],
+            "close": [100.0] * 3,
+            "volume": [1_000_000.0] * 3,
+        }
+    )
+
+    result = Engine(
+        DataFeed(prices_df=prices),
+        OpeningTargetWithStop(),
+        BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR),
+    ).run()
+
+    assert [(fill.side.value, fill.timestamp.day) for fill in result.fills] == [
+        ("buy", 4),
+        ("sell", 5),
+    ]
+
+
+def test_next_bar_pre_risk_excludes_entry_bar_extreme_from_trailing_watermark() -> None:
+    prices = pl.DataFrame(
+        {
+            "timestamp": [datetime(2026, 8, day) for day in (3, 4, 5)],
+            "asset": ["SPY"] * 3,
+            "open": [100.0] * 3,
+            "high": [100.0, 200.0, 100.0],
+            "low": [100.0, 95.0, 96.0],
+            "close": [100.0] * 3,
+            "volume": [1_000_000.0] * 3,
+        }
+    )
+    engine = Engine(
+        DataFeed(prices_df=prices),
+        OpeningTargetWithTrailingStop(),
+        BacktestConfig(
+            execution_mode=ExecutionMode.NEXT_BAR,
+            trail_hwm_source=WaterMarkSource.BAR_EXTREME,
+        ),
+    )
+
+    result = engine.run()
+
+    assert [(fill.side.value, fill.timestamp.day) for fill in result.fills] == [("buy", 4)]
+    assert engine.broker.get_position("SPY").high_water_mark == 100.0
+
+
+def test_next_bar_exit_first_preserves_exit_funded_entry() -> None:
+    rows = []
+    for day in (3, 4, 5):
+        for asset in ("AAPL", "GOOGL"):
+            low = 94.0 if day == 5 and asset == "AAPL" else 100.0
+            rows.append(
+                {
+                    "timestamp": datetime(2026, 8, day),
+                    "asset": asset,
+                    "open": 100.0,
+                    "high": 100.0,
+                    "low": low,
+                    "close": 100.0,
+                    "volume": 1_000_000.0,
+                }
+            )
+
+    result = Engine(
+        DataFeed(prices_df=pl.DataFrame(rows)),
+        ExitFundedEntry(),
+        BacktestConfig(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+        ),
+    ).run()
+
+    assert result.rejected_orders == []
+    assert [(fill.asset, fill.side.value, fill.timestamp.day) for fill in result.fills] == [
+        ("AAPL", "buy", 4),
+        ("AAPL", "sell", 5),
+        ("GOOGL", "buy", 5),
+    ]
+
+
+def test_next_bar_pending_limit_guard_does_not_duplicate_intent() -> None:
+    engine = Engine(
+        DataFeed(prices_df=_daily_prices()),
+        PendingAwareLimitEntry(),
+        BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR),
+    )
+
+    result = engine.run()
+
+    assert result.fills == []
+    assert len(engine.broker.orders) == 1
     assert len(engine.broker.get_pending_orders("SPY")) == 1

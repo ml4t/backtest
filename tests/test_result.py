@@ -805,7 +805,7 @@ class TestBacktestResultParquet:
             with open(path / "manifest.json") as file:
                 manifest = json.load(file)
             assert manifest["artifact_type"] == "ml4t-backtest-result"
-            assert manifest["schema_version"] == 1
+            assert manifest["schema_version"] == 2
             assert set(manifest["components"]) >= {
                 "trades",
                 "fills",
@@ -889,6 +889,25 @@ class TestBacktestResultParquet:
             with pytest.raises(ArtifactReadError, match="daily_pnl.parquet"):
                 BacktestResult.from_parquet(path)
 
+    def test_from_parquet_rejects_daily_pnl_inconsistent_with_equity(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            daily_path = path / "daily_pnl.parquet"
+            daily = pl.read_parquet(daily_path).with_columns((pl.col("pnl") + 1.0).alias("pnl"))
+            daily.write_parquet(daily_path)
+
+            with pytest.raises(ArtifactReadError, match="inconsistent"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert any(
+                diagnostic.code == "component_inconsistent" and diagnostic.component == "daily_pnl"
+                for diagnostic in recovered.artifact_diagnostics
+            )
+
     def test_from_parquet_rejects_unsupported_schema(self, backtest_result: BacktestResult):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
@@ -900,11 +919,6 @@ class TestBacktestResultParquet:
 
             with pytest.raises(UnsupportedArtifactVersionError, match="999"):
                 BacktestResult.from_parquet(path)
-
-            manifest["artifact_type"] = "foreign-result"
-            manifest_path.write_text(json.dumps(manifest))
-            with pytest.raises(UnsupportedArtifactVersionError, match="999"):
-                BacktestResult.from_parquet(path, recovery=True)
 
     def test_foreign_artifact_type_fails_strict_and_recovers_current_schema(
         self, backtest_result: BacktestResult
@@ -922,6 +936,21 @@ class TestBacktestResultParquet:
 
             recovered = BacktestResult.from_parquet(path, recovery=True)
             assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+
+    def test_foreign_manifest_without_schema_can_recover_legacy_components(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "manifest.json").write_text(json.dumps({"artifact_type": "foreign-result"}))
+
+            with pytest.raises(ArtifactManifestError, match="foreign-result"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+            assert len(recovered.trades) == len(backtest_result.trades)
 
     def test_noncanonical_manifest_component_fails_strict_and_recovers(
         self, backtest_result: BacktestResult
@@ -1018,6 +1047,10 @@ class TestBacktestResultParquet:
             assert metrics["array"] == [1.0, 2.0]
             assert metrics["series"] == [3.0, 4.0]
 
+            loaded = BacktestResult.from_parquet(path)
+            assert loaded.metrics["array"] == [1.0, 2.0]
+            assert loaded.metrics["series"] == [3.0, 4.0]
+
     def test_nonfinite_metrics_use_portable_json_and_round_trip(
         self, backtest_result: BacktestResult
     ):
@@ -1065,8 +1098,9 @@ class TestBacktestResultParquet:
                 raise OSError("simulated component write failure")
 
             monkeypatch.setattr(pl.DataFrame, "write_parquet", fail_write)
-            with pytest.raises(OSError, match="simulated"):
+            with pytest.raises(ArtifactWriteError, match="trades component") as exc_info:
                 backtest_result.to_parquet(path)
+            assert isinstance(exc_info.value.__cause__, OSError)
 
             assert not (path / "manifest.json").exists()
             assert (path / ".artifact-incomplete").exists()
@@ -1084,6 +1118,20 @@ class TestBacktestResultParquet:
         with (
             tempfile.TemporaryDirectory() as tmpdir,
             pytest.raises(ArtifactWriteError, match="opaque"),
+        ):
+            result.to_parquet(Path(tmpdir) / "test_backtest")
+
+    def test_metrics_json_rejects_array_class_with_metric_path(self):
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={"opaque": pl.Series},
+        )
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            pytest.raises(ArtifactWriteError, match=r"metrics\['opaque'\]"),
         ):
             result.to_parquet(Path(tmpdir) / "test_backtest")
 

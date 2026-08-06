@@ -222,17 +222,27 @@ class Engine:
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits
             self.broker._process_pending_exits()
 
+            pre_risk_opened_assets: set[str] = set()
             if self.execution_mode == ExecutionMode.NEXT_BAR:
-                # Fill orders submitted on prior bars before exposing state to the
-                # pre-risk callback. Orders submitted by the callback remain queued.
-                self.broker._process_orders(use_open=True)
+                # Fill only flat-position entries submitted by this callback on a
+                # prior bar. Ordinary orders retain the configured exit-first batch.
+                positions_before = set(self.broker.positions)
+                self.broker._process_orders(
+                    use_open=True,
+                    only_pre_risk_flat_entries=True,
+                )
+                pre_risk_opened_assets = set(self.broker.positions) - positions_before
 
             # Optional strategy phase for opening orders that must receive risk
             # protection during the current bar. Existing strategies inherit a no-op.
-            self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
+            self.broker._submitting_before_risk = True
+            try:
+                self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
+            finally:
+                self.broker._submitting_before_risk = False
 
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
-            self.broker.evaluate_position_rules()
+            self.broker.evaluate_position_rules(skip_assets=pre_risk_opened_assets)
 
             if self.execution_mode == ExecutionMode.NEXT_BAR:
                 # Process same-cycle risk exits. Ordinary orders created by

@@ -21,11 +21,13 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
     ):
         if self._should_use_next_bar_queue_shadow_validation(
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         ):
             self._process_orders_next_bar_queue_shadow(use_open)
             return
@@ -36,18 +38,21 @@ class ExecutionEngine:
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
+                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
             )
         elif ordering == "sequential":
             self._process_orders_sequential(
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
+                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
             )
         else:
             self._process_orders_fifo(
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
+                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
             )
 
     def _is_exit_order(self, order) -> bool:
@@ -60,6 +65,7 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
     ):
         broker = self.broker
         fill = broker._fill_engine
@@ -69,6 +75,7 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         for order in eligible_orders:
@@ -127,12 +134,14 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
     ) -> bool:
         broker = self.broker
         if not (
             use_open
             and broker.execution_mode is ExecutionMode.NEXT_BAR
             and broker.next_bar_queue_shadow_validation
+            and not only_pre_risk_flat_entries
         ):
             return False
         if order_types is not None or include_orders_this_bar:
@@ -284,11 +293,7 @@ class ExecutionEngine:
 
         if valid:
             return True, reason, None
-        if new_qty < 0 and not policy.allows_short_selling():
-            return False, reason, "account_restriction"
-        if getattr(policy, "allow_leverage", False):
-            return False, reason, "insufficient_buying_power"
-        return False, reason, "insufficient_cash"
+        return False, reason, broker.gatekeeper.classify_rejection(new_qty)
 
     def _commit_shadow_queue_fill(
         self,
@@ -343,12 +348,14 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
     ):
         broker = self.broker
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         filled_orders: list = []
@@ -366,6 +373,7 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
     ):
         """Process orders in submission order without exit/entry separation.
 
@@ -386,6 +394,7 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         filled_orders: list = []
@@ -576,6 +585,7 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
     ) -> list:
         broker = self.broker
         eligible_orders = []
@@ -584,6 +594,10 @@ class ExecutionEngine:
             if use_open and order.order_type is OrderType.MOC:
                 continue
             if order_types is not None and order.order_type not in order_types:
+                continue
+            if only_pre_risk_flat_entries and not (
+                order._submitted_before_risk and order._submitted_from_flat
+            ):
                 continue
             if (
                 broker.execution_mode is ExecutionMode.NEXT_BAR

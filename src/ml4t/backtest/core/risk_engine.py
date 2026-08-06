@@ -13,11 +13,14 @@ class RiskEngine:
     def __init__(self, broker):
         self.broker = broker
 
-    def evaluate_position_rules(self):
+    def evaluate_position_rules(self, *, skip_assets: set[str] | None = None):
         broker = self.broker
         exit_orders = []
+        skipped = skip_assets or set()
 
         for asset, pos in list(broker.positions.items()):
+            if asset in skipped:
+                continue
             rules = self._get_position_rules(asset)
             if rules is None:
                 continue

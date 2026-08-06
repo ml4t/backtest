@@ -87,22 +87,22 @@ print(f"Net PF:        {m['profit_factor']:.2f}")
 | `sharpe` | Sharpe ratio |
 | `sortino` | Sortino ratio |
 | `calmar` | Calmar ratio |
-| `num_trades` | Total completed trades |
+| `num_trades` | Realized exit legs, including partial reductions and full closes |
 | `num_orders` | Total submitted orders |
 | `num_rejected_orders` | Orders that reached the rejected terminal state |
 | `num_fills` | Total execution events |
 | `num_rebalance_events` | Unique timestamps with at least one fill |
 | `unique_symbols_traded` | Number of symbols with at least one fill |
-| `winning_trades` | Number of winning trades |
-| `losing_trades` | Number of losing trades |
-| `win_rate` | Win rate (0 to 1) |
-| `profit_factor` | Net profit factor (winning P&L / losing P&L) |
-| `expectancy` | Expected return per trade (decimal) |
-| `avg_trade` | Average trade return (decimal) |
-| `avg_win` | Average winning trade return (decimal) |
-| `avg_loss` | Average losing trade return (decimal, negative) |
-| `largest_win` | Best single trade return (decimal) |
-| `largest_loss` | Worst single trade return (decimal, negative) |
+| `winning_trades` | Winning realized exit legs |
+| `losing_trades` | Losing realized exit legs |
+| `win_rate` | Winning fraction across realized exit legs (0 to 1) |
+| `profit_factor` | Winning P&L / losing P&L across realized exit legs |
+| `expectancy` | Expected return per realized exit leg (decimal) |
+| `avg_trade` | Average realized exit-leg return (decimal) |
+| `avg_win` | Average winning realized exit-leg return (decimal) |
+| `avg_loss` | Average losing realized exit-leg return (decimal, negative) |
+| `largest_win` | Best realized exit-leg return (decimal) |
+| `largest_loss` | Worst realized exit-leg return (decimal, negative) |
 | `payoff_ratio` | avg_win / \|avg_loss\| (size-normalized reward-to-risk) |
 | `total_commission` | Total commission paid |
 | `total_slippage` | Total slippage cost in dollars (entry + exit) |
@@ -183,7 +183,9 @@ Quote-aware backtests therefore leave an explicit audit trail:
 
 ## Trade Analyzer
 
-`result.trade_analyzer` provides aggregate statistics on closed trades:
+`result.trade_analyzer` computes P&L statistics from realized exit legs, including partial
+reductions. Holding-period and MAE/MFE statistics use fully closed position lifecycles. Those
+lifecycle values are `NaN` when partial realizations exist but no position has fully closed.
 
 ```python
 ta = result.trade_analyzer
@@ -405,11 +407,14 @@ from ml4t.backtest.result import BacktestResult
 result = BacktestResult.from_parquet("./results/my_backtest")
 ```
 
-`manifest.json` identifies artifact schema version 1 and every component written. Loading is
+`manifest.json` identifies artifact schema version 2 and every component written. Loading is
 strict by default. An empty directory, missing manifest or required component, interrupted write,
 malformed file, or unsupported schema version raises a specific `ArtifactError` subclass before a
 result is returned. Selective exports are valid component exports, but they are not complete result
-artifacts unless they contain all required components.
+artifacts unless they contain all required components. Schema 1 was an unreleased development
+format whose metrics used non-standard bare JSON constants for `NaN` and infinity; current readers
+reject it rather than silently changing metric types. The stored `daily_pnl` component must decode
+and equal the value recomputed from the stored equity curve.
 
 Manifest-free beta artifacts require explicit recovery:
 
@@ -427,9 +432,9 @@ the default export records unavailable optional components in the manifest. A se
 raises `ArtifactWriteError` whether the component came from the default set or an explicit
 `include`. Component payloads are serialized before output files are created.
 Non-finite metric floats use a tagged JSON object and are restored on load, so `metrics.json`
-remains standards-compliant without losing `NaN` or infinity. The returned path mapping includes
-`manifest`; passing its keys back through `include` treats that key as a no-op because the manifest
-is always written.
+remains standards-compliant without losing `NaN` or infinity. NumPy arrays and Polars Series are
+stored and loaded as JSON lists. The returned path mapping includes `manifest`; passing its keys
+back through `include` treats that key as a no-op because the manifest is always written.
 
 ## Integration with ml4t-diagnostic
 

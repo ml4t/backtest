@@ -12,7 +12,13 @@ if TYPE_CHECKING:
 
 @dataclass
 class TradeAnalyzer:
-    """Analyze a collection of trades for performance statistics."""
+    """Analyze realized exit legs and full-close position lifecycles.
+
+    P&L statistics use every supplied realized exit leg, including partial
+    reductions. Holding-period and excursion statistics use only records whose
+    status is ``"closed"``. If realized legs exist but no position lifecycle has
+    closed, lifecycle statistics return NaN instead of an unmeasured zero.
+    """
 
     trades: Sequence["Trade"]
     _lifecycle_trades: list["Trade"] = field(init=False, repr=False)
@@ -120,9 +126,9 @@ class TradeAnalyzer:
 
     @property
     def avg_bars_held(self) -> float:
-        """Average number of bars positions were held."""
+        """Average bars held across fully closed position lifecycles."""
         if not self._lifecycle_trades:
-            return 0.0
+            return float("nan") if self.trades else 0.0
         bars = [t.bars_held for t in self._lifecycle_trades if hasattr(t, "bars_held")]
         return float(np.mean(bars)) if bars else 0.0
 
@@ -193,29 +199,29 @@ class TradeAnalyzer:
 
     @property
     def avg_mfe(self) -> float:
-        """Average maximum favorable excursion across trades."""
+        """Average maximum favorable excursion across fully closed lifecycles."""
         if not self._lifecycle_trades:
-            return 0.0
+            return float("nan") if self.trades else 0.0
         mfes = [t.mfe for t in self._lifecycle_trades]
         return float(np.mean(mfes))
 
     @property
     def avg_mae(self) -> float:
-        """Average maximum adverse excursion across trades."""
+        """Average maximum adverse excursion across fully closed lifecycles."""
         if not self._lifecycle_trades:
-            return 0.0
+            return float("nan") if self.trades else 0.0
         maes = [t.mae for t in self._lifecycle_trades]
         return float(np.mean(maes))
 
     @property
     def mfe_capture_ratio(self) -> float:
-        """Average ratio of realized return to MFE.
+        """Average ratio of realized return to MFE for fully closed lifecycles.
 
         Values close to 1.0 indicate exits near peak profit.
         Values close to 0.0 indicate exits gave back most gains.
         """
         if not self._lifecycle_trades:
-            return 0.0
+            return float("nan") if self.trades else 0.0
         ratios = []
         for t in self._lifecycle_trades:
             if t.mfe > 0:
@@ -224,13 +230,13 @@ class TradeAnalyzer:
 
     @property
     def mae_recovery_ratio(self) -> float:
-        """Average ratio showing how much of MAE was recovered.
+        """Average MAE recovery ratio for fully closed position lifecycles.
 
         Calculated as (MAE - final_loss) / MAE for losing trades.
         Higher values indicate better recovery from drawdowns.
         """
         if not self._lifecycle_trades:
-            return 0.0
+            return float("nan") if self.trades else 0.0
         ratios = []
         for t in self._lifecycle_trades:
             if t.mae < 0 and t.pnl_percent < 0:

@@ -19,17 +19,18 @@ class Strategy(ABC):
         """Run strategy logic immediately before current-bar position risk.
 
         The broker has registered the current bar's prices before this callback.
-        In ``NEXT_BAR`` mode, orders from prior bars and deferred exits have also
-        filled at the current open, so position and pending-order queries expose
-        post-open state. Ordinary orders submitted here remain pending until the
-        next bar. In ``SAME_BAR`` mode, the callback runs before regular pending
-        orders are processed; a market order is visible to current-bar risk only
-        when ``immediate_fill=True``.
+        In ``NEXT_BAR`` mode, a marketable flat-position entry submitted by this
+        callback on a prior bar fills at the current open before the callback runs.
+        Newly opened positions start risk evaluation on the following bar, preserving
+        next-bar timing. Untriggered limit or stop orders remain pending, so guarded
+        entries must check both ``broker.get_position(asset)`` and
+        ``broker.get_pending_orders(asset)``. Ordinary orders submitted here remain
+        pending until the next bar. In ``SAME_BAR`` mode, the callback runs before
+        regular pending orders are processed; a market order is visible to current-bar
+        risk only when ``immediate_fill=True``.
 
-        A position guard therefore prevents duplicate next-bar entries. Strategies
-        can pyramid explicitly by submitting additional orders without that guard,
-        and can inspect ``broker.get_pending_orders(asset)`` when pending intent is
-        relevant to their sizing rule.
+        Strategies can pyramid explicitly by submitting additional orders without
+        the flat-position and pending-order guard.
         """
         return None
 

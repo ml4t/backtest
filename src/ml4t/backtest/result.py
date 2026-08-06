@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 
 
 _ARTIFACT_TYPE = "ml4t-backtest-result"
-_ARTIFACT_SCHEMA_VERSION = 1
+_ARTIFACT_SCHEMA_VERSION = 2
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -97,14 +97,12 @@ def _serialize_metric_value(value: Any, *, path: str) -> Any:
 
         if isinstance(value, np.generic):
             return _serialize_metric_value(value.item(), path=path)
+        if isinstance(value, np.ndarray):
+            return _serialize_metric_value(value.tolist(), path=path)
     except (ImportError, AttributeError):
         pass
-    to_list = getattr(value, "to_list", None)
-    if callable(to_list):
-        return _serialize_metric_value(to_list(), path=path)
-    tolist = getattr(value, "tolist", None)
-    if callable(tolist):
-        return _serialize_metric_value(tolist(), path=path)
+    if isinstance(value, pl.Series):
+        return _serialize_metric_value(value.to_list(), path=path)
     raise ArtifactWriteError(f"{path} has unsupported value type {type(value).__name__}")
 
 
@@ -768,62 +766,114 @@ class BacktestResult:
                     raise ArtifactWriteError(f"Failed to serialize spec component: {exc}") from exc
 
         path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            raise ArtifactWriteError(f"Failed to create artifact directory {path}: {exc}") from exc
+
+        def write_component(name: str, writer) -> None:
+            try:
+                writer()
+            except Exception as exc:
+                raise ArtifactWriteError(f"Failed to write {name} component: {exc}") from exc
+
         marker_path = path / _INCOMPLETE_MARKER
-        marker_path.write_text("Result artifact write did not complete.\n")
+        write_component(
+            "incomplete marker",
+            lambda: marker_path.write_text("Result artifact write did not complete.\n"),
+        )
         manifest_path = path / _MANIFEST_FILE
-        manifest_path.unlink(missing_ok=True)
+        write_component("stale manifest removal", lambda: manifest_path.unlink(missing_ok=True))
 
         written: dict[str, Path] = {}
 
         if "trades" in selected:
             trades_path = path / "trades.parquet"
-            self.to_trades_dataframe().write_parquet(trades_path, compression=compression)
+            write_component(
+                "trades",
+                lambda: self.to_trades_dataframe().write_parquet(
+                    trades_path,
+                    compression=compression,
+                ),
+            )
             written["trades"] = trades_path
 
         if "fills" in selected:
             fills_path = path / "fills.parquet"
-            self.to_fills_dataframe().write_parquet(fills_path, compression=compression)
+            write_component(
+                "fills",
+                lambda: self.to_fills_dataframe().write_parquet(
+                    fills_path,
+                    compression=compression,
+                ),
+            )
             written["fills"] = fills_path
 
         if "rejected_orders" in selected:
             rejected_orders_path = path / "rejected_orders.parquet"
-            self.to_rejected_orders_dataframe().write_parquet(
-                rejected_orders_path,
-                compression=compression,
+            write_component(
+                "rejected_orders",
+                lambda: self.to_rejected_orders_dataframe().write_parquet(
+                    rejected_orders_path,
+                    compression=compression,
+                ),
             )
             written["rejected_orders"] = rejected_orders_path
 
         if "predictions" in selected:
             predictions_path = path / "predictions.parquet"
-            self.to_predictions_dataframe().write_parquet(predictions_path, compression=compression)
+            write_component(
+                "predictions",
+                lambda: self.to_predictions_dataframe().write_parquet(
+                    predictions_path,
+                    compression=compression,
+                ),
+            )
             written["predictions"] = predictions_path
 
         if "equity" in selected:
             equity_path = path / "equity.parquet"
-            self.to_equity_dataframe().write_parquet(equity_path, compression=compression)
+            write_component(
+                "equity",
+                lambda: self.to_equity_dataframe().write_parquet(
+                    equity_path,
+                    compression=compression,
+                ),
+            )
             written["equity"] = equity_path
 
         if "portfolio_state" in selected:
             portfolio_state_path = path / "portfolio_state.parquet"
-            self.to_portfolio_state_dataframe().write_parquet(
-                portfolio_state_path, compression=compression
+            write_component(
+                "portfolio_state",
+                lambda: self.to_portfolio_state_dataframe().write_parquet(
+                    portfolio_state_path,
+                    compression=compression,
+                ),
             )
             written["portfolio_state"] = portfolio_state_path
 
         if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
-            self.to_daily_pnl().write_parquet(daily_path, compression=compression)
+            write_component(
+                "daily_pnl",
+                lambda: self.to_daily_pnl().write_parquet(
+                    daily_path,
+                    compression=compression,
+                ),
+            )
             written["daily_pnl"] = daily_path
 
         for name in ("metrics", "config", "spec"):
             if name not in selected:
                 continue
             component_path = path / _COMPONENT_FILES[name]
-            try:
-                component_path.write_text(text_payloads[name])
-            except Exception as exc:
-                raise ArtifactWriteError(f"Failed to write {name} component: {exc}") from exc
+            write_component(
+                name,
+                lambda component_path=component_path, payload=text_payloads[name]: (
+                    component_path.write_text(payload)
+                ),
+            )
             written[name] = component_path
 
         manifest = {
@@ -838,13 +888,10 @@ class BacktestResult:
                 name: reason for name, reason in unavailable.items() if name in requested
             },
         }
-        try:
-            with open(manifest_path, "w") as file:
-                json.dump(manifest, file, indent=2, allow_nan=False)
-        except Exception as exc:
-            raise ArtifactWriteError(f"Failed to write artifact manifest: {exc}") from exc
+        manifest_payload = json.dumps(manifest, indent=2, allow_nan=False)
+        write_component("manifest", lambda: manifest_path.write_text(manifest_payload))
         written["manifest"] = manifest_path
-        marker_path.unlink()
+        write_component("incomplete marker removal", marker_path.unlink)
 
         return written
 
@@ -943,14 +990,6 @@ class BacktestResult:
                 components = discover_legacy_components()
 
         if manifest is not None:
-            schema_version = manifest.get("schema_version")
-            if schema_version != _ARTIFACT_SCHEMA_VERSION:
-                raise UnsupportedArtifactVersionError(
-                    f"Unsupported result artifact schema version {schema_version!r}; "
-                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
-                )
-
-        if manifest is not None:
             artifact_type = manifest.get("artifact_type")
             if artifact_type != _ARTIFACT_TYPE:
                 message = f"Unsupported artifact type: {artifact_type!r}"
@@ -961,6 +1000,12 @@ class BacktestResult:
                 manifest = None
 
         if manifest is not None:
+            schema_version = manifest.get("schema_version")
+            if schema_version != _ARTIFACT_SCHEMA_VERSION:
+                raise UnsupportedArtifactVersionError(
+                    f"Unsupported result artifact schema version {schema_version!r}; "
+                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
+                )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
                 isinstance(name, str) and isinstance(filename, str)
@@ -1219,11 +1264,30 @@ class BacktestResult:
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
         metrics = read_component("metrics", read_metrics, {})
         predictions = read_component("predictions", pl.read_parquet, None)
-        read_component("daily_pnl", pl.read_parquet, None)
+        daily_pnl = read_component("daily_pnl", pl.read_parquet, None)
         config = read_component("config", read_config, None)
         spec_config = read_component("spec", read_spec_config, None)
         if config is None:
             config = spec_config
+
+        if daily_pnl is not None:
+            expected_daily_pnl = cls(
+                trades=[],
+                equity_curve=equity_curve,
+                fills=[],
+                metrics={},
+            ).to_daily_pnl()
+            if not daily_pnl.equals(expected_daily_pnl):
+                message = "daily_pnl.parquet is inconsistent with equity.parquet"
+                if not recovery:
+                    raise ArtifactReadError(message)
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="component_inconsistent",
+                        component="daily_pnl",
+                        message=message,
+                    )
+                )
 
         return cls(
             trades=trades,

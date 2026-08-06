@@ -8,7 +8,7 @@ import pytest
 from ml4t.backtest import BacktestConfig, Order, Strategy, run_backtest
 from ml4t.backtest.config import ShareType
 from ml4t.backtest.execution.limits import VolumeParticipationLimit
-from ml4t.backtest.types import ExecutionMode, OrderSide, OrderStatus
+from ml4t.backtest.types import ExecutionMode, OrderSide, OrderStatus, OrderType
 
 
 class _UnaffordableOrder(Strategy):
@@ -41,6 +41,17 @@ class _CaptureOrder(Strategy):
     def on_data(self, timestamp, data, context, broker) -> None:
         if self.order is None:
             self.order = broker.submit_order("AAPL", self.quantity)
+
+
+class _DelayedLimitOrder(Strategy):
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if not broker.orders:
+            broker.submit_order(
+                "AAPL",
+                10.0,
+                order_type=OrderType.LIMIT,
+                limit_price=50.0,
+            )
 
 
 def _prices() -> pl.DataFrame:
@@ -118,6 +129,50 @@ def test_cash_account_short_rejection_has_structured_restriction_code() -> None:
     assert rejected.rejection_reason == "Short selling not allowed in cash account"
     assert rejected._rejection_code == "account_restriction"
     assert rejected.rejection_code == "account_restriction"
+
+
+def test_margin_rejection_has_structured_buying_power_code() -> None:
+    result = run_backtest(
+        prices=_prices(),
+        strategy=_UnaffordableOrder(),
+        config=BacktestConfig(
+            initial_cash=100.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            allow_leverage=True,
+        ),
+    )
+
+    assert len(result.rejected_orders) == 1
+    assert result.rejected_orders[0]._rejection_code == "insufficient_buying_power"
+    assert result.rejected_orders[0].rejection_code == "insufficient_buying_power"
+
+
+def test_next_bar_shadow_queue_rejection_has_structured_cash_code() -> None:
+    prices = pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, day) for day in (2, 3, 4)],
+            "asset": ["AAPL"] * 3,
+            "open": [100.0, 100.0, 50.0],
+            "high": [100.0, 100.0, 50.0],
+            "low": [100.0, 100.0, 50.0],
+            "close": [100.0, 100.0, 50.0],
+            "volume": [1_000_000.0] * 3,
+        }
+    )
+    result = run_backtest(
+        prices=prices,
+        strategy=_DelayedLimitOrder(),
+        config=BacktestConfig(
+            initial_cash=100.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_queue_shadow_validation=True,
+        ),
+    )
+
+    assert len(result.rejected_orders) == 1
+    rejected = result.rejected_orders[0]
+    assert rejected.rejection_code == "insufficient_cash"
+    assert rejected._rejection_code == "insufficient_cash"
 
 
 def test_rejected_orders_round_trip_through_result_artifact(tmp_path) -> None:

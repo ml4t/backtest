@@ -170,7 +170,6 @@ def _coverage_session_started() -> bool:
     return Coverage.current() is not None
 
 
-@pytest.mark.benchmark
 def test_optimized_feed_matches_legacy_output():
     prices, signals = _build_benchmark_data(n_bars=50, n_assets=5)
 
