@@ -433,9 +433,10 @@ class Engine:
                 )
                 all_trades.append(open_trade)
 
-        # Build TradeAnalyzer (only on closed trades for accurate stats)
-        closed_trades = [t for t in all_trades if t.status == "closed"]
-        trade_analyzer = TradeAnalyzer(closed_trades)
+        # Realized-P&L metrics include partial reductions. TradeAnalyzer limits
+        # lifecycle metrics such as holding period and excursions to full closes.
+        realized_trades = [t for t in all_trades if t.status in {"closed", "partial"}]
+        trade_analyzer = TradeAnalyzer(realized_trades)
         activity_metrics = self._build_activity_metrics()
 
         # Build metrics dictionary (backward compatible)

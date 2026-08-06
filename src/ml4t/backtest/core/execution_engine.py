@@ -74,8 +74,10 @@ class ExecutionEngine:
         for order in eligible_orders:
             fill.apply_share_rounding(order)
             if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order.reject(
+                    "Quantity rounds to zero (share_type=INTEGER)",
+                    "quantity_rounds_to_zero",
+                )
                 continue
             if self._is_exit_order(order):
                 exit_orders.append(order)
@@ -181,8 +183,10 @@ class ExecutionEngine:
 
             fill.apply_share_rounding(order)
             if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order.reject(
+                    "Quantity rounds to zero (share_type=INTEGER)",
+                    "quantity_rounds_to_zero",
+                )
                 continue
 
             fill_price = fill.check_fill(order, price)
@@ -190,15 +194,17 @@ class ExecutionEngine:
                 continue
 
             validation_price = broker._current_prices.get(order.asset, fill_price)
-            valid, rejection_reason = self._validate_shadow_queue_order(
+            valid, rejection_reason, rejection_code = self._validate_shadow_queue_order(
                 order=order,
                 validation_price=validation_price,
                 shadow_cash=shadow_cash,
                 shadow_positions=shadow_positions,
             )
             if not valid:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = rejection_reason
+                order.reject(
+                    rejection_reason,
+                    rejection_code or "order_validation_failed",
+                )
                 continue
 
             accepted_orders.append((order, fill_price))
@@ -227,7 +233,7 @@ class ExecutionEngine:
         validation_price: float,
         shadow_cash: float,
         shadow_positions: dict[str, Position],
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str | None]:
         broker = self.broker
         policy = broker.account.policy
         qty_delta = order.quantity if order.side is OrderSide.BUY else -order.quantity
@@ -246,7 +252,7 @@ class ExecutionEngine:
         multiplier = broker.get_multiplier(order.asset)
 
         if abs(current_qty) <= 1e-12:
-            return policy.validate_new_position(
+            valid, reason = policy.validate_new_position(
                 asset=order.asset,
                 quantity=qty_delta,
                 price=validation_price,
@@ -254,8 +260,8 @@ class ExecutionEngine:
                 cash=shadow_cash - commission,
                 multiplier=multiplier,
             )
-        if is_reversal:
-            return policy.handle_reversal(
+        elif is_reversal:
+            valid, reason = policy.handle_reversal(
                 asset=order.asset,
                 current_quantity=current_qty,
                 order_quantity_delta=qty_delta,
@@ -265,15 +271,24 @@ class ExecutionEngine:
                 commission=commission,
                 multiplier=multiplier,
             )
-        return policy.validate_position_change(
-            asset=order.asset,
-            current_quantity=current_qty,
-            quantity_delta=qty_delta,
-            price=validation_price,
-            current_positions=shadow_positions,
-            cash=shadow_cash - commission,
-            multiplier=multiplier,
-        )
+        else:
+            valid, reason = policy.validate_position_change(
+                asset=order.asset,
+                current_quantity=current_qty,
+                quantity_delta=qty_delta,
+                price=validation_price,
+                current_positions=shadow_positions,
+                cash=shadow_cash - commission,
+                multiplier=multiplier,
+            )
+
+        if valid:
+            return True, reason, None
+        if new_qty < 0 and not policy.allows_short_selling():
+            return False, reason, "account_restriction"
+        if getattr(policy, "allow_leverage", False):
+            return False, reason, "insufficient_buying_power"
+        return False, reason, "insufficient_cash"
 
     def _commit_shadow_queue_fill(
         self,
@@ -388,8 +403,10 @@ class ExecutionEngine:
 
             fill.apply_share_rounding(order)
             if order.quantity <= 0:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order.reject(
+                    "Quantity rounds to zero (share_type=INTEGER)",
+                    "quantity_rounds_to_zero",
+                )
                 continue
 
             is_exit = self._is_exit_order(order)
@@ -431,8 +448,10 @@ class ExecutionEngine:
 
         fill.apply_share_rounding(order)
         if order.quantity <= 0:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+            order.reject(
+                "Quantity rounds to zero (share_type=INTEGER)",
+                "quantity_rounds_to_zero",
+            )
             return
 
         is_exit = self._is_exit_order(order)
@@ -441,8 +460,7 @@ class ExecutionEngine:
             fill_price = fill.check_fill(order, price)
             if fill_price is not None:
                 if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = "Insufficient cash (open cash check)"
+                    order.reject("Insufficient cash (open cash check)", "insufficient_cash")
                     return
 
                 # Under locked-short-cash semantics, short covers/reversals can be
@@ -456,15 +474,13 @@ class ExecutionEngine:
                     if broker.share_type.value == "integer":
                         max_qty = float(int(max_qty))
                     if max_qty <= 0:
-                        order.status = OrderStatus.REJECTED
-                        order.rejection_reason = "Insufficient cash to cover short"
+                        order.reject("Insufficient cash to cover short", "insufficient_cash")
                         return
                     if max_qty < order.quantity:
                         if broker.partial_fills_allowed:
                             order.quantity = max_qty
                         else:
-                            order.status = OrderStatus.REJECTED
-                            order.rejection_reason = "Insufficient cash to cover short"
+                            order.reject("Insufficient cash to cover short", "insufficient_cash")
                             return
 
                 fully_filled = fill.execute_fill(order, fill_price)
@@ -479,8 +495,7 @@ class ExecutionEngine:
                 return
 
             if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = "Insufficient cash (open cash check)"
+                order.reject("Insufficient cash (open cash check)", "insufficient_cash")
                 return
 
             # Under locked-short-cash semantics, reversal entries can be
@@ -495,21 +510,22 @@ class ExecutionEngine:
                 if broker.share_type.value == "integer":
                     max_qty = float(int(max_qty))
                 if max_qty <= 0:
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = "Insufficient cash for reversal"
+                    order.reject("Insufficient cash for reversal", "insufficient_cash")
                     return
                 if max_qty < order.quantity:
                     if broker.partial_fills_allowed:
                         order.quantity = max_qty
                     else:
-                        order.status = OrderStatus.REJECTED
-                        order.rejection_reason = "Insufficient cash for reversal"
+                        order.reject("Insufficient cash for reversal", "insufficient_cash")
                         return
 
+            rejection_code: str | None = None
             if skip_cash or use_simple_cash_check:
                 valid, rejection_reason = True, ""
             else:
-                valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
+                valid, rejection_reason, rejection_code = (
+                    broker.gatekeeper.validate_order_with_code(order, fill_price)
+                )
 
             insufficient_cash = "insufficient" in rejection_reason.lower()
             if valid:
@@ -535,11 +551,15 @@ class ExecutionEngine:
                     filled_orders.append(order)
                     broker._partial_orders.pop(order.order_id, None)
                 else:
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = rejection_reason
+                    order.reject(
+                        rejection_reason,
+                        rejection_code or "order_validation_failed",
+                    )
             else:
-                order.status = OrderStatus.REJECTED
-                order.rejection_reason = rejection_reason
+                order.reject(
+                    rejection_reason,
+                    rejection_code or "order_validation_failed",
+                )
 
     def _use_simple_next_bar_cash_check(self, order, use_open: bool) -> bool:
         broker = self.broker

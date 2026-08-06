@@ -1540,6 +1540,20 @@ class TestEvaluatePositionRules:
         assert broker.trades[-1].exit_reason == "signal"
         assert broker.trades[-1].exit_reason_detail == "scale_out_5%_25%"
 
+    def test_signal_exit_reason_is_present_on_fill_and_trade(self):
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        mark_prices(broker, {"AAPL": 100.0})
+        broker.submit_order("AAPL", 10.0, OrderSide.BUY)
+        broker._process_orders()
+
+        mark_prices(broker, {"AAPL": 105.0})
+        broker.submit_order("AAPL", 10.0, OrderSide.SELL)
+        broker._process_orders()
+
+        assert broker.fills[0].exit_reason == ""
+        assert broker.fills[-1].exit_reason == "signal"
+        assert broker.trades[-1].exit_reason == "signal"
+
     def test_evaluate_position_rules_exit_full_deferred(self):
         """Test EXIT_FULL action with defer_fill=True (NEXT_BAR_OPEN mode)."""
         from ml4t.backtest.risk.position.static import StopLoss

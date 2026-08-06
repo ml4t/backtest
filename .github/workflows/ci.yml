@@ -77,9 +77,13 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        env:
-          ML4T_REQUIRE_RUNTIME_BENCHMARK: "1"
         run: uv run pytest tests/ -v --tb=short -x --no-cov
+
+      - name: Run runtime regression benchmark
+        run: >-
+          uv run pytest
+          tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_runtime_vs_legacy_baseline
+          -v --tb=short --no-cov
 
   contracts:
     name: Cross-Engine Contracts

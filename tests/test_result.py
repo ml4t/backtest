@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -873,6 +874,46 @@ class TestBacktestResultParquet:
             with pytest.raises(UnsupportedArtifactVersionError, match="999"):
                 BacktestResult.from_parquet(path)
 
+            manifest["artifact_type"] = "foreign-result"
+            manifest_path.write_text(json.dumps(manifest))
+            with pytest.raises(UnsupportedArtifactVersionError, match="999"):
+                BacktestResult.from_parquet(path, recovery=True)
+
+    def test_foreign_artifact_type_fails_strict_and_recovers_current_schema(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            manifest_path = path / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["artifact_type"] = "foreign-result"
+            manifest_path.write_text(json.dumps(manifest))
+
+            with pytest.raises(ArtifactManifestError, match="foreign-result"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+
+    def test_noncanonical_manifest_component_fails_strict_and_recovers(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            manifest_path = path / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["components"]["trades"] = "other.parquet"
+            manifest_path.write_text(json.dumps(manifest))
+
+            with pytest.raises(ArtifactManifestError, match="noncanonical"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+            assert len(recovered.trades) == len(backtest_result.trades)
+
     def test_from_parquet_rejects_malformed_manifest(self, backtest_result: BacktestResult):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
@@ -945,6 +986,61 @@ class TestBacktestResultParquet:
             assert isinstance(metrics["final_value"], float)
             assert metrics["monthly_returns"] == [0.01, -0.02]
             assert metrics["segments"] == {"train": [1, 2], "test": [3]}
+
+    def test_nonfinite_metrics_use_portable_json_and_round_trip(
+        self, backtest_result: BacktestResult
+    ):
+        backtest_result.metrics.update(
+            {
+                "profit_factor": float("inf"),
+                "negative": float("-inf"),
+                "nested": [float("nan")],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+
+            raw_metrics = (path / "metrics.json").read_text()
+            assert "Infinity" not in raw_metrics
+            assert "NaN" not in raw_metrics
+            json.loads(raw_metrics, parse_constant=lambda value: pytest.fail(value))
+
+            loaded = BacktestResult.from_parquet(path)
+            assert math.isinf(loaded.metrics["profit_factor"])
+            assert loaded.metrics["profit_factor"] > 0
+            assert math.isinf(loaded.metrics["negative"])
+            assert loaded.metrics["negative"] < 0
+            assert math.isnan(loaded.metrics["nested"][0])
+
+    def test_written_keys_can_be_reused_as_include(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir) / "first"
+            second = Path(tmpdir) / "second"
+
+            written = backtest_result.to_parquet(first)
+            replicated = backtest_result.to_parquet(second, include=list(written))
+
+            assert set(replicated) == set(written)
+
+    def test_failed_reexport_removes_stale_manifest(
+        self, backtest_result: BacktestResult, monkeypatch: pytest.MonkeyPatch
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+
+            def fail_write(*args, **kwargs):
+                raise OSError("simulated component write failure")
+
+            monkeypatch.setattr(pl.DataFrame, "write_parquet", fail_write)
+            with pytest.raises(OSError, match="simulated"):
+                backtest_result.to_parquet(path)
+
+            assert not (path / "manifest.json").exists()
+            assert (path / ".artifact-incomplete").exists()
+            with pytest.raises(ArtifactIncompleteError, match="did not complete"):
+                BacktestResult.from_parquet(path)
 
     def test_metrics_json_rejects_unserializable_values(self):
         result = BacktestResult(

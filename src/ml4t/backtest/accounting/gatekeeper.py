@@ -187,6 +187,23 @@ class Gatekeeper:
                 multiplier=multiplier,
             )
 
+    def validate_order_with_code(self, order: Order, price: float) -> tuple[bool, str, str | None]:
+        """Validate an order and return a stable rejection code when invalid."""
+        valid, reason = self.validate_order(order, price)
+        if valid:
+            return True, reason, None
+
+        current_qty = self.account.get_position_quantity(order.asset)
+        quantity_delta = self._calculate_quantity_delta(order.side, order.quantity)
+        resulting_qty = current_qty + quantity_delta
+        if resulting_qty < 0 and not self.account.policy.allows_short_selling():
+            code = "account_restriction"
+        elif getattr(self.account.policy, "allow_leverage", False):
+            code = "insufficient_buying_power"
+        else:
+            code = "insufficient_cash"
+        return False, reason, code
+
     def _is_reversal(self, current_qty: float, order_qty_delta: float) -> bool:
         """Check if order reverses position (long → short or short → long).
 

@@ -82,17 +82,20 @@ class OrderBook:
         if self._should_apply_submission_precheck(order) and not self._passes_submission_precheck(
             order
         ):
-            order.status = OrderStatus.REJECTED
             if not order.rejection_reason:
                 order.rejection_reason = "Insufficient cash (submission precheck)"
+            order.reject(order.rejection_reason, order._rejection_code or "insufficient_cash")
             return order
 
         if self._should_apply_buying_power_reservation(
             order
         ) and not self._passes_buying_power_check(order):
-            order.status = OrderStatus.REJECTED
             if not order.rejection_reason:
                 order.rejection_reason = "Insufficient buying power"
+            order.reject(
+                order.rejection_reason,
+                order._rejection_code or "insufficient_buying_power",
+            )
             return order
 
         broker.pending_orders.append(order)
@@ -134,21 +137,21 @@ class OrderBook:
         # Apply share rounding
         fill.apply_share_rounding(order)
         if order.quantity <= 0:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+            order.reject(
+                "Quantity rounds to zero (share_type=INTEGER)",
+                "quantity_rounds_to_zero",
+            )
             return order
 
         # Get fill price (close price for same-bar)
         price = fill.get_fill_price_for_order(order, use_open=False)
         if price is None:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "No price available"
+            order.reject("No price available", "price_unavailable")
             return order
 
         fill_price = fill.check_fill(order, price)
         if fill_price is None:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "Fill check failed"
+            order.reject("Fill check failed", "fill_check_failed")
             return order
 
         # Determine if this is an exit (reduces existing position)
@@ -164,27 +167,35 @@ class OrderBook:
         else:
             # Entries: validate against real cash via gatekeeper
             if not broker.skip_cash_validation:
-                valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
+                valid, rejection_reason, rejection_code = (
+                    broker.gatekeeper.validate_order_with_code(order, fill_price)
+                )
                 if not valid:
                     allow_rebalance_partial = (
                         order.rebalance_id is not None and broker.share_type.value == "integer"
                     )
                     if broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
                         if not fill.try_partial_fill(order, fill_price):
-                            order.status = OrderStatus.REJECTED
-                            order.rejection_reason = rejection_reason
+                            order.reject(
+                                rejection_reason,
+                                rejection_code or "order_validation_failed",
+                            )
                             return order
                         broker._partial_orders.pop(order.order_id, None)
                         return order
                     if allow_rebalance_partial and "insufficient" in rejection_reason.lower():
                         if not fill.try_partial_fill(order, fill_price):
-                            order.status = OrderStatus.REJECTED
-                            order.rejection_reason = rejection_reason
+                            order.reject(
+                                rejection_reason,
+                                rejection_code or "order_validation_failed",
+                            )
                             return order
                         broker._partial_orders.pop(order.order_id, None)
                         return order
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = rejection_reason
+                    order.reject(
+                        rejection_reason,
+                        rejection_code or "order_validation_failed",
+                    )
                     return order
 
             fully_filled = fill.execute_fill(order, fill_price)
@@ -314,6 +325,7 @@ class OrderBook:
             order.quantity = float(int(order.quantity))
             if order.quantity <= 0:
                 order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order._rejection_code = "quantity_rounds_to_zero"
                 return False
 
         signal_price = getattr(order, "_signal_price", None)
@@ -399,6 +411,7 @@ class OrderBook:
             order.quantity = float(int(order.quantity))
             if order.quantity <= 0:
                 order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order._rejection_code = "quantity_rounds_to_zero"
                 return False
 
         signal_price = getattr(order, "_signal_price", None)
@@ -515,6 +528,11 @@ class OrderBook:
 
         if not valid:
             order.rejection_reason = reason or "Insufficient buying power (submission precheck)"
+            resulting_qty = old_qty + size
+            if resulting_qty < 0 and not broker.account.policy.allows_short_selling():
+                order._rejection_code = "account_restriction"
+            else:
+                order._rejection_code = "insufficient_buying_power"
             return False
 
         multiplier = broker.get_multiplier(order.asset)

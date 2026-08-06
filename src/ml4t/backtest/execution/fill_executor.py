@@ -182,6 +182,7 @@ class FillExecutor:
         close_commission = None
         open_commission = None
         position = broker.positions.get(order.asset)
+        is_exit_fill = position is not None and position.quantity * signed_qty < 0
         if position is not None:
             new_qty = position.quantity + signed_qty
             if _is_position_flip(position.quantity, new_qty):
@@ -228,18 +229,23 @@ class FillExecutor:
             bid_size=quote_context["bid_size"],
             ask_size=quote_context["ask_size"],
             available_size=quote_context["available_size"],
-            exit_reason=order._exit_reason.value if order._exit_reason is not None else "",
+            exit_reason=_get_exit_reason(order) if is_exit_fill else "",
             exit_reason_detail=order._risk_exit_reason,
         )
         broker.fills.append(fill)
 
         # Determine if partial fill
         is_partial = order.order_id in broker._partial_orders
-        order.filled_quantity += fill_quantity
+        previous_filled_quantity = order.filled_quantity
+        cumulative_filled_quantity = previous_filled_quantity + fill_quantity
+        previous_fill_notional = (order.filled_price or 0.0) * previous_filled_quantity
+        order.filled_price = (
+            previous_fill_notional + fill_price * fill_quantity
+        ) / cumulative_filled_quantity
+        order.filled_quantity = cumulative_filled_quantity
         if not is_partial:
             order.status = OrderStatus.FILLED
             order.filled_at = current_time
-            order.filled_price = fill_price
 
         # Build fill context
         ctx = FillContext(

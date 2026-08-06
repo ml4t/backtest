@@ -27,6 +27,22 @@ class _NoOrders(Strategy):
         pass
 
 
+class _ShortOrder(Strategy):
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if not broker.orders:
+            broker.submit_order("AAPL", 1.0, OrderSide.SELL)
+
+
+class _CaptureOrder(Strategy):
+    def __init__(self, quantity: float) -> None:
+        self.quantity = quantity
+        self.order: Order | None = None
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if self.order is None:
+            self.order = broker.submit_order("AAPL", self.quantity)
+
+
 def _prices() -> pl.DataFrame:
     return pl.DataFrame(
         {
@@ -94,6 +110,16 @@ def test_no_orders_and_all_orders_rejected_are_distinguishable() -> None:
     assert all_rejected.metrics["num_rejected_orders"] == 1
 
 
+def test_cash_account_short_rejection_has_structured_restriction_code() -> None:
+    result = _run(_ShortOrder())
+
+    assert len(result.rejected_orders) == 1
+    rejected = result.rejected_orders[0]
+    assert rejected.rejection_reason == "Short selling not allowed in cash account"
+    assert rejected._rejection_code == "account_restriction"
+    assert rejected.rejection_code == "account_restriction"
+
+
 def test_rejected_orders_round_trip_through_result_artifact(tmp_path) -> None:
     result = _run(_UnaffordableOrder())
 
@@ -153,12 +179,50 @@ def test_partially_filled_then_rejected_order_is_reconcilable() -> None:
     assert record["remaining_quantity"] == 10.0
 
 
+def test_completed_multi_bar_order_accumulates_quantity_and_average_price() -> None:
+    strategy = _CaptureOrder(12.0)
+    prices = pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, day) for day in (2, 3, 4)],
+            "asset": ["AAPL"] * 3,
+            "open": [10.0, 20.0, 40.0],
+            "high": [10.0, 20.0, 40.0],
+            "low": [10.0, 20.0, 40.0],
+            "close": [10.0, 20.0, 40.0],
+            "volume": [5.0, 5.0, 5.0],
+        }
+    )
+
+    result = run_backtest(
+        prices=prices,
+        strategy=strategy,
+        config=BacktestConfig(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            partial_fills_allowed=True,
+        ),
+        execution_limits=VolumeParticipationLimit(max_participation=1.0),
+    )
+
+    assert strategy.order is not None
+    assert strategy.order.status is OrderStatus.FILLED
+    assert strategy.order.filled_quantity == sum(fill.quantity for fill in result.fills) == 12.0
+    expected_average = sum(fill.quantity * fill.price for fill in result.fills) / 12.0
+    assert strategy.order.filled_price == pytest.approx(expected_average)
+
+
 @pytest.mark.parametrize(
     ("reason", "expected"),
     [
         ("Insufficient cash to cover short", "insufficient_cash"),
         ("Insufficient buying power", "insufficient_buying_power"),
-        ("Short selling not allowed", "account_restriction"),
+        ("Position reversal not allowed in cash account", "account_restriction"),
+        ("Short selling not allowed in cash account", "account_restriction"),
+        (
+            "Position reversal not allowed in cash account (current: 10, delta: -20)",
+            "account_restriction",
+        ),
+        ("Short positions not allowed in cash account", "account_restriction"),
         ("No price available", "price_unavailable"),
     ],
 )

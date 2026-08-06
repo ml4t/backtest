@@ -293,6 +293,12 @@ python validation/run_all_correctness.py --framework zipline --scenarios 01,03,0
 
 ## Performance
 
+Run the instrument-free runtime regression check with:
+
+```bash
+uv run pytest tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_runtime_vs_legacy_baseline --no-cov
+```
+
 Benchmark on 250 assets x 20 years daily data (1.26M bars):
 
 | Metric | Value |

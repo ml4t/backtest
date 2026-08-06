@@ -256,9 +256,10 @@ Returns a Polars DataFrame with columns:
 | `exit_reason_detail` | String | Detailed risk or liquidation cause, when available |
 | `status` | String | "closed", "partial", or "open" |
 
-Partial reductions use `status="partial"`; lifecycle metrics exclude them to avoid counting one
-position's holding period and excursions more than once. Open positions at the end of the backtest
-use `status="open"` and mark-to-market values.
+Partial reductions use `status="partial"`. Realized-P&L metrics include partial and fully closed
+records, while holding-period and excursion metrics use only fully closed records to avoid counting
+one position lifecycle more than once. Open positions at the end of the backtest use `status="open"`
+and mark-to-market values.
 
 ## Equity DataFrame
 
@@ -424,6 +425,10 @@ or ignored component. Unsupported manifest schema versions still fail because th
 is not defined. If an export selects `config` or `spec`, whether through the default component set
 or an explicit `include`, its absence or a serialization failure raises `ArtifactWriteError`
 instead of omitting the file. Component payloads are serialized before output files are created.
+Non-finite metric floats use a tagged JSON object and are restored on load, so `metrics.json`
+remains standards-compliant without losing `NaN` or infinity. The returned path mapping includes
+`manifest`; passing its keys back through `include` treats that key as a no-op because the manifest
+is always written.
 
 ## Integration with ml4t-diagnostic
 

@@ -153,4 +153,8 @@ def test_partial_exit_scale_up_and_close_reconcile_end_to_end() -> None:
     assert sum(trade.fees for trade in result.trades) == pytest.approx(
         sum(fill.commission for fill in result.fills)
     )
-    assert result.metrics["num_trades"] == 1
+    assert result.metrics["num_trades"] == 2
+    assert result.metrics["winning_trades"] == 2
+    assert result.trade_analyzer is not None
+    assert result.trade_analyzer.avg_bars_held == result.trades[-1].bars_held
+    assert result.trade_analyzer.avg_mfe == result.trades[-1].mfe

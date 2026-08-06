@@ -191,6 +191,8 @@ class Order:
             return "price_unavailable"
         if "fill check" in reason:
             return "fill_check_failed"
+        if "not allowed" in reason:
+            return "account_restriction"
         if "buying power" in reason or "margin" in reason:
             return "insufficient_buying_power"
         if "cash" in reason or "insufficient" in reason:
@@ -198,6 +200,12 @@ class Order:
         if "short" in reason or "reversal not allowed" in reason:
             return "account_restriction"
         return "order_validation_failed"
+
+    def reject(self, reason: str, code: str) -> None:
+        """Move the order to a rejected state with a stable reason code."""
+        self.status = OrderStatus.REJECTED
+        self.rejection_reason = reason
+        self._rejection_code = code
 
 
 @dataclass

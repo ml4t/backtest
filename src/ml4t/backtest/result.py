@@ -22,6 +22,7 @@ Example:
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,7 @@ _ARTIFACT_TYPE = "ml4t-backtest-result"
 _ARTIFACT_SCHEMA_VERSION = 1
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
+_NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
 _COMPONENT_FILES = {
     "trades": "trades.parquet",
     "fills": "fills.parquet",
@@ -65,8 +67,18 @@ _REQUIRED_RESULT_COMPONENTS = frozenset(
 
 def _serialize_metric_value(value: Any, *, path: str) -> Any:
     """Convert a metric value to JSON-safe built-in containers and scalars."""
-    if isinstance(value, int | float | str | bool | type(None)):
+    if isinstance(value, bool | str | type(None) | int):
         return value
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
+        if math.isnan(value):
+            label = "nan"
+        elif value > 0:
+            label = "positive_infinity"
+        else:
+            label = "negative_infinity"
+        return {_NONFINITE_FLOAT_KEY: label}
     if isinstance(value, datetime):
         return value.isoformat()
     if isinstance(value, list | tuple):
@@ -88,6 +100,25 @@ def _serialize_metric_value(value: Any, *, path: str) -> Any:
     except (ImportError, AttributeError):
         pass
     raise ArtifactWriteError(f"{path} has unsupported value type {type(value).__name__}")
+
+
+def _deserialize_metric_value(value: Any) -> Any:
+    """Restore tagged non-finite floats from a portable JSON payload."""
+    if isinstance(value, list):
+        return [_deserialize_metric_value(item) for item in value]
+    if isinstance(value, dict):
+        if set(value) == {_NONFINITE_FLOAT_KEY}:
+            labels = {
+                "nan": float("nan"),
+                "positive_infinity": float("inf"),
+                "negative_infinity": float("-inf"),
+            }
+            label = value[_NONFINITE_FLOAT_KEY]
+            if label not in labels:
+                raise ValueError(f"Unknown non-finite metric label: {label!r}")
+            return labels[label]
+        return {key: _deserialize_metric_value(item) for key, item in value.items()}
+    return value
 
 
 @dataclass(frozen=True)
@@ -669,9 +700,10 @@ class BacktestResult:
         """
         explicitly_selected = include is not None
         requested = list(include) if include is not None else list(_COMPONENT_FILES)
-        unknown = sorted(set(requested) - _COMPONENT_FILES.keys())
+        unknown = sorted(set(requested) - _COMPONENT_FILES.keys() - {"manifest"})
         if unknown:
             raise ArtifactWriteError(f"Unknown artifact components requested: {unknown}")
+        requested = [name for name in requested if name != "manifest"]
 
         unavailable: dict[str, str] = {}
         if self.predictions is None:
@@ -694,7 +726,7 @@ class BacktestResult:
                     key: _serialize_metric_value(value, path=f"metrics[{key!r}]")
                     for key, value in self.metrics.items()
                 }
-                metrics_payload = json.dumps(serializable_metrics, indent=2)
+                metrics_payload = json.dumps(serializable_metrics, indent=2, allow_nan=False)
             except ArtifactWriteError:
                 raise
             except Exception as exc:
@@ -727,6 +759,8 @@ class BacktestResult:
         path.mkdir(parents=True, exist_ok=True)
         marker_path = path / _INCOMPLETE_MARKER
         marker_path.write_text("Result artifact write did not complete.\n")
+        manifest_path = path / _MANIFEST_FILE
+        manifest_path.unlink(missing_ok=True)
 
         written: dict[str, Path] = {}
 
@@ -800,10 +834,9 @@ class BacktestResult:
                 name: reason for name, reason in unavailable.items() if name in requested
             },
         }
-        manifest_path = path / _MANIFEST_FILE
         try:
             with open(manifest_path, "w") as file:
-                json.dump(manifest, file, indent=2)
+                json.dump(manifest, file, indent=2, allow_nan=False)
         except Exception as exc:
             raise ArtifactWriteError(f"Failed to write artifact manifest: {exc}") from exc
         written["manifest"] = manifest_path
@@ -906,6 +939,14 @@ class BacktestResult:
                 components = discover_legacy_components()
 
         if manifest is not None:
+            schema_version = manifest.get("schema_version")
+            if schema_version != _ARTIFACT_SCHEMA_VERSION:
+                raise UnsupportedArtifactVersionError(
+                    f"Unsupported result artifact schema version {schema_version!r}; "
+                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
+                )
+
+        if manifest is not None:
             artifact_type = manifest.get("artifact_type")
             if artifact_type != _ARTIFACT_TYPE:
                 message = f"Unsupported artifact type: {artifact_type!r}"
@@ -916,12 +957,6 @@ class BacktestResult:
                 manifest = None
 
         if manifest is not None:
-            schema_version = manifest.get("schema_version")
-            if schema_version != _ARTIFACT_SCHEMA_VERSION:
-                raise UnsupportedArtifactVersionError(
-                    f"Unsupported result artifact schema version {schema_version!r}; "
-                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
-                )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
                 isinstance(name, str) and isinstance(filename, str)
@@ -1144,7 +1179,7 @@ class BacktestResult:
                 data = json.load(file)
             if not isinstance(data, dict):
                 raise TypeError("metrics root must be an object")
-            return data
+            return _deserialize_metric_value(data)
 
         def read_config(component_path: Path):
             import yaml

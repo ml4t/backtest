@@ -15,12 +15,16 @@ class TradeAnalyzer:
     """Analyze a collection of trades for performance statistics."""
 
     trades: Sequence["Trade"]
+    _lifecycle_trades: list["Trade"] = field(init=False, repr=False)
 
     def __post_init__(self):
         self._pnls = np.array([t.pnl for t in self.trades]) if self.trades else np.array([])
         self._returns = (
             np.array([t.pnl_percent for t in self.trades]) if self.trades else np.array([])
         )
+        self._lifecycle_trades = [
+            trade for trade in self.trades if getattr(trade, "status", "closed") == "closed"
+        ]
 
     @property
     def num_trades(self) -> int:
@@ -117,9 +121,9 @@ class TradeAnalyzer:
     @property
     def avg_bars_held(self) -> float:
         """Average number of bars positions were held."""
-        if not self.trades:
+        if not self._lifecycle_trades:
             return 0.0
-        bars = [t.bars_held for t in self.trades if hasattr(t, "bars_held")]
+        bars = [t.bars_held for t in self._lifecycle_trades if hasattr(t, "bars_held")]
         return float(np.mean(bars)) if bars else 0.0
 
     @property
@@ -190,17 +194,17 @@ class TradeAnalyzer:
     @property
     def avg_mfe(self) -> float:
         """Average maximum favorable excursion across trades."""
-        if not self.trades:
+        if not self._lifecycle_trades:
             return 0.0
-        mfes = [t.mfe for t in self.trades]
+        mfes = [t.mfe for t in self._lifecycle_trades]
         return float(np.mean(mfes))
 
     @property
     def avg_mae(self) -> float:
         """Average maximum adverse excursion across trades."""
-        if not self.trades:
+        if not self._lifecycle_trades:
             return 0.0
-        maes = [t.mae for t in self.trades]
+        maes = [t.mae for t in self._lifecycle_trades]
         return float(np.mean(maes))
 
     @property
@@ -210,10 +214,10 @@ class TradeAnalyzer:
         Values close to 1.0 indicate exits near peak profit.
         Values close to 0.0 indicate exits gave back most gains.
         """
-        if not self.trades:
+        if not self._lifecycle_trades:
             return 0.0
         ratios = []
-        for t in self.trades:
+        for t in self._lifecycle_trades:
             if t.mfe > 0:
                 ratios.append(t.pnl_percent / t.mfe)
         return float(np.mean(ratios)) if ratios else 0.0
@@ -225,10 +229,10 @@ class TradeAnalyzer:
         Calculated as (MAE - final_loss) / MAE for losing trades.
         Higher values indicate better recovery from drawdowns.
         """
-        if not self.trades:
+        if not self._lifecycle_trades:
             return 0.0
         ratios = []
-        for t in self.trades:
+        for t in self._lifecycle_trades:
             if t.mae < 0 and t.pnl_percent < 0:
                 # Both negative: MAE was -10%, final was -5% = recovered 50%
                 recovery = (t.pnl_percent - t.mae) / abs(t.mae)
