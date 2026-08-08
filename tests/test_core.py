@@ -706,6 +706,16 @@ class TestEngine:
         assert portfolio_state["open_positions"].to_list() == [1, 0, 0]
         assert portfolio_state["gross_exposure"].to_list() == [1000.0, 0.0, 0.0]
 
+        assert results.fills is not engine.broker.fills
+        assert results.equity_curve is not engine.equity_curve
+        assert results.portfolio_state is not engine.portfolio_state
+        results.fills.clear()
+        results.equity_curve.clear()
+        results.portfolio_state.clear()
+        assert len(engine.broker.fills) == 2
+        assert len(engine.equity_curve) == 3
+        assert len(engine.portfolio_state) == 3
+
     def test_activity_metrics_prefer_explicit_rebalance_ids(self):
         prices = pl.DataFrame(
             {

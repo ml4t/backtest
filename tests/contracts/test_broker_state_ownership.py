@@ -73,17 +73,25 @@ COLLECTION_COPY_OR_READ_CALLS = {
     "all",
     "any",
     "bool",
+    "dict",
+    "enumerate",
+    "frozenset",
     "iter",
     "len",
     "list",
     "max",
     "min",
+    "next",
+    "reversed",
     "set",
     "sorted",
+    "str",
     "sum",
     "tuple",
+    "zip",
 }
-COLLECTION_READ_METHODS = {"get_spendable_cash"}
+# fill_engine.py passes positions to this read-only accounting policy method.
+COLLECTION_READ_METHOD_PATHS = {("broker", "account", "policy", "get_spendable_cash")}
 
 
 def _parse(path: Path) -> ast.Module:
@@ -107,6 +115,15 @@ def _references_strategy(node: ast.AST) -> bool:
         and child.attr == "strategy"
         for child in ast.walk(node)
     )
+
+
+def _attribute_path(node: ast.AST) -> tuple[str, ...] | None:
+    if isinstance(node, ast.Name):
+        return (node.id,)
+    if isinstance(node, ast.Attribute):
+        parent = _attribute_path(node.value)
+        return (*parent, node.attr) if parent is not None else None
+    return None
 
 
 def _private_state_names(broker_class: ast.ClassDef) -> set[str]:
@@ -175,6 +192,23 @@ def _broker_collection_access(node: ast.AST) -> str | None:
         and _references_broker(node.value)
     ):
         return node.attr
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        for element in node.elts:
+            if (collection := _broker_collection_access(element)) is not None:
+                return collection
+    if isinstance(node, ast.Dict):
+        for element in [*node.keys, *node.values]:
+            if (
+                element is not None
+                and (collection := _broker_collection_access(element)) is not None
+            ):
+                return collection
+    if isinstance(node, ast.Starred):
+        return _broker_collection_access(node.value)
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+        return _broker_collection_access(node.elt)
+    if isinstance(node, ast.DictComp):
+        return _broker_collection_access(node.key) or _broker_collection_access(node.value)
     return None
 
 
@@ -201,7 +235,7 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
     if isinstance(node, ast.Call):
         if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_READ_CALLS:
             return None
-        if isinstance(node.func, ast.Attribute) and node.func.attr in COLLECTION_READ_METHODS:
+        if _attribute_path(node.func) in COLLECTION_READ_METHOD_PATHS:
             return None
         for argument in [*node.args, *(keyword.value for keyword in node.keywords)]:
             if (collection := _broker_collection_access(argument)) is not None:
@@ -212,7 +246,7 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
         and (collection := _broker_collection_access(node.value)) is not None
     ):
         return collection
-    if isinstance(node, ast.Return) and node.value is not None:
+    if isinstance(node, (ast.Return, ast.Yield, ast.YieldFrom)) and node.value is not None:
         return _broker_collection_access(node.value)
     return None
 
@@ -299,14 +333,29 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
         "    order_count = len(broker.orders)\n"
         "    fills_copy = list(broker.fills)\n"
         "    consume(broker.trades)\n"
-        "    return broker.fills\n"
+        "    consume({'fills': broker.fills})\n"
+        "    unrelated.get_spendable_cash(broker.trades)\n"
+        "    broker.account.policy.get_spendable_cash(cash, broker.positions)\n"
+        "    yield broker.fills\n"
+        "    yield from (broker.fills,)\n"
+        "    return [broker.fills]\n"
     )
 
     assert sorted(
         access
         for node in ast.walk(tree)
         if (access := _mutable_collection_access(node)) is not None
-    ) == ["fills", "fills", "orders", "positions", "trades"]
+    ) == [
+        "fills",
+        "fills",
+        "fills",
+        "fills",
+        "fills",
+        "orders",
+        "positions",
+        "trades",
+        "trades",
+    ]
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:

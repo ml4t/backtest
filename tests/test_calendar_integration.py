@@ -311,6 +311,44 @@ class TestCalendarEnforcementIntraday:
 
         assert result.metrics["skipped_bars"] == 1
 
+    def test_timezone_diagnostic_is_bounded_to_twenty_dates(self):
+        trading_dates = []
+        current = datetime(2024, 4, 1)
+        while len(trading_dates) < 25:
+            if current.weekday() < 5:
+                trading_dates.append(current)
+            current += timedelta(days=1)
+        timestamps = [
+            date.replace(hour=hour, minute=minute)
+            for date in trading_dates
+            for hour, minute in [(9, 30), (15, 59)]
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        with pytest.warns(UserWarning, match="in a 40-bar sample"):
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
+        assert len(timestamps) == 50
+        assert result.metrics["skipped_bars"] == 25
+
     def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
         timestamps = [
             datetime(2024, 1, 2, 14, 30),
@@ -373,9 +411,9 @@ class TestCalendarEnforcementIntraday:
 
         assert 0 < result.metrics["skipped_bars"] < len(timestamps)
 
-    def test_naive_local_extended_hours_warn_when_misread_as_utc(self):
-        start = datetime(2024, 1, 2, 4, 0)
-        timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
+    def test_naive_utc_partial_day_does_not_warn_for_small_counterfactual_gain(self):
+        start = datetime(2024, 1, 2, 6, 0)
+        timestamps = [start + timedelta(hours=index) for index in range(15)]
         frame = pl.DataFrame(
             {
                 "timestamp": timestamps,
@@ -388,19 +426,19 @@ class TestCalendarEnforcementIntraday:
             }
         )
 
-        with pytest.warns(
-            UserWarning,
-            match="Interpreting naive timestamps as 'America/New_York'",
-        ):
-            Engine(
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = Engine(
                 feed=DataFeed(prices_df=frame),
                 strategy=SimpleStrategy(),
                 config=BacktestConfig(
                     calendar="NYSE",
                     enforce_sessions=True,
-                    data_frequency=DataFrequency.MINUTE_30,
+                    data_frequency=DataFrequency.HOURLY,
                 ),
             ).run()
+
+        assert result.metrics["skipped_bars"] == 9
 
     def test_intraday_weekend_skipped(self):
         """Weekend intraday bars are skipped by the precomputed session mask."""

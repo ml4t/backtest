@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import warnings
 from datetime import date, datetime
+from math import ceil
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
@@ -20,10 +21,11 @@ if TYPE_CHECKING:
     from .config import BacktestConfig
     from .result import BacktestResult
 
-# Counterfactual checks are bounded and require the alternative to explain material bar loss.
+# Counterfactual checks are bounded and require recovery of 10% of sampled bars plus 25% relative.
 _TIMEZONE_DIAGNOSTIC_MAX_DATES = 20
 _TIMEZONE_DIAGNOSTIC_MAX_RETENTION = 0.5
-_TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN = 1.05
+_TIMEZONE_DIAGNOSTIC_MIN_ABSOLUTE_GAIN = 0.1
+_TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN = 1.25
 _TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS = 0.1
 
 
@@ -187,9 +189,14 @@ class Engine:
                     relative_retention_gain = float("inf")
                 else:
                     relative_retention_gain = 1.0
+                minimum_absolute_gain = max(
+                    1,
+                    ceil(sample_bars * _TIMEZONE_DIAGNOSTIC_MIN_ABSOLUTE_GAIN),
+                )
                 alternative_timezone_explains_loss = (
                     compare_calendar_timezone
-                    and alternative_sample_retained > configured_sample_retained
+                    and alternative_sample_retained - configured_sample_retained
+                    >= minimum_absolute_gain
                     and relative_retention_gain >= _TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN
                 )
                 possible_session_misconfiguration = (
@@ -197,8 +204,8 @@ class Engine:
                     or alternative_timezone_explains_loss
                 )
                 should_warn = possible_session_misconfiguration and any(
-                    is_trading_day_fn(calendar_id, date)
-                    for date in {ts.date() for ts in timestamps}
+                    is_trading_day_fn(calendar_id, feed_date)
+                    for feed_date in {ts.date() for ts in timestamps}
                 )
                 if should_warn:
                     timezone_note = ""
@@ -607,11 +614,11 @@ class Engine:
 
         return BacktestResult(
             trades=all_trades,  # Includes both closed and open trades
-            equity_curve=self.equity_curve,
+            equity_curve=list(self.equity_curve),
             fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),
             predictions=self.feed.signals,
-            portfolio_state=self.portfolio_state,
+            portfolio_state=list(self.portfolio_state),
             metrics=metrics,
             config=self.config,
             equity=equity,
