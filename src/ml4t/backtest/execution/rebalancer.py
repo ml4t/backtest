@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from ..broker import Broker
     from ..types import Order
 
-from ..config import RebalanceMode, ShareType
+from ..config import ExecutionPrice, RebalanceMode, ShareType
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
 from .schedule import RebalanceSchedule, resolve_rebalance_timestamps
@@ -194,7 +194,7 @@ class TargetWeightExecutor:
 
         # 1. Cancel pending orders if configured (prevents double-allocation)
         if self.config.cancel_before_rebalance:
-            for pending_order in list(broker.pending_orders):
+            for pending_order in broker.get_pending_orders():
                 broker.cancel_order(pending_order.order_id)
 
         equity = broker.get_account_value()
@@ -389,9 +389,7 @@ class TargetWeightExecutor:
         """Return a mark price for an existing position, tolerating sparse bars."""
         price = self._get_rebalance_price(asset, data)
         if price is None:
-            price = broker._current_prices.get(asset)
-        if price is None:
-            price = broker._last_prices.get(asset)
+            price = broker.get_price_for_source(ExecutionPrice.PRICE, asset)
         if price is None:
             price = pos.current_price
         if price is None:
@@ -413,7 +411,7 @@ class TargetWeightExecutor:
             return {}
 
         weights = {}
-        for asset, pos in broker.positions.items():
+        for asset, pos in broker.get_positions().items():
             price = self._get_position_price(asset, pos, data, broker)
             if price is None or price <= 0:
                 continue
@@ -442,7 +440,7 @@ class TargetWeightExecutor:
 
         # Start with actual positions
         effective_value: dict[str, float] = {}
-        for asset, pos in broker.positions.items():
+        for asset, pos in broker.get_positions().items():
             price = self._get_position_price(asset, pos, data, broker)
             if price is None or price <= 0:
                 continue
@@ -450,7 +448,7 @@ class TargetWeightExecutor:
             effective_value[asset] = pos.quantity * price * multiplier
 
         # Add net value of pending orders
-        for order in broker.pending_orders:
+        for order in broker.get_pending_orders():
             price = order.limit_price or data.get(order.asset, {}).get("close")
             if price is not None and price > 0:
                 multiplier = broker.get_multiplier(order.asset)

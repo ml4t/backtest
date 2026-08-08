@@ -7,6 +7,7 @@ when a calendar is configured with enforce_sessions=True.
 from datetime import datetime, timedelta
 
 import polars as pl
+import pytest
 
 from ml4t.backtest import DataFeed, Engine, OrderSide, Strategy
 from ml4t.backtest.config import BacktestConfig, DataFrequency
@@ -238,6 +239,37 @@ class TestCalendarEnforcementIntraday:
 
     Timezone-naive timestamps use the configured feed timezone.
     """
+
+    def test_naive_exchange_local_bars_warn_when_default_timezone_is_used(self):
+        timestamps = [
+            datetime(2024, 1, 2, 9, 30),
+            datetime(2024, 1, 2, 15, 59),
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 2,
+                "open": [100.0] * 2,
+                "high": [100.0] * 2,
+                "low": [100.0] * 2,
+                "close": [100.0] * 2,
+                "volume": [100_000] * 2,
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        )
+
+        with pytest.warns(UserWarning, match="Naive intraday timestamps are interpreted as 'UTC'"):
+            result = engine.run()
+
+        assert result.metrics["skipped_bars"] == 1
 
     def test_intraday_weekend_skipped(self):
         """Weekend intraday bars are skipped (via trading day fallback)."""

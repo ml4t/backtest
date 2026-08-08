@@ -24,10 +24,18 @@ def _load_checker() -> ModuleType:
 
 def test_required_examples_are_selected_from_primary_adoption_docs() -> None:
     checker = _load_checker()
-    examples = checker.collect_examples(checker._DEFAULT_PATHS)
+    examples = checker.collect_examples(checker._DEFAULT_PATHS, require_all=True)
 
     assert {example.name for example in examples} == checker._REQUIRED_EXAMPLES
-    assert {example.language for example in examples} == {"bash", "python"}
+    assert {example.language for example in examples} == {"python"}
+
+
+def test_explicit_documentation_path_does_not_require_the_default_example_set() -> None:
+    checker = _load_checker()
+
+    examples = checker.collect_examples([_ROOT / "docs" / "getting-started" / "quickstart.md"])
+
+    assert {example.name for example in examples} == {"quickstart-minimal"}
 
 
 def test_documentation_ci_installs_wheel_before_running_examples() -> None:

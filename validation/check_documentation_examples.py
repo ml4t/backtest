@@ -17,9 +17,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "getting-started" / "installation.md",
     _ROOT / "docs" / "getting-started" / "quickstart.md",
 )
-_REQUIRED_EXAMPLES = frozenset(
-    {"installation-import", "readme-quickstart", "quickstart-minimal"}
-)
+_REQUIRED_EXAMPLES = frozenset({"installation-import", "readme-quickstart", "quickstart-minimal"})
 _EXAMPLE = re.compile(
     r"<!-- ml4t-doc-test: (?P<name>[a-z0-9-]+) -->\s*"
     r"```(?P<language>python|bash)\n(?P<code>.*?)\n```",
@@ -35,7 +33,9 @@ class Example:
     source: Path
 
 
-def collect_examples(paths: list[Path] | tuple[Path, ...]) -> list[Example]:
+def collect_examples(
+    paths: list[Path] | tuple[Path, ...], *, require_all: bool = False
+) -> list[Example]:
     """Collect uniquely named executable examples from Markdown files."""
     examples: list[Example] = []
     names: set[str] = set()
@@ -53,9 +53,10 @@ def collect_examples(paths: list[Path] | tuple[Path, ...]) -> list[Example]:
                     source=path,
                 )
             )
-    missing = sorted(_REQUIRED_EXAMPLES - names)
-    if missing:
-        raise ValueError(f"Required documentation examples are missing: {missing}")
+    if require_all:
+        missing = sorted(_REQUIRED_EXAMPLES - names)
+        if missing:
+            raise ValueError(f"Required documentation examples are missing: {missing}")
     return examples
 
 
@@ -85,7 +86,7 @@ def main() -> int:
     parser.add_argument("paths", nargs="*", type=Path)
     arguments = parser.parse_args()
     paths = arguments.paths or list(_DEFAULT_PATHS)
-    run_examples(collect_examples(paths))
+    run_examples(collect_examples(paths, require_all=not arguments.paths))
     return 0
 
 

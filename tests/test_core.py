@@ -314,6 +314,21 @@ class TestDataFeed:
         ):
             DataFeed(prices_df=prices)
 
+    def test_explicit_missing_price_column_does_not_silently_fall_back_to_close(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="price_col='vwap' not found in price columns",
+        ):
+            DataFeed(prices_df=prices, price_col="vwap")
+
     @pytest.mark.parametrize("source", ["prices", "signals", "context"])
     def test_path_and_dataframe_for_same_source_are_rejected(self, source):
         prices = pl.DataFrame(

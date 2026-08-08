@@ -4,7 +4,6 @@ import ast
 from pathlib import Path
 
 from ml4t.backtest import Broker
-from ml4t.backtest.core.state import STATE_OWNERS
 
 SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
 COLLABORATORS = (
@@ -14,35 +13,59 @@ COLLABORATORS = (
     SOURCE_ROOT / "core" / "portfolio_ledger.py",
     SOURCE_ROOT / "core" / "risk_engine.py",
     SOURCE_ROOT / "execution" / "fill_executor.py",
+    SOURCE_ROOT / "execution" / "rebalancer.py",
 )
-LEGACY_BROKER_STATE = {
-    "_bar_index",
-    "_current_asks",
-    "_current_bid_sizes",
-    "_current_bids",
-    "_current_closes",
-    "_current_highs",
-    "_current_lows",
-    "_current_opens",
-    "_current_prices",
-    "_current_time",
-    "_fill_engine",
-    "_fill_executor",
-    "_filled_this_bar",
-    "_last_prices",
-    "_order_counter",
-    "_orders_this_bar",
-    "_orders_this_bar_ids",
-    "_partial_orders",
-    "_pending_exits",
-    "_position_rules",
-    "_position_rules_by_asset",
-    "_positions_created_this_bar",
-    "_stop_exits_this_bar",
-    "_submitting_before_risk",
-}
 BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
 STRATEGY_CALLBACKS = {"on_before_risk", "on_data", "on_end", "on_prepare", "on_start"}
+
+
+def _parse(path: Path) -> ast.Module:
+    return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _legacy_broker_state() -> set[str]:
+    broker_tree = _parse(SOURCE_ROOT / "broker.py")
+    broker_class = next(
+        node
+        for node in broker_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "Broker"
+    )
+    return {
+        node.name
+        for node in broker_class.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name.startswith("_")
+        and any(
+            isinstance(decorator, ast.Name) and decorator.id == "property"
+            for decorator in node.decorator_list
+        )
+    }
+
+
+def _references_strategy(node: ast.AST) -> bool:
+    return any(
+        isinstance(child, ast.Name)
+        and child.id == "strategy"
+        or isinstance(child, ast.Attribute)
+        and child.attr == "strategy"
+        for child in ast.walk(node)
+    )
+
+
+def _strategy_callback_access(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Attribute) and node.attr in STRATEGY_CALLBACKS:
+        return node.attr if _references_strategy(node.value) else None
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "getattr"
+        and len(node.args) >= 2
+        and _references_strategy(node.args[0])
+        and isinstance(node.args[1], ast.Constant)
+        and node.args[1].value in STRATEGY_CALLBACKS
+    ):
+        return str(node.args[1].value)
+    return None
 
 
 def test_account_state_is_the_only_position_ledger() -> None:
@@ -51,18 +74,7 @@ def test_account_state_is_the_only_position_ledger() -> None:
     assert broker.positions is broker.account.positions
 
 
-def test_mutable_domain_state_has_one_declared_owner() -> None:
-    assert STATE_OWNERS == {
-        "cash": "AccountState",
-        "positions": "AccountState",
-        "orders": "OrderState",
-        "fills": "ExecutionJournal",
-        "trades": "ExecutionJournal",
-        "market": "MarketState",
-        "risk": "RiskState",
-        "callback_sequence": "Engine",
-    }
-
+def test_mutable_domain_state_delegates_to_its_owner() -> None:
     broker = Broker()
     assert broker.orders is broker._order_state.orders
     assert broker.pending_orders is broker._order_state.pending
@@ -79,14 +91,23 @@ def test_mutable_domain_state_has_one_declared_owner() -> None:
     broker.positions = replacement_positions
     assert broker.positions is broker.account.positions is replacement_positions
 
+    replacement_pending = []
+    broker._order_state.pending = replacement_pending
+    assert broker.pending_orders is replacement_pending
+
+    replacement_trades = []
+    broker._execution_journal.trades = replacement_trades
+    assert broker.trades is replacement_trades
+
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
+    legacy_broker_state = _legacy_broker_state()
     violations: list[str] = []
 
     for path in COLLABORATORS:
-        tree = ast.parse(path.read_text())
+        tree = _parse(path)
         for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr in LEGACY_BROKER_STATE:
+            if isinstance(node, ast.Attribute) and node.attr in legacy_broker_state:
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
             if (
                 isinstance(node, ast.Attribute)
@@ -109,18 +130,18 @@ def test_engine_is_the_only_strategy_callback_sequencer() -> None:
     violations: list[str] = []
 
     for path in SOURCE_ROOT.rglob("*.py"):
-        tree = ast.parse(path.read_text())
+        tree = _parse(path)
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-                continue
-            if node.func.attr not in STRATEGY_CALLBACKS:
+            callback = _strategy_callback_access(node)
+            if callback is None:
                 continue
             if path == engine_path:
-                engine_calls.add(node.func.attr)
+                engine_calls.add(callback)
             else:
-                violations.append(
-                    f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.func.attr}"
-                )
+                violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {callback}")
 
-    assert engine_calls == STRATEGY_CALLBACKS
+    assert engine_calls == STRATEGY_CALLBACKS, (
+        f"Engine callbacks differ: missing={STRATEGY_CALLBACKS - engine_calls}, "
+        f"extra={engine_calls - STRATEGY_CALLBACKS}"
+    )
     assert not violations, "Callback sequencing bypasses:\n" + "\n".join(violations)

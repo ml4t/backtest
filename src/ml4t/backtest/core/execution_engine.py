@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import copy
+from typing import TYPE_CHECKING
 
 from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import is_exit_order, quantity_zero_tolerance
 from .state import MarketState, OrderState
+
+if TYPE_CHECKING:
+    from ..accounting import AccountState
+    from ..broker import Broker
+    from .fill_engine import FillEngine
 
 
 class ExecutionEngine:
@@ -15,13 +21,13 @@ class ExecutionEngine:
 
     def __init__(
         self,
-        broker,
+        broker: Broker,
         *,
-        account,
+        account: AccountState,
         market: MarketState,
         orders: OrderState,
-        fill_engine,
-    ):
+        fill_engine: FillEngine,
+    ) -> None:
         self.broker = broker
         self.account = account
         self.market = market

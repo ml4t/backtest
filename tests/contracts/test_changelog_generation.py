@@ -28,6 +28,13 @@ def test_changelog_matches_structured_release_history() -> None:
     assert (_ROOT / "CHANGELOG.md").read_text(encoding="utf-8") == generator.render()
 
 
+def test_changelog_generator_uses_an_independent_legacy_source() -> None:
+    generator = _load_generator()
+
+    assert generator._OUTPUT not in {generator._SOURCE, generator._LEGACY}
+    assert generator._LEGACY.read_text(encoding="utf-8").startswith("## 0.1.0b17 -")
+
+
 def test_beta_18_through_stable_candidate_have_compatibility_impact() -> None:
     source = json.loads((_ROOT / "release" / "changelog.json").read_text(encoding="utf-8"))
     releases = {release["version"]: release for release in source["releases"]}

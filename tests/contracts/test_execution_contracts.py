@@ -53,6 +53,16 @@ class _BuyOnce(Strategy):
             self.done = True
 
 
+class _RecordPreRiskMarks(_BuyOnce):
+    def __init__(self) -> None:
+        super().__init__()
+        self.pre_risk_marks: list[float | None] = []
+
+    def on_before_risk(self, timestamp, data, context, broker) -> None:
+        position = broker.get_position("AAPL")
+        self.pre_risk_marks.append(position.current_price if position is not None else None)
+
+
 def _entry_price(mode: ExecutionMode, price: ExecutionPrice) -> float:
     config = BacktestConfig(
         execution_mode=mode,
@@ -133,6 +143,52 @@ def test_same_bar_quote_side_execution_uses_ask_for_buys() -> None:
     assert result.trades[0].entry_price == 100.5
     assert result.trades[0].entry_ask_price == 100.5
     assert result.metrics["final_value"] == pytest.approx(100000.0 - 100.5 + 110.75)
+
+
+def test_end_of_bar_watermarks_do_not_replace_the_configured_account_mark() -> None:
+    prices = pl.DataFrame(
+        [
+            {
+                "timestamp": datetime(2024, 1, 1),
+                "asset": "AAPL",
+                "open": 119.0,
+                "high": 125.0,
+                "low": 95.0,
+                "close": 120.0,
+                "bid": 99.0,
+                "ask": 101.0,
+                "volume": 1_000_000.0,
+            },
+            {
+                "timestamp": datetime(2024, 1, 2),
+                "asset": "AAPL",
+                "open": 139.0,
+                "high": 145.0,
+                "low": 105.0,
+                "close": 140.0,
+                "bid": 109.0,
+                "ask": 111.0,
+                "volume": 1_000_000.0,
+            },
+        ]
+    )
+    strategy = _RecordPreRiskMarks()
+    config = BacktestConfig(
+        execution_mode=ExecutionMode.SAME_BAR,
+        execution_price=ExecutionPrice.CLOSE,
+        mark_price=ExecutionPrice.QUOTE_MID,
+        commission_type=CommissionType.NONE,
+        slippage_type=SlippageType.NONE,
+    )
+
+    run_backtest(
+        prices=prices,
+        strategy=strategy,
+        config=config,
+        feed_spec=FeedSpec(bid_col="bid", ask_col="ask"),
+    )
+
+    assert strategy.pre_risk_marks == [None, 100.0]
 
 
 def test_spread_slippage_full_spread_uses_half_spread_per_side() -> None:

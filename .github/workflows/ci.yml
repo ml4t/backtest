@@ -44,10 +44,18 @@ jobs:
           test "$before" = "$after"
 
       - name: Run ruff check
-        run: uv run ruff check --no-fix src/ tests/ validation/
+        run: >-
+          uv run ruff check --no-fix src/ tests/
+          validation/performance_baseline.py
+          validation/generate_changelog.py
+          validation/check_documentation_examples.py
 
       - name: Run ruff format check
-        run: uv run ruff format --check src/ tests/ validation/
+        run: >-
+          uv run ruff format --check src/ tests/
+          validation/performance_baseline.py
+          validation/generate_changelog.py
+          validation/check_documentation_examples.py
 
       - name: Verify parity claims match retained evidence
         run: uv run python validation/generate_parity_claims.py --check
@@ -79,7 +87,11 @@ jobs:
         run: uv sync --dev --locked
 
       - name: Run ty check
-        run: uv run ty check
+        run: >-
+          uv run ty check
+          validation/performance_baseline.py
+          validation/generate_changelog.py
+          validation/check_documentation_examples.py
 
       - name: Build the wheel for consumer type checking
         run: uv build --wheel

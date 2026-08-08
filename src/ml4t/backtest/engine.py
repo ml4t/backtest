@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -99,7 +100,7 @@ class Engine:
         """
         # Lazy calendar initialization (zero cost if unused)
         is_trading_day_fn = None
-        valid_intraday_bar_indices: set[int] | None = None
+        valid_intraday_bar_mask: bytearray | None = None
         if self.config and self.config.resolved_calendar:
             from .calendar import filter_to_trading_sessions, get_calendar, is_trading_day
 
@@ -110,6 +111,25 @@ class Engine:
                 self.config.enforce_sessions
                 and self.config.resolved_data_frequency != DataFrequency.DAILY
             ):
+                prices_frame = self.feed.prices
+                assert prices_frame is not None
+                timestamp_dtype = prices_frame.schema[self.feed.feed_spec.timestamp_col]
+                calendar_timezone = str(getattr(self._calendar, "tz", ""))
+                if (
+                    isinstance(timestamp_dtype, pl.Datetime)
+                    and timestamp_dtype.time_zone is None
+                    and calendar_timezone
+                    and self.config.resolved_timezone != calendar_timezone
+                ):
+                    warnings.warn(
+                        "Naive intraday timestamps are interpreted as "
+                        f"{self.config.resolved_timezone!r}, but calendar "
+                        f"{self.config.resolved_calendar!r} uses {calendar_timezone!r}; "
+                        "set BacktestConfig.timezone to the data timezone or provide "
+                        "timezone-aware timestamps",
+                        UserWarning,
+                        stacklevel=2,
+                    )
                 timestamp_frame = pl.DataFrame(
                     {
                         "timestamp": self.feed.timestamps,
@@ -121,7 +141,9 @@ class Engine:
                     self.config.resolved_calendar,
                     naive_tz=self.config.resolved_timezone,
                 )
-                valid_intraday_bar_indices = set(filtered["__feed_bar_index"].to_list())
+                valid_intraday_bar_mask = bytearray(len(self.feed.timestamps))
+                for index in filtered["__feed_bar_index"]:
+                    valid_intraday_bar_mask[index] = 1
 
         self.strategy.on_prepare(self.broker, self.feed.timestamps, self.config)
         self.strategy.on_start(self.broker)
@@ -141,10 +163,7 @@ class Engine:
                     if not is_trading_day_fn(calendar_id, timestamp.date()):
                         self._skipped_bars += 1
                         continue
-                elif (
-                    valid_intraday_bar_indices is None
-                    or feed_bar_index not in valid_intraday_bar_indices
-                ):
+                elif valid_intraday_bar_mask is None or not valid_intraday_bar_mask[feed_bar_index]:
                     self._skipped_bars += 1
                     continue
 

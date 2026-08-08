@@ -132,6 +132,8 @@ class DataFeed:
             raise ValueError("prices_path or prices_df required")
 
         raw_spec = FeedSpec.from_any(feed_spec if feed_spec is not None else contract)
+        default_price_col = FeedSpec().price_col
+        price_col_is_explicit = price_col is not None or raw_spec.price_col != default_price_col
         self.feed_spec = raw_spec.with_overrides(
             entity_col=entity_col,
             timestamp_col=timestamp_col,
@@ -155,6 +157,11 @@ class DataFeed:
         self._entity_col = resolved_entity_col
         self._price_col = self.feed_spec.price_col
         if self._price_col not in self.prices.columns:
+            if price_col_is_explicit:
+                raise ValueError(
+                    f"price_col={self._price_col!r} not found in price columns "
+                    f"{self.prices.columns}"
+                )
             if self.feed_spec.close_col not in self.prices.columns:
                 raise ValueError(
                     f"price_col={self._price_col!r} and close_col={self.feed_spec.close_col!r} "

@@ -3,17 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from ..config import ExecutionPrice, ShareType
 from ..types import OrderSide, OrderType
 from .shared import CASH_TOLERANCE
 from .state import MarketState, OrderState
 
+if TYPE_CHECKING:
+    from ..broker import Broker
+    from ..execution.fill_executor import FillExecutor
+
 
 class FillEngine:
     """Owns fill-price checks, quantity helpers, and fill execution delegation."""
 
-    def __init__(self, broker, *, market: MarketState, orders: OrderState, executor):
+    def __init__(
+        self,
+        broker: Broker,
+        *,
+        market: MarketState,
+        orders: OrderState,
+        executor: FillExecutor,
+    ) -> None:
         self.broker = broker
         self.market = market
         self.orders = orders

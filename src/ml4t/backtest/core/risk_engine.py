@@ -2,16 +2,31 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..risk.types import ActionType, PositionState
 from ..types import OrderSide, OrderType
 from .shared import SubmitOrderOptions, reason_to_exit_reason
 from .state import MarketState, RiskState
 
+if TYPE_CHECKING:
+    from ..accounting import AccountState
+    from ..broker import Broker
+    from .fill_engine import FillEngine
+
 
 class RiskEngine:
     """Evaluates position rules and manages deferred exits."""
 
-    def __init__(self, broker, *, account, market: MarketState, risk: RiskState, fill_engine):
+    def __init__(
+        self,
+        broker: Broker,
+        *,
+        account: AccountState,
+        market: MarketState,
+        risk: RiskState,
+        fill_engine: FillEngine,
+    ) -> None:
         self.broker = broker
         self.account = account
         self.market = market

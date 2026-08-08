@@ -8,8 +8,11 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
+from packaging.version import InvalidVersion, Version
+
 _ROOT = Path(__file__).parents[1]
 _SOURCE = _ROOT / "release" / "changelog.json"
+_LEGACY = _ROOT / "release" / "changelog_legacy.md"
 _OUTPUT = _ROOT / "CHANGELOG.md"
 _HEADER = "# Changelog"
 _MARKER = "<!-- Generated from release/changelog.json. Do not edit managed entries. -->"
@@ -21,6 +24,7 @@ def _load_source() -> dict[str, Any]:
     if not isinstance(releases, list) or not releases:
         raise ValueError("release/changelog.json requires a non-empty releases list")
     versions: set[str] = set()
+    ordered_versions: list[Version] = []
     for release in releases:
         if not isinstance(release, dict):
             raise ValueError("Each changelog release must be an object")
@@ -28,9 +32,15 @@ def _load_source() -> dict[str, Any]:
         sections = release.get("sections")
         if not isinstance(version, str) or not version or version in versions:
             raise ValueError(f"Duplicate or invalid changelog version: {version!r}")
+        try:
+            ordered_versions.append(Version(version))
+        except InvalidVersion as exc:
+            raise ValueError(f"Invalid changelog version: {version!r}") from exc
         versions.add(version)
-        if not isinstance(sections, dict) or "Compatibility" not in sections:
-            raise ValueError(f"Release {version} requires a Compatibility section")
+        if not isinstance(sections, dict) or not sections:
+            raise ValueError(f"Release {version} requires a non-empty sections object")
+    if ordered_versions != sorted(ordered_versions, reverse=True):
+        raise ValueError("Managed changelog releases must be ordered newest first")
     return payload
 
 
@@ -38,12 +48,21 @@ def _legacy_history(source: dict[str, Any]) -> str:
     legacy_start = source.get("legacy_start")
     if not isinstance(legacy_start, str) or not legacy_start:
         raise ValueError("release/changelog.json requires legacy_start")
-    current = _OUTPUT.read_text(encoding="utf-8")
-    heading = f"## {legacy_start} -"
-    offset = current.find(heading)
-    if offset < 0:
-        raise ValueError(f"Could not find legacy changelog heading: {heading}")
-    return current[offset:].strip()
+    if not _LEGACY.exists():
+        raise ValueError(f"Legacy changelog source is missing: {_LEGACY.relative_to(_ROOT)}")
+    legacy = _LEGACY.read_text(encoding="utf-8").strip()
+    legacy_versions = [
+        line.removeprefix("## ").split(" -", maxsplit=1)[0]
+        for line in legacy.splitlines()
+        if line.startswith("## ") and " -" in line
+    ]
+    if not legacy_versions or legacy_versions[0] != legacy_start:
+        raise ValueError(f"Legacy changelog must start with version {legacy_start}")
+    managed_versions = {release["version"] for release in source["releases"]}
+    duplicates = sorted(managed_versions.intersection(legacy_versions))
+    if duplicates:
+        raise ValueError(f"Managed and legacy changelog versions overlap: {duplicates}")
+    return legacy
 
 
 def _bullet(item: str) -> str:
@@ -81,7 +100,7 @@ def main() -> int:
     arguments = parser.parse_args()
     generated = render()
     if arguments.check:
-        if _OUTPUT.read_text(encoding="utf-8") != generated:
+        if not _OUTPUT.exists() or _OUTPUT.read_text(encoding="utf-8") != generated:
             print("CHANGELOG.md differs from release/changelog.json")
             return 1
         return 0

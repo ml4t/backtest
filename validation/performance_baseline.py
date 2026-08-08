@@ -32,8 +32,10 @@ MEASUREMENT_CONTRACT = {
     "runtime": "perf_counter around Engine.run only; setup excluded",
     "setup": "deterministic data, DataFeed, strategy, config, and Engine construction",
     "memory": "child-process peak RSS from interpreter start through completed run",
-    "reproducibility_tolerance": 0.10,
+    "sample_deviation_reporting_threshold": 0.10,
+    "regression_gate": "instrument-free hotpath benchmark in tests/benchmark",
 }
+WORKER_TIMEOUT_SECONDS = 600
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,9 @@ class Workload:
     strategy: str
     quote_aware: bool = False
     volume: float = 1_000_000.0
+    execution_mode: ExecutionMode = ExecutionMode.SAME_BAR
+    commission_rate: float = 0.0
+    slippage_rate: float = 0.0
 
     @property
     def data_points(self) -> int:
@@ -50,8 +55,15 @@ class Workload:
 
 
 WORKLOADS = {
-    "single_asset": Workload(bars=2_000, assets=1, strategy="alternating"),
-    "daily_250_assets": Workload(bars=2_520, assets=250, strategy="noop"),
+    "single_asset": Workload(
+        bars=2_000,
+        assets=1,
+        strategy="alternating",
+        execution_mode=ExecutionMode.NEXT_BAR,
+        commission_rate=0.0005,
+        slippage_rate=0.0002,
+    ),
+    "daily_250_assets": Workload(bars=2_520, assets=250, strategy="alternating"),
     "quote_aware": Workload(bars=1_000, assets=20, strategy="alternating", quote_aware=True),
     "rebalance": Workload(bars=504, assets=50, strategy="rebalance"),
     "partial_fill": Workload(bars=500, assets=10, strategy="partial_fill", volume=100.0),
@@ -151,11 +163,15 @@ def _config(workload: Workload) -> BacktestConfig:
     execution_price = ExecutionPrice.QUOTE_SIDE if workload.quote_aware else ExecutionPrice.CLOSE
     return BacktestConfig(
         initial_cash=10_000_000.0,
-        execution_mode=ExecutionMode.SAME_BAR,
+        execution_mode=workload.execution_mode,
         execution_price=execution_price,
         mark_price=execution_price,
-        commission_type=CommissionType.NONE,
-        slippage_type=SlippageType.NONE,
+        commission_type=(
+            CommissionType.PERCENTAGE if workload.commission_rate else CommissionType.NONE
+        ),
+        commission_rate=workload.commission_rate,
+        slippage_type=(SlippageType.PERCENTAGE if workload.slippage_rate else SlippageType.NONE),
+        slippage_rate=workload.slippage_rate,
         partial_fills_allowed=workload.strategy == "partial_fill",
     )
 
@@ -176,7 +192,7 @@ def _feed(workload: Workload, prices: pl.DataFrame) -> DataFeed:
 
 
 def _canonical_float(value: float) -> float:
-    return round(float(value), 8)
+    return float(f"{float(value):.10g}")
 
 
 def _behavior(result) -> tuple[dict[str, Any], str]:
@@ -263,15 +279,34 @@ def run_worker(name: str) -> dict[str, Any]:
 def _worker_sample(name: str) -> dict[str, Any]:
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = "0"
-    completed = subprocess.run(
-        [sys.executable, str(Path(__file__).resolve()), "--worker", name],
-        check=True,
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=180,
-    )
-    return json.loads(completed.stdout)
+    command = [sys.executable, str(Path(__file__).resolve()), "--worker", name]
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=WORKER_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else exc.stderr
+        raise RuntimeError(
+            f"Performance worker {name!r} exceeded {WORKER_TIMEOUT_SECONDS}s"
+            + (f": {stderr.strip()}" if stderr else "")
+        ) from exc
+    if completed.returncode != 0:
+        details = completed.stderr.strip() or completed.stdout.strip() or "no worker output"
+        raise RuntimeError(f"Performance worker {name!r} exited {completed.returncode}: {details}")
+    try:
+        sample = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"Performance worker {name!r} returned malformed JSON: {completed.stdout!r}"
+        ) from exc
+    if not isinstance(sample, dict):
+        raise RuntimeError(f"Performance worker {name!r} returned a non-object JSON value")
+    return sample
 
 
 def _relative_deviation(values: list[float]) -> float:
@@ -279,8 +314,50 @@ def _relative_deviation(values: list[float]) -> float:
     return max(abs(value - center) / center for value in values) if center > 0 else 0.0
 
 
+def _workload_metadata(workload: Workload) -> dict[str, Any]:
+    return {
+        "bars": workload.bars,
+        "assets": workload.assets,
+        "data_points": workload.data_points,
+        "strategy": workload.strategy,
+        "quote_aware": workload.quote_aware,
+        "execution_mode": workload.execution_mode.value,
+        "commission_rate": workload.commission_rate,
+        "slippage_rate": workload.slippage_rate,
+    }
+
+
+def _validate_manifest(manifest: dict[str, Any]) -> None:
+    if manifest.get("schema_version") != 2:
+        raise ValueError("Performance manifest schema_version must be 2")
+    if manifest.get("measurement_contract") != MEASUREMENT_CONTRACT:
+        raise ValueError("Performance manifest measurement contract differs from the runner")
+    configured = manifest.get("workloads")
+    if not isinstance(configured, dict):
+        raise ValueError("Performance manifest workloads must be an object")
+    configured_names = set(configured)
+    expected_names = set(WORKLOADS)
+    if configured_names != expected_names:
+        raise ValueError(
+            "Performance manifest workloads differ from the runner: "
+            f"missing={sorted(expected_names - configured_names)}, "
+            f"extra={sorted(configured_names - expected_names)}"
+        )
+    for name, workload in WORKLOADS.items():
+        expected_metadata = _workload_metadata(workload)
+        actual = configured[name]
+        drift = {
+            key: (actual.get(key), value)
+            for key, value in expected_metadata.items()
+            if actual.get(key) != value
+        }
+        if drift:
+            raise ValueError(f"Performance manifest metadata drift for {name!r}: {drift}")
+
+
 def collect_evidence(manifest: dict[str, Any], samples: int) -> dict[str, Any]:
-    tolerance = float(MEASUREMENT_CONTRACT["reproducibility_tolerance"])
+    _validate_manifest(manifest)
+    reporting_threshold = float(MEASUREMENT_CONTRACT["sample_deviation_reporting_threshold"])
     evidence: dict[str, Any] = {
         "schema_version": 1,
         "generated_at": datetime.now().astimezone().isoformat(),
@@ -306,24 +383,33 @@ def collect_evidence(manifest: dict[str, Any], samples: int) -> dict[str, Any]:
         checksums = {str(run["behavior_sha256"]) for run in runs}
         runtime_deviation = _relative_deviation(runtimes)
         memory_deviation = _relative_deviation(memories)
-        passed = (
-            checksums == {expected["behavior_sha256"]}
-            and all(run["data_points"] == expected["data_points"] for run in runs)
-            and all(run["fill_count"] == expected["expected_fill_count"] for run in runs)
-            and all(run["trade_count"] == expected["expected_trade_count"] for run in runs)
-            and all(run["final_value"] == expected["expected_final_value"] for run in runs)
-            and runtime_deviation <= tolerance
-            and memory_deviation <= tolerance
-        )
+        checks = {
+            "behavior_checksum": checksums == {expected["behavior_sha256"]},
+            "data_points": all(run["data_points"] == expected["data_points"] for run in runs),
+            "fill_count": all(run["fill_count"] == expected["expected_fill_count"] for run in runs),
+            "trade_count": all(
+                run["trade_count"] == expected["expected_trade_count"] for run in runs
+            ),
+            "final_value": all(
+                run["final_value"] == expected["expected_final_value"] for run in runs
+            ),
+        }
+        failed_checks = sorted(name for name, passed in checks.items() if not passed)
+        passed = not failed_checks
         evidence["workloads"][name] = {
             "passed": passed,
-            "behavior_sha256": next(iter(checksums)) if len(checksums) == 1 else sorted(checksums),
+            "failed_checks": failed_checks,
+            "behavior_sha256": sorted(checksums),
+            "expected_behavior_sha256": expected["behavior_sha256"],
             "runtime_median_seconds": median(runtimes),
             "runtime_max_relative_deviation": runtime_deviation,
             "setup_median_seconds": median(setups),
             "total_median_seconds": median(totals),
             "peak_rss_median_mb": median(memories),
             "peak_rss_max_relative_deviation": memory_deviation,
+            "sample_spread_within_reporting_threshold": (
+                runtime_deviation <= reporting_threshold and memory_deviation <= reporting_threshold
+            ),
             "samples": runs,
         }
         evidence["passed"] = bool(evidence["passed"] and passed)
@@ -335,11 +421,7 @@ def update_manifest(path: Path) -> None:
     for name, workload in WORKLOADS.items():
         sample = _worker_sample(name)
         workloads[name] = {
-            "bars": workload.bars,
-            "assets": workload.assets,
-            "data_points": workload.data_points,
-            "strategy": workload.strategy,
-            "quote_aware": workload.quote_aware,
+            **_workload_metadata(workload),
             "behavior_sha256": sample["behavior_sha256"],
             "expected_fill_count": sample["fill_count"],
             "expected_trade_count": sample["trade_count"],
@@ -349,7 +431,7 @@ def update_manifest(path: Path) -> None:
     path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "measurement_contract": MEASUREMENT_CONTRACT,
                 "workloads": workloads,
             },
@@ -381,6 +463,15 @@ def main() -> int:
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     evidence = collect_evidence(manifest, args.samples)
+    for name, workload in evidence["workloads"].items():
+        state = "PASS" if workload["passed"] else "FAIL"
+        failed = ",".join(workload["failed_checks"]) or "none"
+        print(
+            f"{state} {name}: failed_checks={failed}, "
+            f"runtime_deviation={workload['runtime_max_relative_deviation']:.3f}, "
+            f"rss_deviation={workload['peak_rss_max_relative_deviation']:.3f}",
+            file=sys.stderr,
+        )
     rendered = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

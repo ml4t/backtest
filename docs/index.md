@@ -121,9 +121,10 @@ No large-scale claim is published for Backtrader, Zipline, VectorBT OSS, or LEAN
 
 Release performance evidence runs deterministic single-asset, 250-asset daily, quote-aware,
 rebalance, and partial-fill workloads in isolated processes. It reports setup and engine runtime
-separately, measures whole-process peak RSS, checks 10 percent sample reproducibility, and verifies
-retained behavior checksums. The project does not publish hardware-dependent performance ratios as
-stable claims.
+separately, measures whole-process peak RSS, and verifies retained financial-output checksums and
+counts. Sample spread is reported for diagnosis, while the
+instrument-free hotpath benchmark enforces the runtime regression limit. The project does not
+publish hardware-dependent performance ratios as stable claims.
 
 ## Installation
 

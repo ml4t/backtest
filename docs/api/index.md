@@ -71,16 +71,21 @@ Auto-generated from source docstrings.
         - update_order
         - cancel_order
         - get_order
+        - orders
         - get_pending_orders
+        - pending_orders
         - get_rejected_orders
         - get_position
         - get_positions
+        - positions
         - get_cash
         - cash
         - equity
         - get_account_value
         - get_buying_power
         - get_trades
+        - trades
+        - fills
         - get_last_trade
         - last_rejection_reason
         - set_position_rules

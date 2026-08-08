@@ -3327,6 +3327,10 @@
           "kind": "method",
           "signature": "(self, *, skip_assets: 'set[str] | None' = None) -> 'list[Order]'"
         },
+        "fills": {
+          "kind": "property",
+          "signature": "(self) -> 'list[Fill]'"
+        },
         "flatten_all_positions": {
           "kind": "method",
           "signature": "(self, reason: 'str', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
@@ -3423,6 +3427,18 @@
           "kind": "method",
           "signature": "(self, asset: 'str', target_value: 'float', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
         },
+        "orders": {
+          "kind": "property",
+          "signature": "(self) -> 'list[Order]'"
+        },
+        "pending_orders": {
+          "kind": "property",
+          "signature": "(self) -> 'list[Order]'"
+        },
+        "positions": {
+          "kind": "property",
+          "signature": "(self) -> 'dict[str, Position]'"
+        },
         "rebalance_to_weights": {
           "kind": "method",
           "signature": "(self, target_weights: 'dict[str, float]', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
@@ -3450,6 +3466,10 @@
         "submit_order": {
           "kind": "method",
           "signature": "(self, asset: 'str', quantity: 'float', side: 'OrderSide | None' = None, order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None, stop_price: 'float | None' = None, trail_amount: 'float | None' = None, _options: 'SubmitOrderOptions | None' = None) -> 'Order | None'"
+        },
+        "trades": {
+          "kind": "property",
+          "signature": "(self) -> 'list[Trade]'"
         },
         "update_order": {
           "kind": "method",

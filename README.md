@@ -317,13 +317,13 @@ python validation/run_all_correctness.py --framework zipline --scenarios 01,03,0
 Release performance evidence covers deterministic single-asset, 250-asset daily, quote-aware,
 rebalance, and partial-fill workloads. Each workload runs three times in a fresh child process.
 The evidence separates setup from `Engine.run()`, measures peak RSS over the whole child process,
-requires runtime and memory samples to stay within 10 percent of their median, and verifies a
-retained behavior checksum.
+reports runtime and memory sample spread, and verifies retained financial-output checksums and
+counts. The dedicated instrument-free hotpath benchmark enforces the runtime regression limit.
 
 Run the release baselines and the instrument-free feed regression check locally:
 
 ```bash
-uv run python validation/performance_baseline.py --output performance-evidence.json
+uv run python validation/performance_baseline.py --output release-performance-evidence.json
 uv run pytest tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_runtime_vs_legacy_baseline --no-cov
 ```
 

@@ -28,6 +28,7 @@ from ..types import (
 )
 
 if TYPE_CHECKING:
+    from ..accounting import AccountState
     from ..broker import Broker
     from ..core.fill_engine import FillEngine
 
@@ -102,26 +103,29 @@ class FillExecutor:
     - flip_position: Reverse position (long→short or short→long)
     - scale_position: Add to or reduce existing position
 
-    Example:
-        >>> executor = FillExecutor(broker)
-        >>> fully_filled = executor.execute(order, base_price=100.0)
     """
 
     def __init__(
         self,
         broker: Broker,
         *,
-        account,
+        account: AccountState,
         market: MarketState,
         orders: OrderState,
         risk: RiskState,
         journal: ExecutionJournal,
         record_pnl: Callable[[str, float], None],
     ):
-        """Initialize with broker instance.
+        """Initialize the fill executor with its state owners.
 
         Args:
-            broker: The Broker instance whose state we'll modify
+            broker: Broker services and execution configuration.
+            account: Canonical cash and position ledger.
+            market: Canonical current market state.
+            orders: Canonical order lifecycle state.
+            risk: Canonical risk state.
+            journal: Canonical fill and trade journal.
+            record_pnl: Callback that records realized PnL statistics.
         """
         self.broker = broker
         self.account = account
@@ -328,9 +332,6 @@ class FillExecutor:
         # In next-bar/open execution this avoids close-price mark-to-market
         # leaking into same-cycle buying-power checks.
         self._sync_account_state(order.asset, current_price=ctx.fill_price)
-
-        # Update account cash
-        self.account.cash = broker.cash
 
         # Settlement delay: hold sale proceeds until settlement completes
         if broker.settlement_delay > 0 and cash_change > 0:

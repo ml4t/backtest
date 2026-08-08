@@ -38,6 +38,7 @@ from .types import (
     ContractSpec,
     ExecutionMode,
     ExitReason,
+    Fill,
     Order,
     OrderSide,
     OrderType,
@@ -66,19 +67,6 @@ class OrderUpdate(TypedDict, total=False):
 
 class Broker:
     """Broker interface - same for backtest and live trading."""
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if name == "positions" and "account" in self.__dict__:
-            self.account.positions = value
-        elif name == "orders" and "_order_state" in self.__dict__:
-            self._order_state.orders = value
-        elif name == "pending_orders" and "_order_state" in self.__dict__:
-            self._order_state.pending = value
-        elif name == "fills" and "_execution_journal" in self.__dict__:
-            self._execution_journal.fills = value
-        elif name == "trades" and "_execution_journal" in self.__dict__:
-            self._execution_journal.trades = value
-        object.__setattr__(self, name, value)
 
     def __init__(
         self,
@@ -223,12 +211,6 @@ class Broker:
             settlement_reduces_buying_power=self.settlement_reduces_buying_power,
             multiplier_resolver=self.get_multiplier,
         )
-
-        self.positions = self.account.positions
-        self.orders = self._order_state.orders
-        self.pending_orders = self._order_state.pending
-        self.fills = self._execution_journal.fills
-        self.trades = self._execution_journal.trades
 
         self._rebalance_counter = 0
 
@@ -447,6 +429,51 @@ class Broker:
     def cash(self, value: float) -> None:
         """Set cash balance (delegates to AccountState)."""
         self.account.cash = value
+
+    @property
+    def positions(self) -> dict[str, Position]:
+        """Return the open-position ledger owned by AccountState."""
+        return self.account.positions
+
+    @positions.setter
+    def positions(self, value: dict[str, Position]) -> None:
+        self.account.positions = value
+
+    @property
+    def orders(self) -> list[Order]:
+        """Return the complete order history owned by OrderState."""
+        return self._order_state.orders
+
+    @orders.setter
+    def orders(self, value: list[Order]) -> None:
+        self._order_state.orders = value
+
+    @property
+    def pending_orders(self) -> list[Order]:
+        """Return the pending-order collection owned by OrderState."""
+        return self._order_state.pending
+
+    @pending_orders.setter
+    def pending_orders(self, value: list[Order]) -> None:
+        self._order_state.pending = value
+
+    @property
+    def fills(self) -> list[Fill]:
+        """Return the fill journal owned by ExecutionJournal."""
+        return self._execution_journal.fills
+
+    @fills.setter
+    def fills(self, value: list[Fill]) -> None:
+        self._execution_journal.fills = value
+
+    @property
+    def trades(self) -> list[Trade]:
+        """Return the trade journal owned by ExecutionJournal."""
+        return self._execution_journal.trades
+
+    @trades.setter
+    def trades(self, value: list[Trade]) -> None:
+        self._execution_journal.trades = value
 
     @property
     def _bar_index(self) -> int:
@@ -2024,6 +2051,9 @@ class Broker:
                     use_high_for_hwm=use_extremes,
                     use_low_for_lwm=use_extremes,
                 )
+                mark_price = self.get_mark_price(asset, quantity=pos.quantity)
+                if mark_price is not None:
+                    pos.current_price = mark_price
 
     def _process_orders(
         self,

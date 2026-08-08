@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .state import MarketState, OrderState
+
+if TYPE_CHECKING:
+    from ..accounting import AccountState
+    from ..broker import Broker
 
 
 class PortfolioLedger:
     """Read-model helpers for account/portfolio state."""
 
-    def __init__(self, broker, *, account, market: MarketState, orders: OrderState):
+    def __init__(
+        self,
+        broker: Broker,
+        *,
+        account: AccountState,
+        market: MarketState,
+        orders: OrderState,
+    ) -> None:
         self.broker = broker
         self.account = account
         self.market = market

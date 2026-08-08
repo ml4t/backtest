@@ -62,15 +62,3 @@ class ExecutionJournal:
 
     fills: list[Fill] = field(default_factory=list)
     trades: list[Trade] = field(default_factory=list)
-
-
-STATE_OWNERS = {
-    "cash": "AccountState",
-    "positions": "AccountState",
-    "orders": "OrderState",
-    "fills": "ExecutionJournal",
-    "trades": "ExecutionJournal",
-    "market": "MarketState",
-    "risk": "RiskState",
-    "callback_sequence": "Engine",
-}
