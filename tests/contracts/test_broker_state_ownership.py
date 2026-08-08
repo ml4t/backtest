@@ -69,6 +69,21 @@ COLLECTION_MUTATORS = {
     "sort",
     "update",
 }
+COLLECTION_COPY_OR_READ_CALLS = {
+    "all",
+    "any",
+    "bool",
+    "iter",
+    "len",
+    "list",
+    "max",
+    "min",
+    "set",
+    "sorted",
+    "sum",
+    "tuple",
+}
+COLLECTION_READ_METHODS = {"get_spendable_cash"}
 
 
 def _parse(path: Path) -> ast.Module:
@@ -183,12 +198,22 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
         and (collection := _broker_collection_access(node.func.value)) is not None
     ):
         return collection
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_READ_CALLS:
+            return None
+        if isinstance(node.func, ast.Attribute) and node.func.attr in COLLECTION_READ_METHODS:
+            return None
+        for argument in [*node.args, *(keyword.value for keyword in node.keywords)]:
+            if (collection := _broker_collection_access(argument)) is not None:
+                return collection
     if (
         isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
         and node.value is not None
         and (collection := _broker_collection_access(node.value)) is not None
     ):
         return collection
+    if isinstance(node, ast.Return) and node.value is not None:
+        return _broker_collection_access(node.value)
     return None
 
 
@@ -265,19 +290,23 @@ def test_private_state_discovery_covers_property_variants_and_setattr() -> None:
     assert _private_state_names(broker_class) == {"_cached", "_dynamic", "_getter"}
 
 
-def test_mutable_collection_contract_distinguishes_reads_from_mutations() -> None:
+def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
     tree = ast.parse(
-        "broker.account.positions['AAPL'] = position\n"
-        "broker.fills.append(fill)\n"
-        "orders = broker.orders\n"
-        "order_count = len(broker.orders)\n"
+        "def inspect():\n"
+        "    broker.account.positions['AAPL'] = position\n"
+        "    broker.fills.append(fill)\n"
+        "    orders = broker.orders\n"
+        "    order_count = len(broker.orders)\n"
+        "    fills_copy = list(broker.fills)\n"
+        "    consume(broker.trades)\n"
+        "    return broker.fills\n"
     )
 
-    assert {
+    assert sorted(
         access
         for node in ast.walk(tree)
         if (access := _mutable_collection_access(node)) is not None
-    } == {"positions", "fills", "orders"}
+    ) == ["fills", "fills", "orders", "positions", "trades"]
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:

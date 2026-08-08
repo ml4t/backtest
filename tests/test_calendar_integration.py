@@ -303,7 +303,10 @@ class TestCalendarEnforcementIntraday:
             ),
         )
 
-        with pytest.warns(UserWarning, match="retained 1 of 2 intraday bars"):
+        with pytest.warns(
+            UserWarning,
+            match=("Interpreting naive timestamps as 'America/New_York' would retain 2 bars"),
+        ):
             result = engine.run()
 
         assert result.metrics["skipped_bars"] == 1
@@ -370,6 +373,35 @@ class TestCalendarEnforcementIntraday:
 
         assert 0 < result.metrics["skipped_bars"] < len(timestamps)
 
+    def test_naive_local_extended_hours_warn_when_misread_as_utc(self):
+        start = datetime(2024, 1, 2, 4, 0)
+        timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        with pytest.warns(
+            UserWarning,
+            match="Interpreting naive timestamps as 'America/New_York'",
+        ):
+            Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
     def test_intraday_weekend_skipped(self):
         """Weekend intraday bars are skipped by the precomputed session mask."""
         saturday = datetime(2024, 1, 6, 10, 0)  # Saturday 10 AM
@@ -411,6 +443,7 @@ class TestCalendarEnforcementIntraday:
         assert results.metrics["skipped_bars"] == 3
 
     def test_session_warning_checks_each_distinct_date_once(self, monkeypatch: pytest.MonkeyPatch):
+        """A low-retention fixture forces evaluation of every distinct date."""
         start = datetime(2024, 1, 6, 10, 0)
         timestamps = [start, start + timedelta(minutes=1), start + timedelta(days=1)]
         frame = pl.DataFrame(

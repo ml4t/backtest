@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
@@ -19,6 +19,12 @@ from .types import ExecutionMode, OrderSide, OrderType
 if TYPE_CHECKING:
     from .config import BacktestConfig
     from .result import BacktestResult
+
+# Counterfactual checks are bounded and require the alternative to explain material bar loss.
+_TIMEZONE_DIAGNOSTIC_MAX_DATES = 20
+_TIMEZONE_DIAGNOSTIC_MAX_RETENTION = 0.5
+_TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN = 1.05
+_TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS = 0.1
 
 
 class Engine:
@@ -140,27 +146,55 @@ class Engine:
                 compare_calendar_timezone = (
                     naive_timestamps
                     and self.config.resolved_timezone != calendar_timezone
-                    and retention <= 0.5
+                    and retention <= _TIMEZONE_DIAGNOSTIC_MAX_RETENTION
                 )
-                alternative_retained_bars = retained_bars
+                configured_sample_retained = retained_bars
+                alternative_sample_retained = retained_bars
+                sample_bars = total_bars
                 if compare_calendar_timezone:
-                    alternative_retained_bars = len(
+                    sample_dates: set[date] = set()
+                    sample_bars = 0
+                    for sample_bars, timestamp in enumerate(timestamps, start=1):
+                        sample_date = timestamp.date()
+                        if (
+                            sample_date not in sample_dates
+                            and len(sample_dates) == _TIMEZONE_DIAGNOSTIC_MAX_DATES
+                        ):
+                            sample_bars -= 1
+                            break
+                        sample_dates.add(sample_date)
+                    diagnostic_frame = timestamp_frame.head(sample_bars)
+                    if sample_bars != total_bars:
+                        configured_sample_retained = len(
+                            filter_to_trading_sessions(
+                                diagnostic_frame,
+                                calendar_id,
+                                naive_tz=self.config.resolved_timezone,
+                            )
+                        )
+                    alternative_sample_retained = len(
                         filter_to_trading_sessions(
-                            timestamp_frame,
+                            diagnostic_frame,
                             calendar_id,
                             naive_tz=calendar_timezone,
                         )
                     )
-                alternative_retention = (
-                    alternative_retained_bars / total_bars if total_bars else 1.0
-                )
+                if configured_sample_retained:
+                    relative_retention_gain = (
+                        alternative_sample_retained / configured_sample_retained
+                    )
+                elif alternative_sample_retained:
+                    relative_retention_gain = float("inf")
+                else:
+                    relative_retention_gain = 1.0
                 alternative_timezone_explains_loss = (
                     compare_calendar_timezone
-                    and alternative_retention >= 0.8
-                    and alternative_retention - retention >= 0.25
+                    and alternative_sample_retained > configured_sample_retained
+                    and relative_retention_gain >= _TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN
                 )
                 possible_session_misconfiguration = (
-                    retention <= 0.1 or alternative_timezone_explains_loss
+                    retention <= _TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS
+                    or alternative_timezone_explains_loss
                 )
                 should_warn = possible_session_misconfiguration and any(
                     is_trading_day_fn(calendar_id, date)
@@ -171,7 +205,8 @@ class Engine:
                     if alternative_timezone_explains_loss:
                         timezone_note = (
                             f" Interpreting naive timestamps as {calendar_timezone!r} would "
-                            f"retain {alternative_retained_bars} bars."
+                            f"retain {alternative_sample_retained} bars instead of "
+                            f"{configured_sample_retained} in a {sample_bars}-bar sample."
                         )
                     elif naive_timestamps:
                         timezone_note = (
@@ -379,8 +414,7 @@ class Engine:
 
     def _build_activity_metrics(self) -> dict[str, int | float]:
         """Compute fill and portfolio activity metrics."""
-        fills = tuple(self.broker.fills)
-        if not fills:
+        if not self.broker.fills:
             avg_open_positions = (
                 sum(state[5] for state in self.portfolio_state) / len(self.portfolio_state)
                 if self.portfolio_state
@@ -405,7 +439,7 @@ class Engine:
         traded_symbols: set[str] = set()
         rebalance_events: set[str | datetime] = set()
 
-        for fill in fills:
+        for fill in self.broker.fills:
             multiplier = self.broker.get_multiplier(fill.asset)
             notional = abs(fill.quantity) * fill.price * multiplier
             total_filled_notional += notional
@@ -429,7 +463,7 @@ class Engine:
         return {
             "num_orders": len(self.broker.orders),
             "num_rejected_orders": len(self.broker.get_rejected_orders()),
-            "num_fills": len(fills),
+            "num_fills": len(self.broker.fills),
             "num_rebalance_events": len(rebalance_events),
             "unique_symbols_traded": len(traded_symbols),
             "total_filled_notional": total_filled_notional,
@@ -574,7 +608,7 @@ class Engine:
         return BacktestResult(
             trades=all_trades,  # Includes both closed and open trades
             equity_curve=self.equity_curve,
-            fills=self.broker.fills,
+            fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),
             predictions=self.feed.signals,
             portfolio_state=self.portfolio_state,
