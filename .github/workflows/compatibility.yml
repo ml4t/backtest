@@ -77,13 +77,60 @@ jobs:
       - name: Run the non-hardware test suite
         run: uv run --no-sync pytest tests/ -v --tb=short --no-cov -m "not benchmark"
 
+  minimum:
+    name: Minimum Dependencies (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: "latest"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the lowest direct dependency set
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install --resolution lowest-direct --only-binary :all: \
+            --no-binary ml4t-backtest --editable . --group test "ty>=0.0.18"
+
+      - name: Record the resolved versions
+        run: uv pip freeze > minimum-versions-${{ matrix.python-version }}.txt
+
+      - name: Verify package import
+        run: uv run --no-sync python -c "import ml4t.backtest"
+
+      - name: Run the non-hardware test suite
+        run: uv run --no-sync pytest tests/ -v --tb=short --no-cov -m "not benchmark"
+
+      - name: Type-check for Python ${{ matrix.python-version }}
+        run: uv run --no-sync ty check --python-version ${{ matrix.python-version }}
+
+      - name: Build the package
+        run: uv build
+
+      - name: Retain minimum-version evidence
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: minimum-versions-${{ matrix.python-version }}
+          path: minimum-versions-${{ matrix.python-version }}.txt
+          if-no-files-found: error
+
   gate:
     name: Compatibility Gate
     if: always()
-    needs: [stable, prerelease]
+    needs: [stable, prerelease, minimum]
     runs-on: ubuntu-latest
     steps:
       - name: Require every compatibility job
         run: |
           test "${{ needs.stable.result }}" = "success"
           test "${{ needs.prerelease.result }}" = "success"
+          test "${{ needs.minimum.result }}" = "success"
