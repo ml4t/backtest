@@ -256,6 +256,16 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
             for argument in node.args:
                 if _direct_broker_collection_access(argument) is not None:
                     continue
+                if (
+                    isinstance(argument, ast.Starred)
+                    and isinstance(argument.value, (ast.List, ast.Tuple, ast.Set))
+                    and argument.value.elts
+                    and all(
+                        _direct_broker_collection_access(element) is not None
+                        for element in argument.value.elts
+                    )
+                ):
+                    continue
                 if (collection := _broker_collection_access(argument)) is not None:
                     return collection
             for keyword in node.keywords:
@@ -444,21 +454,24 @@ def test_mutable_collection_contract_follows_nested_copy_arguments() -> None:
         "sorted([broker.fills])",
         "tuple((broker.fills,))",
         "dict([('fills', broker.fills)])",
-        "iter(*[broker.fills])",
         "max([broker.fills])",
     ):
         call = ast.parse(source).body[0].value
         assert _mutable_collection_access(call) == "fills", source
 
-    direct_copy = ast.parse("list(broker.fills)").body[0].value
-    assert _mutable_collection_access(direct_copy) is None
+    for source in ("list(broker.fills)", "iter(*[broker.fills])"):
+        direct_copy = ast.parse(source).body[0].value
+        assert _mutable_collection_access(direct_copy) is None, source
 
 
 def test_mutable_collection_contract_allows_nested_consumer_arguments() -> None:
     for source in (
         "all([broker.fills, broker.orders])",
+        "any([broker.fills])",
+        "bool([broker.fills])",
         "len([broker.fills])",
         "str([broker.fills])",
+        "sum([broker.fills], [])",
     ):
         call = ast.parse(source).body[0].value
         assert _mutable_collection_access(call) is None, source
