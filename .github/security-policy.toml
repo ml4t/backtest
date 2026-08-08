@@ -1,0 +1,9 @@
+[policy]
+dependency_threshold = "any"
+source_severity = "medium"
+source_confidence = "medium"
+max_exception_days = 90
+
+[tools]
+pip_audit = "2.10.1"
+bandit = "1.9.4"

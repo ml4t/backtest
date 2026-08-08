@@ -1,0 +1,73 @@
+name: Security
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_NO_SOURCES: "1"
+  PIP_AUDIT_VERSION: "2.10.1"
+  BANDIT_VERSION: "1.9.4"
+
+jobs:
+  scan:
+    name: Dependency and Source Scans
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Export the locked runtime dependency set
+        run: >-
+          uv export --frozen --no-dev --no-emit-project
+          --format requirements-txt --quiet
+          --output-file security-requirements.txt
+
+      - name: Scan dependencies and source
+        run: |
+          set +e
+          uvx --from "pip-audit==$PIP_AUDIT_VERSION" pip-audit \
+            --requirement security-requirements.txt --require-hashes --strict \
+            --format json --output dependency-audit.json
+          dependency_status=$?
+          uvx --from "bandit==$BANDIT_VERSION" bandit \
+            -r src/ml4t/backtest --severity-level medium --confidence-level medium \
+            --format json --output source-security.json --quiet
+          source_status=$?
+          set -e
+          test "$dependency_status" -le 1
+          test "$source_status" -le 1
+
+      - name: Enforce the security policy
+        run: >-
+          uv run --no-project --python "${{ env.PYTHON_VERSION }}"
+          python validation/check_security.py
+          --requirements security-requirements.txt
+          --dependency-report dependency-audit.json
+          --source-report source-security.json
+          --summary security-summary.json
+
+      - name: Retain security inputs and outputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-evidence-${{ github.sha }}
+          path: |
+            security-requirements.txt
+            dependency-audit.json
+            source-security.json
+            security-summary.json
+            .github/security-policy.toml
+            .github/security-exceptions.toml
+          if-no-files-found: error
+          retention-days: 90

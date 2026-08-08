@@ -263,7 +263,7 @@ def run_zipline_target_shares(
     bundle_sig_input = (
         "|".join(asset_names) + f"|{pd.Timestamp(dates[0]).date()}|{pd.Timestamp(dates[-1]).date()}"
     )
-    bundle_sig = hashlib.md5(bundle_sig_input.encode("utf-8")).hexdigest()[:10]
+    bundle_sig = hashlib.sha256(bundle_sig_input.encode("utf-8")).hexdigest()[:10]
     bundle_name = f"bench_multi_{len(asset_names)}_{config.n_bars}_{bundle_sig}"
     start_session = nyse_sessions[0]
     end_session = (

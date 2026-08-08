@@ -58,7 +58,7 @@ def encode_sequential_ticker(idx: int) -> str:
 def encode_hashed_ticker(project_slug: str, asset_name: str, attempt: int = 0) -> str:
     """Create a project-scoped hashed ticker namespace."""
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    digest = hashlib.sha1(f"{project_slug}|{asset_name}|{attempt}".encode()).digest()
+    digest = hashlib.sha256(f"{project_slug}|{asset_name}|{attempt}".encode()).digest()
     value = int.from_bytes(digest[:8], "big")
     chars: list[str] = []
     for _ in range(6):
@@ -234,7 +234,7 @@ def export_lean_daily_data(
     (data_root / "factor_files").mkdir(parents=True, exist_ok=True)
     (data_root / "daily").mkdir(parents=True, exist_ok=True)
 
-    signature = hashlib.md5(json.dumps(signature_payload, sort_keys=True).encode()).hexdigest()
+    signature = hashlib.sha256(json.dumps(signature_payload, sort_keys=True).encode()).hexdigest()
     cache_hit = False
     if manifest_path.exists():
         try:
