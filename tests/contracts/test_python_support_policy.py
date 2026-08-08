@@ -52,8 +52,13 @@ def test_python_315_prerelease_matrix_is_blocking_on_all_platforms() -> None:
     commands = _step_commands(prerelease)
     assert "sys.version_info[:2] == (3, 15)" in commands
     assert "{'beta', 'candidate'}" in commands
-    assert "uv sync --no-dev --group test --locked" in commands
+    assert "uv venv --python 3.15" in commands
+    assert "https://pypi.anaconda.org/scientific-python-nightly-wheels/simple" in commands
+    assert '--prerelease allow --only-binary :all: "numpy>=2.6.0.dev0"' in commands
+    assert "--no-build-isolation-package pandas" in commands
+    assert "--editable . --group test" in commands
     assert 'pytest tests/ -v --tb=short --no-cov -m "not benchmark"' in commands
+    assert any("actions/upload-artifact" in step.get("uses", "") for step in prerelease["steps"])
     assert {"stable", "prerelease"} <= set(gate["needs"])
 
 
