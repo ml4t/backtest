@@ -3501,7 +3501,7 @@
         },
         "__next__": {
           "kind": "method",
-          "signature": "(self) -> tuple[datetime.datetime, dict[str, dict], dict[str, typing.Any]]"
+          "signature": "(self) -> tuple[datetime.datetime, dict[str, dict], dict[str, Any]]"
         },
         "n_bars": {
           "kind": "property",
@@ -3770,11 +3770,11 @@
       "members": {
         "on_before_risk": {
           "kind": "method",
-          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, typing.Any], broker: Any) -> None"
+          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, Any], broker: Any) -> None"
         },
         "on_data": {
           "kind": "method",
-          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, typing.Any], broker: Any) -> None"
+          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, Any], broker: Any) -> None"
         },
         "on_end": {
           "kind": "method",

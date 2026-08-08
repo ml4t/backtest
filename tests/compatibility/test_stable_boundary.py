@@ -34,6 +34,13 @@ def test_current_surface_exactly_matches_the_reviewed_versioned_snapshot() -> No
     assert actual == expected
 
 
+def test_snapshot_canonicalizes_interpreter_dependent_typing_qualification() -> None:
+    generator = _load_snapshot_generator()
+    assert generator._canonical_type_text("dict[str, typing.Any] | None") == (
+        "dict[str, Any] | None"
+    )
+
+
 def test_beta_fixture_has_unchanged_release_generated_bytes() -> None:
     fixture = json.loads((_BETA_ARTIFACT / "fixture.json").read_text(encoding="utf-8"))
     assert fixture["source_distribution"] == "ml4t-backtest==0.1.0b22"

@@ -30,6 +30,7 @@ _DOCS = (_ROOT / "README.md", *sorted((_ROOT / "docs").rglob("*.md")))
 _IMPORT = re.compile(
     r"^\s*(from\s+(ml4t\.backtest[\w.]*)\s+import\s+([^#]+)|import\s+(ml4t\.backtest[\w.]*))\s*$"
 )
+_TYPING_PREFIX = re.compile(r"\btyping\.")
 _ENUM_MODULES = (
     "ml4t.backtest.config",
     "ml4t.backtest.execution.schedule",
@@ -41,9 +42,14 @@ _PUBLIC_DUNDERS = {"__contains__", "__getitem__", "__iter__", "__len__", "__next
 
 def _signature(value: object) -> str | None:
     try:
-        return str(inspect.signature(value))
+        return _canonical_type_text(str(inspect.signature(value)))
     except (TypeError, ValueError):
         return None
+
+
+def _canonical_type_text(value: str) -> str:
+    """Remove interpreter-dependent qualification from type representations."""
+    return _TYPING_PREFIX.sub("", value)
 
 
 def _member_surface(value: type) -> dict[str, dict[str, object]]:
@@ -131,7 +137,8 @@ def _enum_surface(module: ModuleType) -> dict[str, list[dict[str, object]]]:
 
 
 def _annotation(value: object) -> str:
-    return value if isinstance(value, str) else inspect.formatannotation(value)
+    rendered = value if isinstance(value, str) else inspect.formatannotation(value)
+    return _canonical_type_text(rendered)
 
 
 def _encoded_value(value: object) -> object:
