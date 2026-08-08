@@ -350,6 +350,7 @@ class TestCalendarEnforcementIntraday:
         assert result.metrics["skipped_bars"] == 50
 
     def test_timezone_diagnostic_caps_the_required_absolute_gain(self):
+        """A 60-bar sample caps the gain floor at 4 instead of 6, admitting a gain of 5."""
         trading_dates = []
         current = datetime(2024, 4, 1)
         while len(trading_dates) < 20:
@@ -358,12 +359,16 @@ class TestCalendarEnforcementIntraday:
             current += timedelta(days=1)
         timestamps = []
         for index, trading_date in enumerate(trading_dates):
-            timestamps.append(trading_date.replace(hour=15, minute=59))
             timestamps.append(trading_date.replace(hour=8, minute=0))
             timestamps.append(
                 trading_date.replace(hour=9, minute=30)
                 if index < 5
                 else trading_date.replace(hour=8, minute=30)
+            )
+            timestamps.append(
+                trading_date.replace(hour=23, minute=0)
+                if index == 0
+                else trading_date.replace(hour=15, minute=59)
             )
         frame = pl.DataFrame(
             {
@@ -378,7 +383,7 @@ class TestCalendarEnforcementIntraday:
         )
 
         assert len(timestamps) == 60
-        with pytest.warns(UserWarning, match="retain 25 bars instead of 20"):
+        with pytest.warns(UserWarning, match="retain 24 bars instead of 19"):
             result = Engine(
                 feed=DataFeed(prices_df=frame),
                 strategy=SimpleStrategy(),
@@ -389,7 +394,7 @@ class TestCalendarEnforcementIntraday:
                 ),
             ).run()
 
-        assert result.metrics["skipped_bars"] == 40
+        assert result.metrics["skipped_bars"] == 41
 
     def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
         timestamps = [

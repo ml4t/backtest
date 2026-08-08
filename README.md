@@ -87,6 +87,8 @@ print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 print(result.to_fills_dataframe().head())
 ```
 
+Each `Engine` instance is single-use. Create a new instance for every independent run.
+
 `bar["price"]` follows `FeedSpec.price_col` when you provide one, so the same strategy works for close-based bars and quote-aware feeds.
 
 ## Risk Management

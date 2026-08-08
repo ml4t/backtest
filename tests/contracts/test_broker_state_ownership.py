@@ -255,7 +255,10 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
             and _references_broker(node.func.value)
         ):
             return None
-        for argument in [*node.args, *(keyword.value for keyword in node.keywords)]:
+        for argument in [
+            *node.args,
+            *(keyword.value for keyword in node.keywords if keyword.arg is not None),
+        ]:
             if (collection := _broker_collection_access(argument)) is not None:
                 return collection
     if (
@@ -383,6 +386,12 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
         (18, "fills"),
         (19, "fills"),
     ]
+
+
+def test_mutable_collection_contract_allows_keyword_unpacking() -> None:
+    tree = ast.parse("helper(**broker.positions)")
+
+    assert all(_mutable_collection_access(node) is None for node in ast.walk(tree))
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:

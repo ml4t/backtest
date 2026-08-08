@@ -64,6 +64,8 @@ print(f"Total Return: {result.metrics['total_return_pct']:.1f}%")
 print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 ```
 
+Each `Engine` instance is single-use. Create a new instance for every independent run.
+
 Or use the convenience function:
 
 ```python
