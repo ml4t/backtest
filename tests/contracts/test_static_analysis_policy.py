@@ -64,6 +64,7 @@ def test_ci_checks_every_release_validation_script() -> None:
     assert "ruff check --no-fix src/ tests/ < validation/release_checks.txt" in lint_commands
     assert "ruff format --check src/ tests/ < validation/release_checks.txt" in lint_commands
     assert "ty check src/ < validation/release_checks.txt" in typecheck_commands
+    assert "--force-exclude" not in lint_commands
 
     manifest = {
         line
@@ -80,4 +81,15 @@ def test_ci_checks_every_release_validation_script() -> None:
             workflow.read_text(encoding="utf-8"),
         )
     }
-    assert manifest == workflow_scripts
+    excluded_root_scripts = {
+        "validation/benchmark_suite.py",
+        "validation/run_all_benchmarks.py",
+        "validation/run_full_validation.py",
+        "validation/run_scenario.py",
+    }
+    root_scripts = {
+        path.relative_to(_ROOT).as_posix() for path in (_ROOT / "validation").glob("*.py")
+    }
+
+    assert workflow_scripts <= manifest
+    assert root_scripts == manifest | excluded_root_scripts

@@ -117,12 +117,8 @@ class Engine:
                     if prices_frame is not None
                     else None
                 )
-                calendar_timezone = str(getattr(self._calendar, "tz", ""))
-                timezone_mismatch = (
-                    isinstance(timestamp_dtype, pl.Datetime)
-                    and timestamp_dtype.time_zone is None
-                    and calendar_timezone
-                    and self.config.resolved_timezone != calendar_timezone
+                naive_timestamps = (
+                    isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None
                 )
                 timestamp_frame = pl.DataFrame(
                     {
@@ -137,14 +133,21 @@ class Engine:
                 )
                 retained_bars = len(filtered)
                 total_bars = len(timestamp_frame)
-                if timezone_mismatch and total_bars and retained_bars / total_bars <= 0.5:
+                calendar_id = self.config.resolved_calendar
+                has_trading_date = any(
+                    is_trading_day_fn(calendar_id, timestamp.date())
+                    for timestamp in self.feed.timestamps
+                )
+                if total_bars and has_trading_date and retained_bars / total_bars <= 0.1:
+                    timezone_note = (
+                        f" Naive timestamps were interpreted as {self.config.resolved_timezone!r}."
+                        if naive_timestamps
+                        else ""
+                    )
                     warnings.warn(
-                        "Naive intraday timestamps are interpreted as "
-                        f"{self.config.resolved_timezone!r}, but calendar "
-                        f"{self.config.resolved_calendar!r} uses {calendar_timezone!r}; "
-                        f"session filtering retained {retained_bars} of {total_bars} bars. "
-                        "Set BacktestConfig.timezone to the data timezone or provide "
-                        "timezone-aware timestamps",
+                        f"Session filtering for {self.config.resolved_calendar!r} retained "
+                        f"{retained_bars} of {total_bars} intraday bars.{timezone_note} "
+                        "Verify the configured calendar, data timezone, and session coverage.",
                         UserWarning,
                         stacklevel=2,
                     )

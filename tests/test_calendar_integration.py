@@ -241,10 +241,10 @@ class TestCalendarEnforcementIntraday:
     Timezone-naive timestamps use the configured feed timezone.
     """
 
-    def test_naive_exchange_local_bars_warn_when_default_timezone_is_used(self):
+    def test_session_filter_warns_when_nearly_all_intraday_bars_are_removed(self):
         timestamps = [
             datetime(2024, 1, 2, 9, 30),
-            datetime(2024, 1, 2, 15, 59),
+            datetime(2024, 1, 2, 10, 0),
         ]
         frame = pl.DataFrame(
             {
@@ -267,10 +267,10 @@ class TestCalendarEnforcementIntraday:
             ),
         )
 
-        with pytest.warns(UserWarning, match="Naive intraday timestamps are interpreted as 'UTC'"):
+        with pytest.warns(UserWarning, match="retained 0 of 2 intraday bars"):
             result = engine.run()
 
-        assert result.metrics["skipped_bars"] == 1
+        assert result.metrics["skipped_bars"] == 2
 
     def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
         timestamps = [

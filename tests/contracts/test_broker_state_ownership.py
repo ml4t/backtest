@@ -6,7 +6,9 @@ from pathlib import Path
 from ml4t.backtest import Broker
 
 SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
+BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
 FORBIDDEN_BROKER_STATE = {
+    "_asset_stats",
     "_asset_bars_seen",
     "_bar_index",
     "_current_ask_sizes",
@@ -22,22 +24,36 @@ FORBIDDEN_BROKER_STATE = {
     "_current_signals",
     "_current_time",
     "_current_volumes",
+    "_contract_specs",
+    "_execution_engine",
+    "_execution_journal",
     "_fill_engine",
     "_fill_executor",
     "_filled_this_bar",
     "_last_prices",
+    "_last_session_id",
+    "_market_state",
+    "_order_book",
     "_order_counter",
+    "_order_state",
     "_orders_this_bar",
     "_orders_this_bar_ids",
     "_partial_orders",
     "_pending_exits",
+    "_portfolio_ledger",
     "_position_rules",
     "_position_rules_by_asset",
     "_positions_created_this_bar",
+    "_rebalance_counter",
+    "_risk_engine",
+    "_risk_state",
+    "_session_config",
+    "_stats_config",
     "_stop_exits_this_bar",
     "_submitting_before_risk",
 }
 TRANSITIONAL_ENGINE_LIFECYCLE_STATE = {"_submitting_before_risk"}
+ENGINE_COLLECTION_ACCESS = BROKER_MUTABLE_COLLECTIONS
 STRATEGY_CALLBACKS = {"on_before_risk", "on_data", "on_end", "on_prepare", "on_start"}
 
 
@@ -61,6 +77,24 @@ def _references_strategy(node: ast.AST) -> bool:
         and child.attr == "strategy"
         for child in ast.walk(node)
     )
+
+
+def _broker_private_assignments() -> set[str]:
+    broker_tree = _parse(SOURCE_ROOT / "broker.py")
+    broker_class = next(
+        node
+        for node in broker_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "Broker"
+    )
+    return {
+        node.attr
+        for node in ast.walk(broker_class)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.ctx, ast.Store)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "self"
+        and node.attr.startswith("_")
+    }
 
 
 def _strategy_callback_access(node: ast.AST) -> str | None:
@@ -111,6 +145,14 @@ def test_mutable_domain_state_delegates_to_its_owner() -> None:
     assert broker.trades is replacement_trades
 
 
+def test_new_broker_private_state_requires_an_explicit_boundary_decision() -> None:
+    discovered = _broker_private_assignments()
+
+    assert discovered <= FORBIDDEN_BROKER_STATE, (
+        f"Unreviewed Broker private state: {sorted(discovered - FORBIDDEN_BROKER_STATE)}"
+    )
+
+
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
     violations: list[str] = []
     broker_path = SOURCE_ROOT / "broker.py"
@@ -126,6 +168,13 @@ def test_collaborators_do_not_reach_through_broker_private_state() -> None:
                 and node.attr in FORBIDDEN_BROKER_STATE
                 and _references_broker(node.value)
                 and not (path == engine_path and node.attr in TRANSITIONAL_ENGINE_LIFECYCLE_STATE)
+            ):
+                violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
+            if (
+                isinstance(node, ast.Attribute)
+                and node.attr in BROKER_MUTABLE_COLLECTIONS
+                and _references_broker(node.value)
+                and not (path == engine_path and node.attr in ENGINE_COLLECTION_ACCESS)
             ):
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
 

@@ -40,8 +40,6 @@ def test_release_performance_manifest_covers_required_workloads() -> None:
 
 def test_public_docs_do_not_publish_unretained_performance_numbers() -> None:
     documents = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
-    text = "\n".join(path.read_text(encoding="utf-8") for path in documents)
-    prose = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
     retained_evidence = re.compile(r"performance_baselines\.json|release-performance-evidence")
     ratio_or_throughput = re.compile(
         r"\b\d+(?:\.\d+)?x\s+(?:faster|slower|less)|"
@@ -53,16 +51,24 @@ def test_public_docs_do_not_publish_unretained_performance_numbers() -> None:
     resource_context = re.compile(
         r"\b(?:benchmark|memory|performance|rss|runtime)\b", re.IGNORECASE
     )
-    violations = [
-        line
-        for line in prose.splitlines()
-        if not retained_evidence.search(line)
-        and (
-            ratio_or_throughput.search(line)
-            or resource_claim.search(line)
-            and resource_context.search(line)
-        )
-    ]
+    violations: list[str] = []
+    for path in documents:
+        fence: str | None = None
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+            if fence is not None:
+                if marker is not None and marker.group(1)[0] == fence[0]:
+                    fence = None
+                continue
+            if marker is not None:
+                fence = marker.group(1)
+                continue
+            if line.startswith("    ") or retained_evidence.search(line):
+                continue
+            if ratio_or_throughput.search(line) or (
+                resource_claim.search(line) and resource_context.search(line)
+            ):
+                violations.append(f"{path.relative_to(ROOT)}:{line_number}: {line}")
 
     assert not violations
 

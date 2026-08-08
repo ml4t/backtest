@@ -26,11 +26,13 @@ repos:
         name: release validation format check
         entry: bash -c 'xargs uv run ruff format --check < validation/release_checks.txt'
         language: system
+        files: ^validation/
         pass_filenames: false
       - id: release-validation-lint
         name: release validation lint check
         entry: bash -c 'xargs uv run ruff check --no-fix < validation/release_checks.txt'
         language: system
+        files: ^validation/
         pass_filenames: false
       - id: ty
         name: ty type check

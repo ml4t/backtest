@@ -7,3 +7,4 @@ validation/generate_compatibility_snapshot.py
 validation/generate_parity_claims.py
 validation/performance_baseline.py
 validation/release_candidate.py
+validation/run_all_correctness.py
