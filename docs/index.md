@@ -119,9 +119,11 @@ Large-scale claims are published only when a retained workload has zero canonica
 No large-scale claim is published for Backtrader, Zipline, VectorBT OSS, or LEAN without a passing retained artifact.
 <!-- parity-claims:end -->
 
-Performance regression checks compare the current implementation with the repository's legacy
-data-feed implementation. Cross-framework speed claims require a retained benchmark artifact that
-uses the same workload and execution semantics for every framework.
+Release performance evidence runs deterministic single-asset, 250-asset daily, quote-aware,
+rebalance, and partial-fill workloads in isolated processes. It reports setup and engine runtime
+separately, measures whole-process peak RSS, checks 10 percent sample reproducibility, and verifies
+retained behavior checksums. The project does not publish hardware-dependent performance ratios as
+stable claims.
 
 ## Installation
 

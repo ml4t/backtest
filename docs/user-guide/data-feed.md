@@ -210,7 +210,7 @@ result = run_backtest("data/prices.parquet", strategy, signals="data/signals.par
 
 ## Performance
 
-DataFeed pre-partitions data by timestamp at initialization and pre-extracts column indices for O(1) per-bar access. For 1M bars, this uses roughly 100 MB (10x less than converting everything to Python dicts upfront). Quote columns are cached additively, so the legacy OHLCV path stays unchanged unless you provide quote data.
+DataFeed pre-partitions data by timestamp at initialization and pre-extracts column indices for O(1) per-bar access. Quote columns are cached additively, so the OHLCV path stays unchanged unless you provide quote data. The release benchmark records setup separately from engine runtime and measures memory over the complete child process.
 
 ## See It in Action
 

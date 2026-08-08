@@ -1,0 +1,66 @@
+{
+  "measurement_contract": {
+    "memory": "child-process peak RSS from interpreter start through completed run",
+    "reproducibility_tolerance": 0.1,
+    "runtime": "perf_counter around Engine.run only; setup excluded",
+    "setup": "deterministic data, DataFeed, strategy, config, and Engine construction"
+  },
+  "schema_version": 1,
+  "workloads": {
+    "daily_250_assets": {
+      "assets": 250,
+      "bars": 2520,
+      "behavior_sha256": "97a562431d24ddd2a39670e953a68a5d5fb8f16fa6cd6d15c42409a377bb303a",
+      "data_points": 630000,
+      "expected_fill_count": 0,
+      "expected_final_value": 10000000.0,
+      "expected_trade_count": 0,
+      "quote_aware": false,
+      "strategy": "noop"
+    },
+    "partial_fill": {
+      "assets": 10,
+      "bars": 500,
+      "behavior_sha256": "c4482cf55b677abba42faad0e2cefa4330aec947291bac1aaec895789f09a42d",
+      "data_points": 5000,
+      "expected_fill_count": 100,
+      "expected_final_value": 10000880.5,
+      "expected_trade_count": 1,
+      "quote_aware": false,
+      "strategy": "partial_fill"
+    },
+    "quote_aware": {
+      "assets": 20,
+      "bars": 1000,
+      "behavior_sha256": "31499cd07ea8eb7334fd02799548a2f9ebe2dcafaaecb5f9525879789636a931",
+      "data_points": 20000,
+      "expected_fill_count": 20,
+      "expected_final_value": 10000087.0,
+      "expected_trade_count": 10,
+      "quote_aware": true,
+      "strategy": "alternating"
+    },
+    "rebalance": {
+      "assets": 50,
+      "bars": 504,
+      "behavior_sha256": "627e12f1a0e53915e613a01067dd1b41c254122d2de73f6ea74ea46d0e013d8f",
+      "data_points": 25200,
+      "expected_fill_count": 470,
+      "expected_final_value": 10087875.55999999,
+      "expected_trade_count": 242,
+      "quote_aware": false,
+      "strategy": "rebalance"
+    },
+    "single_asset": {
+      "assets": 1,
+      "bars": 2000,
+      "behavior_sha256": "dc76b10a26eaed68c7bd9f0da8d0131e803630d77536078a70740be762d3d872",
+      "data_points": 2000,
+      "expected_fill_count": 40,
+      "expected_final_value": 10000214.0,
+      "expected_trade_count": 20,
+      "quote_aware": false,
+      "strategy": "alternating"
+    }
+  }
+}

@@ -300,15 +300,22 @@ python validation/run_all_correctness.py --framework zipline --scenarios 01,03,0
 
 ## Performance
 
-Run the instrument-free runtime regression check locally:
+Release performance evidence covers deterministic single-asset, 250-asset daily, quote-aware,
+rebalance, and partial-fill workloads. Each workload runs three times in a fresh child process.
+The evidence separates setup from `Engine.run()`, measures peak RSS over the whole child process,
+requires runtime and memory samples to stay within 10 percent of their median, and verifies a
+retained behavior checksum.
+
+Run the release baselines and the instrument-free feed regression check locally:
 
 ```bash
+uv run python validation/performance_baseline.py --output performance-evidence.json
 uv run pytest tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_runtime_vs_legacy_baseline --no-cov
 ```
 
-This check detects regressions against the repository's legacy data-feed implementation. The
-project does not publish cross-framework speed ratios without a retained benchmark artifact that
-uses the same workload and execution semantics for every framework.
+Workload definitions and expected checksums are retained in
+`validation/performance_baselines.json`. The project does not publish hardware-dependent runtime,
+throughput, memory, or cross-framework ratios as stable claims.
 
 ## Documentation
 

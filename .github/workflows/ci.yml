@@ -154,12 +154,21 @@ jobs:
           tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_runtime_vs_legacy_baseline
           -v --tb=short --no-cov
 
+      - name: Run stable-release performance baselines
+        run: >-
+          uv run python validation/performance_baseline.py
+          --manifest validation/performance_baselines.json
+          --output release-performance-evidence.json
+          --samples 3
+
       - name: Retain performance evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: performance-evidence
-          path: performance-evidence.json
+          path: |
+            performance-evidence.json
+            release-performance-evidence.json
           if-no-files-found: error
 
   contracts:
