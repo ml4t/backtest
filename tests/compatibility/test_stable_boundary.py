@@ -49,6 +49,11 @@ def test_beta_fixture_has_unchanged_release_generated_bytes() -> None:
         assert actual_digest == expected_digest
 
 
+def test_beta_fixture_checkout_disables_platform_line_ending_conversion() -> None:
+    attributes = (_ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+    assert "/tests/fixtures/artifacts/v0.1.0b22/** -text" in attributes
+
+
 def test_manifest_free_beta_artifact_requires_explicit_recovery() -> None:
     with pytest.raises(ArtifactManifestError, match="manifest is missing"):
         BacktestResult.from_parquet(_BETA_ARTIFACT)
