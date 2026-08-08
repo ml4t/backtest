@@ -21,20 +21,17 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
         defer_policy_rejections: bool = False,
     ):
         if self._should_use_next_bar_queue_shadow_validation(
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         ):
             self._process_orders_next_bar_queue_shadow(
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
-                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
                 defer_policy_rejections=defer_policy_rejections,
             )
             return
@@ -45,7 +42,6 @@ class ExecutionEngine:
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
-                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
                 defer_policy_rejections=defer_policy_rejections,
             )
         elif ordering == "sequential":
@@ -53,7 +49,6 @@ class ExecutionEngine:
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
-                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
                 defer_policy_rejections=defer_policy_rejections,
             )
         else:
@@ -61,7 +56,6 @@ class ExecutionEngine:
                 use_open,
                 order_types=order_types,
                 include_orders_this_bar=include_orders_this_bar,
-                only_pre_risk_flat_entries=only_pre_risk_flat_entries,
                 defer_policy_rejections=defer_policy_rejections,
             )
 
@@ -75,7 +69,6 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
         defer_policy_rejections: bool = False,
     ):
         broker = self.broker
@@ -86,7 +79,6 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         for order in eligible_orders:
@@ -150,7 +142,6 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
     ) -> bool:
         broker = self.broker
         if not (
@@ -159,7 +150,7 @@ class ExecutionEngine:
             and broker.next_bar_queue_shadow_validation
         ):
             return False
-        if (order_types is not None or include_orders_this_bar) and not only_pre_risk_flat_entries:
+        if order_types is not None or include_orders_this_bar:
             return False
 
         current_bar_index = broker._bar_index
@@ -167,7 +158,6 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
         for order in eligible_orders:
             if getattr(order, "_created_bar_index", current_bar_index) < current_bar_index - 1:
@@ -181,7 +171,6 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
         defer_policy_rejections: bool = False,
     ):
         broker = self.broker
@@ -190,7 +179,6 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         if not eligible_orders:
@@ -376,7 +364,6 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
         defer_policy_rejections: bool = False,
     ):
         broker = self.broker
@@ -384,7 +371,6 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         filled_orders: list = []
@@ -407,7 +393,6 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
         defer_policy_rejections: bool = False,
     ):
         """Process orders in submission order without exit/entry separation.
@@ -429,7 +414,6 @@ class ExecutionEngine:
             use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
         )
 
         filled_orders: list = []
@@ -636,7 +620,6 @@ class ExecutionEngine:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
     ) -> list:
         broker = self.broker
         eligible_orders = []
@@ -645,12 +628,6 @@ class ExecutionEngine:
             if use_open and order.order_type is OrderType.MOC:
                 continue
             if order_types is not None and order.order_type not in order_types:
-                continue
-            if only_pre_risk_flat_entries and not (
-                order._submitted_before_risk
-                and order._submitted_from_flat
-                and broker.get_position(order.asset) is None
-            ):
                 continue
             if (
                 broker.execution_mode is ExecutionMode.NEXT_BAR

@@ -219,7 +219,7 @@ class Broker:
         self._rebalance_counter = 0
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
         self._orders_this_bar_ids: set[str] = set()
-        self._submitting_before_risk = False
+        self._lifecycle_transaction: Any | None = None
 
         # Risk management
         self._position_rules: Any = None  # Global position rules
@@ -408,7 +408,13 @@ class Broker:
     @cash.setter
     def cash(self, value: float) -> None:
         """Set cash balance (delegates to AccountState)."""
+        self._capture_lifecycle_mutation()
         self.account.cash = value
+
+    def _capture_lifecycle_mutation(self) -> None:
+        transaction = self._lifecycle_transaction
+        if transaction is not None:
+            transaction.capture()
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Get contract specification for an asset."""
@@ -420,6 +426,7 @@ class Broker:
         return spec.multiplier if spec else 1.0
 
     def _next_rebalance_id(self) -> str:
+        self._capture_lifecycle_mutation()
         self._rebalance_counter += 1
         return f"rebalance-{self._rebalance_counter}"
 
@@ -541,6 +548,7 @@ class Broker:
 
     def mark_account_positions(self, use_open: bool = False) -> None:
         """Synchronize account position marks using configured price semantics."""
+        self._capture_lifecycle_mutation()
         for asset, position in self.account.positions.items():
             mark_price = self.get_mark_price(asset, quantity=position.quantity, use_open=use_open)
             if mark_price is not None:
@@ -576,6 +584,7 @@ class Broker:
                 track_session_stats=True,
             ))
         """
+        self._capture_lifecycle_mutation()
         if config is not None:
             self._stats_config = config
         else:
@@ -629,6 +638,7 @@ class Broker:
                 return
         """
         if asset not in self._asset_stats:
+            self._capture_lifecycle_mutation()
             self._asset_stats[asset] = AssetTradingStats(
                 recent_pnls=deque(maxlen=self._stats_config.recent_window_size)
             )
@@ -675,6 +685,7 @@ class Broker:
             )
             broker.set_session_config(session_config)
         """
+        self._capture_lifecycle_mutation()
         self._session_config = config
         self._last_session_id = None
 
@@ -785,6 +796,7 @@ class Broker:
                 disables rules for the selected scope.
             asset: If provided, apply only to this asset; otherwise global
         """
+        self._capture_lifecycle_mutation()
         if asset is not None:
             self._position_rules_by_asset[asset] = rules
         else:
@@ -801,6 +813,7 @@ class Broker:
             asset: Asset symbol
             context: Dict of signal/indicator values (e.g., {'exit_signal': -0.5, 'atr': 2.5})
         """
+        self._capture_lifecycle_mutation()
         pos = self.positions.get(asset)
         if pos:
             pos.context.update(context)
@@ -811,6 +824,7 @@ class Broker:
         Called by Engine before processing orders. Returns list of exit orders.
         Handles defer_fill=True by storing pending exits for next bar.
         """
+        self._capture_lifecycle_mutation()
         return self._risk_engine.evaluate_position_rules(skip_assets=skip_assets)
 
     def submit_order(
@@ -858,6 +872,7 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
+        self._capture_lifecycle_mutation()
         return self._order_book.submit_order(
             asset=asset,
             quantity=quantity,
@@ -992,9 +1007,11 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
+        self._capture_lifecycle_mutation()
         return self._order_book.update_order(order_id, **kwargs)
 
     def cancel_order(self, order_id: str) -> bool:
+        self._capture_lifecycle_mutation()
         return self._order_book.cancel_order(order_id)
 
     def close_position(
@@ -1639,6 +1656,7 @@ class Broker:
 
         Returns list of exit orders that were created and will be filled.
         """
+        self._capture_lifecycle_mutation()
         return self._risk_engine.process_pending_exits()
 
     def _update_time(
@@ -1685,6 +1703,7 @@ class Broker:
         if highs is None or lows is None:
             raise TypeError("_update_time requires highs and lows")
 
+        self._capture_lifecycle_mutation()
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens
@@ -1748,6 +1767,7 @@ class Broker:
         - trail_include_entry_bar_extremes: Include a completed entry bar's
           extreme in the watermark used from the next bar onward
         """
+        self._capture_lifecycle_mutation()
         for asset, pos in self.positions.items():
             if asset in self._current_prices:
                 # For new positions (created this bar), skip updating from entry bar's HIGH/LOW
@@ -1771,7 +1791,6 @@ class Broker:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
-        only_pre_risk_flat_entries: bool = False,
         defer_policy_rejections: bool = False,
     ):
         """Process pending orders against current prices.
@@ -1787,10 +1806,10 @@ class Broker:
         Args:
             use_open: If True, use open prices (for next-bar mode at bar start).
         """
+        self._capture_lifecycle_mutation()
         self._execution_engine.process_orders(
             use_open=use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
-            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
             defer_policy_rejections=defer_policy_rejections,
         )

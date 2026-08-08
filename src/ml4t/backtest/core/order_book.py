@@ -65,8 +65,6 @@ class OrderBook:
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,
-            _submitted_before_risk=broker._submitting_before_risk,
-            _submitted_from_flat=broker.get_position(asset) is None,
         )
 
         order._signal_price = broker._current_prices.get(asset)
