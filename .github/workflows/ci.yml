@@ -193,6 +193,15 @@ jobs:
       - name: Build package
         run: uv build
 
+      - name: Rebuild package for reproducibility
+        run: uv build --out-dir dist-rebuild
+
+      - name: Validate distribution contents and reproducibility
+        run: uv run python validation/check_artifacts.py dist --compare dist-rebuild
+
+      - name: Validate package metadata and long description
+        run: uvx twine check dist/*
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7.0.1
         with:

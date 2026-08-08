@@ -11,6 +11,12 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "src/ml4t/backtest/_version.py"
 
+[tool.hatch.build]
+exclude = [
+    "**/AGENTS.md",
+    "**/CLAUDE.md",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/ml4t"]
 namespaces = true
