@@ -1,6 +1,6 @@
 # Validation Methodology
 
-*Last updated: 2026-03-02*
+*Last updated: 2026-08-08*
 
 ## Core Principle
 
@@ -120,6 +120,12 @@ Set the new parameter in the framework's profile to match its behavior.
 
 Run the benchmark suite again. The gap for this dimension should now be zero.
 If not, there are additional behavioral differences to capture -- go back to step 1.
+
+Release comparisons use equality after all adapters serialize numeric values to an eight-decimal
+fixed-point representation. This representation removes framework-specific binary floating-point
+noise without allowing a nonzero value difference. Comparison artifacts retain raw values, raw
+differences, canonical values, record counts, hashes, and the first divergent record. Scenario
+diagnostic thresholds provide context in failure messages and never change pass or fail status.
 
 ### Step 6: Update Documentation
 

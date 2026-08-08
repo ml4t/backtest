@@ -7,6 +7,7 @@ framework dependencies are installed.
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 from pathlib import Path
@@ -30,7 +31,7 @@ def _load_benchmark_suite():
     return module
 
 
-def _run_framework_pair(framework: str, runner_name: str):
+def _run_framework_pair(framework: str, runner_name: str, artifact_dir: Path):
     if framework == "vectorbt":
         pytest.importorskip("vectorbt")
     elif framework == "backtrader":
@@ -55,46 +56,52 @@ def _run_framework_pair(framework: str, runner_name: str):
     )
     price_data, signals, dates = suite.generate_benchmark_data(config, seed=123)
 
+    execution_mode = "next_bar" if framework in {"backtrader", "zipline"} else "same_bar"
     ml4t_result = suite.benchmark_ml4t(
-        config, price_data, signals, dates, execution_mode="same_bar"
+        config, price_data, signals, dates, execution_mode=execution_mode
     )
     framework_result = getattr(suite, runner_name)(config, price_data, signals, dates)
 
     assert ml4t_result.error is None, ml4t_result.error
     assert framework_result.error is None, framework_result.error
-    assert ml4t_result.runtime_sec > 0
-    assert framework_result.runtime_sec > 0
-    assert ml4t_result.num_trades >= 0
-    assert framework_result.num_trades >= 0
+    artifact = suite.compare_benchmark_results_exact(
+        framework_result,
+        ml4t_result,
+        initial_cash=config.initial_cash,
+    )
+    artifact_path = artifact_dir / f"{framework}-exact-comparison.json"
+    suite.write_exact_comparison_artifact(artifact, artifact_path)
+
+    assert artifact["passed"], json.dumps(artifact, indent=2, sort_keys=True)
 
 
 @pytest.mark.skipif(
     not _RUN_COMPARISON,
     reason="Set ML4T_RUN_COMPARISON_BENCHMARKS=1 to enable cross-framework benchmarks.",
 )
-def test_selected_scenario_vs_vectorbt_oss():
-    _run_framework_pair("vectorbt", "benchmark_vectorbt_oss")
+def test_selected_scenario_vs_vectorbt_oss(tmp_path: Path):
+    _run_framework_pair("vectorbt", "benchmark_vectorbt_oss", tmp_path)
 
 
 @pytest.mark.skipif(
     not _RUN_COMPARISON,
     reason="Set ML4T_RUN_COMPARISON_BENCHMARKS=1 to enable cross-framework benchmarks.",
 )
-def test_selected_scenario_vs_backtrader():
-    _run_framework_pair("backtrader", "benchmark_backtrader")
+def test_selected_scenario_vs_backtrader(tmp_path: Path):
+    _run_framework_pair("backtrader", "benchmark_backtrader", tmp_path)
 
 
 @pytest.mark.skipif(
     not _RUN_COMPARISON,
     reason="Set ML4T_RUN_COMPARISON_BENCHMARKS=1 to enable cross-framework benchmarks.",
 )
-def test_selected_scenario_vs_nautilus():
-    _run_framework_pair("nautilus", "benchmark_nautilus")
+def test_selected_scenario_vs_nautilus(tmp_path: Path):
+    _run_framework_pair("nautilus", "benchmark_nautilus", tmp_path)
 
 
 @pytest.mark.skipif(
     not _RUN_COMPARISON,
     reason="Set ML4T_RUN_COMPARISON_BENCHMARKS=1 to enable cross-framework benchmarks.",
 )
-def test_selected_scenario_vs_zipline_reloaded():
-    _run_framework_pair("zipline", "benchmark_zipline")
+def test_selected_scenario_vs_zipline_reloaded(tmp_path: Path):
+    _run_framework_pair("zipline", "benchmark_zipline", tmp_path)

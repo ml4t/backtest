@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from decimal import ROUND_HALF_EVEN, Decimal
+
 from .types import CheckResult, ComparisonResult, FrameworkResult, ScenarioConfig, Tolerance
+
+CANONICAL_QUANTUM = Decimal("0.00000001")
+
+
+def _canonical_number(value: int | float) -> Decimal:
+    """Convert binary framework output to the shared eight-decimal fixed-point domain."""
+    return Decimal(str(value)).quantize(CANONICAL_QUANTUM, rounding=ROUND_HALF_EVEN)
 
 
 def compare_results(
@@ -17,14 +26,15 @@ def compare_results(
         scenario: Scenario configuration.
         framework_result: Result from external framework.
         ml4t_result: Result from ml4t.backtest.
-        tolerance: Comparison tolerances (uses scenario defaults if None).
+        tolerance: Diagnostic thresholds reported with exact release checks.
 
     Returns:
         ComparisonResult with individual check results.
     """
     if tolerance is None:
-        if scenario.tolerances and framework_result.framework.lower().replace(" ", "_") in scenario.tolerances:
-            tolerance = scenario.tolerances[framework_result.framework.lower().replace(" ", "_")]
+        framework_key = framework_result.framework.lower().replace(" ", "_")
+        if scenario.tolerances and framework_key in scenario.tolerances:
+            tolerance = scenario.tolerances[framework_key]
         elif scenario.default_tolerance:
             tolerance = scenario.default_tolerance
         else:
@@ -34,92 +44,160 @@ def compare_results(
 
     # Trade count
     trade_diff = abs(framework_result.num_trades - ml4t_result.num_trades)
-    checks.append(CheckResult(
-        name="trade_count",
-        passed=trade_diff <= tolerance.trade_count,
-        message=(
-            f"{framework_result.framework}={framework_result.num_trades}, "
-            f"ML4T={ml4t_result.num_trades}"
-        ),
-        expected=framework_result.num_trades,
-        actual=ml4t_result.num_trades,
-    ))
+    checks.append(
+        CheckResult(
+            name="trade_count",
+            passed=trade_diff == 0,
+            message=(
+                f"{framework_result.framework}={framework_result.num_trades}, "
+                f"ML4T={ml4t_result.num_trades}, exact_diff={trade_diff}; "
+                f"diagnostic_limit={tolerance.trade_count}"
+            ),
+            expected=framework_result.num_trades,
+            actual=ml4t_result.num_trades,
+        )
+    )
 
     # Final value
     fw_value = framework_result.final_value
     ml4t_value = ml4t_result.final_value
     value_diff = abs(fw_value - ml4t_value)
     value_pct = value_diff / abs(fw_value) * 100 if fw_value != 0 else 0
-    checks.append(CheckResult(
-        name="final_value",
-        passed=value_pct < tolerance.value_pct,
-        message=(
-            f"{framework_result.framework}=${fw_value:,.2f}, "
-            f"ML4T=${ml4t_value:,.2f} (diff={value_pct:.4f}%)"
-        ),
-        expected=fw_value,
-        actual=ml4t_value,
-    ))
+    checks.append(
+        CheckResult(
+            name="final_value",
+            passed=_canonical_number(fw_value) == _canonical_number(ml4t_value),
+            message=(
+                f"{framework_result.framework}=${fw_value:,.10f}, "
+                f"ML4T=${ml4t_value:,.10f} (exact_diff=${value_diff:.10f}, "
+                f"{value_pct:.10f}%; diagnostic_limit={tolerance.value_pct}%)"
+            ),
+            expected=fw_value,
+            actual=ml4t_value,
+        )
+    )
 
     # Total P&L
     fw_pnl = framework_result.total_pnl
     ml4t_pnl = ml4t_result.total_pnl
     pnl_diff = abs(fw_pnl - ml4t_pnl)
-    checks.append(CheckResult(
-        name="total_pnl",
-        passed=pnl_diff < tolerance.pnl_abs,
-        message=(
-            f"{framework_result.framework}=${fw_pnl:,.2f}, "
-            f"ML4T=${ml4t_pnl:,.2f} (diff=${pnl_diff:.2f})"
-        ),
-        expected=fw_pnl,
-        actual=ml4t_pnl,
-    ))
+    checks.append(
+        CheckResult(
+            name="total_pnl",
+            passed=_canonical_number(fw_pnl) == _canonical_number(ml4t_pnl),
+            message=(
+                f"{framework_result.framework}=${fw_pnl:,.10f}, "
+                f"ML4T=${ml4t_pnl:,.10f} (exact_diff=${pnl_diff:.10f}; "
+                f"diagnostic_limit=${tolerance.pnl_abs})"
+            ),
+            expected=fw_pnl,
+            actual=ml4t_pnl,
+        )
+    )
 
     # Extra checks
     if "commission" in scenario.extra_checks:
         fw_comm = framework_result.extra.get("total_commission")
         ml4t_comm = ml4t_result.extra.get("total_commission")
-        # Only compare if the framework provides commission data
-        if fw_comm is not None and ml4t_comm is not None:
+        if fw_comm is None or ml4t_comm is None:
+            checks.append(
+                CheckResult(
+                    name="total_commission",
+                    passed=False,
+                    message="Required commission output is missing",
+                    expected=fw_comm,
+                    actual=ml4t_comm,
+                )
+            )
+        else:
             comm_diff = abs(fw_comm - ml4t_comm)
-            checks.append(CheckResult(
-                name="total_commission",
-                passed=comm_diff < tolerance.commission_abs,
-                message=f"{framework_result.framework}=${fw_comm:.2f}, ML4T=${ml4t_comm:.2f} (diff=${comm_diff:.2f})",
-                expected=fw_comm,
-                actual=ml4t_comm,
-            ))
+            checks.append(
+                CheckResult(
+                    name="total_commission",
+                    passed=_canonical_number(fw_comm) == _canonical_number(ml4t_comm),
+                    message=(
+                        f"{framework_result.framework}=${fw_comm:.10f}, "
+                        f"ML4T=${ml4t_comm:.10f} (exact_diff=${comm_diff:.10f}; "
+                        f"diagnostic_limit=${tolerance.commission_abs})"
+                    ),
+                    expected=fw_comm,
+                    actual=ml4t_comm,
+                )
+            )
 
     if "exit_price" in scenario.extra_checks:
         fw_exit = framework_result.extra.get("exit_price")
         ml4t_exit = ml4t_result.extra.get("exit_price")
-        if fw_exit is not None and ml4t_exit is not None:
+        if fw_exit is None or ml4t_exit is None:
+            checks.append(
+                CheckResult(
+                    name="exit_price",
+                    passed=False,
+                    message="Required exit-price output is missing",
+                    expected=fw_exit,
+                    actual=ml4t_exit,
+                )
+            )
+        else:
             exit_diff = abs(fw_exit - ml4t_exit)
-            checks.append(CheckResult(
-                name="exit_price",
-                passed=exit_diff < tolerance.exit_price_abs,
-                message=f"{framework_result.framework}=${fw_exit:.2f}, ML4T=${ml4t_exit:.2f} (diff=${exit_diff:.2f})",
-                expected=fw_exit,
-                actual=ml4t_exit,
-            ))
+            checks.append(
+                CheckResult(
+                    name="exit_price",
+                    passed=_canonical_number(fw_exit) == _canonical_number(ml4t_exit),
+                    message=(
+                        f"{framework_result.framework}=${fw_exit:.10f}, "
+                        f"ML4T=${ml4t_exit:.10f} (exact_diff=${exit_diff:.10f}; "
+                        f"diagnostic_limit=${tolerance.exit_price_abs})"
+                    ),
+                    expected=fw_exit,
+                    actual=ml4t_exit,
+                )
+            )
 
-    # Trade-by-trade comparison (if counts match)
-    if framework_result.num_trades == ml4t_result.num_trades and framework_result.trades and ml4t_result.trades:
-        trade_matches = 0
-        for fw_t, ml4t_t in zip(framework_result.trades, ml4t_result.trades):
-            entry_ok = abs(fw_t.get("entry_price", 0) - ml4t_t.get("entry_price", 0)) < tolerance.exit_price_abs
-            exit_ok = abs(fw_t.get("exit_price", 0) - ml4t_t.get("exit_price", 0)) < tolerance.exit_price_abs
-            if entry_ok and exit_ok:
-                trade_matches += 1
-
-        if framework_result.num_trades > 0:
-            match_pct = trade_matches / framework_result.num_trades * 100
-            checks.append(CheckResult(
-                name="trade_level_match",
-                passed=match_pct >= 99.0,
-                message=f"{trade_matches}/{framework_result.num_trades} ({match_pct:.1f}%)",
-            ))
+    # Exact trade-by-trade release surface. Timestamps are excluded until every adapter exposes
+    # them consistently; prices, size, direction, and PnL are mandatory for every reported trade.
+    required_trade_fields = ("entry_price", "exit_price", "pnl", "size", "direction")
+    trade_detail = "exact match"
+    trade_level_passed = len(framework_result.trades) == len(ml4t_result.trades)
+    if trade_level_passed:
+        for index, (fw_trade, ml4t_trade) in enumerate(
+            zip(framework_result.trades, ml4t_result.trades, strict=True)
+        ):
+            for field in required_trade_fields:
+                if field not in fw_trade or field not in ml4t_trade:
+                    trade_level_passed = False
+                    trade_detail = f"trade {index} missing required field {field}"
+                    break
+                expected = fw_trade[field]
+                actual = ml4t_trade[field]
+                if field == "direction":
+                    expected = str(expected).lower()
+                    actual = str(actual).lower()
+                else:
+                    expected = _canonical_number(expected)
+                    actual = _canonical_number(actual)
+                if expected != actual:
+                    trade_level_passed = False
+                    trade_detail = (
+                        f"trade {index} field {field}: expected={expected!r}, actual={actual!r}"
+                    )
+                    break
+            if not trade_level_passed:
+                break
+    else:
+        trade_detail = (
+            f"record_count expected={len(framework_result.trades)}, "
+            f"actual={len(ml4t_result.trades)}"
+        )
+    checks.append(
+        CheckResult(
+            name="trade_level_match",
+            passed=trade_level_passed,
+            message=trade_detail,
+            expected=framework_result.trades,
+            actual=ml4t_result.trades,
+        )
+    )
 
     all_passed = all(c.passed for c in checks)
 
@@ -138,6 +216,8 @@ def print_comparison(result: ComparisonResult, verbose: bool = True) -> None:
     print("=" * 70)
 
     for check in result.checks:
+        if not verbose and check.passed:
+            continue
         status = "PASS" if check.passed else "FAIL"
         print(f"  {check.name}: {check.message} [{status}]")
 

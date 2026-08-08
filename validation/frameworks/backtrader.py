@@ -38,7 +38,9 @@ def run(
     try:
         import backtrader as bt
     except ImportError:
-        raise ImportError("Backtrader not installed. Run in .venv-backtrader environment.")
+        raise ImportError(
+            "Backtrader not installed. Run in .venv-backtrader environment."
+        ) from None
 
     # Data feed adapter
     class PandasData(bt.feeds.PandasData):
@@ -102,10 +104,11 @@ def run(
         for t in trade_list:
             if "pnl" in t and "entry_price" in t and "size" in t:
                 size = t["size"]
+                price_pnl = t.get("gross_pnl", t["pnl"])
                 if t.get("direction") == "Short":
-                    t["exit_price"] = t["entry_price"] - t["pnl"] / abs(size)
+                    t["exit_price"] = t["entry_price"] - price_pnl / abs(size)
                 else:
-                    t["exit_price"] = t["entry_price"] + t["pnl"] / abs(size)
+                    t["exit_price"] = t["entry_price"] + price_pnl / abs(size)
     if scenario.extra_checks and "exit_price" in scenario.extra_checks and trade_list:
         extra["exit_price"] = trade_list[0].get("exit_price")
 
@@ -172,17 +175,20 @@ def _signal_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                 entry_size = self.pending_trade["entry_size"]
                 exit_price = self.pending_trade["entry_price"] + trade.pnl / abs(entry_size)
 
-                self.trade_log.append({
-                    "entry_time": self.pending_trade["entry_time"],
-                    "exit_time": bt.num2date(trade.dtclose),
-                    "entry_price": self.pending_trade["entry_price"],
-                    "exit_price": exit_price,
-                    "pnl": trade.pnl,
-                    "pnlcomm": trade.pnlcomm,
-                    "commission": trade.commission,
-                    "size": abs(entry_size),
-                    "direction": "Long",
-                })
+                self.trade_log.append(
+                    {
+                        "entry_time": self.pending_trade["entry_time"],
+                        "exit_time": bt.num2date(trade.dtclose),
+                        "entry_price": self.pending_trade["entry_price"],
+                        "exit_price": exit_price,
+                        "gross_pnl": trade.pnl,
+                        "pnl": trade.pnlcomm,
+                        "pnlcomm": trade.pnlcomm,
+                        "commission": trade.commission,
+                        "size": abs(entry_size),
+                        "direction": "Long",
+                    }
+                )
                 self.pending_trade = None
 
         def notify_order(self, order):
@@ -238,15 +244,18 @@ def _short_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                 else:
                     exit_price = self.pending_trade["entry_price"] + trade.pnl / abs(entry_size)
 
-                self.trade_log.append({
-                    "entry_time": self.pending_trade["entry_time"],
-                    "exit_time": bt.num2date(trade.dtclose),
-                    "entry_price": self.pending_trade["entry_price"],
-                    "exit_price": exit_price,
-                    "size": abs(entry_size),
-                    "pnl": trade.pnl,
-                    "direction": "Short" if entry_size < 0 else "Long",
-                })
+                self.trade_log.append(
+                    {
+                        "entry_time": self.pending_trade["entry_time"],
+                        "exit_time": bt.num2date(trade.dtclose),
+                        "entry_price": self.pending_trade["entry_price"],
+                        "exit_price": exit_price,
+                        "size": abs(entry_size),
+                        "gross_pnl": trade.pnl,
+                        "pnl": trade.pnlcomm,
+                        "direction": "Short" if entry_size < 0 else "Long",
+                    }
+                )
                 self.pending_trade = None
 
     return ShortStrategy
@@ -296,27 +305,43 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
             if is_short:
                 if has_stop_loss:
                     sl_price = ref_price * (1 + sl_pct)
-                    orders.append(self.buy(
-                        exectype=bt.Order.Stop, price=sl_price, size=shares,
-                    ))
+                    orders.append(
+                        self.buy(
+                            exectype=bt.Order.Stop,
+                            price=sl_price,
+                            size=shares,
+                        )
+                    )
                 if has_take_profit:
                     tp_price = ref_price * (1 - tp_pct)
-                    orders.append(self.buy(
-                        exectype=bt.Order.Limit, price=tp_price, size=shares,
-                        oco=orders[0] if orders else None,
-                    ))
+                    orders.append(
+                        self.buy(
+                            exectype=bt.Order.Limit,
+                            price=tp_price,
+                            size=shares,
+                            oco=orders[0] if orders else None,
+                        )
+                    )
             else:
                 if has_stop_loss:
                     sl_price = ref_price * (1 - sl_pct)
-                    orders.append(self.sell(
-                        exectype=bt.Order.Stop, price=sl_price, size=shares,
-                    ))
+                    orders.append(
+                        self.sell(
+                            exectype=bt.Order.Stop,
+                            price=sl_price,
+                            size=shares,
+                        )
+                    )
                 if has_take_profit:
                     tp_price = ref_price * (1 + tp_pct)
-                    orders.append(self.sell(
-                        exectype=bt.Order.Limit, price=tp_price, size=shares,
-                        oco=orders[0] if orders else None,
-                    ))
+                    orders.append(
+                        self.sell(
+                            exectype=bt.Order.Limit,
+                            price=tp_price,
+                            size=shares,
+                            oco=orders[0] if orders else None,
+                        )
+                    )
             return orders
 
         def _submit_trail(self):
@@ -328,13 +353,17 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
             first_existing = self.exit_orders[0] if self.exit_orders else None
             if is_short:
                 trail = self.buy(
-                    exectype=bt.Order.StopTrail, trailpercent=trail_pct,
-                    size=shares, oco=first_existing,
+                    exectype=bt.Order.StopTrail,
+                    trailpercent=trail_pct,
+                    size=shares,
+                    oco=first_existing,
                 )
             else:
                 trail = self.sell(
-                    exectype=bt.Order.StopTrail, trailpercent=trail_pct,
-                    size=shares, oco=first_existing,
+                    exectype=bt.Order.StopTrail,
+                    trailpercent=trail_pct,
+                    size=shares,
+                    oco=first_existing,
                 )
             self.exit_orders.append(trail)
 
@@ -383,15 +412,18 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                 else:
                     exit_price = self.pending_trade["entry_price"] + trade.pnl / abs(entry_size)
 
-                self.trade_log.append({
-                    "entry_time": self.pending_trade["entry_time"],
-                    "exit_time": bt.num2date(trade.dtclose),
-                    "entry_price": self.pending_trade["entry_price"],
-                    "exit_price": exit_price,
-                    "size": abs(entry_size),
-                    "pnl": trade.pnl,
-                    "direction": "Short" if entry_size < 0 else "Long",
-                })
+                self.trade_log.append(
+                    {
+                        "entry_time": self.pending_trade["entry_time"],
+                        "exit_time": bt.num2date(trade.dtclose),
+                        "entry_price": self.pending_trade["entry_price"],
+                        "exit_price": exit_price,
+                        "size": abs(entry_size),
+                        "gross_pnl": trade.pnl,
+                        "pnl": trade.pnlcomm,
+                        "direction": "Short" if entry_size < 0 else "Long",
+                    }
+                )
                 self.pending_trade = None
                 self.exit_orders = []
 

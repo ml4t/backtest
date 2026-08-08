@@ -144,7 +144,7 @@ class ScenarioConfig:
 
 @dataclass
 class Tolerance:
-    """Comparison tolerances for a framework."""
+    """Diagnostic gap thresholds that never affect release pass/fail status."""
 
     trade_count: int = 0  # Absolute difference allowed
     value_pct: float = 0.01  # Percentage of final value
