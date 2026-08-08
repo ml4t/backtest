@@ -165,7 +165,7 @@ def test_ci_and_release_both_require_the_evidence_retaining_security_workflow() 
 
     scan = security["jobs"]["scan"]
     commands = "\n".join(step.get("run", "") for step in scan["steps"])
-    assert "uv export --frozen --no-dev --no-emit-project" in commands
+    assert "uv export --locked --no-dev --no-emit-project" in commands
     assert "pip-audit==$PIP_AUDIT_VERSION" in commands
     assert "bandit==$BANDIT_VERSION" in commands
     assert "validation/check_security.py" in commands
