@@ -229,6 +229,19 @@ def _broker_collection_access(node: ast.AST) -> str | None:
     return None
 
 
+def _copy_or_view_argument_access(node: ast.AST) -> str | None:
+    if _direct_broker_collection_access(node) is not None:
+        return None
+    if isinstance(node, ast.Starred) and isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+        for element in node.value.elts:
+            if _direct_broker_collection_access(element) is not None:
+                continue
+            if (collection := _broker_collection_access(element)) is not None:
+                return collection
+        return None
+    return _broker_collection_access(node)
+
+
 def _mutable_collection_access(node: ast.AST) -> str | None:
     if (
         isinstance(node, ast.Attribute)
@@ -254,19 +267,7 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
             return None
         if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_VIEW_CALLS:
             for argument in node.args:
-                if _direct_broker_collection_access(argument) is not None:
-                    continue
-                if (
-                    isinstance(argument, ast.Starred)
-                    and isinstance(argument.value, (ast.List, ast.Tuple, ast.Set))
-                    and argument.value.elts
-                    and all(
-                        _direct_broker_collection_access(element) is not None
-                        for element in argument.value.elts
-                    )
-                ):
-                    continue
-                if (collection := _broker_collection_access(argument)) is not None:
+                if (collection := _copy_or_view_argument_access(argument)) is not None:
                     return collection
             for keyword in node.keywords:
                 if (
@@ -459,9 +460,18 @@ def test_mutable_collection_contract_follows_nested_copy_arguments() -> None:
         call = ast.parse(source).body[0].value
         assert _mutable_collection_access(call) == "fills", source
 
-    for source in ("list(broker.fills)", "iter(*[broker.fills])"):
+    for source in (
+        "list(broker.fills)",
+        "iter(*[broker.fills])",
+        "zip(*(broker.fills, broker.orders))",
+        "zip(*{broker.fills})",
+        "zip(*[broker.fills, timestamps])",
+    ):
         direct_copy = ast.parse(source).body[0].value
         assert _mutable_collection_access(direct_copy) is None, source
+
+    nested_escape = ast.parse("zip(*[broker.fills, [broker.orders]])").body[0].value
+    assert _mutable_collection_access(nested_escape) == "orders"
 
 
 def test_mutable_collection_contract_allows_nested_consumer_arguments() -> None:
