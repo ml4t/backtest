@@ -232,7 +232,7 @@ def _broker_collection_access(node: ast.AST) -> str | None:
 def _copy_or_view_argument_access(node: ast.AST) -> str | None:
     if _direct_broker_collection_access(node) is not None:
         return None
-    if isinstance(node, ast.Starred) and isinstance(node.value, (ast.List, ast.Tuple)):
+    if isinstance(node, ast.Starred) and isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
         for element in node.value.elts:
             if (collection := _copy_or_view_argument_access(element)) is not None:
                 return collection
@@ -462,14 +462,20 @@ def test_mutable_collection_contract_follows_nested_copy_arguments() -> None:
         "list(broker.fills)",
         "iter(*[broker.fills])",
         "zip(*(broker.fills, broker.orders))",
+        "zip(*{broker.fills})",
         "zip(*[broker.fills, timestamps])",
         "zip(*[*[broker.fills]])",
     ):
         direct_copy = ast.parse(source).body[0].value
         assert _mutable_collection_access(direct_copy) is None, source
 
-    nested_escape = ast.parse("zip(*[broker.fills, [broker.orders]])").body[0].value
-    assert _mutable_collection_access(nested_escape) == "orders"
+    for source, expected in (
+        ("zip(*[broker.fills, [broker.orders]])", "orders"),
+        ("zip(*[*[broker.fills, [broker.orders]]])", "orders"),
+        ("zip(*[*[[broker.fills]]])", "fills"),
+    ):
+        nested_escape = ast.parse(source).body[0].value
+        assert _mutable_collection_access(nested_escape) == expected, source
 
 
 def test_mutable_collection_contract_allows_nested_consumer_arguments() -> None:
