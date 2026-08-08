@@ -340,9 +340,38 @@ class TestCalendarEnforcementIntraday:
 
         assert result.metrics["skipped_bars"] == 0
 
-    def test_intraday_weekend_skipped(self, monkeypatch: pytest.MonkeyPatch):
-        """Weekend intraday bars are skipped (via trading day fallback)."""
-        # Saturday data - will be caught by trading day check
+    def test_naive_utc_extended_hours_do_not_warn_when_filtering_is_intentional(self):
+        start = datetime(2024, 1, 2, 9, 0)
+        timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_30,
+            ),
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = engine.run()
+
+        assert 0 < result.metrics["skipped_bars"] < len(timestamps)
+
+    def test_intraday_weekend_skipped(self):
+        """Weekend intraday bars are skipped by the precomputed session mask."""
         saturday = datetime(2024, 1, 6, 10, 0)  # Saturday 10 AM
         timestamps = [
             saturday,
@@ -351,14 +380,6 @@ class TestCalendarEnforcementIntraday:
         ]
         prices = [100.0, 100.1, 100.2]
         n_bars = len(timestamps)
-        checked_dates = []
-
-        def reject_trading_date(_calendar_id, date):
-            checked_dates.append(date)
-            return False
-
-        monkeypatch.setattr(calendar_module, "is_trading_day", reject_trading_date)
-
         df = pl.DataFrame(
             {
                 "timestamp": timestamps,
@@ -388,10 +409,44 @@ class TestCalendarEnforcementIntraday:
         # All bars should be skipped (Saturday)
         assert strategy.bars_processed == 0
         assert results.metrics["skipped_bars"] == 3
-        assert checked_dates == [saturday.date()]
+
+    def test_session_warning_checks_each_distinct_date_once(self, monkeypatch: pytest.MonkeyPatch):
+        start = datetime(2024, 1, 6, 10, 0)
+        timestamps = [start, start + timedelta(minutes=1), start + timedelta(days=1)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+        checked_dates = []
+
+        def reject_trading_date(_calendar_id, date):
+            checked_dates.append(date)
+            return False
+
+        monkeypatch.setattr(calendar_module, "is_trading_day", reject_trading_date)
+
+        Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                timezone="America/New_York",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        ).run()
+
+        assert sorted(checked_dates) == sorted({timestamp.date() for timestamp in timestamps})
 
     def test_intraday_holiday_skipped(self):
-        """Holiday intraday bars are skipped (via trading day fallback)."""
+        """Holiday intraday bars are skipped by the precomputed session mask."""
         # July 4th 2024 - Independence Day
         july4 = datetime(2024, 7, 4, 10, 0)
         timestamps = [

@@ -137,24 +137,47 @@ class Engine:
                 calendar_id = self.config.resolved_calendar
                 retention = retained_bars / total_bars if total_bars else 1.0
                 calendar_timezone = str(self._calendar.tz)
-                possible_naive_timezone_mismatch = (
+                compare_calendar_timezone = (
                     naive_timestamps
                     and self.config.resolved_timezone != calendar_timezone
                     and retention <= 0.5
                 )
-                possible_session_misconfiguration = (
-                    retention <= 0.1 or possible_naive_timezone_mismatch
+                alternative_retained_bars = retained_bars
+                if compare_calendar_timezone:
+                    alternative_retained_bars = len(
+                        filter_to_trading_sessions(
+                            timestamp_frame,
+                            calendar_id,
+                            naive_tz=calendar_timezone,
+                        )
+                    )
+                alternative_retention = (
+                    alternative_retained_bars / total_bars if total_bars else 1.0
                 )
-                has_trading_date = possible_session_misconfiguration and any(
+                alternative_timezone_explains_loss = (
+                    compare_calendar_timezone
+                    and alternative_retention >= 0.8
+                    and alternative_retention - retention >= 0.25
+                )
+                possible_session_misconfiguration = (
+                    retention <= 0.1 or alternative_timezone_explains_loss
+                )
+                should_warn = possible_session_misconfiguration and any(
                     is_trading_day_fn(calendar_id, date)
                     for date in {ts.date() for ts in timestamps}
                 )
-                if has_trading_date:
-                    timezone_note = (
-                        f" Naive timestamps were interpreted as {self.config.resolved_timezone!r}."
-                        if naive_timestamps
-                        else ""
-                    )
+                if should_warn:
+                    timezone_note = ""
+                    if alternative_timezone_explains_loss:
+                        timezone_note = (
+                            f" Interpreting naive timestamps as {calendar_timezone!r} would "
+                            f"retain {alternative_retained_bars} bars."
+                        )
+                    elif naive_timestamps:
+                        timezone_note = (
+                            f" Naive timestamps were interpreted as "
+                            f"{self.config.resolved_timezone!r}."
+                        )
                     warnings.warn(
                         f"Session filtering for {self.config.resolved_calendar!r} retained "
                         f"{retained_bars} of {total_bars} intraday bars.{timezone_note} "
@@ -356,7 +379,7 @@ class Engine:
 
     def _build_activity_metrics(self) -> dict[str, int | float]:
         """Compute fill and portfolio activity metrics."""
-        fills = self.broker.fills
+        fills = tuple(self.broker.fills)
         if not fills:
             avg_open_positions = (
                 sum(state[5] for state in self.portfolio_state) / len(self.portfolio_state)

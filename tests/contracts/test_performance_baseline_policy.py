@@ -87,6 +87,7 @@ def test_public_docs_do_not_publish_unretained_performance_numbers() -> None:
 def test_performance_claim_scanner_respects_fence_length_and_scans_nested_text(
     tmp_path: Path,
 ) -> None:
+    """Scanned docs must use fenced code; indentation remains eligible nested prose."""
     document = tmp_path / "claims.md"
     document.write_text(
         "````python\n"

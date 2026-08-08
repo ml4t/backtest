@@ -79,7 +79,8 @@ def _references_broker(node: ast.AST) -> bool:
     return (
         isinstance(node, ast.Name)
         and node.id == "broker"
-        or (isinstance(node, ast.Attribute) and node.attr == "broker")
+        or isinstance(node, ast.Attribute)
+        and (node.attr == "broker" or _references_broker(node.value))
     )
 
 
@@ -93,13 +94,7 @@ def _references_strategy(node: ast.AST) -> bool:
     )
 
 
-def _broker_private_assignments() -> set[str]:
-    broker_tree = _parse(SOURCE_ROOT / "broker.py")
-    broker_class = next(
-        node
-        for node in broker_tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "Broker"
-    )
+def _private_state_names(broker_class: ast.ClassDef) -> set[str]:
     assigned = {
         node.attr
         for node in ast.walk(broker_class)
@@ -116,9 +111,12 @@ def _broker_private_assignments() -> set[str]:
         and node.name.startswith("_")
         and any(
             isinstance(decorator, ast.Name)
-            and decorator.id == "property"
+            and decorator.id.endswith("property")
             or isinstance(decorator, ast.Attribute)
-            and decorator.attr in {"setter", "deleter"}
+            and (
+                decorator.attr.endswith("property")
+                or decorator.attr in {"getter", "setter", "deleter"}
+            )
             for decorator in node.decorator_list
         )
     }
@@ -129,34 +127,68 @@ def _broker_private_assignments() -> set[str]:
         and isinstance(node.target, ast.Name)
         and node.target.id.startswith("_")
     }
-    return assigned | properties | annotated
+    dynamic_assignments = {
+        node.args[1].value
+        for node in ast.walk(broker_class)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "setattr"
+        and len(node.args) >= 2
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == "self"
+        and isinstance(node.args[1], ast.Constant)
+        and isinstance(node.args[1].value, str)
+        and node.args[1].value.startswith("_")
+    }
+    return assigned | properties | annotated | dynamic_assignments
+
+
+def _broker_private_assignments() -> set[str]:
+    broker_tree = _parse(SOURCE_ROOT / "broker.py")
+    broker_class = next(
+        node
+        for node in broker_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "Broker"
+    )
+    return _private_state_names(broker_class)
+
+
+def _broker_collection_access(node: ast.AST) -> str | None:
+    if (
+        isinstance(node, ast.Attribute)
+        and node.attr in BROKER_MUTABLE_COLLECTIONS
+        and _references_broker(node.value)
+    ):
+        return node.attr
+    return None
 
 
 def _mutable_collection_access(node: ast.AST) -> str | None:
     if (
         isinstance(node, ast.Attribute)
-        and node.attr in BROKER_MUTABLE_COLLECTIONS
-        and _references_broker(node.value)
+        and _broker_collection_access(node) is not None
         and isinstance(node.ctx, (ast.Store, ast.Del))
     ):
         return node.attr
     if (
         isinstance(node, ast.Subscript)
         and isinstance(node.ctx, (ast.Store, ast.Del))
-        and isinstance(node.value, ast.Attribute)
-        and node.value.attr in BROKER_MUTABLE_COLLECTIONS
-        and _references_broker(node.value.value)
+        and (collection := _broker_collection_access(node.value)) is not None
     ):
-        return node.value.attr
+        return collection
     if (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr in COLLECTION_MUTATORS
-        and isinstance(node.func.value, ast.Attribute)
-        and node.func.value.attr in BROKER_MUTABLE_COLLECTIONS
-        and _references_broker(node.func.value.value)
+        and (collection := _broker_collection_access(node.func.value)) is not None
     ):
-        return node.func.value.attr
+        return collection
+    if (
+        isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+        and node.value is not None
+        and (collection := _broker_collection_access(node.value)) is not None
+    ):
+        return collection
     return None
 
 
@@ -218,16 +250,34 @@ def test_new_broker_private_state_requires_an_explicit_boundary_decision() -> No
     )
 
 
+def test_private_state_discovery_covers_property_variants_and_setattr() -> None:
+    tree = ast.parse(
+        "class Broker:\n"
+        "    @cached_property\n"
+        "    def _cached(self): ...\n"
+        "    @_cached.getter\n"
+        "    def _getter(self): ...\n"
+        "    def configure(self):\n"
+        "        setattr(self, '_dynamic', {})\n"
+    )
+    broker_class = next(node for node in tree.body if isinstance(node, ast.ClassDef))
+
+    assert _private_state_names(broker_class) == {"_cached", "_dynamic", "_getter"}
+
+
 def test_mutable_collection_contract_distinguishes_reads_from_mutations() -> None:
     tree = ast.parse(
-        "broker.positions['AAPL'] = position\nbroker.fills.append(fill)\norders = broker.orders\n"
+        "broker.account.positions['AAPL'] = position\n"
+        "broker.fills.append(fill)\n"
+        "orders = broker.orders\n"
+        "order_count = len(broker.orders)\n"
     )
 
-    assert [
+    assert {
         access
         for node in ast.walk(tree)
         if (access := _mutable_collection_access(node)) is not None
-    ] == ["positions", "fills"]
+    } == {"positions", "fills", "orders"}
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
