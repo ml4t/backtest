@@ -108,6 +108,9 @@ def test_initial_weight_target_lowers_at_open_and_rules_see_only_later_movement(
     assert reconciliation.outcome is IntentOutcome.FULL
     assert reconciliation.rule_policy_id == "stop-5"
     assert reconciliation.rule_activated_at == datetime(2026, 8, 3, tzinfo=UTC)
+    assert {record.rule_activated_at for record in engine.broker.get_intent_reconciliations()} == {
+        datetime(2026, 8, 3, tzinfo=UTC)
+    }
     assert result.metrics["lifecycle_version"] == "1"
     assert result.metrics["execution_policy"]["bar_path"] == "conservative"
     assert result.metrics["target_intents"] == [intent.to_dict()]
