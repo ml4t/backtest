@@ -236,10 +236,7 @@ class TestCalendarEnforcementDaily:
 class TestCalendarEnforcementIntraday:
     """Tests for intraday data calendar enforcement.
 
-    Note: Intraday session validation falls back to trading day check when
-    timezone-naive timestamps are used (which is typical). Full intraday
-    session enforcement requires timezone-aware timestamps matching the
-    exchange's timezone.
+    Timezone-naive timestamps use the configured feed timezone.
     """
 
     def test_intraday_weekend_skipped(self):
@@ -273,6 +270,7 @@ class TestCalendarEnforcementIntraday:
             calendar="NYSE",
             enforce_sessions=True,
             data_frequency=DataFrequency.MINUTE_1,
+            timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
         results = engine.run()
@@ -311,6 +309,7 @@ class TestCalendarEnforcementIntraday:
             calendar="NYSE",
             enforce_sessions=True,
             data_frequency=DataFrequency.MINUTE_1,
+            timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
         results = engine.run()
@@ -350,6 +349,7 @@ class TestCalendarEnforcementIntraday:
             calendar="NYSE",
             enforce_sessions=True,
             data_frequency=DataFrequency.MINUTE_1,
+            timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
         results = engine.run()
@@ -357,6 +357,42 @@ class TestCalendarEnforcementIntraday:
         # All bars should be processed (regular trading day)
         assert strategy.bars_processed == 3
         assert results.metrics["skipped_bars"] == 0
+
+    def test_intraday_pre_and_post_market_bars_are_skipped(self):
+        """Session enforcement excludes bars outside regular NYSE hours."""
+        timestamps = [
+            datetime(2024, 1, 2, 9, 29),
+            datetime(2024, 1, 2, 9, 30),
+            datetime(2024, 1, 2, 15, 59),
+            datetime(2024, 1, 2, 16, 0),
+        ]
+        prices = [100.0, 100.1, 100.2, 100.3]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 4,
+                "open": prices,
+                "high": prices,
+                "low": prices,
+                "close": prices,
+                "volume": [100_000] * 4,
+            }
+        )
+        strategy = SimpleStrategy()
+
+        result = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=strategy,
+            config=BacktestConfig(
+                calendar="NYSE",
+                timezone="America/New_York",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        ).run()
+
+        assert strategy.timestamps_seen == timestamps[1:3]
+        assert result.metrics["skipped_bars"] == 2
 
 
 class TestCalendarEdgeCases:

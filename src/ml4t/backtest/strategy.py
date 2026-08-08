@@ -48,7 +48,11 @@ class Strategy(ABC):
         pass
 
     def on_start(self, broker: Any) -> None:  # noqa: B027
-        """Called before backtest starts."""
+        """Initialize strategy state before the first bar.
+
+        The broker is configured, but no market bar has been registered. Use
+        this callback for position rules and state that does not require prices.
+        """
         pass
 
     def on_prepare(
@@ -61,5 +65,9 @@ class Strategy(ABC):
         return None
 
     def on_end(self, broker: Any) -> None:  # noqa: B027
-        """Called after backtest ends."""
+        """Finalize strategy state after the final bar.
+
+        Open positions remain marked in the returned result; the engine does not
+        submit automatic end-of-data closing orders before this callback.
+        """
         pass

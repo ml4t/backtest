@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
 from .config import (
     EntryOrderPriority,
@@ -52,6 +52,16 @@ if TYPE_CHECKING:
     from .config import BacktestConfig
     from .execution import ExecutionLimits, MarketImpactModel
     from .risk.position import PositionRule
+    from .sessions import SessionConfig
+
+
+class OrderUpdate(TypedDict, total=False):
+    """Fields accepted by :meth:`Broker.update_order`."""
+
+    quantity: float
+    limit_price: float | None
+    stop_price: float | None
+    trail_amount: float | None
 
 
 class Broker:
@@ -426,7 +436,11 @@ class Broker:
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
     @property
     def cash(self) -> float:
-        """Current cash balance (delegates to AccountState)."""
+        """Return the cash balance owned by the account ledger.
+
+        The value can be negative for a configured margin account. Assignment is
+        retained for compatibility and updates the same account ledger.
+        """
         return self.account.cash
 
     @cash.setter
@@ -651,7 +665,7 @@ class Broker:
         self._risk_state.positions_created_this_bar = value
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
-        """Get contract specification for an asset."""
+        """Return the configured contract specification, or None when absent."""
         return self._contract_specs.get(asset)
 
     def get_multiplier(self, asset: str) -> float:
@@ -894,7 +908,7 @@ class Broker:
         stats = self.get_asset_stats(asset)
         stats.record_pnl(pnl)
 
-    def set_session_config(self, config) -> None:
+    def set_session_config(self, config: SessionConfig | None) -> None:
         """Set session configuration for session-aware statistics.
 
         When a session config is set, trading statistics are reset at
@@ -902,7 +916,8 @@ class Broker:
         want to track performance within each trading session.
 
         Args:
-            config: SessionConfig object from ml4t.backtest.sessions
+            config: SessionConfig object from ml4t.backtest.sessions, or None to
+                disable session-aware statistics resets.
 
         Example:
             from ml4t.backtest.sessions import SessionConfig
@@ -984,11 +999,11 @@ class Broker:
         return self.cash
 
     def equity(self) -> float:
-        """Calculate current marked account equity."""
+        """Return cash plus positions marked from the configured price source."""
         return self._portfolio_ledger.get_account_value()
 
     def get_account_value(self) -> float:
-        """Alias for equity()."""
+        """Return marked account equity using the compatibility method name."""
         return self.equity()
 
     def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
@@ -1213,7 +1228,7 @@ class Broker:
 
         return entry, tp, sl
 
-    def update_order(self, order_id: str, **kwargs) -> bool:
+    def update_order(self, order_id: str, **kwargs: Unpack[OrderUpdate]) -> bool:
         """Update pending order parameters.
 
         Only the following fields can be updated:
@@ -1235,6 +1250,11 @@ class Broker:
         return self._order_book.update_order(order_id, **kwargs)
 
     def cancel_order(self, order_id: str) -> bool:
+        """Cancel a pending order.
+
+        Returns True only when the identifier names a pending order. Filled,
+        rejected, cancelled, and unknown orders return False.
+        """
         return self._order_book.cancel_order(order_id)
 
     def close_position(
@@ -1861,11 +1881,11 @@ class Broker:
         return orders
 
     def get_order(self, order_id: str) -> Order | None:
-        """Get order by ID."""
+        """Return an order from the complete order history, or None when unknown."""
         return self._order_book.get_order(order_id)
 
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
-        """Get pending orders, optionally filtered by asset."""
+        """Return a copy of pending orders, optionally filtered by asset."""
         return self._order_book.get_pending_orders(asset=asset)
 
     def _process_pending_exits(self) -> list[Order]:

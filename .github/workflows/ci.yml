@@ -52,6 +52,9 @@ jobs:
       - name: Verify parity claims match retained evidence
         run: uv run python validation/generate_parity_claims.py --check
 
+      - name: Verify generated release history
+        run: uv run python validation/generate_changelog.py --check
+
       - name: Verify the stable compatibility snapshot
         run: uv run python validation/generate_compatibility_snapshot.py
 
@@ -222,6 +225,21 @@ jobs:
 
       - name: Build documentation with strict validation
         run: uv run mkdocs build --strict
+
+      - name: Build candidate wheel for documentation examples
+        run: uv build --wheel --out-dir "$RUNNER_TEMP/docs-wheel"
+
+      - name: Install candidate wheel in an isolated environment
+        run: |
+          uv venv "$RUNNER_TEMP/docs-venv"
+          uv pip install \
+            --python "$RUNNER_TEMP/docs-venv/bin/python" \
+            "$RUNNER_TEMP"/docs-wheel/*.whl
+
+      - name: Execute selected documentation examples against the wheel
+        run: >-
+          "$RUNNER_TEMP/docs-venv/bin/python"
+          validation/check_documentation_examples.py
 
   build:
     name: Build Package

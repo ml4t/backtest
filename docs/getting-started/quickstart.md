@@ -4,6 +4,7 @@ Build and run your first backtest in 5 minutes.
 
 ## Minimal Example
 
+<!-- ml4t-doc-test: quickstart-minimal -->
 ```python
 import polars as pl
 from ml4t.backtest import Engine, DataFeed, Strategy
@@ -42,22 +43,30 @@ print(f"Trades:       {result.metrics['num_trades']}")
 
 ## Data Format
 
-DataFeed expects a Polars DataFrame keyed by `timestamp` and `asset` plus at least one price column. Standard OHLCV is the default:
+With the default feed mapping, `DataFeed` requires `timestamp`, a recognized entity
+column such as `asset`, and `close`:
 
 | Column | Type | Required |
 |--------|------|----------|
 | `timestamp` | Datetime | Yes |
 | `asset` | String | Yes |
-| `open` | Float | Yes |
-| `high` | Float | Yes |
-| `low` | Float | Yes |
+| `open` | Float | No |
+| `high` | Float | No |
+| `low` | Float | No |
 | `close` | Float | Yes |
-| `volume` | Float | Yes |
+| `volume` | Float | No |
 
 For multi-asset backtests, stack all assets in a single DataFrame -- the engine
 handles partitioning by timestamp automatically.
 
-`bar["price"]` is always populated. By default it follows `close`, but it switches to `FeedSpec.price_col` or the `price_col=` override when you provide one.
+Missing open, high, and low values fall back to `close`; missing volume becomes
+zero. This makes close-only examples runnable, but stop, limit, and volume-limited
+fills require the corresponding input columns for useful simulation.
+
+`bar["price"]` is always populated from the configured reference-price column. By
+default it follows `close`, but it switches to `FeedSpec.price_col` or the
+`price_col=` override when you provide one. Construction fails if that resolved
+column is absent.
 
 ## Strategy Callbacks
 

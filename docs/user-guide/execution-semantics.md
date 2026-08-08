@@ -330,16 +330,19 @@ config = BacktestConfig(
 
 ## Settlement
 
-The `settlement_delay` parameter simulates T+N settlement:
+The `settlement_delay` parameter delays when sale proceeds become spendable. The
+unit is processed bars, not calendar or business days:
 
 ```python
 config = BacktestConfig(
-    settlement_delay=2,                    # T+2 (US equities standard)
+    settlement_delay=2,                    # Proceeds held for two processed bars
     settlement_reduces_buying_power=True,  # Unsettled cash not spendable
 )
 ```
 
-With T+2 settlement, cash from selling shares on Monday isn't available for buying until Wednesday.
+Use this as an explicit simulation assumption. A value of two does not by itself
+represent any market's legal settlement calendar because skipped sessions and bar
+frequency change the elapsed time.
 
 ## Cash Management
 

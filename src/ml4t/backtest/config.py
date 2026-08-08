@@ -618,7 +618,7 @@ class BacktestConfig:
         if self.settlement_delay < 0 or self.settlement_delay > 5:
             issues.append(
                 f"settlement_delay ({self.settlement_delay}) should be 0-5. "
-                "Common values: 0 (instant), 1 (T+1), 2 (T+2 US equities)."
+                "Values count processed bars: 0 is instant, 1 delays one bar."
             )
 
         if not 0.0 < self.rebalance_headroom_pct <= 1.0:

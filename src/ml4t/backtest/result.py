@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import ItemsView, KeysView
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -294,7 +295,12 @@ class BacktestResult:
         return self._trades_df
 
     def to_fills_dataframe(self) -> pl.DataFrame:
-        """Convert fills to Polars DataFrame."""
+        """Convert every execution fill to a stable Polars DataFrame.
+
+        The result includes order identity, quantity, execution costs, price
+        source, nullable quote context, available size, and exit-reason fields.
+        An empty result retains the same typed schema.
+        """
         if self._fills_df is not None:
             return self._fills_df
 
@@ -643,15 +649,19 @@ class BacktestResult:
 
     # Dict-like access keeps validation scripts and older notebook code working.
     def __getitem__(self, key: str) -> Any:
+        """Return a metric or raw result component, raising KeyError if absent."""
         return self.to_dict()[key]
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Return a metric or raw component, or default when the key is absent."""
         return self.to_dict().get(key, default)
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
+        """Return keys from the backward-compatible dictionary representation."""
         return self.to_dict().keys()
 
-    def items(self):
+    def items(self) -> ItemsView[str, Any]:
+        """Return items from the backward-compatible dictionary representation."""
         return self.to_dict().items()
 
     def to_parquet(

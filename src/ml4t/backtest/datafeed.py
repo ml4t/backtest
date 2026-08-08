@@ -63,9 +63,9 @@ class DataFeed:
     avoiding the large memory overhead of materializing one child DataFrame per
     timestamp.
 
-    Memory Efficiency:
-        - 1M bars: ~100 MB (was ~1 GB with pre-converted dicts)
-        - 10M bars: ~1 GB (vs ~10+ GB with dicts)
+    The resolved timestamp, entity, and reference-price columns are required.
+    Open, high, low, and volume columns are optional. Missing OHLC values fall
+    back to the configured close and missing volume becomes zero.
 
     Usage:
         feed = DataFeed(prices_df=prices, signals_df=signals)
@@ -104,6 +104,13 @@ class DataFeed:
     ):
         if feed_spec is not None and contract is not None:
             raise ValueError("Pass either feed_spec or contract, not both")
+        for label, path, frame in (
+            ("prices", prices_path, prices_df),
+            ("signals", signals_path, signals_df),
+            ("context", context_path, context_df),
+        ):
+            if path is not None and frame is not None:
+                raise ValueError(f"Pass either {label}_path or {label}_df, not both")
 
         self.prices = (
             prices_df
@@ -147,6 +154,15 @@ class DataFeed:
             raise ValueError("DataFeed requires one resolved string entity column")
         self._entity_col = resolved_entity_col
         self._price_col = self.feed_spec.price_col
+        if self._price_col not in self.prices.columns:
+            if self.feed_spec.close_col not in self.prices.columns:
+                raise ValueError(
+                    f"price_col={self._price_col!r} and close_col={self.feed_spec.close_col!r} "
+                    f"not found in price columns {self.prices.columns}"
+                )
+            self._price_col = self.feed_spec.close_col
+            self.feed_spec = self.feed_spec.with_overrides(price_col=self._price_col)
+            self.contract = self.feed_spec
         self._open_col = self.feed_spec.open_col
         self._high_col = self.feed_spec.high_col
         self._low_col = self.feed_spec.low_col
@@ -160,6 +176,11 @@ class DataFeed:
 
         self.prices, self._price_ranges_by_ts = self._index_by_timestamp(self.prices)
         if self.signals is not None:
+            if self._entity_col not in self.signals.columns:
+                raise ValueError(
+                    f"entity_col={self._entity_col!r} not found in signal columns "
+                    f"{self.signals.columns}"
+                )
             self.signals, self._signal_ranges_by_ts = self._index_by_timestamp(self.signals)
         else:
             self._signal_ranges_by_ts = {}

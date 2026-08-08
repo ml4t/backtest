@@ -2593,11 +2593,11 @@
         },
         "items": {
           "kind": "method",
-          "signature": "(self)"
+          "signature": "(self) -> 'ItemsView[str, Any]'"
         },
         "keys": {
           "kind": "method",
-          "signature": "(self)"
+          "signature": "(self) -> 'KeysView[str]'"
         },
         "to_daily_pnl": {
           "kind": "method",
@@ -3229,11 +3229,11 @@
         },
         "items": {
           "kind": "method",
-          "signature": "(self)"
+          "signature": "(self) -> 'ItemsView[str, Any]'"
         },
         "keys": {
           "kind": "method",
-          "signature": "(self)"
+          "signature": "(self) -> 'KeysView[str]'"
         },
         "to_daily_pnl": {
           "kind": "method",
@@ -3441,7 +3441,7 @@
         },
         "set_session_config": {
           "kind": "method",
-          "signature": "(self, config) -> 'None'"
+          "signature": "(self, config: 'SessionConfig | None') -> 'None'"
         },
         "submit_bracket": {
           "kind": "method",
@@ -3453,7 +3453,7 @@
         },
         "update_order": {
           "kind": "method",
-          "signature": "(self, order_id: 'str', **kwargs) -> 'bool'"
+          "signature": "(self, order_id: 'str', **kwargs: 'Unpack[OrderUpdate]') -> 'bool'"
         },
         "update_position_context": {
           "kind": "method",

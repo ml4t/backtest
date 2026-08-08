@@ -29,11 +29,14 @@ pip install -e .
 
 ## Verify Installation
 
-```python
+<!-- ml4t-doc-test: installation-import -->
+```bash
+python - <<'PY'
 from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest
 from ml4t.backtest import StopLoss, TakeProfit, TrailingStop, RuleChain
 
-print("ml4t-backtest installed successfully!")
+print("ml4t-backtest installed successfully")
+PY
 ```
 
 ## Optional Dependencies

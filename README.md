@@ -40,7 +40,10 @@ pip install ml4t-backtest
 
 ## Quick Start
 
+<!-- ml4t-doc-test: readme-quickstart -->
 ```python
+from datetime import datetime
+
 import polars as pl
 from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed
 
@@ -58,12 +61,23 @@ class SignalStrategy(Strategy):
             elif position is not None and signal < -0.5:
                 broker.close_position(asset)
 
-config = BacktestConfig(
-    initial_cash=100_000,
-    commission_rate=0.001,
-    slippage_rate=0.0005,
+timestamps = [datetime(2024, 1, day) for day in (2, 3, 4, 5)]
+prices = pl.DataFrame(
+    {
+        "timestamp": timestamps,
+        "asset": ["AAPL"] * 4,
+        "close": [100.0, 101.0, 103.0, 102.0],
+    }
+)
+signals = pl.DataFrame(
+    {
+        "timestamp": timestamps,
+        "asset": ["AAPL"] * 4,
+        "prediction": [1.0, 1.0, -1.0, -1.0],
+    }
 )
 
+config = BacktestConfig(initial_cash=100_000)
 feed = DataFeed(prices_df=prices, signals_df=signals)
 engine = Engine(feed, SignalStrategy(), config)
 result = engine.run()
@@ -333,8 +347,8 @@ throughput, memory, or cross-framework ratios as stable claims.
 
 ## Technical Characteristics
 
-- **Event-driven**: Each bar processes sequentially with exit-first logic
-- **Point-in-time**: No access to future data within strategy callbacks
+- **Event-driven**: Each bar processes sequentially with configurable order sequencing
+- **Point-in-time bar data**: Per-bar callbacks receive the current bar; `on_prepare` receives only the timestamp sequence and resolved config
 - **Configurable fills**: Match behavior of different backtesting frameworks
 - **Quote-aware**: Optional bid/ask/mid/size caches with side-aware market fills
 - **Parquet export**: Trades, fills, equity, daily P&L, and config are serializable
@@ -361,9 +375,9 @@ uv run ty check
 
 See [LIMITATIONS.md](LIMITATIONS.md) for documented assumptions:
 
-- No intrabar stop simulation (uses bar OHLC)
-- Calendar overnight sessions require configuration
-- See LIMITATIONS.md for full list
+- Bar data cannot identify the path or queue order of intrabar events
+- Corporate actions, borrow costs, taxes, and currency conversion are not modeled
+- The pre-stable strategy lifecycle still depends on the shared `ml4t-live` contract
 
 ## License
 

@@ -92,19 +92,26 @@ Rules are set in `on_start()` and apply globally, or per-asset via `broker.set_p
 
 ## Execution Flow
 
-The engine processes each bar in this order:
+The engine calls `on_prepare` with the full feed timestamp sequence and resolved
+config, then calls `on_start`. It processes each accepted session bar in this
+order:
 
 ```
 for each bar:
     1. Update broker with current OHLCV prices
     2. Process pending exits from previous bar (NEXT_BAR mode)
-    3. Evaluate position rules (stops, trails) → generate exit orders
-    4. Process pending orders (fills at open or close)
-    5. Call strategy.on_data()
-    6. Process new orders (SAME_BAR mode only)
-    7. Update water marks for trailing stops
-    8. Record equity
+    3. Fill eligible prior pre-risk market entries (NEXT_BAR mode)
+    4. Call strategy.on_before_risk()
+    5. Evaluate position rules (stops, trails)
+    6. Process eligible pending orders
+    7. Call strategy.on_data()
+    8. Process current-bar MOC or SAME_BAR orders
+    9. Update trailing water marks and record portfolio state
 ```
+
+After the last feed timestamp, the engine calls `on_end` and constructs the result.
+The pre-risk callback is a pre-stable compatibility surface pending the shared
+strategy lifecycle contract with `ml4t-live`.
 
 ### NEXT_BAR vs SAME_BAR
 

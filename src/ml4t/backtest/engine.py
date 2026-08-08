@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
@@ -27,18 +27,14 @@ class Engine:
     managing the broker, and calling the strategy on each bar.
 
     Execution Flow:
-        1. Initialize strategy (on_start)
-        2. For each bar:
-           a. Update broker with current prices
-           b. Process pending exits (NEXT_BAR_OPEN mode)
-           c. Evaluate position rules (stops, trails)
-           d. Process pending orders
-           e. Call strategy.on_data()
-           f. Process new orders (SAME_BAR mode)
-           g. Update water marks
-           h. Record equity
-        3. Close open positions
-        4. Finalize strategy (on_end)
+        1. Call on_prepare with the feed timestamps and resolved config.
+        2. Call on_start before any market bar is registered.
+        3. For each accepted session bar, register data, process eligible
+           deferred orders and risk, call the per-bar strategy callbacks, process
+           configured current-bar orders, and record marked portfolio state.
+        4. Call on_end after the final timestamp.
+        5. Return closed trades plus marked open positions. The engine does not
+           submit automatic end-of-data liquidation orders.
 
     Attributes:
         feed: DataFeed providing price and signal data
@@ -103,19 +99,34 @@ class Engine:
         """
         # Lazy calendar initialization (zero cost if unused)
         is_trading_day_fn = None
+        valid_intraday_bar_indices: set[int] | None = None
         if self.config and self.config.resolved_calendar:
-            from .calendar import get_calendar, is_trading_day
+            from .calendar import filter_to_trading_sessions, get_calendar, is_trading_day
 
             self._calendar = get_calendar(self.config.resolved_calendar)
             is_trading_day_fn = is_trading_day
 
+            if (
+                self.config.enforce_sessions
+                and self.config.resolved_data_frequency != DataFrequency.DAILY
+            ):
+                timestamp_frame = pl.DataFrame(
+                    {
+                        "timestamp": self.feed.timestamps,
+                        "__feed_bar_index": range(len(self.feed.timestamps)),
+                    }
+                )
+                filtered = filter_to_trading_sessions(
+                    timestamp_frame,
+                    self.config.resolved_calendar,
+                    naive_tz=self.config.resolved_timezone,
+                )
+                valid_intraday_bar_indices = set(filtered["__feed_bar_index"].to_list())
+
         self.strategy.on_prepare(self.broker, self.feed.timestamps, self.config)
         self.strategy.on_start(self.broker)
 
-        # Date-level cache for trading day checks (significant speedup for intraday data)
-        trading_day_cache: dict[date, bool] = {}
-
-        for timestamp, assets_data, context in self.feed:
+        for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
             if (
@@ -125,19 +136,17 @@ class Engine:
                 and self.config.enforce_sessions
                 and is_trading_day_fn
             ):
-                # For daily data, check trading day; for intraday, check market hours
+                # Daily bars use valid dates. Intraday bars use precomputed session intervals.
                 if self.config.resolved_data_frequency == DataFrequency.DAILY:
                     if not is_trading_day_fn(calendar_id, timestamp.date()):
                         self._skipped_bars += 1
                         continue
-                else:
-                    # Intraday: use cached trading day check (avoid expensive calendar.valid_days per bar)
-                    bar_date = timestamp.date()
-                    if bar_date not in trading_day_cache:
-                        trading_day_cache[bar_date] = is_trading_day_fn(calendar_id, bar_date)
-                    if not trading_day_cache[bar_date]:
-                        self._skipped_bars += 1
-                        continue
+                elif (
+                    valid_intraday_bar_indices is None
+                    or feed_bar_index not in valid_intraday_bar_indices
+                ):
+                    self._skipped_bars += 1
+                    continue
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
