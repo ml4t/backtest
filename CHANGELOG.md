@@ -20,6 +20,8 @@
   breaks, using the configured timezone for naive timestamps.
 - DataFeed now rejects a missing resolved reference-price column at construction and documents
   close-only fallbacks explicitly.
+- Stable distribution metadata, release-critical static analysis, and the 250-asset performance
+  workload now match the 0.1 release contract.
 
 ### Fixed
 

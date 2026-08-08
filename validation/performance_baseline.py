@@ -63,16 +63,11 @@ WORKLOADS = {
         commission_rate=0.0005,
         slippage_rate=0.0002,
     ),
-    "daily_250_assets": Workload(bars=2_520, assets=250, strategy="alternating"),
+    "daily_250_assets": Workload(bars=2_520, assets=250, strategy="portfolio_alternating"),
     "quote_aware": Workload(bars=1_000, assets=20, strategy="alternating", quote_aware=True),
     "rebalance": Workload(bars=504, assets=50, strategy="rebalance"),
     "partial_fill": Workload(bars=500, assets=10, strategy="partial_fill", volume=100.0),
 }
-
-
-class _Noop(Strategy):
-    def on_data(self, timestamp, data, context, broker) -> None:
-        return None
 
 
 class _Alternating(Strategy):
@@ -90,6 +85,23 @@ class _Alternating(Strategy):
             broker.submit_order(self.asset, 100.0)
         else:
             broker.close_position(self.asset)
+
+
+class _PortfolioAlternating(Strategy):
+    def __init__(self, assets: list[str], interval: int = 50):
+        self.assets = assets
+        self.interval = interval
+        self.bar = 0
+
+    def on_data(self, timestamp, data, context, broker) -> None:
+        self.bar += 1
+        if self.bar % self.interval != 1:
+            return
+        for asset in self.assets:
+            if broker.get_position(asset) is None:
+                broker.submit_order(asset, 100.0)
+            else:
+                broker.close_position(asset)
 
 
 class _Rebalance(Strategy):
@@ -148,10 +160,10 @@ def _build_prices(workload: Workload) -> pl.DataFrame:
 
 def _strategy(workload: Workload) -> Strategy:
     assets = [f"A{i:03d}" for i in range(workload.assets)]
-    if workload.strategy == "noop":
-        return _Noop()
     if workload.strategy == "alternating":
         return _Alternating(assets[0])
+    if workload.strategy == "portfolio_alternating":
+        return _PortfolioAlternating(assets[:50])
     if workload.strategy == "rebalance":
         return _Rebalance(assets)
     if workload.strategy == "partial_fill":

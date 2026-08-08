@@ -9,7 +9,7 @@ from ml4t.backtest import (
     Broker,
     OrderSide,
 )
-from ml4t.backtest.config import RebalanceMode
+from ml4t.backtest.config import ExecutionPrice, RebalanceMode
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.execution.schedule import RebalanceSchedule
 from ml4t.backtest.models import NoCommission, NoSlippage
@@ -782,6 +782,55 @@ class TestTargetWeightExecutorEdgeCases:
         orders = executor.execute({"AAPL": 0.15}, {"AAPL": {"close": None}}, broker)
 
         assert orders == []
+
+    def test_sparse_quote_mark_uses_last_reference_price_for_position_weight(self):
+        broker = Broker(
+            initial_cash=100_000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            mark_price=ExecutionPrice.QUOTE_SIDE,
+        )
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 100.0},
+            {"AAPL": 100.0},
+            {"AAPL": 101.0},
+            {"AAPL": 99.0},
+            closes={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000.0},
+            bids={"AAPL": 99.0},
+            asks={"AAPL": 101.0},
+            mids={"AAPL": 100.0},
+            bid_sizes={"AAPL": 1_000.0},
+            ask_sizes={"AAPL": 1_000.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+        broker.mark_account_positions()
+        position = broker.get_position("AAPL")
+        assert position is not None
+        assert position.current_price == 99.0
+
+        broker._update_time(
+            datetime(2024, 1, 2, 9, 30),
+            {},
+            {},
+            {},
+            {},
+            closes={},
+            volumes={},
+            bids={},
+            asks={},
+            mids={},
+            bid_sizes={},
+            ask_sizes={},
+            signals={},
+        )
+
+        price = TargetWeightExecutor()._get_position_price("AAPL", position, {}, broker)
+
+        assert price == 100.0
 
     def test_execute_effective_weights_handles_null_close_for_existing_positions(self, broker):
         """Pending-aware rebalancing should also tolerate null closes on held positions."""

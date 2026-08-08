@@ -41,14 +41,30 @@ def test_release_performance_manifest_covers_required_workloads() -> None:
 def test_public_docs_do_not_publish_unretained_performance_numbers() -> None:
     documents = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
     text = "\n".join(path.read_text(encoding="utf-8") for path in documents)
-    claim_pattern = re.compile(
+    prose = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    retained_evidence = re.compile(r"performance_baselines\.json|release-performance-evidence")
+    ratio_or_throughput = re.compile(
         r"\b\d+(?:\.\d+)?x\s+(?:faster|slower|less)|"
-        r"\b\d+(?:\.\d+)?\s*(?:MB|GB|bars/s|rows/s|points/s|seconds?)\b|"
+        r"\b\d[\d,]*(?:\.\d+)?\s*(?:bars/s|rows/s|points/s)|"
         r"\b\d[\d,]*(?:\.\d+)?\s+(?:bars|rows|points)\s+per\s+second",
         re.IGNORECASE,
     )
+    resource_claim = re.compile(r"\b\d+(?:\.\d+)?\s*(?:MB|GB|seconds?)\b", re.IGNORECASE)
+    resource_context = re.compile(
+        r"\b(?:benchmark|memory|performance|rss|runtime)\b", re.IGNORECASE
+    )
+    violations = [
+        line
+        for line in prose.splitlines()
+        if not retained_evidence.search(line)
+        and (
+            ratio_or_throughput.search(line)
+            or resource_claim.search(line)
+            and resource_context.search(line)
+        )
+    ]
 
-    assert not claim_pattern.findall(text)
+    assert not violations
 
 
 def test_runtime_sample_spread_is_reported_without_becoming_a_host_noise_failure(

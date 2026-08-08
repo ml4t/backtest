@@ -22,10 +22,20 @@ repos:
 
   - repo: local
     hooks:
+      - id: release-validation-format
+        name: release validation format check
+        entry: bash -c 'xargs uv run ruff format --check < validation/release_checks.txt'
+        language: system
+        pass_filenames: false
+      - id: release-validation-lint
+        name: release validation lint check
+        entry: bash -c 'xargs uv run ruff check --no-fix < validation/release_checks.txt'
+        language: system
+        pass_filenames: false
       - id: ty
         name: ty type check
-        entry: uv run ty check
+        entry: bash -c 'xargs uv run ty check src/ < validation/release_checks.txt'
         language: system
-        files: ^src/
+        files: ^(src/|validation/)
         types: [python]
         pass_filenames: false

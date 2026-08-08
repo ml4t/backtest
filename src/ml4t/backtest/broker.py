@@ -774,6 +774,10 @@ class Broker:
             return self.get_quote_mid(asset) or self._current_prices.get(asset)
         return self._current_prices.get(asset, self._current_closes.get(asset))
 
+    def get_last_price(self, asset: str) -> float | None:
+        """Return the most recent positive reference price observed for an asset."""
+        return self._last_prices.get(asset)
+
     def get_mark_price(
         self,
         asset: str,
@@ -2051,9 +2055,7 @@ class Broker:
                     use_high_for_hwm=use_extremes,
                     use_low_for_lwm=use_extremes,
                 )
-                mark_price = self.get_mark_price(asset, quantity=pos.quantity)
-                if mark_price is not None:
-                    pos.current_price = mark_price
+        self.mark_account_positions()
 
     def _process_orders(
         self,

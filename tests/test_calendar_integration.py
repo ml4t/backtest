@@ -4,6 +4,7 @@ These tests verify that the Engine correctly handles trading session enforcement
 when a calendar is configured with enforce_sessions=True.
 """
 
+import warnings
 from datetime import datetime, timedelta
 
 import polars as pl
@@ -270,6 +271,38 @@ class TestCalendarEnforcementIntraday:
             result = engine.run()
 
         assert result.metrics["skipped_bars"] == 1
+
+    def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
+        timestamps = [
+            datetime(2024, 1, 2, 14, 30),
+            datetime(2024, 1, 2, 20, 59),
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 2,
+                "open": [100.0] * 2,
+                "high": [100.0] * 2,
+                "low": [100.0] * 2,
+                "close": [100.0] * 2,
+                "volume": [100_000] * 2,
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = engine.run()
+
+        assert result.metrics["skipped_bars"] == 0
 
     def test_intraday_weekend_skipped(self):
         """Weekend intraday bars are skipped (via trading day fallback)."""

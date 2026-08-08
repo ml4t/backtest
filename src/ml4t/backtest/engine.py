@@ -112,24 +112,18 @@ class Engine:
                 and self.config.resolved_data_frequency != DataFrequency.DAILY
             ):
                 prices_frame = self.feed.prices
-                assert prices_frame is not None
-                timestamp_dtype = prices_frame.schema[self.feed.feed_spec.timestamp_col]
+                timestamp_dtype = (
+                    prices_frame.schema[self.feed.feed_spec.timestamp_col]
+                    if prices_frame is not None
+                    else None
+                )
                 calendar_timezone = str(getattr(self._calendar, "tz", ""))
-                if (
+                timezone_mismatch = (
                     isinstance(timestamp_dtype, pl.Datetime)
                     and timestamp_dtype.time_zone is None
                     and calendar_timezone
                     and self.config.resolved_timezone != calendar_timezone
-                ):
-                    warnings.warn(
-                        "Naive intraday timestamps are interpreted as "
-                        f"{self.config.resolved_timezone!r}, but calendar "
-                        f"{self.config.resolved_calendar!r} uses {calendar_timezone!r}; "
-                        "set BacktestConfig.timezone to the data timezone or provide "
-                        "timezone-aware timestamps",
-                        UserWarning,
-                        stacklevel=2,
-                    )
+                )
                 timestamp_frame = pl.DataFrame(
                     {
                         "timestamp": self.feed.timestamps,
@@ -141,6 +135,19 @@ class Engine:
                     self.config.resolved_calendar,
                     naive_tz=self.config.resolved_timezone,
                 )
+                retained_bars = len(filtered)
+                total_bars = len(timestamp_frame)
+                if timezone_mismatch and total_bars and retained_bars / total_bars <= 0.5:
+                    warnings.warn(
+                        "Naive intraday timestamps are interpreted as "
+                        f"{self.config.resolved_timezone!r}, but calendar "
+                        f"{self.config.resolved_calendar!r} uses {calendar_timezone!r}; "
+                        f"session filtering retained {retained_bars} of {total_bars} bars. "
+                        "Set BacktestConfig.timezone to the data timezone or provide "
+                        "timezone-aware timestamps",
+                        UserWarning,
+                        stacklevel=2,
+                    )
                 valid_intraday_bar_mask = bytearray(len(self.feed.timestamps))
                 for index in filtered["__feed_bar_index"]:
                     valid_intraday_bar_mask[index] = 1
@@ -322,7 +329,7 @@ class Engine:
         for asset, pos in self.broker.positions.items():
             price = self.broker.get_mark_price(asset, quantity=pos.quantity)
             if price is None:
-                price = self.broker._last_prices.get(asset, pos.current_price or pos.entry_price)
+                price = self.broker.get_last_price(asset) or pos.current_price or pos.entry_price
             position_value = pos.quantity * price * pos.multiplier
             gross_exposure += abs(position_value)
             net_exposure += position_value

@@ -391,6 +391,8 @@ class TargetWeightExecutor:
         if price is None:
             price = broker.get_price_for_source(ExecutionPrice.PRICE, asset)
         if price is None:
+            price = broker.get_last_price(asset)
+        if price is None:
             price = pos.current_price
         if price is None:
             price = pos.entry_price

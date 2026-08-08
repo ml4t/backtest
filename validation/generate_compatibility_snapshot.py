@@ -8,12 +8,13 @@ import importlib
 import inspect
 import json
 import re
+from collections.abc import Callable
 from dataclasses import MISSING, fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, Protocol, cast
 
 import polars as pl
 
@@ -40,9 +41,16 @@ _ENUM_MODULES = (
 _PUBLIC_DUNDERS = {"__contains__", "__getitem__", "__iter__", "__len__", "__next__", "__repr__"}
 
 
+class _NamedFactory(Protocol):
+    __module__: str
+    __qualname__: str
+
+    def __call__(self) -> object: ...
+
+
 def _signature(value: object) -> str | None:
     try:
-        return _canonical_type_text(str(inspect.signature(value)))
+        return _canonical_type_text(str(inspect.signature(cast(Callable[..., object], value))))
     except (TypeError, ValueError):
         return None
 
@@ -170,9 +178,10 @@ def _dataclass_schema(value: type) -> list[dict[str, object]]:
         if field.default is not MISSING:
             default: object = _encoded_value(field.default)
         elif field.default_factory is not MISSING:
+            factory = cast(_NamedFactory, field.default_factory)
             default = {
-                "factory": f"{field.default_factory.__module__}.{field.default_factory.__qualname__}",
-                "value": _encoded_value(field.default_factory()),
+                "factory": f"{factory.__module__}.{factory.__qualname__}",
+                "value": _encoded_value(factory()),
             }
         else:
             default = {"required": True}

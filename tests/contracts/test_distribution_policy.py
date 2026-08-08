@@ -31,6 +31,13 @@ def test_build_configuration_excludes_internal_agent_material() -> None:
     assert {"**/AGENTS.md", "**/CLAUDE.md"} <= excludes
 
 
+def test_distribution_declares_stable_development_status() -> None:
+    config = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    classifiers = set(config["project"]["classifiers"])
+    assert "Development Status :: 5 - Production/Stable" in classifiers
+    assert not any(classifier.startswith("Development Status :: 4") for classifier in classifiers)
+
+
 def test_manifest_comparison_rejects_unexpected_and_missing_files() -> None:
     checker = _load_artifact_checker()
     failures = checker._manifest_diff(

@@ -13,7 +13,8 @@
         "Changed": [
           "Broker state now has explicit account, market, order, risk, and execution-journal owners while the Broker remains the public facade.",
           "Intraday session enforcement now filters actual exchange intervals, including early closes and breaks, using the configured timezone for naive timestamps.",
-          "DataFeed now rejects a missing resolved reference-price column at construction and documents close-only fallbacks explicitly."
+          "DataFeed now rejects a missing resolved reference-price column at construction and documents close-only fallbacks explicitly.",
+          "Stable distribution metadata, release-critical static analysis, and the 250-asset performance workload now match the 0.1 release contract."
         ],
         "Fixed": [
           "Financial-accounting, order-rejection, artifact-integrity, quantity-tolerance, and parity-comparison defects found during the stable-release audit.",

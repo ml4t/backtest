@@ -316,6 +316,7 @@ python validation/run_all_correctness.py --framework zipline --scenarios 01,03,0
 
 Release performance evidence covers deterministic single-asset, 250-asset daily, quote-aware,
 rebalance, and partial-fill workloads. Each workload runs three times in a fresh child process.
+The 250-asset workload periodically enters and exits a 50-position portfolio.
 The evidence separates setup from `Engine.run()`, measures peak RSS over the whole child process,
 reports runtime and memory sample spread, and verifies retained financial-output checksums and
 counts. The dedicated instrument-free hotpath benchmark enforces the runtime regression limit.

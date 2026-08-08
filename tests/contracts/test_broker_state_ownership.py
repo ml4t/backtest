@@ -6,16 +6,38 @@ from pathlib import Path
 from ml4t.backtest import Broker
 
 SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
-COLLABORATORS = (
-    SOURCE_ROOT / "core" / "execution_engine.py",
-    SOURCE_ROOT / "core" / "fill_engine.py",
-    SOURCE_ROOT / "core" / "order_book.py",
-    SOURCE_ROOT / "core" / "portfolio_ledger.py",
-    SOURCE_ROOT / "core" / "risk_engine.py",
-    SOURCE_ROOT / "execution" / "fill_executor.py",
-    SOURCE_ROOT / "execution" / "rebalancer.py",
-)
-BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
+FORBIDDEN_BROKER_STATE = {
+    "_asset_bars_seen",
+    "_bar_index",
+    "_current_ask_sizes",
+    "_current_asks",
+    "_current_bid_sizes",
+    "_current_bids",
+    "_current_closes",
+    "_current_highs",
+    "_current_lows",
+    "_current_mids",
+    "_current_opens",
+    "_current_prices",
+    "_current_signals",
+    "_current_time",
+    "_current_volumes",
+    "_fill_engine",
+    "_fill_executor",
+    "_filled_this_bar",
+    "_last_prices",
+    "_order_counter",
+    "_orders_this_bar",
+    "_orders_this_bar_ids",
+    "_partial_orders",
+    "_pending_exits",
+    "_position_rules",
+    "_position_rules_by_asset",
+    "_positions_created_this_bar",
+    "_stop_exits_this_bar",
+    "_submitting_before_risk",
+}
+TRANSITIONAL_ENGINE_LIFECYCLE_STATE = {"_submitting_before_risk"}
 STRATEGY_CALLBACKS = {"on_before_risk", "on_data", "on_end", "on_prepare", "on_start"}
 
 
@@ -23,23 +45,12 @@ def _parse(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
 
 
-def _legacy_broker_state() -> set[str]:
-    broker_tree = _parse(SOURCE_ROOT / "broker.py")
-    broker_class = next(
-        node
-        for node in broker_tree.body
-        if isinstance(node, ast.ClassDef) and node.name == "Broker"
+def _references_broker(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Name)
+        and node.id == "broker"
+        or (isinstance(node, ast.Attribute) and node.attr == "broker")
     )
-    return {
-        node.name
-        for node in broker_class.body
-        if isinstance(node, ast.FunctionDef)
-        and node.name.startswith("_")
-        and any(
-            isinstance(decorator, ast.Name) and decorator.id == "property"
-            for decorator in node.decorator_list
-        )
-    }
 
 
 def _references_strategy(node: ast.AST) -> bool:
@@ -101,23 +112,20 @@ def test_mutable_domain_state_delegates_to_its_owner() -> None:
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
-    legacy_broker_state = _legacy_broker_state()
     violations: list[str] = []
+    broker_path = SOURCE_ROOT / "broker.py"
+    engine_path = SOURCE_ROOT / "engine.py"
 
-    for path in COLLABORATORS:
+    for path in SOURCE_ROOT.rglob("*.py"):
+        if path == broker_path:
+            continue
         tree = _parse(path)
         for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr in legacy_broker_state:
-                violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
             if (
                 isinstance(node, ast.Attribute)
-                and node.attr in BROKER_MUTABLE_COLLECTIONS
-                and (
-                    isinstance(node.value, ast.Name)
-                    and node.value.id == "broker"
-                    or isinstance(node.value, ast.Attribute)
-                    and node.value.attr == "broker"
-                )
+                and node.attr in FORBIDDEN_BROKER_STATE
+                and _references_broker(node.value)
+                and not (path == engine_path and node.attr in TRANSITIONAL_ENGINE_LIFECYCLE_STATE)
             ):
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
 

@@ -171,3 +171,4 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
     assert "release_candidate.py verify" in "\n".join(step.get("run", "") for step in publish_steps)
     assert release_jobs["verify-pypi"]["needs"] == "publish"
     assert release_jobs["github-release"]["needs"] == "verify-pypi"
+    assert "if" not in release_jobs["github-release"]

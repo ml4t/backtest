@@ -94,6 +94,7 @@ Auto-generated from source docstrings.
         - get_contract_spec
         - get_multiplier
         - get_mark_price
+        - get_last_price
         - get_price_for_source
         - get_quote_mid
         - get_quote_context

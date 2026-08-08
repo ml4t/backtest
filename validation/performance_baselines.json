@@ -11,16 +11,16 @@
     "daily_250_assets": {
       "assets": 250,
       "bars": 2520,
-      "behavior_sha256": "3d8ecd0927d083c7bbf9c2844968f97dc14486e26f2fafd92fdef1d4f12a0e69",
+      "behavior_sha256": "03ad5690a1910b15b2cbb340cf3ea1752b9444a0b605be5b23cb3338646f73f6",
       "commission_rate": 0.0,
       "data_points": 630000,
       "execution_mode": "same_bar",
-      "expected_fill_count": 51,
-      "expected_final_value": 10000264.8,
-      "expected_trade_count": 26,
+      "expected_fill_count": 2550,
+      "expected_final_value": 10013240.0,
+      "expected_trade_count": 1300,
       "quote_aware": false,
       "slippage_rate": 0.0,
-      "strategy": "alternating"
+      "strategy": "portfolio_alternating"
     },
     "partial_fill": {
       "assets": 10,

@@ -56,7 +56,7 @@ keywords = [
     "polars",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
@@ -193,7 +193,7 @@ filterwarnings = [
 line-length = 100
 target-version = "py312"
 exclude = [
-    "validation/*",  # Standalone scripts run in isolated venvs
+    "validation/*",  # Release-critical scripts are checked from validation/release_checks.txt
     "docs/*",        # Documentation artifacts
     ".claude/*",     # Claude workspace files
     ".serena/*",     # Serena workspace files

@@ -34,6 +34,12 @@ REQUIRED_GATES = frozenset(
 )
 
 
+def _object_mapping(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return None
+    return cast(dict[str, object], value)
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -138,8 +144,8 @@ def candidate_failures(
     if manifest.get("schema_version") != _SCHEMA_VERSION:
         failures.append(f"Unsupported candidate schema: {manifest.get('schema_version')!r}")
 
-    source = manifest.get("source")
-    if not isinstance(source, dict):
+    source = _object_mapping(manifest.get("source"))
+    if source is None:
         failures.append("Candidate source must be an object")
     else:
         if source.get("commit") != expected_commit:
@@ -160,8 +166,8 @@ def candidate_failures(
     else:
         failures.extend(gate_failures(cast(dict[str, str], gates)))
 
-    package = manifest.get("package")
-    if not isinstance(package, dict):
+    package = _object_mapping(manifest.get("package"))
+    if package is None:
         failures.append("Candidate package must be an object")
     elif expected_tag is not None and expected_tag != f"v{package.get('version')}":
         failures.append(
@@ -169,8 +175,8 @@ def candidate_failures(
             f"'v{package.get('version')}'"
         )
 
-    files = manifest.get("files")
-    if not isinstance(files, dict):
+    files = _object_mapping(manifest.get("files"))
+    if files is None:
         failures.append("Candidate files must be an object")
         return failures
     actual_paths = {path.name: path for path in _distribution_paths(directory)}
@@ -183,8 +189,8 @@ def candidate_failures(
     if unexpected:
         failures.append(f"Candidate has undeclared distributions: {unexpected}")
     for name in sorted(declared_names & actual_names):
-        record = files[name]
-        if not isinstance(record, dict):
+        record = _object_mapping(files[name])
+        if record is None:
             failures.append(f"Candidate file record must be an object: {name}")
             continue
         path = actual_paths[name]
@@ -197,7 +203,7 @@ def candidate_failures(
         paths = list(actual_paths.values())
         if len(paths) == 2:
             name, version = _package_identity(paths)
-            if isinstance(package, dict) and package != {"name": name, "version": version}:
+            if package is not None and package != {"name": name, "version": version}:
                 failures.append("Candidate package identity differs from distribution metadata")
     except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as error:
         failures.append(str(error))
@@ -205,32 +211,34 @@ def candidate_failures(
 
 
 def index_failures(manifest: dict[str, object], payload: dict[str, object]) -> list[str]:
-    files = manifest.get("files")
-    package = manifest.get("package")
-    if not isinstance(files, dict) or not isinstance(package, dict):
+    files = _object_mapping(manifest.get("files"))
+    package = _object_mapping(manifest.get("package"))
+    if files is None or package is None:
         return ["Candidate manifest lacks package or file records"]
-    info = payload.get("info")
+    info = _object_mapping(payload.get("info"))
     urls = payload.get("urls")
-    if not isinstance(info, dict) or not isinstance(urls, list):
+    if info is None or not isinstance(urls, list):
         return ["Package-index response lacks info or urls"]
     failures: list[str] = []
     if info.get("name") != package.get("name") or info.get("version") != package.get("version"):
         failures.append("Published package identity differs from the candidate")
     published: dict[str, str | None] = {}
-    for item in urls:
-        if not isinstance(item, dict) or not isinstance(item.get("filename"), str):
+    for raw_item in urls:
+        item = _object_mapping(raw_item)
+        if item is None or not isinstance(item.get("filename"), str):
             continue
-        digests = item.get("digests")
-        digest = digests.get("sha256") if isinstance(digests, dict) else None
-        published[item["filename"]] = digest if isinstance(digest, str) else None
+        filename = cast(str, item["filename"])
+        digests = _object_mapping(item.get("digests"))
+        digest = digests.get("sha256") if digests is not None else None
+        published[filename] = digest if isinstance(digest, str) else None
     if set(published) != set(files):
         failures.append(
             f"Published files differ from candidate: published={sorted(published)}, "
             f"candidate={sorted(files)}"
         )
     for name in sorted(set(published) & set(files)):
-        record = files[name]
-        if not isinstance(record, dict) or published[name] != record.get("sha256"):
+        record = _object_mapping(files[name])
+        if record is None or published[name] != record.get("sha256"):
             failures.append(f"Published digest differs from candidate: {name}")
     return failures
 
@@ -309,8 +317,8 @@ def main() -> int:
                 expected_tag=args.expected_tag,
             )
         else:
-            package = manifest.get("package")
-            if not isinstance(package, dict):
+            package = _object_mapping(manifest.get("package"))
+            if package is None:
                 raise ValueError("Candidate manifest lacks package identity")
             url = (
                 f"{args.index_url.rstrip('/')}/{package.get('name')}/{package.get('version')}/json"

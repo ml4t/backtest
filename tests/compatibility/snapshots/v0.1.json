@@ -3363,6 +3363,10 @@
           "kind": "method",
           "signature": "(self, asset: 'str') -> 'ContractSpec | None'"
         },
+        "get_last_price": {
+          "kind": "method",
+          "signature": "(self, asset: 'str') -> 'float | None'"
+        },
         "get_last_trade": {
           "kind": "method",
           "signature": "(self, asset: 'str | None' = None) -> 'Trade | None'"
