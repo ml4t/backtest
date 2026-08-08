@@ -25,6 +25,7 @@ This page explains the architecture, key abstractions, and execution flow of the
 ```
 
 **Engine** orchestrates the main loop -- iterating bars, calling the strategy, and recording equity.
+Each Engine instance is single-use; create a new instance for each independent run.
 
 **DataFeed** partitions a Polars DataFrame by timestamp and iterates bar-by-bar across all assets. It pre-extracts OHLCV data for O(1) per-bar access.
 
@@ -42,7 +43,7 @@ Broker is a facade, not a second ledger. Each mutable domain concept has one sta
 | Current and historical market values | `MarketState` | `Broker._update_time()` replaces the current bar and advances its index. Execution and risk components receive the state as a read dependency. |
 | Orders, pending queues, and partial quantities | `OrderState` | `OrderBook` creates and queues orders. `ExecutionEngine` and `FillExecutor` update lifecycle and partial-fill state through the same injected object. |
 | Position rules and deferred exits | `RiskState` | Broker configuration methods set rules. `RiskEngine` records and consumes deferred exits. |
-| Fills and completed trades | `ExecutionJournal` | `FillExecutor` appends records. Broker result APIs expose those same lists. |
+| Fills and completed trades | `ExecutionJournal` | `FillExecutor` appends records. Broker access uses those lists; `BacktestResult` receives list snapshots. |
 | Strategy callback sequence | `Engine` | `Engine.run()` is the only component that invokes lifecycle callbacks. |
 
 Broker compatibility attributes reference these owner collections. They do not store copies. Boundary tests reject direct access from collaborators to the legacy Broker private fields.

@@ -349,6 +349,48 @@ class TestCalendarEnforcementIntraday:
 
         assert result.metrics["skipped_bars"] == 50
 
+    def test_timezone_diagnostic_caps_the_required_absolute_gain(self):
+        trading_dates = []
+        current = datetime(2024, 4, 1)
+        while len(trading_dates) < 20:
+            if current.weekday() < 5:
+                trading_dates.append(current)
+            current += timedelta(days=1)
+        timestamps = []
+        for index, trading_date in enumerate(trading_dates):
+            timestamps.append(trading_date.replace(hour=15, minute=59))
+            timestamps.append(trading_date.replace(hour=8, minute=0))
+            timestamps.append(
+                trading_date.replace(hour=9, minute=30)
+                if index < 5
+                else trading_date.replace(hour=8, minute=30)
+            )
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        assert len(timestamps) == 60
+        with pytest.warns(UserWarning, match="retain 25 bars instead of 20"):
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
+        assert result.metrics["skipped_bars"] == 40
+
     def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
         timestamps = [
             datetime(2024, 1, 2, 14, 30),
@@ -440,7 +482,8 @@ class TestCalendarEnforcementIntraday:
 
         assert result.metrics["skipped_bars"] == 9
 
-    def test_extended_hours_timezone_misread_is_not_detectable_from_retention(self):
+    def test_small_extended_hours_counterfactual_gain_does_not_warn(self):
+        """A 2-bar, 1.167x recovery is deliberately below both warning gates."""
         start = datetime(2024, 1, 2, 4, 0)
         timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
         frame = pl.DataFrame(

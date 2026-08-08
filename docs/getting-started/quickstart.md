@@ -41,6 +41,9 @@ print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 print(f"Trades:       {result.metrics['num_trades']}")
 ```
 
+An `Engine` instance can run once. Create a new instance for another run. Result collection fields
+are snapshots, so changing their lists does not change Engine or Broker state.
+
 ## Data Format
 
 With the default feed mapping, `DataFeed` requires `timestamp`, a recognized entity

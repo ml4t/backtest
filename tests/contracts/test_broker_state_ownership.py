@@ -241,7 +241,10 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
     if isinstance(node, ast.Call):
         if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_READ_CALLS:
             for keyword in node.keywords:
-                if (collection := _broker_collection_access(keyword.value)) is not None:
+                if (
+                    keyword.arg is not None
+                    and (collection := _broker_collection_access(keyword.value)) is not None
+                ):
                     return collection
             return None
         method_path = _attribute_path(node.func)
@@ -348,6 +351,7 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
         "    order_count = len(broker.orders)\n"
         "    fills_copy = list(broker.fills)\n"
         "    positions_copy = dict(broker.positions)\n"
+        "    unpacked_copy = dict(**broker.positions)\n"
         "    dict(fills=broker.orders)\n"
         "    consume(broker.trades)\n"
         "    consume({'fills': broker.fills})\n"
@@ -362,22 +366,22 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
     )
 
     assert sorted(
-        access
+        (node.lineno, access)
         for node in ast.walk(tree)
         if (access := _mutable_collection_access(node)) is not None
     ) == [
-        "fills",
-        "fills",
-        "fills",
-        "fills",
-        "fills",
-        "fills",
-        "orders",
-        "orders",
-        "orders",
-        "positions",
-        "trades",
-        "trades",
+        (2, "positions"),
+        (3, "fills"),
+        (4, "orders"),
+        (9, "orders"),
+        (10, "trades"),
+        (11, "fills"),
+        (12, "trades"),
+        (15, "fills"),
+        (16, "orders"),
+        (17, "fills"),
+        (18, "fills"),
+        (19, "fills"),
     ]
 
 

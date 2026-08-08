@@ -38,6 +38,9 @@
   as schema-versioned stable artifacts.
 - The ambiguous beta-only Broker(account_type=...) constructor spelling was removed; use explicit
   short-selling and leverage policy fields.
+- Engine instances are single-use in 0.1.0; create a new Engine for each independent run.
+- BacktestResult fills, equity_curve, and portfolio_state lists are snapshots instead of aliases
+  to mutable Engine or Broker state.
 - The shared strategy lifecycle with ml4t-live remains a release blocker. on_before_risk is not
   accepted as a stable 0.1 callback and requires explicit migration before release.
 

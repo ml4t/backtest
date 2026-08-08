@@ -738,7 +738,7 @@ class TestEngine:
         assert len(engine.broker.fills) == 1
         assert len(engine.equity_curve) == 2
         assert len(engine.portfolio_state) == 2
-        with pytest.raises(RuntimeError, match="single-use"):
+        with pytest.raises(RuntimeError, match="already started"):
             engine.run()
 
     def test_activity_metrics_prefer_explicit_rebalance_ids(self):

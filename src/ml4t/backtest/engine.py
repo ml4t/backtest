@@ -21,10 +21,10 @@ if TYPE_CHECKING:
     from .config import BacktestConfig
     from .result import BacktestResult
 
-# Only counterfactuals recovering a large block trigger; ambiguous extended-hours feeds do not.
+# Compare at most 20 dates; require min(4, 10% of sample) bars and 25% relative recovery.
 _TIMEZONE_DIAGNOSTIC_MAX_DATES = 20
 _TIMEZONE_DIAGNOSTIC_MAX_RETENTION = 0.5
-_TIMEZONE_DIAGNOSTIC_MAX_ABSOLUTE_GAIN = 4
+_TIMEZONE_DIAGNOSTIC_MAX_REQUIRED_GAIN = 4
 _TIMEZONE_DIAGNOSTIC_MIN_GAIN_FRACTION = 0.1
 _TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN = 1.25
 _TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS = 0.1
@@ -35,6 +35,7 @@ class Engine:
 
     The Engine orchestrates the backtest by iterating through market data,
     managing the broker, and calling the strategy on each bar.
+    Engine instances are single-use; create a new instance for each run.
 
     Execution Flow:
         1. Call on_prepare with the feed timestamps and resolved config.
@@ -109,10 +110,10 @@ class Engine:
             Call .to_dict() for backward-compatible dictionary output.
 
         Raises:
-            RuntimeError: If this Engine instance has already been run.
+            RuntimeError: If a run was already started on this Engine instance.
         """
         if self._has_run:
-            raise RuntimeError("Engine instances are single-use; create a new Engine for each run")
+            raise RuntimeError("Engine.run() was already started; create a new Engine for each run")
         self._has_run = True
 
         # Lazy calendar initialization (zero cost if unused)
@@ -201,7 +202,7 @@ class Engine:
                 minimum_absolute_gain = max(
                     1,
                     min(
-                        _TIMEZONE_DIAGNOSTIC_MAX_ABSOLUTE_GAIN,
+                        _TIMEZONE_DIAGNOSTIC_MAX_REQUIRED_GAIN,
                         ceil(sample_bars * _TIMEZONE_DIAGNOSTIC_MIN_GAIN_FRACTION),
                     ),
                 )
@@ -408,6 +409,9 @@ class Engine:
 
         Returns:
             Dictionary with metrics, trades, and equity curve.
+
+        Raises:
+            RuntimeError: If a run was already started on this Engine instance.
         """
         return self.run().to_dict()
 
