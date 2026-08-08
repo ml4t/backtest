@@ -63,7 +63,10 @@ def resolve_python(framework: str) -> Path:
     """Resolve the isolated interpreter for a framework."""
     override = os.getenv(FRAMEWORK_PYTHON_ENV_VARS[framework])
     if override:
-        return Path(override).expanduser().resolve()
+        override_path = Path(override).expanduser()
+        if not override_path.is_absolute():
+            override_path = PROJECT_ROOT / override_path
+        return override_path.absolute()
     return PROJECT_ROOT / FRAMEWORK_ENVIRONMENTS[framework] / "bin" / "python"
 
 

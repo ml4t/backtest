@@ -243,6 +243,8 @@ SCENARIO_09 = ScenarioConfig(
         },
         "vectorbt_pro": {
             "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "VBT_PRO",
         },
         "backtrader": {
             "stop_fill_mode": "STOP_PRICE",
@@ -345,6 +347,8 @@ SCENARIO_12 = ScenarioConfig(
         },
         "vectorbt_pro": {
             "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "VBT_PRO",
         },
         "backtrader": {
             "stop_fill_mode": "STOP_PRICE",
@@ -383,7 +387,11 @@ SCENARIO_13 = ScenarioConfig(
     constants={"trail_pct": 0.05, "tp_pct": 0.08},
     ml4t_overrides={
         "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
-        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "VBT_PRO",
+        },
         "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
         "zipline": {
             "stop_fill_mode": "NEXT_BAR_OPEN",
@@ -418,7 +426,11 @@ SCENARIO_14 = ScenarioConfig(
     constants={"trail_pct": 0.05, "sl_pct": 0.08},
     ml4t_overrides={
         "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
-        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "VBT_PRO",
+        },
         "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
         "zipline": {
             "stop_fill_mode": "NEXT_BAR_OPEN",
@@ -454,7 +466,11 @@ SCENARIO_15 = ScenarioConfig(
     constants={"trail_pct": 0.03, "tp_pct": 0.10, "sl_pct": 0.05},
     ml4t_overrides={
         "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
-        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "VBT_PRO",
+        },
         "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
         "zipline": {
             "stop_fill_mode": "NEXT_BAR_OPEN",
@@ -486,7 +502,11 @@ SCENARIO_16 = ScenarioConfig(
     constants={"trail_pct": 0.05, "allow_reentry": True},
     ml4t_overrides={
         "vectorbt_oss": {"stop_fill_mode": "STOP_PRICE", "trail_hwm_source": "BAR_EXTREME"},
-        "vectorbt_pro": {"stop_fill_mode": "STOP_PRICE"},
+        "vectorbt_pro": {
+            "stop_fill_mode": "STOP_PRICE",
+            "trail_hwm_source": "BAR_EXTREME",
+            "trail_stop_timing": "VBT_PRO",
+        },
         "backtrader": {"stop_fill_mode": "STOP_PRICE", "stop_level_basis": "SIGNAL_PRICE"},
         "zipline": {
             "stop_fill_mode": "NEXT_BAR_OPEN",

@@ -3,11 +3,12 @@
 Consolidates 17 run_vectorbt_pro() functions into a single parameterized driver.
 
 VectorBT Pro uses same-bar execution with close fills by default.
-Licensed software — guarded by try/except ImportError.
+Licensed software; guarded by try/except ImportError.
 """
 
 from __future__ import annotations
 
+import importlib.metadata
 import sys
 from pathlib import Path
 
@@ -16,6 +17,78 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.types import FrameworkResult, ScenarioConfig
+
+SUPPORTED_VECTORBT_PRO_VERSION = "2025.12.31"
+
+
+def _require_supported_version(actual_version: str) -> None:
+    if actual_version != SUPPORTED_VECTORBT_PRO_VERSION:
+        raise RuntimeError(
+            "VectorBT Pro validation requires version "
+            f"{SUPPORTED_VECTORBT_PRO_VERSION}, found {actual_version}."
+        )
+
+
+def _build_portfolio_kwargs(
+    scenario: ScenarioConfig,
+    prices_df: pd.DataFrame,
+    entries: np.ndarray,
+    exits: np.ndarray | None,
+) -> dict[str, object]:
+    constants = scenario.constants
+    kwargs: dict[str, object] = {
+        "open": prices_df["open"],
+        "high": prices_df["high"],
+        "low": prices_df["low"],
+        "close": prices_df["close"],
+        "entries": entries,
+        "init_cash": scenario.initial_cash,
+        "size": scenario.shares,
+        "size_type": "amount",
+        "accumulate": False,
+        "freq": "D",
+    }
+
+    if exits is not None and scenario.strategy_type in ("long_signal", "long_short"):
+        kwargs["exits"] = exits
+    elif exits is not None and scenario.strategy_type == "short_only":
+        kwargs["short_entries"] = entries
+        kwargs["short_exits"] = exits
+        del kwargs["entries"]
+
+    if "commission_rate" in constants:
+        kwargs["fees"] = constants["commission_rate"]
+    elif "per_share_rate" in constants:
+        kwargs["fees"] = 0.0
+        kwargs["fixed_fees"] = constants["per_share_rate"] * scenario.shares
+    else:
+        kwargs["fees"] = 0.0
+
+    if "slippage_rate" in constants:
+        kwargs["slippage"] = constants["slippage_rate"]
+    elif "slippage_fixed" in constants:
+        kwargs["slippage"] = constants["slippage_fixed"] / prices_df["close"].mean()
+    else:
+        kwargs["slippage"] = 0.0
+
+    risk_rules = {rule["type"]: rule["pct"] for rule in scenario.risk_rules}
+    if "StopLoss" in risk_rules:
+        kwargs["sl_stop"] = risk_rules["StopLoss"]
+    if "TakeProfit" in risk_rules:
+        kwargs["tp_stop"] = risk_rules["TakeProfit"]
+    if "TrailingStop" in risk_rules:
+        kwargs["tsl_stop"] = risk_rules["TrailingStop"]
+
+    is_short = scenario.strategy_type == "short_only" or (
+        scenario.ml4t_config.get("allow_short_selling", False)
+        and "short" in scenario.data_generator.lower()
+    )
+    if is_short:
+        if "entries" in kwargs:
+            kwargs["short_entries"] = kwargs.pop("entries")
+        if "exits" in kwargs:
+            kwargs["short_exits"] = kwargs.pop("exits")
+    return kwargs
 
 
 def run(
@@ -41,67 +114,9 @@ def run(
         raise ImportError(
             "VectorBT Pro not installed. Run in .venv-vectorbt-pro environment."
         ) from None
+    _require_supported_version(importlib.metadata.version("vectorbtpro"))
 
-    constants = scenario.constants
-
-    # Build portfolio kwargs
-    pf_kwargs = {
-        "close": prices_df["close"],
-        "entries": entries,
-        "init_cash": scenario.initial_cash,
-        "size": scenario.shares,
-        "size_type": "amount",
-        "accumulate": False,
-        "freq": "D",
-    }
-
-    # Handle exits
-    if exits is not None and scenario.strategy_type in ("long_signal", "long_short"):
-        pf_kwargs["exits"] = exits
-    elif exits is not None and scenario.strategy_type == "short_only":
-        pf_kwargs["short_entries"] = entries
-        pf_kwargs["short_exits"] = exits
-        del pf_kwargs["entries"]
-
-    # Commission
-    if "commission_rate" in constants:
-        pf_kwargs["fees"] = constants["commission_rate"]
-    elif "per_share_rate" in constants:
-        pf_kwargs["fees"] = constants["per_share_rate"]
-        pf_kwargs["fixed_fees"] = 0.0
-    else:
-        pf_kwargs["fees"] = 0.0
-
-    # Slippage
-    if "slippage_rate" in constants:
-        pf_kwargs["slippage"] = constants["slippage_rate"]
-    elif "slippage_fixed" in constants:
-        pf_kwargs["slippage"] = constants["slippage_fixed"] / prices_df["close"].mean()
-    else:
-        pf_kwargs["slippage"] = 0.0
-
-    # Risk rules
-    if any(r["type"] == "StopLoss" for r in scenario.risk_rules):
-        sl_pct = next(r["pct"] for r in scenario.risk_rules if r["type"] == "StopLoss")
-        pf_kwargs["sl_stop"] = sl_pct
-
-    if any(r["type"] == "TakeProfit" for r in scenario.risk_rules):
-        tp_pct = next(r["pct"] for r in scenario.risk_rules if r["type"] == "TakeProfit")
-        pf_kwargs["tp_stop"] = tp_pct
-
-    if any(r["type"] == "TrailingStop" for r in scenario.risk_rules):
-        trail_pct = next(r["pct"] for r in scenario.risk_rules if r["type"] == "TrailingStop")
-        pf_kwargs["sl_stop"] = trail_pct
-        pf_kwargs["sl_trail"] = True
-
-    # Short-only
-    if scenario.strategy_type == "short_only":
-        if "entries" in pf_kwargs:
-            pf_kwargs["short_entries"] = pf_kwargs.pop("entries")
-        if "exits" in pf_kwargs:
-            pf_kwargs["short_exits"] = pf_kwargs.pop("exits")
-
-    # Run portfolio simulation
+    pf_kwargs = _build_portfolio_kwargs(scenario, prices_df, entries, exits)
     pf = vbt.Portfolio.from_signals(**pf_kwargs)
 
     # Extract results

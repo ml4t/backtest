@@ -99,6 +99,14 @@ python validation/run_full_validation.py
 ## Virtual Environment Setup
 
 ```bash
+# VectorBT Pro 2025.12.31, commit 1305a1e1974325db9382eaeacc6452e9b075ca71
+# Requires an authorized VectorBT Pro license and GitHub SSH access.
+uv venv .venv-vectorbt-pro --python 3.12
+uv pip install --python .venv-vectorbt-pro/bin/python \
+  "vectorbtpro @ git+ssh://git@github.com/polakowo/vectorbt.pro.git@1305a1e1974325db9382eaeacc6452e9b075ca71"
+uv pip install --python .venv-vectorbt-pro/bin/python -e .
+uv run python validation/run_all_correctness.py --framework vectorbt_pro
+
 # VectorBT OSS
 python3 -m venv .venv-vectorbt
 .venv-vectorbt/bin/pip install vectorbt pandas numpy polars pyyaml pydantic numba

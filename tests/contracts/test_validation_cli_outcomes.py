@@ -215,3 +215,18 @@ def test_unavailable_vectorbt_pro_matrix_cannot_report_sixteen_passes(
     assert summary["pass"] == 0
     assert summary["unavailable"] == 16
     assert run_all_correctness.release_gate_passed(records) is False
+
+
+def test_python_override_preserves_virtual_environment_symlink(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    interpreter = tmp_path / "venv" / "bin" / "python"
+    interpreter.parent.mkdir(parents=True)
+    interpreter.symlink_to(sys.executable)
+    monkeypatch.setenv("ML4T_VECTORBT_PRO_PYTHON", str(interpreter))
+
+    resolved = run_all_correctness.resolve_python("vectorbt_pro")
+
+    assert resolved == interpreter
+    assert resolved.is_symlink()
