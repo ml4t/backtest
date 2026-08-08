@@ -1902,7 +1902,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
-    { name = "ml4t-specs", git = "https://github.com/ml4t/specs.git?rev=409f2b5637e4a45755c81c31658cb4716cc05384" },
+    { name = "ml4t-specs", git = "https://github.com/ml4t/specs.git?rev=85d3476683a70b4f17e5e8cb82dd23d05b373dc8" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.3.2" },
@@ -2084,7 +2084,7 @@ wheels = [
 [[package]]
 name = "ml4t-specs"
 version = "0.1.0"
-source = { git = "https://github.com/ml4t/specs.git?rev=409f2b5637e4a45755c81c31658cb4716cc05384#409f2b5637e4a45755c81c31658cb4716cc05384" }
+source = { git = "https://github.com/ml4t/specs.git?rev=85d3476683a70b4f17e5e8cb82dd23d05b373dc8#85d3476683a70b4f17e5e8cb82dd23d05b373dc8" }
 dependencies = [
     { name = "pyyaml" },
 ]
