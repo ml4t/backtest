@@ -230,3 +230,13 @@ def test_python_override_preserves_virtual_environment_symlink(
 
     assert resolved == interpreter
     assert resolved.is_symlink()
+
+
+def test_report_retains_framework_pins(tmp_path: Path) -> None:
+    report_path = tmp_path / "correctness.json"
+    records = [ValidationRecord("vectorbt_pro", "01", "Long Only", ValidationStatus.PASS, True)]
+
+    run_all_correctness.write_report(report_path, records)
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["frameworks"] == run_all_correctness.FRAMEWORK_PINS

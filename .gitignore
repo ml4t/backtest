@@ -45,7 +45,6 @@ CLAUDE.md
 # Validation-generated local artifacts
 validation/.zipline/
 validation/CORRECTNESS_RESULTS.md
-validation/CORRECTNESS_RESULTS.json
 validation/BENCHMARK_RESULTS.md
 validation/trade_logs/
 validation/lean/workspace/

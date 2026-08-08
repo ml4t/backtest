@@ -34,6 +34,9 @@ jobs:
       - name: Run ruff format check
         run: uv run ruff format --check src/ tests/
 
+      - name: Verify parity claims match retained evidence
+        run: uv run python validation/generate_parity_claims.py --check
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest

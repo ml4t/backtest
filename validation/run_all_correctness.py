@@ -39,6 +39,38 @@ FRAMEWORK_PYTHON_ENV_VARS = {
     "zipline": "ML4T_ZIPLINE_PYTHON",
 }
 
+FRAMEWORK_PINS = {
+    "vectorbt_pro": {
+        "display_name": "VectorBT Pro",
+        "profile": "vectorbt_strict",
+        "package": "vectorbtpro",
+        "version": "2025.12.31",
+        "source": "https://github.com/polakowo/vectorbt.pro",
+        "commit": "1305a1e1974325db9382eaeacc6452e9b075ca71",
+    },
+    "vectorbt_oss": {
+        "display_name": "VectorBT OSS",
+        "profile": "vectorbt",
+        "package": "vectorbt",
+        "version": "0.28.2",
+        "source": "https://pypi.org/project/vectorbt/0.28.2/",
+    },
+    "backtrader": {
+        "display_name": "Backtrader",
+        "profile": "backtrader_strict",
+        "package": "backtrader",
+        "version": "1.9.78.123",
+        "source": "https://pypi.org/project/backtrader/1.9.78.123/",
+    },
+    "zipline": {
+        "display_name": "Zipline Reloaded",
+        "profile": "zipline_strict",
+        "package": "zipline-reloaded",
+        "version": "3.1.1",
+        "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
+    },
+}
+
 
 def _record(
     framework: str,
@@ -228,6 +260,7 @@ def write_report(path: Path, records: list[ValidationRecord]) -> None:
     payload = {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(),
+        "frameworks": FRAMEWORK_PINS,
         "release_gate_passed": release_gate_passed(records),
         "summary": summarize(records),
         "records": [record.to_dict() for record in records],

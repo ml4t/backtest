@@ -54,7 +54,8 @@ config.commission_rate = 0.002
 
 ### Profiles
 
-Pre-configured settings that replicate the exact behavior of VectorBT, Backtrader, Zipline, and LEAN. A "strict" variant of each profile tunes additional knobs (like cash validation and settlement) for maximum parity.
+Pre-configured settings select the execution semantics of VectorBT, Backtrader, Zipline, and LEAN.
+Strict variants tune additional cash-validation and settlement behavior for parity testing.
 
 See [Profiles](../user-guide/profiles.md) for the full comparison.
 
