@@ -44,6 +44,55 @@ Initial and scheduled opening-auction target intents use the separate pre-open c
 be decided from information available before the auction cutoff and do not use `on_data()` to
 recover an earlier fill price.
 
+Register an initial target during causal initialization. The target records the decision and
+information cutoff, but quantity lowering waits for the eligible opening price:
+
+```python
+from datetime import UTC, date, datetime
+
+from ml4t.specs import (
+    AssetTarget,
+    CanonicalTargetIntent,
+    IntentReason,
+    LifecyclePhase,
+    ResidualPolicy,
+    RoundingPolicy,
+    TargetMeasure,
+)
+
+
+def on_prepare(self, broker, config=None):
+    decision = datetime(2026, 8, 2, 20, 0, tzinfo=UTC)
+    broker.register_target_intent(
+        CanonicalTargetIntent(
+            intent_id="initial-portfolio",
+            decision_time=decision,
+            information_cutoff=decision,
+            effective_session=date(2026, 8, 3),
+            effective_phase=LifecyclePhase.PRE_OPEN,
+            targets=(AssetTarget("SPY", TargetMeasure.WEIGHT, 0.95),),
+            idempotency_key="initial-portfolio-2026-08-03",
+            measure=TargetMeasure.WEIGHT,
+            cash_buffer=0.05,
+            rounding=RoundingPolicy.TOWARD_ZERO,
+            residual=ResidualPolicy.KEEP_CASH,
+            reason=IntentReason.REBALANCE,
+        )
+    )
+```
+
+The engine validates the cutoff, lowers the target at the opening auction, records canonical child
+intent and order lineage, reconciles fills and remaining quantity, then activates any associated
+position rules. A scheduled target uses the same method from an earlier event with a future
+`effective_session`. Same-session registration from `on_data()` is rejected because that callback
+has already observed information after the opening phase.
+
+For a rule activated after an opening fill, `ExecutionPolicy.bar_path` controls daily OHLC
+ambiguity. Use `REJECT_AMBIGUOUS` to fail when high-low order changes the result,
+`OPEN_HIGH_LOW_CLOSE` or `OPEN_LOW_HIGH_CLOSE` to declare an order, or `CONSERVATIVE` to select the
+more adverse supported outcome. The result artifact retains the lifecycle version, execution
+policy, target intents, child intents, and reconciliation records.
+
 ### SAME_BAR
 
 Orders fill at the **current bar's close** price, in the same bar they are submitted.
@@ -357,9 +406,9 @@ config = BacktestConfig(share_type=ShareType.INTEGER)
 
 The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates execution semantics across chapters:
 
-- **Ch16 / NB11** (`engine_divergence_anatomy`) — detailed analysis of how SAME_BAR vs NEXT_BAR and fill ordering affect backtest results
-- **Ch18** (`portfolio_construction`) — LinearImpact and SquareRootImpact market impact models with VolumeParticipationLimit
-- **Ch16 case studies** — each case study uses setup.yaml to configure commission_rate, slippage_rate, and execution_mode
+- **Ch16 / NB11** (`engine_divergence_anatomy`) - detailed analysis of how SAME_BAR vs NEXT_BAR and fill ordering affect backtest results
+- **Ch18** (`portfolio_construction`) - LinearImpact and SquareRootImpact market impact models with VolumeParticipationLimit
+- **Ch16 case studies** - each case study uses setup.yaml to configure commission_rate, slippage_rate, and execution_mode
 
 ## Next Steps
 

@@ -165,6 +165,9 @@ class Order:
     filled_quantity: float = 0.0
     rejection_reason: str | None = None  # Reason if order was rejected
     requested_quantity: float | None = None
+    target_intent_id: str | None = None
+    child_intent_id: str | None = None
+    intent_idempotency_key: str | None = None
     _rejection_code: str | None = None
     # Internal risk management fields (set by broker)
     _created_bar_index: int = 0
@@ -409,6 +412,9 @@ class Fill:
     available_size: float | None = None
     exit_reason: str = ""
     exit_reason_detail: str | None = None
+    target_intent_id: str | None = None
+    child_intent_id: str | None = None
+    intent_idempotency_key: str | None = None
 
 
 @dataclass

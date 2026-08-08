@@ -45,9 +45,12 @@ from .types import (
 )
 
 if TYPE_CHECKING:
+    from ml4t.specs import CanonicalChildOrderIntent, CanonicalTargetIntent, LifecyclePhase
+
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
     from .execution import ExecutionLimits, MarketImpactModel
+    from .preopen import IntentReconciliation, PreOpenTargetManager
     from .risk.position import PositionRule
 
 
@@ -220,6 +223,8 @@ class Broker:
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
         self._orders_this_bar_ids: set[str] = set()
         self._lifecycle_transaction: Any | None = None
+        self._active_lifecycle_phase: LifecyclePhase | None = None
+        self._preopen_target_manager: PreOpenTargetManager | None = None
 
         # Risk management
         self._position_rules: Any = None  # Global position rules
@@ -817,6 +822,56 @@ class Broker:
         pos = self.positions.get(asset)
         if pos:
             pos.context.update(context)
+
+    def register_target_intent(
+        self,
+        intent: CanonicalTargetIntent,
+        *,
+        position_rules: PositionRule | None = None,
+    ) -> CanonicalTargetIntent:
+        """Register an idempotent target for a causal opening phase."""
+        self._capture_lifecycle_mutation()
+        if self._preopen_target_manager is None:
+            raise RuntimeError("target intents require an Engine-configured broker")
+        return self._preopen_target_manager.register(intent, position_rules=position_rules)
+
+    def register_position_rule_policy(self, policy_id: str, rules: PositionRule) -> None:
+        """Bind a position-rule implementation to a portable policy identity."""
+        self._capture_lifecycle_mutation()
+        if self._preopen_target_manager is None:
+            raise RuntimeError("position rule policies require an Engine-configured broker")
+        self._preopen_target_manager.register_position_rule_policy(policy_id, rules)
+
+    def get_target_intents(self) -> tuple[CanonicalTargetIntent, ...]:
+        """Return accepted canonical target intents."""
+        if self._preopen_target_manager is None:
+            return ()
+        return self._preopen_target_manager.targets
+
+    def get_child_order_intents(self) -> tuple[CanonicalChildOrderIntent, ...]:
+        """Return canonical child intents derived from accepted targets."""
+        if self._preopen_target_manager is None:
+            return ()
+        return self._preopen_target_manager.children
+
+    def get_intent_reconciliations(self) -> tuple[IntentReconciliation, ...]:
+        """Return retained child fill and remainder evidence."""
+        if self._preopen_target_manager is None:
+            return ()
+        return self._preopen_target_manager.reconciliations
+
+    def export_target_intent_state(self) -> dict[str, Any]:
+        """Serialize accepted target, child, and reconciliation state."""
+        if self._preopen_target_manager is None:
+            return {}
+        return self._preopen_target_manager.to_state()
+
+    def restore_target_intent_state(self, state: dict[str, Any]) -> None:
+        """Restore target intent state before strategy initialization."""
+        self._capture_lifecycle_mutation()
+        if self._preopen_target_manager is None:
+            raise RuntimeError("target intents require an Engine-configured broker")
+        self._preopen_target_manager.restore_state(state)
 
     def evaluate_position_rules(self, *, skip_assets: set[str] | None = None) -> list[Order]:
         """Evaluate position rules for all open positions.
@@ -1790,6 +1845,7 @@ class Broker:
         use_open: bool = False,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
         defer_policy_rejections: bool = False,
     ):
@@ -1810,6 +1866,7 @@ class Broker:
         self._execution_engine.process_orders(
             use_open=use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
             defer_policy_rejections=defer_policy_rejections,
         )

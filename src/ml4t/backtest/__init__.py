@@ -27,6 +27,15 @@ from .execution.schedule import (
     resolve_rebalance_timestamps,
 )
 from .lifecycle import LifecycleDispatcher, LifecycleInvocation, callback_trace
+from .preopen import (
+    AmbiguousBarPathError,
+    IntentOutcome,
+    IntentReconciliation,
+    LateAuctionIntentError,
+    PreOpenIntentError,
+    UnsupportedPreOpenPolicyError,
+    default_execution_policy,
+)
 from .result import (
     ArtifactDiagnostic,
     ArtifactError,
@@ -103,6 +112,13 @@ __all__ = [
     "LifecycleDispatcher",
     "LifecycleInvocation",
     "callback_trace",
+    "AmbiguousBarPathError",
+    "IntentOutcome",
+    "IntentReconciliation",
+    "LateAuctionIntentError",
+    "PreOpenIntentError",
+    "UnsupportedPreOpenPolicyError",
+    "default_execution_policy",
     # Risk rules
     "StopLoss",
     "TakeProfit",

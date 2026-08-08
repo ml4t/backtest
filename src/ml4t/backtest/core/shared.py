@@ -40,6 +40,9 @@ class SubmitOrderOptions:
     risk_exit_reason: str | None = None
     exit_reason: ExitReason | None = None
     risk_fill_price: float | None = None
+    target_intent_id: str | None = None
+    child_intent_id: str | None = None
+    intent_idempotency_key: str | None = None
 
 
 def is_exit_order(order: Order, positions: dict[str, Position]) -> bool:
