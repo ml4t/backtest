@@ -211,7 +211,9 @@ def _broker_collection_access(node: ast.AST) -> str | None:
             if (collection := _broker_collection_access(value)) is not None:
                 return collection
     if isinstance(node, ast.Starred):
-        return None
+        if _direct_broker_collection_access(node.value) is not None:
+            return None
+        return _broker_collection_access(node.value)
     if isinstance(node, ast.IfExp):
         return _broker_collection_access(node.body) or _broker_collection_access(node.orelse)
     if isinstance(node, ast.BoolOp):
@@ -411,6 +413,12 @@ def test_mutable_collection_contract_allows_argument_unpacking() -> None:
 
 def test_mutable_collection_contract_follows_nested_keyword_unpacking() -> None:
     call = ast.parse("helper(**{'data': broker.fills})").body[0].value
+
+    assert _mutable_collection_access(call) == "fills"
+
+
+def test_mutable_collection_contract_follows_nested_positional_unpacking() -> None:
+    call = ast.parse("helper(*[broker.fills])").body[0].value
 
     assert _mutable_collection_access(call) == "fills"
 
