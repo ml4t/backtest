@@ -203,22 +203,24 @@ if not is_valid:
     print(f"Order rejected: {reason}")
 ```
 
-## Migration from `account_type`
+## Migration from the beta `account_type` keyword
 
-If you still have older code using an `account_type` string, migrate to explicit
-policy flags:
+The beta-only `Broker(account_type=...)` keyword was removed before 0.1 and is not part of the
+stable compatibility boundary. A single string selected several independent shorting and leverage
+policies, so preserving it could silently change buying-power and liquidation behavior. Migrate to
+the explicit policy flags:
 
 ```python
-# Old API (deprecated)
-broker = Broker(account_type="margin")
-
-# New API
 broker = Broker(allow_short_selling=True, allow_leverage=True)
 
 # Or with config
 config = BacktestConfig(allow_short_selling=True, allow_leverage=True)
 broker = Broker.from_config(config)
 ```
+
+The reviewed 0.1 compatibility snapshot is `tests/compatibility/snapshots/v0.1.json`. Run
+`uv run python validation/generate_compatibility_snapshot.py` to check it. An intentional API or
+schema change requires `--write` and review of the resulting snapshot diff.
 
 ## See It in Action
 

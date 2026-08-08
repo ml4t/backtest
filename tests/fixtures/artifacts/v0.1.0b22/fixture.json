@@ -1,0 +1,53 @@
+{
+  "source_distribution": "ml4t-backtest==0.1.0b22",
+  "generated_with": "BacktestResult.to_parquet",
+  "sha256": {
+    "config.yaml": "c9482b75fd6758ce5f04f389efe20f9ece5aca144683bba05cc832f47bcf286e",
+    "daily_pnl.parquet": "e5666f6bb44b52ae0da3ebc893a972bf9b7fb3d6d57e16e4022b475b4744c0cb",
+    "equity.parquet": "7ca6659c9f1424661ba5fe7f8c04fc03b3872cf6fbf1eca0f3f225a014f0d4f4",
+    "fills.parquet": "659fdb1b93c8822d947c1a9516cd2f7ad515326201c6fc9b025afe2ffeb436f7",
+    "metrics.json": "0411c772767a0e5ee4d7f68a54af153a53ac2d891511408f4436968345c9682d",
+    "portfolio_state.parquet": "bff73116d1949a1f60d7ef082f382cc018f7b559dfdbf7d9ebff335026f6283d",
+    "spec.yaml": "90a9c36c9d6e843ce780a646c0650b098e6f39b9214a4e50a6076bfc61e1397a",
+    "trades.parquet": "89de9f5f299bf80e3cf967c35c069c73cb31f475537140a9ef76b38bea7978a5"
+  },
+  "expected": {
+    "metrics": {
+      "final_value": 100195.0,
+      "max_drawdown": -0.03,
+      "sharpe": 1.25,
+      "total_return_pct": 0.195
+    },
+    "trade": {
+      "symbol": "AAPL",
+      "entry_price": 100.0,
+      "exit_price": 120.0,
+      "quantity": 10.0,
+      "pnl": 195.0,
+      "pnl_percent": 0.195,
+      "fees": 5.0,
+      "entry_slippage": 0.05,
+      "exit_slippage": 0.1,
+      "exit_reason": "signal",
+      "status": "closed"
+    },
+    "fill_order_ids": ["O1", "O2"],
+    "equity_curve": [100000.0, 100195.0],
+    "portfolio_cash": [99000.0, 100195.0],
+    "config": {
+      "initial_cash": 100000.0,
+      "allow_short_selling": false,
+      "allow_leverage": false,
+      "execution_price": "open",
+      "execution_mode": "next_bar",
+      "share_type": "integer",
+      "rebalance_mode": "incremental",
+      "preset_name": null
+    },
+    "diagnostics": [
+      ["manifest_missing", "manifest"],
+      ["component_missing", "predictions"],
+      ["component_missing", "rejected_orders"]
+    ]
+  }
+}

@@ -48,6 +48,9 @@ jobs:
       - name: Verify parity claims match retained evidence
         run: uv run python validation/generate_parity_claims.py --check
 
+      - name: Verify the stable compatibility snapshot
+        run: uv run python validation/generate_compatibility_snapshot.py
+
       - name: Verify the committed checkout is unchanged
         run: git diff --exit-code
 

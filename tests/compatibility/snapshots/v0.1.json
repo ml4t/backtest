@@ -1,0 +1,3920 @@
+{
+  "analytics_exports": [
+    "to_trade_record",
+    "to_trade_records",
+    "to_returns_series",
+    "to_equity_dataframe",
+    "EquityCurve",
+    "TradeAnalyzer",
+    "MAEMFEAnalyzer",
+    "sharpe_ratio",
+    "sortino_ratio",
+    "calmar_ratio",
+    "max_drawdown",
+    "cagr",
+    "volatility"
+  ],
+  "beta_exclusions": {
+    "Broker(account_type=...)": "Removed before 0.1 because one string silently selected multiple shorting and leverage policies. Use explicit account-policy flags."
+  },
+  "compatibility_version": "0.1",
+  "configuration": {
+    "BacktestConfig": [
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "allow_short_selling"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "allow_leverage"
+      },
+      {
+        "annotation": "float",
+        "default": 0.5,
+        "keyword_only": false,
+        "name": "initial_margin"
+      },
+      {
+        "annotation": "float",
+        "default": 0.25,
+        "keyword_only": false,
+        "name": "long_maintenance_margin"
+      },
+      {
+        "annotation": "float",
+        "default": 0.3,
+        "keyword_only": false,
+        "name": "short_maintenance_margin"
+      },
+      {
+        "annotation": "dict[str, tuple[float, float]] | None",
+        "default": null,
+        "keyword_only": false,
+        "name": "fixed_margin_schedule"
+      },
+      {
+        "annotation": "dict[str, tuple[float, float]] | None",
+        "default": null,
+        "keyword_only": false,
+        "name": "margin_pct_schedule"
+      },
+      {
+        "annotation": "ShortCashPolicy",
+        "default": {
+          "enum": "ml4t.backtest.config.ShortCashPolicy.CREDIT",
+          "value": "credit"
+        },
+        "keyword_only": false,
+        "name": "short_cash_policy"
+      },
+      {
+        "annotation": "ExecutionPrice",
+        "default": {
+          "enum": "ml4t.backtest.config.ExecutionPrice.OPEN",
+          "value": "open"
+        },
+        "keyword_only": false,
+        "name": "execution_price"
+      },
+      {
+        "annotation": "ExecutionPrice",
+        "default": {
+          "enum": "ml4t.backtest.config.ExecutionPrice.PRICE",
+          "value": "price"
+        },
+        "keyword_only": false,
+        "name": "mark_price"
+      },
+      {
+        "annotation": "ExecutionMode",
+        "default": {
+          "enum": "ml4t.backtest.types.ExecutionMode.NEXT_BAR",
+          "value": "next_bar"
+        },
+        "keyword_only": false,
+        "name": "execution_mode"
+      },
+      {
+        "annotation": "StopFillMode",
+        "default": {
+          "enum": "ml4t.backtest.types.StopFillMode.STOP_PRICE",
+          "value": "stop_price"
+        },
+        "keyword_only": false,
+        "name": "stop_fill_mode"
+      },
+      {
+        "annotation": "StopLevelBasis",
+        "default": {
+          "enum": "ml4t.backtest.types.StopLevelBasis.FILL_PRICE",
+          "value": "fill_price"
+        },
+        "keyword_only": false,
+        "name": "stop_level_basis"
+      },
+      {
+        "annotation": "WaterMarkSource",
+        "default": {
+          "enum": "ml4t.backtest.config.WaterMarkSource.CLOSE",
+          "value": "close"
+        },
+        "keyword_only": false,
+        "name": "trail_hwm_source"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "trail_include_entry_bar_extremes"
+      },
+      {
+        "annotation": "InitialHwmSource",
+        "default": {
+          "enum": "ml4t.backtest.config.InitialHwmSource.FILL_PRICE",
+          "value": "fill_price"
+        },
+        "keyword_only": false,
+        "name": "initial_hwm_source"
+      },
+      {
+        "annotation": "TrailStopTiming",
+        "default": {
+          "enum": "ml4t.backtest.config.TrailStopTiming.LAGGED",
+          "value": "lagged"
+        },
+        "keyword_only": false,
+        "name": "trail_stop_timing"
+      },
+      {
+        "annotation": "ShareType",
+        "default": {
+          "enum": "ml4t.backtest.config.ShareType.INTEGER",
+          "value": "integer"
+        },
+        "keyword_only": false,
+        "name": "share_type"
+      },
+      {
+        "annotation": "CommissionType",
+        "default": {
+          "enum": "ml4t.backtest.config.CommissionType.NONE",
+          "value": "none"
+        },
+        "keyword_only": false,
+        "name": "commission_type"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "commission_rate"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "commission_per_share"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "commission_per_trade"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "commission_minimum"
+      },
+      {
+        "annotation": "SlippageType",
+        "default": {
+          "enum": "ml4t.backtest.config.SlippageType.NONE",
+          "value": "none"
+        },
+        "keyword_only": false,
+        "name": "slippage_type"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "slippage_rate"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "slippage_fixed"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "slippage_spread"
+      },
+      {
+        "annotation": "dict[str, float]",
+        "default": {
+          "factory": "builtins.dict",
+          "value": {}
+        },
+        "keyword_only": false,
+        "name": "slippage_spread_by_asset"
+      },
+      {
+        "annotation": "SpreadConvention",
+        "default": {
+          "enum": "ml4t.backtest.config.SpreadConvention.FULL_SPREAD",
+          "value": "full_spread"
+        },
+        "keyword_only": false,
+        "name": "slippage_spread_convention"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "stop_slippage_rate"
+      },
+      {
+        "annotation": "float",
+        "default": 100000.0,
+        "keyword_only": false,
+        "name": "initial_cash"
+      },
+      {
+        "annotation": "float",
+        "default": 0.0,
+        "keyword_only": false,
+        "name": "cash_buffer_pct"
+      },
+      {
+        "annotation": "int",
+        "default": 0,
+        "keyword_only": false,
+        "name": "settlement_delay"
+      },
+      {
+        "annotation": "bool",
+        "default": true,
+        "keyword_only": false,
+        "name": "settlement_reduces_buying_power"
+      },
+      {
+        "annotation": "bool",
+        "default": true,
+        "keyword_only": false,
+        "name": "reject_on_insufficient_cash"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "skip_cash_validation"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "partial_fills_allowed"
+      },
+      {
+        "annotation": "FillOrdering",
+        "default": {
+          "enum": "ml4t.backtest.config.FillOrdering.EXIT_FIRST",
+          "value": "exit_first"
+        },
+        "keyword_only": false,
+        "name": "fill_ordering"
+      },
+      {
+        "annotation": "EntryOrderPriority",
+        "default": {
+          "enum": "ml4t.backtest.config.EntryOrderPriority.SUBMISSION",
+          "value": "submission"
+        },
+        "keyword_only": false,
+        "name": "entry_order_priority"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "next_bar_submission_precheck"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "next_bar_simple_cash_check"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "buying_power_reservation"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "next_bar_queue_shadow_validation"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "immediate_fill"
+      },
+      {
+        "annotation": "RebalanceMode",
+        "default": {
+          "enum": "ml4t.backtest.config.RebalanceMode.INCREMENTAL",
+          "value": "incremental"
+        },
+        "keyword_only": false,
+        "name": "rebalance_mode"
+      },
+      {
+        "annotation": "float",
+        "default": 1.0,
+        "keyword_only": false,
+        "name": "rebalance_headroom_pct"
+      },
+      {
+        "annotation": "MissingPricePolicy",
+        "default": {
+          "enum": "ml4t.backtest.config.MissingPricePolicy.SKIP",
+          "value": "skip"
+        },
+        "keyword_only": false,
+        "name": "missing_price_policy"
+      },
+      {
+        "annotation": "LateAssetPolicy",
+        "default": {
+          "enum": "ml4t.backtest.config.LateAssetPolicy.ALLOW",
+          "value": "allow"
+        },
+        "keyword_only": false,
+        "name": "late_asset_policy"
+      },
+      {
+        "annotation": "int",
+        "default": 1,
+        "keyword_only": false,
+        "name": "late_asset_min_bars"
+      },
+      {
+        "annotation": "str | None",
+        "default": null,
+        "keyword_only": false,
+        "name": "calendar"
+      },
+      {
+        "annotation": "str",
+        "default": "UTC",
+        "keyword_only": false,
+        "name": "timezone"
+      },
+      {
+        "annotation": "DataFrequency",
+        "default": {
+          "enum": "ml4t.backtest.config.DataFrequency.DAILY",
+          "value": "daily"
+        },
+        "keyword_only": false,
+        "name": "data_frequency"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "enforce_sessions"
+      },
+      {
+        "annotation": "str | None",
+        "default": null,
+        "keyword_only": false,
+        "name": "preset_name"
+      },
+      {
+        "annotation": "FeedSpec | None",
+        "default": null,
+        "keyword_only": false,
+        "name": "feed_spec"
+      },
+      {
+        "annotation": "dict[str, Any]",
+        "default": {
+          "factory": "builtins.dict",
+          "value": {}
+        },
+        "keyword_only": false,
+        "name": "metadata"
+      }
+    ],
+    "StatsConfig": [
+      {
+        "annotation": "int",
+        "default": 50,
+        "keyword_only": false,
+        "name": "recent_window_size"
+      },
+      {
+        "annotation": "bool",
+        "default": true,
+        "keyword_only": false,
+        "name": "track_session_stats"
+      },
+      {
+        "annotation": "bool",
+        "default": true,
+        "keyword_only": false,
+        "name": "enabled"
+      }
+    ],
+    "default_serialization": {
+      "account": {
+        "allow_leverage": false,
+        "allow_short_selling": false,
+        "fixed_margin_schedule": null,
+        "initial_margin": 0.5,
+        "long_maintenance_margin": 0.25,
+        "margin_pct_schedule": null,
+        "short_cash_policy": "credit",
+        "short_maintenance_margin": 0.3
+      },
+      "calendar": {
+        "calendar": null,
+        "data_frequency": "daily",
+        "enforce_sessions": false,
+        "timezone": "UTC"
+      },
+      "cash": {
+        "buffer_pct": 0.0,
+        "initial": 100000.0
+      },
+      "commission": {
+        "minimum": 0.0,
+        "model": "none",
+        "per_share": 0.0,
+        "per_trade": 0.0,
+        "rate": 0.0
+      },
+      "execution": {
+        "execution_mode": "next_bar",
+        "execution_price": "open",
+        "mark_price": "price"
+      },
+      "feed": {
+        "ask_col": null,
+        "ask_size_col": null,
+        "bar_type": null,
+        "bid_col": null,
+        "bid_size_col": null,
+        "calendar": null,
+        "close_col": "close",
+        "data_frequency": "daily",
+        "entity_col": null,
+        "high_col": "high",
+        "low_col": "low",
+        "mid_col": null,
+        "open_col": "open",
+        "price_col": "close",
+        "session_start_time": null,
+        "timestamp_col": "timestamp",
+        "timestamp_semantics": null,
+        "timezone": "UTC",
+        "volume_col": "volume"
+      },
+      "metadata": {},
+      "orders": {
+        "buying_power_reservation": false,
+        "entry_order_priority": "submission",
+        "fill_ordering": "exit_first",
+        "immediate_fill": false,
+        "late_asset_min_bars": 1,
+        "late_asset_policy": "allow",
+        "missing_price_policy": "skip",
+        "next_bar_queue_shadow_validation": false,
+        "next_bar_simple_cash_check": false,
+        "next_bar_submission_precheck": false,
+        "partial_fills_allowed": false,
+        "rebalance_headroom_pct": 1.0,
+        "rebalance_mode": "incremental",
+        "reject_on_insufficient_cash": true,
+        "skip_cash_validation": false
+      },
+      "position_sizing": {
+        "share_type": "integer"
+      },
+      "settlement": {
+        "delay": 0,
+        "reduces_buying_power": true
+      },
+      "slippage": {
+        "fixed": 0.0,
+        "model": "none",
+        "rate": 0.0,
+        "spread": 0.0,
+        "spread_by_asset": {},
+        "spread_convention": "full_spread",
+        "stop_rate": 0.0
+      },
+      "stops": {
+        "initial_hwm_source": "fill_price",
+        "stop_fill_mode": "stop_price",
+        "stop_level_basis": "fill_price",
+        "trail_hwm_source": "close",
+        "trail_include_entry_bar_extremes": false,
+        "trail_stop_timing": "lagged"
+      }
+    }
+  },
+  "documented_imports": [
+    "from ml4t.backtest import BacktestConfig",
+    "from ml4t.backtest import BacktestConfig, CommissionType",
+    "from ml4t.backtest import BacktestConfig, DataFeed",
+    "from ml4t.backtest import BacktestConfig, Engine",
+    "from ml4t.backtest import Broker, BacktestConfig",
+    "from ml4t.backtest import DataFeed",
+    "from ml4t.backtest import Engine",
+    "from ml4t.backtest import Engine, DataFeed",
+    "from ml4t.backtest import Engine, DataFeed, Strategy",
+    "from ml4t.backtest import Engine, DataFeed, Strategy, BacktestConfig",
+    "from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed",
+    "from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest",
+    "from ml4t.backtest import ExecutionMode, StopFillMode",
+    "from ml4t.backtest import RuleChain, StopLoss, TakeProfit, TrailingStop",
+    "from ml4t.backtest import StopLoss",
+    "from ml4t.backtest import StopLoss, TakeProfit, TrailingStop, RuleChain",
+    "from ml4t.backtest import StopLoss, TrailingStop, RuleChain",
+    "from ml4t.backtest import Strategy",
+    "from ml4t.backtest import Strategy, StopLoss, TakeProfit, TrailingStop, RuleChain",
+    "from ml4t.backtest import Strategy, TargetWeightExecutor, RebalanceConfig",
+    "from ml4t.backtest import TakeProfit",
+    "from ml4t.backtest import TrailingStop",
+    "from ml4t.backtest import run_backtest",
+    "from ml4t.backtest.accounting import Gatekeeper",
+    "from ml4t.backtest.analytics.bridge import to_trade_records",
+    "from ml4t.backtest.config import BacktestConfig",
+    "from ml4t.backtest.config import CommissionType",
+    "from ml4t.backtest.config import CommissionType, SlippageType",
+    "from ml4t.backtest.config import ExecutionPrice",
+    "from ml4t.backtest.config import FillOrdering",
+    "from ml4t.backtest.config import LateAssetPolicy, MissingPricePolicy",
+    "from ml4t.backtest.config import RebalanceMode",
+    "from ml4t.backtest.config import ShareType",
+    "from ml4t.backtest.config import SlippageType",
+    "from ml4t.backtest.config import SlippageType, SpreadConvention",
+    "from ml4t.backtest.config import TrailStopTiming, WaterMarkSource, InitialHwmSource",
+    "from ml4t.backtest.execution import LinearImpact",
+    "from ml4t.backtest.execution import LinearImpact, SquareRootImpact, NoImpact",
+    "from ml4t.backtest.execution import SquareRootImpact",
+    "from ml4t.backtest.execution import VolumeParticipationLimit",
+    "from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig",
+    "from ml4t.backtest.models import TieredCommission, CombinedCommission",
+    "from ml4t.backtest.profiles import list_profiles",
+    "from ml4t.backtest.result import BacktestResult",
+    "from ml4t.backtest.risk.portfolio.limits import BetaLimit",
+    "from ml4t.backtest.risk.portfolio.limits import DailyLossLimit",
+    "from ml4t.backtest.risk.portfolio.limits import GrossExposureLimit, NetExposureLimit",
+    "from ml4t.backtest.risk.portfolio.limits import MaxDrawdownLimit",
+    "from ml4t.backtest.risk.portfolio.limits import MaxDrawdownLimit, DailyLossLimit",
+    "from ml4t.backtest.risk.portfolio.limits import MaxExposureLimit",
+    "from ml4t.backtest.risk.portfolio.limits import MaxPositionsLimit",
+    "from ml4t.backtest.risk.portfolio.limits import SectorExposureLimit, FactorExposureLimit",
+    "from ml4t.backtest.risk.portfolio.limits import VaRLimit, CVaRLimit",
+    "from ml4t.backtest.risk.position import AllOf, TakeProfit, TimeExit",
+    "from ml4t.backtest.risk.position import AnyOf",
+    "from ml4t.backtest.risk.position import ScaledExit",
+    "from ml4t.backtest.risk.position import SignalExit",
+    "from ml4t.backtest.risk.position import TighteningTrailingStop",
+    "from ml4t.backtest.risk.position import TimeExit",
+    "from ml4t.backtest.risk.position import VolatilityStop",
+    "from ml4t.backtest.strategies.templates import LongShortStrategy",
+    "from ml4t.backtest.strategies.templates import MeanReversionStrategy",
+    "from ml4t.backtest.strategies.templates import MomentumStrategy",
+    "from ml4t.backtest.strategies.templates import SignalFollowingStrategy",
+    "from ml4t.backtest.types import ExecutionMode",
+    "from ml4t.backtest.types import OrderType"
+  ],
+  "enums": {
+    "ml4t.backtest.config.CommissionType": [
+      {
+        "name": "NONE",
+        "value": "none"
+      },
+      {
+        "name": "PERCENTAGE",
+        "value": "percentage"
+      },
+      {
+        "name": "PER_SHARE",
+        "value": "per_share"
+      },
+      {
+        "name": "PER_CONTRACT",
+        "value": "per_share"
+      },
+      {
+        "name": "PER_TRADE",
+        "value": "per_trade"
+      },
+      {
+        "name": "TIERED",
+        "value": "tiered"
+      }
+    ],
+    "ml4t.backtest.config.DataFrequency": [
+      {
+        "name": "DAILY",
+        "value": "daily"
+      },
+      {
+        "name": "MINUTE_1",
+        "value": "1m"
+      },
+      {
+        "name": "MINUTE_5",
+        "value": "5m"
+      },
+      {
+        "name": "MINUTE_15",
+        "value": "15m"
+      },
+      {
+        "name": "MINUTE_30",
+        "value": "30m"
+      },
+      {
+        "name": "HOURLY",
+        "value": "1h"
+      },
+      {
+        "name": "IRREGULAR",
+        "value": "irregular"
+      }
+    ],
+    "ml4t.backtest.config.EntryOrderPriority": [
+      {
+        "name": "SUBMISSION",
+        "value": "submission"
+      },
+      {
+        "name": "NOTIONAL_DESC",
+        "value": "notional_desc"
+      },
+      {
+        "name": "NOTIONAL_ASC",
+        "value": "notional_asc"
+      }
+    ],
+    "ml4t.backtest.config.ExecutionPrice": [
+      {
+        "name": "PRICE",
+        "value": "price"
+      },
+      {
+        "name": "CLOSE",
+        "value": "close"
+      },
+      {
+        "name": "OPEN",
+        "value": "open"
+      },
+      {
+        "name": "VWAP",
+        "value": "vwap"
+      },
+      {
+        "name": "MID",
+        "value": "mid"
+      },
+      {
+        "name": "BID",
+        "value": "bid"
+      },
+      {
+        "name": "ASK",
+        "value": "ask"
+      },
+      {
+        "name": "QUOTE_MID",
+        "value": "quote_mid"
+      },
+      {
+        "name": "QUOTE_SIDE",
+        "value": "quote_side"
+      }
+    ],
+    "ml4t.backtest.config.FillOrdering": [
+      {
+        "name": "EXIT_FIRST",
+        "value": "exit_first"
+      },
+      {
+        "name": "FIFO",
+        "value": "fifo"
+      },
+      {
+        "name": "SEQUENTIAL",
+        "value": "sequential"
+      }
+    ],
+    "ml4t.backtest.config.InitialHwmSource": [
+      {
+        "name": "FILL_PRICE",
+        "value": "fill_price"
+      },
+      {
+        "name": "BAR_CLOSE",
+        "value": "bar_close"
+      },
+      {
+        "name": "BAR_HIGH",
+        "value": "bar_high"
+      }
+    ],
+    "ml4t.backtest.config.LateAssetPolicy": [
+      {
+        "name": "ALLOW",
+        "value": "allow"
+      },
+      {
+        "name": "REQUIRE_HISTORY",
+        "value": "require_history"
+      }
+    ],
+    "ml4t.backtest.config.MissingPricePolicy": [
+      {
+        "name": "SKIP",
+        "value": "skip"
+      },
+      {
+        "name": "USE_LAST",
+        "value": "use_last"
+      }
+    ],
+    "ml4t.backtest.config.RebalanceMode": [
+      {
+        "name": "SNAPSHOT",
+        "value": "snapshot"
+      },
+      {
+        "name": "INCREMENTAL",
+        "value": "incremental"
+      },
+      {
+        "name": "HYBRID",
+        "value": "hybrid"
+      }
+    ],
+    "ml4t.backtest.config.ShareType": [
+      {
+        "name": "FRACTIONAL",
+        "value": "fractional"
+      },
+      {
+        "name": "INTEGER",
+        "value": "integer"
+      }
+    ],
+    "ml4t.backtest.config.ShortCashPolicy": [
+      {
+        "name": "CREDIT",
+        "value": "credit"
+      },
+      {
+        "name": "CREDIT_PROCEEDS",
+        "value": "credit_proceeds"
+      },
+      {
+        "name": "LOCK_NOTIONAL",
+        "value": "lock_notional"
+      }
+    ],
+    "ml4t.backtest.config.SlippageType": [
+      {
+        "name": "NONE",
+        "value": "none"
+      },
+      {
+        "name": "PERCENTAGE",
+        "value": "percentage"
+      },
+      {
+        "name": "FIXED",
+        "value": "fixed"
+      },
+      {
+        "name": "SPREAD",
+        "value": "spread"
+      },
+      {
+        "name": "VOLUME_BASED",
+        "value": "volume_based"
+      }
+    ],
+    "ml4t.backtest.config.SpreadConvention": [
+      {
+        "name": "FULL_SPREAD",
+        "value": "full_spread"
+      },
+      {
+        "name": "HALF_SPREAD",
+        "value": "half_spread"
+      }
+    ],
+    "ml4t.backtest.config.TrailStopTiming": [
+      {
+        "name": "LAGGED",
+        "value": "lagged"
+      },
+      {
+        "name": "INTRABAR",
+        "value": "intrabar"
+      },
+      {
+        "name": "VBT_PRO",
+        "value": "vbt_pro"
+      }
+    ],
+    "ml4t.backtest.config.WaterMarkSource": [
+      {
+        "name": "CLOSE",
+        "value": "close"
+      },
+      {
+        "name": "BAR_EXTREME",
+        "value": "bar_extreme"
+      }
+    ],
+    "ml4t.backtest.execution.schedule.RebalanceCadence": [
+      {
+        "name": "EVERY_BAR",
+        "value": "every_bar"
+      },
+      {
+        "name": "EVERY_SESSION",
+        "value": "every_session"
+      },
+      {
+        "name": "FIXED_N_SESSIONS",
+        "value": "fixed_n_sessions"
+      },
+      {
+        "name": "WEEKLY",
+        "value": "weekly"
+      },
+      {
+        "name": "MONTH_END",
+        "value": "month_end"
+      },
+      {
+        "name": "EXPLICIT_TIMESTAMPS",
+        "value": "explicit_timestamps"
+      }
+    ],
+    "ml4t.backtest.risk.types.ActionType": [
+      {
+        "name": "HOLD",
+        "value": 1
+      },
+      {
+        "name": "EXIT_FULL",
+        "value": 2
+      },
+      {
+        "name": "EXIT_PARTIAL",
+        "value": 3
+      },
+      {
+        "name": "ADJUST_STOP",
+        "value": 4
+      }
+    ],
+    "ml4t.backtest.types.AssetClass": [
+      {
+        "name": "EQUITY",
+        "value": "equity"
+      },
+      {
+        "name": "FUTURE",
+        "value": "future"
+      },
+      {
+        "name": "FOREX",
+        "value": "forex"
+      }
+    ],
+    "ml4t.backtest.types.ExecutionMode": [
+      {
+        "name": "SAME_BAR",
+        "value": "same_bar"
+      },
+      {
+        "name": "NEXT_BAR",
+        "value": "next_bar"
+      }
+    ],
+    "ml4t.backtest.types.ExitReason": [
+      {
+        "name": "SIGNAL",
+        "value": "signal"
+      },
+      {
+        "name": "STOP_LOSS",
+        "value": "stop_loss"
+      },
+      {
+        "name": "TAKE_PROFIT",
+        "value": "take_profit"
+      },
+      {
+        "name": "TRAILING_STOP",
+        "value": "trailing_stop"
+      },
+      {
+        "name": "TIME_STOP",
+        "value": "time_stop"
+      },
+      {
+        "name": "RISK_LIQUIDATION",
+        "value": "risk_liquidation"
+      },
+      {
+        "name": "END_OF_DATA",
+        "value": "end_of_data"
+      }
+    ],
+    "ml4t.backtest.types.OrderSide": [
+      {
+        "name": "BUY",
+        "value": "buy"
+      },
+      {
+        "name": "SELL",
+        "value": "sell"
+      }
+    ],
+    "ml4t.backtest.types.OrderStatus": [
+      {
+        "name": "PENDING",
+        "value": "pending"
+      },
+      {
+        "name": "FILLED",
+        "value": "filled"
+      },
+      {
+        "name": "CANCELLED",
+        "value": "cancelled"
+      },
+      {
+        "name": "REJECTED",
+        "value": "rejected"
+      }
+    ],
+    "ml4t.backtest.types.OrderType": [
+      {
+        "name": "MARKET",
+        "value": "market"
+      },
+      {
+        "name": "MOC",
+        "value": "moc"
+      },
+      {
+        "name": "LIMIT",
+        "value": "limit"
+      },
+      {
+        "name": "STOP",
+        "value": "stop"
+      },
+      {
+        "name": "STOP_LIMIT",
+        "value": "stop_limit"
+      },
+      {
+        "name": "TRAILING_STOP",
+        "value": "trailing_stop"
+      }
+    ],
+    "ml4t.backtest.types.StopFillMode": [
+      {
+        "name": "STOP_PRICE",
+        "value": "stop_price"
+      },
+      {
+        "name": "CLOSE_PRICE",
+        "value": "close_price"
+      },
+      {
+        "name": "BAR_EXTREME",
+        "value": "bar_extreme"
+      },
+      {
+        "name": "NEXT_BAR_OPEN",
+        "value": "next_bar_open"
+      }
+    ],
+    "ml4t.backtest.types.StopLevelBasis": [
+      {
+        "name": "FILL_PRICE",
+        "value": "fill_price"
+      },
+      {
+        "name": "SIGNAL_PRICE",
+        "value": "signal_price"
+      }
+    ]
+  },
+  "metrics": {
+    "backtest_result": [
+      "avg_cost_drag",
+      "avg_loss",
+      "avg_open_positions",
+      "avg_trade",
+      "avg_turnover",
+      "avg_win",
+      "cagr",
+      "calmar",
+      "expectancy",
+      "final_value",
+      "gross_profit_factor",
+      "initial_cash",
+      "largest_loss",
+      "largest_win",
+      "losing_trades",
+      "max_drawdown",
+      "max_drawdown_pct",
+      "max_open_positions",
+      "max_turnover",
+      "num_fills",
+      "num_orders",
+      "num_rebalance_events",
+      "num_rejected_orders",
+      "num_trades",
+      "payoff_ratio",
+      "profit_factor",
+      "sharpe",
+      "skipped_bars",
+      "sortino",
+      "total_commission",
+      "total_costs",
+      "total_filled_notional",
+      "total_gross_pnl",
+      "total_return",
+      "total_return_pct",
+      "total_slippage",
+      "unique_symbols_traded",
+      "volatility",
+      "win_rate",
+      "winning_trades"
+    ],
+    "equity_curve": [
+      "cagr",
+      "calmar",
+      "final_value",
+      "initial_value",
+      "max_drawdown",
+      "sharpe",
+      "sortino",
+      "total_return",
+      "trading_days",
+      "volatility",
+      "years"
+    ],
+    "mae_mfe_analyzer": [
+      "edge_ratio",
+      "efficiency",
+      "mae_mean",
+      "mae_median",
+      "mae_p10",
+      "mae_p25",
+      "mae_p50",
+      "mae_p75",
+      "mae_p90",
+      "mae_std",
+      "mfe_mean",
+      "mfe_median",
+      "mfe_p10",
+      "mfe_p25",
+      "mfe_p50",
+      "mfe_p75",
+      "mfe_p90",
+      "mfe_std",
+      "num_trades",
+      "suggested_stop_loss",
+      "suggested_take_profit"
+    ],
+    "trade_analyzer": [
+      "avg_bars_held",
+      "avg_cost_drag",
+      "avg_loss",
+      "avg_mae",
+      "avg_mfe",
+      "avg_trade",
+      "avg_win",
+      "expectancy",
+      "gross_loss",
+      "gross_profit",
+      "gross_profit_factor",
+      "largest_loss",
+      "largest_win",
+      "mae_recovery_ratio",
+      "mfe_capture_ratio",
+      "net_profit",
+      "num_losers",
+      "num_trades",
+      "num_winners",
+      "payoff_ratio",
+      "profit_factor",
+      "total_commission",
+      "total_costs",
+      "total_gross_pnl",
+      "total_slippage",
+      "win_rate"
+    ]
+  },
+  "profiles": {
+    "advertised": [
+      "backtrader",
+      "default",
+      "lean",
+      "realistic",
+      "vectorbt",
+      "zipline"
+    ],
+    "aliases": {
+      "backtrader_compare": "backtrader_strict",
+      "ibkr:us:stocks:fixed": "ibkr_us_stocks_fixed",
+      "lean_compare": "lean",
+      "quantconnect": "lean",
+      "vectorbt_compare": "vectorbt_strict",
+      "vectorbt_oss": "vectorbt",
+      "vectorbt_pro": "vectorbt",
+      "zipline_compare": "zipline_strict"
+    },
+    "canonical": {
+      "backtrader": {
+        "account": {
+          "allow_leverage": true,
+          "allow_short_selling": true,
+          "initial_margin": 0.5,
+          "long_maintenance_margin": 0.25,
+          "short_cash_policy": "credit",
+          "short_maintenance_margin": 0.3
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "percentage",
+          "rate": 0.001
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "fifo",
+          "late_asset_min_bars": 2,
+          "late_asset_policy": "require_history",
+          "missing_price_policy": "use_last",
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 0.998,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "percentage",
+          "rate": 0.001
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "signal_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "backtrader_strict": {
+        "account": {
+          "allow_leverage": true,
+          "allow_short_selling": true,
+          "initial_margin": 0.5,
+          "long_maintenance_margin": 0.25,
+          "short_cash_policy": "credit",
+          "short_maintenance_margin": 0.3
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "percentage",
+          "rate": 0.001
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "fifo",
+          "late_asset_min_bars": 2,
+          "late_asset_policy": "require_history",
+          "missing_price_policy": "use_last",
+          "next_bar_simple_cash_check": true,
+          "next_bar_submission_precheck": true,
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 0.998,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "percentage",
+          "rate": 0.001
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "signal_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "default": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": false,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "minimum": 0.0,
+          "model": "none",
+          "per_share": 0.0,
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "incremental",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "fast": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "same_bar",
+          "execution_price": "close"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": false
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "ibkr_us_stocks_fixed": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": false,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "minimum": 1.0,
+          "model": "per_share",
+          "per_share": 0.005,
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "incremental",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "lean": {
+        "account": {
+          "allow_leverage": true,
+          "allow_short_selling": true,
+          "initial_margin": 0.5,
+          "long_maintenance_margin": 0.25,
+          "short_cash_policy": "credit",
+          "short_maintenance_margin": 0.3
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "minimum": 1.0,
+          "model": "per_share",
+          "per_share": 0.005,
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "use_last",
+          "next_bar_queue_shadow_validation": true,
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "percentage",
+          "rate": 0.001
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "realistic": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": false,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.02,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "percentage",
+          "rate": 0.002
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "incremental",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "percentage",
+          "rate": 0.002,
+          "stop_rate": 0.001
+        },
+        "stops": {
+          "stop_fill_mode": "next_bar_open",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "vectorbt": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "same_bar",
+          "execution_price": "close"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "use_last",
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "hybrid",
+          "reject_on_insufficient_cash": false
+        },
+        "position_sizing": {
+          "share_type": "fractional"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "initial_hwm_source": "bar_high",
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
+        }
+      },
+      "vectorbt_strict": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "short_cash_policy": "lock_notional"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "same_bar",
+          "execution_price": "close"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "fifo",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "use_last",
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "hybrid",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "fractional"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "initial_hwm_source": "bar_high",
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
+        }
+      },
+      "zipline": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": false,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "minimum": 1.0,
+          "model": "per_share",
+          "per_share": 0.005,
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "use_last",
+          "next_bar_queue_shadow_validation": true,
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 0.998,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "volume_based",
+          "rate": 0.1
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      },
+      "zipline_strict": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "short_cash_policy": "credit"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "minimum": 1.0,
+          "model": "per_share",
+          "per_share": 0.005,
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "next_bar",
+          "execution_price": "open"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "exit_first",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "use_last",
+          "next_bar_queue_shadow_validation": true,
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 0.998,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true,
+          "skip_cash_validation": true
+        },
+        "position_sizing": {
+          "share_type": "integer"
+        },
+        "slippage": {
+          "model": "volume_based",
+          "rate": 0.1
+        },
+        "stops": {
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "close",
+          "trail_stop_timing": "lagged"
+        }
+      }
+    }
+  },
+  "result_artifact": {
+    "artifact_type": "ml4t-backtest-result",
+    "component_files": {
+      "config": "config.yaml",
+      "daily_pnl": "daily_pnl.parquet",
+      "equity": "equity.parquet",
+      "fills": "fills.parquet",
+      "metrics": "metrics.json",
+      "portfolio_state": "portfolio_state.parquet",
+      "predictions": "predictions.parquet",
+      "rejected_orders": "rejected_orders.parquet",
+      "spec": "spec.yaml",
+      "trades": "trades.parquet"
+    },
+    "dataframe_schemas": {
+      "equity": {
+        "cumulative_return": "Float64",
+        "drawdown": "Float64",
+        "equity": "Float64",
+        "high_water_mark": "Float64",
+        "return": "Float64",
+        "timestamp": "Datetime(time_unit='us', time_zone=None)"
+      },
+      "fills": {
+        "ask_price": "Float64",
+        "ask_size": "Float64",
+        "asset": "String",
+        "available_size": "Float64",
+        "bid_price": "Float64",
+        "bid_size": "Float64",
+        "commission": "Float64",
+        "exit_reason": "String",
+        "exit_reason_detail": "String",
+        "limit_price": "Float64",
+        "order_id": "String",
+        "order_type": "String",
+        "price": "Float64",
+        "price_source": "String",
+        "quantity": "Float64",
+        "quote_mid_price": "Float64",
+        "rebalance_id": "String",
+        "reference_price": "Float64",
+        "side": "String",
+        "slippage": "Float64",
+        "spread": "Float64",
+        "stop_price": "Float64",
+        "timestamp": "Datetime(time_unit='us', time_zone=None)"
+      },
+      "portfolio_state": {
+        "cash": "Float64",
+        "equity": "Float64",
+        "gross_exposure": "Float64",
+        "net_exposure": "Float64",
+        "open_positions": "Int32",
+        "timestamp": "Datetime(time_unit='us', time_zone=None)"
+      },
+      "rejected_orders": {
+        "filled_quantity": "Float64",
+        "limit_price": "Float64",
+        "order_id": "String",
+        "order_type": "String",
+        "parent_id": "String",
+        "rebalance_id": "String",
+        "rejection_code": "String",
+        "rejection_reason": "String",
+        "remaining_quantity": "Float64",
+        "requested_quantity": "Float64",
+        "side": "String",
+        "status": "String",
+        "stop_price": "Float64",
+        "symbol": "String",
+        "timestamp": "Datetime(time_unit='us', time_zone=None)",
+        "trail_amount": "Float64"
+      },
+      "trades": {
+        "bars_held": "Int32",
+        "cost_drag": "Float64",
+        "direction": "String",
+        "entry_ask_price": "Float64",
+        "entry_available_size": "Float64",
+        "entry_bid_price": "Float64",
+        "entry_price": "Float64",
+        "entry_quote_mid_price": "Float64",
+        "entry_slippage": "Float64",
+        "entry_spread": "Float64",
+        "entry_time": "Datetime(time_unit='us', time_zone=None)",
+        "exit_ask_price": "Float64",
+        "exit_available_size": "Float64",
+        "exit_bid_price": "Float64",
+        "exit_price": "Float64",
+        "exit_quote_mid_price": "Float64",
+        "exit_reason": "String",
+        "exit_reason_detail": "String",
+        "exit_slippage": "Float64",
+        "exit_spread": "Float64",
+        "exit_time": "Datetime(time_unit='us', time_zone=None)",
+        "fees": "Float64",
+        "gross_pnl": "Float64",
+        "mae": "Float64",
+        "mfe": "Float64",
+        "multiplier": "Float64",
+        "net_return": "Float64",
+        "pnl": "Float64",
+        "pnl_percent": "Float64",
+        "quantity": "Float64",
+        "status": "String",
+        "symbol": "String",
+        "total_slippage_cost": "Float64"
+      }
+    },
+    "required_components": [
+      "daily_pnl",
+      "equity",
+      "fills",
+      "metrics",
+      "portfolio_state",
+      "rejected_orders",
+      "trades"
+    ],
+    "schema_version": 2
+  },
+  "root_exports": [
+    "DataFeed",
+    "Broker",
+    "Strategy",
+    "Engine",
+    "run_backtest",
+    "BacktestConfig",
+    "BacktestResult",
+    "ArtifactDiagnostic",
+    "ArtifactError",
+    "ArtifactNotFoundError",
+    "ArtifactManifestError",
+    "ArtifactIncompleteError",
+    "ArtifactReadError",
+    "ArtifactWriteError",
+    "UnsupportedArtifactVersionError",
+    "CommissionType",
+    "OrderType",
+    "OrderSide",
+    "OrderStatus",
+    "ExecutionMode",
+    "ExitReason",
+    "StopFillMode",
+    "StopLevelBasis",
+    "Order",
+    "Position",
+    "Fill",
+    "Trade",
+    "AssetClass",
+    "ContractSpec",
+    "RebalanceConfig",
+    "TargetWeightExecutor",
+    "RebalanceCadence",
+    "RebalanceSchedule",
+    "resolve_rebalance_timestamps",
+    "StopLoss",
+    "TakeProfit",
+    "TrailingStop",
+    "RuleChain"
+  ],
+  "snapshot_schema_version": 1,
+  "symbols": {
+    "ml4t.backtest.accounting:Gatekeeper": {
+      "kind": "class",
+      "members": {
+        "classify_rejection": {
+          "kind": "method",
+          "signature": "(self, resulting_quantity: float) -> str"
+        },
+        "validate_order": {
+          "kind": "method",
+          "signature": "(self, order: ml4t.backtest.types.Order, price: float) -> tuple[bool, str]"
+        },
+        "validate_order_with_code": {
+          "kind": "method",
+          "signature": "(self, order: ml4t.backtest.types.Order, price: float) -> tuple[bool, str, str | None]"
+        }
+      },
+      "module": "ml4t.backtest.accounting.gatekeeper",
+      "qualname": "Gatekeeper",
+      "signature": "(account: ml4t.backtest.accounting.account.AccountState, commission_model: ml4t.backtest.models.CommissionModel, cash_buffer_pct: float = 0.0, settlement_reduces_buying_power: bool = True, multiplier_resolver: collections.abc.Callable[[str], float] | None = None)"
+    },
+    "ml4t.backtest.analytics.bridge:to_trade_records": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.bridge",
+      "qualname": "to_trade_records",
+      "signature": "(trades: 'list[Trade]') -> 'list[dict[str, Any]]'"
+    },
+    "ml4t.backtest.analytics:EquityCurve": {
+      "kind": "class",
+      "members": {
+        "__len__": {
+          "kind": "method",
+          "signature": "(self) -> 'int'"
+        },
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "append": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime', value: 'float') -> 'None'"
+        },
+        "cagr": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "cumulative_returns": {
+          "kind": "property",
+          "signature": "(self) -> 'np.ndarray'"
+        },
+        "drawdown_series": {
+          "kind": "method",
+          "signature": "(self) -> 'np.ndarray'"
+        },
+        "final_value": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "from_config": {
+          "kind": "method",
+          "signature": "(cls, config: 'BacktestConfig') -> 'EquityCurve'"
+        },
+        "initial_value": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "max_dd": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "max_drawdown_info": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[float, int, int]'"
+        },
+        "periods_per_year": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "returns": {
+          "kind": "property",
+          "signature": "(self) -> 'np.ndarray'"
+        },
+        "sharpe": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "sortino": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict'"
+        },
+        "total_return": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "volatility": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "years": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        }
+      },
+      "module": "ml4t.backtest.analytics.equity",
+      "qualname": "EquityCurve",
+      "signature": "(timestamps: 'list[datetime]' = <factory>, values: 'list[float]' = <factory>, periods_per_year_override: 'float | None' = None) -> None"
+    },
+    "ml4t.backtest.analytics:MAEMFEAnalyzer": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "distribution_data": {
+          "kind": "method",
+          "signature": "(self) -> dict[str, list[float]]"
+        },
+        "edge_ratio": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "efficiency": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mae_mean": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mae_median": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mae_percentile": {
+          "kind": "method",
+          "signature": "(self, q: float) -> float"
+        },
+        "mae_std": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mfe_mean": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mfe_median": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mfe_percentile": {
+          "kind": "method",
+          "signature": "(self, q: float) -> float"
+        },
+        "mfe_std": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "num_trades": {
+          "kind": "property",
+          "signature": "(self) -> int"
+        },
+        "optimal_exit_levels": {
+          "kind": "method",
+          "signature": "(self, stop_percentile: float = 90, target_percentile: float = 75) -> dict[str, float]"
+        },
+        "suggest_stop_loss": {
+          "kind": "method",
+          "signature": "(self, percentile: float = 90) -> float"
+        },
+        "suggest_take_profit": {
+          "kind": "method",
+          "signature": "(self, percentile: float = 75) -> float"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> dict"
+        }
+      },
+      "module": "ml4t.backtest.analytics.trades",
+      "qualname": "MAEMFEAnalyzer",
+      "signature": "(trades: collections.abc.Sequence['Trade']) -> None"
+    },
+    "ml4t.backtest.analytics:TradeAnalyzer": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "avg_bars_held": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "avg_cost_drag": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "avg_loss": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "avg_mae": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "avg_mfe": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "avg_trade": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "avg_win": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "by_asset": {
+          "kind": "method",
+          "signature": "(self, asset: str) -> 'TradeAnalyzer'"
+        },
+        "by_side": {
+          "kind": "method",
+          "signature": "(self, side: str) -> 'TradeAnalyzer'"
+        },
+        "by_symbol": {
+          "kind": "method",
+          "signature": "(self, symbol: str) -> 'TradeAnalyzer'"
+        },
+        "expectancy": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "gross_loss": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "gross_profit": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "gross_profit_factor": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "largest_loss": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "largest_win": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mae_recovery_ratio": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "mfe_capture_ratio": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "net_profit": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "num_losers": {
+          "kind": "property",
+          "signature": "(self) -> int"
+        },
+        "num_trades": {
+          "kind": "property",
+          "signature": "(self) -> int"
+        },
+        "num_winners": {
+          "kind": "property",
+          "signature": "(self) -> int"
+        },
+        "payoff_ratio": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "profit_factor": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> dict"
+        },
+        "total_commission": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "total_costs": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "total_fees": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "total_gross_pnl": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "total_slippage": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "win_rate": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        }
+      },
+      "module": "ml4t.backtest.analytics.trades",
+      "qualname": "TradeAnalyzer",
+      "signature": "(trades: collections.abc.Sequence['Trade']) -> None"
+    },
+    "ml4t.backtest.analytics:cagr": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.metrics",
+      "qualname": "cagr",
+      "signature": "(initial_value: float, final_value: float, years: float) -> float"
+    },
+    "ml4t.backtest.analytics:calmar_ratio": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.metrics",
+      "qualname": "calmar_ratio",
+      "signature": "(cagr_value: float, max_dd: float) -> float"
+    },
+    "ml4t.backtest.analytics:max_drawdown": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.metrics",
+      "qualname": "max_drawdown",
+      "signature": "(values: collections.abc.Sequence[float]) -> tuple[float, int, int]"
+    },
+    "ml4t.backtest.analytics:sharpe_ratio": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.metrics",
+      "qualname": "sharpe_ratio",
+      "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, risk_free_rate: float = 0.0, annualize: bool = True) -> float"
+    },
+    "ml4t.backtest.analytics:sortino_ratio": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.metrics",
+      "qualname": "sortino_ratio",
+      "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, risk_free_rate: float = 0.0, annualize: bool = True) -> float"
+    },
+    "ml4t.backtest.analytics:to_equity_dataframe": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.bridge",
+      "qualname": "to_equity_dataframe",
+      "signature": "(equity_history: 'list[float]', timestamps: 'list[Any] | None' = None) -> 'pl.DataFrame'"
+    },
+    "ml4t.backtest.analytics:to_returns_series": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.bridge",
+      "qualname": "to_returns_series",
+      "signature": "(equity_curve: 'list[float] | np.ndarray') -> 'pl.Series'"
+    },
+    "ml4t.backtest.analytics:to_trade_record": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.bridge",
+      "qualname": "to_trade_record",
+      "signature": "(trade: 'Trade') -> 'dict[str, Any]'"
+    },
+    "ml4t.backtest.analytics:to_trade_records": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.bridge",
+      "qualname": "to_trade_records",
+      "signature": "(trades: 'list[Trade]') -> 'list[dict[str, Any]]'"
+    },
+    "ml4t.backtest.analytics:volatility": {
+      "kind": "function",
+      "module": "ml4t.backtest.analytics.metrics",
+      "qualname": "volatility",
+      "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, annualize: bool = True) -> float"
+    },
+    "ml4t.backtest.config:BacktestConfig": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "describe": {
+          "kind": "method",
+          "signature": "(self) -> 'str'"
+        },
+        "from_assumptions": {
+          "kind": "method",
+          "signature": "(cls, *, broker: 'str', region: 'str', asset_class: 'str', plan: 'str', overrides: 'dict[str, Any] | None' = None, **config_overrides: 'Any') -> 'BacktestConfig'"
+        },
+        "from_dict": {
+          "kind": "method",
+          "signature": "(cls, data: 'dict', preset_name: 'str | None' = None, strict: 'bool' = True) -> 'BacktestConfig'"
+        },
+        "from_preset": {
+          "kind": "method",
+          "signature": "(cls, preset: 'str') -> 'BacktestConfig'"
+        },
+        "from_user_config": {
+          "kind": "method",
+          "signature": "(cls, *, config_dir: 'str | Path | None' = None, broker: 'str | None' = None, region: 'str | None' = None, asset_class: 'str | None' = None, plan: 'str | None' = None, **config_overrides: 'Any') -> 'BacktestConfig'"
+        },
+        "from_yaml": {
+          "kind": "method",
+          "signature": "(cls, path: 'str | Path') -> 'BacktestConfig'"
+        },
+        "get_effective_account_settings": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[bool, bool]'"
+        },
+        "get_effective_account_type": {
+          "kind": "method",
+          "signature": "(self) -> 'str'"
+        },
+        "merge_feed_spec": {
+          "kind": "method",
+          "signature": "(self, feed_spec: 'FeedSpec | Any | None') -> 'BacktestConfig'"
+        },
+        "resolved_calendar": {
+          "kind": "property",
+          "signature": "(self) -> 'str | None'"
+        },
+        "resolved_data_frequency": {
+          "kind": "property",
+          "signature": "(self) -> 'DataFrequency'"
+        },
+        "resolved_feed_spec": {
+          "kind": "property",
+          "signature": "(self) -> 'FeedSpec'"
+        },
+        "resolved_session_start_time": {
+          "kind": "property",
+          "signature": "(self) -> 'str | None'"
+        },
+        "resolved_timestamp_semantics": {
+          "kind": "property",
+          "signature": "(self) -> 'TimestampSemantics | None'"
+        },
+        "resolved_timezone": {
+          "kind": "property",
+          "signature": "(self) -> 'str'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict'"
+        },
+        "to_yaml": {
+          "kind": "method",
+          "signature": "(self, path: 'str | Path') -> 'None'"
+        },
+        "validate": {
+          "kind": "method",
+          "signature": "(self, warn: 'bool' = True) -> 'list[str]'"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "BacktestConfig",
+      "signature": "(*args: 'Any', **kwargs: 'Any')"
+    },
+    "ml4t.backtest.config:CommissionType": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "CommissionType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:ExecutionPrice": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "ExecutionPrice",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:FillOrdering": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "FillOrdering",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:InitialHwmSource": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "InitialHwmSource",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:LateAssetPolicy": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "LateAssetPolicy",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:MissingPricePolicy": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "MissingPricePolicy",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:RebalanceMode": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "RebalanceMode",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:ShareType": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "ShareType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:SlippageType": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "SlippageType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:SpreadConvention": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "SpreadConvention",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:TrailStopTiming": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "TrailStopTiming",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:WaterMarkSource": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "WaterMarkSource",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.execution.rebalancer:RebalanceConfig": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.execution.rebalancer",
+      "qualname": "RebalanceConfig",
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None) -> None"
+    },
+    "ml4t.backtest.execution.rebalancer:TargetWeightExecutor": {
+      "kind": "class",
+      "members": {
+        "execute": {
+          "kind": "method",
+          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None) -> 'list[Order]'"
+        },
+        "prepare_schedule": {
+          "kind": "method",
+          "signature": "(self, available_timestamps: 'Sequence[datetime] | pl.Series', *, feed_spec: 'FeedSpec | Any | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None) -> 'frozenset[datetime] | None'"
+        },
+        "preview": {
+          "kind": "method",
+          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker') -> 'list[dict]'"
+        },
+        "should_rebalance": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime') -> 'bool'"
+        }
+      },
+      "module": "ml4t.backtest.execution.rebalancer",
+      "qualname": "TargetWeightExecutor",
+      "signature": "(config: 'RebalanceConfig | None' = None)"
+    },
+    "ml4t.backtest.execution:LinearImpact": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, quantity: float, price: float, volume: float | None, is_buy: bool) -> float"
+        }
+      },
+      "module": "ml4t.backtest.execution.impact",
+      "qualname": "LinearImpact",
+      "signature": "(coefficient: float = 0.1, permanent_fraction: float = 0.5) -> None"
+    },
+    "ml4t.backtest.execution:NoImpact": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, quantity: float, price: float, volume: float | None, is_buy: bool) -> float"
+        }
+      },
+      "module": "ml4t.backtest.execution.impact",
+      "qualname": "NoImpact",
+      "signature": "() -> None"
+    },
+    "ml4t.backtest.execution:SquareRootImpact": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, quantity: float, price: float, volume: float | None, is_buy: bool) -> float"
+        }
+      },
+      "module": "ml4t.backtest.execution.impact",
+      "qualname": "SquareRootImpact",
+      "signature": "(coefficient: float = 0.5, volatility: float = 0.02, adv_factor: float = 1.0) -> None"
+    },
+    "ml4t.backtest.execution:VolumeParticipationLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, order_quantity: float, bar_volume: float | None, price: float) -> ml4t.backtest.execution.result.ExecutionResult"
+        }
+      },
+      "module": "ml4t.backtest.execution.limits",
+      "qualname": "VolumeParticipationLimit",
+      "signature": "(max_participation: float = 0.1, min_volume: float = 0.0) -> None"
+    },
+    "ml4t.backtest.models:CombinedCommission": {
+      "kind": "class",
+      "members": {
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, asset: str, quantity: float, price: float) -> float"
+        }
+      },
+      "module": "ml4t.backtest.models",
+      "qualname": "CombinedCommission",
+      "signature": "(percentage: float = 0.0, fixed: float = 0.0)"
+    },
+    "ml4t.backtest.models:TieredCommission": {
+      "kind": "class",
+      "members": {
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, asset: str, quantity: float, price: float) -> float"
+        }
+      },
+      "module": "ml4t.backtest.models",
+      "qualname": "TieredCommission",
+      "signature": "(tiers: list[tuple[float, float]])"
+    },
+    "ml4t.backtest.profiles:list_profiles": {
+      "kind": "function",
+      "module": "ml4t.backtest.profiles",
+      "qualname": "list_profiles",
+      "signature": "() -> 'list[str]'"
+    },
+    "ml4t.backtest.result:BacktestResult": {
+      "kind": "class",
+      "members": {
+        "__getitem__": {
+          "kind": "method",
+          "signature": "(self, key: 'str') -> 'Any'"
+        },
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self) -> 'str'"
+        },
+        "from_parquet": {
+          "kind": "method",
+          "signature": "(cls, path: 'str | Path', *, recovery: 'bool' = False) -> 'BacktestResult'"
+        },
+        "get": {
+          "kind": "method",
+          "signature": "(self, key: 'str', default: 'Any' = None) -> 'Any'"
+        },
+        "items": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "keys": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "to_daily_pnl": {
+          "kind": "method",
+          "signature": "(self, session_aligned: 'bool' = False) -> 'pl.DataFrame'"
+        },
+        "to_daily_returns": {
+          "kind": "method",
+          "signature": "(self, calendar: 'str | None' = None, session_aligned: 'bool | None' = None) -> 'pl.Series'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        "to_equity_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_fills_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_parquet": {
+          "kind": "method",
+          "signature": "(self, path: 'str | Path', include: 'list[str] | None' = None, compression: \"Literal['lz4', 'uncompressed', 'snappy', 'gzip', 'brotli', 'zstd']\" = 'zstd') -> 'dict[str, Path]'"
+        },
+        "to_portfolio_state_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_predictions_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_rejected_orders_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_returns_series": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.Series'"
+        },
+        "to_spec_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        "to_trade_records": {
+          "kind": "method",
+          "signature": "(self) -> 'list[dict[str, Any]]'"
+        },
+        "to_trades_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        }
+      },
+      "module": "ml4t.backtest.result",
+      "qualname": "BacktestResult",
+      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:BetaLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "BetaLimit",
+      "signature": "(max_beta: float = 1.5, min_beta: float = -0.5, action: str = 'warn', betas_key: str = 'asset_betas') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:CVaRLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "CVaRLimit",
+      "signature": "(threshold: float = 0.08, confidence_level: float = 0.95, lookback_days: int = 20, action: str = 'warn', returns_key: str = 'historical_returns') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:DailyLossLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "DailyLossLimit",
+      "signature": "(max_daily_loss_pct: float = 0.02, action: str = 'liquidate') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:FactorExposureLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "FactorExposureLimit",
+      "signature": "(factor_name: str = 'factor', max_exposure: float = 1.0, min_exposure: float = -1.0, action: str = 'warn', factor_key: str = 'factor_loadings') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:GrossExposureLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "GrossExposureLimit",
+      "signature": "(max_gross_exposure: float = 1.0, action: str = 'halt') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:MaxDrawdownLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "MaxDrawdownLimit",
+      "signature": "(max_drawdown: float = 0.2, action: str = 'liquidate', warn_threshold: float | None = None) -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:MaxExposureLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "MaxExposureLimit",
+      "signature": "(max_exposure_pct: float = 0.1, action: str = 'warn') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:MaxPositionsLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "MaxPositionsLimit",
+      "signature": "(max_positions: int = 10, action: str = 'halt') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:NetExposureLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "NetExposureLimit",
+      "signature": "(max_net_exposure: float = 1.0, min_net_exposure: float = -1.0, action: str = 'warn') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:SectorExposureLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "SectorExposureLimit",
+      "signature": "(max_sector_exposure: float = 0.3, action: str = 'warn', sectors_key: str = 'asset_sectors') -> None"
+    },
+    "ml4t.backtest.risk.portfolio.limits:VaRLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "VaRLimit",
+      "signature": "(threshold: float = 0.05, confidence_level: float = 0.95, lookback_days: int = 20, action: str = 'warn', returns_key: str = 'historical_returns') -> None"
+    },
+    "ml4t.backtest.risk.position:AllOf": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.composite",
+      "qualname": "AllOf",
+      "signature": "(rules: list[ml4t.backtest.risk.position.protocol.PositionRule]) -> None"
+    },
+    "ml4t.backtest.risk.position:AnyOf": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.composite",
+      "qualname": "AnyOf",
+      "signature": "(rules: list[ml4t.backtest.risk.position.protocol.PositionRule]) -> None"
+    },
+    "ml4t.backtest.risk.position:ScaledExit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        },
+        "reset": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.dynamic",
+      "qualname": "ScaledExit",
+      "signature": "(targets: list[tuple[float, float]], _triggered: set[float] = <factory>) -> None"
+    },
+    "ml4t.backtest.risk.position:SignalExit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.signal",
+      "qualname": "SignalExit",
+      "signature": "(signal_name: str = 'exit_signal', threshold: float = 0.0) -> None"
+    },
+    "ml4t.backtest.risk.position:TakeProfit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.static",
+      "qualname": "TakeProfit",
+      "signature": "(pct: float) -> None"
+    },
+    "ml4t.backtest.risk.position:TighteningTrailingStop": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.dynamic",
+      "qualname": "TighteningTrailingStop",
+      "signature": "(schedule: list[tuple[float, float]]) -> None"
+    },
+    "ml4t.backtest.risk.position:TimeExit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.static",
+      "qualname": "TimeExit",
+      "signature": "(max_bars: int) -> None"
+    },
+    "ml4t.backtest.risk.position:VolatilityStop": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        },
+        "reset": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.dynamic",
+      "qualname": "VolatilityStop",
+      "signature": "(multiplier: float = 2.0, atr_key: str = 'atr', use_entry_atr: bool = True, _entry_atr: float | None = None) -> None"
+    },
+    "ml4t.backtest.strategies.templates:LongShortStrategy": {
+      "kind": "class",
+      "members": {
+        "on_data": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime', data: 'dict[str, dict]', context: 'dict[str, Any]', broker: 'Broker') -> 'None'"
+        },
+        "on_prepare": {
+          "kind": "method",
+          "signature": "(self, broker: 'Any', timestamps: 'Sequence[datetime]', config: 'BacktestConfig | None' = None) -> 'None'"
+        },
+        "rank_assets": {
+          "kind": "method",
+          "signature": "(self, data: 'dict[str, dict]') -> 'tuple[list[str], list[str]]'"
+        }
+      },
+      "module": "ml4t.backtest.strategies.templates",
+      "qualname": "LongShortStrategy",
+      "signature": "() -> 'None'"
+    },
+    "ml4t.backtest.strategies.templates:MeanReversionStrategy": {
+      "kind": "class",
+      "members": {
+        "calculate_zscore": {
+          "kind": "method",
+          "signature": "(self, prices: 'list[float]', current: 'float') -> 'float | None'"
+        },
+        "on_data": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime', data: 'dict[str, dict]', context: 'dict[str, Any]', broker: 'Broker') -> 'None'"
+        }
+      },
+      "module": "ml4t.backtest.strategies.templates",
+      "qualname": "MeanReversionStrategy",
+      "signature": "() -> 'None'"
+    },
+    "ml4t.backtest.strategies.templates:MomentumStrategy": {
+      "kind": "class",
+      "members": {
+        "calculate_momentum": {
+          "kind": "method",
+          "signature": "(self, prices: 'list[float]') -> 'float'"
+        },
+        "on_data": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime', data: 'dict[str, dict]', context: 'dict[str, Any]', broker: 'Broker') -> 'None'"
+        }
+      },
+      "module": "ml4t.backtest.strategies.templates",
+      "qualname": "MomentumStrategy",
+      "signature": "() -> 'None'"
+    },
+    "ml4t.backtest.strategies.templates:SignalFollowingStrategy": {
+      "kind": "class",
+      "members": {
+        "on_data": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime', data: 'dict[str, dict]', context: 'dict[str, Any]', broker: 'Broker') -> 'None'"
+        },
+        "should_enter_long": {
+          "kind": "method",
+          "signature": "(self, signal: 'float') -> 'bool'"
+        },
+        "should_enter_short": {
+          "kind": "method",
+          "signature": "(self, signal: 'float') -> 'bool'"
+        },
+        "should_exit": {
+          "kind": "method",
+          "signature": "(self, signal: 'float') -> 'bool'"
+        }
+      },
+      "module": "ml4t.backtest.strategies.templates",
+      "qualname": "SignalFollowingStrategy",
+      "signature": "()"
+    },
+    "ml4t.backtest.types:ExecutionMode": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "ExecutionMode",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.types:OrderType": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.types",
+      "qualname": "OrderType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:ArtifactDiagnostic": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactDiagnostic",
+      "signature": "(code: 'str', component: 'str', message: 'str') -> None"
+    },
+    "ml4t.backtest:ArtifactError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactError",
+      "signature": null
+    },
+    "ml4t.backtest:ArtifactIncompleteError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactIncompleteError",
+      "signature": null
+    },
+    "ml4t.backtest:ArtifactManifestError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactManifestError",
+      "signature": null
+    },
+    "ml4t.backtest:ArtifactNotFoundError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactNotFoundError",
+      "signature": null
+    },
+    "ml4t.backtest:ArtifactReadError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactReadError",
+      "signature": null
+    },
+    "ml4t.backtest:ArtifactWriteError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "ArtifactWriteError",
+      "signature": null
+    },
+    "ml4t.backtest:AssetClass": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.types",
+      "qualname": "AssetClass",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:BacktestConfig": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "describe": {
+          "kind": "method",
+          "signature": "(self) -> 'str'"
+        },
+        "from_assumptions": {
+          "kind": "method",
+          "signature": "(cls, *, broker: 'str', region: 'str', asset_class: 'str', plan: 'str', overrides: 'dict[str, Any] | None' = None, **config_overrides: 'Any') -> 'BacktestConfig'"
+        },
+        "from_dict": {
+          "kind": "method",
+          "signature": "(cls, data: 'dict', preset_name: 'str | None' = None, strict: 'bool' = True) -> 'BacktestConfig'"
+        },
+        "from_preset": {
+          "kind": "method",
+          "signature": "(cls, preset: 'str') -> 'BacktestConfig'"
+        },
+        "from_user_config": {
+          "kind": "method",
+          "signature": "(cls, *, config_dir: 'str | Path | None' = None, broker: 'str | None' = None, region: 'str | None' = None, asset_class: 'str | None' = None, plan: 'str | None' = None, **config_overrides: 'Any') -> 'BacktestConfig'"
+        },
+        "from_yaml": {
+          "kind": "method",
+          "signature": "(cls, path: 'str | Path') -> 'BacktestConfig'"
+        },
+        "get_effective_account_settings": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[bool, bool]'"
+        },
+        "get_effective_account_type": {
+          "kind": "method",
+          "signature": "(self) -> 'str'"
+        },
+        "merge_feed_spec": {
+          "kind": "method",
+          "signature": "(self, feed_spec: 'FeedSpec | Any | None') -> 'BacktestConfig'"
+        },
+        "resolved_calendar": {
+          "kind": "property",
+          "signature": "(self) -> 'str | None'"
+        },
+        "resolved_data_frequency": {
+          "kind": "property",
+          "signature": "(self) -> 'DataFrequency'"
+        },
+        "resolved_feed_spec": {
+          "kind": "property",
+          "signature": "(self) -> 'FeedSpec'"
+        },
+        "resolved_session_start_time": {
+          "kind": "property",
+          "signature": "(self) -> 'str | None'"
+        },
+        "resolved_timestamp_semantics": {
+          "kind": "property",
+          "signature": "(self) -> 'TimestampSemantics | None'"
+        },
+        "resolved_timezone": {
+          "kind": "property",
+          "signature": "(self) -> 'str'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict'"
+        },
+        "to_yaml": {
+          "kind": "method",
+          "signature": "(self, path: 'str | Path') -> 'None'"
+        },
+        "validate": {
+          "kind": "method",
+          "signature": "(self, warn: 'bool' = True) -> 'list[str]'"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "BacktestConfig",
+      "signature": "(*args: 'Any', **kwargs: 'Any')"
+    },
+    "ml4t.backtest:BacktestResult": {
+      "kind": "class",
+      "members": {
+        "__getitem__": {
+          "kind": "method",
+          "signature": "(self, key: 'str') -> 'Any'"
+        },
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self) -> 'str'"
+        },
+        "from_parquet": {
+          "kind": "method",
+          "signature": "(cls, path: 'str | Path', *, recovery: 'bool' = False) -> 'BacktestResult'"
+        },
+        "get": {
+          "kind": "method",
+          "signature": "(self, key: 'str', default: 'Any' = None) -> 'Any'"
+        },
+        "items": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "keys": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "to_daily_pnl": {
+          "kind": "method",
+          "signature": "(self, session_aligned: 'bool' = False) -> 'pl.DataFrame'"
+        },
+        "to_daily_returns": {
+          "kind": "method",
+          "signature": "(self, calendar: 'str | None' = None, session_aligned: 'bool | None' = None) -> 'pl.Series'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        "to_equity_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_fills_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_parquet": {
+          "kind": "method",
+          "signature": "(self, path: 'str | Path', include: 'list[str] | None' = None, compression: \"Literal['lz4', 'uncompressed', 'snappy', 'gzip', 'brotli', 'zstd']\" = 'zstd') -> 'dict[str, Path]'"
+        },
+        "to_portfolio_state_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_predictions_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_rejected_orders_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        },
+        "to_returns_series": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.Series'"
+        },
+        "to_spec_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
+        "to_trade_records": {
+          "kind": "method",
+          "signature": "(self) -> 'list[dict[str, Any]]'"
+        },
+        "to_trades_dataframe": {
+          "kind": "method",
+          "signature": "(self) -> 'pl.DataFrame'"
+        }
+      },
+      "module": "ml4t.backtest.result",
+      "qualname": "BacktestResult",
+      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
+    },
+    "ml4t.backtest:Broker": {
+      "kind": "class",
+      "members": {
+        "buy": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', shares: 'float | None' = None, contracts: 'int | None' = None, amount: 'float | None' = None, dollars: 'float | None' = None, order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
+        },
+        "cancel_order": {
+          "kind": "method",
+          "signature": "(self, order_id: 'str') -> 'bool'"
+        },
+        "cash": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "clear_position_rules": {
+          "kind": "method",
+          "signature": "(self, asset: 'str | None' = None) -> 'None'"
+        },
+        "close_position": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, _options: 'SubmitOrderOptions | None' = None) -> 'Order | None'"
+        },
+        "configure_stats": {
+          "kind": "method",
+          "signature": "(self, recent_window_size: 'int | None' = None, track_session_stats: 'bool | None' = None, enabled: 'bool | None' = None, config: 'StatsConfig | None' = None) -> 'None'"
+        },
+        "equity": {
+          "kind": "method",
+          "signature": "(self) -> 'float'"
+        },
+        "evaluate_position_rules": {
+          "kind": "method",
+          "signature": "(self, *, skip_assets: 'set[str] | None' = None) -> 'list[Order]'"
+        },
+        "flatten_all_positions": {
+          "kind": "method",
+          "signature": "(self, reason: 'str', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
+        },
+        "from_config": {
+          "kind": "method",
+          "signature": "(cls, config: 'BacktestConfig', execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None) -> 'Broker'"
+        },
+        "get_account_value": {
+          "kind": "method",
+          "signature": "(self) -> 'float'"
+        },
+        "get_asset_stats": {
+          "kind": "method",
+          "signature": "(self, asset: 'str') -> 'AssetTradingStats'"
+        },
+        "get_available_size": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', side: 'OrderSide | None' = None) -> 'float | None'"
+        },
+        "get_buying_power": {
+          "kind": "method",
+          "signature": "(self) -> 'float'"
+        },
+        "get_cash": {
+          "kind": "method",
+          "signature": "(self) -> 'float'"
+        },
+        "get_contract_spec": {
+          "kind": "method",
+          "signature": "(self, asset: 'str') -> 'ContractSpec | None'"
+        },
+        "get_last_trade": {
+          "kind": "method",
+          "signature": "(self, asset: 'str | None' = None) -> 'Trade | None'"
+        },
+        "get_mark_price": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', *, quantity: 'float | None' = None, use_open: 'bool' = False) -> 'float | None'"
+        },
+        "get_multiplier": {
+          "kind": "method",
+          "signature": "(self, asset: 'str') -> 'float'"
+        },
+        "get_order": {
+          "kind": "method",
+          "signature": "(self, order_id: 'str') -> 'Order | None'"
+        },
+        "get_pending_orders": {
+          "kind": "method",
+          "signature": "(self, asset: 'str | None' = None) -> 'list[Order]'"
+        },
+        "get_position": {
+          "kind": "method",
+          "signature": "(self, asset: 'str') -> 'Position | None'"
+        },
+        "get_positions": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Position]'"
+        },
+        "get_price_for_source": {
+          "kind": "method",
+          "signature": "(self, source: 'ExecutionPrice', asset: 'str', *, side: 'OrderSide | None' = None, quantity: 'float | None' = None, use_open: 'bool' = False) -> 'float | None'"
+        },
+        "get_quote_context": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', side: 'OrderSide | None' = None) -> 'dict[str, float | None]'"
+        },
+        "get_quote_mid": {
+          "kind": "method",
+          "signature": "(self, asset: 'str') -> 'float | None'"
+        },
+        "get_rejected_orders": {
+          "kind": "method",
+          "signature": "(self, asset: 'str | None' = None) -> 'list[Order]'"
+        },
+        "get_trades": {
+          "kind": "method",
+          "signature": "(self, asset: 'str | None' = None, last_n: 'int | None' = None) -> 'list[Trade]'"
+        },
+        "last_rejection_reason": {
+          "kind": "property",
+          "signature": "(self) -> 'str | None'"
+        },
+        "mark_account_positions": {
+          "kind": "method",
+          "signature": "(self, use_open: 'bool' = False) -> 'None'"
+        },
+        "order_target_percent": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', target_percent: 'float', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
+        },
+        "order_target_value": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', target_value: 'float', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
+        },
+        "rebalance_to_weights": {
+          "kind": "method",
+          "signature": "(self, target_weights: 'dict[str, float]', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
+        },
+        "reduce_position": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', fraction: 'float', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
+        },
+        "sell": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', shares: 'float | None' = None, contracts: 'int | None' = None, amount: 'float | None' = None, dollars: 'float | None' = None, order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
+        },
+        "set_position_rules": {
+          "kind": "method",
+          "signature": "(self, rules: 'PositionRule | None', asset: 'str | None' = None) -> 'None'"
+        },
+        "set_session_config": {
+          "kind": "method",
+          "signature": "(self, config) -> 'None'"
+        },
+        "submit_bracket": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', quantity: 'float', take_profit: 'float', stop_loss: 'float', entry_type: 'OrderType' = <OrderType.MARKET: 'market'>, entry_limit: 'float | None' = None, validate_prices: 'bool' = True) -> 'tuple[Order, Order, Order] | None'"
+        },
+        "submit_order": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', quantity: 'float', side: 'OrderSide | None' = None, order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None, stop_price: 'float | None' = None, trail_amount: 'float | None' = None, _options: 'SubmitOrderOptions | None' = None) -> 'Order | None'"
+        },
+        "update_order": {
+          "kind": "method",
+          "signature": "(self, order_id: 'str', **kwargs) -> 'bool'"
+        },
+        "update_position_context": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', context: 'dict') -> 'None'"
+        }
+      },
+      "module": "ml4t.backtest.broker",
+      "qualname": "Broker",
+      "signature": "(initial_cash: 'float' = 100000.0, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, stop_slippage_rate: 'float' = 0.0, execution_mode: 'ExecutionMode' = <ExecutionMode.SAME_BAR: 'same_bar'>, execution_price: 'ExecutionPrice' = <ExecutionPrice.CLOSE: 'close'>, mark_price: 'ExecutionPrice' = <ExecutionPrice.PRICE: 'price'>, stop_fill_mode: 'StopFillMode' = <StopFillMode.STOP_PRICE: 'stop_price'>, stop_level_basis: 'StopLevelBasis' = <StopLevelBasis.FILL_PRICE: 'fill_price'>, trail_hwm_source: 'WaterMarkSource' = <WaterMarkSource.CLOSE: 'close'>, trail_include_entry_bar_extremes: 'bool' = False, initial_hwm_source: 'InitialHwmSource' = <InitialHwmSource.FILL_PRICE: 'fill_price'>, trail_stop_timing: 'TrailStopTiming' = <TrailStopTiming.LAGGED: 'lagged'>, allow_short_selling: 'bool' = False, allow_leverage: 'bool' = False, initial_margin: 'float' = 0.5, long_maintenance_margin: 'float' = 0.25, short_maintenance_margin: 'float' = 0.3, fixed_margin_schedule: 'dict[str, tuple[float, float]] | None' = None, margin_pct_schedule: 'dict[str, tuple[float, float]] | None' = None, short_cash_policy: 'ShortCashPolicy' = <ShortCashPolicy.CREDIT: 'credit'>, execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, share_type: 'ShareType' = <ShareType.INTEGER: 'integer'>, fill_ordering: 'FillOrdering' = <FillOrdering.EXIT_FIRST: 'exit_first'>, entry_order_priority: 'EntryOrderPriority' = <EntryOrderPriority.SUBMISSION: 'submission'>, next_bar_submission_precheck: 'bool' = False, next_bar_simple_cash_check: 'bool' = False, buying_power_reservation: 'bool' = False, next_bar_queue_shadow_validation: 'bool' = False, immediate_fill: 'bool' = False, reject_on_insufficient_cash: 'bool' = True, skip_cash_validation: 'bool' = False, cash_buffer_pct: 'float' = 0.0, partial_fills_allowed: 'bool' = False, rebalance_headroom_pct: 'float' = 1.0, missing_price_policy: 'MissingPricePolicy' = <MissingPricePolicy.SKIP: 'skip'>, late_asset_policy: 'LateAssetPolicy' = <LateAssetPolicy.ALLOW: 'allow'>, late_asset_min_bars: 'int' = 1, settlement_delay: 'int' = 0, settlement_reduces_buying_power: 'bool' = True)"
+    },
+    "ml4t.backtest:CommissionType": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "CommissionType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:ContractSpec": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "ContractSpec",
+      "signature": "(symbol: str, asset_class: ml4t.backtest.types.AssetClass = <AssetClass.EQUITY: 'equity'>, multiplier: float = 1.0, tick_size: float = 0.01, margin: float | None = None, margin_pct: tuple[float, float] | None = None, currency: str = 'USD') -> None"
+    },
+    "ml4t.backtest:DataFeed": {
+      "kind": "class",
+      "members": {
+        "__iter__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "__len__": {
+          "kind": "method",
+          "signature": "(self) -> int"
+        },
+        "__next__": {
+          "kind": "method",
+          "signature": "(self) -> tuple[datetime.datetime, dict[str, dict], dict[str, typing.Any]]"
+        },
+        "n_bars": {
+          "kind": "property",
+          "signature": "(self) -> int"
+        },
+        "timestamps": {
+          "kind": "property",
+          "signature": "(self) -> tuple[datetime.datetime, ...]"
+        }
+      },
+      "module": "ml4t.backtest.datafeed",
+      "qualname": "DataFeed",
+      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None)"
+    },
+    "ml4t.backtest:Engine": {
+      "kind": "class",
+      "members": {
+        "from_config": {
+          "kind": "method",
+          "signature": "(cls, feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig', *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None) -> 'Engine'"
+        },
+        "run": {
+          "kind": "method",
+          "signature": "(self) -> 'BacktestResult'"
+        },
+        "run_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "module": "ml4t.backtest.engine",
+      "qualname": "Engine",
+      "signature": "(feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig | None' = None, *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None)"
+    },
+    "ml4t.backtest:ExecutionMode": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "ExecutionMode",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:ExitReason": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "ExitReason",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:Fill": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "Fill",
+      "signature": "(order_id: str, asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, price: float, timestamp: datetime.datetime, rebalance_id: str | None = None, commission: float = 0.0, slippage: float = 0.0, order_type: str = '', limit_price: float | None = None, stop_price: float | None = None, price_source: str = '', reference_price: float | None = None, quote_mid_price: float | None = None, bid_price: float | None = None, ask_price: float | None = None, spread: float | None = None, bid_size: float | None = None, ask_size: float | None = None, available_size: float | None = None, exit_reason: str = '', exit_reason_detail: str | None = None) -> None"
+    },
+    "ml4t.backtest:Order": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "reject": {
+          "kind": "method",
+          "signature": "(self, reason: str, code: str) -> None"
+        },
+        "rejection_code": {
+          "kind": "property",
+          "signature": "(self) -> str | None"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "Order",
+      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None, _submitted_before_risk: bool = False, _submitted_from_flat: bool = False) -> None"
+    },
+    "ml4t.backtest:OrderSide": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.types",
+      "qualname": "OrderSide",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:OrderStatus": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.types",
+      "qualname": "OrderStatus",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:OrderType": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.types",
+      "qualname": "OrderType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:Position": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self) -> str"
+        },
+        "market_value": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "notional_value": {
+          "kind": "method",
+          "signature": "(self, current_price: float | None = None) -> float"
+        },
+        "pnl_percent": {
+          "kind": "method",
+          "signature": "(self, current_price: float | None = None) -> float"
+        },
+        "side": {
+          "kind": "property",
+          "signature": "(self) -> str"
+        },
+        "unrealized_pnl": {
+          "kind": "method",
+          "signature": "(self, current_price: float | None = None) -> float"
+        },
+        "update_water_marks": {
+          "kind": "method",
+          "signature": "(self, current_price: float, bar_high: float | None = None, bar_low: float | None = None, use_high_for_hwm: bool = False, use_low_for_lwm: bool = False) -> None"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "Position",
+      "signature": "(asset: str, quantity: float, entry_price: float, entry_time: datetime.datetime, current_price: float | None = None, bars_held: int = 0, high_water_mark: float | None = None, low_water_mark: float | None = None, max_favorable_excursion: float = 0.0, max_adverse_excursion: float = 0.0, initial_quantity: float | None = None, context: dict = <factory>, multiplier: float = 1.0, entry_commission: float = 0.0, entry_slippage: float = 0.0) -> None"
+    },
+    "ml4t.backtest:RebalanceCadence": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.execution.schedule",
+      "qualname": "RebalanceCadence",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:RebalanceConfig": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.execution.rebalancer",
+      "qualname": "RebalanceConfig",
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None) -> None"
+    },
+    "ml4t.backtest:RebalanceSchedule": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "every_bar": {
+          "kind": "method",
+          "signature": "(cls) -> 'RebalanceSchedule'"
+        },
+        "every_session": {
+          "kind": "method",
+          "signature": "(cls) -> 'RebalanceSchedule'"
+        },
+        "explicit_timestamps": {
+          "kind": "method",
+          "signature": "(cls, timestamps: 'Sequence[datetime]') -> 'RebalanceSchedule'"
+        },
+        "fixed_n_sessions": {
+          "kind": "method",
+          "signature": "(cls, n: 'int') -> 'RebalanceSchedule'"
+        },
+        "month_end": {
+          "kind": "method",
+          "signature": "(cls) -> 'RebalanceSchedule'"
+        },
+        "weekly": {
+          "kind": "method",
+          "signature": "(cls) -> 'RebalanceSchedule'"
+        }
+      },
+      "module": "ml4t.backtest.execution.schedule",
+      "qualname": "RebalanceSchedule",
+      "signature": "(cadence: 'RebalanceCadence' = <RebalanceCadence.EVERY_BAR: 'every_bar'>, every_n: 'int' = 1, timestamps: 'tuple[datetime, ...]' = ()) -> None"
+    },
+    "ml4t.backtest:RuleChain": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.composite",
+      "qualname": "RuleChain",
+      "signature": "(rules: list[ml4t.backtest.risk.position.protocol.PositionRule]) -> None"
+    },
+    "ml4t.backtest:StopFillMode": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "StopFillMode",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:StopLevelBasis": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "StopLevelBasis",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:StopLoss": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.static",
+      "qualname": "StopLoss",
+      "signature": "(pct: float) -> None"
+    },
+    "ml4t.backtest:Strategy": {
+      "kind": "class",
+      "members": {
+        "on_before_risk": {
+          "kind": "method",
+          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, typing.Any], broker: Any) -> None"
+        },
+        "on_data": {
+          "kind": "method",
+          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, typing.Any], broker: Any) -> None"
+        },
+        "on_end": {
+          "kind": "method",
+          "signature": "(self, broker: Any) -> None"
+        },
+        "on_prepare": {
+          "kind": "method",
+          "signature": "(self, broker: Any, timestamps: collections.abc.Sequence[datetime.datetime], config: Any | None = None) -> None"
+        },
+        "on_start": {
+          "kind": "method",
+          "signature": "(self, broker: Any) -> None"
+        }
+      },
+      "module": "ml4t.backtest.strategy",
+      "qualname": "Strategy",
+      "signature": "()"
+    },
+    "ml4t.backtest:TakeProfit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.static",
+      "qualname": "TakeProfit",
+      "signature": "(pct: float) -> None"
+    },
+    "ml4t.backtest:TargetWeightExecutor": {
+      "kind": "class",
+      "members": {
+        "execute": {
+          "kind": "method",
+          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None) -> 'list[Order]'"
+        },
+        "prepare_schedule": {
+          "kind": "method",
+          "signature": "(self, available_timestamps: 'Sequence[datetime] | pl.Series', *, feed_spec: 'FeedSpec | Any | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None) -> 'frozenset[datetime] | None'"
+        },
+        "preview": {
+          "kind": "method",
+          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker') -> 'list[dict]'"
+        },
+        "should_rebalance": {
+          "kind": "method",
+          "signature": "(self, timestamp: 'datetime') -> 'bool'"
+        }
+      },
+      "module": "ml4t.backtest.execution.rebalancer",
+      "qualname": "TargetWeightExecutor",
+      "signature": "(config: 'RebalanceConfig | None' = None)"
+    },
+    "ml4t.backtest:Trade": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "commission": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "cost_drag": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "direction": {
+          "kind": "property",
+          "signature": "(self) -> str"
+        },
+        "gross_pnl": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "gross_return": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "is_open": {
+          "kind": "property",
+          "signature": "(self) -> bool"
+        },
+        "net_pnl": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "net_return": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "total_slippage_cost": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        }
+      },
+      "module": "ml4t.backtest.types",
+      "qualname": "Trade",
+      "signature": "(symbol: str, entry_time: datetime.datetime, exit_time: datetime.datetime, entry_price: float, exit_price: float, quantity: float, pnl: float, pnl_percent: float, bars_held: int, fees: float = 0.0, exit_slippage: float = 0.0, exit_reason: str = 'signal', exit_reason_detail: str | None = None, status: str = 'closed', mfe: float = 0.0, mae: float = 0.0, entry_slippage: float = 0.0, multiplier: float = 1.0, entry_quote_mid_price: float | None = None, entry_bid_price: float | None = None, entry_ask_price: float | None = None, entry_spread: float | None = None, entry_available_size: float | None = None, exit_quote_mid_price: float | None = None, exit_bid_price: float | None = None, exit_ask_price: float | None = None, exit_spread: float | None = None, exit_available_size: float | None = None, metadata: dict[str, Any] | None = None) -> None"
+    },
+    "ml4t.backtest:TrailingStop": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.dynamic",
+      "qualname": "TrailingStop",
+      "signature": "(pct: float) -> None"
+    },
+    "ml4t.backtest:UnsupportedArtifactVersionError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.result",
+      "qualname": "UnsupportedArtifactVersionError",
+      "signature": null
+    },
+    "ml4t.backtest:resolve_rebalance_timestamps": {
+      "kind": "function",
+      "module": "ml4t.backtest.execution.schedule",
+      "qualname": "resolve_rebalance_timestamps",
+      "signature": "(available_timestamps: 'Sequence[datetime] | pl.Series', schedule: 'RebalanceSchedule | RebalanceCadence | str', *, feed_spec: 'FeedSpec | Any | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'Any | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> 'pl.Series'"
+    },
+    "ml4t.backtest:run_backtest": {
+      "kind": "function",
+      "module": "ml4t.backtest.engine",
+      "qualname": "run_backtest",
+      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None) -> 'BacktestResult'"
+    }
+  }
+}

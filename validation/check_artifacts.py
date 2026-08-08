@@ -12,6 +12,10 @@ _ROOT = Path(__file__).parents[1]
 _PACKAGE = _ROOT / "src" / "ml4t" / "backtest"
 _TESTS = _ROOT / "tests"
 _INTERNAL_NAMES = {"AGENTS.md", "CLAUDE.md"}
+_APPROVED_TEST_DATA = (
+    _TESTS / "compatibility" / "snapshots",
+    _TESTS / "fixtures" / "artifacts",
+)
 
 
 def _python_files(root: Path) -> set[str]:
@@ -19,6 +23,16 @@ def _python_files(root: Path) -> set[str]:
         path.relative_to(_ROOT).as_posix()
         for path in root.rglob("*.py")
         if "__pycache__" not in path.parts
+    }
+
+
+def _data_files(root: Path) -> set[str]:
+    if not root.is_dir():
+        return set()
+    return {
+        path.relative_to(_ROOT).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
     }
 
 
@@ -78,6 +92,7 @@ def artifact_failures(directory: Path) -> list[str]:
     expected_sdist = (
         _python_files(_PACKAGE)
         | _python_files(_TESTS)
+        | set().union(*(_data_files(path) for path in _APPROVED_TEST_DATA))
         | {
             ".gitignore",
             "CHANGELOG.md",
