@@ -185,26 +185,33 @@ def _broker_private_assignments() -> set[str]:
     return _private_state_names(broker_class)
 
 
-def _broker_collection_access(node: ast.AST) -> str | None:
+def _direct_broker_collection_access(node: ast.AST) -> str | None:
     if (
         isinstance(node, ast.Attribute)
         and node.attr in BROKER_MUTABLE_COLLECTIONS
         and _references_broker(node.value)
     ):
         return node.attr
+    return None
+
+
+def _broker_collection_access(node: ast.AST) -> str | None:
+    if (collection := _direct_broker_collection_access(node)) is not None:
+        return collection
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
         for element in node.elts:
             if (collection := _broker_collection_access(element)) is not None:
                 return collection
     if isinstance(node, ast.Dict):
-        for element in [*node.keys, *node.values]:
-            if (
-                element is not None
-                and (collection := _broker_collection_access(element)) is not None
-            ):
+        for key, value in zip(node.keys, node.values, strict=True):
+            if key is not None and (collection := _broker_collection_access(key)) is not None:
+                return collection
+            if key is None and _direct_broker_collection_access(value) is not None:
+                continue
+            if (collection := _broker_collection_access(value)) is not None:
                 return collection
     if isinstance(node, ast.Starred):
-        return _broker_collection_access(node.value)
+        return None
     if isinstance(node, ast.IfExp):
         return _broker_collection_access(node.body) or _broker_collection_access(node.orelse)
     if isinstance(node, ast.BoolOp):
@@ -242,9 +249,11 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
         if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_READ_CALLS:
             for keyword in node.keywords:
                 if (
-                    keyword.arg is not None
-                    and (collection := _broker_collection_access(keyword.value)) is not None
+                    keyword.arg is None
+                    and _direct_broker_collection_access(keyword.value) is not None
                 ):
+                    continue
+                if (collection := _broker_collection_access(keyword.value)) is not None:
                     return collection
             return None
         method_path = _attribute_path(node.func)
@@ -255,10 +264,12 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
             and _references_broker(node.func.value)
         ):
             return None
-        for argument in [
-            *node.args,
-            *(keyword.value for keyword in node.keywords if keyword.arg is not None),
-        ]:
+        arguments = [*node.args]
+        for keyword in node.keywords:
+            if keyword.arg is None and _direct_broker_collection_access(keyword.value) is not None:
+                continue
+            arguments.append(keyword.value)
+        for argument in arguments:
             if (collection := _broker_collection_access(argument)) is not None:
                 return collection
     if (
@@ -388,10 +399,20 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
     ]
 
 
-def test_mutable_collection_contract_allows_keyword_unpacking() -> None:
-    tree = ast.parse("helper(**broker.positions)")
+def test_mutable_collection_contract_allows_argument_unpacking() -> None:
+    tree = ast.parse(
+        "def copies():\n"
+        "    helper(*broker.fills, **broker.positions)\n"
+        "    return dict(**broker.positions), [*broker.fills], {**broker.positions}\n"
+    )
 
     assert all(_mutable_collection_access(node) is None for node in ast.walk(tree))
+
+
+def test_mutable_collection_contract_follows_nested_keyword_unpacking() -> None:
+    call = ast.parse("helper(**{'data': broker.fills})").body[0].value
+
+    assert _mutable_collection_access(call) == "fills"
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
