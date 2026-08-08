@@ -6,7 +6,7 @@ import pytest
 from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.broker import Broker
-from ml4t.backtest.config import ShareType
+from ml4t.backtest.config import ExecutionPrice, InitialHwmSource, ShareType
 from ml4t.backtest.models import NoCommission, NoSlippage, PercentageCommission
 from ml4t.backtest.types import (
     ExecutionMode,
@@ -114,6 +114,34 @@ class TestBrokerBasics:
         assert broker.get_last_price("AAPL") == 100.0
         assert broker.get_last_price("MSFT") is None
 
+    def test_bar_close_initializes_both_water_marks(self):
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            execution_price=ExecutionPrice.PRICE,
+            initial_hwm_source=InitialHwmSource.BAR_CLOSE,
+        )
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1, 9, 30),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 99.0},
+            highs={"AAPL": 105.0},
+            lows={"AAPL": 95.0},
+            closes={"AAPL": 102.0},
+            volumes={"AAPL": 1_000_000.0},
+            signals={},
+        )
+
+        broker.submit_order("AAPL", 10.0, OrderSide.BUY)
+        broker._process_orders()
+
+        position = broker.get_position("AAPL")
+        assert position is not None
+        assert position.entry_price == 100.0
+        assert position.high_water_mark == 102.0
+        assert position.low_water_mark == 102.0
+
 
 class TestOrderManagement:
     """Test order management methods."""
@@ -134,6 +162,16 @@ class TestOrderManagement:
         assert order is not None
         assert order.order_type == OrderType.LIMIT
         assert order.limit_price == 145.0
+
+    def test_limit_fill_requires_limit_price(self, broker):
+        order = Order(
+            asset="AAPL",
+            side=OrderSide.BUY,
+            quantity=10.0,
+            order_type=OrderType.LIMIT,
+        )
+
+        assert broker._fill_engine.check_limit_fill(order, high=101.0, low=99.0) is None
 
     def test_submit_stop_order(self, broker):
         """Test submitting a stop order."""
@@ -1631,6 +1669,33 @@ class TestEvaluatePositionRules:
         assert broker._pending_exits["AAPL"]["reason"] == "stop_loss_5.0%"
         assert broker._pending_exits["AAPL"]["pct"] == 1.0
 
+    def test_evaluate_position_rules_exit_partial_deferred(self):
+        from ml4t.backtest.risk.types import ActionType, PositionAction
+
+        class DeferredPartialExit:
+            def evaluate(self, _state):
+                return PositionAction(
+                    action=ActionType.EXIT_PARTIAL,
+                    pct=0.25,
+                    fill_price=95.0,
+                    reason="deferred_partial",
+                    defer_fill=True,
+                )
+
+        broker = Broker(100000.0, NoCommission(), NoSlippage())
+        broker.set_position_rules(DeferredPartialExit())
+        mark_prices(broker, {"AAPL": 100.0})
+        broker.submit_order("AAPL", 100.0, OrderSide.BUY)
+        broker._process_orders()
+
+        assert broker.evaluate_position_rules() == []
+        assert broker._pending_exits["AAPL"] == {
+            "reason": "deferred_partial",
+            "pct": 0.25,
+            "quantity": 25.0,
+            "fill_price": 95.0,
+        }
+
     def test_evaluate_position_rules_no_rules(self):
         """Test evaluate_position_rules with no rules set."""
         broker = Broker(100000.0, NoCommission(), NoSlippage())
@@ -2454,6 +2519,15 @@ class TestConvenienceMethods:
         # 10% of 100k = 10k, at $100/share = 100 shares
         assert abs(order.quantity - 100.0) < 0.01
         assert order.side == OrderSide.BUY
+
+    def test_order_target_percent_requires_positive_account_value(self):
+        broker = Broker(0.0, NoCommission(), NoSlippage())
+        mark_prices(broker, {"AAPL": 100.0})
+
+        assert broker.order_target_percent("AAPL", 0.10) is None
+
+    def test_order_target_percent_requires_positive_price(self, broker):
+        assert broker.order_target_percent("AAPL", 0.10) is None
 
     def test_order_target_percent_increase_position(self, broker_with_position):
         """Test order_target_percent increases existing position."""

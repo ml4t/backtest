@@ -30,6 +30,7 @@ from ml4t.backtest.config import (
     SlippageType,
     SpreadConvention,
 )
+from ml4t.backtest.execution.limits import VolumeParticipationLimit
 from ml4t.backtest.models import (
     CombinedCommission,
     NoCommission,
@@ -976,6 +977,25 @@ class TestImmediateFill:
         assert order.status.value == "filled"
         assert broker.get_position("AAPL") is None
         assert broker.cash == 10_000.0
+
+    def test_immediate_fill_exit_preserves_unfilled_quantity(self):
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            execution_limits=VolumeParticipationLimit(max_participation=0.5),
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+        broker._current_volumes = {"AAPL": 1_000.0}
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+
+        broker._current_volumes = {"AAPL": 100.0}
+        order = broker.submit_order("AAPL", 100, OrderSide.SELL)
+
+        assert order is not None
+        assert order.status.value == "pending"
+        assert order.quantity == 50.0
+        assert broker.get_position("AAPL").quantity == 50.0
 
     def test_immediate_fill_sequential_cash_tracking(self):
         """Each fill updates cash before the next submit sees it."""
