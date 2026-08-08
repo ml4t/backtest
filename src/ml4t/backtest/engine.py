@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
+import inspect
 import warnings
 from datetime import date, datetime
 from math import ceil
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
+from ml4t.specs import (
+    LIFECYCLE_V1,
+    HistoricalStrategyCompatibilityError,
+    LifecyclePhase,
+    LifecycleVersion,
+    negotiate_lifecycle_version,
+)
 
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
 from .broker import Broker
 from .config import DataFrequency
 from .datafeed import DataFeed
+from .lifecycle import LifecycleDispatcher
 from .strategy import Strategy
 from .types import ExecutionMode, OrderSide, OrderType
 
@@ -78,9 +87,12 @@ class Engine:
         contract_specs: dict[str, Any] | None = None,
         market_impact_model: Any | None = None,
         execution_limits: Any | None = None,
+        lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     ):
         from .config import BacktestConfig as ConfigCls
 
+        negotiated_version = negotiate_lifecycle_version(lifecycle_version)
+        self._validate_strategy_lifecycle(strategy)
         if config is None:
             config = ConfigCls()
 
@@ -88,6 +100,7 @@ class Engine:
         self.strategy = strategy
         self.config = config.merge_feed_spec(getattr(feed, "feed_spec", None))
         self.execution_mode = self.config.execution_mode
+        self.lifecycle_version = negotiated_version
         self.broker = Broker.from_config(
             self.config,
             contract_specs=contract_specs,
@@ -96,6 +109,9 @@ class Engine:
         )
         self.equity_curve: list[tuple[datetime, float]] = []
         self.portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
+        self.lifecycle_dispatcher = LifecycleDispatcher(strategy, LIFECYCLE_V1)
+        self._strategy_finalized = False
+        self._market_event_count = 0
 
         # Calendar session enforcement (lazy initialized in run())
         self._calendar = None
@@ -244,8 +260,17 @@ class Engine:
                 for index in filtered["__feed_bar_index"]:
                     valid_intraday_bar_mask[index] = 1
 
-        self.strategy.on_prepare(self.broker, timestamps, self.config)
-        self.strategy.on_start(self.broker)
+        self.lifecycle_dispatcher.dispatch(
+            LifecyclePhase.RUN_START,
+            self.broker,
+            self.broker,
+        )
+        self.lifecycle_dispatcher.dispatch(
+            LifecyclePhase.CAUSAL_INITIALIZATION,
+            self.broker,
+            self.broker,
+            self.config,
+        )
 
         for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
@@ -349,36 +374,14 @@ class Engine:
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits
             self.broker._process_pending_exits()
 
-            pre_risk_opened_assets: set[str] = set()
-            if self.execution_mode == ExecutionMode.NEXT_BAR:
-                # Fill only prior market entries submitted from a flat position by
-                # this callback. Other orders retain the configured ordered batch.
-                positions_before = set(self.broker.positions)
-                self.broker._process_orders(
-                    use_open=True,
-                    order_types={OrderType.MARKET},
-                    only_pre_risk_flat_entries=True,
-                    defer_policy_rejections=True,
-                )
-                pre_risk_opened_assets = set(self.broker.positions) - positions_before
-
-            # Optional strategy phase. SAME_BAR immediate fills can receive current-bar
-            # risk; NEXT_BAR entries retain next-bar risk timing.
-            self.broker._submitting_before_risk = True
-            try:
-                self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
-            finally:
-                self.broker._submitting_before_risk = False
-
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
-            self.broker.evaluate_position_rules(skip_assets=pre_risk_opened_assets)
+            self.broker.evaluate_position_rules()
 
             if self.execution_mode == ExecutionMode.NEXT_BAR:
-                # Process same-cycle risk exits. Ordinary orders created by
-                # on_before_risk remain ineligible until the next bar.
+                # Process same-cycle risk exits before ordinary strategy decisions.
                 self.broker._process_orders(use_open=True)
                 # Strategy generates new orders
-                self.strategy.on_data(timestamp, assets_data, context, self.broker)
+                self._dispatch_market_event(timestamp, assets_data, context)
                 # MOC orders are the one next-bar exception: they execute on the
                 # current session close after strategy logic runs.
                 self.broker._process_orders(
@@ -388,7 +391,7 @@ class Engine:
             else:
                 # Same-bar mode: process before and after strategy
                 self.broker._process_orders()
-                self.strategy.on_data(timestamp, assets_data, context, self.broker)
+                self._dispatch_market_event(timestamp, assets_data, context)
                 self.broker._process_orders()
 
             # Update water marks at END of bar, AFTER all orders processed
@@ -398,8 +401,69 @@ class Engine:
 
             self._record_portfolio_state(timestamp)
 
-        self.strategy.on_end(self.broker)
+        self._finalize_strategy()
+        self.lifecycle_dispatcher.validate_completed_run(self._market_event_count)
         return self._generate_results()
+
+    @staticmethod
+    def _validate_strategy_lifecycle(strategy: Strategy) -> None:
+        strategy_type = type(strategy)
+        if getattr(strategy_type, "on_before_risk", None) is not None:
+            raise HistoricalStrategyCompatibilityError(
+                strategy_type.__name__,
+                "on_before_risk",
+                LifecyclePhase.PRE_OPEN,
+            )
+        parameters = tuple(inspect.signature(strategy_type.on_prepare).parameters.values())
+        positional = tuple(
+            parameter
+            for parameter in parameters
+            if parameter.kind
+            in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        )
+        if any(parameter.name == "timestamps" for parameter in parameters) or len(positional) > 3:
+            raise HistoricalStrategyCompatibilityError(
+                strategy_type.__name__,
+                "on_prepare(timestamps)",
+                LifecyclePhase.CAUSAL_INITIALIZATION,
+            )
+
+    def _dispatch_market_event(
+        self,
+        timestamp: datetime,
+        assets_data: Any,
+        context: dict[str, Any],
+    ) -> None:
+        try:
+            self.lifecycle_dispatcher.dispatch(
+                LifecyclePhase.MARKET_EVENT,
+                self.broker,
+                timestamp,
+                assets_data,
+                context,
+                self.broker,
+                event_time=timestamp,
+            )
+            self._market_event_count += 1
+        except BaseException as failure:
+            try:
+                self._finalize_strategy()
+            except BaseException as finalization_failure:
+                failure.add_note(
+                    "on_end also failed during cleanup: "
+                    f"{type(finalization_failure).__name__}: {finalization_failure}"
+                )
+            raise
+
+    def _finalize_strategy(self) -> None:
+        if self._strategy_finalized:
+            return
+        self.lifecycle_dispatcher.dispatch(
+            LifecyclePhase.RUN_END,
+            self.broker,
+            self.broker,
+        )
+        self._strategy_finalized = True
 
     def run_dict(self) -> dict[str, Any]:
         """Run backtest and return dictionary (backward compatible).
@@ -651,6 +715,7 @@ class Engine:
         contract_specs: dict[str, Any] | None = None,
         market_impact_model: Any | None = None,
         execution_limits: Any | None = None,
+        lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     ) -> Engine:
         """Create an Engine instance from a BacktestConfig.
 
@@ -675,6 +740,7 @@ class Engine:
             contract_specs=contract_specs,
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
+            lifecycle_version=lifecycle_version,
         )
 
 
@@ -693,6 +759,7 @@ def run_backtest(
     contract_specs: dict[str, Any] | None = None,
     market_impact_model: Any | None = None,
     execution_limits: Any | None = None,
+    lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
 ) -> BacktestResult:
     """Run a backtest with minimal setup.
 
@@ -749,4 +816,5 @@ def run_backtest(
         contract_specs=contract_specs,
         market_impact_model=market_impact_model,
         execution_limits=execution_limits,
+        lifecycle_version=lifecycle_version,
     ).run()

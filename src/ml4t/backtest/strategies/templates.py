@@ -8,13 +8,12 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import defaultdict
-from collections.abc import Sequence
 from datetime import datetime
 from statistics import mean, stdev
 from typing import TYPE_CHECKING, Any
 
 from ..config import ShareType
-from ..execution.schedule import RebalanceSchedule, resolve_rebalance_timestamps
+from ..execution.schedule import RebalanceSchedule, is_rebalance_timestamp
 from ..strategy import Strategy
 
 if TYPE_CHECKING:
@@ -336,29 +335,15 @@ class LongShortStrategy(Strategy):
 
     def __init__(self) -> None:
         self.bar_count = 0
-        self._resolved_schedule: frozenset[datetime] | None = None
+        self._schedule_config: BacktestConfig | None = None
 
     def on_prepare(
         self,
         broker: Any,
-        timestamps: Sequence[datetime],
         config: BacktestConfig | None = None,
     ) -> None:
-        """Resolve optional schedule-based rebalance gating before the run starts."""
-        if self.rebalance_schedule is None:
-            self._resolved_schedule = None
-            return
-        calendar = config.resolved_calendar if config is not None else None
-        timezone = config.resolved_timezone if config is not None else "UTC"
-        feed_spec = config.resolved_feed_spec if config is not None else None
-        resolved = resolve_rebalance_timestamps(
-            timestamps,
-            self.rebalance_schedule,
-            feed_spec=feed_spec,
-            calendar=calendar,
-            timezone=timezone,
-        )
-        self._resolved_schedule = frozenset(resolved.to_list())
+        """Retain causal calendar metadata for online schedule evaluation."""
+        self._schedule_config = config
 
     def rank_assets(self, data: dict[str, dict]) -> tuple[list[str], list[str]]:
         """Rank assets by signal and return long/short lists.
@@ -403,9 +388,14 @@ class LongShortStrategy(Strategy):
         self.bar_count += 1
 
         if self.rebalance_schedule is not None:
-            if self._resolved_schedule is None:
+            if self._schedule_config is None:
                 raise ValueError("rebalance_schedule is set but was not prepared before execution")
-            if timestamp not in self._resolved_schedule:
+            if not is_rebalance_timestamp(
+                timestamp,
+                self.rebalance_schedule,
+                session_index=self.bar_count,
+                calendar=self._schedule_config.resolved_calendar,
+            ):
                 return
         elif self.bar_count % self.rebalance_frequency != 1:
             return

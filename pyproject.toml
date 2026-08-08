@@ -30,6 +30,9 @@ include = [
     "/CHANGELOG.md",
 ]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [project]
 name = "ml4t-backtest"
 dynamic = ["version"]
@@ -75,7 +78,7 @@ requires-python = ">=3.12"
 
 # Core dependencies
 dependencies = [
-    "ml4t-specs>=0.1.0",
+    "ml4t-specs @ git+https://github.com/ml4t/specs.git@d922cf7d831a2a704143fb27bd9f9d507219ccbb",
     "polars>=1.36.1",
     "pandas>=2.3.3; python_version < '3.15'",
     "pandas>=3.0.5; python_version >= '3.15'",
