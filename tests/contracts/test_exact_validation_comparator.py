@@ -208,15 +208,26 @@ def test_terminal_value_uses_exact_microdollar_representation() -> None:
     assert different["passed"] is False
 
 
+def _replace_column(result, attribute: str, column: str, values: list[float]) -> None:
+    frame = getattr(result, attribute)
+    frame.loc[:, column] = values
+
+
 @pytest.mark.parametrize(
     ("check_name", "mutate"),
     [
         (
             "order_intents",
-            lambda result: result.target_trace_df.__setitem__("target", [11.0]),
+            lambda result: _replace_column(result, "target_trace_df", "target", [11.0]),
         ),
-        ("fills", lambda result: result.fills_df.__setitem__("price", [100.0, 101.01])),
-        ("trades", lambda result: result.trades_df.__setitem__("pnl", [9.99])),
+        (
+            "fills",
+            lambda result: _replace_column(result, "fills_df", "price", [100.0, 101.01]),
+        ),
+        (
+            "trades",
+            lambda result: _replace_column(result, "trades_df", "pnl", [9.99]),
+        ),
         ("trade_count", lambda result: setattr(result, "num_trades", 2)),
         ("total_pnl", lambda result: setattr(result, "final_value", 100_019.46)),
     ],

@@ -17,13 +17,12 @@ def load_vectorbt_package(package_name: str = "vectorbt") -> Any:
 
 def prices_to_wide(prices: pl.DataFrame, value_col: str = "close") -> pd.DataFrame:
     """Convert long-format Polars prices to a wide pandas price matrix."""
-    wide = (
+    wide_pl = (
         prices.select("timestamp", "symbol", value_col)
         .pivot(on="symbol", index="timestamp", values=value_col)
         .sort("timestamp")
-        .to_pandas()
-        .set_index("timestamp")
     )
+    wide = pd.DataFrame(wide_pl.to_dict(as_series=False)).set_index("timestamp")
     wide.index = pd.DatetimeIndex(wide.index)
     return wide
 

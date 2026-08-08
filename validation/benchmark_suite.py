@@ -41,6 +41,7 @@ import json
 import os
 import pickle
 import sys
+import tempfile
 import time
 import tracemalloc
 from contextlib import suppress
@@ -106,8 +107,18 @@ from ml4t.backtest._validation.zipline_runner import (  # noqa: E402
 )
 
 _BENCHMARK_LOG_FILE = os.getenv("ML4T_BENCHMARK_LOG_FILE")
-DEFAULT_REAL_DATA_PATH = Path("/home/stefan/Dropbox/ml4t/data/equities/us_equities.parquet")
-DEFAULT_CACHE_ROOT = Path(os.getenv("ML4T_BENCHMARK_CACHE_DIR", "/tmp/ml4t-benchmark-cache"))
+DEFAULT_REAL_DATA_PATH = Path(
+    os.getenv(
+        "ML4T_BENCHMARK_DATA_PATH",
+        str(Path.home() / ".cache" / "ml4t" / "us_equities.parquet"),
+    )
+)
+DEFAULT_CACHE_ROOT = Path(
+    os.getenv(
+        "ML4T_BENCHMARK_CACHE_DIR",
+        str(Path(tempfile.gettempdir()) / "ml4t-benchmark-cache"),
+    )
+)
 CANONICAL_QUANTUM = Decimal("0.00000001")
 CANONICAL_MONEY_QUANTUM = Decimal("0.000001")
 
@@ -1408,7 +1419,8 @@ def benchmark_ml4t(
 
     # Extract validation surface. For LEAN parity we need fill-level chronology,
     # not round-trip trade summaries.
-    fills_df = results.to_fills_dataframe().to_pandas()
+    fills_pl = results.to_fills_dataframe()
+    fills_df = pd.DataFrame(fills_pl.to_dict(as_series=False))
     trades_df = None
     if profile_name == "lean":
         if not fills_df.empty:

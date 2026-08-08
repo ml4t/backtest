@@ -8,9 +8,14 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
+  compatibility:
+    name: Compatibility
+    uses: ./.github/workflows/compatibility.yml
+
   build:
     name: Build Package
     runs-on: ubuntu-latest
+    needs: compatibility
     steps:
       - uses: actions/checkout@v6.0.3
         with:

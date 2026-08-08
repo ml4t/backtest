@@ -71,9 +71,9 @@ requires-python = ">=3.12"
 dependencies = [
     "ml4t-specs>=0.1.0b0",
     "polars>=0.20.0",
-    "pandas>=2.0.0",
+    "pandas>=2.0.0; python_version < '3.15'",
+    "pandas>=3.0.5; python_version >= '3.15'",
     "numpy>=1.24.0",
-    "pyarrow>=14.0.0",
     "PyYAML>=6.0.0",
     "pandas-market-calendars>=4.0.0",
 ]
@@ -94,10 +94,10 @@ advanced = [
 
 # Comparison libraries (for benchmarking)
 comparison = [
-    "vectorbt>=0.24.0",
-    "backtrader>=1.9.0",
-    "zipline-reloaded>=2.4.0",
-    "pyfolio-reloaded>=0.9.9",
+    "vectorbt>=0.24.0; python_version < '3.15'",
+    "backtrader>=1.9.0; python_version < '3.15'",
+    "zipline-reloaded>=2.4.0; python_version < '3.15'",
+    "pyfolio-reloaded>=0.9.9; python_version < '3.15'",
 ]
 
 # Development dependencies
@@ -135,14 +135,17 @@ Issues = "https://github.com/ml4t/backtest/issues"
 Changelog = "https://github.com/ml4t/backtest/blob/main/CHANGELOG.md"
 
 [dependency-groups]
-dev = [
-    "ml4t-diagnostic>=0.1.0b4",
+test = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",
     "pytest-timeout>=2.1.0",
     "pytest-benchmark>=4.0.0",
     "hypothesis>=6.80.0",
+]
+dev = [
+    { include-group = "test" },
+    "ml4t-diagnostic>=0.1.0b4",
     "ruff>=0.8.0",
     "ty",
     "pre-commit>=3.3.0",
@@ -176,7 +179,7 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
     "ignore::UserWarning:vectorbt",  # VectorBT accessor registration warnings
-    "ignore::tables.NaturalNameWarning",  # PyTables naming warnings
+    "ignore::Warning:tables",  # PyTables naming warnings without importing optional PyTables
     "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
     "ignore::pytest.PytestReturnNotNoneWarning",  # Some tests return values for direct execution
 ]

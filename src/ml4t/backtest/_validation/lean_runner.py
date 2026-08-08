@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import zipfile
 from collections.abc import Mapping
@@ -197,8 +198,9 @@ def resolve_lean_command() -> list[str]:
 def make_lean_env() -> dict[str, str]:
     """Build the subprocess environment for local LEAN runs."""
     env = os.environ.copy()
-    env.setdefault("UV_CACHE_DIR", "/tmp/uv-cache")
-    env.setdefault("UV_TOOL_DIR", "/tmp/uv-tools")
+    temporary_root = Path(tempfile.gettempdir())
+    env.setdefault("UV_CACHE_DIR", str(temporary_root / "ml4t-uv-cache"))
+    env.setdefault("UV_TOOL_DIR", str(temporary_root / "ml4t-uv-tools"))
     return env
 
 

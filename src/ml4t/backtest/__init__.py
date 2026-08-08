@@ -8,6 +8,8 @@ A clean, extensible backtesting engine with:
 - Live trading compatible interface
 """
 
+from . import _compat as _compat
+
 try:
     from ml4t.backtest._version import __version__
 except ImportError:
@@ -53,6 +55,8 @@ from .types import (
     StopLevelBasis,
     Trade,
 )
+
+del _compat
 
 __all__ = [
     # Core API

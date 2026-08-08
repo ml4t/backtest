@@ -121,7 +121,7 @@ def get_schedule(
     """Get trading schedule as a Polars DataFrame.
 
     This is the primary function for retrieving exchange schedules.
-    Uses the efficient pandas -> pyarrow -> polars conversion path.
+    Converts the calendar's pandas schedule to a Polars DataFrame.
 
     Args:
         calendar_id: Exchange MIC code or alias (e.g., 'NYSE', 'XNYS', 'CME_Equity')
@@ -170,8 +170,10 @@ def get_schedule(
             }
         )
 
-    # Convert to Polars via pyarrow (efficient zero-copy path)
-    schedule_pl = pl.from_pandas(schedule_pd.reset_index())
+    schedule_pd = schedule_pd.reset_index()
+    schedule_pl = pl.DataFrame(
+        {str(name): series.to_list() for name, series in schedule_pd.items()}
+    )
 
     # Rename columns to standardized names
     rename_map = {
