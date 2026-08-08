@@ -109,6 +109,7 @@ _BENCHMARK_LOG_FILE = os.getenv("ML4T_BENCHMARK_LOG_FILE")
 DEFAULT_REAL_DATA_PATH = Path("/home/stefan/Dropbox/ml4t/data/equities/us_equities.parquet")
 DEFAULT_CACHE_ROOT = Path(os.getenv("ML4T_BENCHMARK_CACHE_DIR", "/tmp/ml4t-benchmark-cache"))
 CANONICAL_QUANTUM = Decimal("0.00000001")
+CANONICAL_MONEY_QUANTUM = Decimal("0.000001")
 
 
 def _log(*args, **kwargs):
@@ -788,8 +789,9 @@ def _timestamp_value(value: object) -> str | None:
     return timestamp.isoformat()
 
 
-def _canonical_float(value: object) -> float:
-    return float(Decimal(str(value)).quantize(CANONICAL_QUANTUM, rounding=ROUND_HALF_EVEN))
+def _canonical_float(value: object, quantum: Decimal = CANONICAL_QUANTUM) -> float:
+    canonical = float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_EVEN))
+    return 0.0 if canonical == 0.0 else canonical
 
 
 def _side_value(value: object, quantity: float) -> str:
@@ -827,6 +829,8 @@ def canonical_fill_records(frame: pd.DataFrame | None) -> list[dict[str, object]
         signed_quantity = _canonical_float(
             _row_value(row, ("quantity", "amount", "filled_qty", "last_qty", "size"), 0.0)
         )
+        if signed_quantity == 0.0:
+            continue
         records.append(
             {
                 "timestamp": _timestamp_value(
@@ -854,6 +858,8 @@ def canonical_trade_records(frame: pd.DataFrame | None) -> list[dict[str, object
     records: list[dict[str, object]] = []
     for _, row in work.iterrows():
         quantity = _canonical_float(_row_value(row, ("quantity", "size"), 0.0))
+        if quantity == 0.0:
+            continue
         side = str(_row_value(row, ("side", "direction"), "")).lower()
         if side in {"buy", "long", "bought"} or side.endswith(".buy"):
             side = "long"
@@ -873,7 +879,15 @@ def canonical_trade_records(frame: pd.DataFrame | None) -> list[dict[str, object
                 "pnl": _canonical_float(_row_value(row, ("pnl",), 0.0)),
             }
         )
-    return records
+    return sorted(
+        records,
+        key=lambda record: (
+            record["entry_time"] or "",
+            record["exit_time"] or "",
+            record["asset"],
+            record["side"],
+        ),
+    )
 
 
 def canonical_target_records(frame: pd.DataFrame | None) -> list[dict[str, object]] | None:
@@ -935,8 +949,9 @@ def _surface_check(
 
 
 def _scalar_check(name: str, expected: int | float, actual: int | float) -> dict[str, object]:
-    canonical_expected = _canonical_float(expected)
-    canonical_actual = _canonical_float(actual)
+    quantum = CANONICAL_QUANTUM if name == "trade_count" else CANONICAL_MONEY_QUANTUM
+    canonical_expected = _canonical_float(expected, quantum)
+    canonical_actual = _canonical_float(actual, quantum)
     return {
         "name": name,
         "passed": canonical_expected == canonical_actual,
@@ -982,6 +997,8 @@ def compare_benchmark_results_exact(
     ]
     return {
         "schema_version": 1,
+        "canonical_record_quantum": str(CANONICAL_QUANTUM),
+        "canonical_money_quantum": str(CANONICAL_MONEY_QUANTUM),
         "scenario": expected.scenario,
         "expected_framework": expected.framework,
         "actual_framework": actual.framework,
@@ -1423,9 +1440,8 @@ def benchmark_ml4t(
             )
         trades_df = pd.DataFrame(trade_records)
 
-    trade_count = results["num_trades"]
-    if profile_name == "lean" and trades_df is not None:
-        trade_count = len(trades_df)
+    canonical_trades = canonical_trade_records(trades_df)
+    trade_count = len(canonical_trades) if canonical_trades is not None else results["num_trades"]
 
     return BenchmarkResult(
         framework=framework_name,
@@ -1482,7 +1498,8 @@ def benchmark_vectorbt_pro(
     final_value = float(equity.iloc[-1])
     fills_df = shared_extract_vectorbt_order_log(pf)
     trades_df = shared_extract_vectorbt_trade_log(pf)
-    num_trades = len(trades_df)
+    canonical_trades = canonical_trade_records(trades_df)
+    num_trades = len(canonical_trades) if canonical_trades is not None else 0
 
     end_time = time.perf_counter()
     _, peak = tracemalloc.get_traced_memory()

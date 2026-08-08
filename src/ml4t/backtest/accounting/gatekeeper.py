@@ -65,9 +65,14 @@ class Gatekeeper:
 
     def _available_cash(self) -> float:
         """Cash available for new orders after applying buffer reserve and settlement holds."""
-        spendable = self.account.policy.get_spendable_cash(
-            self.account.cash, self.account.positions
-        )
+        if getattr(
+            self.account.policy, "short_cash_policy", None
+        ) == "lock_notional" and not getattr(self.account.policy, "allow_leverage", False):
+            spendable = self.account._lock_notional_free_cash
+        else:
+            spendable = self.account.policy.get_spendable_cash(
+                self.account.cash, self.account.positions
+            )
         # Subtract unsettled sale proceeds (T+N settlement) unless disabled
         if self.settlement_reduces_buying_power:
             spendable -= self.account.unsettled_cash
@@ -141,13 +146,18 @@ class Gatekeeper:
             commission = calculate_commission(
                 self.commission_model, order.asset, order.quantity, price
             )
+            reversal_cash = self.account.cash
+            if getattr(
+                self.account.policy, "short_cash_policy", None
+            ) == "lock_notional" and not getattr(self.account.policy, "allow_leverage", False):
+                reversal_cash = self.account._lock_notional_free_cash
             return self.account.policy.handle_reversal(
                 asset=order.asset,
                 current_quantity=current_qty,
                 order_quantity_delta=order_qty_delta,
                 price=price,
                 current_positions=self.account.positions,
-                cash=self.account.cash,
+                cash=reversal_cash,
                 commission=commission,
                 multiplier=multiplier,
             )

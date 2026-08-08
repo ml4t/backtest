@@ -539,6 +539,15 @@ class UnifiedAccountPolicy(AccountPolicy):
                 cash_after_close = cash + close_proceeds
             else:
                 cash_after_close = cash - close_proceeds
+        elif self.short_cash_policy == "lock_notional":
+            if current_quantity < 0:
+                position = current_positions[asset]
+                released_collateral = (
+                    2.0 * abs(current_quantity) * position.entry_price * multiplier
+                )
+                cash_after_close = cash + released_collateral - close_proceeds
+            else:
+                cash_after_close = cash + close_proceeds
         else:
             # Non-levered: long close receives proceeds, short cover pays cash.
             if current_quantity > 0:
@@ -551,10 +560,10 @@ class UnifiedAccountPolicy(AccountPolicy):
         # Calculate the new opposite position
         new_qty = current_quantity + order_quantity_delta
         new_position_cost = abs(new_qty * price * multiplier)
+        positions_after_close = {k: v for k, v in current_positions.items() if k != asset}
 
         if self.allow_leverage:
             # Margin: check buying power for new position
-            positions_after_close = {k: v for k, v in current_positions.items() if k != asset}
             return self.validate_new_position(
                 asset=asset,
                 quantity=new_qty,
@@ -567,11 +576,13 @@ class UnifiedAccountPolicy(AccountPolicy):
             # Crypto: check cash covers new position
             if self.short_cash_policy == "credit_proceeds" and new_qty < 0:
                 return True, ""
-            if new_position_cost > cash_after_close + CASH_TOLERANCE:
+            available_after_close = cash_after_close
+            cash_tolerance = 0.0 if self.short_cash_policy == "lock_notional" else CASH_TOLERANCE
+            if new_position_cost > available_after_close + cash_tolerance:
                 return (
                     False,
                     f"Insufficient cash for reversal: need ${new_position_cost:.2f}, "
-                    f"have ${cash_after_close:.2f} after closing",
+                    f"have ${available_after_close:.2f} after closing",
                 )
             return True, ""
 
@@ -611,7 +622,8 @@ class UnifiedAccountPolicy(AccountPolicy):
                 )
         else:
             # Cash/Crypto: check cash directly
-            if order_cost > cash + CASH_TOLERANCE:
+            cash_tolerance = 0.0 if self.short_cash_policy == "lock_notional" else CASH_TOLERANCE
+            if order_cost > cash + cash_tolerance:
                 direction = "long" if quantity > 0 else "short"
                 if self.allow_short_selling:
                     return (
@@ -702,7 +714,8 @@ class UnifiedAccountPolicy(AccountPolicy):
                 )
         else:
             # Cash/Crypto: check cash
-            if order_cost > cash + CASH_TOLERANCE:
+            cash_tolerance = 0.0 if self.short_cash_policy == "lock_notional" else CASH_TOLERANCE
+            if order_cost > cash + cash_tolerance:
                 return (
                     False,
                     f"Insufficient cash: need ${order_cost:.2f}, have ${cash:.2f}",

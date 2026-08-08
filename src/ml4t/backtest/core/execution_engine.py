@@ -284,6 +284,9 @@ class ExecutionEngine:
             broker.commission_model, order.asset, order.quantity, validation_price
         )
         multiplier = broker.get_multiplier(order.asset)
+        available_shadow_cash = shadow_cash
+        if policy.short_cash_policy == "lock_notional" and not policy.allow_leverage:
+            available_shadow_cash = policy.get_spendable_cash(shadow_cash, shadow_positions)
 
         if abs(current_qty) <= quantity_zero_tolerance(current_qty):
             valid, reason = policy.validate_new_position(
@@ -291,7 +294,7 @@ class ExecutionEngine:
                 quantity=qty_delta,
                 price=validation_price,
                 current_positions=shadow_positions,
-                cash=shadow_cash - commission,
+                cash=available_shadow_cash - commission,
                 multiplier=multiplier,
             )
         elif is_reversal:
@@ -301,7 +304,7 @@ class ExecutionEngine:
                 order_quantity_delta=qty_delta,
                 price=validation_price,
                 current_positions=shadow_positions,
-                cash=shadow_cash,
+                cash=available_shadow_cash,
                 commission=commission,
                 multiplier=multiplier,
             )
@@ -312,7 +315,7 @@ class ExecutionEngine:
                 quantity_delta=qty_delta,
                 price=validation_price,
                 current_positions=shadow_positions,
-                cash=shadow_cash - commission,
+                cash=available_shadow_cash - commission,
                 multiplier=multiplier,
             )
 

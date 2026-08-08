@@ -88,7 +88,7 @@ def extract_order_log(portfolio: Any) -> pd.DataFrame:
         for _, row in orders.iterrows():
             rows.append(
                 {
-                    "timestamp": row.get("Timestamp"),
+                    "timestamp": row.get("Timestamp", row.get("Index")),
                     "symbol": row.get("Column"),
                     "side": "buy" if row.get("Side") == "Buy" else "sell",
                     "quantity": float(row.get("Size", 0.0)),
@@ -101,7 +101,7 @@ def extract_order_log(portfolio: Any) -> pd.DataFrame:
         return pd.DataFrame(
             columns=["timestamp", "symbol", "side", "quantity", "price", "commission"]
         )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows).sort_values(["timestamp", "symbol"]).reset_index(drop=True)
 
 
 def extract_trade_log(portfolio: Any) -> pd.DataFrame:
@@ -111,6 +111,7 @@ def extract_trade_log(portfolio: Any) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "timestamp",
+                "exit_time",
                 "asset",
                 "side",
                 "quantity",
@@ -121,13 +122,15 @@ def extract_trade_log(portfolio: Any) -> pd.DataFrame:
         )
 
     entry_col = "Entry Timestamp" if "Entry Timestamp" in trades_readable.columns else "Entry Index"
-    trades_readable = trades_readable.sort_values(entry_col)
+    exit_col = "Exit Timestamp" if "Exit Timestamp" in trades_readable.columns else "Exit Index"
+    trades_readable = trades_readable.sort_values([entry_col, exit_col, "Column"])
     rows: list[dict[str, object]] = []
     for _, row in trades_readable.iterrows():
         direction = str(row.get("Direction", "Long")).lower()
         rows.append(
             {
                 "timestamp": row.get("Entry Timestamp", row.get("Entry Index")),
+                "exit_time": row.get("Exit Timestamp", row.get("Exit Index")),
                 "asset": row.get("Column", "unknown"),
                 "side": "long" if direction == "long" else "short",
                 "quantity": abs(float(row.get("Size", 0.0))),

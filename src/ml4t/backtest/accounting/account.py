@@ -37,6 +37,7 @@ class AccountState:
             policy: AccountPolicy instance (CashAccountPolicy or MarginAccountPolicy)
         """
         self.cash = initial_cash
+        self._lock_notional_free_cash = initial_cash
         self.positions: dict[str, Position] = {}
         self.policy = policy
 

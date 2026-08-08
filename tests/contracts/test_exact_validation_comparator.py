@@ -157,6 +157,57 @@ def test_zero_gap_benchmark_passes_and_writes_deterministic_artifact(tmp_path: P
     assert all(check["passed"] for check in first["checks"])
 
 
+def test_fixed_point_zero_fill_and_trade_records_are_omitted() -> None:
+    suite = _load_benchmark_suite()
+    timestamp = pd.Timestamp("2024-01-02")
+    dust_fill = pd.DataFrame(
+        [
+            {
+                "timestamp": timestamp,
+                "asset": "AAPL",
+                "side": "buy",
+                "quantity": 1e-12,
+                "price": 100.0,
+                "commission": 0.0,
+            }
+        ]
+    )
+    dust_trade = pd.DataFrame(
+        [
+            {
+                "entry_time": timestamp,
+                "exit_time": timestamp,
+                "asset": "AAPL",
+                "side": "long",
+                "quantity": 1e-12,
+                "entry_price": 100.0,
+                "exit_price": 100.0,
+                "pnl": 0.0,
+            }
+        ]
+    )
+
+    assert suite.canonical_fill_records(dust_fill) == []
+    assert suite.canonical_trade_records(dust_trade) == []
+
+
+def test_terminal_value_uses_exact_microdollar_representation() -> None:
+    suite = _load_benchmark_suite()
+    expected = _benchmark_result(suite, "Reference")
+    same_microdollar = copy.deepcopy(_benchmark_result(suite, "ml4t.backtest"))
+    same_microdollar.final_value += 4e-8
+    different_microdollar = copy.deepcopy(_benchmark_result(suite, "ml4t.backtest"))
+    different_microdollar.final_value += 1e-6
+
+    same = suite.compare_benchmark_results_exact(expected, same_microdollar, initial_cash=100_000.0)
+    different = suite.compare_benchmark_results_exact(
+        expected, different_microdollar, initial_cash=100_000.0
+    )
+
+    assert same["passed"] is True
+    assert different["passed"] is False
+
+
 @pytest.mark.parametrize(
     ("check_name", "mutate"),
     [

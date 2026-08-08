@@ -479,11 +479,18 @@ class OrderBook:
         commission = calculate_commission(
             broker.commission_model, order.asset, order.quantity, signal_price
         )
+        shadow_positions = self._build_shadow_policy_positions()
         available_cash = self._submission_shadow_cash
+        if (
+            broker.account.policy.short_cash_policy == "lock_notional"
+            and not broker.account.policy.allow_leverage
+        ):
+            available_cash = broker.account.policy.get_spendable_cash(
+                self._submission_shadow_cash, shadow_positions
+            )
         if broker.cash_buffer_pct > 0 and available_cash > 0:
             available_cash *= 1.0 - broker.cash_buffer_pct
 
-        shadow_positions = self._build_shadow_policy_positions()
         is_reversal = (
             abs(old_qty) > quantity_zero_tolerance(old_qty)
             and abs(new_qty) > quantity_zero_tolerance(old_qty, size)

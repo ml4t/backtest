@@ -14,7 +14,19 @@ from datetime import datetime
 
 import pytest
 
+from ml4t.backtest.execution.fill_executor import _calculate_position_pnl
 from ml4t.backtest.types import Position, Trade
+
+
+def test_position_pnl_uses_ledger_notional_operation_order() -> None:
+    entry_price = 100.90226400205
+    exit_price = 103.1011026849
+    quantity = 100.0
+
+    pnl = _calculate_position_pnl(entry_price, exit_price, quantity, 1.0)
+
+    assert pnl == exit_price * quantity - entry_price * quantity
+
 
 # === Position.pnl_percent short fix ===
 
