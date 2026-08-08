@@ -7,6 +7,7 @@ from datetime import datetime
 from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
+from .state import MarketState, OrderState, RiskState
 
 
 class OrderBook:
@@ -17,8 +18,22 @@ class OrderBook:
     )
     _MIN_ORDER_SIZE: float = 1e-8
 
-    def __init__(self, broker):
+    def __init__(
+        self,
+        broker,
+        *,
+        account,
+        market: MarketState,
+        orders: OrderState,
+        risk: RiskState,
+        fill_engine,
+    ):
         self.broker = broker
+        self.account = account
+        self.market = market
+        self.orders = orders
+        self.risk = risk
+        self.fill_engine = fill_engine
         self._submission_shadow_bar: object | None = None
         self._submission_shadow_cash: float = 0.0
         self._submission_shadow_positions: dict[str, tuple[float, float]] = {}
@@ -44,12 +59,12 @@ class OrderBook:
         if quantity <= self._MIN_ORDER_SIZE:
             return None
 
-        if asset in broker._stop_exits_this_bar:
-            existing_pos = broker.positions.get(asset)
+        if asset in self.risk.stop_exits_this_bar:
+            existing_pos = self.account.positions.get(asset)
             if existing_pos is None:
                 return None
 
-        broker._order_counter += 1
+        self.orders.counter += 1
         order = Order(
             asset=asset,
             side=side,
@@ -59,19 +74,19 @@ class OrderBook:
             stop_price=stop_price,
             trail_amount=trail_amount,
             rebalance_id=options.rebalance_id if options is not None else None,
-            order_id=f"ORD-{broker._order_counter}",
-            created_at=broker._current_time,
-            _created_bar_index=broker._bar_index,
+            order_id=f"ORD-{self.orders.counter}",
+            created_at=self.market.time,
+            _created_bar_index=self.market.bar_index,
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,
-            _submitted_before_risk=broker._submitting_before_risk,
+            _submitted_before_risk=self.orders.submitting_before_risk,
             _submitted_from_flat=broker.get_position(asset) is None,
         )
 
-        order._signal_price = broker._current_prices.get(asset)
+        order._signal_price = self.market.prices.get(asset)
 
-        broker.orders.append(order)
+        self.orders.orders.append(order)
 
         # Immediate fill: same-bar market orders fill during submit_order()
         # instead of being queued for later _process_orders(). Each order
@@ -99,13 +114,13 @@ class OrderBook:
             )
             return order
 
-        broker.pending_orders.append(order)
+        self.orders.pending.append(order)
 
         if broker.execution_mode is ExecutionMode.NEXT_BAR and (
             options is None or not options.eligible_in_next_bar_mode
         ):
-            broker._orders_this_bar.append(order)
-            broker._orders_this_bar_ids.add(order.order_id)
+            self.orders.current_bar.append(order)
+            self.orders.current_bar_ids.add(order.order_id)
 
         return order
 
@@ -133,7 +148,7 @@ class OrderBook:
         Returns the order with status FILLED or REJECTED.
         """
         broker = self.broker
-        fill = broker._fill_engine
+        fill = self.fill_engine
 
         # Apply share rounding
         fill.apply_share_rounding(order)
@@ -162,7 +177,7 @@ class OrderBook:
             # Exits always fill (they free capital)
             fully_filled = fill.execute_fill(order, fill_price)
             if fully_filled:
-                broker._partial_orders.pop(order.order_id, None)
+                self.orders.partial_quantities.pop(order.order_id, None)
             else:
                 fill.update_partial_order(order)
         else:
@@ -182,7 +197,7 @@ class OrderBook:
                                 rejection_code or "order_validation_failed",
                             )
                             return order
-                        broker._partial_orders.pop(order.order_id, None)
+                        self.orders.partial_quantities.pop(order.order_id, None)
                         return order
                     if allow_rebalance_partial and "insufficient" in rejection_reason.lower():
                         if not fill.try_partial_fill(order, fill_price):
@@ -191,7 +206,7 @@ class OrderBook:
                                 rejection_code or "order_validation_failed",
                             )
                             return order
-                        broker._partial_orders.pop(order.order_id, None)
+                        self.orders.partial_quantities.pop(order.order_id, None)
                         return order
                     order.reject(
                         rejection_reason,
@@ -201,7 +216,7 @@ class OrderBook:
 
             fully_filled = fill.execute_fill(order, fill_price)
             if fully_filled:
-                broker._partial_orders.pop(order.order_id, None)
+                self.orders.partial_quantities.pop(order.order_id, None)
             else:
                 fill.update_partial_order(order)
 
@@ -209,7 +224,7 @@ class OrderBook:
 
     def _is_exit_order(self, order: Order) -> bool:
         """Check if an order reduces an existing position without reversing."""
-        return is_exit_order(order, self.broker.positions)
+        return is_exit_order(order, self.account.positions)
 
     def update_order(self, order_id: str, **kwargs) -> bool:
         invalid_fields = set(kwargs.keys()) - self._UPDATABLE_ORDER_FIELDS
@@ -219,7 +234,7 @@ class OrderBook:
                 f"Updatable fields: {sorted(self._UPDATABLE_ORDER_FIELDS)}"
             )
 
-        for order in self.broker.pending_orders:
+        for order in self.orders.pending:
             if order.order_id == order_id:
                 for key, value in kwargs.items():
                     setattr(order, key, value)
@@ -227,23 +242,23 @@ class OrderBook:
         return False
 
     def cancel_order(self, order_id: str) -> bool:
-        for order in self.broker.pending_orders:
+        for order in self.orders.pending:
             if order.order_id == order_id:
                 order.status = OrderStatus.CANCELLED
-                self.broker.pending_orders.remove(order)
+                self.orders.pending.remove(order)
                 return True
         return False
 
     def get_order(self, order_id: str) -> Order | None:
-        for order in self.broker.orders:
+        for order in self.orders.orders:
             if order.order_id == order_id:
                 return order
         return None
 
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
         if asset is None:
-            return list(self.broker.pending_orders)
-        return [o for o in self.broker.pending_orders if o.asset == asset]
+            return list(self.orders.pending)
+        return [o for o in self.orders.pending if o.asset == asset]
 
     def _should_apply_submission_precheck(self, order: Order) -> bool:
         broker = self.broker
@@ -255,7 +270,7 @@ class OrderBook:
 
     def _reset_submission_shadow_if_needed(self) -> None:
         broker = self.broker
-        ts = broker._current_time
+        ts = self.market.time
         bar_key = ts.date() if ts is not None else None
         if bar_key == self._submission_shadow_bar:
             return
@@ -269,13 +284,13 @@ class OrderBook:
                 or pos.current_price
                 or pos.entry_price,
             )
-            for asset, pos in broker.positions.items()
+            for asset, pos in self.account.positions.items()
             if abs(pos.quantity) > quantity_zero_tolerance(pos.quantity)
         }
 
     def _build_shadow_policy_positions(self) -> dict[str, Position]:
         broker = self.broker
-        ts = broker._current_time or datetime(1970, 1, 1)
+        ts = self.market.time or datetime(1970, 1, 1)
         positions: dict[str, Position] = {}
         for asset, (qty, basis_price) in self._submission_shadow_positions.items():
             if abs(qty) <= quantity_zero_tolerance(qty):
@@ -331,7 +346,7 @@ class OrderBook:
 
         signal_price = getattr(order, "_signal_price", None)
         if signal_price is None:
-            signal_price = broker._current_prices.get(order.asset)
+            signal_price = self.market.prices.get(order.asset)
         if signal_price is None:
             # No local price to precheck with; keep order eligible.
             return True
@@ -376,15 +391,15 @@ class OrderBook:
 
         if shadow_cash < 0.0:
             trace_counts = getattr(broker, "_trace_submission_precheck_counts", None)
-            if isinstance(trace_counts, dict) and broker._current_time is not None:
-                ts = broker._current_time.date()
+            if isinstance(trace_counts, dict) and self.market.time is not None:
+                ts = self.market.time.date()
                 counts = trace_counts.setdefault(ts, {"accepted": 0, "rejected": 0})
                 counts["rejected"] += 1
             return False
 
         trace_counts = getattr(broker, "_trace_submission_precheck_counts", None)
-        if isinstance(trace_counts, dict) and broker._current_time is not None:
-            ts = broker._current_time.date()
+        if isinstance(trace_counts, dict) and self.market.time is not None:
+            ts = self.market.time.date()
             counts = trace_counts.setdefault(ts, {"accepted": 0, "rejected": 0})
             counts["accepted"] += 1
         return True
@@ -417,7 +432,7 @@ class OrderBook:
 
         signal_price = getattr(order, "_signal_price", None)
         if signal_price is None:
-            signal_price = broker._current_prices.get(order.asset)
+            signal_price = self.market.prices.get(order.asset)
         if signal_price is None:
             return True
 
@@ -482,10 +497,10 @@ class OrderBook:
         shadow_positions = self._build_shadow_policy_positions()
         available_cash = self._submission_shadow_cash
         if (
-            broker.account.policy.short_cash_policy == "lock_notional"
-            and not broker.account.policy.allow_leverage
+            self.account.policy.short_cash_policy == "lock_notional"
+            and not self.account.policy.allow_leverage
         ):
-            available_cash = broker.account.policy.get_spendable_cash(
+            available_cash = self.account.policy.get_spendable_cash(
                 self._submission_shadow_cash, shadow_positions
             )
         if broker.cash_buffer_pct > 0 and available_cash > 0:
@@ -498,7 +513,7 @@ class OrderBook:
         )
 
         if abs(old_qty) <= quantity_zero_tolerance(old_qty):
-            valid, reason = broker.account.policy.validate_new_position(
+            valid, reason = self.account.policy.validate_new_position(
                 asset=order.asset,
                 quantity=size,
                 price=signal_price,
@@ -507,7 +522,7 @@ class OrderBook:
                 multiplier=broker.get_multiplier(order.asset),
             )
         elif is_reversal:
-            valid, reason = broker.account.policy.handle_reversal(
+            valid, reason = self.account.policy.handle_reversal(
                 asset=order.asset,
                 current_quantity=old_qty,
                 order_quantity_delta=size,
@@ -518,7 +533,7 @@ class OrderBook:
                 multiplier=broker.get_multiplier(order.asset),
             )
         else:
-            valid, reason = broker.account.policy.validate_position_change(
+            valid, reason = self.account.policy.validate_position_change(
                 asset=order.asset,
                 current_quantity=old_qty,
                 quantity_delta=size,
@@ -529,8 +544,8 @@ class OrderBook:
             )
 
         trace_counts = getattr(broker, "_trace_submission_precheck_counts", None)
-        if isinstance(trace_counts, dict) and broker._current_time is not None:
-            ts = broker._current_time.date()
+        if isinstance(trace_counts, dict) and self.market.time is not None:
+            ts = self.market.time.date()
             counts = trace_counts.setdefault(ts, {"accepted": 0, "rejected": 0})
             counts["accepted" if valid else "rejected"] += 1
 

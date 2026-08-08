@@ -28,9 +28,24 @@ This page explains the architecture, key abstractions, and execution flow of the
 
 **DataFeed** partitions a Polars DataFrame by timestamp and iterates bar-by-bar across all assets. It pre-extracts OHLCV data for O(1) per-bar access.
 
-**Broker** is the strategy's interface to the market. It accepts orders, manages positions, evaluates risk rules, and delegates fills to the execution pipeline.
+**Broker** is the strategy's interface to the market. It accepts orders and delegates state changes to the account, order, risk, and execution components.
 
 **Strategy** is the user's code. It receives `(timestamp, data, context, broker)` on each bar and submits orders through the broker.
+
+### State Ownership
+
+Broker is a facade, not a second ledger. Each mutable domain concept has one state owner:
+
+| State | Owner | Mutation contract |
+|---|---|---|
+| Cash and positions | `AccountState` | Fill execution changes cash and positions through the injected account. Validation and valuation read the same position objects. |
+| Current and historical market values | `MarketState` | `Broker._update_time()` replaces the current bar and advances its index. Execution and risk components receive the state as a read dependency. |
+| Orders, pending queues, and partial quantities | `OrderState` | `OrderBook` creates and queues orders. `ExecutionEngine` and `FillExecutor` update lifecycle and partial-fill state through the same injected object. |
+| Position rules and deferred exits | `RiskState` | Broker configuration methods set rules. `RiskEngine` records and consumes deferred exits. |
+| Fills and completed trades | `ExecutionJournal` | `FillExecutor` appends records. Broker result APIs expose those same lists. |
+| Strategy callback sequence | `Engine` | `Engine.run()` is the only component that invokes lifecycle callbacks. |
+
+Broker compatibility attributes reference these owner collections. They do not store copies. Boundary tests reject direct access from collaborators to the legacy Broker private fields.
 
 ## Key Abstractions
 

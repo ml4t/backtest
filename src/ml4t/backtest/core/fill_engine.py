@@ -7,13 +7,17 @@ from dataclasses import replace
 from ..config import ExecutionPrice, ShareType
 from ..types import OrderSide, OrderType
 from .shared import CASH_TOLERANCE
+from .state import MarketState, OrderState
 
 
 class FillEngine:
     """Owns fill-price checks, quantity helpers, and fill execution delegation."""
 
-    def __init__(self, broker):
+    def __init__(self, broker, *, market: MarketState, orders: OrderState, executor):
         self.broker = broker
+        self.market = market
+        self.orders = orders
+        self.executor = executor
 
     def get_available_cash(self) -> float:
         broker = self.broker
@@ -110,13 +114,13 @@ class FillEngine:
         )
 
     def get_effective_quantity(self, order) -> float:
-        remaining = self.broker._partial_orders.get(order.order_id)
+        remaining = self.orders.partial_quantities.get(order.order_id)
         if remaining is not None:
             return remaining
         return order.quantity
 
     def update_partial_order(self, order) -> None:
-        remaining = self.broker._partial_orders.get(order.order_id)
+        remaining = self.orders.partial_quantities.get(order.order_id)
         if remaining is not None:
             order.quantity = remaining
 
@@ -198,10 +202,9 @@ class FillEngine:
         return gap_price if gap_price is not None else order.stop_price
 
     def check_fill(self, order, price: float) -> float | None:
-        broker = self.broker
-        high = broker._current_highs.get(order.asset, price)
-        low = broker._current_lows.get(order.asset, price)
-        bar_open = broker._current_opens.get(order.asset, price)
+        high = self.market.highs.get(order.asset, price)
+        low = self.market.lows.get(order.asset, price)
+        bar_open = self.market.opens.get(order.asset, price)
 
         if order.order_type in {OrderType.MARKET, OrderType.MOC}:
             return self.check_market_fill(order, price)
@@ -214,4 +217,4 @@ class FillEngine:
         return None
 
     def execute_fill(self, order, base_price: float) -> bool:
-        return self.broker._fill_executor.execute(order, base_price)
+        return self.executor.execute(order, base_price)

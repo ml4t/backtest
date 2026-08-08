@@ -21,10 +21,14 @@ from .config import (
 )
 from .core import (
     ExecutionEngine,
+    ExecutionJournal,
     FillEngine,
+    MarketState,
     OrderBook,
+    OrderState,
     PortfolioLedger,
     RiskEngine,
+    RiskState,
     SubmitOrderOptions,
 )
 from .execution.fill_executor import FillExecutor
@@ -34,7 +38,6 @@ from .types import (
     ContractSpec,
     ExecutionMode,
     ExitReason,
-    Fill,
     Order,
     OrderSide,
     OrderType,
@@ -53,6 +56,19 @@ if TYPE_CHECKING:
 
 class Broker:
     """Broker interface - same for backtest and live trading."""
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "positions" and "account" in self.__dict__:
+            self.account.positions = value
+        elif name == "orders" and "_order_state" in self.__dict__:
+            self._order_state.orders = value
+        elif name == "pending_orders" and "_order_state" in self.__dict__:
+            self._order_state.pending = value
+        elif name == "fills" and "_execution_journal" in self.__dict__:
+            self._execution_journal.fills = value
+        elif name == "trades" and "_execution_journal" in self.__dict__:
+            self._execution_journal.trades = value
+        object.__setattr__(self, name, value)
 
     def __init__(
         self,
@@ -142,7 +158,10 @@ class Broker:
         self.late_asset_min_bars = late_asset_min_bars
         self.settlement_delay = settlement_delay
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
-        self._bar_index: int = 0
+        self._market_state = MarketState()
+        self._order_state = OrderState()
+        self._risk_state = RiskState()
+        self._execution_journal = ExecutionJournal()
 
         # Auto-populate margin schedules from ContractSpec settings
         # This lets users specify margin once on ContractSpec rather than duplicating
@@ -195,56 +214,31 @@ class Broker:
             multiplier_resolver=self.get_multiplier,
         )
 
-        self.positions: dict[str, Position] = {}
-        self.orders: list[Order] = []
-        self.pending_orders: list[Order] = []
-        self.fills: list[Fill] = []
-        self.trades: list[Trade] = []
-        self._order_counter = 0
-        self._current_time: datetime | None = None
-        self._current_prices: dict[str, float] = {}  # FeedSpec.price_col values
-        self._current_opens: dict[str, float] = {}  # open prices for next-bar execution
-        self._current_highs: dict[str, float] = {}  # high prices for limit/stop checks
-        self._current_lows: dict[str, float] = {}  # low prices for limit/stop checks
-        self._current_closes: dict[str, float] = {}
-        self._current_volumes: dict[str, float] = {}
-        self._current_bids: dict[str, float] = {}
-        self._current_asks: dict[str, float] = {}
-        self._current_mids: dict[str, float] = {}
-        self._current_bid_sizes: dict[str, float] = {}
-        self._current_ask_sizes: dict[str, float] = {}
-        self._current_signals: dict[str, dict[str, float]] = {}
-        self._last_prices: dict[str, float] = {}
-        self._asset_bars_seen: dict[str, int] = {}
-        self._rebalance_counter = 0
-        self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
-        self._orders_this_bar_ids: set[str] = set()
-        self._submitting_before_risk = False
+        self.positions = self.account.positions
+        self.orders = self._order_state.orders
+        self.pending_orders = self._order_state.pending
+        self.fills = self._execution_journal.fills
+        self.trades = self._execution_journal.trades
 
-        # Risk management
-        self._position_rules: Any = None  # Global position rules
-        self._position_rules_by_asset: dict[str, Any] = {}  # Per-asset rules
-        self._pending_exits: dict[str, dict] = {}  # asset -> {reason, pct} for NEXT_BAR_OPEN mode
+        self._rebalance_counter = 0
 
         # Execution model (volume limits and market impact)
         self.execution_limits = execution_limits  # ExecutionLimits instance
         self.market_impact_model = market_impact_model  # MarketImpactModel instance
-        self._partial_orders: dict[str, float] = {}  # order_id -> remaining quantity
-        self._filled_this_bar: set[str] = set()  # order_ids that had fills this bar
-
-        # VBT Pro compatibility: prevent same-bar re-entry after stop exit
-        self._stop_exits_this_bar: set[str] = set()  # assets that had stop exits this bar
-
-        # VBT Pro compatibility: track positions created this bar
-        # New positions should NOT have HWM updated from entry bar's high
-        # VBT Pro uses CLOSE for initial HWM on entry bar, then updates from HIGH next bar
-        self._positions_created_this_bar: set[str] = set()
 
         # Contract specifications (for futures and other derivatives)
         self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
 
         # Fill execution (extracted from _execute_fill)
-        self._fill_executor = FillExecutor(self)
+        self._fill_executor = FillExecutor(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            risk=self._risk_state,
+            journal=self._execution_journal,
+            record_pnl=self._record_pnl_event,
+        )
 
         # Per-asset trading statistics for stateful decision-making
         self._asset_stats: dict[str, AssetTradingStats] = {}
@@ -253,11 +247,41 @@ class Broker:
         self._last_session_id: int | None = None  # Track current session for boundary detection
 
         # Extracted orchestration components (Phase B1 alpha-reset)
-        self._order_book = OrderBook(self)
-        self._risk_engine = RiskEngine(self)
-        self._fill_engine = FillEngine(self)
-        self._execution_engine = ExecutionEngine(self)
-        self._portfolio_ledger = PortfolioLedger(self)
+        self._fill_engine = FillEngine(
+            self,
+            market=self._market_state,
+            orders=self._order_state,
+            executor=self._fill_executor,
+        )
+        self._fill_executor.fill_engine = self._fill_engine
+        self._order_book = OrderBook(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            risk=self._risk_state,
+            fill_engine=self._fill_engine,
+        )
+        self._risk_engine = RiskEngine(
+            self,
+            account=self.account,
+            market=self._market_state,
+            risk=self._risk_state,
+            fill_engine=self._fill_engine,
+        )
+        self._execution_engine = ExecutionEngine(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            fill_engine=self._fill_engine,
+        )
+        self._portfolio_ledger = PortfolioLedger(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+        )
 
     @classmethod
     def from_config(
@@ -409,6 +433,222 @@ class Broker:
     def cash(self, value: float) -> None:
         """Set cash balance (delegates to AccountState)."""
         self.account.cash = value
+
+    @property
+    def _bar_index(self) -> int:
+        return self._market_state.bar_index
+
+    @_bar_index.setter
+    def _bar_index(self, value: int) -> None:
+        self._market_state.bar_index = value
+
+    @property
+    def _current_time(self) -> datetime | None:
+        return self._market_state.time
+
+    @_current_time.setter
+    def _current_time(self, value: datetime | None) -> None:
+        self._market_state.time = value
+
+    @property
+    def _current_prices(self) -> dict[str, float]:
+        return self._market_state.prices
+
+    @_current_prices.setter
+    def _current_prices(self, value: dict[str, float]) -> None:
+        self._market_state.prices = value
+
+    @property
+    def _current_opens(self) -> dict[str, float]:
+        return self._market_state.opens
+
+    @_current_opens.setter
+    def _current_opens(self, value: dict[str, float]) -> None:
+        self._market_state.opens = value
+
+    @property
+    def _current_highs(self) -> dict[str, float]:
+        return self._market_state.highs
+
+    @_current_highs.setter
+    def _current_highs(self, value: dict[str, float]) -> None:
+        self._market_state.highs = value
+
+    @property
+    def _current_lows(self) -> dict[str, float]:
+        return self._market_state.lows
+
+    @_current_lows.setter
+    def _current_lows(self, value: dict[str, float]) -> None:
+        self._market_state.lows = value
+
+    @property
+    def _current_closes(self) -> dict[str, float]:
+        return self._market_state.closes
+
+    @_current_closes.setter
+    def _current_closes(self, value: dict[str, float]) -> None:
+        self._market_state.closes = value
+
+    @property
+    def _current_volumes(self) -> dict[str, float]:
+        return self._market_state.volumes
+
+    @_current_volumes.setter
+    def _current_volumes(self, value: dict[str, float]) -> None:
+        self._market_state.volumes = value
+
+    @property
+    def _current_bids(self) -> dict[str, float]:
+        return self._market_state.bids
+
+    @_current_bids.setter
+    def _current_bids(self, value: dict[str, float]) -> None:
+        self._market_state.bids = value
+
+    @property
+    def _current_asks(self) -> dict[str, float]:
+        return self._market_state.asks
+
+    @_current_asks.setter
+    def _current_asks(self, value: dict[str, float]) -> None:
+        self._market_state.asks = value
+
+    @property
+    def _current_mids(self) -> dict[str, float]:
+        return self._market_state.mids
+
+    @_current_mids.setter
+    def _current_mids(self, value: dict[str, float]) -> None:
+        self._market_state.mids = value
+
+    @property
+    def _current_bid_sizes(self) -> dict[str, float]:
+        return self._market_state.bid_sizes
+
+    @_current_bid_sizes.setter
+    def _current_bid_sizes(self, value: dict[str, float]) -> None:
+        self._market_state.bid_sizes = value
+
+    @property
+    def _current_ask_sizes(self) -> dict[str, float]:
+        return self._market_state.ask_sizes
+
+    @_current_ask_sizes.setter
+    def _current_ask_sizes(self, value: dict[str, float]) -> None:
+        self._market_state.ask_sizes = value
+
+    @property
+    def _current_signals(self) -> dict[str, dict[str, float]]:
+        return self._market_state.signals
+
+    @_current_signals.setter
+    def _current_signals(self, value: dict[str, dict[str, float]]) -> None:
+        self._market_state.signals = value
+
+    @property
+    def _last_prices(self) -> dict[str, float]:
+        return self._market_state.last_prices
+
+    @_last_prices.setter
+    def _last_prices(self, value: dict[str, float]) -> None:
+        self._market_state.last_prices = value
+
+    @property
+    def _asset_bars_seen(self) -> dict[str, int]:
+        return self._market_state.asset_bars_seen
+
+    @_asset_bars_seen.setter
+    def _asset_bars_seen(self, value: dict[str, int]) -> None:
+        self._market_state.asset_bars_seen = value
+
+    @property
+    def _order_counter(self) -> int:
+        return self._order_state.counter
+
+    @_order_counter.setter
+    def _order_counter(self, value: int) -> None:
+        self._order_state.counter = value
+
+    @property
+    def _orders_this_bar(self) -> list[Order]:
+        return self._order_state.current_bar
+
+    @_orders_this_bar.setter
+    def _orders_this_bar(self, value: list[Order]) -> None:
+        self._order_state.current_bar = value
+
+    @property
+    def _orders_this_bar_ids(self) -> set[str]:
+        return self._order_state.current_bar_ids
+
+    @_orders_this_bar_ids.setter
+    def _orders_this_bar_ids(self, value: set[str]) -> None:
+        self._order_state.current_bar_ids = value
+
+    @property
+    def _partial_orders(self) -> dict[str, float]:
+        return self._order_state.partial_quantities
+
+    @_partial_orders.setter
+    def _partial_orders(self, value: dict[str, float]) -> None:
+        self._order_state.partial_quantities = value
+
+    @property
+    def _filled_this_bar(self) -> set[str]:
+        return self._order_state.filled_this_bar
+
+    @_filled_this_bar.setter
+    def _filled_this_bar(self, value: set[str]) -> None:
+        self._order_state.filled_this_bar = value
+
+    @property
+    def _submitting_before_risk(self) -> bool:
+        return self._order_state.submitting_before_risk
+
+    @_submitting_before_risk.setter
+    def _submitting_before_risk(self, value: bool) -> None:
+        self._order_state.submitting_before_risk = value
+
+    @property
+    def _position_rules(self) -> Any:
+        return self._risk_state.position_rules
+
+    @_position_rules.setter
+    def _position_rules(self, value: Any) -> None:
+        self._risk_state.position_rules = value
+
+    @property
+    def _position_rules_by_asset(self) -> dict[str, Any]:
+        return self._risk_state.position_rules_by_asset
+
+    @_position_rules_by_asset.setter
+    def _position_rules_by_asset(self, value: dict[str, Any]) -> None:
+        self._risk_state.position_rules_by_asset = value
+
+    @property
+    def _pending_exits(self) -> dict[str, dict[str, Any]]:
+        return self._risk_state.pending_exits
+
+    @_pending_exits.setter
+    def _pending_exits(self, value: dict[str, dict[str, Any]]) -> None:
+        self._risk_state.pending_exits = value
+
+    @property
+    def _stop_exits_this_bar(self) -> set[str]:
+        return self._risk_state.stop_exits_this_bar
+
+    @_stop_exits_this_bar.setter
+    def _stop_exits_this_bar(self, value: set[str]) -> None:
+        self._risk_state.stop_exits_this_bar = value
+
+    @property
+    def _positions_created_this_bar(self) -> set[str]:
+        return self._risk_state.positions_created_this_bar
+
+    @_positions_created_this_bar.setter
+    def _positions_created_this_bar(self, value: set[str]) -> None:
+        self._risk_state.positions_created_this_bar = value
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Get contract specification for an asset."""

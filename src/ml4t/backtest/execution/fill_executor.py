@@ -8,12 +8,14 @@ with helper methods for position creation, closing, flipping, and scaling.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import InitialHwmSource, ShareType
 from ..core.shared import quantity_zero_tolerance
+from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
 from ..models import calculate_commission, calculate_slippage
 from ..types import (
     ExitReason,
@@ -27,6 +29,7 @@ from ..types import (
 
 if TYPE_CHECKING:
     from ..broker import Broker
+    from ..core.fill_engine import FillEngine
 
 
 def _get_exit_reason(order: Order) -> str:
@@ -104,13 +107,30 @@ class FillExecutor:
         >>> fully_filled = executor.execute(order, base_price=100.0)
     """
 
-    def __init__(self, broker: Broker):
+    def __init__(
+        self,
+        broker: Broker,
+        *,
+        account,
+        market: MarketState,
+        orders: OrderState,
+        risk: RiskState,
+        journal: ExecutionJournal,
+        record_pnl: Callable[[str, float], None],
+    ):
         """Initialize with broker instance.
 
         Args:
             broker: The Broker instance whose state we'll modify
         """
         self.broker = broker
+        self.account = account
+        self.market = market
+        self.orders = orders
+        self.risk = risk
+        self.journal = journal
+        self.record_pnl = record_pnl
+        self.fill_engine: FillEngine | None = None
 
     def execute(self, order: Order, base_price: float) -> bool:
         """Execute a fill and update positions.
@@ -129,7 +149,7 @@ class FillExecutor:
                 negative, or directionally favorable value outside its contract.
         """
         broker = self.broker
-        current_time = broker._current_time
+        current_time = self.market.time
         assert current_time is not None, "Cannot execute fill without current time"
 
         self._validate_execution_price(base_price, source="base execution price")
@@ -137,13 +157,15 @@ class FillExecutor:
         available_size = broker.get_available_size(order.asset, order.side)
 
         # Get effective quantity (considering partial fills from previous bars)
-        effective_quantity = broker._fill_engine.get_effective_quantity(order)
+        if self.fill_engine is None:
+            raise RuntimeError("FillExecutor is not connected to a FillEngine")
+        effective_quantity = self.fill_engine.get_effective_quantity(order)
         fill_quantity = effective_quantity
 
         # Apply execution limits (volume participation)
         remaining_quantity = 0.0
         if broker.execution_limits is not None:
-            if order.order_id in broker._filled_this_bar:
+            if order.order_id in self.orders.filled_this_bar:
                 return False
 
             exec_result = broker.execution_limits.calculate(
@@ -200,7 +222,7 @@ class FillExecutor:
         signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
         close_commission = None
         open_commission = None
-        position = broker.positions.get(order.asset)
+        position = self.account.positions.get(order.asset)
         is_exit_fill = position is not None and position.quantity * signed_qty < 0
         if position is not None:
             new_qty = position.quantity + signed_qty
@@ -219,11 +241,11 @@ class FillExecutor:
                 )
 
         if broker.execution_limits is not None:
-            broker._filled_this_bar.add(order.order_id)
+            self.orders.filled_this_bar.add(order.order_id)
             if remaining_quantity > 0:
-                broker._partial_orders[order.order_id] = remaining_quantity
+                self.orders.partial_quantities[order.order_id] = remaining_quantity
             else:
-                broker._partial_orders.pop(order.order_id, None)
+                self.orders.partial_quantities.pop(order.order_id, None)
 
         # Create fill record
         fill = Fill(
@@ -251,10 +273,10 @@ class FillExecutor:
             exit_reason=_get_exit_reason(order) if is_exit_fill else "",
             exit_reason_detail=order._risk_exit_reason,
         )
-        broker.fills.append(fill)
+        self.journal.fills.append(fill)
 
         # Determine if partial fill
-        is_partial = order.order_id in broker._partial_orders
+        is_partial = order.order_id in self.orders.partial_quantities
         previous_filled_quantity = order.filled_quantity
         cumulative_filled_quantity = previous_filled_quantity + fill_quantity
         previous_fill_notional = (order.filled_price or 0.0) * previous_filled_quantity
@@ -282,7 +304,7 @@ class FillExecutor:
             open_commission=open_commission,
         )
 
-        old_position = broker.positions.get(order.asset)
+        old_position = self.account.positions.get(order.asset)
         old_quantity = old_position.quantity if old_position is not None else 0.0
         old_entry_price = old_position.entry_price if old_position is not None else 0.0
 
@@ -308,20 +330,20 @@ class FillExecutor:
         self._sync_account_state(order.asset, current_price=ctx.fill_price)
 
         # Update account cash
-        broker.account.cash = broker.cash
+        self.account.cash = broker.cash
 
         # Settlement delay: hold sale proceeds until settlement completes
         if broker.settlement_delay > 0 and cash_change > 0:
-            broker.account.add_settlement_hold(
-                broker._bar_index, broker.settlement_delay, cash_change
+            self.account.add_settlement_hold(
+                self.market.bar_index, broker.settlement_delay, cash_change
             )
 
         # Cancel sibling bracket orders on full fill
         if order.parent_id and not is_partial:
-            for o in broker.pending_orders[:]:
+            for o in self.orders.pending[:]:
                 if o.parent_id == order.parent_id and o.order_id != order.order_id:
                     o.status = OrderStatus.CANCELLED
-                    broker.pending_orders.remove(o)
+                    self.orders.pending.remove(o)
 
         return not is_partial
 
@@ -334,12 +356,12 @@ class FillExecutor:
         commission: float,
     ) -> None:
         broker = self.broker
-        policy = broker.account.policy
+        policy = self.account.policy
         if policy.allow_leverage or policy.short_cash_policy != "lock_notional":
             return
 
         remaining = ctx.signed_qty
-        free_cash = broker.account._lock_notional_free_cash
+        free_cash = self.account._lock_notional_free_cash
         multiplier = broker.get_multiplier(ctx.order.asset)
 
         if old_quantity < 0.0 and remaining > 0.0:
@@ -357,9 +379,7 @@ class FillExecutor:
             required_cash = abs(remaining) * ctx.fill_price * multiplier
             free_cash = _add_with_zero_cancellation(free_cash, -required_cash)
 
-        broker.account._lock_notional_free_cash = _add_with_zero_cancellation(
-            free_cash, -commission
-        )
+        self.account._lock_notional_free_cash = _add_with_zero_cancellation(free_cash, -commission)
 
     @staticmethod
     def _validate_execution_price(value: float, *, source: str) -> None:
@@ -389,8 +409,7 @@ class FillExecutor:
         Returns:
             Actual commission charged (may differ from ctx.commission for flips)
         """
-        broker = self.broker
-        pos = broker.positions.get(ctx.order.asset)
+        pos = self.account.positions.get(ctx.order.asset)
 
         if pos is None:
             if ctx.signed_qty != 0:
@@ -426,9 +445,9 @@ class FillExecutor:
         """
         broker = self.broker
         if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
-            return broker._current_highs.get(asset, fill_price)
+            return self.market.highs.get(asset, fill_price)
         elif broker.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
-            return broker._current_closes.get(asset, broker._current_prices.get(asset, fill_price))
+            return self.market.closes.get(asset, self.market.prices.get(asset, fill_price))
         else:
             return fill_price
 
@@ -449,9 +468,9 @@ class FillExecutor:
         broker = self.broker
         # When using BAR_HIGH for HWM, use BAR_LOW for LWM
         if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
-            return broker._current_lows.get(asset, fill_price)
+            return self.market.lows.get(asset, fill_price)
         elif broker.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
-            return broker._current_closes.get(asset, broker._current_prices.get(asset, fill_price))
+            return self.market.closes.get(asset, self.market.prices.get(asset, fill_price))
         else:
             return fill_price
 
@@ -505,8 +524,8 @@ class FillExecutor:
             high_water_mark=initial_hwm,
             low_water_mark=initial_lwm,
         )
-        broker.positions[order.asset] = pos
-        broker._positions_created_this_bar.add(order.asset)
+        self.account.positions[order.asset] = pos
+        self.risk.positions_created_this_bar.add(order.asset)
 
     def _close_position(self, ctx: FillContext, pos: Position, old_qty: float) -> None:
         """Close an existing position to flat.
@@ -516,7 +535,6 @@ class FillExecutor:
             pos: Position being closed
             old_qty: Original position quantity
         """
-        broker = self.broker
         order = ctx.order
 
         # PnL includes both entry and exit commission, and multiplier for futures
@@ -559,11 +577,11 @@ class FillExecutor:
             exit_spread=exit_quote.get("spread"),
             exit_available_size=exit_quote.get("available_size"),
         )
-        broker.trades.append(trade)
-        del broker.positions[order.asset]
+        self.journal.trades.append(trade)
+        del self.account.positions[order.asset]
 
         # Record P&L event for trading stats
-        broker._record_pnl_event(order.asset, pnl)
+        self.record_pnl(order.asset, pnl)
 
     def _flip_position(
         self, ctx: FillContext, pos: Position, old_qty: float, new_qty: float
@@ -629,17 +647,17 @@ class FillExecutor:
             exit_spread=exit_quote.get("spread"),
             exit_available_size=exit_quote.get("available_size"),
         )
-        broker.trades.append(trade)
+        self.journal.trades.append(trade)
 
         # Record P&L event for trading stats (flip = close old position)
-        broker._record_pnl_event(order.asset, pnl)
+        self.record_pnl(order.asset, pnl)
 
         # Create new position in opposite direction
         initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
         initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
         context = self._build_position_context(order)
 
-        broker.positions[order.asset] = Position(
+        self.account.positions[order.asset] = Position(
             asset=order.asset,
             quantity=new_qty,
             entry_price=ctx.fill_price,
@@ -651,13 +669,13 @@ class FillExecutor:
             high_water_mark=initial_hwm,
             low_water_mark=initial_lwm,
         )
-        broker._positions_created_this_bar.add(order.asset)
+        self.risk.positions_created_this_bar.add(order.asset)
 
         # Cancel all other pending orders for this asset
-        for pending_order in list(broker.pending_orders):
+        for pending_order in list(self.orders.pending):
             if pending_order.asset == order.asset and pending_order.order_id != order.order_id:
                 pending_order.status = OrderStatus.CANCELLED
-                broker.pending_orders.remove(pending_order)
+                self.orders.pending.remove(pending_order)
 
         return total_commission
 
@@ -672,8 +690,6 @@ class FillExecutor:
             old_qty: Original position quantity
             new_qty: New position quantity (same sign)
         """
-        broker = self.broker
-
         if abs(new_qty) < abs(old_qty):
             # Scaling down - this is a partial exit, calculate and record P&L
             exited_qty = abs(old_qty) - abs(new_qty)
@@ -702,7 +718,7 @@ class FillExecutor:
             pnl_pct = raw_pct if old_qty > 0 else -raw_pct
             entry_quote = pos.context.get("entry_quote_context", {})
             exit_quote = ctx.quote_context
-            broker.trades.append(
+            self.journal.trades.append(
                 Trade(
                     symbol=ctx.order.asset,
                     entry_time=pos.entry_time,
@@ -736,7 +752,7 @@ class FillExecutor:
             )
 
             # Record P&L event for trading stats
-            broker._record_pnl_event(ctx.order.asset, pnl)
+            self.record_pnl(ctx.order.asset, pnl)
 
         elif abs(new_qty) > abs(old_qty):
             # Scaling up - recalculate average entry price
@@ -753,7 +769,7 @@ class FillExecutor:
         pos.quantity = new_qty
 
     def _sync_account_state(self, asset: str, current_price: float | None = None) -> None:
-        """Sync broker position to AccountState.
+        """Apply the fill mark to the canonical AccountState position.
 
         Args:
             asset: Asset to sync
@@ -761,35 +777,12 @@ class FillExecutor:
                 broker close price when not provided.
         """
         broker = self.broker
-        broker_pos = broker.positions.get(asset)
-
-        if broker_pos is None:
-            # Position was closed, remove from account
-            if asset in broker.account.positions:
-                del broker.account.positions[asset]
-        else:
-            # Update or create position in account (include multiplier for correct valuation)
-            account_pos = broker.account.positions.get(asset)
-            mark_price = (
-                current_price
-                if current_price is not None
-                else broker.get_mark_price(asset, quantity=broker_pos.quantity)
-                or broker_pos.entry_price
-            )
-            if account_pos is None:
-                broker.account.positions[asset] = Position(
-                    asset=broker_pos.asset,
-                    quantity=broker_pos.quantity,
-                    entry_price=broker_pos.entry_price,
-                    current_price=mark_price,
-                    entry_time=broker_pos.entry_time,
-                    bars_held=broker_pos.bars_held,
-                    multiplier=broker_pos.multiplier,
-                )
-            else:
-                account_pos.quantity = broker_pos.quantity
-                account_pos.entry_price = broker_pos.entry_price
-                account_pos.current_price = mark_price
-                account_pos.entry_time = broker_pos.entry_time
-                account_pos.bars_held = broker_pos.bars_held
-                account_pos.multiplier = broker_pos.multiplier
+        position = self.account.positions.get(asset)
+        if position is None:
+            return
+        mark_price = (
+            current_price
+            if current_price is not None
+            else broker.get_mark_price(asset, quantity=position.quantity) or position.entry_price
+        )
+        position.current_price = mark_price
