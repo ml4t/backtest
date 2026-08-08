@@ -42,6 +42,7 @@ LEGACY_BROKER_STATE = {
     "_submitting_before_risk",
 }
 BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
+STRATEGY_CALLBACKS = {"on_before_risk", "on_data", "on_end", "on_prepare", "on_start"}
 
 
 def test_account_state_is_the_only_position_ledger() -> None:
@@ -100,3 +101,26 @@ def test_collaborators_do_not_reach_through_broker_private_state() -> None:
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
 
     assert not violations, "Broker state bypasses:\n" + "\n".join(violations)
+
+
+def test_engine_is_the_only_strategy_callback_sequencer() -> None:
+    engine_path = SOURCE_ROOT / "engine.py"
+    engine_calls: set[str] = set()
+    violations: list[str] = []
+
+    for path in SOURCE_ROOT.rglob("*.py"):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr not in STRATEGY_CALLBACKS:
+                continue
+            if path == engine_path:
+                engine_calls.add(node.func.attr)
+            else:
+                violations.append(
+                    f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.func.attr}"
+                )
+
+    assert engine_calls == STRATEGY_CALLBACKS
+    assert not violations, "Callback sequencing bypasses:\n" + "\n".join(violations)
