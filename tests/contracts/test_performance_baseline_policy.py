@@ -20,6 +20,26 @@ WORKLOADS = {
 }
 
 
+def _prose_lines(path: Path) -> list[tuple[int, str]]:
+    lines: list[tuple[int, str]] = []
+    fence: tuple[str, int] | None = None
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+        if fence is not None:
+            if (
+                marker is not None
+                and marker.group(1)[0] == fence[0]
+                and len(marker.group(1)) >= fence[1]
+            ):
+                fence = None
+            continue
+        if marker is not None:
+            fence = (marker.group(1)[0], len(marker.group(1)))
+            continue
+        lines.append((line_number, line))
+    return lines
+
+
 def test_release_performance_manifest_covers_required_workloads() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
 
@@ -53,17 +73,8 @@ def test_public_docs_do_not_publish_unretained_performance_numbers() -> None:
     )
     violations: list[str] = []
     for path in documents:
-        fence: str | None = None
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            marker = re.match(r"^\s*(`{3,}|~{3,})", line)
-            if fence is not None:
-                if marker is not None and marker.group(1)[0] == fence[0]:
-                    fence = None
-                continue
-            if marker is not None:
-                fence = marker.group(1)
-                continue
-            if line.startswith("    ") or retained_evidence.search(line):
+        for line_number, line in _prose_lines(path):
+            if retained_evidence.search(line):
                 continue
             if ratio_or_throughput.search(line) or (
                 resource_claim.search(line) and resource_context.search(line)
@@ -71,6 +82,27 @@ def test_public_docs_do_not_publish_unretained_performance_numbers() -> None:
                 violations.append(f"{path.relative_to(ROOT)}:{line_number}: {line}")
 
     assert not violations
+
+
+def test_performance_claim_scanner_respects_fence_length_and_scans_nested_text(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "claims.md"
+    document.write_text(
+        "````python\n"
+        "print('10x faster')\n"
+        "```\n"
+        "print('20x faster')\n"
+        "````\n"
+        "- Results\n"
+        "    30x faster in the benchmark\n",
+        encoding="utf-8",
+    )
+
+    assert _prose_lines(document) == [
+        (6, "- Results"),
+        (7, "    30x faster in the benchmark"),
+    ]
 
 
 def test_runtime_sample_spread_is_reported_without_becoming_a_host_noise_failure(

@@ -81,15 +81,34 @@ def test_ci_checks_every_release_validation_script() -> None:
             workflow.read_text(encoding="utf-8"),
         )
     }
-    excluded_root_scripts = {
+    excluded_validation_scripts = {
+        # Legacy benchmark entry points run only in their named framework environments.
+        "validation/backtrader/benchmark_performance.py",
+        "validation/backtrader/scale_validation.py",
+        "validation/vectorbt_pro/benchmark_performance.py",
+        "validation/zipline/benchmark_performance.py",
+        # LEAN algorithms import names supplied by the QuantConnect runtime.
+        "validation/lean/scenario_01_long_only/main.py",
+        "validation/lean/workspace/chapter16_etfs/main.py",
+        "validation/lean/workspace/chapter16_sp500_equity_option_analytics/main.py",
+        "validation/lean/workspace/chapter16_us_equities_panel/main.py",
+        # Legacy manual orchestrators require optional framework environments.
         "validation/benchmark_suite.py",
         "validation/run_all_benchmarks.py",
         "validation/run_full_validation.py",
         "validation/run_scenario.py",
+        # Framework adapters execute only inside their isolated correctness environments.
+        "validation/frameworks/backtrader.py",
+        "validation/frameworks/vectorbt_oss.py",
+        "validation/frameworks/vectorbt_pro.py",
+        "validation/frameworks/zipline.py",
     }
-    root_scripts = {
-        path.relative_to(_ROOT).as_posix() for path in (_ROOT / "validation").glob("*.py")
+    validation_scripts = {
+        path.relative_to(_ROOT).as_posix()
+        for path in (_ROOT / "validation").rglob("*.py")
+        if path.name != "__init__.py" and "__pycache__" not in path.parts
     }
 
     assert workflow_scripts <= manifest
-    assert root_scripts == manifest | excluded_root_scripts
+    assert not manifest & excluded_validation_scripts
+    assert validation_scripts == manifest | excluded_validation_scripts

@@ -23,7 +23,7 @@ PROJECT_ROOT = VALIDATION_DIR.parent
 sys.path.insert(0, str(VALIDATION_DIR))
 
 from common.types import ValidationRecord, ValidationStatus  # noqa: E402, I001
-from scenarios.definitions import SCENARIOS  # noqa: E402, I001
+from scenarios.definitions import SCENARIOS  # noqa: E402
 
 FRAMEWORK_ENVIRONMENTS = {
     "vectorbt_pro": ".venv-vectorbt-pro",

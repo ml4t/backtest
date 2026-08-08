@@ -53,8 +53,22 @@ FORBIDDEN_BROKER_STATE = {
     "_submitting_before_risk",
 }
 TRANSITIONAL_ENGINE_LIFECYCLE_STATE = {"_submitting_before_risk"}
-ENGINE_COLLECTION_ACCESS = BROKER_MUTABLE_COLLECTIONS
 STRATEGY_CALLBACKS = {"on_before_risk", "on_data", "on_end", "on_prepare", "on_start"}
+COLLECTION_MUTATORS = {
+    "add",
+    "append",
+    "clear",
+    "discard",
+    "extend",
+    "insert",
+    "pop",
+    "popitem",
+    "remove",
+    "reverse",
+    "setdefault",
+    "sort",
+    "update",
+}
 
 
 def _parse(path: Path) -> ast.Module:
@@ -86,7 +100,7 @@ def _broker_private_assignments() -> set[str]:
         for node in broker_tree.body
         if isinstance(node, ast.ClassDef) and node.name == "Broker"
     )
-    return {
+    assigned = {
         node.attr
         for node in ast.walk(broker_class)
         if isinstance(node, ast.Attribute)
@@ -95,6 +109,55 @@ def _broker_private_assignments() -> set[str]:
         and node.value.id == "self"
         and node.attr.startswith("_")
     }
+    properties = {
+        node.name
+        for node in broker_class.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name.startswith("_")
+        and any(
+            isinstance(decorator, ast.Name)
+            and decorator.id == "property"
+            or isinstance(decorator, ast.Attribute)
+            and decorator.attr in {"setter", "deleter"}
+            for decorator in node.decorator_list
+        )
+    }
+    annotated = {
+        node.target.id
+        for node in broker_class.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id.startswith("_")
+    }
+    return assigned | properties | annotated
+
+
+def _mutable_collection_access(node: ast.AST) -> str | None:
+    if (
+        isinstance(node, ast.Attribute)
+        and node.attr in BROKER_MUTABLE_COLLECTIONS
+        and _references_broker(node.value)
+        and isinstance(node.ctx, (ast.Store, ast.Del))
+    ):
+        return node.attr
+    if (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.ctx, (ast.Store, ast.Del))
+        and isinstance(node.value, ast.Attribute)
+        and node.value.attr in BROKER_MUTABLE_COLLECTIONS
+        and _references_broker(node.value.value)
+    ):
+        return node.value.attr
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in COLLECTION_MUTATORS
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr in BROKER_MUTABLE_COLLECTIONS
+        and _references_broker(node.func.value.value)
+    ):
+        return node.func.value.attr
+    return None
 
 
 def _strategy_callback_access(node: ast.AST) -> str | None:
@@ -148,9 +211,23 @@ def test_mutable_domain_state_delegates_to_its_owner() -> None:
 def test_new_broker_private_state_requires_an_explicit_boundary_decision() -> None:
     discovered = _broker_private_assignments()
 
-    assert discovered <= FORBIDDEN_BROKER_STATE, (
-        f"Unreviewed Broker private state: {sorted(discovered - FORBIDDEN_BROKER_STATE)}"
+    assert discovered == FORBIDDEN_BROKER_STATE, (
+        f"Broker private state differs: missing decisions="
+        f"{sorted(discovered - FORBIDDEN_BROKER_STATE)}, "
+        f"stale decisions={sorted(FORBIDDEN_BROKER_STATE - discovered)}"
     )
+
+
+def test_mutable_collection_contract_distinguishes_reads_from_mutations() -> None:
+    tree = ast.parse(
+        "broker.positions['AAPL'] = position\nbroker.fills.append(fill)\norders = broker.orders\n"
+    )
+
+    assert [
+        access
+        for node in ast.walk(tree)
+        if (access := _mutable_collection_access(node)) is not None
+    ] == ["positions", "fills"]
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
@@ -170,13 +247,11 @@ def test_collaborators_do_not_reach_through_broker_private_state() -> None:
                 and not (path == engine_path and node.attr in TRANSITIONAL_ENGINE_LIFECYCLE_STATE)
             ):
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
-            if (
-                isinstance(node, ast.Attribute)
-                and node.attr in BROKER_MUTABLE_COLLECTIONS
-                and _references_broker(node.value)
-                and not (path == engine_path and node.attr in ENGINE_COLLECTION_ACCESS)
-            ):
-                violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
+            mutable_collection = _mutable_collection_access(node)
+            if mutable_collection is not None:
+                violations.append(
+                    f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {mutable_collection}"
+                )
 
     assert not violations, "Broker state bypasses:\n" + "\n".join(violations)
 

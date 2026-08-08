@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import polars as pl
 import pytest
 
+import ml4t.backtest.calendar as calendar_module
 from ml4t.backtest import DataFeed, Engine, OrderSide, Strategy
 from ml4t.backtest.config import BacktestConfig, DataFrequency
 
@@ -153,7 +154,9 @@ class TestCalendarEnforcementDaily:
             data_frequency=DataFrequency.DAILY,
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # All 14 bars should be processed
         assert strategy.bars_processed == 14
@@ -179,7 +182,9 @@ class TestCalendarEnforcementDaily:
             data_frequency=DataFrequency.DAILY,
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # Should skip 4 weekend days + 1 MLK Day = 5 non-trading days
         # 14 days - 5 = 9 trading days
@@ -272,6 +277,37 @@ class TestCalendarEnforcementIntraday:
 
         assert result.metrics["skipped_bars"] == 2
 
+    def test_session_filter_warns_when_naive_timezone_causes_partial_loss(self):
+        timestamps = [
+            datetime(2024, 1, 2, 9, 30),
+            datetime(2024, 1, 2, 15, 59),
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 2,
+                "open": [100.0] * 2,
+                "high": [100.0] * 2,
+                "low": [100.0] * 2,
+                "close": [100.0] * 2,
+                "volume": [100_000] * 2,
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        )
+
+        with pytest.warns(UserWarning, match="retained 1 of 2 intraday bars"):
+            result = engine.run()
+
+        assert result.metrics["skipped_bars"] == 1
+
     def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
         timestamps = [
             datetime(2024, 1, 2, 14, 30),
@@ -304,7 +340,7 @@ class TestCalendarEnforcementIntraday:
 
         assert result.metrics["skipped_bars"] == 0
 
-    def test_intraday_weekend_skipped(self):
+    def test_intraday_weekend_skipped(self, monkeypatch: pytest.MonkeyPatch):
         """Weekend intraday bars are skipped (via trading day fallback)."""
         # Saturday data - will be caught by trading day check
         saturday = datetime(2024, 1, 6, 10, 0)  # Saturday 10 AM
@@ -315,6 +351,13 @@ class TestCalendarEnforcementIntraday:
         ]
         prices = [100.0, 100.1, 100.2]
         n_bars = len(timestamps)
+        checked_dates = []
+
+        def reject_trading_date(_calendar_id, date):
+            checked_dates.append(date)
+            return False
+
+        monkeypatch.setattr(calendar_module, "is_trading_day", reject_trading_date)
 
         df = pl.DataFrame(
             {
@@ -338,11 +381,14 @@ class TestCalendarEnforcementIntraday:
             timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # All bars should be skipped (Saturday)
         assert strategy.bars_processed == 0
         assert results.metrics["skipped_bars"] == 3
+        assert checked_dates == [saturday.date()]
 
     def test_intraday_holiday_skipped(self):
         """Holiday intraday bars are skipped (via trading day fallback)."""
@@ -377,7 +423,9 @@ class TestCalendarEnforcementIntraday:
             timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # All bars should be skipped (holiday)
         assert strategy.bars_processed == 0
