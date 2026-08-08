@@ -25,6 +25,35 @@ config = BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR)  # default
 `OrderType.MOC` is the exception. In `NEXT_BAR` mode, `MOC` orders submitted during
 `on_data()` still fill on the current bar, at the close, after strategy logic runs.
 
+### Pre-Risk Callback State
+
+`Strategy.on_before_risk()` runs after the current bar has been registered and immediately before
+position rules are evaluated. The state visible to the callback depends on execution mode:
+
+| Mode | Positions visible to `on_before_risk()` | Ordinary orders submitted there |
+|------|------------------------------------------|----------------------------------|
+| `NEXT_BAR` | All open positions, plus any fills from priced, policy-valid prior market entries submitted by this callback | Pending until the next bar |
+| `SAME_BAR` | State before regular pending-order processing | Processed during the current bar |
+
+In `SAME_BAR`, set `immediate_fill=True` when a position opened in `on_before_risk()` must receive
+stop or trailing-rule evaluation on that same bar. In `NEXT_BAR`, newly opened positions start risk
+evaluation on the following bar, matching ordinary next-bar entry timing. A prior market entry
+fills before the callback only when a current price is available and policy and execution limits
+permit it. Partial fills are visible to the callback while the remaining quantity stays pending.
+Limit and stop orders can remain pending, so a guarded entry checks both position and pending intent:
+
+```python
+def on_before_risk(self, timestamp, data, context, broker):
+    if broker.get_position("SPY") is None and not broker.get_pending_orders("SPY"):
+        broker.submit_order("SPY", 10)
+```
+
+Orders submitted by `on_data()` retain the configured within-bar fill ordering with risk exits. A
+pre-risk market entry that lacks buying power remains pending during the callback and
+then participates in the normal ordered batch, so a same-bar exit can fund it. Limit and stop
+orders stay in the normal ordered batch. Explicit pyramiding remains available by submitting an
+additional order without the flat-position and pending-order guard.
+
 ### SAME_BAR
 
 Orders fill at the **current bar's close** price, in the same bar they are submitted.

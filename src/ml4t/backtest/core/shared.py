@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from math import fabs, isfinite, ulp
 from typing import TYPE_CHECKING
 
 from ..types import ExitReason, OrderSide
@@ -14,6 +15,20 @@ if TYPE_CHECKING:
 # Floating-point tolerance for cash comparisons ($0.01 = 1 cent).
 # Prevents order rejections due to rounding in equity/price arithmetic.
 CASH_TOLERANCE: float = 0.01
+QUANTITY_ZERO_FLOOR: float = 1e-12
+QUANTITY_ZERO_ULPS: int = 16
+
+
+def quantity_zero_tolerance(*operands: float) -> float:
+    """Return the larger of the absolute floor and 16 ULP at the operand scale.
+
+    Cancellation residue inherits the scale of the values being cancelled, so callers pass the
+    pre-operation quantities rather than the near-zero result.
+    """
+    scale = max((fabs(value) for value in operands if isfinite(value)), default=0.0)
+    if scale == 0.0:
+        return QUANTITY_ZERO_FLOOR
+    return max(QUANTITY_ZERO_FLOOR, QUANTITY_ZERO_ULPS * ulp(scale))
 
 
 @dataclass

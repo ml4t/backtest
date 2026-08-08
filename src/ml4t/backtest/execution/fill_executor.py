@@ -7,11 +7,14 @@ with helper methods for position creation, closing, flipping, and scaling.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import InitialHwmSource, ShareType
+from ..core.shared import quantity_zero_tolerance
+from ..models import calculate_commission, calculate_slippage
 from ..types import (
     ExitReason,
     Fill,
@@ -40,6 +43,11 @@ def _get_exit_reason(order: Order) -> str:
     return ExitReason.SIGNAL.value
 
 
+def _is_position_flip(old_quantity: float, new_quantity: float) -> bool:
+    """Return whether a position crosses through zero to the opposite side."""
+    return old_quantity > 0 > new_quantity or old_quantity < 0 < new_quantity
+
+
 @dataclass
 class FillContext:
     """Context for a single fill execution.
@@ -58,6 +66,8 @@ class FillContext:
     is_partial: bool
     price_source: str
     quote_context: dict[str, float | None]
+    close_commission: float | None = None
+    open_commission: float | None = None
 
 
 class FillExecutor:
@@ -82,7 +92,6 @@ class FillExecutor:
             broker: The Broker instance whose state we'll modify
         """
         self.broker = broker
-        self._qty_zero_epsilon = 1e-12
 
     def execute(self, order: Order, base_price: float) -> bool:
         """Execute a fill and update positions.
@@ -95,10 +104,16 @@ class FillExecutor:
 
         Returns:
             True if order is fully filled, False if partially filled
+
+        Raises:
+            ValueError: If an execution model returns a non-finite, non-positive,
+                negative, or directionally favorable value outside its contract.
         """
         broker = self.broker
         current_time = broker._current_time
         assert current_time is not None, "Cannot execute fill without current time"
+
+        self._validate_execution_price(base_price, source="base execution price")
 
         available_size = broker.get_available_size(order.asset, order.side)
 
@@ -107,6 +122,7 @@ class FillExecutor:
         fill_quantity = effective_quantity
 
         # Apply execution limits (volume participation)
+        remaining_quantity = 0.0
         if broker.execution_limits is not None:
             if order.order_id in broker._filled_this_bar:
                 return False
@@ -118,22 +134,19 @@ class FillExecutor:
             )
             fill_quantity = exec_result.fillable_quantity
 
+            if not math.isfinite(fill_quantity) or fill_quantity < 0:
+                raise ValueError(
+                    "Invalid execution quantity from "
+                    f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}"
+                )
             if broker.share_type == ShareType.INTEGER:
                 fill_quantity = float(int(fill_quantity))
-
-            if fill_quantity <= 0:
+            if fill_quantity == 0:
                 return False
-
-            broker._filled_this_bar.add(order.order_id)
 
             remaining_quantity = max(0.0, effective_quantity - fill_quantity)
             if broker.share_type == ShareType.INTEGER:
                 remaining_quantity = float(int(remaining_quantity))
-
-            if remaining_quantity > 0:
-                broker._partial_orders[order.order_id] = remaining_quantity
-            else:
-                broker._partial_orders.pop(order.order_id, None)
 
         # Apply market impact
         if broker.market_impact_model is not None:
@@ -144,20 +157,54 @@ class FillExecutor:
                 available_size,
                 is_buy,
             )
+            self._validate_market_impact(impact, is_buy=is_buy)
             base_price = base_price + impact
+            self._validate_execution_price(base_price, source="market-impact execution price")
 
         # Calculate slippage
-        slippage = broker.slippage_model.calculate(
+        slippage = calculate_slippage(
+            broker.slippage_model,
             order.asset,
             fill_quantity,
             base_price,
             available_size,
         )
         fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
+        self._validate_execution_price(fill_price, source="execution price")
 
         # Calculate commission
-        commission = broker.commission_model.calculate(order.asset, fill_quantity, fill_price)
+        commission = calculate_commission(
+            broker.commission_model, order.asset, fill_quantity, fill_price
+        )
         quote_context = broker.get_quote_context(order.asset, order.side)
+
+        signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
+        close_commission = None
+        open_commission = None
+        position = broker.positions.get(order.asset)
+        is_exit_fill = position is not None and position.quantity * signed_qty < 0
+        if position is not None:
+            new_qty = position.quantity + signed_qty
+            if _is_position_flip(position.quantity, new_qty):
+                close_commission = calculate_commission(
+                    broker.commission_model,
+                    order.asset,
+                    abs(position.quantity),
+                    fill_price,
+                )
+                open_commission = calculate_commission(
+                    broker.commission_model,
+                    order.asset,
+                    abs(new_qty),
+                    fill_price,
+                )
+
+        if broker.execution_limits is not None:
+            broker._filled_this_bar.add(order.order_id)
+            if remaining_quantity > 0:
+                broker._partial_orders[order.order_id] = remaining_quantity
+            else:
+                broker._partial_orders.pop(order.order_id, None)
 
         # Create fill record
         fill = Fill(
@@ -182,21 +229,25 @@ class FillExecutor:
             bid_size=quote_context["bid_size"],
             ask_size=quote_context["ask_size"],
             available_size=quote_context["available_size"],
+            exit_reason=_get_exit_reason(order) if is_exit_fill else "",
+            exit_reason_detail=order._risk_exit_reason,
         )
         broker.fills.append(fill)
 
         # Determine if partial fill
         is_partial = order.order_id in broker._partial_orders
-        if is_partial:
-            order.filled_quantity = (order.filled_quantity or 0) + fill_quantity
-        else:
+        previous_filled_quantity = order.filled_quantity
+        cumulative_filled_quantity = previous_filled_quantity + fill_quantity
+        previous_fill_notional = (order.filled_price or 0.0) * previous_filled_quantity
+        order.filled_price = (
+            previous_fill_notional + fill_price * fill_quantity
+        ) / cumulative_filled_quantity
+        order.filled_quantity = cumulative_filled_quantity
+        if not is_partial:
             order.status = OrderStatus.FILLED
             order.filled_at = current_time
-            order.filled_price = fill_price
-            order.filled_quantity = fill_quantity
 
         # Build fill context
-        signed_qty = fill_quantity if order.side == OrderSide.BUY else -fill_quantity
         ctx = FillContext(
             order=order,
             current_time=current_time,
@@ -208,10 +259,13 @@ class FillExecutor:
             is_partial=is_partial,
             price_source=broker.execution_price.value,
             quote_context=quote_context,
+            close_commission=close_commission,
+            open_commission=open_commission,
         )
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
+        fill.commission = actual_commission
 
         # Update cash (include multiplier for futures/derivatives)
         multiplier = broker.get_multiplier(order.asset)
@@ -241,6 +295,25 @@ class FillExecutor:
 
         return not is_partial
 
+    @staticmethod
+    def _validate_execution_price(value: float, *, source: str) -> None:
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError(f"Invalid {source}: expected a finite positive number, got {value!r}")
+
+    def _validate_market_impact(self, value: float, *, is_buy: bool) -> None:
+        model_name = type(self.broker.market_impact_model).__name__
+        if not math.isfinite(value):
+            raise ValueError(
+                f"Invalid market impact from {model_name}: expected a finite adverse value, "
+                f"got {value!r}"
+            )
+        wrong_direction = (is_buy and value < 0.0) or (not is_buy and value > 0.0)
+        if wrong_direction:
+            expected = ">= 0 for buys" if is_buy else "<= 0 for sells"
+            raise ValueError(
+                f"Invalid market impact from {model_name}: expected {expected}, got {value!r}"
+            )
+
     def _update_position(self, ctx: FillContext) -> float:
         """Update position based on fill.
 
@@ -260,13 +333,13 @@ class FillExecutor:
         else:
             old_qty = pos.quantity
             new_qty = old_qty + ctx.signed_qty
-            if abs(new_qty) < self._qty_zero_epsilon:
+            if abs(new_qty) <= quantity_zero_tolerance(old_qty, ctx.signed_qty):
                 new_qty = 0.0
 
             if new_qty == 0:
                 self._close_position(ctx, pos, old_qty)
                 return ctx.commission
-            elif (old_qty > 0) != (new_qty > 0):
+            elif _is_position_flip(old_qty, new_qty):
                 return self._flip_position(ctx, pos, old_qty, new_qty)
             else:
                 self._scale_position(ctx, pos, old_qty, new_qty)
@@ -401,6 +474,7 @@ class FillExecutor:
             fees=total_commission,
             exit_slippage=ctx.slippage,
             exit_reason=_get_exit_reason(order),
+            exit_reason_detail=order._risk_exit_reason,
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
             entry_slippage=pos.entry_slippage,
@@ -439,12 +513,11 @@ class FillExecutor:
         broker = self.broker
         order = ctx.order
 
-        close_qty = abs(old_qty)
-        open_qty = abs(new_qty)
-
         # Calculate separate commissions for close and open portions
-        close_commission = broker.commission_model.calculate(order.asset, close_qty, ctx.fill_price)
-        open_commission = broker.commission_model.calculate(order.asset, open_qty, ctx.fill_price)
+        if ctx.close_commission is None or ctx.open_commission is None:
+            raise RuntimeError("Position flip commissions were not calculated before mutation")
+        close_commission = ctx.close_commission
+        open_commission = ctx.open_commission
         total_commission = close_commission + open_commission
 
         # Close the old position (include multiplier for futures)
@@ -468,6 +541,7 @@ class FillExecutor:
             fees=total_close_commission,
             exit_slippage=ctx.slippage,
             exit_reason=_get_exit_reason(order),
+            exit_reason_detail=order._risk_exit_reason,
             mfe=pos.max_favorable_excursion,
             mae=pos.max_adverse_excursion,
             entry_slippage=pos.entry_slippage,
@@ -540,13 +614,53 @@ class FillExecutor:
             else:  # Short position
                 pnl = (pos.entry_price - ctx.fill_price) * exited_qty * pos.multiplier
 
-            # Subtract proportional commission
-            # entry_commission is for the full position, so we take the proportional part
-            exit_portion_ratio = exited_qty / abs(pos.initial_quantity or old_qty)
+            # Allocate the current position's entry costs in proportion to the quantity
+            # removed. The residual cost remains attached to the residual position.
+            exit_portion_ratio = exited_qty / abs(old_qty)
             proportional_entry_commission = pos.entry_commission * exit_portion_ratio
+            pos.entry_commission -= proportional_entry_commission
             partial_exit_commission = ctx.commission
             total_commission = proportional_entry_commission + partial_exit_commission
             pnl -= total_commission
+
+            raw_pct = (
+                (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
+            )
+            pnl_pct = raw_pct if old_qty > 0 else -raw_pct
+            entry_quote = pos.context.get("entry_quote_context", {})
+            exit_quote = ctx.quote_context
+            broker.trades.append(
+                Trade(
+                    symbol=ctx.order.asset,
+                    entry_time=pos.entry_time,
+                    exit_time=ctx.current_time,
+                    entry_price=pos.entry_price,
+                    exit_price=ctx.fill_price,
+                    quantity=math.copysign(exited_qty, old_qty),
+                    pnl=pnl,
+                    pnl_percent=pnl_pct,
+                    bars_held=pos.bars_held,
+                    fees=total_commission,
+                    exit_slippage=ctx.slippage,
+                    exit_reason=_get_exit_reason(ctx.order),
+                    exit_reason_detail=ctx.order._risk_exit_reason,
+                    status="partial",
+                    mfe=pos.max_favorable_excursion,
+                    mae=pos.max_adverse_excursion,
+                    entry_slippage=pos.entry_slippage,
+                    multiplier=pos.multiplier,
+                    entry_quote_mid_price=entry_quote.get("quote_mid_price"),
+                    entry_bid_price=entry_quote.get("bid_price"),
+                    entry_ask_price=entry_quote.get("ask_price"),
+                    entry_spread=entry_quote.get("spread"),
+                    entry_available_size=entry_quote.get("available_size"),
+                    exit_quote_mid_price=exit_quote.get("quote_mid_price"),
+                    exit_bid_price=exit_quote.get("bid_price"),
+                    exit_ask_price=exit_quote.get("ask_price"),
+                    exit_spread=exit_quote.get("spread"),
+                    exit_available_size=exit_quote.get("available_size"),
+                )
+            )
 
             # Record P&L event for trading stats
             broker._record_pnl_event(ctx.order.asset, pnl)

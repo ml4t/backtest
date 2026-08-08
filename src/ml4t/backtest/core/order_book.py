@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
-from .shared import SubmitOrderOptions, is_exit_order
+from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
 
 
 class OrderBook:
@@ -15,7 +16,6 @@ class OrderBook:
         {"quantity", "limit_price", "stop_price", "trail_amount"}
     )
     _MIN_ORDER_SIZE: float = 1e-8
-    _QTY_EPS: float = 1e-12
 
     def __init__(self, broker):
         self.broker = broker
@@ -65,6 +65,8 @@ class OrderBook:
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,
+            _submitted_before_risk=broker._submitting_before_risk,
+            _submitted_from_flat=broker.get_position(asset) is None,
         )
 
         order._signal_price = broker._current_prices.get(asset)
@@ -81,17 +83,20 @@ class OrderBook:
         if self._should_apply_submission_precheck(order) and not self._passes_submission_precheck(
             order
         ):
-            order.status = OrderStatus.REJECTED
             if not order.rejection_reason:
                 order.rejection_reason = "Insufficient cash (submission precheck)"
+            order.reject(order.rejection_reason, order._rejection_code or "insufficient_cash")
             return order
 
         if self._should_apply_buying_power_reservation(
             order
         ) and not self._passes_buying_power_check(order):
-            order.status = OrderStatus.REJECTED
             if not order.rejection_reason:
                 order.rejection_reason = "Insufficient buying power"
+            order.reject(
+                order.rejection_reason,
+                order._rejection_code or "insufficient_buying_power",
+            )
             return order
 
         broker.pending_orders.append(order)
@@ -133,21 +138,21 @@ class OrderBook:
         # Apply share rounding
         fill.apply_share_rounding(order)
         if order.quantity <= 0:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+            order.reject(
+                "Quantity rounds to zero (share_type=INTEGER)",
+                "quantity_rounds_to_zero",
+            )
             return order
 
         # Get fill price (close price for same-bar)
         price = fill.get_fill_price_for_order(order, use_open=False)
         if price is None:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "No price available"
+            order.reject("No price available", "price_unavailable")
             return order
 
         fill_price = fill.check_fill(order, price)
         if fill_price is None:
-            order.status = OrderStatus.REJECTED
-            order.rejection_reason = "Fill check failed"
+            order.reject("Fill check failed", "fill_check_failed")
             return order
 
         # Determine if this is an exit (reduces existing position)
@@ -163,27 +168,35 @@ class OrderBook:
         else:
             # Entries: validate against real cash via gatekeeper
             if not broker.skip_cash_validation:
-                valid, rejection_reason = broker.gatekeeper.validate_order(order, fill_price)
+                valid, rejection_reason, rejection_code = (
+                    broker.gatekeeper.validate_order_with_code(order, fill_price)
+                )
                 if not valid:
                     allow_rebalance_partial = (
                         order.rebalance_id is not None and broker.share_type.value == "integer"
                     )
                     if broker.partial_fills_allowed and "insufficient" in rejection_reason.lower():
                         if not fill.try_partial_fill(order, fill_price):
-                            order.status = OrderStatus.REJECTED
-                            order.rejection_reason = rejection_reason
+                            order.reject(
+                                rejection_reason,
+                                rejection_code or "order_validation_failed",
+                            )
                             return order
                         broker._partial_orders.pop(order.order_id, None)
                         return order
                     if allow_rebalance_partial and "insufficient" in rejection_reason.lower():
                         if not fill.try_partial_fill(order, fill_price):
-                            order.status = OrderStatus.REJECTED
-                            order.rejection_reason = rejection_reason
+                            order.reject(
+                                rejection_reason,
+                                rejection_code or "order_validation_failed",
+                            )
                             return order
                         broker._partial_orders.pop(order.order_id, None)
                         return order
-                    order.status = OrderStatus.REJECTED
-                    order.rejection_reason = rejection_reason
+                    order.reject(
+                        rejection_reason,
+                        rejection_code or "order_validation_failed",
+                    )
                     return order
 
             fully_filled = fill.execute_fill(order, fill_price)
@@ -257,7 +270,7 @@ class OrderBook:
                 or pos.entry_price,
             )
             for asset, pos in broker.positions.items()
-            if abs(pos.quantity) > self._QTY_EPS
+            if abs(pos.quantity) > quantity_zero_tolerance(pos.quantity)
         }
 
     def _build_shadow_policy_positions(self) -> dict[str, Position]:
@@ -265,7 +278,7 @@ class OrderBook:
         ts = broker._current_time or datetime(1970, 1, 1)
         positions: dict[str, Position] = {}
         for asset, (qty, basis_price) in self._submission_shadow_positions.items():
-            if abs(qty) <= self._QTY_EPS:
+            if abs(qty) <= quantity_zero_tolerance(qty):
                 continue
             mark_price = broker.get_mark_price(asset, quantity=qty) or basis_price
             positions[asset] = Position(
@@ -284,10 +297,10 @@ class OrderBook:
     ) -> tuple[float, float, float, float]:
         """Mirror Backtrader Position.update for pseudo-exec prechecks."""
         new_qty = old_qty + size
-        if abs(new_qty) < OrderBook._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             return 0.0, 0.0, 0.0, size
 
-        if abs(old_qty) < OrderBook._QTY_EPS:
+        if abs(old_qty) <= quantity_zero_tolerance(old_qty):
             return new_qty, price, size, 0.0
 
         if old_qty > 0:
@@ -313,6 +326,7 @@ class OrderBook:
             order.quantity = float(int(order.quantity))
             if order.quantity <= 0:
                 order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order._rejection_code = "quantity_rounds_to_zero"
                 return False
 
         signal_price = getattr(order, "_signal_price", None)
@@ -339,23 +353,23 @@ class OrderBook:
         if closed != 0.0:
             close_cash = (-closed) * signal_price
             shadow_cash += close_cash
-            closed_commission = broker.commission_model.calculate(
-                order.asset, abs(closed), signal_price
+            closed_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(closed), signal_price
             )
             shadow_cash -= closed_commission
 
         if opened != 0.0:
             open_cash = opened * signal_price
             shadow_cash -= open_cash
-            opened_commission = broker.commission_model.calculate(
-                order.asset, abs(opened), signal_price
+            opened_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(opened), signal_price
             )
             shadow_cash -= opened_commission
 
         # Keep shadow effects even for rejected orders to mirror Backtrader's
         # sequential submitted-queue pseudo-execution behavior.
         self._submission_shadow_cash = shadow_cash
-        if abs(new_qty) <= self._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)
@@ -398,6 +412,7 @@ class OrderBook:
             order.quantity = float(int(order.quantity))
             if order.quantity <= 0:
                 order.rejection_reason = "Quantity rounds to zero (share_type=INTEGER)"
+                order._rejection_code = "quantity_rounds_to_zero"
                 return False
 
         signal_price = getattr(order, "_signal_price", None)
@@ -419,8 +434,8 @@ class OrderBook:
         if closed != 0.0:
             closed_value = (-closed) * signal_price
             shadow_cash += closed_value
-            closed_commission = broker.commission_model.calculate(
-                order.asset, abs(closed), signal_price
+            closed_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(closed), signal_price
             )
             shadow_cash -= closed_commission
 
@@ -430,8 +445,8 @@ class OrderBook:
             # This prevents credit-model inflation where short proceeds
             # artificially inflate shadow cash.
             shadow_cash -= abs(opened) * signal_price
-            opened_commission = broker.commission_model.calculate(
-                order.asset, abs(opened), signal_price
+            opened_commission = calculate_commission(
+                broker.commission_model, order.asset, abs(opened), signal_price
             )
             shadow_cash -= opened_commission
 
@@ -441,7 +456,7 @@ class OrderBook:
 
         # Accepted — commit shadow changes
         self._submission_shadow_cash = shadow_cash
-        if abs(new_qty) <= self._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)
@@ -461,19 +476,21 @@ class OrderBook:
             old_qty, old_price, size, signal_price
         )
 
-        commission = broker.commission_model.calculate(order.asset, order.quantity, signal_price)
+        commission = calculate_commission(
+            broker.commission_model, order.asset, order.quantity, signal_price
+        )
         available_cash = self._submission_shadow_cash
         if broker.cash_buffer_pct > 0 and available_cash > 0:
             available_cash *= 1.0 - broker.cash_buffer_pct
 
         shadow_positions = self._build_shadow_policy_positions()
         is_reversal = (
-            abs(old_qty) > self._QTY_EPS
-            and abs(new_qty) > self._QTY_EPS
+            abs(old_qty) > quantity_zero_tolerance(old_qty)
+            and abs(new_qty) > quantity_zero_tolerance(old_qty, size)
             and ((old_qty > 0 and new_qty < 0) or (old_qty < 0 and new_qty > 0))
         )
 
-        if abs(old_qty) <= self._QTY_EPS:
+        if abs(old_qty) <= quantity_zero_tolerance(old_qty):
             valid, reason = broker.account.policy.validate_new_position(
                 asset=order.asset,
                 quantity=size,
@@ -511,12 +528,19 @@ class OrderBook:
             counts["accepted" if valid else "rejected"] += 1
 
         if not valid:
-            order.rejection_reason = reason or "Insufficient buying power (submission precheck)"
+            rejection_code = broker.gatekeeper.classify_rejection(old_qty + size)
+            fallback_reason = {
+                "account_restriction": "Account restriction (submission precheck)",
+                "insufficient_cash": "Insufficient cash (submission precheck)",
+                "insufficient_buying_power": "Insufficient buying power (submission precheck)",
+            }[rejection_code]
+            order.rejection_reason = reason or fallback_reason
+            order._rejection_code = rejection_code
             return False
 
         multiplier = broker.get_multiplier(order.asset)
         self._submission_shadow_cash += -size * signal_price * multiplier - commission
-        if abs(new_qty) <= self._QTY_EPS:
+        if abs(new_qty) <= quantity_zero_tolerance(old_qty, size):
             self._submission_shadow_positions.pop(order.asset, None)
         else:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)

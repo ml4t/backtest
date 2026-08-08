@@ -12,6 +12,7 @@ Validates that BacktestConfig fields actually affect execution:
 from datetime import datetime
 
 import pytest
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import (
     BacktestConfig,
@@ -41,7 +42,6 @@ from ml4t.backtest.models import (
     VolumeShareSlippage,
 )
 from ml4t.backtest.types import OrderSide, Position
-from ml4t.specs.market_data import FeedSpec
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -235,6 +235,8 @@ class TestRejectOnInsufficientCash:
         assert order is not None
         assert order.status.value == "rejected"
         assert "submission precheck" in (order.rejection_reason or "").lower()
+        assert "insufficient cash" in (order.rejection_reason or "").lower()
+        assert order.rejection_code == "insufficient_cash"
         assert len(broker.pending_orders) == 0
 
     def test_next_bar_submission_precheck_uses_sequential_shadow_cash(self):

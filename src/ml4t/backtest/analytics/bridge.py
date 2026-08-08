@@ -23,6 +23,8 @@ def to_trade_record(trade: Trade) -> dict[str, Any]:
 
     With the aligned schema (v0.1.0a6+), field names now match between
     backtest Trade and diagnostic TradeRecord, simplifying this conversion.
+    ``exit_reason_detail`` remains on the backtest record until the diagnostic
+    TradeRecord schema accepts that optional field.
 
     Args:
         trade: A completed Trade from backtest

@@ -21,7 +21,17 @@ from .engine import Engine, run_backtest
 # Execution: rebalancing
 from .execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from .execution.schedule import RebalanceCadence, RebalanceSchedule, resolve_rebalance_timestamps
-from .result import BacktestResult
+from .result import (
+    ArtifactDiagnostic,
+    ArtifactError,
+    ArtifactIncompleteError,
+    ArtifactManifestError,
+    ArtifactNotFoundError,
+    ArtifactReadError,
+    ArtifactWriteError,
+    BacktestResult,
+    UnsupportedArtifactVersionError,
+)
 
 # Risk management rules (position-level)
 from .risk.position.composite import RuleChain
@@ -53,6 +63,14 @@ __all__ = [
     "run_backtest",
     "BacktestConfig",
     "BacktestResult",
+    "ArtifactDiagnostic",
+    "ArtifactError",
+    "ArtifactNotFoundError",
+    "ArtifactManifestError",
+    "ArtifactIncompleteError",
+    "ArtifactReadError",
+    "ArtifactWriteError",
+    "UnsupportedArtifactVersionError",
     "CommissionType",
     # Canonical domain types
     "OrderType",

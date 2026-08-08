@@ -22,6 +22,7 @@ Usage:
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
@@ -29,7 +30,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from ml4t.specs.base import serialize_artifact_value
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
@@ -535,7 +535,7 @@ class BacktestConfig:
         """
         import warnings as _warnings
 
-        issues: list[str] = []
+        issues: list[str] = self._execution_validation_errors()
 
         # Look-ahead bias warning
         if self.execution_mode == ExecutionMode.SAME_BAR:
@@ -564,12 +564,6 @@ class BacktestConfig:
                 f"Total transaction cost ({total_cost:.2%}) is high. "
                 "Verify this matches your broker's actual costs."
             )
-
-        if self.slippage_spread < 0:
-            issues.append(f"slippage_spread ({self.slippage_spread}) must be >= 0")
-
-        if any(spread < 0 for spread in self.slippage_spread_by_asset.values()):
-            issues.append("slippage_spread_by_asset values must all be >= 0")
 
         if (
             self.slippage_type == SlippageType.SPREAD
@@ -640,6 +634,43 @@ class BacktestConfig:
                 _warnings.warn(msg, UserWarning, stacklevel=2)
 
         return issues
+
+    def _execution_validation_errors(self) -> list[str]:
+        errors: list[str] = []
+        cost_fields = (
+            "commission_rate",
+            "commission_per_share",
+            "commission_per_trade",
+            "commission_minimum",
+            "slippage_rate",
+            "slippage_fixed",
+            "slippage_spread",
+            "stop_slippage_rate",
+        )
+        for field_name in cost_fields:
+            value = getattr(self, field_name)
+            try:
+                valid = math.isfinite(value) and value >= 0.0
+            except TypeError:
+                valid = False
+            if not valid:
+                errors.append(f"{field_name} ({value!r}) must be finite and >= 0")
+
+        for asset, spread in self.slippage_spread_by_asset.items():
+            try:
+                valid = math.isfinite(spread) and spread >= 0.0
+            except TypeError:
+                valid = False
+            if not valid:
+                errors.append(
+                    f"slippage_spread_by_asset[{asset!r}] ({spread!r}) must be finite and >= 0"
+                )
+        return errors
+
+    def _validate_for_execution(self) -> None:
+        errors = self._execution_validation_errors()
+        if errors:
+            raise ValueError("Invalid BacktestConfig: " + "; ".join(errors))
 
     def get_effective_account_settings(self) -> tuple[bool, bool]:
         """Get account settings as a tuple.

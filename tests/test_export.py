@@ -144,6 +144,17 @@ class TestBacktestExporterParquet:
             assert len(loaded.trades) == 1
             assert loaded.metrics["sharpe"] == 1.5
 
+    def test_from_parquet_passes_through_beta_recovery(self, sample_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_export"
+            sample_result.to_parquet(path)
+            (path / "manifest.json").unlink()
+
+            loaded = BacktestExporter.from_parquet(path, recovery=True)
+
+            assert len(loaded.trades) == 1
+            assert loaded.artifact_diagnostics[0].code == "manifest_missing"
+
 
 class TestBacktestExporterBatch:
     """Tests for batch export functionality."""

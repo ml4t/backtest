@@ -130,6 +130,8 @@ class BacktestExporter:
             record["total_commission"] = metrics.get("total_commission", 0.0)
             record["total_slippage"] = metrics.get("total_slippage", 0.0)
             record["num_fills"] = metrics.get("num_fills", 0)
+            record["num_orders"] = metrics.get("num_orders", 0)
+            record["num_rejected_orders"] = metrics.get("num_rejected_orders", 0)
             record["num_rebalance_events"] = metrics.get("num_rebalance_events", 0)
             record["unique_symbols_traded"] = metrics.get("unique_symbols_traded", 0)
             record["total_filled_notional"] = metrics.get("total_filled_notional", 0.0)
@@ -159,20 +161,25 @@ class BacktestExporter:
         return summary_df
 
     @staticmethod
-    def from_parquet(path: str | Path) -> BacktestResult:
+    def from_parquet(path: str | Path, *, recovery: bool = False) -> BacktestResult:
         """Load backtest result from Parquet directory.
 
         Delegates to BacktestResult.from_parquet().
 
         Args:
             path: Directory containing Parquet files
+            recovery: Permit manifest-free beta artifacts and report omissions on
+                the returned result.
 
         Returns:
             BacktestResult instance
+
+        Raises:
+            ArtifactError: If strict artifact validation or decoding fails.
         """
         from .result import BacktestResult
 
-        return BacktestResult.from_parquet(path)
+        return BacktestResult.from_parquet(path, recovery=recovery)
 
     @staticmethod
     def load_sweep_summary(base_path: str | Path) -> pl.DataFrame:
@@ -217,6 +224,8 @@ class BacktestExporter:
                     "win_rate": metrics.get("win_rate", 0.0),
                     "profit_factor": metrics.get("profit_factor", 0.0),
                     "final_value": metrics.get("final_value", 0.0),
+                    "num_orders": metrics.get("num_orders", 0),
+                    "num_rejected_orders": metrics.get("num_rejected_orders", 0),
                 }
             )
 

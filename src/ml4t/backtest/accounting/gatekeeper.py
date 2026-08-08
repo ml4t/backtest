@@ -6,7 +6,8 @@ ensuring they meet account policy constraints and preventing invalid trades.
 
 from collections.abc import Callable
 
-from ..models import CommissionModel
+from ..core.shared import quantity_zero_tolerance
+from ..models import CommissionModel, calculate_commission
 from ..types import Order, OrderSide
 from .account import AccountState
 
@@ -127,7 +128,7 @@ class Gatekeeper:
         """
         # Get current position quantity (0 if no position)
         current_qty = self.account.get_position_quantity(order.asset)
-        if abs(current_qty) < 1e-12:
+        if abs(current_qty) <= quantity_zero_tolerance(current_qty):
             current_qty = 0.0
 
         # Determine order direction (positive=buy, negative=sell)
@@ -137,7 +138,9 @@ class Gatekeeper:
         # Check for position reversal (long→short or short→long)
         # Delegate to policy's handle_reversal() method
         if self._is_reversal(current_qty, order_qty_delta):
-            commission = self.commission_model.calculate(order.asset, order.quantity, price)
+            commission = calculate_commission(
+                self.commission_model, order.asset, order.quantity, price
+            )
             return self.account.policy.handle_reversal(
                 asset=order.asset,
                 current_quantity=current_qty,
@@ -156,7 +159,7 @@ class Gatekeeper:
 
         # This is an opening order (new position or adding to existing)
         # Calculate commission to include in cost
-        commission = self.commission_model.calculate(order.asset, order.quantity, price)
+        commission = calculate_commission(self.commission_model, order.asset, order.quantity, price)
 
         # Use buffered cash (reserves cash_buffer_pct for safety margin)
         available = self._available_cash()
@@ -184,6 +187,25 @@ class Gatekeeper:
                 cash=available - commission,
                 multiplier=multiplier,
             )
+
+    def validate_order_with_code(self, order: Order, price: float) -> tuple[bool, str, str | None]:
+        """Validate an order and return a stable rejection code when invalid."""
+        valid, reason = self.validate_order(order, price)
+        if valid:
+            return True, reason, None
+
+        current_qty = self.account.get_position_quantity(order.asset)
+        quantity_delta = self._calculate_quantity_delta(order.side, order.quantity)
+        resulting_qty = current_qty + quantity_delta
+        return False, reason, self.classify_rejection(resulting_qty)
+
+    def classify_rejection(self, resulting_quantity: float) -> str:
+        """Classify a policy rejection independently of its display text."""
+        if resulting_quantity < 0 and not self.account.policy.allows_short_selling():
+            return "account_restriction"
+        if getattr(self.account.policy, "allow_leverage", False):
+            return "insufficient_buying_power"
+        return "insufficient_cash"
 
     def _is_reversal(self, current_qty: float, order_qty_delta: float) -> bool:
         """Check if order reverses position (long → short or short → long).

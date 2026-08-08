@@ -222,15 +222,33 @@ class Engine:
             # This must happen BEFORE evaluate_position_rules() to clear deferred exits
             self.broker._process_pending_exits()
 
-            # Optional strategy phase for opening orders that must receive risk
-            # protection during the current bar. Existing strategies inherit a no-op.
-            self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
+            pre_risk_opened_assets: set[str] = set()
+            if self.execution_mode == ExecutionMode.NEXT_BAR:
+                # Fill only prior market entries submitted from a flat position by
+                # this callback. Other orders retain the configured ordered batch.
+                positions_before = set(self.broker.positions)
+                self.broker._process_orders(
+                    use_open=True,
+                    order_types={OrderType.MARKET},
+                    only_pre_risk_flat_entries=True,
+                    defer_policy_rejections=True,
+                )
+                pre_risk_opened_assets = set(self.broker.positions) - positions_before
+
+            # Optional strategy phase. SAME_BAR immediate fills can receive current-bar
+            # risk; NEXT_BAR entries retain next-bar risk timing.
+            self.broker._submitting_before_risk = True
+            try:
+                self.strategy.on_before_risk(timestamp, assets_data, context, self.broker)
+            finally:
+                self.broker._submitting_before_risk = False
 
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
-            self.broker.evaluate_position_rules()
+            self.broker.evaluate_position_rules(skip_assets=pre_risk_opened_assets)
 
             if self.execution_mode == ExecutionMode.NEXT_BAR:
-                # Next-bar mode: process pending orders at open price
+                # Process same-cycle risk exits. Ordinary orders created by
+                # on_before_risk remain ineligible until the next bar.
                 self.broker._process_orders(use_open=True)
                 # Strategy generates new orders
                 self.strategy.on_data(timestamp, assets_data, context, self.broker)
@@ -298,6 +316,8 @@ class Engine:
             )
             max_open_positions = max((state[5] for state in self.portfolio_state), default=0)
             return {
+                "num_orders": len(self.broker.orders),
+                "num_rejected_orders": len(self.broker.get_rejected_orders()),
                 "num_fills": 0,
                 "num_rebalance_events": 0,
                 "unique_symbols_traded": 0,
@@ -335,6 +355,8 @@ class Engine:
         max_open_positions = max((state[5] for state in self.portfolio_state), default=0)
 
         return {
+            "num_orders": len(self.broker.orders),
+            "num_rejected_orders": len(self.broker.get_rejected_orders()),
             "num_fills": len(fills),
             "num_rebalance_events": len(rebalance_events),
             "unique_symbols_traded": len(traded_symbols),
@@ -356,9 +378,14 @@ class Engine:
                 trades=[],
                 equity_curve=[],
                 fills=[],
+                rejected_orders=self.broker.get_rejected_orders(),
                 predictions=self.feed.signals,
                 portfolio_state=[],
-                metrics={"skipped_bars": self._skipped_bars},
+                metrics={
+                    "skipped_bars": self._skipped_bars,
+                    "num_orders": len(self.broker.orders),
+                    "num_rejected_orders": len(self.broker.get_rejected_orders()),
+                },
                 config=self.config,
             )
 
@@ -424,9 +451,10 @@ class Engine:
                 )
                 all_trades.append(open_trade)
 
-        # Build TradeAnalyzer (only on closed trades for accurate stats)
-        closed_trades = [t for t in all_trades if t.status == "closed"]
-        trade_analyzer = TradeAnalyzer(closed_trades)
+        # Realized-P&L metrics include partial reductions. TradeAnalyzer limits
+        # lifecycle metrics such as holding period and excursions to full closes.
+        realized_trades = [t for t in all_trades if t.status in {"closed", "partial"}]
+        trade_analyzer = TradeAnalyzer(realized_trades)
         activity_metrics = self._build_activity_metrics()
 
         # Build metrics dictionary (backward compatible)
@@ -475,6 +503,7 @@ class Engine:
             trades=all_trades,  # Includes both closed and open trades
             equity_curve=self.equity_curve,
             fills=self.broker.fills,
+            rejected_orders=self.broker.get_rejected_orders(),
             predictions=self.feed.signals,
             portfolio_state=self.portfolio_state,
             metrics=metrics,

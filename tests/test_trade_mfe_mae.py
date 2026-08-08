@@ -1,5 +1,6 @@
 """Tests for MFE/MAE preservation in Trade class."""
 
+import math
 from datetime import datetime
 
 import pytest
@@ -135,6 +136,18 @@ class TestTradeAnalyzerMfeMae:
         assert analyzer.avg_mae == 0.0
         assert analyzer.mfe_capture_ratio == 0.0
         assert analyzer.mae_recovery_ratio == 0.0
+
+    def test_partial_only_trades_report_unmeasured_lifecycle_metrics(self, sample_trades):
+        partial = sample_trades[0]
+        partial.status = "partial"
+        analyzer = TradeAnalyzer([partial])
+
+        assert analyzer.num_trades == 1
+        assert math.isnan(analyzer.avg_bars_held)
+        assert math.isnan(analyzer.avg_mfe)
+        assert math.isnan(analyzer.avg_mae)
+        assert math.isnan(analyzer.mfe_capture_ratio)
+        assert math.isnan(analyzer.mae_recovery_ratio)
 
     def test_to_dict_includes_mfe_mae(self, sample_trades):
         """Test that to_dict includes MFE/MAE metrics."""

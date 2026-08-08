@@ -22,13 +22,13 @@ Example:
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import polars as pl
-
 from ml4t.specs.market_data import FeedSpec
 
 try:
@@ -36,11 +36,130 @@ try:
 except ImportError:  # pragma: no cover - fallback for local editable edge cases
     __version__ = "0.0.0.dev0"
 from .analytics.annualization import should_session_align
-from .types import Fill, OrderSide, Trade
+from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
 
 if TYPE_CHECKING:
     from .analytics import EquityCurve, TradeAnalyzer
     from .config import BacktestConfig
+
+
+_ARTIFACT_TYPE = "ml4t-backtest-result"
+_ARTIFACT_SCHEMA_VERSION = 2
+_MANIFEST_FILE = "manifest.json"
+_INCOMPLETE_MARKER = ".artifact-incomplete"
+_NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
+_COMPONENT_FILES = {
+    "trades": "trades.parquet",
+    "fills": "fills.parquet",
+    "rejected_orders": "rejected_orders.parquet",
+    "predictions": "predictions.parquet",
+    "equity": "equity.parquet",
+    "portfolio_state": "portfolio_state.parquet",
+    "daily_pnl": "daily_pnl.parquet",
+    "metrics": "metrics.json",
+    "config": "config.yaml",
+    "spec": "spec.yaml",
+}
+_REQUIRED_RESULT_COMPONENTS = frozenset(
+    {"trades", "fills", "rejected_orders", "equity", "portfolio_state", "daily_pnl", "metrics"}
+)
+
+
+def _serialize_metric_value(value: Any, *, path: str) -> Any:
+    """Convert a metric value to JSON-safe built-in containers and scalars."""
+    if isinstance(value, bool | str | type(None) | int):
+        return value
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
+        if math.isnan(value):
+            label = "nan"
+        elif value > 0:
+            label = "positive_infinity"
+        else:
+            label = "negative_infinity"
+        return {_NONFINITE_FLOAT_KEY: label}
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, list | tuple):
+        return [
+            _serialize_metric_value(item, path=f"{path}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise ArtifactWriteError(f"{path} contains a non-string mapping key")
+        return {
+            key: _serialize_metric_value(item, path=f"{path}.{key}") for key, item in value.items()
+        }
+    try:
+        import numpy as np
+
+        if isinstance(value, np.generic):
+            return _serialize_metric_value(value.item(), path=path)
+        if isinstance(value, np.ndarray):
+            return _serialize_metric_value(value.tolist(), path=path)
+    except (ImportError, AttributeError):
+        pass
+    if isinstance(value, pl.Series):
+        return _serialize_metric_value(value.to_list(), path=path)
+    raise ArtifactWriteError(f"{path} has unsupported value type {type(value).__name__}")
+
+
+def _deserialize_metric_value(value: Any) -> Any:
+    """Restore tagged non-finite floats from a portable JSON payload."""
+    if isinstance(value, list):
+        return [_deserialize_metric_value(item) for item in value]
+    if isinstance(value, dict):
+        if set(value) == {_NONFINITE_FLOAT_KEY}:
+            labels = {
+                "nan": float("nan"),
+                "positive_infinity": float("inf"),
+                "negative_infinity": float("-inf"),
+            }
+            label = value[_NONFINITE_FLOAT_KEY]
+            if label not in labels:
+                raise ValueError(f"Unknown non-finite metric label: {label!r}")
+            return labels[label]
+        return {key: _deserialize_metric_value(item) for key, item in value.items()}
+    return value
+
+
+@dataclass(frozen=True)
+class ArtifactDiagnostic:
+    """Structured description of one omission or recovery action."""
+
+    code: str
+    component: str
+    message: str
+
+
+class ArtifactError(ValueError):
+    """Base class for result-artifact failures."""
+
+
+class ArtifactNotFoundError(ArtifactError):
+    """Raised when an artifact path does not contain any result data."""
+
+
+class ArtifactManifestError(ArtifactError):
+    """Raised when the artifact manifest is missing or malformed."""
+
+
+class ArtifactIncompleteError(ArtifactError):
+    """Raised when a current artifact is incomplete."""
+
+
+class ArtifactReadError(ArtifactError):
+    """Raised when a declared artifact component cannot be decoded."""
+
+
+class ArtifactWriteError(ArtifactError):
+    """Raised when a requested artifact component cannot be written."""
+
+
+class UnsupportedArtifactVersionError(ArtifactError):
+    """Raised when an artifact uses an unsupported schema version."""
 
 
 @dataclass
@@ -57,11 +176,15 @@ class BacktestResult:
         trades: List of completed Trade objects
         equity_curve: List of (timestamp, portfolio_value) tuples
         fills: List of Fill objects (all order fills)
+        rejected_orders: Orders that reached the rejected terminal state. Orders
+            cancelled under permissive insufficient-cash handling are not included.
         predictions: Raw prediction DataFrame passed into the backtest (optional)
         metrics: Dictionary of computed performance metrics
         config: BacktestConfig used for the backtest (optional)
         equity: EquityCurve analytics object
         trade_analyzer: TradeAnalyzer analytics object
+        artifact_diagnostics: Structured omissions and recovery actions. Empty for
+            artifacts loaded successfully in strict mode.
     """
 
     trades: list[Trade]
@@ -75,12 +198,15 @@ class BacktestResult:
     portfolio_state: list[tuple[datetime, float, float, float, float, int]] = field(
         default_factory=list
     )
+    rejected_orders: list[Order] = field(default_factory=list)
+    artifact_diagnostics: tuple[ArtifactDiagnostic, ...] = field(default_factory=tuple)
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
     _equity_df: pl.DataFrame | None = field(default=None, repr=False)
     _fills_df: pl.DataFrame | None = field(default=None, repr=False)
     _portfolio_state_df: pl.DataFrame | None = field(default=None, repr=False)
+    _rejected_orders_df: pl.DataFrame | None = field(default=None, repr=False)
 
     def _feed_spec(self) -> FeedSpec | None:
         if self.config is None:
@@ -104,7 +230,7 @@ class BacktestResult:
             quantity, direction, pnl, pnl_percent, bars_held,
             fees, exit_slippage, mfe, mae, entry_slippage, multiplier,
             gross_pnl, net_return, total_slippage_cost, cost_drag,
-            exit_reason, status
+            exit_reason, exit_reason_detail, status
 
         Cost decomposition columns:
             gross_pnl: Price-move P&L before fees
@@ -112,8 +238,8 @@ class BacktestResult:
             total_slippage_cost: Entry + exit slippage in dollars
             cost_drag: Total cost as fraction of notional
 
-        The status column indicates "closed" (actually exited) or "open"
-        (mark-to-market at end of backtest).
+        The status column indicates "closed" (flat-to-flat completion), "partial"
+        (realized reduction), or "open" (mark-to-market at end of backtest).
 
         Returns:
             Polars DataFrame with one row per trade
@@ -159,6 +285,7 @@ class BacktestResult:
                     "total_slippage_cost": t.total_slippage_cost,
                     "cost_drag": t.cost_drag,
                     "exit_reason": t.exit_reason,
+                    "exit_reason_detail": t.exit_reason_detail,
                     "status": t.status,
                 }
             )
@@ -199,11 +326,47 @@ class BacktestResult:
                     "bid_size": fill.bid_size,
                     "ask_size": fill.ask_size,
                     "available_size": fill.available_size,
+                    "exit_reason": fill.exit_reason,
+                    "exit_reason_detail": fill.exit_reason_detail,
                 }
             )
 
         self._fills_df = pl.DataFrame(records, schema=self._fills_schema())
         return self._fills_df
+
+    def to_rejected_orders_dataframe(self) -> pl.DataFrame:
+        """Convert rejected orders to a stable, machine-readable DataFrame."""
+        if self._rejected_orders_df is not None:
+            return self._rejected_orders_df
+        if not self.rejected_orders:
+            return pl.DataFrame(schema=self._rejected_orders_schema())
+
+        records = [
+            {
+                "order_id": order.order_id,
+                "symbol": order.asset,
+                "timestamp": order.created_at,
+                "requested_quantity": order.requested_quantity,
+                "filled_quantity": order.filled_quantity,
+                "remaining_quantity": order.quantity,
+                "side": order.side.value,
+                "order_type": order.order_type.value,
+                "limit_price": order.limit_price,
+                "stop_price": order.stop_price,
+                "trail_amount": order.trail_amount,
+                "parent_id": order.parent_id,
+                "rebalance_id": order.rebalance_id,
+                "status": order.status.value,
+                "rejection_code": order.rejection_code,
+                "rejection_reason": order.rejection_reason,
+            }
+            for order in self.rejected_orders
+        ]
+        self._rejected_orders_df = pl.DataFrame(
+            records,
+            schema=self._rejected_orders_schema(),
+        )
+        return self._rejected_orders_df
 
     def to_predictions_dataframe(self) -> pl.DataFrame:
         """Return the raw prediction DataFrame used as backtest input."""
@@ -514,6 +677,7 @@ class BacktestResult:
             {path}/
                 trades.parquet
                 fills.parquet
+                rejected_orders.parquet
                 predictions.parquet
                 equity.parquet
                 portfolio_state.parquet
@@ -521,135 +685,439 @@ class BacktestResult:
                 metrics.json
                 config.yaml (if config available)
                 spec.yaml (if config available)
+                manifest.json
 
         Args:
             path: Directory path to write files
             include: Components to include. Default: all.
-                Options: ["trades", "fills", "predictions", "equity", "portfolio_state",
-                    "daily_pnl", "metrics", "config", "spec"]
+                Options: ["trades", "fills", "rejected_orders", "predictions", "equity",
+                    "portfolio_state", "daily_pnl", "metrics", "config", "spec"]
             compression: Parquet compression codec (default: "zstd")
 
         Returns:
-            Dict mapping component names to file paths
-        """
-        path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
+            Dict mapping requested component names to file paths. The always-written
+            manifest is returned under the additional ``"manifest"`` key; it is not
+            a selectable component.
 
-        if include is None:
-            include = [
-                "trades",
-                "fills",
-                "predictions",
-                "equity",
-                "portfolio_state",
-                "daily_pnl",
-                "metrics",
-                "config",
-                "spec",
-            ]
+        Raises:
+            ArtifactWriteError: If a requested component is unavailable or cannot be written.
+        """
+        explicitly_selected = include is not None
+        requested = list(include) if include is not None else list(_COMPONENT_FILES)
+        unknown = sorted(set(requested) - _COMPONENT_FILES.keys() - {"manifest"})
+        if unknown:
+            raise ArtifactWriteError(f"Unknown artifact components requested: {unknown}")
+        requested = [name for name in requested if name != "manifest"]
+
+        unavailable: dict[str, str] = {}
+        if self.predictions is None:
+            unavailable["predictions"] = "result has no predictions"
+        if self.config is None:
+            unavailable["config"] = "result has no config"
+            unavailable["spec"] = "result has no config for a runtime spec"
+
+        explicitly_unavailable = sorted(set(requested) & unavailable.keys())
+        if explicitly_selected and explicitly_unavailable:
+            details = ", ".join(f"{name}: {unavailable[name]}" for name in explicitly_unavailable)
+            raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
+
+        selected = [name for name in requested if name not in unavailable]
+
+        text_payloads: dict[str, str] = {}
+        if "metrics" in selected:
+            try:
+                serializable_metrics = {
+                    key: _serialize_metric_value(value, path=f"metrics[{key!r}]")
+                    for key, value in self.metrics.items()
+                }
+                text_payloads["metrics"] = json.dumps(
+                    serializable_metrics,
+                    indent=2,
+                    allow_nan=False,
+                )
+            except ArtifactWriteError:
+                raise
+            except Exception as exc:
+                raise ArtifactWriteError(f"Failed to serialize metrics: {exc}") from exc
+
+        if "config" in selected or "spec" in selected:
+            try:
+                import yaml
+            except ImportError as exc:
+                raise ArtifactWriteError("PyYAML is required to serialize config or spec") from exc
+            if "config" in selected:
+                try:
+                    text_payloads["config"] = yaml.safe_dump(
+                        self.config.to_dict(),
+                        default_flow_style=False,
+                    )
+                except Exception as exc:
+                    raise ArtifactWriteError(
+                        f"Failed to serialize config component: {exc}"
+                    ) from exc
+            if "spec" in selected:
+                try:
+                    text_payloads["spec"] = yaml.safe_dump(
+                        self.to_spec_dict(),
+                        default_flow_style=False,
+                        sort_keys=False,
+                    )
+                except Exception as exc:
+                    raise ArtifactWriteError(f"Failed to serialize spec component: {exc}") from exc
+
+        path = Path(path)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            raise ArtifactWriteError(f"Failed to create artifact directory {path}: {exc}") from exc
+
+        def write_component(name: str, writer) -> None:
+            try:
+                writer()
+            except Exception as exc:
+                raise ArtifactWriteError(f"Failed to write {name} component: {exc}") from exc
+
+        marker_path = path / _INCOMPLETE_MARKER
+        write_component(
+            "incomplete marker",
+            lambda: marker_path.write_text("Result artifact write did not complete.\n"),
+        )
+        manifest_path = path / _MANIFEST_FILE
+        write_component("stale manifest removal", lambda: manifest_path.unlink(missing_ok=True))
 
         written: dict[str, Path] = {}
 
-        if "trades" in include:
+        if "trades" in selected:
             trades_path = path / "trades.parquet"
-            self.to_trades_dataframe().write_parquet(trades_path, compression=compression)
+            write_component(
+                "trades",
+                lambda: self.to_trades_dataframe().write_parquet(
+                    trades_path,
+                    compression=compression,
+                ),
+            )
             written["trades"] = trades_path
 
-        if "fills" in include:
+        if "fills" in selected:
             fills_path = path / "fills.parquet"
-            self.to_fills_dataframe().write_parquet(fills_path, compression=compression)
+            write_component(
+                "fills",
+                lambda: self.to_fills_dataframe().write_parquet(
+                    fills_path,
+                    compression=compression,
+                ),
+            )
             written["fills"] = fills_path
 
-        if "predictions" in include and self.predictions is not None:
+        if "rejected_orders" in selected:
+            rejected_orders_path = path / "rejected_orders.parquet"
+            write_component(
+                "rejected_orders",
+                lambda: self.to_rejected_orders_dataframe().write_parquet(
+                    rejected_orders_path,
+                    compression=compression,
+                ),
+            )
+            written["rejected_orders"] = rejected_orders_path
+
+        if "predictions" in selected:
             predictions_path = path / "predictions.parquet"
-            self.to_predictions_dataframe().write_parquet(predictions_path, compression=compression)
+            write_component(
+                "predictions",
+                lambda: self.to_predictions_dataframe().write_parquet(
+                    predictions_path,
+                    compression=compression,
+                ),
+            )
             written["predictions"] = predictions_path
 
-        if "equity" in include:
+        if "equity" in selected:
             equity_path = path / "equity.parquet"
-            self.to_equity_dataframe().write_parquet(equity_path, compression=compression)
+            write_component(
+                "equity",
+                lambda: self.to_equity_dataframe().write_parquet(
+                    equity_path,
+                    compression=compression,
+                ),
+            )
             written["equity"] = equity_path
 
-        if "portfolio_state" in include:
+        if "portfolio_state" in selected:
             portfolio_state_path = path / "portfolio_state.parquet"
-            self.to_portfolio_state_dataframe().write_parquet(
-                portfolio_state_path, compression=compression
+            write_component(
+                "portfolio_state",
+                lambda: self.to_portfolio_state_dataframe().write_parquet(
+                    portfolio_state_path,
+                    compression=compression,
+                ),
             )
             written["portfolio_state"] = portfolio_state_path
 
-        if "daily_pnl" in include:
+        if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
-            self.to_daily_pnl().write_parquet(daily_path, compression=compression)
+            write_component(
+                "daily_pnl",
+                lambda: self.to_daily_pnl().write_parquet(
+                    daily_path,
+                    compression=compression,
+                ),
+            )
             written["daily_pnl"] = daily_path
 
-        if "metrics" in include:
-            metrics_path = path / "metrics.json"
-            # Filter to JSON-serializable metrics
-            serializable = {}
-            for k, v in self.metrics.items():
-                if isinstance(v, int | float | str | bool | type(None)):
-                    serializable[k] = v
-                elif isinstance(v, datetime):
-                    serializable[k] = v.isoformat()
-                else:
-                    # Handle numpy scalars (np.float64, np.int64, etc.)
-                    try:
-                        import numpy as np
+        for name in ("metrics", "config", "spec"):
+            if name not in selected:
+                continue
+            component_path = path / _COMPONENT_FILES[name]
+            write_component(
+                name,
+                lambda component_path=component_path, payload=text_payloads[name]: (
+                    component_path.write_text(payload)
+                ),
+            )
+            written[name] = component_path
 
-                        if isinstance(v, np.generic):
-                            serializable[k] = v.item()
-                    except (ImportError, AttributeError):
-                        pass  # Skip if numpy not available or not a numpy type
-            with open(metrics_path, "w") as f:
-                json.dump(serializable, f, indent=2)
-            written["metrics"] = metrics_path
-
-        if "config" in include and self.config is not None:
-            config_path = path / "config.yaml"
-            try:
-                import yaml
-
-                with open(config_path, "w") as f:
-                    yaml.dump(self.config.to_dict(), f, default_flow_style=False)
-                written["config"] = config_path
-            except (ImportError, AttributeError):
-                pass  # Skip if yaml not available or config has no to_dict
-
-        if "spec" in include and self.config is not None:
-            spec_path = path / "spec.yaml"
-            try:
-                import yaml
-
-                with open(spec_path, "w") as f:
-                    yaml.dump(self.to_spec_dict(), f, default_flow_style=False, sort_keys=False)
-                written["spec"] = spec_path
-            except (ImportError, AttributeError):
-                pass
+        manifest = {
+            "artifact_type": _ARTIFACT_TYPE,
+            "schema_version": _ARTIFACT_SCHEMA_VERSION,
+            "library_version": __version__,
+            "complete": written.keys() >= _REQUIRED_RESULT_COMPONENTS,
+            "components": {
+                name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
+            },
+            "omitted_components": {
+                name: reason for name, reason in unavailable.items() if name in requested
+            },
+        }
+        manifest_payload = json.dumps(manifest, indent=2, allow_nan=False)
+        write_component("manifest", lambda: manifest_path.write_text(manifest_payload))
+        written["manifest"] = manifest_path
+        write_component("incomplete marker removal", marker_path.unlink)
 
         return written
 
     @classmethod
-    def from_parquet(cls, path: str | Path) -> BacktestResult:
-        """Load backtest result from Parquet directory.
+    def from_parquet(
+        cls,
+        path: str | Path,
+        *,
+        recovery: bool = False,
+    ) -> BacktestResult:
+        """Load a validated result artifact.
 
         Args:
-            path: Directory containing Parquet files from to_parquet()
+            path: Directory containing files written by :meth:`to_parquet`.
+            recovery: Permit manifest-free beta artifacts and omit unreadable components.
+                Every omission is reported through ``artifact_diagnostics``.
 
         Returns:
-            BacktestResult instance
+            BacktestResult instance.
+
+        Raises:
+            ArtifactError: If strict validation or component decoding fails.
         """
         path = Path(path)
+        artifact_path = path
+        if not path.exists():
+            raise ArtifactNotFoundError(f"Result artifact path does not exist: {path}")
+        if not path.is_dir():
+            raise ArtifactNotFoundError(f"Result artifact path is not a directory: {path}")
 
-        # Load trades
-        trades_path = path / "trades.parquet"
-        trades: list[Trade] = []
-        if trades_path.exists():
-            trades_df = pl.read_parquet(trades_path)
-            for row in trades_df.iter_rows(named=True):
-                # Support both old (asset/commission) and new (symbol/fees) column names
+        diagnostics: list[ArtifactDiagnostic] = []
+        entries = list(path.iterdir())
+        if not entries and not recovery:
+            raise ArtifactNotFoundError(f"Result artifact directory is empty: {path}")
+
+        marker_path = path / _INCOMPLETE_MARKER
+        if marker_path.exists():
+            if not recovery:
+                raise ArtifactIncompleteError(
+                    f"Result artifact contains {_INCOMPLETE_MARKER}; its write did not complete"
+                )
+            diagnostics.append(
+                ArtifactDiagnostic(
+                    code="incomplete_write",
+                    component="manifest",
+                    message="Artifact write did not complete.",
+                )
+            )
+
+        def discover_legacy_components() -> dict[str, str]:
+            discovered = {
+                name: filename
+                for name, filename in _COMPONENT_FILES.items()
+                if (artifact_path / filename).exists()
+            }
+            if "predictions" not in discovered and (artifact_path / "signals.parquet").exists():
+                discovered["predictions"] = "signals.parquet"
+            return discovered
+
+        manifest_path = path / _MANIFEST_FILE
+        components: dict[str, str] = {}
+        manifest: dict[str, Any] | None = None
+        if not manifest_path.exists():
+            if not recovery:
+                raise ArtifactManifestError(
+                    "Result artifact manifest is missing; pass recovery=True only for retained "
+                    "beta artifacts"
+                )
+            diagnostics.append(
+                ArtifactDiagnostic(
+                    code="manifest_missing",
+                    component="manifest",
+                    message="Loaded a manifest-free beta artifact.",
+                )
+            )
+            components = discover_legacy_components()
+        else:
+            try:
+                with open(manifest_path) as file:
+                    manifest_data = json.load(file)
+                if not isinstance(manifest_data, dict):
+                    raise TypeError("manifest root must be an object")
+                manifest = manifest_data
+            except Exception as exc:
+                if not recovery:
+                    raise ArtifactManifestError(
+                        f"Failed to read {_MANIFEST_FILE}: {type(exc).__name__}: {exc}"
+                    ) from exc
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="manifest_invalid",
+                        component="manifest",
+                        message=f"Ignored malformed manifest ({type(exc).__name__}).",
+                    )
+                )
+                components = discover_legacy_components()
+
+        if manifest is not None:
+            artifact_type = manifest.get("artifact_type")
+            if artifact_type != _ARTIFACT_TYPE:
+                message = f"Unsupported artifact type: {artifact_type!r}"
+                if not recovery:
+                    raise ArtifactManifestError(message)
+                diagnostics.append(ArtifactDiagnostic("manifest_invalid", "manifest", message))
+                components = discover_legacy_components()
+                manifest = None
+
+        if manifest is not None:
+            schema_version = manifest.get("schema_version")
+            if schema_version != _ARTIFACT_SCHEMA_VERSION:
+                raise UnsupportedArtifactVersionError(
+                    f"Unsupported result artifact schema version {schema_version!r}; "
+                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
+                )
+            component_data = manifest.get("components")
+            if not isinstance(component_data, dict) or not all(
+                isinstance(name, str) and isinstance(filename, str)
+                for name, filename in component_data.items()
+            ):
+                if not recovery:
+                    raise ArtifactManifestError("Manifest components must be a string mapping")
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        "manifest_invalid",
+                        "manifest",
+                        "Ignored invalid component mapping.",
+                    )
+                )
+                components = discover_legacy_components()
+            else:
+                unknown = sorted(set(component_data) - _COMPONENT_FILES.keys())
+                noncanonical = sorted(
+                    name
+                    for name, filename in component_data.items()
+                    if name in _COMPONENT_FILES and filename != _COMPONENT_FILES[name]
+                )
+                if unknown or noncanonical:
+                    details = f"unknown={unknown}, noncanonical={noncanonical}"
+                    if not recovery:
+                        raise ArtifactManifestError(f"Invalid manifest components: {details}")
+                    diagnostics.append(
+                        ArtifactDiagnostic(
+                            "manifest_invalid",
+                            "manifest",
+                            f"Ignored invalid manifest components: {details}.",
+                        )
+                    )
+                    components = discover_legacy_components()
+                else:
+                    components = dict(component_data)
+
+        declared_incomplete = manifest is not None and manifest.get("complete") is not True
+        if declared_incomplete and not recovery:
+            raise ArtifactIncompleteError("Result artifact manifest marks the export incomplete")
+        if declared_incomplete:
+            diagnostics.append(
+                ArtifactDiagnostic(
+                    code="manifest_incomplete",
+                    component="manifest",
+                    message="Manifest marks this as a selective or incomplete export.",
+                )
+            )
+
+        missing_required_components = sorted(_REQUIRED_RESULT_COMPONENTS - components.keys())
+        missing_files = sorted(
+            name for name, filename in components.items() if not (path / filename).is_file()
+        )
+        if not recovery and (missing_required_components or missing_files):
+            raise ArtifactIncompleteError(
+                "Result artifact is incomplete: "
+                f"missing components={missing_required_components}, missing files={missing_files}"
+            )
+        if recovery:
+            missing_components = sorted(_COMPONENT_FILES.keys() - components.keys())
+            diagnostics.extend(
+                ArtifactDiagnostic(
+                    code="component_missing",
+                    component=name,
+                    message=f"Component {_COMPONENT_FILES[name]} is absent.",
+                )
+                for name in missing_components
+            )
+            for name in missing_files:
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="component_missing_file",
+                        component=name,
+                        message=f"Declared component {components[name]} is absent.",
+                    )
+                )
+                components.pop(name)
+
+        component_read_ok: dict[str, bool] = {}
+
+        def read_component(name: str, reader, default):
+            filename = components.get(name)
+            if filename is None:
+                component_read_ok[name] = False
+                return default
+            try:
+                value = reader(path / filename)
+                component_read_ok[name] = True
+                return value
+            except Exception as exc:
+                component_read_ok[name] = False
+                if not recovery:
+                    raise ArtifactReadError(
+                        f"Failed to read {filename}: {type(exc).__name__}: {exc}"
+                    ) from exc
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="component_invalid",
+                        component=name,
+                        message=f"Ignored unreadable {filename} ({type(exc).__name__}).",
+                    )
+                )
+                return default
+
+        def read_trades(component_path: Path) -> list[Trade]:
+            result: list[Trade] = []
+            for row in pl.read_parquet(component_path).iter_rows(named=True):
                 symbol = row.get("symbol") or row.get("asset", "")
-                fees = row.get("fees") or row.get("commission", 0.0)
-                trades.append(
+                fees = row.get("fees")
+                if fees is None:
+                    fees = row.get("commission", 0.0)
+                result.append(
                     Trade(
                         symbol=symbol,
                         entry_time=row["entry_time"],
@@ -663,8 +1131,10 @@ class BacktestResult:
                         fees=fees,
                         exit_slippage=row.get("exit_slippage", row.get("slippage", 0.0)),
                         exit_reason=row.get("exit_reason", "signal"),
-                        mfe=row["mfe"],
-                        mae=row["mae"],
+                        exit_reason_detail=row.get("exit_reason_detail"),
+                        status=row.get("status", "closed"),
+                        mfe=row.get("mfe", 0.0),
+                        mae=row.get("mae", 0.0),
                         entry_slippage=row.get("entry_slippage", 0.0),
                         multiplier=row.get("multiplier", 1.0),
                         entry_quote_mid_price=row.get("entry_quote_mid_price"),
@@ -679,28 +1149,12 @@ class BacktestResult:
                         exit_available_size=row.get("exit_available_size"),
                     )
                 )
+            return result
 
-        # Load equity curve
-        equity_curve: list[tuple[datetime, float]] = []
-        equity_path = path / "equity.parquet"
-        if equity_path.exists():
-            equity_df = pl.read_parquet(equity_path)
-            for row in equity_df.iter_rows(named=True):
-                equity_curve.append((row["timestamp"], row["equity"]))
-
-        # Load metrics
-        metrics: dict[str, Any] = {}
-        metrics_path = path / "metrics.json"
-        if metrics_path.exists():
-            with open(metrics_path) as f:
-                metrics = json.load(f)
-
-        fills: list[Fill] = []
-        fills_path = path / "fills.parquet"
-        if fills_path.exists():
-            fills_df = pl.read_parquet(fills_path)
-            for row in fills_df.iter_rows(named=True):
-                fills.append(
+        def read_fills(component_path: Path) -> list[Fill]:
+            result: list[Fill] = []
+            for row in pl.read_parquet(component_path).iter_rows(named=True):
+                result.append(
                     Fill(
                         order_id=row["order_id"],
                         rebalance_id=row.get("rebalance_id"),
@@ -723,62 +1177,132 @@ class BacktestResult:
                         bid_size=row.get("bid_size"),
                         ask_size=row.get("ask_size"),
                         available_size=row.get("available_size"),
+                        exit_reason=row.get("exit_reason", ""),
+                        exit_reason_detail=row.get("exit_reason_detail"),
                     )
                 )
+            return result
 
-        predictions = None
-        predictions_path = path / "predictions.parquet"
-        if predictions_path.exists():
-            predictions = pl.read_parquet(predictions_path)
-        else:
-            signals_path = path / "signals.parquet"
-            if signals_path.exists():
-                predictions = pl.read_parquet(signals_path)
-
-        portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
-        portfolio_state_path = path / "portfolio_state.parquet"
-        if portfolio_state_path.exists():
-            portfolio_state_df = pl.read_parquet(portfolio_state_path)
-            for row in portfolio_state_df.iter_rows(named=True):
-                portfolio_state.append(
-                    (
-                        row["timestamp"],
-                        row["equity"],
-                        row["cash"],
-                        row["gross_exposure"],
-                        row["net_exposure"],
-                        row["open_positions"],
+        def read_rejected_orders(component_path: Path) -> list[Order]:
+            result: list[Order] = []
+            for row in pl.read_parquet(component_path).iter_rows(named=True):
+                result.append(
+                    Order(
+                        order_id=row["order_id"],
+                        asset=row["symbol"],
+                        created_at=row["timestamp"],
+                        requested_quantity=row["requested_quantity"],
+                        quantity=row.get("remaining_quantity", row["requested_quantity"]),
+                        filled_quantity=row.get("filled_quantity", 0.0),
+                        side=OrderSide(row["side"]),
+                        order_type=OrderType(row["order_type"]),
+                        limit_price=row.get("limit_price"),
+                        stop_price=row.get("stop_price"),
+                        trail_amount=row.get("trail_amount"),
+                        parent_id=row.get("parent_id"),
+                        rebalance_id=row.get("rebalance_id"),
+                        status=OrderStatus(row["status"]),
+                        rejection_reason=row.get("rejection_reason"),
+                        _rejection_code=row.get("rejection_code"),
                     )
                 )
+            return result
 
-        # Load config if available
-        config = None
-        config_path = path / "config.yaml"
-        if config_path.exists():
-            try:
-                import yaml
+        def read_equity(component_path: Path) -> list[tuple[datetime, float]]:
+            return [
+                (row["timestamp"], row["equity"])
+                for row in pl.read_parquet(component_path).iter_rows(named=True)
+            ]
 
-                from .config import BacktestConfig
+        def read_portfolio_state(
+            component_path: Path,
+        ) -> list[tuple[datetime, float, float, float, float, int]]:
+            return [
+                (
+                    row["timestamp"],
+                    row["equity"],
+                    row["cash"],
+                    row["gross_exposure"],
+                    row["net_exposure"],
+                    row["open_positions"],
+                )
+                for row in pl.read_parquet(component_path).iter_rows(named=True)
+            ]
 
-                with open(config_path) as f:
-                    config_data = yaml.safe_load(f)
-                config = BacktestConfig.from_dict(config_data)
-            except (ImportError, Exception):
-                pass  # Skip if yaml not available or config invalid
-        else:
-            spec_path = path / "spec.yaml"
-            if spec_path.exists():
-                try:
-                    import yaml
+        def read_metrics(component_path: Path) -> dict[str, Any]:
+            with open(component_path) as file:
+                data = json.load(file)
+            if not isinstance(data, dict):
+                raise TypeError("metrics root must be an object")
+            return _deserialize_metric_value(data)
 
-                    from .config import BacktestConfig
+        def read_config(component_path: Path):
+            import yaml
 
-                    with open(spec_path) as f:
-                        spec_data = yaml.safe_load(f)
-                    if isinstance(spec_data, dict) and isinstance(spec_data.get("config"), dict):
-                        config = BacktestConfig.from_dict(spec_data["config"])
-                except (ImportError, Exception):
-                    pass
+            from .config import BacktestConfig
+
+            with open(component_path) as file:
+                data = yaml.safe_load(file)
+            if not isinstance(data, dict):
+                raise TypeError("config root must be a mapping")
+            return BacktestConfig.from_dict(data)
+
+        def read_spec_config(component_path: Path):
+            import yaml
+
+            from .config import BacktestConfig
+
+            with open(component_path) as file:
+                data = yaml.safe_load(file)
+            if not isinstance(data, dict):
+                raise TypeError("spec root must be a mapping")
+            if data.get("version") != 1:
+                raise ValueError(f"unsupported spec version {data.get('version')!r}")
+            config_data = data.get("config")
+            if not isinstance(config_data, dict):
+                raise TypeError("spec config must be a mapping")
+            return BacktestConfig.from_dict(config_data)
+
+        trades = read_component("trades", read_trades, [])
+        fills = read_component("fills", read_fills, [])
+        rejected_orders = read_component("rejected_orders", read_rejected_orders, [])
+        equity_curve = read_component("equity", read_equity, [])
+        portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
+        metrics = read_component("metrics", read_metrics, {})
+        predictions = read_component("predictions", pl.read_parquet, None)
+        daily_pnl = read_component("daily_pnl", pl.read_parquet, None)
+        config = read_component("config", read_config, None)
+        spec_config = read_component("spec", read_spec_config, None)
+        if config is None:
+            config = spec_config
+
+        if daily_pnl is not None:
+            if not component_read_ok["equity"]:
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="component_unverified",
+                        component="daily_pnl",
+                        message="daily_pnl.parquet could not be verified without equity.parquet",
+                    )
+                )
+            else:
+                expected_daily_pnl = cls(
+                    trades=[],
+                    equity_curve=equity_curve,
+                    fills=[],
+                    metrics={},
+                ).to_daily_pnl()
+            if component_read_ok["equity"] and not daily_pnl.equals(expected_daily_pnl):
+                message = "daily_pnl.parquet is inconsistent with equity.parquet"
+                if not recovery:
+                    raise ArtifactReadError(message)
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        code="component_inconsistent",
+                        component="daily_pnl",
+                        message=message,
+                    )
+                )
 
         return cls(
             trades=trades,
@@ -786,8 +1310,10 @@ class BacktestResult:
             fills=fills,
             predictions=predictions,
             portfolio_state=portfolio_state,
+            rejected_orders=rejected_orders,
             metrics=metrics,
             config=config,
+            artifact_diagnostics=tuple(diagnostics),
         )
 
     @staticmethod
@@ -833,7 +1359,8 @@ class BacktestResult:
             "total_slippage_cost": pl.Float64(),
             "cost_drag": pl.Float64(),
             "exit_reason": pl.String(),
-            "status": pl.String(),  # "closed" or "open"
+            "exit_reason_detail": pl.String(),
+            "status": pl.String(),  # "closed", "partial", or "open"
         }
 
     @staticmethod
@@ -861,6 +1388,30 @@ class BacktestResult:
             "bid_size": pl.Float64(),
             "ask_size": pl.Float64(),
             "available_size": pl.Float64(),
+            "exit_reason": pl.String(),
+            "exit_reason_detail": pl.String(),
+        }
+
+    @staticmethod
+    def _rejected_orders_schema() -> dict[str, pl.DataType]:
+        """Schema for rejected order records added compatibly in v0.1.0."""
+        return {
+            "order_id": pl.String(),
+            "symbol": pl.String(),
+            "timestamp": pl.Datetime(),
+            "requested_quantity": pl.Float64(),
+            "filled_quantity": pl.Float64(),
+            "remaining_quantity": pl.Float64(),
+            "side": pl.String(),
+            "order_type": pl.String(),
+            "limit_price": pl.Float64(),
+            "stop_price": pl.Float64(),
+            "trail_amount": pl.Float64(),
+            "parent_id": pl.String(),
+            "rebalance_id": pl.String(),
+            "status": pl.String(),
+            "rejection_code": pl.String(),
+            "rejection_reason": pl.String(),
         }
 
     @staticmethod

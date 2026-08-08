@@ -29,8 +29,9 @@ class MarketImpactModel(ABC):
             is_buy: True for buy orders, False for sell
 
         Returns:
-            Impact in price units (positive = adverse, negative = favorable)
-            For buys: price increases; for sells: price decreases
+            Adverse impact in price units. Values must be finite and non-negative
+            for buys, or finite and non-positive for sells. Models that represent
+            price improvement must do so through a separate execution-price model.
         """
         pass
 

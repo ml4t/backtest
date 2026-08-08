@@ -3,21 +3,29 @@
 from __future__ import annotations
 
 import json
+import math
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import polars as pl
 import pytest
+from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.config import BacktestConfig
 from ml4t.backtest.result import (
+    ArtifactIncompleteError,
+    ArtifactManifestError,
+    ArtifactNotFoundError,
+    ArtifactReadError,
+    ArtifactWriteError,
     BacktestResult,
+    UnsupportedArtifactVersionError,
     enrich_trades_with_signals,
 )
 from ml4t.backtest.types import Fill, OrderSide, Trade
-from ml4t.specs.market_data import FeedSpec
 
 
 @pytest.fixture
@@ -202,6 +210,7 @@ class TestBacktestResultTradesDataFrame:
             "total_slippage_cost",
             "cost_drag",
             "exit_reason",
+            "exit_reason_detail",
             "status",
         ]
 
@@ -336,6 +345,8 @@ class TestBacktestResultFillsDataFrame:
             "bid_size",
             "ask_size",
             "available_size",
+            "exit_reason",
+            "exit_reason_detail",
         ]
         assert df["rebalance_id"].to_list() == ["rebalance-1", "rebalance-1"]
 
@@ -642,9 +653,40 @@ class TestBacktestResultParquet:
             assert "predictions" not in written
             assert "equity" not in written
             assert "portfolio_state" not in written
+            with pytest.raises(ArtifactIncompleteError, match="marks the export incomplete"):
+                BacktestResult.from_parquet(path)
 
-    def test_to_parquet_config_write_failure_is_non_fatal(self):
-        """Test config export failure is swallowed (ImportError/AttributeError path)."""
+    def test_default_manifest_records_unavailable_optional_components(self):
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            result.to_parquet(path)
+            manifest = json.loads((path / "manifest.json").read_text())
+
+            assert manifest["omitted_components"] == {
+                "predictions": "result has no predictions",
+                "config": "result has no config",
+                "spec": "result has no config for a runtime spec",
+            }
+
+    def test_incomplete_write_marker_fails_strict_and_reports_recovery(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / ".artifact-incomplete").write_text("interrupted\n")
+
+            with pytest.raises(ArtifactIncompleteError, match="did not complete"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "incomplete_write"
+
+    @pytest.mark.parametrize("component", ["config", "spec"])
+    def test_to_parquet_config_write_failure_is_explicit(self, component: str):
+        """Test requested config and spec failures identify the component."""
 
         class _BadConfig:
             def to_dict(self):
@@ -659,8 +701,36 @@ class TestBacktestResultParquet:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
-            written = result.to_parquet(path, include=["config"])
-            assert "config" not in written
+            with pytest.raises(ArtifactWriteError, match=component):
+                result.to_parquet(path, include=[component])
+            assert not path.exists()
+
+    def test_default_export_names_only_the_component_that_failed(
+        self, backtest_result: BacktestResult, monkeypatch: pytest.MonkeyPatch
+    ):
+        backtest_result.config = BacktestConfig()
+
+        def fail_spec():
+            raise ValueError("bad spec")
+
+        monkeypatch.setattr(backtest_result, "to_spec_dict", fail_spec)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            with pytest.raises(ArtifactWriteError, match="spec component") as exc_info:
+                backtest_result.to_parquet(path)
+
+            assert "config and spec" not in str(exc_info.value)
+            assert not path.exists()
+
+    @pytest.mark.parametrize("component", ["config", "spec"])
+    def test_to_parquet_rejects_requested_config_without_config(self, component: str):
+        result = BacktestResult(trades=[], equity_curve=[], fills=[], metrics={})
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            pytest.raises(ArtifactWriteError, match=component),
+        ):
+            result.to_parquet(Path(tmpdir) / "test_backtest", include=[component])
 
     def test_to_parquet_writes_spec_snapshot(self):
         """Test resolved runtime spec export."""
@@ -713,6 +783,8 @@ class TestBacktestResultParquet:
 
     def test_from_parquet_roundtrip(self, backtest_result: BacktestResult):
         """Test Parquet save and load roundtrip."""
+        backtest_result.trades[1].status = "open"
+        backtest_result.trades[1].exit_reason = "end_of_backtest"
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
             backtest_result.to_parquet(path)
@@ -726,7 +798,23 @@ class TestBacktestResultParquet:
             assert len(loaded.equity_curve) == len(backtest_result.equity_curve)
             assert len(loaded.portfolio_state) == len(backtest_result.portfolio_state)
             assert loaded.fills[0].rebalance_id == "rebalance-1"
+            assert [trade.status for trade in loaded.trades] == ["closed", "open"]
             assert loaded.metrics["sharpe"] == backtest_result.metrics["sharpe"]
+            assert loaded.artifact_diagnostics == ()
+
+            with open(path / "manifest.json") as file:
+                manifest = json.load(file)
+            assert manifest["artifact_type"] == "ml4t-backtest-result"
+            assert manifest["schema_version"] == 2
+            assert set(manifest["components"]) >= {
+                "trades",
+                "fills",
+                "rejected_orders",
+                "equity",
+                "portfolio_state",
+                "daily_pnl",
+                "metrics",
+            }
 
     def test_to_parquet_compression(self, backtest_result: BacktestResult):
         """Test different compression codecs."""
@@ -737,27 +825,214 @@ class TestBacktestResultParquet:
                 assert written["trades"].exists()
 
     def test_from_parquet_empty_dir(self):
-        """Test loading from directory without files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            loaded = BacktestResult.from_parquet(tmpdir)
-            assert len(loaded.trades) == 0
-            assert len(loaded.equity_curve) == 0
+        """Test empty directories fail before returning an empty result."""
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            pytest.raises(ArtifactNotFoundError, match="empty"),
+        ):
+            BacktestResult.from_parquet(tmpdir)
 
-    def test_from_parquet_invalid_config_is_non_fatal(self, monkeypatch):
-        """Test config load failures are swallowed and config remains None."""
+    def test_from_parquet_invalid_config_fails_strict_and_reports_recovery(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir)
-            (path / "config.yaml").write_text("bad: [")
-            # Force yaml.safe_load failure branch
-            import yaml
-
-            monkeypatch.setattr(
-                yaml,
-                "safe_load",
-                lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad yaml")),
+            path = Path(tmpdir) / "test_backtest"
+            result = BacktestResult(
+                trades=[],
+                equity_curve=[],
+                fills=[],
+                metrics={},
+                config=BacktestConfig(),
             )
-            loaded = BacktestResult.from_parquet(path)
-            assert loaded.config is None
+            result.to_parquet(path)
+            (path / "config.yaml").write_text("bad: [")
+
+            with pytest.raises(ArtifactReadError, match="config.yaml"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.config is not None  # Recovered from the valid spec component.
+            assert [(item.code, item.component) for item in recovered.artifact_diagnostics] == [
+                ("component_missing", "predictions"),
+                ("component_invalid", "config"),
+            ]
+
+    def test_from_parquet_rejects_missing_required_component(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "fills.parquet").unlink()
+
+            with pytest.raises(ArtifactIncompleteError, match="fills"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert [(item.code, item.component) for item in recovered.artifact_diagnostics] == [
+                ("component_missing", "config"),
+                ("component_missing", "spec"),
+                ("component_missing_file", "fills"),
+            ]
+
+    def test_from_parquet_rejects_corrupt_metrics(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "metrics.json").write_text("{")
+
+            with pytest.raises(ArtifactReadError, match="metrics.json"):
+                BacktestResult.from_parquet(path)
+
+    def test_from_parquet_rejects_corrupt_daily_pnl(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "daily_pnl.parquet").write_bytes(b"not parquet")
+
+            with pytest.raises(ArtifactReadError, match="daily_pnl.parquet"):
+                BacktestResult.from_parquet(path)
+
+    def test_from_parquet_rejects_daily_pnl_inconsistent_with_equity(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            daily_path = path / "daily_pnl.parquet"
+            daily = pl.read_parquet(daily_path).with_columns((pl.col("pnl") + 1.0).alias("pnl"))
+            daily.write_parquet(daily_path)
+
+            with pytest.raises(ArtifactReadError, match="inconsistent"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert any(
+                diagnostic.code == "component_inconsistent" and diagnostic.component == "daily_pnl"
+                for diagnostic in recovered.artifact_diagnostics
+            )
+
+    def test_from_parquet_compares_successfully_read_empty_equity(self, tmp_path: Path):
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[(datetime(2024, 1, 1), 100.0)],
+            fills=[],
+            metrics={},
+        )
+        path = tmp_path / "empty-equity"
+        result.to_parquet(path)
+        pl.DataFrame(schema={"timestamp": pl.Datetime, "equity": pl.Float64}).write_parquet(
+            path / "equity.parquet"
+        )
+
+        with pytest.raises(ArtifactReadError, match="inconsistent"):
+            BacktestResult.from_parquet(path)
+
+    def test_recovery_marks_daily_pnl_unverified_when_equity_is_missing(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "equity.parquet").unlink()
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            diagnostics = {
+                (diagnostic.code, diagnostic.component)
+                for diagnostic in recovered.artifact_diagnostics
+            }
+            assert ("component_unverified", "daily_pnl") in diagnostics
+            assert ("component_inconsistent", "daily_pnl") not in diagnostics
+
+    def test_from_parquet_rejects_unsupported_schema(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            manifest_path = path / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["schema_version"] = 999
+            manifest_path.write_text(json.dumps(manifest))
+
+            with pytest.raises(UnsupportedArtifactVersionError, match="999"):
+                BacktestResult.from_parquet(path)
+
+    def test_foreign_artifact_type_fails_strict_and_recovers_current_schema(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            manifest_path = path / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["artifact_type"] = "foreign-result"
+            manifest_path.write_text(json.dumps(manifest))
+
+            with pytest.raises(ArtifactManifestError, match="foreign-result"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+
+    def test_foreign_manifest_without_schema_can_recover_legacy_components(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "manifest.json").write_text(json.dumps({"artifact_type": "foreign-result"}))
+
+            with pytest.raises(ArtifactManifestError, match="foreign-result"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+            assert len(recovered.trades) == len(backtest_result.trades)
+
+    def test_noncanonical_manifest_component_fails_strict_and_recovers(
+        self, backtest_result: BacktestResult
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            manifest_path = path / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["components"]["trades"] = "other.parquet"
+            manifest_path.write_text(json.dumps(manifest))
+
+            with pytest.raises(ArtifactManifestError, match="noncanonical"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+            assert len(recovered.trades) == len(backtest_result.trades)
+
+    def test_from_parquet_rejects_malformed_manifest(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+            (path / "manifest.json").write_text("{")
+
+            with pytest.raises(ArtifactManifestError, match="manifest.json"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.artifact_diagnostics[0].code == "manifest_invalid"
+
+    def test_legacy_signals_component_loads_only_in_recovery(self):
+        predictions = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "score": [0.75],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "beta_result"
+            path.mkdir()
+            predictions.write_parquet(path / "signals.parquet")
+
+            with pytest.raises(ArtifactManifestError, match="manifest"):
+                BacktestResult.from_parquet(path)
+
+            recovered = BacktestResult.from_parquet(path, recovery=True)
+            assert recovered.predictions is not None
+            assert recovered.predictions.equals(predictions)
 
     def test_from_parquet_loads_config_from_spec_when_config_yaml_missing(self):
         """Test spec.yaml fallback restores replayable config."""
@@ -777,14 +1052,19 @@ class TestBacktestResultParquet:
             path = Path(tmpdir) / "test_backtest"
             result.to_parquet(path, include=["spec"])
 
-            loaded = BacktestResult.from_parquet(path)
+            loaded = BacktestResult.from_parquet(path, recovery=True)
 
             assert loaded.config is not None
             assert loaded.config.initial_cash == 82000.0
             assert loaded.config.metadata["strategy_id"] == "spec_fallback"
+            assert any(item.code == "component_missing" for item in loaded.artifact_diagnostics)
 
     def test_metrics_json_serialization(self, backtest_result: BacktestResult):
         """Test metrics JSON contains only serializable values."""
+        backtest_result.metrics["monthly_returns"] = [0.01, -0.02]
+        backtest_result.metrics["segments"] = {"train": (1, 2), "test": [3]}
+        backtest_result.metrics["array"] = np.array([1.0, 2.0])
+        backtest_result.metrics["series"] = pl.Series([3.0, 4.0])
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test_backtest"
             backtest_result.to_parquet(path)
@@ -794,6 +1074,98 @@ class TestBacktestResultParquet:
 
             assert isinstance(metrics["sharpe"], float)
             assert isinstance(metrics["final_value"], float)
+            assert metrics["monthly_returns"] == [0.01, -0.02]
+            assert metrics["segments"] == {"train": [1, 2], "test": [3]}
+            assert metrics["array"] == [1.0, 2.0]
+            assert metrics["series"] == [3.0, 4.0]
+
+            loaded = BacktestResult.from_parquet(path)
+            assert loaded.metrics["array"] == [1.0, 2.0]
+            assert loaded.metrics["series"] == [3.0, 4.0]
+
+    def test_nonfinite_metrics_use_portable_json_and_round_trip(
+        self, backtest_result: BacktestResult
+    ):
+        backtest_result.metrics.update(
+            {
+                "profit_factor": float("inf"),
+                "negative": float("-inf"),
+                "nested": [float("nan")],
+            }
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+
+            raw_metrics = (path / "metrics.json").read_text()
+            assert "Infinity" not in raw_metrics
+            assert "NaN" not in raw_metrics
+            json.loads(raw_metrics, parse_constant=lambda value: pytest.fail(value))
+
+            loaded = BacktestResult.from_parquet(path)
+            assert math.isinf(loaded.metrics["profit_factor"])
+            assert loaded.metrics["profit_factor"] > 0
+            assert math.isinf(loaded.metrics["negative"])
+            assert loaded.metrics["negative"] < 0
+            assert math.isnan(loaded.metrics["nested"][0])
+
+    def test_written_keys_can_be_reused_as_include(self, backtest_result: BacktestResult):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir) / "first"
+            second = Path(tmpdir) / "second"
+
+            written = backtest_result.to_parquet(first)
+            replicated = backtest_result.to_parquet(second, include=list(written))
+
+            assert set(replicated) == set(written)
+
+    def test_failed_reexport_removes_stale_manifest(
+        self, backtest_result: BacktestResult, monkeypatch: pytest.MonkeyPatch
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test_backtest"
+            backtest_result.to_parquet(path)
+
+            def fail_write(*args, **kwargs):
+                raise OSError("simulated component write failure")
+
+            monkeypatch.setattr(pl.DataFrame, "write_parquet", fail_write)
+            with pytest.raises(ArtifactWriteError, match="trades component") as exc_info:
+                backtest_result.to_parquet(path)
+            assert isinstance(exc_info.value.__cause__, OSError)
+
+            assert not (path / "manifest.json").exists()
+            assert (path / ".artifact-incomplete").exists()
+            with pytest.raises(ArtifactIncompleteError, match="did not complete"):
+                BacktestResult.from_parquet(path)
+
+    def test_metrics_json_rejects_unserializable_values(self):
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={"opaque": object()},
+        )
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            pytest.raises(ArtifactWriteError, match="opaque"),
+        ):
+            result.to_parquet(Path(tmpdir) / "test_backtest")
+
+    def test_metrics_json_rejects_array_class_with_metric_path(self):
+        result = BacktestResult(
+            trades=[],
+            equity_curve=[],
+            fills=[],
+            metrics={"opaque": pl.Series},
+        )
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            pytest.raises(ArtifactWriteError, match=r"metrics\['opaque'\]"),
+        ):
+            result.to_parquet(Path(tmpdir) / "test_backtest")
 
 
 class TestEnrichTradesWithSignals:

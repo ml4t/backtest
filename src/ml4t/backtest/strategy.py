@@ -16,7 +16,24 @@ class Strategy(ABC):
         context: dict[str, Any],
         broker: Any,
     ) -> None:
-        """Called before position rules are evaluated for the current bar."""
+        """Run strategy logic immediately before current-bar position risk.
+
+        The broker has registered the current bar's prices before this callback.
+        In ``NEXT_BAR`` mode, a priced, policy-valid market entry submitted from a
+        flat position by this callback on a prior bar can fill at the current open
+        before the callback runs. Partial fills are visible while the remainder stays
+        pending.
+        Newly opened positions start risk evaluation on the following bar, preserving
+        next-bar timing. Untriggered limit or stop orders remain pending, so guarded
+        entries must check both ``broker.get_position(asset)`` and
+        ``broker.get_pending_orders(asset)``. Ordinary orders submitted here remain
+        pending until the next bar. In ``SAME_BAR`` mode, the callback runs before
+        regular pending orders are processed; a market order is visible to current-bar
+        risk only when ``immediate_fill=True``.
+
+        Strategies can pyramid explicitly by submitting additional orders without
+        the flat-position and pending-order guard.
+        """
         return None
 
     @abstractmethod

@@ -219,6 +219,7 @@ class Broker:
         self._rebalance_counter = 0
         self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
         self._orders_this_bar_ids: set[str] = set()
+        self._submitting_before_risk = False
 
         # Risk management
         self._position_rules: Any = None  # Global position rules
@@ -297,6 +298,8 @@ class Broker:
             TieredCommission,
             VolumeShareSlippage,
         )
+
+        config._validate_for_execution()
 
         effective_commission_type = config.commission_type
         if effective_commission_type == CommissionType.NONE:
@@ -802,13 +805,13 @@ class Broker:
         if pos:
             pos.context.update(context)
 
-    def evaluate_position_rules(self) -> list[Order]:
+    def evaluate_position_rules(self, *, skip_assets: set[str] | None = None) -> list[Order]:
         """Evaluate position rules for all open positions.
 
         Called by Engine before processing orders. Returns list of exit orders.
         Handles defer_fill=True by storing pending exits for next bar.
         """
-        return self._risk_engine.evaluate_position_rules()
+        return self._risk_engine.evaluate_position_rules(skip_assets=skip_assets)
 
     def submit_order(
         self,
@@ -1050,11 +1053,16 @@ class Broker:
 
         liquidations: list[Order] = []
         for asset in list(self.positions):
-            order = self.close_position(asset, order_type=order_type)
+            order = self.close_position(
+                asset,
+                order_type=order_type,
+                _options=SubmitOrderOptions(
+                    risk_exit_reason=reason,
+                    exit_reason=ExitReason.RISK_LIQUIDATION,
+                ),
+            )
             if order is None:
                 continue
-            order._exit_reason = ExitReason.RISK_LIQUIDATION
-            order._risk_exit_reason = reason
             liquidations.append(order)
 
         return liquidations
@@ -1763,6 +1771,8 @@ class Broker:
         *,
         order_types: set[OrderType] | None = None,
         include_orders_this_bar: bool = False,
+        only_pre_risk_flat_entries: bool = False,
+        defer_policy_rejections: bool = False,
     ):
         """Process pending orders against current prices.
 
@@ -1781,4 +1791,6 @@ class Broker:
             use_open=use_open,
             order_types=order_types,
             include_orders_this_bar=include_orders_this_bar,
+            only_pre_risk_flat_entries=only_pre_risk_flat_entries,
+            defer_policy_rejections=defer_policy_rejections,
         )

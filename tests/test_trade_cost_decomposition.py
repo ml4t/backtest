@@ -424,15 +424,30 @@ class TestParquetRoundtrip:
         result_dir.mkdir()
         old_df.write_parquet(result_dir / "trades.parquet")
 
-        from ml4t.backtest.result import BacktestResult
+        from ml4t.backtest.result import ArtifactManifestError, BacktestResult
 
-        loaded = BacktestResult.from_parquet(result_dir)
+        with pytest.raises(ArtifactManifestError, match="manifest"):
+            BacktestResult.from_parquet(result_dir)
+
+        loaded = BacktestResult.from_parquet(result_dir, recovery=True)
         assert len(loaded.trades) == 1
         t = loaded.trades[0]
         assert t.exit_slippage == pytest.approx(0.12)  # Legacy slippage column maps through
         assert t.entry_slippage == 0.0  # Default
         assert t.multiplier == 1.0  # Default
         assert t.gross_pnl == pytest.approx(1000.0)
+        assert [(item.code, item.component) for item in loaded.artifact_diagnostics] == [
+            ("manifest_missing", "manifest"),
+            ("component_missing", "config"),
+            ("component_missing", "daily_pnl"),
+            ("component_missing", "equity"),
+            ("component_missing", "fills"),
+            ("component_missing", "metrics"),
+            ("component_missing", "portfolio_state"),
+            ("component_missing", "predictions"),
+            ("component_missing", "rejected_orders"),
+            ("component_missing", "spec"),
+        ]
 
 
 # === Integration: actual backtest with shorts ===

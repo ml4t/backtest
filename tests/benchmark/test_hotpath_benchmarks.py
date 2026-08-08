@@ -2,6 +2,8 @@
 
 These benchmarks compare the current DataFeed implementation against a
 reference legacy implementation (captured from pre-optimization behavior).
+Run the runtime regression check with ``--no-cov`` because instrumentation
+materially changes the comparison. CI invokes its exact pytest node ID.
 """
 
 from __future__ import annotations
@@ -158,7 +160,16 @@ def _legacy_view(assets: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]
     }
 
 
-@pytest.mark.benchmark
+def _coverage_session_started() -> bool:
+    """Return whether a coverage.py session has started and not stopped."""
+    try:
+        from coverage import Coverage
+    except ImportError:
+        return False
+
+    return Coverage.current() is not None
+
+
 def test_optimized_feed_matches_legacy_output():
     prices, signals = _build_benchmark_data(n_bars=50, n_assets=5)
 
@@ -176,6 +187,9 @@ def test_optimized_feed_matches_legacy_output():
 
 @pytest.mark.benchmark
 def test_optimized_feed_runtime_vs_legacy_baseline():
+    if _coverage_session_started():
+        pytest.skip("Runtime benchmark requires coverage instrumentation to be disabled")
+
     prices, signals = _build_benchmark_data(n_bars=3000, n_assets=20)
 
     # Warm-up for consistent timing
