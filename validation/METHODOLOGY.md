@@ -242,7 +242,7 @@ Scenario claims use the retained release-candidate matrix. "Exact" appears only 
 | `vectorbt_strict` | [VectorBT Pro 2025.12.31](https://github.com/polakowo/vectorbt.pro) | 16/16 exact | [scenario evidence](https://github.com/ml4t/backtest/blob/main/validation/CORRECTNESS_RESULTS.json) |
 | `vectorbt` | [VectorBT OSS 0.28.2](https://pypi.org/project/vectorbt/0.28.2/) | 15/15 exact | [scenario evidence](https://github.com/ml4t/backtest/blob/main/validation/CORRECTNESS_RESULTS.json) |
 | `backtrader_strict` | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 16/16 exact | [scenario evidence](https://github.com/ml4t/backtest/blob/main/validation/CORRECTNESS_RESULTS.json) |
-| `zipline_strict` | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 14/15 pass; blocked by scenario 15 | [scenario evidence](https://github.com/ml4t/backtest/blob/main/validation/CORRECTNESS_RESULTS.json) |
+| `zipline_strict` | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 15/15 exact | [scenario evidence](https://github.com/ml4t/backtest/blob/main/validation/CORRECTNESS_RESULTS.json) |
 
 Large-scale claims are published only when a retained workload has zero canonical gap.
 

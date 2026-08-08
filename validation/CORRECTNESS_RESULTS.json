@@ -30,7 +30,7 @@
       "version": "3.1.1"
     }
   },
-  "generated_at": "2026-08-08T12:04:54.048721+00:00",
+  "generated_at": "2026-08-08T12:20:05.088761+00:00",
   "records": [
     {
       "detail": null,
@@ -591,13 +591,13 @@
       "status": "pass"
     },
     {
-      "detail": "FAIL (final_value: Zipline=$99,727.8000000000, ML4T=$99,737.3000000000 (exact_diff=$9.5000000000, 0.0095259296%; diagnostic_limit=0.01%); total_pnl: Zipline=$-272.2000000000, ML4T=$-262.7000000000 (exact_diff=$9.5000000000; diagnostic_limit=$10.0); trade_level_match: trade 0 field exit_price: expected=Decimal('93.97800000'), actual=Decimal('94.07300000'))",
+      "detail": null,
       "framework": "zipline",
-      "release_blocking": true,
+      "release_blocking": false,
       "required": true,
       "scenario_id": "15",
       "scenario_name": "Triple Rule",
-      "status": "comparison_failure"
+      "status": "pass"
     },
     {
       "detail": null,
@@ -609,16 +609,16 @@
       "status": "pass"
     }
   ],
-  "release_gate_passed": false,
+  "release_gate_passed": true,
   "schema_version": 1,
   "summary": {
     "adapter_failure": 0,
     "adapter_import_failure": 0,
-    "comparison_failure": 1,
+    "comparison_failure": 0,
     "malformed_output": 0,
     "missing_scenario": 0,
     "ml4t_failure": 0,
-    "pass": 61,
+    "pass": 62,
     "skipped": 0,
     "subprocess_failure": 0,
     "timeout": 0,

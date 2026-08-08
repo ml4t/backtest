@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import sys
 from pathlib import Path
 
@@ -39,6 +40,16 @@ def test_claims_pin_every_advertised_framework_and_expose_failures() -> None:
         assert pin["version"] in claims
         assert pin["source"] in claims
         assert f"`{pin['profile']}`" in claims
-    assert "14/15 pass; blocked by scenario 15" in claims
+    assert "15/15 exact" in claims
     assert "225,844 trades" in claims
     assert "No large-scale claim is published for Backtrader" in claims
+
+    failed_correctness = copy.deepcopy(correctness)
+    failed_record = next(
+        record
+        for record in failed_correctness["records"]
+        if record["framework"] == "zipline" and record["scenario_id"] == "15"
+    )
+    failed_record["status"] = "comparison_failure"
+    failed_claims = generate_parity_claims.render_claims(failed_correctness, large_scale)
+    assert "14/15 pass; blocked by scenario 15" in failed_claims

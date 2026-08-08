@@ -25,6 +25,14 @@ from ml4t.backtest._validation.zipline_runner import (
 )
 
 
+def _activate_reconciled_position(context, position) -> None:
+    """Initialize risk state only after Zipline reports an opening fill."""
+    if position.amount == 0 or context.entry_price is not None:
+        return
+    context.entry_price = float(position.cost_basis)
+    context.high_water_mark = context.entry_price
+
+
 def run(
     scenario: ScenarioConfig,
     prices_df: pd.DataFrame,
@@ -70,7 +78,6 @@ def run(
         context.asset = symbol("TEST")
         context.signal_data = signal_data
         context.bar_count = 0
-        context.in_position = False
         context.entry_price = None
         context.high_water_mark = None
 
@@ -104,7 +111,9 @@ def run(
             context.signal_data["exits"][idx] if context.signal_data["exits"] is not None else False
         )
 
-        current_pos = context.portfolio.positions[context.asset].amount
+        position = context.portfolio.positions[context.asset]
+        current_pos = position.amount
+        _activate_reconciled_position(context, position)
         current_price = data.current(context.asset, "close")
         bar_high = data.current(context.asset, "high")
         bar_low = data.current(context.asset, "low")
@@ -153,7 +162,6 @@ def run(
 
             if should_exit:
                 order_target(context.asset, 0)
-                context.in_position = False
                 context.entry_price = None
                 context.high_water_mark = None
                 context.bar_count += 1
@@ -162,7 +170,6 @@ def run(
         # Signal-based exits
         if exit_sig and current_pos > 0 or exit_sig and current_pos < 0:
             order_target(context.asset, 0)
-            context.in_position = False
             context.entry_price = None
         # Entries
         elif entry and current_pos == 0:
@@ -170,9 +177,6 @@ def run(
                 order(context.asset, -shares)
             else:
                 order(context.asset, shares)
-            context.in_position = True
-            context.entry_price = current_price
-            context.high_water_mark = current_price
 
         context.bar_count += 1
 
