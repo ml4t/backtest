@@ -12,6 +12,13 @@ import polars as pl
 from ml4t.specs.market_data import FeedSpec
 
 
+def _read_parquet(path: str) -> pl.DataFrame:
+    frame = pl.scan_parquet(path).collect()
+    if not isinstance(frame, pl.DataFrame):
+        raise TypeError(f"Expected Polars DataFrame, got {type(frame).__name__}")
+    return frame
+
+
 class _AssetsData(dict[str, dict[str, Any]]):
     """Internal per-bar payload with pre-extracted broker views."""
 
@@ -101,17 +108,17 @@ class DataFeed:
         self.prices = (
             prices_df
             if prices_df is not None
-            else (pl.scan_parquet(prices_path).collect() if prices_path else None)
+            else (_read_parquet(prices_path) if prices_path else None)
         )
         self.signals = (
             signals_df
             if signals_df is not None
-            else (pl.scan_parquet(signals_path).collect() if signals_path else None)
+            else (_read_parquet(signals_path) if signals_path else None)
         )
         self.context = (
             context_df
             if context_df is not None
-            else (pl.scan_parquet(context_path).collect() if context_path else None)
+            else (_read_parquet(context_path) if context_path else None)
         )
 
         if self.prices is None:
@@ -135,7 +142,10 @@ class DataFeed:
         ).resolve(self.prices.columns, self.ENTITY_COL_CANDIDATES)
         self.contract = self.feed_spec
         self._timestamp_col = self.feed_spec.timestamp_col
-        self._entity_col = self.feed_spec.entity_col
+        resolved_entity_col = self.feed_spec.entity_col
+        if not isinstance(resolved_entity_col, str):
+            raise ValueError("DataFeed requires one resolved string entity column")
+        self._entity_col = resolved_entity_col
         self._price_col = self.feed_spec.price_col
         self._open_col = self.feed_spec.open_col
         self._high_col = self.feed_spec.high_col

@@ -482,8 +482,7 @@ def get_holidays(
     trading_days = calendar.valid_days(start_date=start, end_date=end)
 
     # Holidays are weekdays that are not trading days
-    # Note: day_of_week is the modern pandas attribute (dayofweek deprecated)
-    weekdays = all_days[all_days.day_of_week < 5]  # ty: ignore[unresolved-attribute]  # Mon-Fri
+    weekdays = all_days[[day.weekday() < 5 for day in all_days]]
     holidays = weekdays.difference(trading_days)
 
     # Build DataFrame
@@ -665,6 +664,8 @@ def filter_to_trading_sessions(
         .drop(["session_open", "session_close"])
         .collect()
     )
+    if not isinstance(result, pl.DataFrame):
+        raise TypeError(f"Expected Polars DataFrame, got {type(result).__name__}")
 
     return result
 

@@ -25,16 +25,31 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --locked
+
+      - name: Prove lint failures do not mutate files
+        run: |
+          violation="$RUNNER_TEMP/ruff-violation.py"
+          printf 'import os\n' > "$violation"
+          before="$(sha256sum "$violation")"
+          if uv run ruff check --no-fix "$violation"; then
+            echo "Ruff accepted an intentional lint violation" >&2
+            exit 1
+          fi
+          after="$(sha256sum "$violation")"
+          test "$before" = "$after"
 
       - name: Run ruff check
-        run: uv run ruff check src/ tests/
+        run: uv run ruff check --no-fix src/ tests/
 
       - name: Run ruff format check
         run: uv run ruff format --check src/ tests/
 
       - name: Verify parity claims match retained evidence
         run: uv run python validation/generate_parity_claims.py --check
+
+      - name: Verify the committed checkout is unchanged
+        run: git diff --exit-code
 
   typecheck:
     name: Type Check
@@ -51,10 +66,21 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --locked
 
       - name: Run ty check
         run: uv run ty check
+
+      - name: Build the wheel for consumer type checking
+        run: uv build --wheel
+
+      - name: Type-check a public API consumer against the wheel
+        run: |
+          cp tests/typing/public_api_consumer.py "$RUNNER_TEMP/public_api_consumer.py"
+          cd "$RUNNER_TEMP"
+          uvx --python "${{ env.PYTHON_VERSION }}" --from ty \
+            --with "$GITHUB_WORKSPACE"/dist/*.whl \
+            ty check public_api_consumer.py
 
   compatibility:
     name: Compatibility

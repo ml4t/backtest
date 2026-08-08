@@ -70,6 +70,9 @@ class AccountPolicy(ABC):
     complex conditional logic or parallel systems.
     """
 
+    allow_leverage: bool
+    short_cash_policy: str
+
     @abstractmethod
     def calculate_buying_power(self, cash: float, positions: dict[str, Position]) -> float:
         """Calculate available buying power for new long positions.

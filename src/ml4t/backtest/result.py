@@ -436,22 +436,11 @@ class BacktestResult:
         if not self.portfolio_state:
             return pl.DataFrame(schema=self._portfolio_state_schema())
 
-        self._portfolio_state_df = (
-            pl.DataFrame(
-                self.portfolio_state,
-                schema=[
-                    "timestamp",
-                    "equity",
-                    "cash",
-                    "gross_exposure",
-                    "net_exposure",
-                    "open_positions",
-                ],
-                orient="row",
-            )
-            .sort("timestamp")
-            .cast(self._portfolio_state_schema())
-        )
+        self._portfolio_state_df = pl.DataFrame(
+            self.portfolio_state,
+            schema=self._portfolio_state_schema(),
+            orient="row",
+        ).sort("timestamp")
         return self._portfolio_state_df
 
     def to_daily_pnl(self, session_aligned: bool = False) -> pl.DataFrame:
@@ -741,6 +730,9 @@ class BacktestResult:
                 raise ArtifactWriteError(f"Failed to serialize metrics: {exc}") from exc
 
         if "config" in selected or "spec" in selected:
+            config = self.config
+            if config is None:
+                raise ArtifactWriteError("Config and spec components require a runtime config")
             try:
                 import yaml
             except ImportError as exc:
@@ -748,7 +740,7 @@ class BacktestResult:
             if "config" in selected:
                 try:
                     text_payloads["config"] = yaml.safe_dump(
-                        self.config.to_dict(),
+                        config.to_dict(),
                         default_flow_style=False,
                     )
                 except Exception as exc:

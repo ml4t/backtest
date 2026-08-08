@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 
 from ..models import calculate_commission
-from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType, Position
+from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import is_exit_order, quantity_zero_tolerance
 
 
@@ -205,8 +205,8 @@ class ExecutionEngine:
             if mark is not None:
                 position.current_price = mark
 
-        accepted_orders: list[tuple[object, float]] = []
-        filled_orders: list = []
+        accepted_orders: list[tuple[Order, float]] = []
+        filled_orders: list[Order] = []
 
         for order in eligible_orders:
             price = fill.get_fill_price_for_order(order, use_open)

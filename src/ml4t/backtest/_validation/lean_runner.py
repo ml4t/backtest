@@ -260,7 +260,9 @@ def export_lean_daily_data(
 
         lines: list[str] = []
         for ts, row in asset_df.iterrows():
-            dt = pd.Timestamp(ts)
+            if not isinstance(ts, pd.Timestamp):
+                raise TypeError(f"Expected a DatetimeIndex, got {type(ts).__name__}")
+            dt = ts
             dt = dt.tz_convert(None) if dt.tz is not None else dt
             open_px = int(round(float(row["open"]) * 10000.0))
             high_px = int(round(float(row["high"]) * 10000.0))

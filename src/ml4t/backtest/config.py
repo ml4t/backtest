@@ -815,7 +815,10 @@ class BacktestConfig:
 
     @property
     def resolved_timestamp_semantics(self) -> TimestampSemantics | None:
-        return self.resolved_feed_spec.timestamp_semantics
+        semantics = self.resolved_feed_spec.timestamp_semantics
+        if semantics is None or isinstance(semantics, TimestampSemantics):
+            return semantics
+        return TimestampSemantics(semantics)
 
     def merge_feed_spec(self, feed_spec: FeedSpec | Any | None) -> BacktestConfig:
         """Fill missing runtime config from feed metadata without mutating user config."""
