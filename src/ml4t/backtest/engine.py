@@ -21,10 +21,11 @@ if TYPE_CHECKING:
     from .config import BacktestConfig
     from .result import BacktestResult
 
-# Counterfactual checks are bounded and require recovery of 10% of sampled bars plus 25% relative.
+# Only counterfactuals recovering a large block trigger; ambiguous extended-hours feeds do not.
 _TIMEZONE_DIAGNOSTIC_MAX_DATES = 20
 _TIMEZONE_DIAGNOSTIC_MAX_RETENTION = 0.5
-_TIMEZONE_DIAGNOSTIC_MIN_ABSOLUTE_GAIN = 0.1
+_TIMEZONE_DIAGNOSTIC_MAX_ABSOLUTE_GAIN = 4
+_TIMEZONE_DIAGNOSTIC_MIN_GAIN_FRACTION = 0.1
 _TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN = 1.25
 _TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS = 0.1
 
@@ -98,6 +99,7 @@ class Engine:
         # Calendar session enforcement (lazy initialized in run())
         self._calendar = None
         self._skipped_bars = 0
+        self._has_run = False
 
     def run(self) -> BacktestResult:
         """Run backtest and return structured results.
@@ -105,7 +107,14 @@ class Engine:
         Returns:
             BacktestResult with trades, equity curve, metrics, and export methods.
             Call .to_dict() for backward-compatible dictionary output.
+
+        Raises:
+            RuntimeError: If this Engine instance has already been run.
         """
+        if self._has_run:
+            raise RuntimeError("Engine instances are single-use; create a new Engine for each run")
+        self._has_run = True
+
         # Lazy calendar initialization (zero cost if unused)
         is_trading_day_fn = None
         valid_intraday_bar_mask: bytearray | None = None
@@ -191,7 +200,10 @@ class Engine:
                     relative_retention_gain = 1.0
                 minimum_absolute_gain = max(
                     1,
-                    ceil(sample_bars * _TIMEZONE_DIAGNOSTIC_MIN_ABSOLUTE_GAIN),
+                    min(
+                        _TIMEZONE_DIAGNOSTIC_MAX_ABSOLUTE_GAIN,
+                        ceil(sample_bars * _TIMEZONE_DIAGNOSTIC_MIN_GAIN_FRACTION),
+                    ),
                 )
                 alternative_timezone_explains_loss = (
                     compare_calendar_timezone

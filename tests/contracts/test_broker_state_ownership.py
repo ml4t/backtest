@@ -91,7 +91,7 @@ COLLECTION_COPY_OR_READ_CALLS = {
     "zip",
 }
 # fill_engine.py passes positions to this read-only accounting policy method.
-COLLECTION_READ_METHOD_PATHS = {("broker", "account", "policy", "get_spendable_cash")}
+COLLECTION_READ_METHOD_SUFFIX = ("account", "policy", "get_spendable_cash")
 
 
 def _parse(path: Path) -> ast.Module:
@@ -205,6 +205,12 @@ def _broker_collection_access(node: ast.AST) -> str | None:
                 return collection
     if isinstance(node, ast.Starred):
         return _broker_collection_access(node.value)
+    if isinstance(node, ast.IfExp):
+        return _broker_collection_access(node.body) or _broker_collection_access(node.orelse)
+    if isinstance(node, ast.BoolOp):
+        for value in node.values:
+            if (collection := _broker_collection_access(value)) is not None:
+                return collection
     if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
         return _broker_collection_access(node.elt)
     if isinstance(node, ast.DictComp):
@@ -234,8 +240,17 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
         return collection
     if isinstance(node, ast.Call):
         if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_READ_CALLS:
+            for keyword in node.keywords:
+                if (collection := _broker_collection_access(keyword.value)) is not None:
+                    return collection
             return None
-        if _attribute_path(node.func) in COLLECTION_READ_METHOD_PATHS:
+        method_path = _attribute_path(node.func)
+        if (
+            method_path is not None
+            and method_path[-3:] == COLLECTION_READ_METHOD_SUFFIX
+            and isinstance(node.func, ast.Attribute)
+            and _references_broker(node.func.value)
+        ):
             return None
         for argument in [*node.args, *(keyword.value for keyword in node.keywords)]:
             if (collection := _broker_collection_access(argument)) is not None:
@@ -332,10 +347,15 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
         "    orders = broker.orders\n"
         "    order_count = len(broker.orders)\n"
         "    fills_copy = list(broker.fills)\n"
+        "    positions_copy = dict(broker.positions)\n"
+        "    dict(fills=broker.orders)\n"
         "    consume(broker.trades)\n"
         "    consume({'fills': broker.fills})\n"
         "    unrelated.get_spendable_cash(broker.trades)\n"
         "    broker.account.policy.get_spendable_cash(cash, broker.positions)\n"
+        "    self.broker.account.policy.get_spendable_cash(cash, self.broker.positions)\n"
+        "    conditional = broker.fills if replay else []\n"
+        "    fallback = broker.orders or []\n"
         "    yield broker.fills\n"
         "    yield from (broker.fills,)\n"
         "    return [broker.fills]\n"
@@ -351,6 +371,9 @@ def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
         "fills",
         "fills",
         "fills",
+        "fills",
+        "orders",
+        "orders",
         "orders",
         "positions",
         "trades",

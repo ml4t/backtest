@@ -706,15 +706,40 @@ class TestEngine:
         assert portfolio_state["open_positions"].to_list() == [1, 0, 0]
         assert portfolio_state["gross_exposure"].to_list() == [1000.0, 0.0, 0.0]
 
+    def test_result_collections_are_isolated_and_engine_is_single_use(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "asset": ["AAPL", "AAPL"],
+                "open": [100.0, 101.0],
+                "high": [100.0, 101.0],
+                "low": [100.0, 101.0],
+                "close": [100.0, 101.0],
+                "volume": [1000.0, 1000.0],
+            }
+        )
+        engine = Engine(
+            DataFeed(prices_df=prices),
+            BuyAndHoldStrategy("AAPL"),
+            BacktestConfig(
+                execution_mode=ExecutionMode.SAME_BAR,
+                commission_type=CommissionType.NONE,
+                slippage_type=SlippageType.NONE,
+            ),
+        )
+        results = engine.run()
+
         assert results.fills is not engine.broker.fills
         assert results.equity_curve is not engine.equity_curve
         assert results.portfolio_state is not engine.portfolio_state
         results.fills.clear()
         results.equity_curve.clear()
         results.portfolio_state.clear()
-        assert len(engine.broker.fills) == 2
-        assert len(engine.equity_curve) == 3
-        assert len(engine.portfolio_state) == 3
+        assert len(engine.broker.fills) == 1
+        assert len(engine.equity_curve) == 2
+        assert len(engine.portfolio_state) == 2
+        with pytest.raises(RuntimeError, match="single-use"):
+            engine.run()
 
     def test_activity_metrics_prefer_explicit_rebalance_ids(self):
         prices = pl.DataFrame(

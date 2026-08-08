@@ -319,9 +319,9 @@ class TestCalendarEnforcementIntraday:
                 trading_dates.append(current)
             current += timedelta(days=1)
         timestamps = [
-            date.replace(hour=hour, minute=minute)
-            for date in trading_dates
-            for hour, minute in [(9, 30), (15, 59)]
+            trading_date.replace(hour=hour, minute=minute)
+            for trading_date in trading_dates
+            for hour, minute in [(8, 0), (9, 30), (15, 59)]
         ]
         frame = pl.DataFrame(
             {
@@ -335,7 +335,8 @@ class TestCalendarEnforcementIntraday:
             }
         )
 
-        with pytest.warns(UserWarning, match="in a 40-bar sample"):
+        assert len(timestamps) == 75
+        with pytest.warns(UserWarning, match="in a 60-bar sample"):
             result = Engine(
                 feed=DataFeed(prices_df=frame),
                 strategy=SimpleStrategy(),
@@ -346,8 +347,7 @@ class TestCalendarEnforcementIntraday:
                 ),
             ).run()
 
-        assert len(timestamps) == 50
-        assert result.metrics["skipped_bars"] == 25
+        assert result.metrics["skipped_bars"] == 50
 
     def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
         timestamps = [
@@ -439,6 +439,35 @@ class TestCalendarEnforcementIntraday:
             ).run()
 
         assert result.metrics["skipped_bars"] == 9
+
+    def test_extended_hours_timezone_misread_is_not_detectable_from_retention(self):
+        start = datetime(2024, 1, 2, 4, 0)
+        timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
+        assert result.metrics["skipped_bars"] == 21
 
     def test_intraday_weekend_skipped(self):
         """Weekend intraday bars are skipped by the precomputed session mask."""
