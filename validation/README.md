@@ -51,7 +51,7 @@ Data: `us_equities.parquet` (250 US equities, 1998-2018). Strategy: long top 25,
 
 ## How to Run
 
-### Parameterized runner (new)
+### Current-environment runner
 
 ```bash
 # Single scenario
@@ -67,14 +67,30 @@ python validation/run_scenario.py --all
 python validation/run_scenario.py --dry-run
 ```
 
+The command returns nonzero when a required framework or scenario does not execute. Use
+`--result-json PATH` to retain machine-readable terminal records. An explicitly unsupported pair
+is reported as `unsupported`; it is visible in the matrix and does not count as a pass.
+
+### Isolated release-gate runner
+
+```bash
+# Complete required matrix using each framework's dedicated environment
+python validation/run_all_correctness.py
+
+# Selected framework/scenario matrix
+python validation/run_all_correctness.py --framework backtrader --scenarios 01,03,05,09
+```
+
+The isolated runner writes `validation/CORRECTNESS_RESULTS.json` and distinguishes comparison
+failures, unsupported pairs, unavailable environments, adapter failures, subprocess failures,
+timeouts, skips, malformed records, and missing scenarios. Every status except `pass` and an
+explicitly optional `unsupported` record fails the release gate.
+
 ### Large-scale benchmarks
 
 ```bash
 # Framework benchmark
 python validation/benchmark_suite.py --profile backtrader_strict --framework backtrader
-
-# All correctness scenarios
-python validation/run_all_correctness.py
 
 # Full validation (correctness + benchmarks)
 python validation/run_full_validation.py
@@ -108,7 +124,7 @@ validation/
 ├── scenarios/                 # Declarative scenario definitions (16 configs)
 ├── frameworks/                # Parameterized framework drivers (4 modules)
 ├── run_scenario.py            # Unified CLI runner
-├── run_all_correctness.py     # Legacy scenario correctness runner
+├── run_all_correctness.py     # Isolated release-gate correctness runner
 ├── run_all_benchmarks.py      # Framework benchmark loop
 ├── benchmark_suite.py         # Large-scale benchmark runner
 ├── run_full_validation.py     # Complete validation pipeline
