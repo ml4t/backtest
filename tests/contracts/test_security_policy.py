@@ -160,8 +160,8 @@ def test_ci_and_release_both_require_the_evidence_retaining_security_workflow() 
 
     assert ci_jobs["security"]["uses"] == "./.github/workflows/security.yml"
     assert "security" in ci_jobs["build"]["needs"]
-    assert release_jobs["security"]["uses"] == "./.github/workflows/security.yml"
-    assert "security" in release_jobs["build"]["needs"]
+    assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
+    assert release_jobs["publish"]["needs"] == "qualification"
 
     scan = security["jobs"]["scan"]
     commands = "\n".join(step.get("run", "") for step in scan["steps"])

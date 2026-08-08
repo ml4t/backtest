@@ -1,9 +1,13 @@
 name: CI
 
 on:
+  workflow_call:
   push:
     branches: [main, develop]
   pull_request:
+
+permissions:
+  contents: read
 
 env:
   PYTHON_VERSION: "3.12"
@@ -40,10 +44,10 @@ jobs:
           test "$before" = "$after"
 
       - name: Run ruff check
-        run: uv run ruff check --no-fix src/ tests/
+        run: uv run ruff check --no-fix src/ tests/ validation/
 
       - name: Run ruff format check
-        run: uv run ruff format --check src/ tests/
+        run: uv run ruff format --check src/ tests/ validation/
 
       - name: Verify parity claims match retained evidence
         run: uv run python validation/generate_parity_claims.py --check
@@ -175,15 +179,46 @@ jobs:
       - name: Install dependencies (with comparison frameworks)
         run: uv sync --dev --extra comparison
 
-      - name: Run cross-engine contract test (scenario 01)
+      - name: Run cross-engine contract tests
         env:
           ML4T_COMPARISON_INPROC: "1"
-        run: uv run pytest tests/contracts/test_cross_engine_contracts.py -v --tb=short --no-cov
+        run: >-
+          uv run pytest tests/contracts/test_cross_engine_contracts.py -v --tb=short --no-cov
+          --junitxml=parity-contracts.xml
+
+      - name: Retain cross-engine parity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: parity-contracts
+          path: parity-contracts.xml
+          if-no-files-found: error
+
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install documentation dependencies
+        run: uv sync --dev --extra docs --locked
+
+      - name: Build documentation with strict validation
+        run: uv run mkdocs build --strict
 
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, compatibility, security, coverage, runtime, contracts]
+    needs:
+      [lint, typecheck, compatibility, security, coverage, runtime, contracts, documentation]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -209,8 +244,40 @@ jobs:
       - name: Validate package metadata and long description
         run: uvx twine check dist/*
 
-      - name: Upload build artifacts
+      - name: Verify source provenance
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+
+      - name: Create commit-bound release candidate
+        run: |
+          mkdir -p release-candidate/dist
+          cp dist/* release-candidate/dist/
+          uv run python validation/release_candidate.py create \
+            --dist release-candidate/dist \
+            --commit "$GITHUB_SHA" \
+            --repository "$GITHUB_REPOSITORY" \
+            --gate compatibility=${{ needs.compatibility.result }} \
+            --gate correctness=${{ needs.coverage.result }} \
+            --gate coverage=${{ needs.coverage.result }} \
+            --gate documentation=${{ needs.documentation.result }} \
+            --gate lint=${{ needs.lint.result }} \
+            --gate packaging=success \
+            --gate parity=${{ needs.contracts.result }} \
+            --gate performance=${{ needs.runtime.result }} \
+            --gate security=${{ needs.security.result }} \
+            --gate typecheck=${{ needs.typecheck.result }} \
+            --output release-candidate/release-candidate.json
+          uv run python validation/release_candidate.py verify \
+            --dist release-candidate/dist \
+            --manifest release-candidate/release-candidate.json \
+            --expected-commit "$GITHUB_SHA" \
+            --expected-repository "$GITHUB_REPOSITORY"
+
+      - name: Upload exact release candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: dist
-          path: dist/
+          name: release-candidate-${{ github.sha }}
+          path: release-candidate/
+          if-no-files-found: error
+          retention-days: 90

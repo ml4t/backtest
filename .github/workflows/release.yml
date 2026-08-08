@@ -4,71 +4,90 @@ on:
   push:
     tags: ["v*"]
 
-env:
-  PYTHON_VERSION: "3.12"
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  compatibility:
-    name: Compatibility
-    uses: ./.github/workflows/compatibility.yml
-
-  security:
-    name: Security
-    uses: ./.github/workflows/security.yml
-
-  build:
-    name: Build Package
-    runs-on: ubuntu-latest
-    needs: [compatibility, security]
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          fetch-depth: 0
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Build package
-        run: uv build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: dist
-          path: dist/
+  qualification:
+    name: Qualify Release Candidate
+    uses: ./.github/workflows/ci.yml
 
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: build
+    needs: qualification
     environment: pypi
     permissions:
+      contents: read
       id-token: write
     steps:
-      - name: Download build artifacts
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Download exact release candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: dist
-          path: dist/
+          name: release-candidate-${{ github.sha }}
+          path: candidate/
+
+      - name: Verify candidate source, tag, and digests
+        run: >-
+          python validation/release_candidate.py verify
+          --dist candidate/dist
+          --manifest candidate/release-candidate.json
+          --expected-commit "$GITHUB_SHA"
+          --expected-repository "$GITHUB_REPOSITORY"
+          --expected-tag "$GITHUB_REF_NAME"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          packages-dir: candidate/dist/
+          verify-metadata: true
+          print-hash: true
+          attestations: true
+
+  verify-pypi:
+    name: Verify PyPI Digests
+    runs-on: ubuntu-latest
+    needs: publish
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Download exact release candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: candidate/
+
+      - name: Compare published files with the candidate
+        run: >-
+          python validation/release_candidate.py verify-index
+          --manifest candidate/release-candidate.json
 
   github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: publish
+    needs: verify-pypi
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Download exact release candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: candidate/
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" --generate-notes
+        run: >-
+          gh release create "${{ github.ref_name }}"
+          candidate/dist/* candidate/release-candidate.json
+          --repo "${{ github.repository }}"
+          --target "${{ github.sha }}"
+          --verify-tag
+          --generate-notes
