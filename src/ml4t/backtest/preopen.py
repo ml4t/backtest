@@ -642,6 +642,18 @@ class PreOpenTargetManager:
         policy_id = intent.position_rule_policy_id
         if policy_id is None or filled_quantity <= 0:
             return None
+        child_intent_id = f"{intent.intent_id}:{asset}"
+        prior_activation = next(
+            (
+                record.rule_activated_at
+                for record in reversed(self._reconciliations)
+                if record.child_intent_id == child_intent_id
+                and record.rule_activated_at is not None
+            ),
+            None,
+        )
+        if prior_activation is not None:
+            return prior_activation
         rules = self._position_rules.get(policy_id)
         if rules is None:
             raise UnsupportedPreOpenPolicyError(
