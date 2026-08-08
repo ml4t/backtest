@@ -249,6 +249,11 @@ def _mutable_collection_access(node: ast.AST) -> str | None:
         return collection
     if isinstance(node, ast.Call):
         if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_READ_CALLS:
+            for argument in node.args:
+                if _direct_broker_collection_access(argument) is not None:
+                    continue
+                if (collection := _broker_collection_access(argument)) is not None:
+                    return collection
             for keyword in node.keywords:
                 if (
                     keyword.arg is None
@@ -418,9 +423,17 @@ def test_mutable_collection_contract_follows_nested_keyword_unpacking() -> None:
 
 
 def test_mutable_collection_contract_follows_nested_positional_unpacking() -> None:
-    call = ast.parse("helper(*[broker.fills])").body[0].value
+    nodes = [
+        ast.parse("helper(*[broker.fills])").body[0].value,
+        ast.parse("helper(*(broker.fills, other))").body[0].value,
+        ast.parse("escaped = [*(broker.fills,)]").body[0],
+        ast.parse("list([broker.fills])").body[0].value,
+    ]
 
-    assert _mutable_collection_access(call) == "fills"
+    assert [_mutable_collection_access(node) for node in nodes] == ["fills"] * len(nodes)
+
+    direct_copy = ast.parse("list(broker.fills)").body[0].value
+    assert _mutable_collection_access(direct_copy) is None
 
 
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
