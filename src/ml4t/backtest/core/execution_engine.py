@@ -39,17 +39,20 @@ class ExecutionEngine:
         use_open: bool = False,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
         defer_policy_rejections: bool = False,
     ):
         if self._should_use_next_bar_queue_shadow_validation(
             use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         ):
             self._process_orders_next_bar_queue_shadow(
                 use_open,
                 order_types=order_types,
+                order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
                 defer_policy_rejections=defer_policy_rejections,
             )
@@ -60,6 +63,7 @@ class ExecutionEngine:
             self._process_orders_exit_first(
                 use_open,
                 order_types=order_types,
+                order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
                 defer_policy_rejections=defer_policy_rejections,
             )
@@ -67,6 +71,7 @@ class ExecutionEngine:
             self._process_orders_sequential(
                 use_open,
                 order_types=order_types,
+                order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
                 defer_policy_rejections=defer_policy_rejections,
             )
@@ -74,6 +79,7 @@ class ExecutionEngine:
             self._process_orders_fifo(
                 use_open,
                 order_types=order_types,
+                order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
                 defer_policy_rejections=defer_policy_rejections,
             )
@@ -87,6 +93,7 @@ class ExecutionEngine:
         use_open: bool = False,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
         defer_policy_rejections: bool = False,
     ):
@@ -97,6 +104,7 @@ class ExecutionEngine:
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         )
 
@@ -160,6 +168,7 @@ class ExecutionEngine:
         use_open: bool,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
     ) -> bool:
         broker = self.broker
@@ -169,13 +178,14 @@ class ExecutionEngine:
             and broker.next_bar_queue_shadow_validation
         ):
             return False
-        if order_types is not None or include_orders_this_bar:
+        if order_types is not None or order_ids is not None or include_orders_this_bar:
             return False
 
         current_bar_index = self.market.bar_index
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         )
         for order in eligible_orders:
@@ -189,6 +199,7 @@ class ExecutionEngine:
         use_open: bool = False,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
         defer_policy_rejections: bool = False,
     ):
@@ -197,6 +208,7 @@ class ExecutionEngine:
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         )
 
@@ -385,6 +397,7 @@ class ExecutionEngine:
         use_open: bool = False,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
         defer_policy_rejections: bool = False,
     ):
@@ -392,6 +405,7 @@ class ExecutionEngine:
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         )
 
@@ -414,6 +428,7 @@ class ExecutionEngine:
         use_open: bool = False,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
         defer_policy_rejections: bool = False,
     ):
@@ -435,6 +450,7 @@ class ExecutionEngine:
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
+            order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         )
 
@@ -641,6 +657,7 @@ class ExecutionEngine:
         use_open: bool,
         *,
         order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
     ) -> list:
         broker = self.broker
@@ -650,6 +667,8 @@ class ExecutionEngine:
             if use_open and order.order_type is OrderType.MOC:
                 continue
             if order_types is not None and order.order_type not in order_types:
+                continue
+            if order_ids is not None and order.order_id not in order_ids:
                 continue
             if (
                 broker.execution_mode is ExecutionMode.NEXT_BAR

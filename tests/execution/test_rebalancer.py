@@ -3,7 +3,6 @@
 from datetime import datetime
 
 import pytest
-from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import (
     Broker,
@@ -422,8 +421,6 @@ class TestTargetWeightExecutorScheduling:
                 schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 9, 30)])
             )
         )
-        executor.prepare_schedule([datetime(2024, 1, 1, 9, 30), datetime(2024, 1, 2, 9, 30)])
-
         orders = executor.execute(
             {"AAPL": 0.5},
             sample_data,
@@ -438,8 +435,6 @@ class TestTargetWeightExecutorScheduling:
         executor = TargetWeightExecutor(
             config=RebalanceConfig(schedule=RebalanceSchedule.explicit_timestamps([scheduled_ts]))
         )
-        executor.prepare_schedule([datetime(2024, 1, 1, 9, 30), scheduled_ts])
-
         orders = executor.execute(
             {"AAPL": 0.5},
             sample_data,
@@ -450,7 +445,7 @@ class TestTargetWeightExecutorScheduling:
         assert len(orders) == 1
         assert orders[0].asset == "AAPL"
 
-    def test_prepare_schedule_uses_feed_semantics_for_daily_labels(self, broker, sample_data):
+    def test_weekly_schedule_uses_current_calendar_metadata(self):
         timestamps = [
             datetime(2024, 1, 1),
             datetime(2024, 1, 2),
@@ -463,34 +458,29 @@ class TestTargetWeightExecutorScheduling:
             datetime(2024, 1, 11),
             datetime(2024, 1, 12),
         ]
-        executor = TargetWeightExecutor(config=RebalanceConfig(schedule=RebalanceSchedule.weekly()))
-
-        resolved = executor.prepare_schedule(
-            timestamps,
-            feed_spec=FeedSpec(
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
                 calendar="NYSE",
-                data_frequency="daily",
-                timestamp_semantics="session_label",
-            ),
+            )
         )
 
-        assert resolved == frozenset({datetime(2024, 1, 5), datetime(2024, 1, 12)})
+        resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
 
-    def test_execute_requires_prepare_schedule_when_schedule_is_configured(
-        self, broker, sample_data
-    ):
+        assert resolved == [datetime(2024, 1, 5), datetime(2024, 1, 12)]
+
+    def test_execute_requires_timestamp_when_schedule_is_configured(self, broker, sample_data):
         executor = TargetWeightExecutor(
             config=RebalanceConfig(
                 schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 9, 30)])
             )
         )
 
-        with pytest.raises(ValueError, match="prepare_schedule"):
+        with pytest.raises(ValueError, match="timestamp is required"):
             executor.execute(
                 {"AAPL": 0.5},
                 sample_data,
                 broker,
-                timestamp=datetime(2024, 1, 2, 9, 30),
             )
 
 

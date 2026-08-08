@@ -72,6 +72,11 @@ class _BrokerTransaction:
             "trades_length": len(self.broker.trades),
             "orders_this_bar": tuple(self.broker._orders_this_bar),
             "orders_this_bar_ids": set(self.broker._orders_this_bar_ids),
+            "target_intent_state": (
+                self.broker._preopen_target_manager.capture_transaction_state()
+                if self.broker._preopen_target_manager is not None
+                else None
+            ),
         }
 
     def rollback(self) -> None:
@@ -92,6 +97,9 @@ class _BrokerTransaction:
         self.broker._orders_this_bar[:] = self.state["orders_this_bar"]
         self.broker._orders_this_bar_ids = self.state["orders_this_bar_ids"]
         self.broker.gatekeeper.account = self.broker.account
+        target_intent_state = self.state["target_intent_state"]
+        if target_intent_state is not None:
+            self.broker._preopen_target_manager.restore_transaction_state(target_intent_state)
 
 
 class LifecycleDispatcher:
@@ -121,7 +129,9 @@ class LifecycleDispatcher:
         transaction = _BrokerTransaction(broker)
         if broker._lifecycle_transaction is not None:
             raise RuntimeError("nested lifecycle dispatch is not supported")
+        previous_phase = broker._active_lifecycle_phase
         broker._lifecycle_transaction = transaction
+        broker._active_lifecycle_phase = phase
         self._counts[phase] += 1
         self.invocations.append(LifecycleInvocation(phase, specification.callback, event_time))
         try:
@@ -130,6 +140,7 @@ class LifecycleDispatcher:
             transaction.rollback()
             raise
         finally:
+            broker._active_lifecycle_phase = previous_phase
             broker._lifecycle_transaction = None
 
     def validate_completed_run(self, market_event_count: int) -> None:

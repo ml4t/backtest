@@ -111,6 +111,13 @@ class FillEngine:
 
     def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
         broker = self.broker
+        if order.child_intent_id is not None and use_open:
+            return broker.get_price_for_source(
+                ExecutionPrice.OPEN,
+                order.asset,
+                side=order.side,
+                use_open=True,
+            )
         if order.order_type is OrderType.MOC:
             return broker.get_price_for_source(
                 ExecutionPrice.CLOSE,

@@ -86,6 +86,11 @@ class OrderBook:
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,
+            target_intent_id=options.target_intent_id if options is not None else None,
+            child_intent_id=options.child_intent_id if options is not None else None,
+            intent_idempotency_key=(
+                options.intent_idempotency_key if options is not None else None
+            ),
         )
 
         order._signal_price = self.market.prices.get(asset)

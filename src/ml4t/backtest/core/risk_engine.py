@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import copy
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from ..risk.types import ActionType, PositionState
+from ml4t.specs import BarPathPolicy
+
+from ..config import TrailStopTiming
+from ..preopen import AmbiguousBarPathError
+from ..risk.types import ActionType, PositionAction, PositionState
 from ..types import OrderSide, OrderType
 from .shared import SubmitOrderOptions, reason_to_exit_reason
 from .state import MarketState, RiskState
@@ -50,7 +56,7 @@ class RiskEngine:
                 continue
 
             state = self._build_position_state(pos, price)
-            action = rules.evaluate(state)
+            action = self._evaluate_rules(rules, state, pos)
 
             if action.action == ActionType.EXIT_FULL:
                 if action.defer_fill:
@@ -105,6 +111,84 @@ class RiskEngine:
                             exit_orders.append(order)
 
         return exit_orders
+
+    def _evaluate_rules(self, rules, state: PositionState, position) -> PositionAction:
+        activation_bar = position.context.get("rule_activation_bar_index")
+        policy = position.context.get("bar_path_policy")
+        if activation_bar != self.broker._bar_index or policy is None:
+            return rules.evaluate(state)
+        policy = policy if isinstance(policy, BarPathPolicy) else BarPathPolicy(policy)
+        if policy is BarPathPolicy.OPEN_HIGH_LOW_CLOSE:
+            return self._evaluate_path(rules, state, high_first=True)
+        if policy is BarPathPolicy.OPEN_LOW_HIGH_CLOSE:
+            return self._evaluate_path(rules, state, high_first=False)
+
+        high_first_action = self._evaluate_path(copy.deepcopy(rules), state, high_first=True)
+        low_first_action = self._evaluate_path(copy.deepcopy(rules), state, high_first=False)
+        if policy is BarPathPolicy.REJECT_AMBIGUOUS:
+            if high_first_action != low_first_action:
+                raise AmbiguousBarPathError(
+                    f"post-open rule outcome for {state.asset} depends on daily high-low order"
+                )
+            return self._evaluate_path(rules, state, high_first=True)
+
+        high_first = self._more_conservative_path(state, high_first_action, low_first_action)
+        return self._evaluate_path(rules, state, high_first=high_first)
+
+    @staticmethod
+    def _evaluate_path(rules, state: PositionState, *, high_first: bool) -> PositionAction:
+        if state.bar_open is None or state.bar_high is None or state.bar_low is None:
+            return rules.evaluate(state)
+        points = (
+            (state.bar_high, state.bar_low, state.current_price)
+            if high_first
+            else (state.bar_low, state.bar_high, state.current_price)
+        )
+        previous = state.bar_open
+        high_water_mark = state.high_water_mark
+        low_water_mark = state.low_water_mark
+        for point in points:
+            context = dict(state.context)
+            context["trail_stop_timing"] = TrailStopTiming.LAGGED
+            raw_return = (point - state.entry_price) / state.entry_price
+            unrealized_return = raw_return if state.is_long else -raw_return
+            phase_state = replace(
+                state,
+                current_price=point,
+                unrealized_pnl=(point - state.entry_price)
+                * state.quantity
+                * (1 if state.is_long else -1),
+                unrealized_return=unrealized_return,
+                high_water_mark=high_water_mark,
+                low_water_mark=low_water_mark,
+                bar_open=previous,
+                bar_high=max(previous, point),
+                bar_low=min(previous, point),
+                context=context,
+            )
+            action = rules.evaluate(phase_state)
+            if action.action is not ActionType.HOLD:
+                return action
+            high_water_mark = max(high_water_mark, point)
+            low_water_mark = min(low_water_mark, point)
+            previous = point
+        return PositionAction.hold()
+
+    @staticmethod
+    def _more_conservative_path(
+        state: PositionState,
+        high_first: PositionAction,
+        low_first: PositionAction,
+    ) -> bool:
+        if high_first.action is ActionType.HOLD:
+            return low_first.action is ActionType.HOLD
+        if low_first.action is ActionType.HOLD:
+            return True
+        high_price = high_first.fill_price
+        low_price = low_first.fill_price
+        if high_price is None or low_price is None or high_price == low_price:
+            return True
+        return high_price < low_price if state.is_long else high_price > low_price
 
     def _get_position_rules(self, asset: str):
         if asset in self.risk.position_rules_by_asset:
