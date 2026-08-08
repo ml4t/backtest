@@ -176,12 +176,11 @@ markers = [
     "no_invariant_check: skip autouse accounting invariant check for this test",
 ]
 filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
+    "error",
+    "ignore:The 'generic' unit for NumPy timedelta is deprecated.*:DeprecationWarning",
+    "ignore:co_lnotab is deprecated, use co_lines instead.*:DeprecationWarning:zipline.*",
     "ignore::UserWarning:vectorbt",  # VectorBT accessor registration warnings
-    "ignore::Warning:tables",  # PyTables naming warnings without importing optional PyTables
     "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
-    "ignore::pytest.PytestReturnNotNoneWarning",  # Some tests return values for direct execution
 ]
 
 [tool.ruff]
@@ -227,12 +226,16 @@ exclude = ["tests", "validation", "docs"]
 
 [tool.coverage.run]
 source = ["src/ml4t/backtest"]
+branch = true
 omit = [
     "*/tests/*",
     "*/__init__.py",
 ]
 
 [tool.coverage.report]
+fail_under = 84
+precision = 2
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

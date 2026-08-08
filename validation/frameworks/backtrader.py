@@ -8,6 +8,7 @@ Backtrader always uses next-bar execution (orders placed on bar N fill at bar N+
 from __future__ import annotations
 
 import sys
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,13 @@ def run(
         FrameworkResult with trade data.
     """
     try:
-        import backtrader as bt
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="invalid escape sequence.*",
+                category=SyntaxWarning,
+            )
+            import backtrader as bt
     except ImportError:
         raise ImportError(
             "Backtrader not installed. Run in .venv-backtrader environment."
