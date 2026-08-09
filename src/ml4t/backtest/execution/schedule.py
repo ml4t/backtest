@@ -32,6 +32,9 @@ class RebalanceCadence(str, Enum):
     EXPLICIT_TIMESTAMPS = "explicit_timestamps"
 
 
+_MIN_IMPLICIT_DAILY_INTERVAL = timedelta(hours=12)
+
+
 @dataclass(frozen=True)
 class RebalanceSchedule:
     """Describe when a strategy or executor should rebalance."""
@@ -132,14 +135,13 @@ def _evaluate_rebalance_timestamp(
     session_date: date | None,
 ) -> bool:
     """Evaluate one resolved schedule with an optional precomputed session date."""
-    resolved = schedule
-    cadence = resolved.cadence
+    cadence = schedule.cadence
     if cadence is RebalanceCadence.EVERY_BAR:
         return True
     if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
         event_time = _event_time_utc(timestamp, timezone)
-        return event_time in _explicit_schedule_instants(resolved, timezone)
-    _validate_schedule_calendar(resolved, calendar)
+        return event_time in _explicit_schedule_instants(schedule, timezone)
+    _validate_schedule_calendar(schedule, calendar)
     if is_session_close is None:
         is_session_close = _is_session_close_timestamp(
             timestamp,
@@ -153,7 +155,7 @@ def _evaluate_rebalance_timestamp(
     if cadence is RebalanceCadence.EVERY_SESSION:
         return True
     if cadence is RebalanceCadence.FIXED_N_SESSIONS:
-        return (session_index - 1) % resolved.every_n == 0
+        return (session_index - 1) % schedule.every_n == 0
 
     if session_date is None:
         session_date = session_date_for_timestamp(
@@ -408,6 +410,7 @@ class _OnlineRebalanceEvaluator:
         self._last_boundary_override: bool | None = None
         self._last_evaluation_result = False
         self._implicit_daily_boundary_modes: dict[date, bool] = {}
+        self._last_implicit_daily_instant: datetime | None = None
         self._observed_exchange_session = False
         self._matched_period_ends: set[date] = set()
         self._explicit_schedule_by_instant = {
@@ -574,10 +577,20 @@ class _OnlineRebalanceEvaluator:
             return
         event_date = timestamp.date()
         explicit_boundary = is_session_close is not None
-        if event_date in self._implicit_daily_boundary_modes and (
-            not explicit_boundary or not self._implicit_daily_boundary_modes[event_date]
-        ):
-            _raise_ambiguous_missing_metadata(event_date)
+        previous_boundary_mode = self._implicit_daily_boundary_modes.get(event_date)
+        if previous_boundary_mode is not None:
+            if previous_boundary_mode != explicit_boundary:
+                _raise_mixed_boundary_modes(event_date)
+            if not explicit_boundary:
+                _raise_ambiguous_missing_metadata(event_date)
+        if not explicit_boundary:
+            event_instant = _event_time_utc(timestamp, self.timezone)
+            if (
+                self._last_implicit_daily_instant is not None
+                and event_instant - self._last_implicit_daily_instant < _MIN_IMPLICIT_DAILY_INTERVAL
+            ):
+                _raise_ambiguous_missing_metadata(event_date)
+            self._last_implicit_daily_instant = event_instant
         self._implicit_daily_boundary_modes[event_date] = explicit_boundary
 
     @property
@@ -848,17 +861,30 @@ def _validate_implicit_daily_timestamps(
     if frequency is not None or semantics is not None:
         return
     observed_dates: set[date] = set()
+    last_instant: datetime | None = None
     for timestamp in timestamps:
         event_date = timestamp.date()
         if event_date in observed_dates:
             _raise_ambiguous_missing_metadata(event_date)
+        instant = _event_time_utc(timestamp, metadata["timezone"])
+        if last_instant is not None and instant - last_instant < _MIN_IMPLICIT_DAILY_INTERVAL:
+            _raise_ambiguous_missing_metadata(event_date)
         observed_dates.add(event_date)
+        last_instant = instant
 
 
 def _raise_ambiguous_missing_metadata(event_date: date) -> None:
     raise ValueError(
         f"multiple schedule events observed on {event_date} while data_frequency and "
         "timestamp_semantics are omitted; configure both fields for intraday data"
+    )
+
+
+def _raise_mixed_boundary_modes(event_date: date) -> None:
+    raise ValueError(
+        f"schedule events on {event_date} mix explicit is_session_close values with inferred "
+        "boundaries; pass is_session_close on every event for that date or configure "
+        "data_frequency and timestamp_semantics"
     )
 
 

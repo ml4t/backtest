@@ -104,7 +104,9 @@ Session-based schedules need enough metadata to identify exchange session closes
 month-end schedules require `calendar`. Daily feeds must also set `data_frequency="daily"`.
 Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and `timestamp_semantics`. Set
 `session_start_time` for a custom evening boundary. Morning-start sessions use the local calendar
-date, so a morning value may only restate the configured calendar's standard open.
+date, so a morning value may only restate the configured calendar's standard open. Intraday feeds
+without calendar boundary metadata may instead pass `is_session_close=True` or `False` on every
+event. Do not mix explicit and inferred boundaries on one date.
 
 ```python
 from ml4t.backtest import RebalanceSchedule
@@ -147,8 +149,9 @@ final event, call `validate_completed_run()` so a missing close in the final ses
 When scheduled `execute()` receives an Engine broker, the Engine registers and runs this final
 validation automatically. Standalone use and direct `should_rebalance()` calls still require the
 explicit completion call. Gating `execute()` on `should_rebalance()` for the same timestamp is
-supported, and `every_bar` schedules impose no event-coverage requirement. Other conditional
-skips fail completion validation because session counters would be incomplete.
+supported when both calls receive the same `is_session_close`, or when only `should_rebalance()`
+receives it. `every_bar` schedules impose no event-coverage requirement. Other conditional skips
+fail completion validation because session counters would be incomplete.
 Call `reset()` before reusing an executor for another run or changing its public
 `RebalanceConfig`. Backward session dates and mid-run configuration changes raise instead of
 silently restarting session counters.
