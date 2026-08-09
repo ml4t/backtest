@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from calendar import monthrange
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -79,6 +80,7 @@ def is_rebalance_timestamp(
     session_index: int,
     calendar: str | None = None,
     timezone: str | None = None,
+    session_start_time: str | None = None,
     data_frequency: Any | None = None,
     timestamp_semantics: TimestampSemantics | str | None = None,
     is_session_close: bool | None = None,
@@ -105,7 +107,14 @@ def is_rebalance_timestamp(
     if cadence is RebalanceCadence.FIXED_N_SESSIONS:
         return (session_index - 1) % resolved.every_n == 0
 
-    session_date = timestamp.date()
+    session_date = session_date_for_timestamp(
+        timestamp,
+        calendar=calendar,
+        timezone=timezone,
+        session_start_time=session_start_time,
+        data_frequency=data_frequency,
+        timestamp_semantics=timestamp_semantics,
+    )
     if cadence is RebalanceCadence.WEEKLY:
         period_start = session_date - timedelta(days=session_date.weekday())
         period_end = period_start + timedelta(days=6)
@@ -135,19 +144,13 @@ def _is_session_close_timestamp(
     data_frequency: Any | None,
     timestamp_semantics: TimestampSemantics | str | None,
 ) -> bool:
-    semantics = (
-        timestamp_semantics
-        if isinstance(timestamp_semantics, TimestampSemantics)
-        else TimestampSemantics(timestamp_semantics)
-        if timestamp_semantics is not None
-        else None
-    )
-    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
+    frequency, semantics = _normalize_schedule_metadata(data_frequency, timestamp_semantics)
     if semantics is TimestampSemantics.SESSION_LABEL or frequency is DataFrequency.DAILY:
         return True
     if semantics is None and frequency is None:
+        _warn_missing_boundary_metadata()
         return True
-    if timestamp.time() == time.min:
+    if timestamp.time() == time.min and frequency in {None, DataFrequency.DAILY}:
         return True
     if calendar is None:
         raise ValueError("intraday session schedules require calendar metadata or is_session_close")
@@ -173,7 +176,17 @@ def _calendar_closes(calendar: str, start: date, end: date) -> frozenset[datetim
     return frozenset(get_schedule(calendar, start, end)["market_close"])
 
 
-def _session_date_for_timestamp(
+@lru_cache(maxsize=1)
+def _warn_missing_boundary_metadata() -> None:
+    warnings.warn(
+        "session cadence has no data_frequency or timestamp_semantics; events are treated as "
+        "daily session closes",
+        UserWarning,
+        stacklevel=4,
+    )
+
+
+def session_date_for_timestamp(
     timestamp: datetime,
     *,
     calendar: str | None,
@@ -182,6 +195,44 @@ def _session_date_for_timestamp(
     data_frequency: Any | None,
     timestamp_semantics: TimestampSemantics | str | None,
 ) -> date:
+    frequency, semantics = _normalize_schedule_metadata(data_frequency, timestamp_semantics)
+    if (
+        semantics is TimestampSemantics.SESSION_LABEL
+        or frequency is DataFrequency.DAILY
+        or (semantics is None and frequency is None)
+        or (timestamp.time() == time.min and frequency in {None, DataFrequency.DAILY})
+    ):
+        return timestamp.date()
+
+    resolved_calendar = _normalize_session_calendar(calendar or "UTC")
+    data_timezone = ZoneInfo(timezone or "UTC")
+    exchange_timezone = (
+        ZoneInfo(str(get_calendar(calendar).tz)) if calendar is not None else data_timezone
+    )
+    event_time = (
+        timestamp.replace(tzinfo=data_timezone)
+        if timestamp.tzinfo is None
+        else timestamp.astimezone(data_timezone)
+    ).astimezone(exchange_timezone)
+    session_config = SessionConfig(
+        calendar=resolved_calendar,
+        timezone=str(exchange_timezone),
+        session_start_time=session_start_time,
+    )
+    session_date = assign_session_date(
+        event_time,
+        exchange_timezone,
+        session_config.get_session_start_hour(),
+        session_config.get_session_start_minute(),
+    )
+    return session_date.date()
+
+
+def _normalize_schedule_metadata(
+    data_frequency: Any | None,
+    timestamp_semantics: TimestampSemantics | str | None,
+) -> tuple[DataFrequency | None, TimestampSemantics | None]:
+    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
     semantics = (
         timestamp_semantics
         if isinstance(timestamp_semantics, TimestampSemantics)
@@ -189,32 +240,7 @@ def _session_date_for_timestamp(
         if timestamp_semantics is not None
         else None
     )
-    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
-    if (
-        semantics is TimestampSemantics.SESSION_LABEL
-        or frequency is DataFrequency.DAILY
-        or semantics is None
-        and frequency is None
-        or timestamp.time() == time.min
-    ):
-        return timestamp.date()
-
-    resolved_calendar = _normalize_session_calendar(calendar or "UTC")
-    resolved_timezone = timezone or (
-        str(get_calendar(calendar).tz) if calendar is not None else "UTC"
-    )
-    session_config = SessionConfig(
-        calendar=resolved_calendar,
-        timezone=resolved_timezone,
-        session_start_time=session_start_time,
-    )
-    session_date = assign_session_date(
-        timestamp,
-        ZoneInfo(resolved_timezone),
-        session_config.get_session_start_hour(),
-        session_config.get_session_start_minute(),
-    )
-    return session_date.date()
+    return frequency, semantics
 
 
 def resolve_rebalance_timestamps(

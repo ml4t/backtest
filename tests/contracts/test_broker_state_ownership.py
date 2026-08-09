@@ -133,6 +133,53 @@ def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
     }
 
 
+def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
+    required_scopes = {
+        "mark_account_positions": {"all_positions"},
+        "configure_stats": {"all_asset_stats"},
+        "get_asset_stats": {"asset"},
+        "set_position_rules": {"risk_rules"},
+        "update_position_context": {"asset"},
+        "register_target_intent": {"target_intents"},
+        "register_position_rule_policy": {"target_intents"},
+        "restore_target_intent_state": {"target_intents"},
+        "evaluate_position_rules": {
+            "all_positions",
+            "all_pending_orders",
+            "risk_rules",
+            "all_asset_stats",
+        },
+        "submit_order": {"asset"},
+        "update_order": {"order_id"},
+        "cancel_order": {"order_id"},
+        "_process_pending_exits": {
+            "all_positions",
+            "all_pending_orders",
+            "risk_rules",
+            "all_asset_stats",
+        },
+        "_update_water_marks": {"all_positions"},
+        "_process_orders": {"all_positions", "all_pending_orders", "all_asset_stats"},
+    }
+    tree = _parse(SOURCE_ROOT / "broker.py")
+    broker_class = next(
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Broker"
+    )
+    methods = {node.name: node for node in broker_class.body if isinstance(node, ast.FunctionDef)}
+
+    for method_name, expected in required_scopes.items():
+        captures = [
+            node
+            for node in ast.walk(methods[method_name])
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "_capture_lifecycle_mutation"
+        ]
+        assert len(captures) == 1, method_name
+        declared = {keyword.arg for keyword in captures[0].keywords}
+        assert declared >= expected, method_name
+
+
 def _references_broker(node: ast.AST) -> bool:
     return (
         isinstance(node, ast.Name)

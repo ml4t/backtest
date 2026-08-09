@@ -462,6 +462,7 @@ class TestTargetWeightExecutorScheduling:
             config=RebalanceConfig(
                 schedule=RebalanceSchedule.weekly(),
                 calendar="NYSE",
+                data_frequency="daily",
             )
         )
 
@@ -513,6 +514,30 @@ class TestTargetWeightExecutorScheduling:
 
         assert not executor.should_rebalance(datetime(2024, 1, 7, 18, 0))
         assert executor.should_rebalance(datetime(2024, 1, 8, 16, 0))
+
+    def test_fixed_session_counter_converts_data_timezone_to_exchange_timezone(self):
+        timestamps = [
+            datetime(2024, 1, 7, 23, 0),
+            datetime(2024, 1, 8, 22, 0),
+            datetime(2024, 1, 8, 23, 0),
+            datetime(2024, 1, 9, 22, 0),
+            datetime(2024, 1, 9, 23, 0),
+            datetime(2024, 1, 10, 22, 0),
+        ]
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="CME_Equity",
+                timezone="UTC",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
+
+        assert resolved == [datetime(2024, 1, 8, 22, 0), datetime(2024, 1, 10, 22, 0)]
 
     def test_execute_requires_timestamp_when_schedule_is_configured(self, broker, sample_data):
         executor = TargetWeightExecutor(

@@ -402,6 +402,58 @@ class TestLongShortStrategy:
         entry_days = sorted({trade.entry_time.date() for trade in result.trades})
         assert entry_days == [datetime(2024, 1, 5).date(), datetime(2024, 1, 12).date()]
 
+    def test_fixed_session_schedule_uses_exchange_session_dates_for_intraday_feed(self):
+        class TrackingLongShort(LongShortStrategy):
+            signal_column = "signal"
+            long_count = 1
+            short_count = 1
+            position_size = 0.1
+            rebalance_schedule = RebalanceSchedule.fixed_n_sessions(2)
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.rank_calls = 0
+
+            def rank_assets(self, data):
+                self.rank_calls += 1
+                return super().rank_assets(data)
+
+        timestamps = [
+            datetime(2024, 1, 7, 23, 0),
+            datetime(2024, 1, 8, 22, 0),
+            datetime(2024, 1, 8, 23, 0),
+            datetime(2024, 1, 9, 22, 0),
+            datetime(2024, 1, 9, 23, 0),
+            datetime(2024, 1, 10, 22, 0),
+        ]
+        rows = [
+            {
+                "timestamp": timestamp,
+                "asset": asset,
+                "close": 100.0,
+                "signal": signal,
+            }
+            for timestamp in timestamps
+            for asset, signal in (("A", 1.0), ("B", 0.0), ("C", -1.0))
+        ]
+        frame = pl.DataFrame(rows)
+        feed = DataFeed(
+            prices_df=frame,
+            signals_df=frame.select(["timestamp", "asset", "signal"]),
+            feed_spec=FeedSpec(
+                calendar="CME_Equity",
+                timezone="UTC",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+                session_start_time="17:00",
+            ),
+        )
+        strategy = TrackingLongShort()
+
+        Engine.from_config(feed, strategy, BacktestConfig(data_frequency="1m")).run()
+
+        assert strategy.rank_calls == 2
+
 
 class TestStrategyImports:
     """Test strategy template import paths."""

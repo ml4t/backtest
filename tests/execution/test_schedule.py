@@ -170,7 +170,12 @@ class TestCausalScheduleEvaluation:
         timestamp = datetime(2024, 1, 5)
 
         assert is_rebalance_timestamp(timestamp, RebalanceSchedule.every_bar(), session_index=1)
-        assert is_rebalance_timestamp(timestamp, RebalanceSchedule.every_session(), session_index=1)
+        assert is_rebalance_timestamp(
+            timestamp,
+            RebalanceSchedule.every_session(),
+            session_index=1,
+            data_frequency="daily",
+        )
         assert is_rebalance_timestamp(
             timestamp,
             RebalanceSchedule.explicit_timestamps([timestamp]),
@@ -182,13 +187,22 @@ class TestCausalScheduleEvaluation:
             session_index=1,
         )
         assert is_rebalance_timestamp(
-            timestamp, RebalanceSchedule.fixed_n_sessions(3), session_index=1
+            timestamp,
+            RebalanceSchedule.fixed_n_sessions(3),
+            session_index=1,
+            data_frequency="daily",
         )
         assert not is_rebalance_timestamp(
-            timestamp, RebalanceSchedule.fixed_n_sessions(3), session_index=2
+            timestamp,
+            RebalanceSchedule.fixed_n_sessions(3),
+            session_index=2,
+            data_frequency="daily",
         )
         assert is_rebalance_timestamp(
-            timestamp, RebalanceSchedule.fixed_n_sessions(3), session_index=4
+            timestamp,
+            RebalanceSchedule.fixed_n_sessions(3),
+            session_index=4,
+            data_frequency="daily",
         )
 
     def test_weekly_calendar_metadata_handles_holiday_friday(self) -> None:
@@ -197,26 +211,40 @@ class TestCausalScheduleEvaluation:
             RebalanceSchedule.weekly(),
             session_index=4,
             calendar="NYSE",
+            data_frequency="daily",
         )
         assert not is_rebalance_timestamp(
             datetime(2024, 3, 27),
             RebalanceSchedule.weekly(),
             session_index=3,
             calendar="NYSE",
+            data_frequency="daily",
         )
         assert is_rebalance_timestamp(
-            datetime(2024, 1, 5), RebalanceSchedule.weekly(), session_index=5
+            datetime(2024, 1, 5),
+            RebalanceSchedule.weekly(),
+            session_index=5,
+            data_frequency="daily",
         )
         assert not is_rebalance_timestamp(
-            datetime(2024, 1, 4), RebalanceSchedule.weekly(), session_index=4
+            datetime(2024, 1, 4),
+            RebalanceSchedule.weekly(),
+            session_index=4,
+            data_frequency="daily",
         )
 
     def test_month_end_without_calendar_uses_last_weekday(self) -> None:
         assert is_rebalance_timestamp(
-            datetime(2024, 3, 29), RebalanceSchedule.month_end(), session_index=20
+            datetime(2024, 3, 29),
+            RebalanceSchedule.month_end(),
+            session_index=20,
+            data_frequency="daily",
         )
         assert not is_rebalance_timestamp(
-            datetime(2024, 3, 28), RebalanceSchedule.month_end(), session_index=19
+            datetime(2024, 3, 28),
+            RebalanceSchedule.month_end(),
+            session_index=19,
+            data_frequency="daily",
         )
 
     def test_intraday_session_cadences_fire_only_at_calendar_close(self) -> None:
@@ -253,17 +281,19 @@ class TestCausalScheduleEvaluation:
     def test_unspecified_metadata_preserves_daily_non_midnight_labels(self) -> None:
         timestamp = datetime(2024, 1, 31, 16, 0)
 
-        assert is_rebalance_timestamp(
-            timestamp,
-            RebalanceSchedule.month_end(),
-            session_index=22,
-            calendar="NYSE",
-        )
-        assert is_rebalance_timestamp(
-            timestamp,
-            RebalanceSchedule.every_session(),
-            session_index=22,
-        )
+        schedule_module._warn_missing_boundary_metadata.cache_clear()
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert is_rebalance_timestamp(
+                timestamp,
+                RebalanceSchedule.month_end(),
+                session_index=22,
+                calendar="NYSE",
+            )
+            assert is_rebalance_timestamp(
+                timestamp,
+                RebalanceSchedule.every_session(),
+                session_index=22,
+            )
 
     def test_midnight_daily_label_overrides_explicit_bar_close_semantics(self) -> None:
         assert is_rebalance_timestamp(
@@ -272,6 +302,17 @@ class TestCausalScheduleEvaluation:
             session_index=22,
             calendar="NYSE",
             timestamp_semantics="bar_close",
+        )
+
+    def test_intraday_midnight_is_not_treated_as_session_close(self) -> None:
+        assert not is_rebalance_timestamp(
+            datetime(2024, 1, 5, tzinfo=UTC),
+            RebalanceSchedule.every_session(),
+            session_index=5,
+            calendar="CME_Equity",
+            timezone="UTC",
+            data_frequency="1m",
+            timestamp_semantics="event_time",
         )
 
     def test_intraday_calendar_closes_are_cached_per_event_date(

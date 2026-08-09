@@ -127,6 +127,20 @@ class IntentReconciliation:
         )
 
 
+@dataclass(slots=True)
+class _PreOpenTransactionState:
+    targets: dict[str, CanonicalTargetIntent]
+    idempotency: dict[str, str]
+    children: dict[str, CanonicalChildOrderIntent]
+    order_by_child: dict[str, str]
+    processed_targets: set[str]
+    reconciliations: list[IntentReconciliation]
+    latest_reconciliation: dict[str, IntentReconciliation]
+    terminal_children: set[str]
+    rule_activations: dict[str, datetime]
+    position_rules: dict[str, PositionRule]
+
+
 def default_execution_policy(config: BacktestConfig) -> ExecutionPolicy:
     """Build the explicit assumptions used when no policy is supplied."""
     fill_phase = (
@@ -484,26 +498,22 @@ class PreOpenTargetManager:
         self._rule_activations = rule_activations
         self._terminal_children = set(latest_reconciliation)
 
-    def capture_transaction_state(self) -> tuple[dict[str, Any], dict[str, PositionRule]]:
+    def capture_transaction_state(self) -> _PreOpenTransactionState:
         """Capture manager state for callback rollback."""
-        return (
-            {
-                "targets": copy.deepcopy(self._targets),
-                "idempotency": dict(self._idempotency),
-                "children": copy.deepcopy(self._children),
-                "order_by_child": dict(self._order_by_child),
-                "processed_targets": set(self._processed_targets),
-                "reconciliations": list(self._reconciliations),
-                "latest_reconciliation": dict(self._latest_reconciliation),
-                "terminal_children": set(self._terminal_children),
-                "rule_activations": dict(self._rule_activations),
-            },
-            copy.deepcopy(self._position_rules),
+        return _PreOpenTransactionState(
+            targets=copy.deepcopy(self._targets),
+            idempotency=dict(self._idempotency),
+            children=copy.deepcopy(self._children),
+            order_by_child=dict(self._order_by_child),
+            processed_targets=set(self._processed_targets),
+            reconciliations=list(self._reconciliations),
+            latest_reconciliation=dict(self._latest_reconciliation),
+            terminal_children=set(self._terminal_children),
+            rule_activations=dict(self._rule_activations),
+            position_rules=copy.deepcopy(self._position_rules),
         )
 
-    def restore_transaction_state(
-        self, state: tuple[dict[str, Any], dict[str, PositionRule]]
-    ) -> None:
+    def restore_transaction_state(self, state: _PreOpenTransactionState) -> None:
         """Restore manager state after a callback failure."""
         self._targets.clear()
         self._idempotency.clear()
@@ -514,17 +524,16 @@ class PreOpenTargetManager:
         self._latest_reconciliation.clear()
         self._terminal_children.clear()
         self._rule_activations.clear()
-        manager_state = state[0]
-        self._targets.update(manager_state["targets"])
-        self._idempotency.update(manager_state["idempotency"])
-        self._children.update(manager_state["children"])
-        self._order_by_child.update(manager_state["order_by_child"])
-        self._processed_targets.update(manager_state["processed_targets"])
-        self._reconciliations.extend(manager_state["reconciliations"])
-        self._latest_reconciliation.update(manager_state["latest_reconciliation"])
-        self._terminal_children.update(manager_state["terminal_children"])
-        self._rule_activations.update(manager_state["rule_activations"])
-        self._position_rules = state[1]
+        self._targets.update(state.targets)
+        self._idempotency.update(state.idempotency)
+        self._children.update(state.children)
+        self._order_by_child.update(state.order_by_child)
+        self._processed_targets.update(state.processed_targets)
+        self._reconciliations.extend(state.reconciliations)
+        self._latest_reconciliation.update(state.latest_reconciliation)
+        self._terminal_children.update(state.terminal_children)
+        self._rule_activations.update(state.rule_activations)
+        self._position_rules = state.position_rules
 
     def _registration_is_causal(
         self, intent: CanonicalTargetIntent, active_phase: LifecyclePhase
