@@ -115,7 +115,7 @@ class RiskEngine:
     def _evaluate_rules(self, rules, state: PositionState, position) -> PositionAction:
         activation_bar = position.context.get("rule_activation_bar_index")
         policy = position.context.get("bar_path_policy")
-        if activation_bar != self.broker._bar_index or policy is None:
+        if activation_bar != self.market.bar_index or policy is None:
             return rules.evaluate(state)
         policy = policy if isinstance(policy, BarPathPolicy) else BarPathPolicy(policy)
         if policy is BarPathPolicy.OPEN_HIGH_LOW_CLOSE:

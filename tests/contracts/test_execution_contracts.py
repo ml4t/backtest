@@ -53,14 +53,14 @@ class _BuyOnce(Strategy):
             self.done = True
 
 
-class _RecordPreRiskMarks(_BuyOnce):
+class _RecordEndMark(_BuyOnce):
     def __init__(self) -> None:
         super().__init__()
-        self.pre_risk_marks: list[float | None] = []
+        self.end_mark: float | None = None
 
-    def on_before_risk(self, timestamp, data, context, broker) -> None:
+    def on_end(self, broker) -> None:
         position = broker.get_position("AAPL")
-        self.pre_risk_marks.append(position.current_price if position is not None else None)
+        self.end_mark = position.current_price if position is not None else None
 
 
 def _entry_price(mode: ExecutionMode, price: ExecutionPrice) -> float:
@@ -172,7 +172,7 @@ def test_end_of_bar_watermarks_do_not_replace_the_configured_account_mark() -> N
             },
         ]
     )
-    strategy = _RecordPreRiskMarks()
+    strategy = _RecordEndMark()
     config = BacktestConfig(
         execution_mode=ExecutionMode.SAME_BAR,
         execution_price=ExecutionPrice.CLOSE,
@@ -188,7 +188,7 @@ def test_end_of_bar_watermarks_do_not_replace_the_configured_account_mark() -> N
         feed_spec=FeedSpec(bid_col="bid", ask_col="ask"),
     )
 
-    assert strategy.pre_risk_marks == [None, 100.0]
+    assert strategy.end_mark == 110.0
 
 
 def test_spread_slippage_full_spread_uses_half_spread_per_side() -> None:

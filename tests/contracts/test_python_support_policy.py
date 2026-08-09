@@ -96,14 +96,18 @@ def test_minimum_dependency_matrix_proves_declared_lower_bounds() -> None:
         assert required_command in commands
     assert any("actions/upload-artifact" in step.get("uses", "") for step in minimum["steps"])
     assert set(gate["needs"]) == {"stable", "prerelease", "minimum"}
-    assert set(project["dependencies"]) >= {
-        "ml4t-specs>=0.1.0",
+    dependencies = set(project["dependencies"])
+    assert dependencies >= {
         "polars>=1.36.1",
         "pandas>=2.3.3; python_version < '3.15'",
         "numpy>=2.3.2",
         "PyYAML>=6.0.3",
         "pandas-market-calendars>=5.2.4",
     }
+    assert (
+        "ml4t-specs @ "
+        "git+https://github.com/ml4t/specs.git@85d3476683a70b4f17e5e8cb82dd23d05b373dc8"
+    ) in dependencies
 
 
 def test_merge_and_release_builds_depend_on_compatibility_gate() -> None:

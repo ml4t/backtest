@@ -8,7 +8,8 @@
         "Added": [
           "Versioned compatibility snapshots, beta-artifact migration fixtures, commit-bound release candidates, and exact publication verification.",
           "Deterministic parity-claim generation and five reproducible performance workloads with behavior checksums.",
-          "Installed-wheel execution checks for the primary installation and quickstart examples."
+          "Installed-wheel execution checks for the primary installation and quickstart examples.",
+          "A versioned causal strategy lifecycle and canonical pre-open target intents shared with ml4t-live, including child-order lineage, reconciliation evidence, and post-fill position-rule activation."
         ],
         "Changed": [
           "Broker state now has explicit account, market, order, risk, and execution-journal owners while the Broker remains the public facade.",
@@ -26,7 +27,7 @@
           "The ambiguous beta-only Broker(account_type=...) constructor spelling was removed; use explicit short-selling and leverage policy fields.",
           "Engine instances are single-use in 0.1.0; create a new Engine for each independent run.",
           "BacktestResult fills, equity_curve, and portfolio_state lists are snapshots instead of aliases to mutable Engine or Broker state.",
-          "The shared strategy lifecycle with ml4t-live remains a release blocker. on_before_risk is not accepted as a stable 0.1 callback and requires explicit migration before release."
+          "The beta-only on_before_risk callback and future-timestamp on_prepare signature are removed. Engine construction raises HistoricalStrategyCompatibilityError for strategies that require either historical behavior."
         ],
         "Validation": [
           "Release requires compatibility, correctness, coverage, documentation, lint, packaging, parity, performance, security, and type-check gates bound to one commit.",

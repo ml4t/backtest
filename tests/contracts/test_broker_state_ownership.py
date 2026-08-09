@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from ml4t.specs import LIFECYCLE_V1, LifecyclePhase
+
 from ml4t.backtest import Broker
 
 SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
@@ -32,6 +34,7 @@ FORBIDDEN_BROKER_STATE = {
     "_filled_this_bar",
     "_last_prices",
     "_last_session_id",
+    "_lifecycle_transaction",
     "_market_state",
     "_order_book",
     "_order_counter",
@@ -44,16 +47,16 @@ FORBIDDEN_BROKER_STATE = {
     "_position_rules",
     "_position_rules_by_asset",
     "_positions_created_this_bar",
+    "_preopen_target_manager",
     "_rebalance_counter",
     "_risk_engine",
     "_risk_state",
     "_session_config",
     "_stats_config",
     "_stop_exits_this_bar",
-    "_submitting_before_risk",
+    "_active_lifecycle_phase",
 }
-TRANSITIONAL_ENGINE_LIFECYCLE_STATE = {"_submitting_before_risk"}
-STRATEGY_CALLBACKS = {"on_before_risk", "on_data", "on_end", "on_prepare", "on_start"}
+STRATEGY_CALLBACKS = {"on_data", "on_end", "on_prepare", "on_start"}
 COLLECTION_MUTATORS = {
     "add",
     "append",
@@ -494,7 +497,6 @@ def test_mutable_collection_contract_allows_nested_consumer_arguments() -> None:
 def test_collaborators_do_not_reach_through_broker_private_state() -> None:
     violations: list[str] = []
     broker_path = SOURCE_ROOT / "broker.py"
-    engine_path = SOURCE_ROOT / "engine.py"
 
     for path in SOURCE_ROOT.rglob("*.py"):
         if path == broker_path:
@@ -505,7 +507,6 @@ def test_collaborators_do_not_reach_through_broker_private_state() -> None:
                 isinstance(node, ast.Attribute)
                 and node.attr in FORBIDDEN_BROKER_STATE
                 and _references_broker(node.value)
-                and not (path == engine_path and node.attr in TRANSITIONAL_ENGINE_LIFECYCLE_STATE)
             ):
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
             mutable_collection = _mutable_collection_access(node)
@@ -517,24 +518,56 @@ def test_collaborators_do_not_reach_through_broker_private_state() -> None:
     assert not violations, "Broker state bypasses:\n" + "\n".join(violations)
 
 
-def test_engine_is_the_only_strategy_callback_sequencer() -> None:
+def test_lifecycle_dispatcher_is_the_only_strategy_callback_sequencer() -> None:
     engine_path = SOURCE_ROOT / "engine.py"
-    engine_calls: set[str] = set()
     violations: list[str] = []
+    dynamic_dispatches: list[str] = []
+    engine_phases: set[LifecyclePhase] = set()
 
     for path in SOURCE_ROOT.rglob("*.py"):
         tree = _parse(path)
         for node in ast.walk(tree):
             callback = _strategy_callback_access(node)
-            if callback is None:
-                continue
-            if path == engine_path:
-                engine_calls.add(callback)
-            else:
+            if callback is not None:
                 violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {callback}")
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "getattr"
+                and len(node.args) >= 2
+                and _references_strategy(node.args[0])
+                and isinstance(node.args[1], ast.Attribute)
+                and node.args[1].attr == "callback"
+            ):
+                dynamic_dispatches.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}")
+            if (
+                path == engine_path
+                and isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "dispatch"
+                and node.args
+                and isinstance(node.args[0], ast.Attribute)
+                and isinstance(node.args[0].value, ast.Name)
+                and node.args[0].value.id == "LifecyclePhase"
+            ):
+                engine_phases.add(LifecyclePhase[node.args[0].attr])
 
-    assert engine_calls == STRATEGY_CALLBACKS, (
-        f"Engine callbacks differ: missing={STRATEGY_CALLBACKS - engine_calls}, "
-        f"extra={engine_calls - STRATEGY_CALLBACKS}"
-    )
+    contract_callbacks = {
+        LIFECYCLE_V1.phase_spec(phase).callback
+        for phase in (
+            LifecyclePhase.RUN_START,
+            LifecyclePhase.CAUSAL_INITIALIZATION,
+            LifecyclePhase.MARKET_EVENT,
+            LifecyclePhase.RUN_END,
+        )
+    }
+    assert contract_callbacks == STRATEGY_CALLBACKS
+    assert engine_phases == {
+        LifecyclePhase.RUN_START,
+        LifecyclePhase.CAUSAL_INITIALIZATION,
+        LifecyclePhase.MARKET_EVENT,
+        LifecyclePhase.RUN_END,
+    }
+    assert len(dynamic_dispatches) == 1
+    assert dynamic_dispatches[0].split(":", maxsplit=1)[0] == "lifecycle.py"
     assert not violations, "Callback sequencing bypasses:\n" + "\n".join(violations)

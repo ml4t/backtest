@@ -42,7 +42,9 @@ from .models import calculate_commission, calculate_slippage
 from .types import OrderSide, OrderStatus, OrderType
 
 if TYPE_CHECKING:
+    from .accounting import AccountState
     from .broker import Broker
+    from .core import MarketState
     from .risk.position import PositionRule
 
 
@@ -170,9 +172,13 @@ class PreOpenTargetManager:
         policy: ExecutionPolicy,
         lifecycle_version: LifecycleVersion,
         *,
+        account: AccountState,
+        market: MarketState,
         calendar: str | None,
     ) -> None:
         self.broker = broker
+        self.account = account
+        self.market = market
         self.policy = policy
         self.lifecycle_version = lifecycle_version
         self.calendar = calendar
@@ -204,6 +210,7 @@ class PreOpenTargetManager:
         intent: CanonicalTargetIntent,
         *,
         position_rules: PositionRule | None = None,
+        active_phase: LifecyclePhase | None = None,
     ) -> CanonicalTargetIntent:
         """Accept one idempotent target without reading feed prices."""
         if intent.lifecycle_version is not self.lifecycle_version:
@@ -219,7 +226,6 @@ class PreOpenTargetManager:
             raise UnsupportedPreOpenPolicyError(
                 f"execution policy {self.policy.policy_id!r} disables opening-auction execution"
             )
-        active_phase = self.broker._active_lifecycle_phase
         if active_phase is not None and not self._registration_is_causal(intent, active_phase):
             raise LateAuctionIntentError(
                 f"target {intent.intent_id!r} for {intent.effective_session} was registered during "
@@ -305,7 +311,7 @@ class PreOpenTargetManager:
                     actual_fill = self.broker.execution_limits.calculate(
                         child.quantity,
                         available_size,
-                        self.broker._current_opens[child.asset],
+                        self.market.opens[child.asset],
                     ).fillable_quantity
                     if self.broker.share_type is ShareType.INTEGER:
                         actual_fill = float(int(actual_fill))
@@ -438,24 +444,24 @@ class PreOpenTargetManager:
             return True
         if active_phase in {LifecyclePhase.PRE_OPEN, LifecyclePhase.RUN_START}:
             return active_phase is LifecyclePhase.PRE_OPEN
-        current_time = self.broker._current_time
+        current_time = self.market.time
         return current_time is not None and intent.effective_session > current_time.date()
 
     def _lower(self, intent: CanonicalTargetIntent) -> list[CanonicalChildOrderIntent]:
         open_prices: dict[str, float] = {}
         for target in intent.targets:
-            price = self.broker._current_opens.get(target.asset)
+            price = self.market.opens.get(target.asset)
             if price is None or not math.isfinite(price) or price <= 0:
                 raise PreOpenIntentError(
                     f"target {intent.intent_id!r} has no valid opening price for {target.asset}"
                 )
             open_prices[target.asset] = price
 
-        equity = self.broker.cash + sum(
+        equity = self.account.cash + sum(
             position.quantity
-            * open_prices.get(asset, self.broker._last_prices.get(asset, position.entry_price))
+            * open_prices.get(asset, self.market.last_prices.get(asset, position.entry_price))
             * position.multiplier
-            for asset, position in self.broker.positions.items()
+            for asset, position in self.account.positions.items()
         )
         desired: dict[str, float] = {}
         raw_desired: dict[str, float] = {}
@@ -465,7 +471,7 @@ class PreOpenTargetManager:
                 multiplier = self.broker.get_multiplier(target.asset)
                 target_notional = equity * (1.0 - effective_cash_buffer) * target.value
                 raw = target_notional / (open_prices[target.asset] * multiplier)
-                current = self.broker.positions.get(target.asset)
+                current = self.account.positions.get(target.asset)
                 current_quantity = current.quantity if current is not None else 0.0
                 if target.value > 0:
                     raw = self._cost_adjusted_buy_quantity(
@@ -497,7 +503,7 @@ class PreOpenTargetManager:
 
         children: list[CanonicalChildOrderIntent] = []
         for target in sorted(intent.targets, key=lambda item: item.asset):
-            current = self.broker.positions.get(target.asset)
+            current = self.account.positions.get(target.asset)
             current_quantity = current.quantity if current is not None else 0.0
             delta = desired[target.asset] - current_quantity
             if math.isclose(delta, 0.0, abs_tol=1e-12):
@@ -602,7 +608,7 @@ class PreOpenTargetManager:
         if self.broker.share_type is ShareType.FRACTIONAL:
             rounded.update(raw)
             return
-        available_cash = max(0.0, self.broker.cash * (1.0 - cash_buffer))
+        available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         target_notional = sum(max(0.0, quantity) * prices[asset] for asset, quantity in raw.items())
         committed = sum(max(0.0, quantity) * prices[asset] for asset, quantity in rounded.items())
         residual_cash = max(0.0, min(available_cash, target_notional) - committed)
@@ -669,7 +675,7 @@ class PreOpenTargetManager:
         position.context.update(
             {
                 "rule_activation_time": activated_at.isoformat(),
-                "rule_activation_bar_index": self.broker._bar_index,
+                "rule_activation_bar_index": self.market.bar_index,
                 "bar_path_policy": self.policy.bar_path,
             }
         )

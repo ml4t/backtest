@@ -11,6 +11,9 @@
 - Deterministic parity-claim generation and five reproducible performance workloads with behavior
   checksums.
 - Installed-wheel execution checks for the primary installation and quickstart examples.
+- A versioned causal strategy lifecycle and canonical pre-open target intents shared with
+  ml4t-live, including child-order lineage, reconciliation evidence, and post-fill position-rule
+  activation.
 
 ### Changed
 
@@ -41,8 +44,9 @@
 - Engine instances are single-use in 0.1.0; create a new Engine for each independent run.
 - BacktestResult fills, equity_curve, and portfolio_state lists are snapshots instead of aliases
   to mutable Engine or Broker state.
-- The shared strategy lifecycle with ml4t-live remains a release blocker. on_before_risk is not
-  accepted as a stable 0.1 callback and requires explicit migration before release.
+- The beta-only on_before_risk callback and future-timestamp on_prepare signature are removed.
+  Engine construction raises HistoricalStrategyCompatibilityError for strategies that require
+  either historical behavior.
 
 ### Validation
 

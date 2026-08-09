@@ -235,7 +235,7 @@ friction:
 | `next_bar_submission_precheck` | bool | False | Pre-check cash at submission time |
 | `next_bar_simple_cash_check` | bool | False | Simple cash check for next-bar orders |
 | `buying_power_reservation` | bool | False | Reserve cash at submission (LEAN-style) |
-| `next_bar_queue_shadow_validation` | bool | False | Revalidate aged next-bar pre-risk entries against the eligible queue before fills |
+| `next_bar_queue_shadow_validation` | bool | False | Revalidate aged next-bar entries against the eligible queue before fills |
 | `immediate_fill` | bool | False | Fill same-bar market orders at submit time |
 
 ### Rebalancing

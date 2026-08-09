@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections import deque
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
@@ -49,7 +50,13 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from ml4t.specs import CanonicalChildOrderIntent, CanonicalTargetIntent, LifecyclePhase
+    from ml4t.specs import (
+        CanonicalChildOrderIntent,
+        CanonicalTargetIntent,
+        ExecutionPolicy,
+        LifecyclePhase,
+        LifecycleVersion,
+    )
 
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
@@ -651,14 +658,6 @@ class Broker:
         self._order_state.filled_this_bar = value
 
     @property
-    def _submitting_before_risk(self) -> bool:
-        return self._order_state.submitting_before_risk
-
-    @_submitting_before_risk.setter
-    def _submitting_before_risk(self, value: bool) -> None:
-        self._order_state.submitting_before_risk = value
-
-    @property
     def _position_rules(self) -> Any:
         return self._risk_state.position_rules
 
@@ -702,6 +701,113 @@ class Broker:
         transaction = self._lifecycle_transaction
         if transaction is not None:
             transaction.capture()
+
+    def _snapshot_lifecycle_state(self) -> dict[str, Any]:
+        pending_orders = tuple(self.pending_orders)
+        return {
+            "account": copy.deepcopy(self.account),
+            "risk": copy.deepcopy(self._risk_state),
+            "orders": tuple(self.orders),
+            "pending_orders": pending_orders,
+            "pending_order_state": {
+                id(order): copy.deepcopy(vars(order)) for order in pending_orders
+            },
+            "order_counter": self._order_state.counter,
+            "partial_quantities": copy.deepcopy(self._order_state.partial_quantities),
+            "filled_this_bar": set(self._order_state.filled_this_bar),
+            "orders_this_bar": tuple(self._order_state.current_bar),
+            "orders_this_bar_ids": set(self._order_state.current_bar_ids),
+            "fills_length": len(self._execution_journal.fills),
+            "trades_length": len(self._execution_journal.trades),
+            "rebalance_counter": self._rebalance_counter,
+            "asset_stats": copy.deepcopy(self._asset_stats),
+            "stats_config": copy.deepcopy(self._stats_config),
+            "session_config": self._session_config,
+            "last_session_id": self._last_session_id,
+            "target_intent_state": (
+                self._preopen_target_manager.capture_transaction_state()
+                if self._preopen_target_manager is not None
+                else None
+            ),
+        }
+
+    def _restore_lifecycle_state(self, state: dict[str, Any]) -> None:
+        restored_account = state["account"]
+        positions = self.account.positions
+        positions.clear()
+        positions.update(restored_account.positions)
+        restored_account_state = copy.deepcopy(restored_account.__dict__)
+        restored_account_state["positions"] = positions
+        self.account.__dict__.clear()
+        self.account.__dict__.update(restored_account_state)
+
+        restored_risk = state["risk"]
+        self._risk_state.position_rules = restored_risk.position_rules
+        self._risk_state.position_rules_by_asset = restored_risk.position_rules_by_asset
+        self._risk_state.pending_exits = restored_risk.pending_exits
+        self._risk_state.stop_exits_this_bar = restored_risk.stop_exits_this_bar
+        self._risk_state.positions_created_this_bar = restored_risk.positions_created_this_bar
+
+        for order in state["pending_orders"]:
+            order.__dict__.clear()
+            order.__dict__.update(copy.deepcopy(state["pending_order_state"][id(order)]))
+        self._order_state.orders[:] = state["orders"]
+        self._order_state.pending[:] = state["pending_orders"]
+        self._order_state.counter = state["order_counter"]
+        self._order_state.partial_quantities.clear()
+        self._order_state.partial_quantities.update(state["partial_quantities"])
+        self._order_state.filled_this_bar.clear()
+        self._order_state.filled_this_bar.update(state["filled_this_bar"])
+        self._order_state.current_bar[:] = state["orders_this_bar"]
+        self._order_state.current_bar_ids.clear()
+        self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
+        del self._execution_journal.fills[state["fills_length"] :]
+        del self._execution_journal.trades[state["trades_length"] :]
+
+        self._rebalance_counter = state["rebalance_counter"]
+        self._asset_stats = state["asset_stats"]
+        self._stats_config = state["stats_config"]
+        self._session_config = state["session_config"]
+        self._last_session_id = state["last_session_id"]
+        target_intent_state = state["target_intent_state"]
+        if target_intent_state is not None and self._preopen_target_manager is not None:
+            self._preopen_target_manager.restore_transaction_state(target_intent_state)
+
+    def _begin_lifecycle_dispatch(
+        self,
+        phase: LifecyclePhase,
+        transaction: Any,
+    ) -> LifecyclePhase | None:
+        if self._lifecycle_transaction is not None:
+            raise RuntimeError("nested lifecycle dispatch is not supported")
+        previous_phase = self._active_lifecycle_phase
+        self._lifecycle_transaction = transaction
+        self._active_lifecycle_phase = phase
+        return previous_phase
+
+    def _end_lifecycle_dispatch(self, previous_phase: LifecyclePhase | None) -> None:
+        self._active_lifecycle_phase = previous_phase
+        self._lifecycle_transaction = None
+
+    def _create_preopen_target_manager(
+        self,
+        policy: ExecutionPolicy,
+        lifecycle_version: LifecycleVersion,
+        *,
+        calendar: str | None,
+    ) -> PreOpenTargetManager:
+        from .preopen import PreOpenTargetManager
+
+        manager = PreOpenTargetManager(
+            self,
+            policy,
+            lifecycle_version,
+            account=self.account,
+            market=self._market_state,
+            calendar=calendar,
+        )
+        self._preopen_target_manager = manager
+        return manager
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Return the configured contract specification, or None when absent."""
@@ -1120,7 +1226,11 @@ class Broker:
         self._capture_lifecycle_mutation()
         if self._preopen_target_manager is None:
             raise RuntimeError("target intents require an Engine-configured broker")
-        return self._preopen_target_manager.register(intent, position_rules=position_rules)
+        return self._preopen_target_manager.register(
+            intent,
+            position_rules=position_rules,
+            active_phase=self._active_lifecycle_phase,
+        )
 
     def register_position_rule_policy(self, policy_id: str, rules: PositionRule) -> None:
         """Bind a position-rule implementation to a portable policy identity."""

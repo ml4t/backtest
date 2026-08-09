@@ -168,6 +168,8 @@ def test_callback_failure_rolls_back_immediate_fill_and_runs_end_once() -> None:
             immediate_fill=True,
         ),
     )
+    account = engine.broker.account
+    positions = account.positions
 
     with pytest.raises(RuntimeError, match="strategy failed"):
         engine.run()
@@ -178,6 +180,15 @@ def test_callback_failure_rolls_back_immediate_fill_and_runs_end_once() -> None:
     assert engine.broker.fills == []
     assert engine.broker.positions == {}
     assert engine.broker.cash == engine.config.initial_cash
+    assert engine.broker.account is account
+    assert engine.broker.positions is positions
+    assert engine.broker.gatekeeper.account is account
+    assert engine.broker._fill_executor.account is account
+    assert engine.broker._order_book.account is account
+    assert engine.broker._risk_engine.account is account
+    assert engine.broker._execution_engine.account is account
+    assert engine.broker._portfolio_ledger.account is account
+    assert engine.preopen_target_manager.account is account
 
 
 def test_callback_failure_restores_updated_and_cancelled_pending_order() -> None:
@@ -207,7 +218,7 @@ def test_read_only_callbacks_do_not_copy_broker_state(monkeypatch: pytest.Monkey
     def fail_if_called(value):
         raise AssertionError(f"unexpected lifecycle snapshot for {type(value).__name__}")
 
-    monkeypatch.setattr("ml4t.backtest.lifecycle.copy.deepcopy", fail_if_called)
+    monkeypatch.setattr("ml4t.backtest.broker.copy.deepcopy", fail_if_called)
 
     Engine(DataFeed(prices_df=prices(bars=2)), TraceStrategy()).run()
 

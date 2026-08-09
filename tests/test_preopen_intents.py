@@ -21,6 +21,7 @@ from ml4t.backtest import (
     AmbiguousBarPathError,
     BacktestConfig,
     BacktestResult,
+    Broker,
     DataFeed,
     Engine,
     IntentOutcome,
@@ -32,8 +33,8 @@ from ml4t.backtest import (
 )
 from ml4t.backtest.config import CommissionType, ExecutionPrice, SlippageType, TrailStopTiming
 from ml4t.backtest.execution import VolumeParticipationLimit
-from ml4t.backtest.preopen import PreOpenTargetManager
 from ml4t.backtest.risk.position import StopLoss, TrailingStop
+from ml4t.backtest.types import OrderStatus, OrderType
 
 
 def prices(*, bars: int = 1, volume: float = 1_000_000.0, low: float | None = None) -> pl.DataFrame:
@@ -89,6 +90,42 @@ class InitialTargetStrategy(Strategy):
         return None
 
 
+def test_target_intent_api_requires_an_engine_configured_broker() -> None:
+    broker = Broker()
+
+    assert broker.get_target_intents() == ()
+    assert broker.get_child_order_intents() == ()
+    assert broker.get_intent_reconciliations() == ()
+    assert broker.export_target_intent_state() == {}
+    with pytest.raises(RuntimeError, match="Engine-configured broker"):
+        broker.register_target_intent(target_intent())
+    with pytest.raises(RuntimeError, match="Engine-configured broker"):
+        broker.register_position_rule_policy("stop-5", StopLoss(0.05))
+    with pytest.raises(RuntimeError, match="Engine-configured broker"):
+        broker.restore_target_intent_state({})
+
+
+def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> None:
+    intent = target_intent(position_rule_policy_id="stop-5")
+
+    class FailingPrepare(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intent, position_rules=StopLoss(0.05))
+            raise RuntimeError("prepare failed")
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(DataFeed(prices_df=prices()), FailingPrepare())
+
+    with pytest.raises(RuntimeError, match="prepare failed"):
+        engine.run()
+
+    assert engine.broker.get_target_intents() == ()
+    assert engine.broker.get_child_order_intents() == ()
+    assert engine.broker.get_intent_reconciliations() == ()
+
+
 def test_initial_weight_target_lowers_at_open_and_rules_see_only_later_movement() -> None:
     intent = target_intent(position_rule_policy_id="stop-5")
     engine = Engine(
@@ -115,6 +152,29 @@ def test_initial_weight_target_lowers_at_open_and_rules_see_only_later_movement(
     assert result.metrics["execution_policy"]["bar_path"] == "conservative"
     assert result.metrics["target_intents"] == [intent.to_dict()]
     assert result.metrics["child_order_intents"] == [child.to_dict()]
+
+
+def test_opening_target_fills_only_its_child_orders_before_the_regular_queue() -> None:
+    intent = target_intent()
+
+    class TargetWithRestingOrder(InitialTargetStrategy):
+        def on_start(self, broker) -> None:
+            broker.submit_order("SPY", 1, order_type=OrderType.LIMIT, limit_price=50.0)
+
+    config = BacktestConfig(next_bar_queue_shadow_validation=True)
+    engine = Engine(
+        DataFeed(prices_df=prices()),
+        TargetWithRestingOrder(intent),
+        config,
+    )
+
+    result = engine.run()
+
+    assert [fill.child_intent_id for fill in result.fills] == [f"{intent.intent_id}:SPY"]
+    resting = engine.broker.get_pending_orders("SPY")
+    assert len(resting) == 1
+    assert resting[0].order_type is OrderType.LIMIT
+    assert resting[0].status is OrderStatus.PENDING
 
 
 def test_scheduled_target_registered_from_prior_event_fills_next_open() -> None:
@@ -427,13 +487,11 @@ def test_restart_state_preserves_partial_remainder_and_idempotency() -> None:
     state = engine.broker.export_target_intent_state()
     original_order_count = len(engine.broker.orders)
 
-    restored = PreOpenTargetManager(
-        engine.broker,
+    restored = engine.broker._create_preopen_target_manager(
         policy,
         engine.lifecycle_version,
         calendar=None,
     )
-    engine.broker._preopen_target_manager = restored
     restored.restore_state(state)
     assert restored.register(intent) is restored.targets[0]
     restored.reconcile(datetime(2026, 8, 3))
@@ -450,8 +508,7 @@ def test_restart_registration_reattaches_position_rule_implementation() -> None:
     )
     engine.run()
     state = engine.preopen_target_manager.to_state()
-    restored = PreOpenTargetManager(
-        engine.broker,
+    restored = engine.broker._create_preopen_target_manager(
         engine.execution_policy,
         engine.lifecycle_version,
         calendar=None,
@@ -494,6 +551,22 @@ def test_ambiguous_opening_bar_path_requires_declared_resolution() -> None:
 
     with pytest.raises(AmbiguousBarPathError, match="depends on daily high-low order"):
         engine.run()
+
+
+def test_reject_ambiguous_policy_accepts_identical_path_outcomes() -> None:
+    policy = replace(
+        default_execution_policy(BacktestConfig()),
+        bar_path=BarPathPolicy.REJECT_AMBIGUOUS,
+    )
+    intent = target_intent(position_rule_policy_id="stop-5")
+
+    result = Engine(
+        DataFeed(prices_df=prices(low=100.0)),
+        InitialTargetStrategy(intent, StopLoss(0.05)),
+        execution_policy=policy,
+    ).run()
+
+    assert len(result.fills) == 1
 
 
 @pytest.mark.parametrize(

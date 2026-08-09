@@ -42,7 +42,6 @@ class OrderState:
     current_bar_ids: set[str] = field(default_factory=set)
     partial_quantities: dict[str, float] = field(default_factory=dict)
     filled_this_bar: set[str] = field(default_factory=set)
-    submitting_before_risk: bool = False
 
 
 @dataclass(slots=True)

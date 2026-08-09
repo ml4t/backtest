@@ -58,10 +58,15 @@ only as reliable as its input data and configured execution assumptions.
 
 ## Strategy Lifecycle Compatibility
 
-The callback and intent contract shared with `ml4t-live` is not final. In particular,
-`on_before_risk` remains a pre-stable compatibility callback and is not accepted as a
-stable 0.1 lifecycle surface. Stable release requires the shared lifecycle contract,
-causal pre-open intent handling, and explicit migration of affected strategies.
+- Lifecycle V1 is shared with `ml4t-live`. A strategy that defines the removed
+  `on_before_risk` callback or requests future timestamps through the historical
+  `on_prepare` signature is rejected during engine construction.
+- Opening-auction targets require a canonical intent whose decision time and
+  information cutoff precede the auction. A target registered after its pre-open
+  phase is rejected instead of receiving a historical opening fill.
+- Daily OHLC data does not reveal whether the high or low occurred first. A position
+  rule activated after an opening fill therefore follows the configured bar-path
+  policy and can reject an ambiguous outcome.
 
 ## Validation Boundaries
 

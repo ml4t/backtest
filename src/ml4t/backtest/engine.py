@@ -24,7 +24,7 @@ from .broker import Broker
 from .config import DataFrequency
 from .datafeed import DataFeed
 from .lifecycle import LifecycleDispatcher
-from .preopen import PreOpenTargetManager, default_execution_policy
+from .preopen import default_execution_policy
 from .strategy import Strategy
 from .types import ExecutionMode, OrderSide, OrderType
 
@@ -49,8 +49,8 @@ class Engine:
     Engine instances are single-use; create a new instance for each run.
 
     Execution Flow:
-        1. Call on_prepare with the feed timestamps and resolved config.
-        2. Call on_start before any market bar is registered.
+        1. Call on_start before any market bar is registered.
+        2. Call on_prepare with the resolved config and no future feed data.
         3. For each accepted session bar, register data, process eligible
            deferred orders and risk, call the per-bar strategy callbacks, process
            configured current-bar orders, and record marked portfolio state.
@@ -121,13 +121,11 @@ class Engine:
         self.equity_curve: list[tuple[datetime, float]] = []
         self.portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
         self.lifecycle_dispatcher = LifecycleDispatcher(strategy, LIFECYCLE_V1)
-        self.preopen_target_manager = PreOpenTargetManager(
-            self.broker,
+        self.preopen_target_manager = self.broker._create_preopen_target_manager(
             self.execution_policy,
             self.lifecycle_version,
             calendar=self.config.resolved_calendar,
         )
-        self.broker._preopen_target_manager = self.preopen_target_manager
         if target_intent_state is not None:
             self.preopen_target_manager.restore_state(target_intent_state)
         self._strategy_finalized = False

@@ -44,7 +44,7 @@ Broker is a facade, not a second ledger. Each mutable domain concept has one sta
 | Orders, pending queues, and partial quantities | `OrderState` | `OrderBook` creates and queues orders. `ExecutionEngine` and `FillExecutor` update lifecycle and partial-fill state through the same injected object. |
 | Position rules and deferred exits | `RiskState` | Broker configuration methods set rules. `RiskEngine` records and consumes deferred exits. |
 | Fills and completed trades | `ExecutionJournal` | `FillExecutor` appends records. Broker access uses those lists; `BacktestResult` receives list snapshots. |
-| Strategy callback sequence | `Engine` | `Engine.run()` is the only component that invokes lifecycle callbacks. |
+| Strategy callback sequence | `LifecycleDispatcher` | `Engine.run()` dispatches versioned phases; the dispatcher invokes callbacks and rolls back broker mutations when a callback fails. |
 
 Broker compatibility attributes reference these owner collections. They do not store copies. Boundary tests reject direct access from collaborators to the legacy Broker private fields.
 
@@ -93,26 +93,25 @@ Rules are set in `on_start()` and apply globally, or per-asset via `broker.set_p
 
 ## Execution Flow
 
-The engine calls `on_prepare` with the full feed timestamp sequence and resolved
-config, then calls `on_start`. It processes each accepted session bar in this
-order:
+The engine calls `on_start`, then calls `on_prepare` with resolved configuration and
+no future feed data. It processes each accepted session bar in this order:
 
 ```
 for each bar:
     1. Update broker with current OHLCV prices
-    2. Process pending exits from previous bar (NEXT_BAR mode)
-    3. Fill eligible prior pre-risk market entries (NEXT_BAR mode)
-    4. Call strategy.on_before_risk()
-    5. Evaluate position rules (stops, trails)
-    6. Process eligible pending orders
-    7. Call strategy.on_data()
-    8. Process current-bar MOC or SAME_BAR orders
+    2. Lower and fill eligible pre-open target intents
+    3. Process pending exits from the previous bar
+    4. Evaluate position rules (stops, trails)
+    5. Process eligible pending orders
+    6. Call strategy.on_data()
+    7. Process current-bar MOC or SAME_BAR orders
+    8. Reconcile target-intent child orders
     9. Update trailing water marks and record portfolio state
 ```
 
-After the last feed timestamp, the engine calls `on_end` and constructs the result.
-The pre-risk callback is a pre-stable compatibility surface pending the shared
-strategy lifecycle contract with `ml4t-live`.
+After the last feed timestamp, the engine calls `on_end`, validates lifecycle callback
+counts, and constructs the result. The same versioned callback and target-intent
+contracts are used by `ml4t-live`.
 
 ### NEXT_BAR vs SAME_BAR
 

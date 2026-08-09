@@ -351,7 +351,7 @@ throughput, memory, or cross-framework ratios as stable claims.
 ## Technical Characteristics
 
 - **Event-driven**: Each bar processes sequentially with configurable order sequencing
-- **Point-in-time bar data**: Per-bar callbacks receive the current bar; `on_prepare` receives only the timestamp sequence and resolved config
+- **Causal lifecycle**: Per-bar callbacks receive the current bar; `on_prepare` receives configuration but no future feed timestamps
 - **Configurable fills**: Match behavior of different backtesting frameworks
 - **Quote-aware**: Optional bid/ask/mid/size caches with side-aware market fills
 - **Parquet export**: Trades, fills, equity, daily P&L, and config are serializable

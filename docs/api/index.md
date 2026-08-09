@@ -22,7 +22,6 @@ Auto-generated from source docstrings.
       members:
         - on_prepare
         - on_start
-        - on_before_risk
         - on_data
         - on_end
 
@@ -68,6 +67,13 @@ Auto-generated from source docstrings.
         - order_target_percent
         - order_target_value
         - rebalance_to_weights
+        - register_target_intent
+        - register_position_rule_policy
+        - get_target_intents
+        - get_child_order_intents
+        - get_intent_reconciliations
+        - export_target_intent_state
+        - restore_target_intent_state
         - update_order
         - cancel_order
         - get_order
