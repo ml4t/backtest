@@ -42,3 +42,7 @@ class Strategy(ABC):
         submit automatic end-of-data closing orders before this callback.
         """
         pass
+
+    def _validate_completed_run(self) -> None:
+        """Validate internal strategy state after a successful run."""
+        return None

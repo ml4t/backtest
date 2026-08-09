@@ -641,6 +641,7 @@ class BacktestResult:
             "version": 1,
             "library_version": __version__,
             "lifecycle_version": self.metrics.get("lifecycle_version"),
+            "lifecycle_callback_counts": self.metrics.get("lifecycle_callback_counts", {}),
             "execution_policy": self.metrics.get("execution_policy"),
             "target_intent_count": self.metrics.get("target_intent_count", 0),
             "child_order_intent_count": self.metrics.get("child_order_intent_count", 0),

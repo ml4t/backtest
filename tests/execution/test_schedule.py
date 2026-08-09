@@ -9,6 +9,7 @@ import polars as pl
 import pytest
 from ml4t.specs.market_data import FeedSpec
 
+from ml4t.backtest import calendar as calendar_module
 from ml4t.backtest.execution import (
     RebalanceCadence,
     RebalanceConfig,
@@ -215,6 +216,23 @@ class TestResolveRebalanceTimestamps:
                 timestamp_semantics="bar_close",
             )
 
+    def test_intraday_batch_rejects_truncated_interior_session(self) -> None:
+        timestamps = [
+            datetime(2024, 1, 2, 16, 0),
+            datetime(2024, 1, 3, 15, 45),
+            datetime(2024, 1, 4, 16, 0),
+        ]
+
+        with pytest.raises(ValueError, match="required session 2024-01-03"):
+            resolve_rebalance_timestamps(
+                timestamps,
+                RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+
     @pytest.mark.parametrize(
         "schedule,timestamp",
         [
@@ -320,6 +338,34 @@ class TestResolveRebalanceTimestamps:
         )
 
         assert result.to_list() == [timestamps[0], timestamps[2]]
+
+    @pytest.mark.parametrize("data_frequency", ["daily", "1m"])
+    def test_calendar_with_no_matching_sessions_fails(self, data_frequency: str) -> None:
+        with pytest.raises(ValueError, match="observed no exchange sessions"):
+            resolve_rebalance_timestamps(
+                [datetime(2024, 1, 15, 16, 0)],
+                RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency=data_frequency,
+                timestamp_semantics="bar_close",
+            )
+
+    def test_every_bar_and_explicit_schedules_include_holiday_timestamps(self) -> None:
+        holiday = datetime(2024, 1, 15, 16, 0)
+
+        assert resolve_rebalance_timestamps(
+            [holiday],
+            RebalanceSchedule.every_bar(),
+            calendar="NYSE",
+            data_frequency="1m",
+        ).to_list() == [holiday]
+        assert resolve_rebalance_timestamps(
+            [holiday],
+            RebalanceSchedule.explicit_timestamps([holiday]),
+            calendar="NYSE",
+            data_frequency="1m",
+        ).to_list() == [holiday]
 
 
 class TestCausalScheduleEvaluation:
@@ -509,11 +555,11 @@ class TestCausalScheduleEvaluation:
             ]
         )
 
-    def test_intraday_calendar_closes_are_cached_per_event_date(
+    def test_intraday_calendar_closes_are_cached_per_calendar_year(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         calls = 0
-        get_schedule = schedule_module.get_schedule
+        get_schedule = calendar_module.get_schedule
 
         def counted_get_schedule(*args, **kwargs):
             nonlocal calls
@@ -521,10 +567,14 @@ class TestCausalScheduleEvaluation:
             return get_schedule(*args, **kwargs)
 
         schedule_module._calendar_closes.cache_clear()
-        monkeypatch.setattr(schedule_module, "get_schedule", counted_get_schedule)
-        for minute in (58, 59):
+        calendar_module.get_calendar_sessions.cache_clear()
+        monkeypatch.setattr(calendar_module, "get_schedule", counted_get_schedule)
+        for timestamp in (
+            datetime(2024, 1, 5, 20, 58, tzinfo=UTC),
+            datetime(2024, 1, 8, 20, 59, tzinfo=UTC),
+        ):
             is_rebalance_timestamp(
-                datetime(2024, 1, 5, 20, minute, tzinfo=UTC),
+                timestamp,
                 RebalanceSchedule.weekly(),
                 session_index=5,
                 calendar="NYSE",
@@ -538,7 +588,7 @@ class TestCausalScheduleEvaluation:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         calls = 0
-        get_schedule = schedule_module.get_schedule
+        get_schedule = calendar_module.get_schedule
 
         def counted_get_schedule(*args, **kwargs):
             nonlocal calls
@@ -546,7 +596,8 @@ class TestCausalScheduleEvaluation:
             return get_schedule(*args, **kwargs)
 
         schedule_module._calendar_period_end.cache_clear()
-        monkeypatch.setattr(schedule_module, "get_schedule", counted_get_schedule)
+        calendar_module.get_calendar_sessions.cache_clear()
+        monkeypatch.setattr(calendar_module, "get_schedule", counted_get_schedule)
         for day in range(25, 29):
             is_rebalance_timestamp(
                 datetime(2024, 3, day),

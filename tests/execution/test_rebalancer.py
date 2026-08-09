@@ -576,8 +576,21 @@ class TestTargetWeightExecutorScheduling:
         assert executor.should_rebalance(datetime(2024, 1, 2))
         config.data_frequency = "15m"
 
-        with pytest.raises(ValueError, match=r"RebalanceConfig changed.*reset"):
+        with pytest.raises(
+            ValueError,
+            match=r"data_frequency: .*daily.* -> .*15m.*; call reset",
+        ):
             executor.validate_completed_run()
+
+    def test_validate_completed_run_accepts_config_mutation_before_observation(self):
+        config = RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            data_frequency="daily",
+        )
+        executor = TargetWeightExecutor(config=config)
+        config.data_frequency = "15m"
+
+        executor.validate_completed_run()
 
     def test_nyse_premarket_bar_does_not_create_a_phantom_session(self):
         executor = TargetWeightExecutor(
@@ -624,6 +637,75 @@ class TestTargetWeightExecutorScheduling:
         assert not executor.should_rebalance(datetime(2024, 1, 15, 16, 0))
         assert not executor.should_rebalance(datetime(2024, 1, 16, 16, 0))
         assert executor.should_rebalance(datetime(2024, 1, 17, 16, 0))
+        executor.validate_completed_run()
+
+    def test_truncated_interior_session_is_an_alignment_error(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 16, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 3, 15, 45))
+        with pytest.raises(ValueError, match="required session 2024-01-03"):
+            executor.should_rebalance(datetime(2024, 1, 4, 9, 30))
+
+    @pytest.mark.parametrize(
+        "schedule",
+        [
+            RebalanceSchedule.every_bar(),
+            RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 15, 16, 0)]),
+        ],
+    )
+    def test_non_session_dates_do_not_filter_non_session_cadences(
+        self, schedule: RebalanceSchedule
+    ):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=schedule,
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 15, 16, 0))
+        executor.validate_completed_run()
+
+    def test_calendar_with_no_matching_sessions_fails_final_validation(self):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 13, 12, 0))
+        with pytest.raises(ValueError, match="observed no exchange sessions"):
+            executor.validate_completed_run()
+
+    def test_explicit_close_signal_overrides_non_session_calendar_inference(self):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 13, 12, 0),
+            is_session_close=True,
+        )
         executor.validate_completed_run()
 
     def test_midnight_daily_labels_do_not_warn_without_optional_metadata(self):

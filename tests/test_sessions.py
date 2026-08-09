@@ -13,6 +13,7 @@ from ml4t.backtest.sessions import (
     align_to_sessions,
     assign_session_date,
     compute_session_pnl,
+    session_date_for_timestamp,
 )
 
 
@@ -54,6 +55,16 @@ class TestSessionConfig:
         config = SessionConfig(calendar="CME_Equity", session_start_time="17")
         assert config.get_session_start_hour() == 17
         assert config.get_session_start_minute() == 0
+
+    def test_custom_morning_session_boundary_is_rejected(self):
+        with pytest.raises(ValueError, match="custom morning session_start_time"):
+            SessionConfig(calendar="CRYPTO", session_start_time="06:00")
+
+    def test_standard_morning_session_boundary_can_be_repeated(self):
+        config = SessionConfig(calendar="NYSE", session_start_time="09:30")
+
+        assert config.get_session_start_hour() == 9
+        assert config.get_session_start_minute() == 30
 
 
 class TestAssignSessionDate:
@@ -119,6 +130,21 @@ class TestAssignSessionDate:
 
         assert session_date == datetime(2024, 1, 9, 0, 0)
 
+    def test_registered_calendar_alias_uses_authoritative_market_open(self):
+        timestamp = datetime(2024, 1, 8, 18, 0)
+
+        assert (
+            session_date_for_timestamp(
+                timestamp,
+                calendar="CMES",
+                timezone="America/Chicago",
+                session_start_time=None,
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+            == datetime(2024, 1, 9).date()
+        )
+
 
 class TestComputeSessionPnL:
     """Tests for compute_session_pnl()."""
@@ -139,6 +165,21 @@ class TestComputeSessionPnL:
         assert len(result) == 0
         assert "session_date" in result.columns
         assert "pnl" in result.columns
+
+    def test_nyse_premarket_and_regular_bars_share_the_same_session(self):
+        new_york = ZoneInfo("America/New_York")
+        equity_curve = [
+            (datetime(2024, 1, 8, 8, 0, tzinfo=new_york), 100000.0),
+            (datetime(2024, 1, 8, 10, 0, tzinfo=new_york), 100100.0),
+        ]
+
+        result = compute_session_pnl(
+            equity_curve,
+            SessionConfig(calendar="NYSE", timezone="America/New_York"),
+        )
+
+        assert result["session_date"].to_list() == [datetime(2024, 1, 8)]
+        assert result["num_bars"].to_list() == [2]
 
     def test_single_session(self, cme_config: SessionConfig):
         """Test with single trading session."""

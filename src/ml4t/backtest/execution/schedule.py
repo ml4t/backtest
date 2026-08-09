@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
-from ..calendar import get_schedule
+from ..calendar import get_calendar_sessions
 from ..config import DataFrequency, _to_backtest_frequency
 from ..sessions import session_date_for_timestamp
 
@@ -175,12 +175,7 @@ def _is_session_close_timestamp(
     if calendar is None:
         raise ValueError("intraday session schedules require calendar metadata or is_session_close")
 
-    source_timezone = ZoneInfo(timezone or "UTC")
-    localized = (
-        timestamp.replace(tzinfo=source_timezone)
-        if timestamp.tzinfo is None
-        else timestamp.astimezone(source_timezone)
-    )
+    localized = _localize_event_time(timestamp, timezone)
     event_time = localized.astimezone(ZoneInfo("UTC"))
     event_date = localized.date()
     closes = _calendar_closes(
@@ -193,13 +188,23 @@ def _is_session_close_timestamp(
 
 @lru_cache(maxsize=512)
 def _calendar_closes(calendar: str, start: date, end: date) -> frozenset[datetime]:
-    return frozenset(get_schedule(calendar, start, end)["market_close"])
+    return frozenset(
+        session.market_close
+        for year in range(start.year, end.year + 1)
+        for session_date, session in get_calendar_sessions(calendar, year).items()
+        if start <= session_date <= end
+    )
 
 
 @lru_cache(maxsize=512)
 def _calendar_period_end(calendar: str, start: date, end: date) -> date | None:
-    schedule = get_schedule(calendar, start, end)
-    return None if schedule.is_empty() else schedule["session_date"][-1]
+    sessions = (
+        session_date
+        for year in range(start.year, end.year + 1)
+        for session_date in get_calendar_sessions(calendar, year)
+        if start <= session_date <= end
+    )
+    return max(sessions, default=None)
 
 
 def _warn_missing_boundary_metadata() -> None:
@@ -246,18 +251,21 @@ def _period_bounds(cadence: RebalanceCadence, session_date: date) -> tuple[date,
 
 @lru_cache(maxsize=512)
 def _calendar_close_for_session(calendar: str, session_date: date) -> datetime | None:
-    schedule = get_schedule(calendar, session_date, session_date)
-    return None if schedule.is_empty() else schedule["market_close"][0]
+    session = get_calendar_sessions(calendar, session_date.year).get(session_date)
+    return None if session is None else session.market_close
 
 
-def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
+def _localize_event_time(timestamp: datetime, timezone: str | None) -> datetime:
     source_timezone = ZoneInfo(timezone or "UTC")
-    localized = (
+    return (
         timestamp.replace(tzinfo=source_timezone)
         if timestamp.tzinfo is None
         else timestamp.astimezone(source_timezone)
     )
-    return localized.astimezone(ZoneInfo("UTC"))
+
+
+def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
+    return _localize_event_time(timestamp, timezone).astimezone(ZoneInfo("UTC"))
 
 
 def _session_reached_expected_close(
@@ -321,8 +329,15 @@ class _OnlineRebalanceEvaluator:
         self._session_index = 0
         self._required_close_matched = False
         self._last_event_time: datetime | None = None
+        self._observed_event_count = 0
+        self._observed_exchange_session = False
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
+        self._observed_event_count += 1
+        if self.schedule.cadence is RebalanceCadence.EVERY_BAR:
+            return True
+        if self.schedule.cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
+            return timestamp in self.schedule._timestamp_set
         session_date = session_date_for_timestamp(
             timestamp,
             calendar=self.calendar,
@@ -332,10 +347,12 @@ class _OnlineRebalanceEvaluator:
             timestamp_semantics=self.timestamp_semantics,
         )
         if (
-            self.calendar is not None
+            is_session_close is None
+            and self.calendar is not None
             and _calendar_close_for_session(self.calendar, session_date) is None
         ):
             return False
+        self._observed_exchange_session = True
         if self._session_date is not None and session_date < self._session_date:
             raise ValueError(
                 f"session date moved backward from {self._session_date} to {session_date}; "
@@ -351,12 +368,6 @@ class _OnlineRebalanceEvaluator:
                     self.calendar,
                 )
                 and not self._required_close_matched
-                and _session_reached_expected_close(
-                    self.calendar,
-                    self._session_date,
-                    self._last_event_time,
-                    self.timezone,
-                )
             ):
                 _raise_close_alignment_error(
                     self.schedule.cadence,
@@ -385,10 +396,24 @@ class _OnlineRebalanceEvaluator:
     @property
     def has_observations(self) -> bool:
         """Return whether at least one event has been evaluated."""
-        return self._session_date is not None
+        return self._observed_event_count > 0
 
     def validate_completed_run(self) -> None:
         """Validate the final observed session after every event has been evaluated."""
+        if self.schedule.cadence in {
+            RebalanceCadence.EVERY_BAR,
+            RebalanceCadence.EXPLICIT_TIMESTAMPS,
+        }:
+            return
+        if (
+            self._observed_event_count > 0
+            and self.calendar is not None
+            and not self._observed_exchange_session
+        ):
+            raise ValueError(
+                f"{self.schedule.cadence.value} observed no exchange sessions for calendar "
+                f"{self.calendar!r}; verify the calendar and feed timestamps"
+            )
         if (
             self._session_date is not None
             and _session_requires_close(
@@ -496,11 +521,17 @@ def resolve_rebalance_timestamps(
         ):
             resolved.append(timestamp)
             matched_sessions.add(session_date)
+    if not session_indices:
+        raise ValueError(
+            f"{cadence.value} observed no exchange sessions for calendar "
+            f"{metadata['calendar']!r}; verify the calendar and feed timestamps"
+        )
     is_intraday = (
         metadata["timestamp_semantics"] is not TimestampSemantics.SESSION_LABEL
         and _to_backtest_frequency(metadata["data_frequency"]) is not DataFrequency.DAILY
     )
     if is_intraday:
+        final_session = next(reversed(session_indices))
         missing_required_sessions = [
             session_date
             for session_date, session_index in session_indices.items()
@@ -511,11 +542,14 @@ def resolve_rebalance_timestamps(
                 metadata["calendar"],
             )
             and session_date not in matched_sessions
-            and _session_reached_expected_close(
-                metadata["calendar"],
-                session_date,
-                last_event_by_session[session_date],
-                metadata["timezone"],
+            and (
+                session_date != final_session
+                or _session_reached_expected_close(
+                    metadata["calendar"],
+                    session_date,
+                    last_event_by_session[session_date],
+                    metadata["timezone"],
+                )
             )
         ]
         if missing_required_sessions:

@@ -146,25 +146,43 @@ class TargetWeightExecutor:
             self.config.timestamp_semantics,
         )
 
+    def _schedule_config_error(self, current: tuple[object, ...]) -> ValueError:
+        fields = (
+            "schedule",
+            "calendar",
+            "timezone",
+            "session_start_time",
+            "data_frequency",
+            "timestamp_semantics",
+        )
+        previous = self._schedule_evaluator_config
+        assert previous is not None
+        changes = ", ".join(
+            f"{name}: {old!r} -> {new!r}"
+            for name, old, new in zip(fields, previous, current, strict=True)
+            if old != new
+        )
+        return ValueError(
+            f"RebalanceConfig changed during evaluation ({changes}); call reset() first"
+        )
+
     def _ensure_schedule_evaluator(self) -> _OnlineRebalanceEvaluator | None:
         schedule = self.config.schedule
-        if schedule is None:
-            if self._schedule_evaluator is not None and self._schedule_evaluator.has_observations:
-                raise ValueError("RebalanceConfig changed during evaluation; call reset() first")
-            self._schedule_evaluator = None
-            self._schedule_evaluator_config = self._schedule_config()
-            return None
         evaluator_config = self._schedule_config()
         if evaluator_config != self._schedule_evaluator_config:
             if self._schedule_evaluator is not None and self._schedule_evaluator.has_observations:
-                raise ValueError("RebalanceConfig changed during evaluation; call reset() first")
-            self._schedule_evaluator = _OnlineRebalanceEvaluator(
-                schedule,
-                calendar=self.config.calendar,
-                timezone=self.config.timezone,
-                session_start_time=self.config.session_start_time,
-                data_frequency=self.config.data_frequency,
-                timestamp_semantics=self.config.timestamp_semantics,
+                raise self._schedule_config_error(evaluator_config)
+            self._schedule_evaluator = (
+                None
+                if schedule is None
+                else _OnlineRebalanceEvaluator(
+                    schedule,
+                    calendar=self.config.calendar,
+                    timezone=self.config.timezone,
+                    session_start_time=self.config.session_start_time,
+                    data_frequency=self.config.data_frequency,
+                    timestamp_semantics=self.config.timestamp_semantics,
+                )
             )
             self._schedule_evaluator_config = evaluator_config
         return self._schedule_evaluator
@@ -191,11 +209,10 @@ class TargetWeightExecutor:
 
     def validate_completed_run(self) -> None:
         """Validate schedule alignment after the final event in a complete run."""
-        if self._schedule_evaluator is None:
+        evaluator = self._ensure_schedule_evaluator()
+        if evaluator is None:
             return
-        if self._schedule_config() != self._schedule_evaluator_config:
-            raise ValueError("RebalanceConfig changed during evaluation; call reset() first")
-        self._schedule_evaluator.validate_completed_run()
+        evaluator.validate_completed_run()
 
     def execute(
         self,

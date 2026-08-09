@@ -78,6 +78,7 @@ def test_default_lifecycle_history_is_bounded_to_counts() -> None:
     assert engine.lifecycle_dispatcher.callback_counts[LifecyclePhase.MARKET_EVENT] == 2
     assert result.metrics["lifecycle_callback_counts"]["market_event"] == 2
     assert result.metrics["lifecycle_invocations"] == []
+    assert result.to_spec_dict()["lifecycle_callback_counts"]["market_event"] == 2
 
 
 def test_completed_close_cannot_create_a_same_timestamp_open_fill() -> None:

@@ -405,11 +405,16 @@ class Engine:
             )
             self._accepted_market_event_count += 1
 
-            self.preopen_target_manager.process_opening(timestamp)
-
             # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
-            # This must happen BEFORE evaluate_position_rules() to clear deferred exits
-            self.broker._process_pending_exits()
+            # before opening targets are sized against the resulting positions.
+            pending_exits = self.broker._process_pending_exits()
+            if pending_exits:
+                self.broker._process_orders(
+                    use_open=True,
+                    order_ids={order.order_id for order in pending_exits},
+                )
+
+            self.preopen_target_manager.process_opening(timestamp)
 
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
             self.broker.evaluate_position_rules()
@@ -441,6 +446,7 @@ class Engine:
             self._record_portfolio_state(timestamp)
 
         self._finalize_strategy()
+        self.strategy._validate_completed_run()
         self.lifecycle_dispatcher.validate_completed_run(self._accepted_market_event_count)
         return self._generate_results()
 

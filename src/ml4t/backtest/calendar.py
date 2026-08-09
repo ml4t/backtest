@@ -29,14 +29,27 @@ Example usage:
         print("Market is open")
 """
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import date, datetime
 from functools import lru_cache
+from types import MappingProxyType
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import polars as pl
 
 # Import pandas_market_calendars with lazy loading to avoid import overhead
 _mcal = None
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarSession:
+    """One exchange session from the authoritative calendar schedule."""
+
+    session_date: date
+    market_open: datetime
+    market_close: datetime
 
 
 def _get_mcal():
@@ -221,6 +234,38 @@ def get_schedule(
     )
 
     return result
+
+
+@lru_cache(maxsize=128)
+def get_calendar_sessions(calendar_id: str, year: int) -> Mapping[date, CalendarSession]:
+    """Return an immutable session lookup built once per calendar year."""
+    schedule = get_schedule(calendar_id, date(year, 1, 1), date(year, 12, 31))
+    sessions = {
+        session_date: CalendarSession(session_date, market_open, market_close)
+        for session_date, market_open, market_close in schedule.select(
+            "session_date", "market_open", "market_close"
+        ).iter_rows()
+    }
+    return MappingProxyType(sessions)
+
+
+@lru_cache(maxsize=128)
+def get_calendar_sessions_by_open_date(
+    calendar_id: str,
+    year: int,
+) -> Mapping[date, tuple[CalendarSession, ...]]:
+    """Index one label-year's sessions by exchange-local market-open date."""
+    timezone = ZoneInfo(str(get_calendar(calendar_id).tz))
+    grouped: dict[date, list[CalendarSession]] = {}
+    for session in get_calendar_sessions(calendar_id, year).values():
+        open_date = session.market_open.astimezone(timezone).date()
+        grouped.setdefault(open_date, []).append(session)
+    return MappingProxyType(
+        {
+            open_date: tuple(sorted(sessions, key=lambda session: session.market_open))
+            for open_date, sessions in grouped.items()
+        }
+    )
 
 
 def get_trading_days(

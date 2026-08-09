@@ -31,6 +31,20 @@ if TYPE_CHECKING:
     pass
 
 
+_DEFAULT_SESSION_STARTS = {
+    "CME_Equity": (17, 0),
+    "CME_Agriculture": (17, 0),
+    "CME_Interest_Rate": (17, 0),
+    "CBOT": (17, 0),
+    "NYMEX": (18, 0),
+    "COMEX": (18, 0),
+    "NYSE": (9, 30),
+    "NASDAQ": (9, 30),
+    "LSE": (8, 0),
+    "XETRA": (9, 0),
+}
+
+
 @dataclass
 class SessionConfig:
     """Configuration for trading session alignment.
@@ -38,43 +52,41 @@ class SessionConfig:
     Attributes:
         calendar: Exchange calendar name (e.g., "CME_Equity", "NYSE")
         timezone: Calendar timezone (e.g., "America/Chicago", "America/New_York")
-        session_start_time: Override session start time (e.g., "17:00" for CME)
-            If None, uses the calendar's default session times.
+        session_start_time: Override an evening session boundary (e.g., "17:00" for CME),
+            or restate the calendar's standard morning open. Custom morning boundaries are
+            rejected because morning-start sessions use the local calendar date. If None,
+            uses the calendar's default session time.
     """
 
     calendar: str
     timezone: str = "UTC"
     session_start_time: str | None = None  # Format: "HH:MM"
 
+    def __post_init__(self) -> None:
+        if self.session_start_time is None:
+            return
+        start = (self.get_session_start_hour(), self.get_session_start_minute())
+        time(*start)
+        default = _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))
+        if start[0] < 12 and start != default:
+            raise ValueError(
+                "custom morning session_start_time values are unsupported because "
+                "morning-start sessions use the local calendar date"
+            )
+
     def get_session_start_hour(self) -> int:
         """Get session start hour (0-23)."""
         if self.session_start_time:
             parts = self.session_start_time.split(":")
             return int(parts[0])
-        # Default session starts (approximate)
-        calendar_defaults = {
-            "CME_Equity": 17,  # 5pm CT
-            "CME_Agriculture": 17,
-            "CME_Interest_Rate": 17,
-            "CBOT": 17,
-            "NYMEX": 18,
-            "COMEX": 18,
-            "NYSE": 9,  # 9:30am ET
-            "NASDAQ": 9,
-            "LSE": 8,
-            "XETRA": 9,
-        }
-        return calendar_defaults.get(self.calendar, 0)
+        return _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))[0]
 
     def get_session_start_minute(self) -> int:
         """Get session start minute (0-59)."""
         if self.session_start_time:
             parts = self.session_start_time.split(":")
             return int(parts[1]) if len(parts) > 1 else 0
-        # NYSE/NASDAQ start at :30
-        if self.calendar in ("NYSE", "NASDAQ"):
-            return 30
-        return 0
+        return _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))[1]
 
 
 def session_date_for_timestamp(
@@ -87,7 +99,7 @@ def session_date_for_timestamp(
     timestamp_semantics: TimestampSemantics | str | None,
 ) -> date:
     """Return the exchange session date for one feed timestamp."""
-    from .calendar import get_calendar
+    from .calendar import get_calendar, get_calendar_sessions_by_open_date
     from .config import DataFrequency, _to_backtest_frequency
 
     frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
@@ -116,18 +128,29 @@ def session_date_for_timestamp(
     )
     if event_time.tzinfo != exchange_timezone:
         event_time = event_time.astimezone(exchange_timezone)
+    if calendar is not None and session_start_time is None:
+        event_time_utc = event_time.astimezone(ZoneInfo("UTC"))
+        event_date = event_time.date()
+        sessions = (
+            session
+            for year in (event_date.year, event_date.year + 1)
+            for session in get_calendar_sessions_by_open_date(calendar, year).get(event_date, ())
+            if session.market_open <= event_time_utc
+        )
+        latest = max(sessions, key=lambda session: session.market_open, default=None)
+        return latest.session_date if latest is not None else event_date
+
     session_config = SessionConfig(
         calendar=_normalize_session_calendar(calendar or "UTC"),
         timezone=str(exchange_timezone),
         session_start_time=session_start_time,
     )
-    session_date = assign_session_date(
+    return assign_session_date(
         event_time,
         exchange_timezone,
         session_config.get_session_start_hour(),
         session_config.get_session_start_minute(),
-    )
-    return session_date.date()
+    ).date()
 
 
 def _normalize_session_calendar(calendar: str) -> str:
@@ -251,9 +274,10 @@ def assign_session_date(
 ) -> datetime:
     """Assign a timestamp to its trading session date.
 
-    For sessions that start in the evening (like CME at 5pm),
-    timestamps before the session start belong to the current day's session,
-    and timestamps after belong to the next day's session.
+    For sessions that start in the evening (like CME at 5pm), timestamps before the
+    session start belong to the current day's session, and timestamps after belong to
+    the next day's session. Morning-start sessions use the local calendar date for both
+    pre-market and regular-hours bars; their open time does not define a date boundary.
 
     Args:
         timestamp: Bar timestamp (may be tz-aware or naive)

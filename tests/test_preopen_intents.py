@@ -44,7 +44,7 @@ from ml4t.backtest.config import (
 )
 from ml4t.backtest.execution import VolumeParticipationLimit
 from ml4t.backtest.risk.position import StopLoss, TrailingStop
-from ml4t.backtest.types import OrderType
+from ml4t.backtest.types import OrderType, StopFillMode
 
 
 def prices(*, bars: int = 1, volume: float = 1_000_000.0, low: float | None = None) -> pl.DataFrame:
@@ -118,14 +118,78 @@ def test_target_intent_api_requires_an_engine_configured_broker() -> None:
 def test_opening_processing_skips_session_resolution_without_outstanding_targets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    engine = Engine(DataFeed(prices_df=prices()), InitialTargetStrategy(target_intent()))
+    engine = Engine(DataFeed(prices_df=prices(bars=2)), InitialTargetStrategy(target_intent()))
+    resolved_sessions = []
+    resolve_session = engine.preopen_target_manager._session_date
 
-    def fail_if_called(timestamp):
-        raise AssertionError("session resolution must be skipped")
+    def track_session_resolution(timestamp):
+        resolved_sessions.append(timestamp)
+        return resolve_session(timestamp)
 
-    monkeypatch.setattr(engine.preopen_target_manager, "_session_date", fail_if_called)
+    monkeypatch.setattr(
+        engine.preopen_target_manager,
+        "_session_date",
+        track_session_resolution,
+    )
 
-    engine.preopen_target_manager.process_opening(datetime(2026, 8, 3))
+    result = engine.run()
+
+    assert result.metrics["target_intent_count"] == 1
+    assert result.metrics["intent_reconciliation_count"] == 1
+    assert resolved_sessions == [datetime(2026, 8, 3)]
+
+
+@pytest.mark.parametrize(
+    "execution_mode,target_session,lows",
+    [
+        (ExecutionMode.SAME_BAR, date(2026, 8, 5), [100.0, 90.0, 100.0]),
+        (ExecutionMode.NEXT_BAR, date(2026, 8, 6), [100.0, 100.0, 90.0, 100.0]),
+    ],
+)
+def test_deferred_risk_exit_fills_before_same_asset_opening_target(
+    execution_mode: ExecutionMode,
+    target_session: date,
+    lows: list[float],
+) -> None:
+    class DeferredExitTargetStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.set_position_rules(StopLoss(0.05))
+            broker.register_target_intent(target_intent(session=target_session, weight=0.15))
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if timestamp == datetime(2026, 8, 3):
+                broker.submit_order("SPY", 100)
+
+    timestamps = [datetime(2026, 8, 3 + offset) for offset in range(len(lows))]
+    feed = DataFeed(
+        prices_df=pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["SPY"] * len(lows),
+                "open": [100.0] * len(lows),
+                "high": [100.0] * len(lows),
+                "low": lows,
+                "close": [100.0] * len(lows),
+                "volume": [1_000_000.0] * len(lows),
+            }
+        )
+    )
+
+    engine = Engine(
+        feed,
+        DeferredExitTargetStrategy(),
+        BacktestConfig(
+            execution_mode=execution_mode,
+            stop_fill_mode=StopFillMode.NEXT_BAR_OPEN,
+        ),
+    )
+
+    result = engine.run()
+
+    assert result.metrics["intent_reconciliation_count"] == 1
+    assert engine.broker.get_position("SPY").quantity == 150
+    assert result.metrics["final_value"] == pytest.approx(100_000.0)
+    assert result.metrics["num_fills"] == 3
 
 
 def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> None:
@@ -767,7 +831,7 @@ def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> 
     assert rounded == {"A": 5.0, "B": 4.0}
 
 
-def test_fractional_largest_remainder_allocates_the_fractional_residual() -> None:
+def test_fractional_largest_remainder_preserves_declared_rounding() -> None:
     engine = Engine(
         DataFeed(prices_df=prices()),
         InitialTargetStrategy(target_intent()),
@@ -782,7 +846,7 @@ def test_fractional_largest_remainder_allocates_the_fractional_residual() -> Non
         0.0,
     )
 
-    assert rounded == {"SPY": 1.75}
+    assert rounded == {"SPY": 1.0}
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:

@@ -342,7 +342,7 @@ class PreOpenTargetManager:
 
     def process_opening(self, timestamp: datetime) -> None:
         """Lower and execute targets eligible for the current opening."""
-        if len(self._processed_targets) == len(self._targets):
+        if self._processed_targets.issuperset(self._targets):
             return
         session = self._session_date(timestamp)
         eligible = [
@@ -791,7 +791,6 @@ class PreOpenTargetManager:
         cash_buffer: float,
     ) -> None:
         if self.broker.share_type is ShareType.FRACTIONAL:
-            rounded.update(raw)
             return
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}

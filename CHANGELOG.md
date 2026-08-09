@@ -29,10 +29,14 @@
   exchange session rather than the last available feed bar; holidays and missing period-end data
   no longer move a rebalance earlier.
 - Batch and online session schedules require every complete exchange session to match its required
-  close; online evaluation exposes validate_completed_run() for the final session, while holidays
-  and truncated sessions remain valid.
+  close; only an incomplete final session is exempt, and calendar mismatches fail explicitly.
 - Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or
   retain_lifecycle_history to include the corresponding event histories.
+- Morning-start exchange sessions group pre-market and regular-hours events under the same local
+  calendar date; exchange session labels and opens come from cached authoritative calendar
+  schedules.
+- Deferred next-open risk exits fill before opening targets are sized, and fractional target
+  allocation preserves the declared rounding policy.
 
 ### Fixed
 

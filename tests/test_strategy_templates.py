@@ -455,9 +455,16 @@ class TestLongShortStrategy:
 
         assert strategy.rank_calls == 2
 
-    def test_intraday_schedule_validates_final_session_from_on_end(self):
+    def test_intraday_schedule_validation_cannot_be_skipped_by_on_end_override(self):
         class ClosingLongShort(LongShortStrategy):
             rebalance_schedule = RebalanceSchedule.every_session()
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.ended = False
+
+            def on_end(self, broker) -> None:
+                self.ended = True
 
         timestamp = datetime(2024, 1, 2, 16, 15)
         rows = [
@@ -476,14 +483,16 @@ class TestLongShortStrategy:
             ),
         )
 
+        strategy = ClosingLongShort()
         with pytest.raises(ValueError, match="required session 2024-01-02"):
             Engine.from_config(
                 feed,
-                ClosingLongShort(),
+                strategy,
                 BacktestConfig(data_frequency="15m"),
             ).run()
+        assert strategy.ended
 
-    def test_intraday_schedule_accepts_aligned_final_session_from_on_end(self):
+    def test_intraday_schedule_accepts_aligned_final_session(self):
         class ClosingLongShort(LongShortStrategy):
             rebalance_schedule = RebalanceSchedule.every_session()
 

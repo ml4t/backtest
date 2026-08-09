@@ -10,7 +10,7 @@ from abc import abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from statistics import mean, stdev
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, final
 
 from ..config import ShareType
 from ..execution.schedule import (
@@ -448,7 +448,8 @@ class LongShortStrategy(Strategy):
             if position is None and target_shares > 0:
                 broker.submit_order(asset, -target_shares)
 
-    def on_end(self, broker: Broker) -> None:
-        """Validate that the final required scheduled session matched its close."""
+    @final
+    def _validate_completed_run(self) -> None:
+        """Validate final schedule alignment independently of lifecycle callbacks."""
         if self._schedule_evaluator is not None:
             self._schedule_evaluator.validate_completed_run()

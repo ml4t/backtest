@@ -3030,10 +3030,6 @@
           "kind": "method",
           "signature": "(self, timestamp: 'datetime', data: 'dict[str, dict]', context: 'dict[str, Any]', broker: 'Broker') -> 'None'"
         },
-        "on_end": {
-          "kind": "method",
-          "signature": "(self, broker: 'Broker') -> 'None'"
-        },
         "on_prepare": {
           "kind": "method",
           "signature": "(self, broker: 'Any', config: 'BacktestConfig | None' = None) -> 'None'"
