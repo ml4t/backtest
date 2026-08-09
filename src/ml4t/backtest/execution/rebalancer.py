@@ -88,6 +88,9 @@ class RebalanceConfig:
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
     schedule: RebalanceSchedule | None = None
     calendar: str | None = None
+    timezone: str | None = None
+    data_frequency: str | None = None
+    timestamp_semantics: str | None = None
 
 
 class TargetWeightExecutor:
@@ -134,6 +137,9 @@ class TargetWeightExecutor:
             self.config.schedule,
             session_index=self._schedule_session_index,
             calendar=self.config.calendar,
+            timezone=self.config.timezone,
+            data_frequency=self.config.data_frequency,
+            timestamp_semantics=self.config.timestamp_semantics,
         )
 
     def execute(

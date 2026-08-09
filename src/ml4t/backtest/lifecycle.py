@@ -26,11 +26,12 @@ class _BrokerTransaction:
         self.broker = broker
         self.state: dict[str, Any] | None = None
 
-    def capture(self) -> None:
-        """Capture a bounded state snapshot once, before the first mutation."""
-        if self.state is not None:
+    def capture(self, **scope: Any) -> None:
+        """Capture original state for each broker resource before it is mutated."""
+        if self.state is None:
+            self.state = self.broker._snapshot_lifecycle_state(**scope)
             return
-        self.state = self.broker._snapshot_lifecycle_state()
+        self.broker._extend_lifecycle_state(self.state, **scope)
 
     def rollback(self) -> None:
         """Restore captured state; a read-only callback has nothing to restore."""

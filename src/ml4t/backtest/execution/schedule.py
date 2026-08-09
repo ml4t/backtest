@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from enum import Enum
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import polars as pl
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
@@ -76,14 +77,30 @@ def is_rebalance_timestamp(
     *,
     session_index: int,
     calendar: str | None = None,
+    timezone: str | None = None,
+    data_frequency: Any | None = None,
+    timestamp_semantics: TimestampSemantics | str | None = None,
+    is_session_close: bool | None = None,
 ) -> bool:
     """Evaluate a schedule from current calendar metadata without future feed timestamps."""
     resolved = _coerce_schedule(schedule)
     cadence = resolved.cadence
-    if cadence in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EVERY_SESSION}:
+    if cadence is RebalanceCadence.EVERY_BAR:
         return True
     if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
         return timestamp in resolved.timestamps
+    if is_session_close is None:
+        is_session_close = _is_session_close_timestamp(
+            timestamp,
+            calendar=calendar,
+            timezone=timezone,
+            data_frequency=data_frequency,
+            timestamp_semantics=timestamp_semantics,
+        )
+    if not is_session_close:
+        return False
+    if cadence is RebalanceCadence.EVERY_SESSION:
+        return True
     if cadence is RebalanceCadence.FIXED_N_SESSIONS:
         return (session_index - 1) % resolved.every_n == 0
 
@@ -107,6 +124,45 @@ def is_rebalance_timestamp(
     while period_end.weekday() >= 5:
         period_end -= timedelta(days=1)
     return session_date == period_end
+
+
+def _is_session_close_timestamp(
+    timestamp: datetime,
+    *,
+    calendar: str | None,
+    timezone: str | None,
+    data_frequency: Any | None,
+    timestamp_semantics: TimestampSemantics | str | None,
+) -> bool:
+    semantics = (
+        timestamp_semantics
+        if isinstance(timestamp_semantics, TimestampSemantics)
+        else TimestampSemantics(timestamp_semantics)
+        if timestamp_semantics is not None
+        else None
+    )
+    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
+    if semantics is TimestampSemantics.SESSION_LABEL or frequency is DataFrequency.DAILY:
+        return True
+    if semantics is None and timestamp.time() == time.min:
+        return True
+    if calendar is None:
+        raise ValueError("intraday session schedules require calendar metadata or is_session_close")
+
+    source_timezone = ZoneInfo(timezone or "UTC")
+    localized = (
+        timestamp.replace(tzinfo=source_timezone)
+        if timestamp.tzinfo is None
+        else timestamp.astimezone(source_timezone)
+    )
+    event_time = localized.astimezone(ZoneInfo("UTC"))
+    event_date = localized.date()
+    schedule = get_schedule(
+        calendar,
+        event_date - timedelta(days=1),
+        event_date + timedelta(days=1),
+    )
+    return any(close == event_time for close in schedule["market_close"])
 
 
 def resolve_rebalance_timestamps(

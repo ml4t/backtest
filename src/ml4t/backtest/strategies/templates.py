@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from statistics import mean, stdev
 from typing import TYPE_CHECKING, Any
 
@@ -336,6 +336,8 @@ class LongShortStrategy(Strategy):
     def __init__(self) -> None:
         self.bar_count = 0
         self._schedule_config: BacktestConfig | None = None
+        self._schedule_session_date: date | None = None
+        self._schedule_session_index = 0
 
     def on_prepare(
         self,
@@ -390,11 +392,18 @@ class LongShortStrategy(Strategy):
         if self.rebalance_schedule is not None:
             if self._schedule_config is None:
                 raise ValueError("rebalance_schedule is set but was not prepared before execution")
+            session_date = timestamp.date()
+            if session_date != self._schedule_session_date:
+                self._schedule_session_date = session_date
+                self._schedule_session_index += 1
             if not is_rebalance_timestamp(
                 timestamp,
                 self.rebalance_schedule,
-                session_index=self.bar_count,
+                session_index=self._schedule_session_index,
                 calendar=self._schedule_config.resolved_calendar,
+                timezone=self._schedule_config.resolved_timezone,
+                data_frequency=self._schedule_config.resolved_data_frequency,
+                timestamp_semantics=self._schedule_config.resolved_timestamp_semantics,
             ):
                 return
         elif self.bar_count % self.rebalance_frequency != 1:

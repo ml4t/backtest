@@ -7,6 +7,7 @@ from itertools import product
 from pathlib import Path
 
 import yaml
+from packaging.requirements import Requirement
 
 _ROOT = Path(__file__).parents[2]
 _WORKFLOWS = _ROOT / ".github" / "workflows"
@@ -104,10 +105,14 @@ def test_minimum_dependency_matrix_proves_declared_lower_bounds() -> None:
         "PyYAML>=6.0.3",
         "pandas-market-calendars>=5.2.4",
     }
-    assert (
-        "ml4t-specs @ "
-        "git+https://github.com/ml4t/specs.git@85d3476683a70b4f17e5e8cb82dd23d05b373dc8"
-    ) in dependencies
+    specs_dependencies = [
+        requirement
+        for dependency in dependencies
+        if (requirement := Requirement(dependency)).name == "ml4t-specs"
+    ]
+    assert len(specs_dependencies) == 1
+    assert str(specs_dependencies[0].specifier) == "<0.2,>=0.1.1"
+    assert specs_dependencies[0].url is None
 
 
 def test_merge_and_release_builds_depend_on_compatibility_gate() -> None:

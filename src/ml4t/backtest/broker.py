@@ -697,21 +697,30 @@ class Broker:
     def _positions_created_this_bar(self, value: set[str]) -> None:
         self._risk_state.positions_created_this_bar = value
 
-    def _capture_lifecycle_mutation(self) -> None:
+    def _capture_lifecycle_mutation(self, **scope: Any) -> None:
         transaction = self._lifecycle_transaction
         if transaction is not None:
-            transaction.capture()
+            transaction.capture(**scope)
 
-    def _snapshot_lifecycle_state(self) -> dict[str, Any]:
-        pending_orders = tuple(self.pending_orders)
-        return {
-            "account": copy.deepcopy(self.account),
-            "risk": copy.deepcopy(self._risk_state),
-            "orders": tuple(self.orders),
-            "pending_orders": pending_orders,
-            "pending_order_state": {
-                id(order): copy.deepcopy(vars(order)) for order in pending_orders
+    def _snapshot_lifecycle_state(self, **scope: Any) -> dict[str, Any]:
+        state = {
+            "account_state": {
+                key: value if key == "policy" else copy.deepcopy(value)
+                for key, value in self.account.__dict__.items()
+                if key != "positions"
             },
+            "original_position_keys": set(self.account.positions),
+            "positions": {},
+            "all_positions": False,
+            "risk_state": {
+                "pending_exits": copy.deepcopy(self._risk_state.pending_exits),
+                "stop_exits_this_bar": set(self._risk_state.stop_exits_this_bar),
+                "positions_created_this_bar": set(self._risk_state.positions_created_this_bar),
+            },
+            "risk_rules": None,
+            "orders": tuple(self.orders),
+            "pending_orders": tuple(self.pending_orders),
+            "pending_order_state": {},
             "order_counter": self._order_state.counter,
             "partial_quantities": copy.deepcopy(self._order_state.partial_quantities),
             "filled_this_bar": set(self._order_state.filled_this_bar),
@@ -720,37 +729,94 @@ class Broker:
             "fills_length": len(self._execution_journal.fills),
             "trades_length": len(self._execution_journal.trades),
             "rebalance_counter": self._rebalance_counter,
-            "asset_stats": copy.deepcopy(self._asset_stats),
+            "original_asset_stats_keys": set(self._asset_stats),
+            "asset_stats": {},
+            "all_asset_stats": False,
             "stats_config": copy.deepcopy(self._stats_config),
             "session_config": self._session_config,
             "last_session_id": self._last_session_id,
-            "target_intent_state": (
-                self._preopen_target_manager.capture_transaction_state()
-                if self._preopen_target_manager is not None
-                else None
-            ),
+            "target_intent_state": None,
         }
+        self._extend_lifecycle_state(state, **scope)
+        return state
+
+    def _extend_lifecycle_state(
+        self,
+        state: dict[str, Any],
+        *,
+        asset: str | None = None,
+        all_positions: bool = False,
+        order_id: str | None = None,
+        all_pending_orders: bool = False,
+        risk_rules: bool = False,
+        all_asset_stats: bool = False,
+        target_intents: bool = False,
+    ) -> None:
+        assets = state["original_position_keys"] if all_positions else ({asset} if asset else ())
+        for asset_name in assets:
+            if asset_name not in state["positions"]:
+                state["positions"][asset_name] = copy.deepcopy(
+                    self.account.positions.get(asset_name)
+                )
+        state["all_positions"] = state["all_positions"] or all_positions
+
+        order_ids = (
+            {order.order_id for order in state["pending_orders"]}
+            if all_pending_orders
+            else ({order_id} if order_id else set())
+        )
+        for order in state["pending_orders"]:
+            if order.order_id in order_ids and id(order) not in state["pending_order_state"]:
+                state["pending_order_state"][id(order)] = copy.deepcopy(vars(order))
+
+        if risk_rules and state["risk_rules"] is None:
+            state["risk_rules"] = (
+                copy.deepcopy(self._risk_state.position_rules),
+                copy.deepcopy(self._risk_state.position_rules_by_asset),
+            )
+
+        stats_assets = (
+            state["original_asset_stats_keys"] if all_asset_stats else ({asset} if asset else ())
+        )
+        for asset_name in stats_assets:
+            if asset_name not in state["asset_stats"]:
+                state["asset_stats"][asset_name] = copy.deepcopy(self._asset_stats.get(asset_name))
+        state["all_asset_stats"] = state["all_asset_stats"] or all_asset_stats
+
+        if (
+            target_intents
+            and state["target_intent_state"] is None
+            and self._preopen_target_manager is not None
+        ):
+            state["target_intent_state"] = self._preopen_target_manager.capture_transaction_state()
 
     def _restore_lifecycle_state(self, state: dict[str, Any]) -> None:
-        restored_account = state["account"]
         positions = self.account.positions
-        positions.clear()
-        positions.update(restored_account.positions)
-        restored_account_state = copy.deepcopy(restored_account.__dict__)
-        restored_account_state["positions"] = positions
+        if state["all_positions"]:
+            positions.clear()
+        for asset, position in state["positions"].items():
+            if position is None:
+                positions.pop(asset, None)
+            else:
+                positions[asset] = position
         self.account.__dict__.clear()
-        self.account.__dict__.update(restored_account_state)
+        self.account.__dict__.update({**state["account_state"], "positions": positions})
 
-        restored_risk = state["risk"]
-        self._risk_state.position_rules = restored_risk.position_rules
-        self._risk_state.position_rules_by_asset = restored_risk.position_rules_by_asset
-        self._risk_state.pending_exits = restored_risk.pending_exits
-        self._risk_state.stop_exits_this_bar = restored_risk.stop_exits_this_bar
-        self._risk_state.positions_created_this_bar = restored_risk.positions_created_this_bar
+        if state["risk_rules"] is not None:
+            self._risk_state.position_rules, self._risk_state.position_rules_by_asset = state[
+                "risk_rules"
+            ]
+        self._risk_state.pending_exits = state["risk_state"]["pending_exits"]
+        self._risk_state.stop_exits_this_bar = state["risk_state"]["stop_exits_this_bar"]
+        self._risk_state.positions_created_this_bar = state["risk_state"][
+            "positions_created_this_bar"
+        ]
 
         for order in state["pending_orders"]:
-            order.__dict__.clear()
-            order.__dict__.update(copy.deepcopy(state["pending_order_state"][id(order)]))
+            order_state = state["pending_order_state"].get(id(order))
+            if order_state is not None:
+                order.__dict__.clear()
+                order.__dict__.update(copy.deepcopy(order_state))
         self._order_state.orders[:] = state["orders"]
         self._order_state.pending[:] = state["pending_orders"]
         self._order_state.counter = state["order_counter"]
@@ -765,7 +831,13 @@ class Broker:
         del self._execution_journal.trades[state["trades_length"] :]
 
         self._rebalance_counter = state["rebalance_counter"]
-        self._asset_stats = state["asset_stats"]
+        if state["all_asset_stats"]:
+            self._asset_stats.clear()
+        for asset, stats in state["asset_stats"].items():
+            if stats is None:
+                self._asset_stats.pop(asset, None)
+            else:
+                self._asset_stats[asset] = stats
         self._stats_config = state["stats_config"]
         self._session_config = state["session_config"]
         self._last_session_id = state["last_session_id"]
@@ -945,7 +1017,7 @@ class Broker:
 
     def mark_account_positions(self, use_open: bool = False) -> None:
         """Synchronize account position marks using configured price semantics."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_positions=True)
         for asset, position in self.account.positions.items():
             mark_price = self.get_mark_price(asset, quantity=position.quantity, use_open=use_open)
             if mark_price is not None:
@@ -1035,7 +1107,7 @@ class Broker:
                 return
         """
         if asset not in self._asset_stats:
-            self._capture_lifecycle_mutation()
+            self._capture_lifecycle_mutation(asset=asset)
             self._asset_stats[asset] = AssetTradingStats(
                 recent_pnls=deque(maxlen=self._stats_config.recent_window_size)
             )
@@ -1194,7 +1266,7 @@ class Broker:
                 disables rules for the selected scope.
             asset: If provided, apply only to this asset; otherwise global
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(risk_rules=True)
         if asset is not None:
             self._position_rules_by_asset[asset] = rules
         else:
@@ -1211,7 +1283,7 @@ class Broker:
             asset: Asset symbol
             context: Dict of signal/indicator values (e.g., {'exit_signal': -0.5, 'atr': 2.5})
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(asset=asset)
         pos = self.positions.get(asset)
         if pos:
             pos.context.update(context)
@@ -1223,7 +1295,7 @@ class Broker:
         position_rules: PositionRule | None = None,
     ) -> CanonicalTargetIntent:
         """Register an idempotent target for a causal opening phase."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(target_intents=True)
         if self._preopen_target_manager is None:
             raise RuntimeError("target intents require an Engine-configured broker")
         return self._preopen_target_manager.register(
@@ -1234,7 +1306,7 @@ class Broker:
 
     def register_position_rule_policy(self, policy_id: str, rules: PositionRule) -> None:
         """Bind a position-rule implementation to a portable policy identity."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(target_intents=True)
         if self._preopen_target_manager is None:
             raise RuntimeError("position rule policies require an Engine-configured broker")
         self._preopen_target_manager.register_position_rule_policy(policy_id, rules)
@@ -1265,19 +1337,24 @@ class Broker:
 
     def restore_target_intent_state(self, state: dict[str, Any]) -> None:
         """Restore target intent state before strategy initialization."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(target_intents=True)
         if self._preopen_target_manager is None:
             raise RuntimeError("target intents require an Engine-configured broker")
         self._preopen_target_manager.restore_state(state)
 
-    def evaluate_position_rules(self, *, skip_assets: set[str] | None = None) -> list[Order]:
+    def evaluate_position_rules(self) -> list[Order]:
         """Evaluate position rules for all open positions.
 
         Called by Engine before processing orders. Returns list of exit orders.
         Handles defer_fill=True by storing pending exits for next bar.
         """
-        self._capture_lifecycle_mutation()
-        return self._risk_engine.evaluate_position_rules(skip_assets=skip_assets)
+        self._capture_lifecycle_mutation(
+            all_positions=True,
+            all_pending_orders=True,
+            risk_rules=True,
+            all_asset_stats=True,
+        )
+        return self._risk_engine.evaluate_position_rules()
 
     def submit_order(
         self,
@@ -1324,7 +1401,7 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(asset=asset)
         return self._order_book.submit_order(
             asset=asset,
             quantity=quantity,
@@ -1459,7 +1536,7 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.update_order(order_id, **kwargs)
 
     def cancel_order(self, order_id: str) -> bool:
@@ -1468,7 +1545,7 @@ class Broker:
         Returns True only when the identifier names a pending order. Filled,
         rejected, cancelled, and unknown orders return False.
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.cancel_order(order_id)
 
     def close_position(
@@ -2113,7 +2190,12 @@ class Broker:
 
         Returns list of exit orders that were created and will be filled.
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(
+            all_positions=True,
+            all_pending_orders=True,
+            risk_rules=True,
+            all_asset_stats=True,
+        )
         return self._risk_engine.process_pending_exits()
 
     def _update_time(
@@ -2224,7 +2306,7 @@ class Broker:
         - trail_include_entry_bar_extremes: Include a completed entry bar's
           extreme in the watermark used from the next bar onward
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_positions=True)
         for asset, pos in self.positions.items():
             if asset in self._current_prices:
                 # For new positions (created this bar), skip updating from entry bar's HIGH/LOW
@@ -2250,7 +2332,6 @@ class Broker:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         """Process pending orders against current prices.
 
@@ -2265,11 +2346,14 @@ class Broker:
         Args:
             use_open: If True, use open prices (for next-bar mode at bar start).
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(
+            all_positions=True,
+            all_pending_orders=True,
+            all_asset_stats=True,
+        )
         self._execution_engine.process_orders(
             use_open=use_open,
             order_types=order_types,
             order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
-            defer_policy_rejections=defer_policy_rejections,
         )

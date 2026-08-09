@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import polars as pl
+import pytest
 from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.execution import (
@@ -216,3 +217,34 @@ class TestCausalScheduleEvaluation:
         assert not is_rebalance_timestamp(
             datetime(2024, 3, 28), RebalanceSchedule.month_end(), session_index=19
         )
+
+    def test_intraday_session_cadences_fire_only_at_calendar_close(self) -> None:
+        before_close = datetime(2024, 1, 5, 20, 59, tzinfo=UTC)
+        at_close = datetime(2024, 1, 5, 21, 0, tzinfo=UTC)
+
+        for schedule in (RebalanceSchedule.every_session(), RebalanceSchedule.weekly()):
+            assert not is_rebalance_timestamp(
+                before_close,
+                schedule,
+                session_index=5,
+                calendar="NYSE",
+                timezone="UTC",
+                data_frequency="1m",
+            )
+            assert is_rebalance_timestamp(
+                at_close,
+                schedule,
+                session_index=5,
+                calendar="NYSE",
+                timezone="UTC",
+                data_frequency="1m",
+            )
+
+    def test_intraday_session_cadence_requires_boundary_metadata(self) -> None:
+        with pytest.raises(ValueError, match="intraday session schedules require"):
+            is_rebalance_timestamp(
+                datetime(2024, 1, 5, 15, 0),
+                RebalanceSchedule.every_session(),
+                session_index=1,
+                data_frequency="1m",
+            )

@@ -146,6 +146,7 @@ class OrderBook:
             broker.immediate_fill
             and broker.execution_mode is ExecutionMode.SAME_BAR
             and order.order_type is OrderType.MARKET
+            and order.child_intent_id is None
         )
 
     def _fill_immediately(self, order: Order) -> Order:
@@ -255,6 +256,7 @@ class OrderBook:
             if order.order_id == order_id:
                 order.status = OrderStatus.CANCELLED
                 self.orders.pending.remove(order)
+                self.orders.partial_quantities.pop(order_id, None)
                 return True
         return False
 

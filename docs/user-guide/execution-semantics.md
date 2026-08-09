@@ -83,7 +83,9 @@ def on_prepare(self, broker, config=None):
 
 The engine validates the cutoff, lowers the target at the opening auction, records canonical child
 intent and order lineage, reconciles fills and remaining quantity, then activates any associated
-position rules. A scheduled target uses the same method from an earlier event with a future
+position rules. Opening child orders use OPG time-in-force: any quantity not filled by the eligible
+opening auction is cancelled and is never carried into a later bar. A scheduled target uses the
+same method from an earlier event with a future
 `effective_session`. Same-session registration from `on_data()` is rejected because that callback
 has already observed information after the opening phase.
 

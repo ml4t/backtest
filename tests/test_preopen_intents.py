@@ -24,6 +24,7 @@ from ml4t.backtest import (
     Broker,
     DataFeed,
     Engine,
+    ExecutionMode,
     IntentOutcome,
     LateAuctionIntentError,
     PreOpenIntentError,
@@ -34,7 +35,7 @@ from ml4t.backtest import (
 from ml4t.backtest.config import CommissionType, ExecutionPrice, SlippageType, TrailStopTiming
 from ml4t.backtest.execution import VolumeParticipationLimit
 from ml4t.backtest.risk.position import StopLoss, TrailingStop
-from ml4t.backtest.types import OrderStatus, OrderType
+from ml4t.backtest.types import OrderType
 
 
 def prices(*, bars: int = 1, volume: float = 1_000_000.0, low: float | None = None) -> pl.DataFrame:
@@ -124,6 +125,25 @@ def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> No
     assert engine.broker.get_target_intents() == ()
     assert engine.broker.get_child_order_intents() == ()
     assert engine.broker.get_intent_reconciliations() == ()
+    assert engine.preopen_target_manager._position_rules == {}
+
+
+def test_opening_target_registration_from_on_start_names_on_prepare_migration() -> None:
+    intent = target_intent()
+
+    class StartTarget(Strategy):
+        def on_start(self, broker) -> None:
+            broker.register_target_intent(intent)
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(DataFeed(prices_df=prices()), StartTarget())
+
+    with pytest.raises(LateAuctionIntentError, match="register opening targets in on_prepare"):
+        engine.run()
+
+    assert engine.broker.get_target_intents() == ()
 
 
 def test_initial_weight_target_lowers_at_open_and_rules_see_only_later_movement() -> None:
@@ -159,7 +179,7 @@ def test_opening_target_fills_only_its_child_orders_before_the_regular_queue() -
 
     class TargetWithRestingOrder(InitialTargetStrategy):
         def on_start(self, broker) -> None:
-            broker.submit_order("SPY", 1, order_type=OrderType.LIMIT, limit_price=50.0)
+            broker.submit_order("SPY", 1, order_type=OrderType.LIMIT, limit_price=110.0)
 
     config = BacktestConfig(next_bar_queue_shadow_validation=True)
     engine = Engine(
@@ -170,11 +190,11 @@ def test_opening_target_fills_only_its_child_orders_before_the_regular_queue() -
 
     result = engine.run()
 
-    assert [fill.child_intent_id for fill in result.fills] == [f"{intent.intent_id}:SPY"]
-    resting = engine.broker.get_pending_orders("SPY")
-    assert len(resting) == 1
-    assert resting[0].order_type is OrderType.LIMIT
-    assert resting[0].status is OrderStatus.PENDING
+    assert [fill.child_intent_id for fill in result.fills] == [
+        f"{intent.intent_id}:SPY",
+        None,
+    ]
+    assert engine.broker.get_pending_orders("SPY") == []
 
 
 def test_scheduled_target_registered_from_prior_event_fills_next_open() -> None:
@@ -279,7 +299,7 @@ def test_overlapping_targets_for_one_session_are_rejected_atomically() -> None:
     assert engine.broker.get_target_intents() == ()
 
 
-def test_partial_opening_fill_retains_child_remainder_and_lineage() -> None:
+def test_partial_opening_fill_cancels_opg_remainder_and_retains_lineage() -> None:
     config = BacktestConfig()
     policy = replace(
         default_execution_policy(config),
@@ -287,7 +307,7 @@ def test_partial_opening_fill_retains_child_remainder_and_lineage() -> None:
         allow_partial_fills=True,
     )
     engine = Engine(
-        DataFeed(prices_df=prices(volume=100)),
+        DataFeed(prices_df=prices(bars=2, volume=100)),
         InitialTargetStrategy(target_intent()),
         config,
         execution_policy=policy,
@@ -296,12 +316,51 @@ def test_partial_opening_fill_retains_child_remainder_and_lineage() -> None:
     result = engine.run()
 
     assert result.fills[0].quantity == 10
-    reconciliation = engine.broker.get_intent_reconciliations()[-1]
-    assert reconciliation.outcome is IntentOutcome.PARTIAL
+    assert len(result.fills) == 1
+    reconciliation = engine.broker.get_intent_reconciliations()[0]
+    assert reconciliation.outcome is IntentOutcome.CANCELLED
     assert reconciliation.requested_quantity == 500
     assert reconciliation.filled_quantity == 10
     assert reconciliation.remaining_quantity == 490
-    assert engine.broker.pending_orders[0].child_intent_id == reconciliation.child_intent_id
+    assert engine.broker.pending_orders == []
+    assert engine.broker._order_state.partial_quantities == {}
+
+
+def test_non_integral_liquidity_limit_is_rounded_consistently() -> None:
+    config = BacktestConfig()
+    policy = replace(
+        default_execution_policy(config),
+        liquidity_fraction=0.1,
+        allow_partial_fills=True,
+    )
+    engine = Engine(
+        DataFeed(prices_df=prices(volume=1005)),
+        InitialTargetStrategy(target_intent()),
+        config,
+        execution_policy=policy,
+    )
+
+    result = engine.run()
+
+    assert result.fills[0].quantity == 100
+    assert engine.broker.get_intent_reconciliations()[0].outcome is IntentOutcome.CANCELLED
+
+
+def test_immediate_same_bar_mode_still_executes_opening_child_at_open() -> None:
+    config = BacktestConfig(
+        execution_price=ExecutionPrice.CLOSE,
+        execution_mode=ExecutionMode.SAME_BAR,
+        immediate_fill=True,
+    )
+
+    result = Engine(
+        DataFeed(prices_df=prices(low=100.0)),
+        InitialTargetStrategy(target_intent()),
+        config,
+    ).run()
+
+    assert result.fills[0].price == 100
+    assert result.fills[0].price_source == "open"
 
 
 def test_partial_fill_policy_rejects_before_submitting_child_order() -> None:
@@ -359,7 +418,7 @@ def test_account_policy_rejection_is_reconciled_with_original_child() -> None:
     assert engine.broker.orders[0].child_intent_id == reconciliation.child_intent_id
 
 
-def test_cancelled_partial_remainder_is_reconciled_before_run_end() -> None:
+def test_terminal_reconciliation_is_not_duplicated_on_later_bars() -> None:
     config = BacktestConfig()
     policy = replace(
         default_execution_policy(config),
@@ -368,24 +427,19 @@ def test_cancelled_partial_remainder_is_reconciled_before_run_end() -> None:
     )
     intent = target_intent()
 
-    class CancelRemainderStrategy(InitialTargetStrategy):
-        def on_data(self, timestamp, data, context, broker) -> None:
-            pending = broker.get_pending_orders("SPY")
-            assert len(pending) == 1
-            broker.cancel_order(pending[0].order_id)
-
     engine = Engine(
-        DataFeed(prices_df=prices(volume=100)),
-        CancelRemainderStrategy(intent),
+        DataFeed(prices_df=prices(bars=10, volume=100)),
+        InitialTargetStrategy(intent),
         config,
         execution_policy=policy,
     )
 
     engine.run()
 
-    outcomes = [record.outcome for record in engine.broker.get_intent_reconciliations()]
-    assert outcomes == [IntentOutcome.PARTIAL, IntentOutcome.CANCELLED]
-    assert engine.broker.get_intent_reconciliations()[-1].remaining_quantity == 490
+    reconciliations = engine.broker.get_intent_reconciliations()
+    assert len(reconciliations) == 1
+    assert reconciliations[0].outcome is IntentOutcome.CANCELLED
+    assert reconciliations[0].remaining_quantity == 490
 
 
 def test_percentage_fees_are_reserved_during_opening_weight_sizing() -> None:
@@ -469,7 +523,7 @@ def test_reject_residual_policy_fails_before_child_order() -> None:
     assert engine.broker.orders == []
 
 
-def test_restart_state_preserves_partial_remainder_and_idempotency() -> None:
+def test_restart_state_requires_matching_broker_order_state() -> None:
     config = BacktestConfig()
     policy = replace(
         default_execution_policy(config),
@@ -485,19 +539,15 @@ def test_restart_state_preserves_partial_remainder_and_idempotency() -> None:
     )
     engine.run()
     state = engine.broker.export_target_intent_state()
-    original_order_count = len(engine.broker.orders)
 
-    restored = engine.broker._create_preopen_target_manager(
-        policy,
-        engine.lifecycle_version,
-        calendar=None,
-    )
-    restored.restore_state(state)
-    assert restored.register(intent) is restored.targets[0]
-    restored.reconcile(datetime(2026, 8, 3))
-
-    assert len(engine.broker.orders) == original_order_count
-    assert restored.reconciliations[-1].remaining_quantity == 490
+    with pytest.raises(PreOpenIntentError, match="restore the broker account and order state"):
+        Engine(
+            DataFeed(prices_df=prices(volume=100)),
+            InitialTargetStrategy(intent),
+            config,
+            execution_policy=policy,
+            target_intent_state=state,
+        )
 
 
 def test_restart_registration_reattaches_position_rule_implementation() -> None:

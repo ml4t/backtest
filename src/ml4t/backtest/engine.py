@@ -129,7 +129,7 @@ class Engine:
         if target_intent_state is not None:
             self.preopen_target_manager.restore_state(target_intent_state)
         self._strategy_finalized = False
-        self._market_event_count = 0
+        self._accepted_market_event_count = 0
 
         # Calendar session enforcement (lazy initialized in run())
         self._calendar = None
@@ -387,6 +387,7 @@ class Engine:
                 ask_sizes,
                 signals,
             )
+            self._accepted_market_event_count += 1
 
             self.preopen_target_manager.process_opening(timestamp)
 
@@ -424,7 +425,7 @@ class Engine:
             self._record_portfolio_state(timestamp)
 
         self._finalize_strategy()
-        self.lifecycle_dispatcher.validate_completed_run(self._market_event_count)
+        self.lifecycle_dispatcher.validate_completed_run(self._accepted_market_event_count)
         return self._generate_results()
 
     @staticmethod
@@ -466,7 +467,6 @@ class Engine:
                 self.broker,
                 event_time=timestamp,
             )
-            self._market_event_count += 1
         except BaseException as failure:
             try:
                 self._finalize_strategy()

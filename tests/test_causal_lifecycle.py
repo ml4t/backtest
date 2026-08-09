@@ -8,7 +8,7 @@ from ml4t.specs import HistoricalStrategyCompatibilityError, LifecyclePhase
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, Strategy, callback_trace
 from ml4t.backtest.broker import Broker
-from ml4t.backtest.types import OrderStatus, OrderType
+from ml4t.backtest.types import OrderStatus, OrderType, Position
 
 
 def prices(*, bars: int = 1) -> pl.DataFrame:
@@ -215,12 +215,28 @@ def test_callback_failure_restores_updated_and_cancelled_pending_order() -> None
 
 
 def test_read_only_callbacks_do_not_copy_broker_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fail_if_called(value):
-        raise AssertionError(f"unexpected lifecycle snapshot for {type(value).__name__}")
+    def fail_if_called(self):
+        raise AssertionError("unexpected lifecycle snapshot")
 
-    monkeypatch.setattr("ml4t.backtest.broker.copy.deepcopy", fail_if_called)
+    monkeypatch.setattr(Broker, "_snapshot_lifecycle_state", fail_if_called)
 
     Engine(DataFeed(prices_df=prices(bars=2)), TraceStrategy()).run()
+
+
+def test_scoped_lifecycle_snapshot_copies_only_the_position_being_mutated() -> None:
+    broker = Broker()
+    broker.positions.update(
+        {
+            "SPY": Position("SPY", 10, 100, datetime(2026, 8, 1), current_price=100),
+            "QQQ": Position("QQQ", 20, 200, datetime(2026, 8, 1), current_price=200),
+        }
+    )
+
+    state = broker._snapshot_lifecycle_state(asset="SPY")
+
+    assert set(state["positions"]) == {"SPY"}
+    assert state["risk_rules"] is None
+    assert state["target_intent_state"] is None
 
 
 def test_non_utc_event_timestamps_remain_feed_values() -> None:

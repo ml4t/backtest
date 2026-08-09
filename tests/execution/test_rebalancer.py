@@ -1,6 +1,6 @@
 """Tests for portfolio rebalancing utilities."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -468,6 +468,25 @@ class TestTargetWeightExecutorScheduling:
         resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
 
         assert resolved == [datetime(2024, 1, 5), datetime(2024, 1, 12)]
+
+    def test_intraday_weekly_schedule_fires_once_at_session_close(self):
+        timestamps = [
+            datetime(2024, 1, 5, 20, 58, tzinfo=UTC),
+            datetime(2024, 1, 5, 20, 59, tzinfo=UTC),
+            datetime(2024, 1, 5, 21, 0, tzinfo=UTC),
+        ]
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="UTC",
+                data_frequency="1m",
+            )
+        )
+
+        resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
+
+        assert resolved == [datetime(2024, 1, 5, 21, 0, tzinfo=UTC)]
 
     def test_execute_requires_timestamp_when_schedule_is_configured(self, broker, sample_data):
         executor = TargetWeightExecutor(

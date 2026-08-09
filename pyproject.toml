@@ -30,9 +30,6 @@ include = [
     "/CHANGELOG.md",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [project]
 name = "ml4t-backtest"
 dynamic = ["version"]
@@ -78,7 +75,7 @@ requires-python = ">=3.12"
 
 # Core dependencies
 dependencies = [
-    "ml4t-specs @ git+https://github.com/ml4t/specs.git@85d3476683a70b4f17e5e8cb82dd23d05b373dc8",
+    "ml4t-specs>=0.1.1,<0.2",
     "polars>=1.36.1",
     "pandas>=2.3.3; python_version < '3.15'",
     "pandas>=3.0.5; python_version >= '3.15'",
@@ -86,6 +83,9 @@ dependencies = [
     "PyYAML>=6.0.3",
     "pandas-market-calendars>=5.2.4",
 ]
+
+[tool.uv.sources]
+ml4t-specs = { git = "https://github.com/ml4t/specs.git", rev = "85d3476683a70b4f17e5e8cb82dd23d05b373dc8" }
 
 [project.optional-dependencies]
 # Visualization and reporting

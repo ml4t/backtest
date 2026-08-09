@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import fields
 from pathlib import Path
 
 from ml4t.specs import LIFECYCLE_V1, LifecyclePhase
 
 from ml4t.backtest import Broker
+from ml4t.backtest.core.state import OrderState, RiskState
 
 SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
 BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
@@ -101,6 +103,34 @@ COLLECTION_READ_METHOD_SUFFIX = ("account", "policy", "get_spendable_cash")
 
 def _parse(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _owned_state_fields(function: ast.FunctionDef, owner: str) -> set[str]:
+    return {
+        node.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Attribute)
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id == "self"
+        and node.value.attr == owner
+    }
+
+
+def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
+    tree = _parse(SOURCE_ROOT / "broker.py")
+    restore = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_restore_lifecycle_state"
+    )
+
+    assert _owned_state_fields(restore, "_order_state") == {
+        field.name for field in fields(OrderState)
+    }
+    assert _owned_state_fields(restore, "_risk_state") == {
+        field.name for field in fields(RiskState)
+    }
 
 
 def _references_broker(node: ast.AST) -> bool:
