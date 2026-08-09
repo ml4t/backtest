@@ -46,6 +46,7 @@ import tracemalloc
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 
 import numpy as np
@@ -85,6 +86,9 @@ from ml4t.backtest._validation.lean_runner import (  # noqa: E402
     read_lean_csv as shared_read_lean_csv,
 )
 from ml4t.backtest._validation.vectorbt_runner import (  # noqa: E402
+    extract_order_log as shared_extract_vectorbt_order_log,
+)
+from ml4t.backtest._validation.vectorbt_runner import (  # noqa: E402
     extract_trade_log as shared_extract_vectorbt_trade_log,
 )
 from ml4t.backtest._validation.vectorbt_runner import (  # noqa: E402
@@ -104,6 +108,8 @@ from ml4t.backtest._validation.zipline_runner import (  # noqa: E402
 _BENCHMARK_LOG_FILE = os.getenv("ML4T_BENCHMARK_LOG_FILE")
 DEFAULT_REAL_DATA_PATH = Path("/home/stefan/Dropbox/ml4t/data/equities/us_equities.parquet")
 DEFAULT_CACHE_ROOT = Path(os.getenv("ML4T_BENCHMARK_CACHE_DIR", "/tmp/ml4t-benchmark-cache"))
+CANONICAL_QUANTUM = Decimal("0.00000001")
+CANONICAL_MONEY_QUANTUM = Decimal("0.000001")
 
 
 def _log(*args, **kwargs):
@@ -732,6 +738,7 @@ class BenchmarkResult:
     final_value: float
     memory_mb: float
     error: str | None = None
+    fills_df: pd.DataFrame | None = None  # Canonical fill log for exact comparison
     trades_df: pd.DataFrame | None = None  # Trade log for validation
     equity_df: pd.DataFrame | None = None  # Equity curve for validation
     order_events_df: pd.DataFrame | None = None  # Raw order-event log for debugging
@@ -771,6 +778,246 @@ class BenchmarkResult:
             "trades_per_second": self.trades_per_second,
             "error": self.error,
         }
+
+
+def _timestamp_value(value: object) -> str | None:
+    if value is None or pd.isna(value):
+        return None
+    timestamp = pd.Timestamp(value)
+    if timestamp.tz is not None:
+        timestamp = timestamp.tz_convert("UTC").tz_localize(None)
+    return timestamp.isoformat()
+
+
+def _canonical_float(value: object, quantum: Decimal = CANONICAL_QUANTUM) -> float:
+    canonical = float(Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_EVEN))
+    return 0.0 if canonical == 0.0 else canonical
+
+
+def _side_value(value: object, quantity: float) -> str:
+    text = str(value).lower()
+    if text.endswith(".buy") or text in {"buy", "long", "bought"}:
+        return "buy"
+    if text.endswith(".sell") or text in {"sell", "short", "sold"}:
+        return "sell"
+    return "buy" if quantity >= 0 else "sell"
+
+
+def _row_value(row: pd.Series, names: tuple[str, ...], default: object = None) -> object:
+    for name in names:
+        if name in row.index and not pd.isna(row[name]):
+            return row[name]
+    return default
+
+
+def _frame_with_index(frame: pd.DataFrame) -> pd.DataFrame:
+    work = frame.copy()
+    if not isinstance(work.index, pd.RangeIndex):
+        index_name = work.index.name or "index"
+        if index_name not in work.columns:
+            work = work.reset_index()
+    return work
+
+
+def canonical_fill_records(frame: pd.DataFrame | None) -> list[dict[str, object]] | None:
+    """Normalize a framework fill log without applying numeric tolerances."""
+    if frame is None:
+        return None
+    work = _frame_with_index(frame)
+    records: list[dict[str, object]] = []
+    for _, row in work.iterrows():
+        signed_quantity = _canonical_float(
+            _row_value(row, ("quantity", "amount", "filled_qty", "last_qty", "size"), 0.0)
+        )
+        if signed_quantity == 0.0:
+            continue
+        records.append(
+            {
+                "timestamp": _timestamp_value(
+                    _row_value(row, ("timestamp", "dt", "date", "index", "filled_at"))
+                ),
+                "asset": str(
+                    _row_value(row, ("asset", "symbol", "instrument_id", "sid"), "unknown")
+                ),
+                "side": _side_value(_row_value(row, ("side", "order_side"), ""), signed_quantity),
+                "quantity": _canonical_float(abs(signed_quantity)),
+                "price": _canonical_float(_row_value(row, ("price", "fill_price", "avg_px"), 0.0)),
+                "commission": _canonical_float(
+                    _row_value(row, ("commission", "fee", "fees", "comm"), 0.0)
+                ),
+            }
+        )
+    return records
+
+
+def canonical_trade_records(frame: pd.DataFrame | None) -> list[dict[str, object]] | None:
+    """Normalize a framework round-trip trade log without applying numeric tolerances."""
+    if frame is None:
+        return None
+    work = _frame_with_index(frame)
+    records: list[dict[str, object]] = []
+    for _, row in work.iterrows():
+        quantity = _canonical_float(_row_value(row, ("quantity", "size"), 0.0))
+        if quantity == 0.0:
+            continue
+        side = str(_row_value(row, ("side", "direction"), "")).lower()
+        if side in {"buy", "long", "bought"} or side.endswith(".buy"):
+            side = "long"
+        elif side in {"sell", "short", "sold"} or side.endswith(".sell"):
+            side = "short"
+        records.append(
+            {
+                "entry_time": _timestamp_value(
+                    _row_value(row, ("entry_time", "entry_date", "timestamp", "index"))
+                ),
+                "exit_time": _timestamp_value(_row_value(row, ("exit_time", "exit_date"))),
+                "asset": str(_row_value(row, ("asset", "symbol", "instrument_id"), "unknown")),
+                "side": side,
+                "quantity": _canonical_float(abs(quantity)),
+                "entry_price": _canonical_float(_row_value(row, ("entry_price",), 0.0)),
+                "exit_price": _canonical_float(_row_value(row, ("exit_price",), 0.0)),
+                "pnl": _canonical_float(_row_value(row, ("pnl",), 0.0)),
+            }
+        )
+    return sorted(
+        records,
+        key=lambda record: (
+            record["entry_time"] or "",
+            record["exit_time"] or "",
+            record["asset"],
+            record["side"],
+        ),
+    )
+
+
+def canonical_target_records(frame: pd.DataFrame | None) -> list[dict[str, object]] | None:
+    """Normalize the canonical target-intent trace."""
+    if frame is None:
+        return None
+    work = _frame_with_index(frame)
+    records: list[dict[str, object]] = []
+    for _, row in work.iterrows():
+        records.append(
+            {
+                "timestamp": _timestamp_value(_row_value(row, ("timestamp", "index"))),
+                "asset": str(_row_value(row, ("asset", "symbol"), "unknown")),
+                "prev_target": _canonical_float(_row_value(row, ("prev_target",), 0.0)),
+                "target": _canonical_float(_row_value(row, ("target",), 0.0)),
+                "delta": _canonical_float(_row_value(row, ("delta",), 0.0)),
+                "action": str(_row_value(row, ("action",), "")),
+            }
+        )
+    return records
+
+
+def _records_hash(records: list[dict[str, object]] | None) -> str | None:
+    if records is None:
+        return None
+    payload = json.dumps(records, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _surface_check(
+    name: str,
+    expected: list[dict[str, object]] | None,
+    actual: list[dict[str, object]] | None,
+) -> dict[str, object]:
+    passed = expected is not None and actual is not None and expected == actual
+    first_difference = None
+    if expected is None or actual is None:
+        first_difference = {
+            "expected_available": expected is not None,
+            "actual_available": actual is not None,
+        }
+    elif expected != actual:
+        limit = min(len(expected), len(actual))
+        index = next((i for i in range(limit) if expected[i] != actual[i]), limit)
+        first_difference = {
+            "index": index,
+            "expected": expected[index] if index < len(expected) else None,
+            "actual": actual[index] if index < len(actual) else None,
+        }
+    return {
+        "name": name,
+        "passed": passed,
+        "expected_count": None if expected is None else len(expected),
+        "actual_count": None if actual is None else len(actual),
+        "expected_sha256": _records_hash(expected),
+        "actual_sha256": _records_hash(actual),
+        "first_difference": first_difference,
+    }
+
+
+def _scalar_check(name: str, expected: int | float, actual: int | float) -> dict[str, object]:
+    quantum = CANONICAL_QUANTUM if name == "trade_count" else CANONICAL_MONEY_QUANTUM
+    canonical_expected = _canonical_float(expected, quantum)
+    canonical_actual = _canonical_float(actual, quantum)
+    return {
+        "name": name,
+        "passed": canonical_expected == canonical_actual,
+        "expected": expected,
+        "actual": actual,
+        "canonical_expected": canonical_expected,
+        "canonical_actual": canonical_actual,
+        "canonical_difference": abs(canonical_expected - canonical_actual),
+        "raw_difference": abs(expected - actual),
+    }
+
+
+def compare_benchmark_results_exact(
+    expected: BenchmarkResult,
+    actual: BenchmarkResult,
+    *,
+    initial_cash: float,
+) -> dict[str, object]:
+    """Compare every release-covered benchmark surface using exact equality."""
+    checks = [
+        _surface_check(
+            "order_intents",
+            canonical_target_records(expected.target_trace_df),
+            canonical_target_records(actual.target_trace_df),
+        ),
+        _surface_check(
+            "fills",
+            canonical_fill_records(expected.fills_df),
+            canonical_fill_records(actual.fills_df),
+        ),
+        _surface_check(
+            "trades",
+            canonical_trade_records(expected.trades_df),
+            canonical_trade_records(actual.trades_df),
+        ),
+        _scalar_check("trade_count", expected.num_trades, actual.num_trades),
+        _scalar_check(
+            "total_pnl",
+            expected.final_value - initial_cash,
+            actual.final_value - initial_cash,
+        ),
+        _scalar_check("final_value", expected.final_value, actual.final_value),
+    ]
+    return {
+        "schema_version": 1,
+        "canonical_record_quantum": str(CANONICAL_QUANTUM),
+        "canonical_money_quantum": str(CANONICAL_MONEY_QUANTUM),
+        "scenario": expected.scenario,
+        "expected_framework": expected.framework,
+        "actual_framework": actual.framework,
+        "passed": expected.error is None
+        and actual.error is None
+        and all(bool(check["passed"]) for check in checks),
+        "expected_error": expected.error,
+        "actual_error": actual.error,
+        "checks": checks,
+    }
+
+
+def write_exact_comparison_artifact(artifact: dict[str, object], output_path: Path) -> None:
+    """Write a deterministic exact-comparison artifact."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(artifact, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 def save_trades(result: BenchmarkResult, output_dir: Path):
@@ -1161,9 +1408,9 @@ def benchmark_ml4t(
 
     # Extract validation surface. For LEAN parity we need fill-level chronology,
     # not round-trip trade summaries.
+    fills_df = results.to_fills_dataframe().to_pandas()
     trades_df = None
     if profile_name == "lean":
-        fills_df = results.to_fills_dataframe().to_pandas()
         if not fills_df.empty:
             trades_df = fills_df.rename(
                 columns={
@@ -1193,9 +1440,8 @@ def benchmark_ml4t(
             )
         trades_df = pd.DataFrame(trade_records)
 
-    trade_count = results["num_trades"]
-    if profile_name == "lean" and trades_df is not None:
-        trade_count = len(trades_df)
+    canonical_trades = canonical_trade_records(trades_df)
+    trade_count = len(canonical_trades) if canonical_trades is not None else results["num_trades"]
 
     return BenchmarkResult(
         framework=framework_name,
@@ -1204,6 +1450,7 @@ def benchmark_ml4t(
         num_trades=trade_count,
         final_value=results["final_value"],
         memory_mb=peak / 1024 / 1024,
+        fills_df=fills_df,
         trades_df=trades_df,
         target_trace_df=target_trace,
     )
@@ -1249,8 +1496,10 @@ def benchmark_vectorbt_pro(
 
     equity = shared_get_vectorbt_equity_curve(pf)
     final_value = float(equity.iloc[-1])
+    fills_df = shared_extract_vectorbt_order_log(pf)
     trades_df = shared_extract_vectorbt_trade_log(pf)
-    num_trades = len(trades_df)
+    canonical_trades = canonical_trade_records(trades_df)
+    num_trades = len(canonical_trades) if canonical_trades is not None else 0
 
     end_time = time.perf_counter()
     _, peak = tracemalloc.get_traced_memory()
@@ -1263,6 +1512,7 @@ def benchmark_vectorbt_pro(
         num_trades=num_trades,
         final_value=float(final_value),
         memory_mb=peak / 1024 / 1024,
+        fills_df=fills_df,
         trades_df=trades_df,
         target_trace_df=target_trace,
     )
@@ -1309,6 +1559,7 @@ def benchmark_vectorbt_oss(
 
     equity = shared_get_vectorbt_equity_curve(pf)
     final_value = float(equity.iloc[-1])
+    fills_df = shared_extract_vectorbt_order_log(pf)
     trades_df = shared_extract_vectorbt_trade_log(pf)
     num_trades = len(trades_df)
 
@@ -1323,6 +1574,7 @@ def benchmark_vectorbt_oss(
         num_trades=num_trades,
         final_value=float(final_value),
         memory_mb=peak / 1024 / 1024,
+        fills_df=fills_df,
         trades_df=trades_df,
         target_trace_df=target_trace,
     )
@@ -1391,6 +1643,11 @@ def benchmark_zipline(
             num_trades=run_result.num_trades,
             final_value=run_result.final_value,
             memory_mb=peak / 1024 / 1024,
+            fills_df=(
+                None
+                if run_result.transactions_df is None
+                else pd.DataFrame(canonical_fill_records(run_result.transactions_df) or [])
+            ),
             trades_df=run_result.trades_df,
             positions_df=run_result.positions_df,
             transactions_df=run_result.transactions_df,
@@ -1465,6 +1722,11 @@ def benchmark_backtrader(
         num_trades=run_result.num_trades,
         final_value=run_result.final_value,
         memory_mb=peak / 1024 / 1024,
+        fills_df=(
+            None
+            if run_result.transactions_df is None
+            else pd.DataFrame(canonical_fill_records(run_result.transactions_df) or [])
+        ),
         trades_df=run_result.trades_df,
         positions_df=run_result.positions_df,
         transactions_df=run_result.transactions_df,
@@ -1706,6 +1968,7 @@ def benchmark_nautilus(
             num_trades=int(len(fills_df)),
             final_value=final_value,
             memory_mb=peak / 1024 / 1024,
+            fills_df=fills_df,
             trades_df=trades_df,
             target_trace_df=target_trace,
         )
@@ -2119,6 +2382,7 @@ class Ml4tBenchmark(QCAlgorithm):
         num_trades=num_trades,
         final_value=final_value,
         memory_mb=0.0,
+        fills_df=trades_df,
         trades_df=trades_df,
         equity_df=equity_df,
         order_events_df=order_events_df,

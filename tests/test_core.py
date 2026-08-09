@@ -911,7 +911,7 @@ class TestRunBacktestWithConfig:
             def __init__(self):
                 self.seen_config = None
 
-            def on_prepare(self, broker, timestamps, config=None):
+            def on_prepare(self, broker, config=None):
                 self.seen_config = config
 
             def on_data(self, timestamp, data, context, broker):
@@ -962,7 +962,7 @@ class TestRunBacktestWithConfig:
             def __init__(self):
                 self.seen_config = None
 
-            def on_prepare(self, broker, timestamps, config=None):
+            def on_prepare(self, broker, config=None):
                 self.seen_config = config
 
             def on_data(self, timestamp, data, context, broker):

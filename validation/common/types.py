@@ -3,7 +3,92 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
+
+
+class ValidationStatus(StrEnum):
+    """Terminal status for one framework/scenario validation attempt."""
+
+    PASS = "pass"
+    COMPARISON_FAILURE = "comparison_failure"
+    UNSUPPORTED = "unsupported"
+    UNAVAILABLE = "unavailable"
+    ADAPTER_IMPORT_FAILURE = "adapter_import_failure"
+    ADAPTER_FAILURE = "adapter_failure"
+    ML4T_FAILURE = "ml4t_failure"
+    SUBPROCESS_FAILURE = "subprocess_failure"
+    TIMEOUT = "timeout"
+    SKIPPED = "skipped"
+    MALFORMED_OUTPUT = "malformed_output"
+    MISSING_SCENARIO = "missing_scenario"
+
+
+@dataclass(frozen=True)
+class ValidationRecord:
+    """Retained outcome for one framework/scenario validation attempt."""
+
+    framework: str
+    scenario_id: str
+    scenario_name: str
+    status: ValidationStatus
+    required: bool
+    detail: str | None = None
+
+    @property
+    def passed(self) -> bool:
+        """Whether the required validation work executed and matched."""
+        return self.status is ValidationStatus.PASS
+
+    @property
+    def release_blocking(self) -> bool:
+        """Whether this record must fail a release validation command."""
+        return self.status not in {ValidationStatus.PASS, ValidationStatus.UNSUPPORTED}
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable record."""
+        return {
+            "framework": self.framework,
+            "scenario_id": self.scenario_id,
+            "scenario_name": self.scenario_name,
+            "status": self.status.value,
+            "required": self.required,
+            "release_blocking": self.release_blocking,
+            "detail": self.detail,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ValidationRecord:
+        """Validate and construct a retained record payload."""
+        required_fields = {"framework", "scenario_id", "scenario_name", "status", "required"}
+        missing = sorted(required_fields - payload.keys())
+        if missing:
+            raise ValueError(f"Validation record missing fields: {', '.join(missing)}")
+
+        framework = payload["framework"]
+        scenario_id = payload["scenario_id"]
+        scenario_name = payload["scenario_name"]
+        required = payload["required"]
+        detail = payload.get("detail")
+        if not all(isinstance(value, str) for value in (framework, scenario_id, scenario_name)):
+            raise TypeError("Validation record identifiers must be strings")
+        if not isinstance(required, bool):
+            raise TypeError("Validation record required must be a boolean")
+        if detail is not None and not isinstance(detail, str):
+            raise TypeError("Validation record detail must be a string or null")
+
+        return cls(
+            framework=framework,
+            scenario_id=scenario_id,
+            scenario_name=scenario_name,
+            status=ValidationStatus(payload["status"]),
+            required=required,
+            detail=detail,
+        )
+
+
+class ValidationSkipped(RuntimeError):
+    """Raised by an adapter that elects not to execute a required scenario."""
 
 
 @dataclass
@@ -59,7 +144,7 @@ class ScenarioConfig:
 
 @dataclass
 class Tolerance:
-    """Comparison tolerances for a framework."""
+    """Diagnostic gap thresholds that never affect release pass/fail status."""
 
     trade_count: int = 0  # Absolute difference allowed
     value_pct: float = 0.01  # Percentage of final value

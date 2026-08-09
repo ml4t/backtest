@@ -37,7 +37,9 @@ def run(
     try:
         import vectorbt as vbt
     except ImportError:
-        raise ImportError("VectorBT OSS not installed. Run in .venv-vectorbt environment.")
+        raise ImportError(
+            "VectorBT OSS not installed. Run in .venv-vectorbt environment."
+        ) from None
 
     constants = scenario.constants
 
@@ -114,28 +116,37 @@ def run(
     # Extract results
     trades = pf.trades.records_readable
     final_value = float(pf.final_value())
-    total_pnl = float(pf.total_profit())
 
     trade_list = trades.to_dict("records") if len(trades) > 0 else []
+    order_list = pf.orders.records_readable.to_dict("records")
     # Normalize trade dict keys for comparison
     normalized_trades = []
-    for t in trade_list:
+    for index, t in enumerate(trade_list):
+        entry_order = order_list[index * 2] if index * 2 < len(order_list) else {}
+        exit_order = order_list[index * 2 + 1] if index * 2 + 1 < len(order_list) else {}
+        size = float(t.get("Size", scenario.shares))
+        direction = t.get("Direction", "Long")
+        entry_price = float(
+            entry_order.get("Price", t.get("Avg Entry Price", t.get("Entry Price", 0)))
+        )
+        exit_price = float(exit_order.get("Price", t.get("Avg Exit Price", t.get("Exit Price", 0))))
+        direction_sign = -1.0 if str(direction).lower() == "short" else 1.0
+        fees = abs(float(entry_order.get("Fees", t.get("Entry Fees", 0)))) + abs(
+            float(exit_order.get("Fees", t.get("Exit Fees", 0)))
+        )
         normalized = {
-            "entry_price": t.get("Avg Entry Price", t.get("Entry Price", 0)),
-            "exit_price": t.get("Avg Exit Price", t.get("Exit Price", 0)),
-            "pnl": t.get("PnL", 0),
-            "size": t.get("Size", scenario.shares),
-            "direction": t.get("Direction", "Long"),
+            "entry_price": entry_price,
+            "exit_price": exit_price,
+            "pnl": (exit_price - entry_price) * size * direction_sign - fees,
+            "size": size,
+            "direction": direction,
         }
         normalized_trades.append(normalized)
 
     extra = {}
     if "commission" in scenario.extra_checks:
         # VBT OSS tracks entry/exit fees separately
-        fees = sum(
-            abs(t.get("Entry Fees", 0)) + abs(t.get("Exit Fees", 0))
-            for t in trade_list
-        )
+        fees = sum(abs(order.get("Fees", 0)) for order in order_list)
         extra["total_commission"] = fees
     if "exit_price" in scenario.extra_checks and normalized_trades:
         extra["exit_price"] = normalized_trades[0].get("exit_price")
@@ -143,7 +154,7 @@ def run(
     return FrameworkResult(
         framework="VectorBT OSS",
         final_value=final_value,
-        total_pnl=total_pnl,
+        total_pnl=final_value - scenario.initial_cash,
         num_trades=len(trades),
         trades=normalized_trades,
         extra=extra,

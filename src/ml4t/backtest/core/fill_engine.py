@@ -17,9 +17,15 @@ class FillEngine:
 
     def get_available_cash(self) -> float:
         broker = self.broker
-        spendable = broker.account.policy.get_spendable_cash(
-            broker.account.cash, broker.account.positions
-        )
+        if (
+            broker.short_cash_policy.value == "lock_notional"
+            and not broker.account.policy.allow_leverage
+        ):
+            spendable = broker.account._lock_notional_free_cash
+        else:
+            spendable = broker.account.policy.get_spendable_cash(
+                broker.account.cash, broker.account.positions
+            )
         if broker.cash_buffer_pct > 0:
             return spendable * (1.0 - broker.cash_buffer_pct)
         return spendable
@@ -67,7 +73,13 @@ class FillEngine:
                 low = mid
             else:
                 high = mid
-        return max(0.0, low - CASH_TOLERANCE / fill_price)
+        cash_tolerance = CASH_TOLERANCE
+        if (
+            self.broker.short_cash_policy.value == "lock_notional"
+            and not self.broker.account.policy.allow_leverage
+        ):
+            cash_tolerance = 0.0
+        return max(0.0, low - cash_tolerance / fill_price)
 
     def try_partial_fill(self, order, fill_price: float) -> bool:
         max_shares = self.get_max_affordable_quantity(order, fill_price)
@@ -83,6 +95,13 @@ class FillEngine:
 
     def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
         broker = self.broker
+        if order.child_intent_id is not None and use_open:
+            return broker.get_price_for_source(
+                ExecutionPrice.OPEN,
+                order.asset,
+                side=order.side,
+                use_open=True,
+            )
         if order.order_type is OrderType.MOC:
             return broker.get_price_for_source(
                 ExecutionPrice.CLOSE,

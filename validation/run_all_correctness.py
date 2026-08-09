@@ -1,358 +1,303 @@
 #!/usr/bin/env python3
-"""Unified Correctness Validation Runner.
+"""Run the required correctness matrix in isolated framework environments.
 
-Runs all validation scenarios across all frameworks and generates a summary report.
-
-Usage:
-    # Run all frameworks
-    python validation/run_all_correctness.py
-
-    # Run specific framework
-    python validation/run_all_correctness.py --framework vectorbt_pro
-
-    # Run specific scenarios
-    python validation/run_all_correctness.py --scenarios 01,02,03,04
-
-Output:
-    - Console summary
-    - validation/CORRECTNESS_RESULTS.md
+Every requested framework/scenario pair produces a retained terminal record. The command fails
+unless every required pair executes and passes. Explicitly unsupported pairs remain visible but
+do not satisfy a required count.
 """
+
+from __future__ import annotations
 
 import argparse
 import json
 import os
 import subprocess
 import sys
-from datetime import datetime
+import tempfile
+from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
-# Directory structure
 VALIDATION_DIR = Path(__file__).parent
 PROJECT_ROOT = VALIDATION_DIR.parent
+sys.path.insert(0, str(VALIDATION_DIR))
 
-# Framework configurations
-FRAMEWORKS = {
+from common.types import ValidationRecord, ValidationStatus  # noqa: E402
+from scenarios.definitions import SCENARIOS  # noqa: E402
+
+FRAMEWORK_ENVIRONMENTS = {
+    "vectorbt_pro": ".venv-vectorbt-pro",
+    "vectorbt_oss": ".venv",
+    "backtrader": ".venv-backtrader",
+    "zipline": ".venv-zipline",
+}
+
+FRAMEWORK_PYTHON_ENV_VARS = {
+    "vectorbt_pro": "ML4T_VECTORBT_PRO_PYTHON",
+    "vectorbt_oss": "ML4T_VECTORBT_OSS_PYTHON",
+    "backtrader": "ML4T_BACKTRADER_PYTHON",
+    "zipline": "ML4T_ZIPLINE_PYTHON",
+}
+
+FRAMEWORK_PINS = {
     "vectorbt_pro": {
-        "venv": ".venv-vectorbt-pro",
-        "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "VectorBT Pro",
-        "ml4t_profile": "vectorbt",
+        "profile": "vectorbt_strict",
+        "package": "vectorbtpro",
+        "version": "2025.12.31",
+        "source": "https://github.com/polakowo/vectorbt.pro",
+        "commit": "1305a1e1974325db9382eaeacc6452e9b075ca71",
     },
     "vectorbt_oss": {
-        "venv": ".venv",  # Can also use .venv-validation
-        "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "VectorBT OSS",
-        "ml4t_profile": "vectorbt",
+        "profile": "vectorbt",
+        "package": "vectorbt",
+        "version": "0.28.2",
+        "source": "https://pypi.org/project/vectorbt/0.28.2/",
     },
     "backtrader": {
-        "venv": ".venv-backtrader",
-        "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
         "display_name": "Backtrader",
-        "ml4t_profile": "backtrader",
+        "profile": "backtrader_strict",
+        "package": "backtrader",
+        "version": "1.9.78.123",
+        "source": "https://pypi.org/project/backtrader/1.9.78.123/",
     },
     "zipline": {
-        "venv": ".venv-zipline",
-        "scenarios": ["01", "02", "03", "04", "05", "06", "07", "08", "09"],  # No scenario 10
-        "display_name": "Zipline",
-        "ml4t_profile": "zipline",
-    },
-    "lean": {
-        "venv": None,  # Uses Docker
-        "scenarios": ["01"],  # Start with basic scenarios
-        "display_name": "LEAN CLI",
-        "ml4t_profile": "default",
+        "display_name": "Zipline Reloaded",
+        "profile": "zipline_strict",
+        "package": "zipline-reloaded",
+        "version": "3.1.1",
+        "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
     },
 }
 
-# Scenario names
-SCENARIO_NAMES = {
-    "01": "Long Only",
-    "02": "Long/Short",
-    "03": "Stop Loss",
-    "04": "Take Profit",
-    "05": "Commission (Pct)",
-    "06": "Commission (Per-Share)",
-    "07": "Slippage (Fixed)",
-    "08": "Slippage (Pct)",
-    "09": "Trailing Stop",
-    "10": "Bracket Order",
-}
+
+def _record(
+    framework: str,
+    scenario_id: str,
+    status: ValidationStatus,
+    *,
+    required: bool = True,
+    detail: str | None = None,
+) -> ValidationRecord:
+    scenario = SCENARIOS.get(scenario_id)
+    return ValidationRecord(
+        framework=framework,
+        scenario_id=scenario_id,
+        scenario_name=scenario.name if scenario else f"Scenario {scenario_id}",
+        status=status,
+        required=required,
+        detail=detail,
+    )
 
 
-def _extract_error_summary(output: str, returncode: int) -> str | None:
-    """Extract a concise failure summary from script output."""
-    if returncode == 0:
-        return None
-
-    lines = [line.strip() for line in output.splitlines() if line.strip()]
-    if not lines:
-        return f"Process exited with code {returncode}"
-
-    # Prefer explicit Python exception lines if present.
-    for line in reversed(lines):
-        if line.startswith(("AssertionError", "ValueError", "TypeError", "RuntimeError")):
-            return line
-        if "Error" in line or "Exception" in line or line.startswith("Traceback"):
-            return line
-
-    # Fall back to last emitted line.
-    return lines[-1][:200]
+def resolve_python(framework: str) -> Path:
+    """Resolve the isolated interpreter for a framework."""
+    override = os.getenv(FRAMEWORK_PYTHON_ENV_VARS[framework])
+    if override:
+        override_path = Path(override).expanduser()
+        if not override_path.is_absolute():
+            override_path = PROJECT_ROOT / override_path
+        return override_path.absolute()
+    return PROJECT_ROOT / FRAMEWORK_ENVIRONMENTS[framework] / "bin" / "python"
 
 
-def run_scenario(framework: str, scenario: str) -> dict:
-    """Run a single validation scenario.
+def _process_detail(result: subprocess.CompletedProcess[str]) -> str:
+    output = (result.stderr or result.stdout).strip()
+    if output:
+        return f"Subprocess exited with code {result.returncode}: {output[-500:]}"
+    return f"Subprocess exited with code {result.returncode} without a validation record"
 
-    Returns dict with keys: passed, error, output
-    """
-    config = FRAMEWORKS[framework]
-    scenario_file = VALIDATION_DIR / framework / f"scenario_{scenario}_*.py"
 
-    # Find the actual file
-    matches = list(VALIDATION_DIR.glob(f"{framework}/scenario_{scenario}_*.py"))
-    if not matches:
-        return {"passed": None, "error": f"Scenario file not found: {scenario_file}", "output": ""}
-
-    script_path = matches[0]
-
-    if framework == "lean":
-        # LEAN uses lean backtest command
-        return run_lean_scenario(scenario)
-
-    # Build command with venv activation
-    venv_path = PROJECT_ROOT / config["venv"]
-    python_path = venv_path / "bin" / "python"
-
-    if not python_path.exists():
-        return {"passed": None, "error": f"venv not found: {venv_path}", "output": ""}
-
-    try:
-        env = {
-            **os.environ,
-            "ML4T_PROFILE": config.get("ml4t_profile", "default"),
-        }
-        if framework == "zipline":
-            env["ZIPLINE_ROOT"] = str(VALIDATION_DIR / ".zipline")
-
-        result = subprocess.run(
-            [str(python_path), str(script_path)],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            cwd=str(PROJECT_ROOT),
-            env=env,
+def run_isolated(
+    framework: str,
+    scenario_id: str,
+    *,
+    python_path: Path | None = None,
+    timeout: int = 180,
+) -> ValidationRecord:
+    """Run one pair in its framework environment and retain its exact terminal status."""
+    scenario = SCENARIOS.get(scenario_id)
+    if scenario is None:
+        return _record(
+            framework,
+            scenario_id,
+            ValidationStatus.MISSING_SCENARIO,
+            detail=f"Scenario {scenario_id} is not defined",
+        )
+    if framework not in scenario.supported_frameworks:
+        return _record(
+            framework,
+            scenario_id,
+            ValidationStatus.UNSUPPORTED,
+            required=False,
+            detail="Scenario explicitly excludes this framework",
         )
 
-        output = result.stdout + result.stderr
-
-        # Use process status as source of truth for determinism.
-        passed = result.returncode == 0
-        error = _extract_error_summary(output, result.returncode)
-        return {"passed": passed, "error": error, "output": output}
-
-    except subprocess.TimeoutExpired:
-        return {"passed": False, "error": "Timeout (120s)", "output": ""}
-    except Exception as e:
-        return {"passed": False, "error": str(e), "output": ""}
-
-
-def run_lean_scenario(scenario: str) -> dict:
-    """Run a LEAN validation scenario using Docker."""
-    lean_dir = VALIDATION_DIR / "lean" / "workspace"
-    scenario_dir = lean_dir / f"scenario_{scenario}_long_only"  # Adjust as needed
-
-    if not scenario_dir.exists():
-        return {"passed": None, "error": f"LEAN scenario not found: {scenario_dir}", "output": ""}
-
-    try:
-        # Activate venv for lean CLI
-        venv_python = PROJECT_ROOT / ".venv" / "bin" / "python"
-
-        result = subprocess.run(
-            ["lean", "backtest", str(scenario_dir)],
-            capture_output=True,
-            text=True,
-            timeout=300,  # LEAN can be slow
-            cwd=str(lean_dir),
-            env={"PATH": f"{PROJECT_ROOT}/.venv/bin:{subprocess.os.environ.get('PATH', '')}"},
+    interpreter = python_path or resolve_python(framework)
+    if not interpreter.is_file():
+        return _record(
+            framework,
+            scenario_id,
+            ValidationStatus.UNAVAILABLE,
+            detail=f"Framework interpreter not found: {interpreter}",
         )
 
-        output = result.stdout + result.stderr
-        passed = result.returncode == 0
+    with tempfile.TemporaryDirectory(prefix="ml4t-validation-") as temporary_directory:
+        result_path = Path(temporary_directory) / "result.json"
+        command = [
+            str(interpreter),
+            str(VALIDATION_DIR / "run_scenario.py"),
+            "--scenario",
+            scenario_id,
+            "--framework",
+            framework,
+            "--result-json",
+            str(result_path),
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=PROJECT_ROOT,
+                env=os.environ.copy(),
+            )
+        except subprocess.TimeoutExpired:
+            return _record(
+                framework,
+                scenario_id,
+                ValidationStatus.TIMEOUT,
+                detail=f"Validation subprocess timed out after {timeout} seconds",
+            )
+        except OSError as error:
+            return _record(
+                framework,
+                scenario_id,
+                ValidationStatus.SUBPROCESS_FAILURE,
+                detail=f"Could not execute validation subprocess: {error}",
+            )
 
-        return {"passed": passed, "error": None, "output": output}
+        if not result_path.is_file():
+            return _record(
+                framework,
+                scenario_id,
+                ValidationStatus.SUBPROCESS_FAILURE,
+                detail=_process_detail(result),
+            )
 
-    except subprocess.TimeoutExpired:
-        return {"passed": False, "error": "Timeout (300s)", "output": ""}
-    except Exception as e:
-        return {"passed": False, "error": str(e), "output": ""}
+        try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise TypeError("single-scenario output must be a JSON object")
+            record = ValidationRecord.from_dict(payload)
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            return _record(
+                framework,
+                scenario_id,
+                ValidationStatus.MALFORMED_OUTPUT,
+                detail=f"Invalid validation record: {error}",
+            )
 
-
-def run_all_validations(frameworks: list = None, scenarios: list = None) -> dict:
-    """Run all validations and return results."""
-    if frameworks is None:
-        frameworks = list(FRAMEWORKS.keys())
-
-    results = {}
-
-    for framework in frameworks:
-        config = FRAMEWORKS.get(framework)
-        if not config:
-            print(f"Unknown framework: {framework}")
-            continue
-
-        print(f"\n{'='*60}")
-        print(f"Framework: {config['display_name']}")
-        print(f"{'='*60}")
-
-        framework_results = {}
-        available_scenarios = scenarios if scenarios else config["scenarios"]
-
-        for scenario in available_scenarios:
-            if scenario not in config["scenarios"]:
-                print(f"  Scenario {scenario}: SKIPPED (not available)")
-                continue
-
-            scenario_name = SCENARIO_NAMES.get(scenario, f"Scenario {scenario}")
-            print(f"  Running {scenario}: {scenario_name}...", end=" ", flush=True)
-
-            result = run_scenario(framework, scenario)
-            framework_results[scenario] = result
-
-            if result["passed"] is True:
-                print("PASS")
-            elif result["passed"] is False:
-                print(f"FAIL - {result.get('error', 'Unknown error')}")
-            else:
-                print(f"SKIP - {result.get('error', 'Not found')}")
-
-        results[framework] = framework_results
-
-    return results
-
-
-def generate_report(results: dict) -> str:
-    """Generate markdown report from results."""
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    lines = [
-        "# Correctness Validation Results",
-        "",
-        f"**Generated**: {now}",
-        "",
-        "## Summary",
-        "",
-        "| Framework | Scenario | Status |",
-        "|-----------|----------|--------|",
-    ]
-
-    pass_count = 0
-    fail_count = 0
-    skip_count = 0
-
-    for framework, scenarios in results.items():
-        display_name = FRAMEWORKS[framework]["display_name"]
-        for scenario, result in scenarios.items():
-            scenario_name = SCENARIO_NAMES.get(scenario, f"Scenario {scenario}")
-
-            if result["passed"] is True:
-                status = "✅ PASS"
-                pass_count += 1
-            elif result["passed"] is False:
-                status = "❌ FAIL"
-                fail_count += 1
-            else:
-                status = "⏭️ SKIP"
-                skip_count += 1
-
-            lines.append(f"| {display_name} | {scenario}: {scenario_name} | {status} |")
-
-    lines.extend([
-        "",
-        "## Statistics",
-        "",
-        f"- **Passed**: {pass_count}",
-        f"- **Failed**: {fail_count}",
-        f"- **Skipped**: {skip_count}",
-        f"- **Total**: {pass_count + fail_count + skip_count}",
-        "",
-    ])
-
-    # Add failure details
-    failures = []
-    for framework, scenarios in results.items():
-        for scenario, result in scenarios.items():
-            if result["passed"] is False:
-                failures.append((framework, scenario, result))
-
-    if failures:
-        lines.extend([
-            "## Failures",
-            "",
-        ])
-        for framework, scenario, result in failures:
-            display_name = FRAMEWORKS[framework]["display_name"]
-            scenario_name = SCENARIO_NAMES.get(scenario, f"Scenario {scenario}")
-            lines.extend([
-                f"### {display_name} - {scenario}: {scenario_name}",
-                "",
-                f"**Error**: {result.get('error', 'Unknown')}",
-                "",
-                "```",
-                result.get("output", "No output")[:500],
-                "```",
-                "",
-            ])
-
-    return "\n".join(lines)
+        if record.framework != framework or record.scenario_id != scenario_id:
+            return _record(
+                framework,
+                scenario_id,
+                ValidationStatus.MALFORMED_OUTPUT,
+                detail=(
+                    "Validation record identity mismatch: "
+                    f"received {record.framework}/{record.scenario_id}"
+                ),
+            )
+        expected_returncode = 1 if record.release_blocking else 0
+        if result.returncode != expected_returncode:
+            return _record(
+                framework,
+                scenario_id,
+                ValidationStatus.MALFORMED_OUTPUT,
+                detail=(
+                    f"Record status {record.status.value} conflicts with subprocess "
+                    f"exit code {result.returncode}"
+                ),
+            )
+        return record
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Run correctness validations")
+def run_all_validations(
+    frameworks: list[str] | None = None,
+    scenarios: list[str] | None = None,
+    *,
+    timeout: int = 180,
+) -> list[ValidationRecord]:
+    """Run every selected pair and return records in deterministic matrix order."""
+    selected_frameworks = frameworks or list(FRAMEWORK_ENVIRONMENTS)
+    selected_scenarios = scenarios or list(SCENARIOS)
+    records: list[ValidationRecord] = []
+    for framework in selected_frameworks:
+        for scenario_id in selected_scenarios:
+            print(f"Running {framework}/{scenario_id}...", end=" ", flush=True)
+            record = run_isolated(framework, scenario_id, timeout=timeout)
+            print(record.status.value.upper())
+            records.append(record)
+    return records
+
+
+def summarize(records: list[ValidationRecord]) -> dict[str, int]:
+    """Count every status without folding unavailable or skipped work into passes."""
+    counts = Counter(record.status.value for record in records)
+    return {status.value: counts[status.value] for status in ValidationStatus}
+
+
+def release_gate_passed(records: list[ValidationRecord]) -> bool:
+    """Return whether every required validation record passed."""
+    required_records = [record for record in records if record.required]
+    return bool(required_records) and all(record.passed for record in required_records)
+
+
+def write_report(path: Path, records: list[ValidationRecord]) -> None:
+    """Retain the complete machine-readable release-gate result."""
+    payload = {
+        "schema_version": 1,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "frameworks": FRAMEWORK_PINS,
+        "release_gate_passed": release_gate_passed(records),
+        "summary": summarize(records),
+        "records": [record.to_dict() for record in records],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run isolated correctness validations")
     parser.add_argument(
         "--framework",
-        type=str,
-        help="Specific framework to test (vectorbt_pro, vectorbt_oss, backtrader, zipline, lean)",
+        choices=tuple(FRAMEWORK_ENVIRONMENTS),
+        help="Run only one required framework",
     )
     parser.add_argument(
         "--scenarios",
-        type=str,
-        help="Comma-separated list of scenarios to run (e.g., 01,02,03,04)",
+        help="Comma-separated scenario IDs; unknown IDs are retained as failures",
     )
     parser.add_argument(
         "--output",
-        type=str,
-        default="validation/CORRECTNESS_RESULTS.md",
-        help="Output file path",
+        type=Path,
+        default=VALIDATION_DIR / "CORRECTNESS_RESULTS.json",
+        help="Machine-readable result path",
     )
-
+    parser.add_argument("--timeout", type=int, default=180, help="Per-scenario timeout in seconds")
     args = parser.parse_args()
 
     frameworks = [args.framework] if args.framework else None
     scenarios = args.scenarios.split(",") if args.scenarios else None
+    records = run_all_validations(frameworks, scenarios, timeout=args.timeout)
+    write_report(args.output, records)
 
-    print("=" * 60)
-    print("Correctness Validation Runner")
-    print("=" * 60)
-
-    results = run_all_validations(frameworks=frameworks, scenarios=scenarios)
-
-    # Generate and save report
-    report = generate_report(results)
-    output_path = PROJECT_ROOT / args.output
-    output_path.write_text(report)
-
-    print(f"\n{'='*60}")
-    print(f"Report saved to: {output_path}")
-    print("=" * 60)
-
-    # Return exit code based on results
-    has_failures = any(
-        r["passed"] is False
-        for scenarios in results.values()
-        for r in scenarios.values()
-    )
-
-    return 1 if has_failures else 0
+    nonzero = [f"{status}={count}" for status, count in summarize(records).items() if count]
+    print(f"Results: {', '.join(nonzero)}")
+    print(f"Report: {args.output}")
+    return 0 if release_gate_passed(records) else 1
 
 
 if __name__ == "__main__":

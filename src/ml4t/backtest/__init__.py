@@ -20,7 +20,22 @@ from .engine import Engine, run_backtest
 
 # Execution: rebalancing
 from .execution.rebalancer import RebalanceConfig, TargetWeightExecutor
-from .execution.schedule import RebalanceCadence, RebalanceSchedule, resolve_rebalance_timestamps
+from .execution.schedule import (
+    RebalanceCadence,
+    RebalanceSchedule,
+    is_rebalance_timestamp,
+    resolve_rebalance_timestamps,
+)
+from .lifecycle import LifecycleDispatcher, LifecycleInvocation, callback_trace
+from .preopen import (
+    AmbiguousBarPathError,
+    IntentOutcome,
+    IntentReconciliation,
+    LateAuctionIntentError,
+    PreOpenIntentError,
+    UnsupportedPreOpenPolicyError,
+    default_execution_policy,
+)
 from .result import (
     ArtifactDiagnostic,
     ArtifactError,
@@ -92,7 +107,18 @@ __all__ = [
     "TargetWeightExecutor",
     "RebalanceCadence",
     "RebalanceSchedule",
+    "is_rebalance_timestamp",
     "resolve_rebalance_timestamps",
+    "LifecycleDispatcher",
+    "LifecycleInvocation",
+    "callback_trace",
+    "AmbiguousBarPathError",
+    "IntentOutcome",
+    "IntentReconciliation",
+    "LateAuctionIntentError",
+    "PreOpenIntentError",
+    "UnsupportedPreOpenPolicyError",
+    "default_execution_policy",
     # Risk rules
     "StopLoss",
     "TakeProfit",

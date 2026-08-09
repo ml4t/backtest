@@ -645,6 +645,11 @@ class BacktestResult:
         return {
             "version": 1,
             "library_version": __version__,
+            "lifecycle_version": self.metrics.get("lifecycle_version"),
+            "execution_policy": self.metrics.get("execution_policy"),
+            "target_intents": self.metrics.get("target_intents", []),
+            "child_order_intents": self.metrics.get("child_order_intents", []),
+            "intent_reconciliations": self.metrics.get("intent_reconciliations", []),
             "config": config_dict,
             "window": {
                 "start": start,

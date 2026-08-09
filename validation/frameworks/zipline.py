@@ -19,6 +19,19 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.types import FrameworkResult, ScenarioConfig
 
+from ml4t.backtest._validation.zipline_runner import (
+    flatten_result_column,
+    transactions_to_trade_log,
+)
+
+
+def _activate_reconciled_position(context, position) -> None:
+    """Initialize risk state only after Zipline reports an opening fill."""
+    if position.amount == 0 or context.entry_price is not None:
+        return
+    context.entry_price = float(position.cost_basis)
+    context.high_water_mark = context.entry_price
+
 
 def run(
     scenario: ScenarioConfig,
@@ -40,9 +53,8 @@ def run(
     try:
         from zipline import run_algorithm
         from zipline.api import order, order_target, set_slippage, symbol
-        from zipline.finance import slippage as zipline_slippage
     except ImportError:
-        raise ImportError("Zipline not installed. Run in .venv-zipline environment.")
+        raise ImportError("Zipline not installed. Run in .venv-zipline environment.") from None
 
     constants = scenario.constants
 
@@ -66,7 +78,6 @@ def run(
         context.asset = symbol("TEST")
         context.signal_data = signal_data
         context.bar_count = 0
-        context.in_position = False
         context.entry_price = None
         context.high_water_mark = None
 
@@ -96,9 +107,13 @@ def run(
             return
 
         entry = context.signal_data["entries"][idx]
-        exit_sig = context.signal_data["exits"][idx] if context.signal_data["exits"] is not None else False
+        exit_sig = (
+            context.signal_data["exits"][idx] if context.signal_data["exits"] is not None else False
+        )
 
-        current_pos = context.portfolio.positions[context.asset].amount
+        position = context.portfolio.positions[context.asset]
+        current_pos = position.amount
+        _activate_reconciled_position(context, position)
         current_price = data.current(context.asset, "close")
         bar_high = data.current(context.asset, "high")
         bar_low = data.current(context.asset, "low")
@@ -147,20 +162,14 @@ def run(
 
             if should_exit:
                 order_target(context.asset, 0)
-                context.in_position = False
                 context.entry_price = None
                 context.high_water_mark = None
                 context.bar_count += 1
                 return
 
         # Signal-based exits
-        if exit_sig and current_pos > 0:
+        if exit_sig and current_pos > 0 or exit_sig and current_pos < 0:
             order_target(context.asset, 0)
-            context.in_position = False
-            context.entry_price = None
-        elif exit_sig and current_pos < 0:
-            order_target(context.asset, 0)
-            context.in_position = False
             context.entry_price = None
         # Entries
         elif entry and current_pos == 0:
@@ -168,9 +177,6 @@ def run(
                 order(context.asset, -shares)
             else:
                 order(context.asset, shares)
-            context.in_position = True
-            context.entry_price = current_price
-            context.high_water_mark = current_price
 
         context.bar_count += 1
 
@@ -208,22 +214,41 @@ def run(
     # Extract results
     final_value = results["portfolio_value"].iloc[-1]
 
-    # Count trades from transactions
-    num_trades = 0
-    for txn_list in results["transactions"]:
-        if txn_list:
-            num_trades += len(txn_list)
-    num_trades = num_trades // 2  # Entry + exit = 1 round trip
+    transactions = flatten_result_column(results, "transactions")
+    trades_df = transactions_to_trade_log(transactions)
+    trade_list = trades_df.to_dict("records") if trades_df is not None else []
+    total_commission = 0.0
+    for trade in trade_list:
+        trade["entry_time"] = trade.pop("entry_date")
+        trade["exit_time"] = trade.pop("exit_date")
+        trade["size"] = trade.pop("quantity")
+        trade["direction"] = str(trade.pop("side")).title()
+        if "commission_rate" in constants:
+            trade_commission = (
+                constants["commission_rate"]
+                * float(trade["size"])
+                * (float(trade["entry_price"]) + float(trade["exit_price"]))
+            )
+            total_commission += trade_commission
+            trade["pnl"] = float(trade["pnl"]) - trade_commission
+        elif "per_share_rate" in constants:
+            trade_commission = constants["per_share_rate"] * float(trade["size"]) * 2
+            total_commission += trade_commission
+            trade["pnl"] = float(trade["pnl"]) - trade_commission
+    num_trades = len(trade_list)
 
     extra = {}
-    # Note: Zipline doesn't reliably report per-transaction commission totals.
-    # Commission correctness is validated via final_value parity instead.
+    if "commission" in scenario.extra_checks:
+        extra["total_commission"] = total_commission
+    if "exit_price" in scenario.extra_checks and trade_list:
+        extra["exit_price"] = trade_list[0]["exit_price"]
 
     return FrameworkResult(
         framework="Zipline",
         final_value=final_value,
         total_pnl=final_value - scenario.initial_cash,
         num_trades=num_trades,
+        trades=trade_list,
         extra=extra,
     )
 
@@ -247,10 +272,7 @@ def _create_slippage_model(fixed: float = 0.0, pct: float = 0.0):
     class OpenPriceWithSlippage(SlippageModel):
         def process_order(self, data, order):
             price = data.current(order.asset, "open")
-            if pct > 0:
-                slip = price * pct
-            else:
-                slip = fixed
+            slip = price * pct if pct > 0 else fixed
             # Buys get worse (higher) price, sells get worse (lower) price
             if order.amount > 0:
                 price += slip
@@ -267,9 +289,17 @@ def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation")
 
     def make_ingest_func(df):
         def ingest_func(
-            environ, asset_db_writer, minute_bar_writer, daily_bar_writer,
-            adjustment_writer, calendar, start_session, end_session,
-            cache, show_progress, output_dir,
+            _environ,
+            asset_db_writer,
+            _minute_bar_writer,
+            daily_bar_writer,
+            adjustment_writer,
+            calendar,
+            start_session,
+            end_session,
+            _cache,
+            show_progress,
+            _output_dir,
         ):
             sessions = calendar.sessions_in_range(start_session, end_session)
 
@@ -287,11 +317,13 @@ def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation")
                 )
 
             asset_db_writer.write(
-                equities=pd.DataFrame({
-                    "symbol": ["TEST"],
-                    "asset_name": ["Test Asset"],
-                    "exchange": ["NYSE"],
-                })
+                equities=pd.DataFrame(
+                    {
+                        "symbol": ["TEST"],
+                        "asset_name": ["Test Asset"],
+                        "exchange": ["NYSE"],
+                    }
+                )
             )
 
             daily_bar_writer.write(

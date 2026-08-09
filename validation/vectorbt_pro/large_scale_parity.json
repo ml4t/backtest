@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-08",
+  "workload": {
+    "name": "Multi-asset (250x20yr daily)",
+    "assets": 250,
+    "sessions": 5040,
+    "date_start": "1998-03-18",
+    "date_end": "2018-03-27",
+    "order_intents": 1260000,
+    "dataset_artifact": "/tmp/ml4t-benchmark-cache/real_data/9675feaaef0ab5a6304bf143c74df8df.pkl",
+    "dataset_sha256": "51f4147c0c11282552d773c7aaae076b3772046e5e662e6039b8c09bac623690"
+  },
+  "reference": {
+    "framework": "VectorBT Pro",
+    "version": "2025.12.31",
+    "git_commit": "1305a1e1974325db9382eaeacc6452e9b075ca71"
+  },
+  "configuration": {
+    "ml4t_profile": "vectorbt_strict",
+    "execution": "same_bar_close",
+    "size_type": "targetamount",
+    "cash_sharing": true,
+    "initial_cash": 1000000.0,
+    "long_target_shares": 100.0,
+    "short_target_shares": -100.0,
+    "top_n": 25,
+    "bottom_n": 25,
+    "rebalance_frequency_sessions": 1,
+    "commissions": 0.0,
+    "slippage": 0.0,
+    "share_type": "fractional",
+    "short_cash_policy": "lock_notional"
+  },
+  "root_cause": {
+    "before_fix_first_material_divergence": {
+      "timestamp": "2013-05-24T00:00:00",
+      "asset": "WTS",
+      "reference_quantity": 199.359795,
+      "ml4t_quantity": 200.0
+    },
+    "finding": "Reversal validation used raw cash and omitted collateral reserved for unrelated short positions.",
+    "correction": "Track lock-notional free cash incrementally and validate reversals against released and remaining collateral."
+  },
+  "exact_comparison": {
+    "canonical_record_quantum": "0.00000001",
+    "canonical_money_quantum": "0.000001",
+    "order_intents": {
+      "count": 1260000,
+      "sha256": "d7a53ef99ab797646825822e3b2529dd2a74f64910dccda356f8b992e1cd3eb1"
+    },
+    "fills": {
+      "count": 426849,
+      "sha256": "1e23ea9ca96b761cbbe2e09ff00f631ce6326e375a5bad8baf77dae7de9505cc"
+    },
+    "trades": {
+      "count": 225844,
+      "sha256": "84c7f85c523d79fea92d25d2aa0401bd026272dd56ab53421520f327a4956cf4"
+    },
+    "terminal_value": {
+      "reference_raw": 685179.0073298088,
+      "ml4t_raw": 685179.0073298512,
+      "reference_canonical": 685179.00733,
+      "ml4t_canonical": 685179.00733
+    },
+    "first_divergence": null,
+    "passed": true
+  },
+  "scenario_regression_gate": {
+    "framework": "VectorBT Pro",
+    "passed": 16,
+    "failed": 0,
+    "release_gate_passed": true
+  }
+}

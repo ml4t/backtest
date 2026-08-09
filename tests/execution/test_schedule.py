@@ -5,11 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import polars as pl
+import pytest
 from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.execution import (
     RebalanceCadence,
     RebalanceSchedule,
+    is_rebalance_timestamp,
     resolve_rebalance_timestamps,
 )
 
@@ -160,3 +162,76 @@ class TestResolveRebalanceTimestamps:
         )
 
         assert result.to_list() == [datetime(2024, 1, 5), datetime(2024, 1, 12)]
+
+
+class TestCausalScheduleEvaluation:
+    def test_schedule_can_carry_calendar_without_runtime_configuration(self) -> None:
+        schedule = RebalanceSchedule.weekly(calendar="NYSE")
+
+        assert is_rebalance_timestamp(
+            datetime(2024, 3, 28),
+            schedule,
+            session_index=4,
+        )
+        assert not is_rebalance_timestamp(
+            datetime(2024, 3, 29),
+            schedule,
+            session_index=5,
+        )
+
+    def test_schedule_rejects_blank_calendar(self) -> None:
+        with pytest.raises(ValueError, match="calendar"):
+            RebalanceSchedule.weekly(calendar=" ")
+
+    def test_bar_session_explicit_and_fixed_cadences_use_current_state(self) -> None:
+        timestamp = datetime(2024, 1, 5)
+
+        assert is_rebalance_timestamp(timestamp, RebalanceSchedule.every_bar(), session_index=1)
+        assert is_rebalance_timestamp(timestamp, RebalanceSchedule.every_session(), session_index=1)
+        assert is_rebalance_timestamp(
+            timestamp,
+            RebalanceSchedule.explicit_timestamps([timestamp]),
+            session_index=1,
+        )
+        assert not is_rebalance_timestamp(
+            timestamp,
+            RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 8)]),
+            session_index=1,
+        )
+        assert is_rebalance_timestamp(
+            timestamp, RebalanceSchedule.fixed_n_sessions(3), session_index=1
+        )
+        assert not is_rebalance_timestamp(
+            timestamp, RebalanceSchedule.fixed_n_sessions(3), session_index=2
+        )
+        assert is_rebalance_timestamp(
+            timestamp, RebalanceSchedule.fixed_n_sessions(3), session_index=4
+        )
+
+    def test_weekly_calendar_metadata_handles_holiday_friday(self) -> None:
+        assert is_rebalance_timestamp(
+            datetime(2024, 3, 28),
+            RebalanceSchedule.weekly(),
+            session_index=4,
+            calendar="NYSE",
+        )
+        assert not is_rebalance_timestamp(
+            datetime(2024, 3, 27),
+            RebalanceSchedule.weekly(),
+            session_index=3,
+            calendar="NYSE",
+        )
+        assert is_rebalance_timestamp(
+            datetime(2024, 1, 5), RebalanceSchedule.weekly(), session_index=5
+        )
+        assert not is_rebalance_timestamp(
+            datetime(2024, 1, 4), RebalanceSchedule.weekly(), session_index=4
+        )
+
+    def test_month_end_without_calendar_uses_last_weekday(self) -> None:
+        assert is_rebalance_timestamp(
+            datetime(2024, 3, 29), RebalanceSchedule.month_end(), session_index=20
+        )
+        assert not is_rebalance_timestamp(
+            datetime(2024, 3, 28), RebalanceSchedule.month_end(), session_index=19
+        )

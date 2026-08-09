@@ -1,0 +1,628 @@
+{
+  "frameworks": {
+    "backtrader": {
+      "display_name": "Backtrader",
+      "package": "backtrader",
+      "profile": "backtrader_strict",
+      "source": "https://pypi.org/project/backtrader/1.9.78.123/",
+      "version": "1.9.78.123"
+    },
+    "vectorbt_oss": {
+      "display_name": "VectorBT OSS",
+      "package": "vectorbt",
+      "profile": "vectorbt",
+      "source": "https://pypi.org/project/vectorbt/0.28.2/",
+      "version": "0.28.2"
+    },
+    "vectorbt_pro": {
+      "commit": "1305a1e1974325db9382eaeacc6452e9b075ca71",
+      "display_name": "VectorBT Pro",
+      "package": "vectorbtpro",
+      "profile": "vectorbt_strict",
+      "source": "https://github.com/polakowo/vectorbt.pro",
+      "version": "2025.12.31"
+    },
+    "zipline": {
+      "display_name": "Zipline Reloaded",
+      "package": "zipline-reloaded",
+      "profile": "zipline_strict",
+      "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
+      "version": "3.1.1"
+    }
+  },
+  "generated_at": "2026-08-08T12:20:05.088761+00:00",
+  "records": [
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "01",
+      "scenario_name": "Long Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "02",
+      "scenario_name": "Long/Short",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "03",
+      "scenario_name": "Stop Loss",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "04",
+      "scenario_name": "Take Profit",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "05",
+      "scenario_name": "Commission (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "06",
+      "scenario_name": "Commission (Per-Share)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "07",
+      "scenario_name": "Slippage (Fixed)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "08",
+      "scenario_name": "Slippage (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "09",
+      "scenario_name": "Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "10",
+      "scenario_name": "Bracket Order",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "11",
+      "scenario_name": "Short Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "12",
+      "scenario_name": "Short Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "13",
+      "scenario_name": "TSL + TP Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "14",
+      "scenario_name": "TSL + SL Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "15",
+      "scenario_name": "Triple Rule",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_pro",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "16",
+      "scenario_name": "Stress Test",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "01",
+      "scenario_name": "Long Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "02",
+      "scenario_name": "Long/Short",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "03",
+      "scenario_name": "Stop Loss",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "04",
+      "scenario_name": "Take Profit",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "05",
+      "scenario_name": "Commission (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": "Scenario explicitly excludes this framework",
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": false,
+      "scenario_id": "06",
+      "scenario_name": "Commission (Per-Share)",
+      "status": "unsupported"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "07",
+      "scenario_name": "Slippage (Fixed)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "08",
+      "scenario_name": "Slippage (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "09",
+      "scenario_name": "Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "10",
+      "scenario_name": "Bracket Order",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "11",
+      "scenario_name": "Short Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "12",
+      "scenario_name": "Short Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "13",
+      "scenario_name": "TSL + TP Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "14",
+      "scenario_name": "TSL + SL Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "15",
+      "scenario_name": "Triple Rule",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "vectorbt_oss",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "16",
+      "scenario_name": "Stress Test",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "01",
+      "scenario_name": "Long Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "02",
+      "scenario_name": "Long/Short",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "03",
+      "scenario_name": "Stop Loss",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "04",
+      "scenario_name": "Take Profit",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "05",
+      "scenario_name": "Commission (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "06",
+      "scenario_name": "Commission (Per-Share)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "07",
+      "scenario_name": "Slippage (Fixed)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "08",
+      "scenario_name": "Slippage (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "09",
+      "scenario_name": "Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "10",
+      "scenario_name": "Bracket Order",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "11",
+      "scenario_name": "Short Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "12",
+      "scenario_name": "Short Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "13",
+      "scenario_name": "TSL + TP Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "14",
+      "scenario_name": "TSL + SL Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "15",
+      "scenario_name": "Triple Rule",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "backtrader",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "16",
+      "scenario_name": "Stress Test",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "01",
+      "scenario_name": "Long Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "02",
+      "scenario_name": "Long/Short",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "03",
+      "scenario_name": "Stop Loss",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "04",
+      "scenario_name": "Take Profit",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "05",
+      "scenario_name": "Commission (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "06",
+      "scenario_name": "Commission (Per-Share)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "07",
+      "scenario_name": "Slippage (Fixed)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "08",
+      "scenario_name": "Slippage (Pct)",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "09",
+      "scenario_name": "Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": "Scenario explicitly excludes this framework",
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": false,
+      "scenario_id": "10",
+      "scenario_name": "Bracket Order",
+      "status": "unsupported"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "11",
+      "scenario_name": "Short Only",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "12",
+      "scenario_name": "Short Trailing Stop",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "13",
+      "scenario_name": "TSL + TP Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "14",
+      "scenario_name": "TSL + SL Combo",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "15",
+      "scenario_name": "Triple Rule",
+      "status": "pass"
+    },
+    {
+      "detail": null,
+      "framework": "zipline",
+      "release_blocking": false,
+      "required": true,
+      "scenario_id": "16",
+      "scenario_name": "Stress Test",
+      "status": "pass"
+    }
+  ],
+  "release_gate_passed": true,
+  "schema_version": 1,
+  "summary": {
+    "adapter_failure": 0,
+    "adapter_import_failure": 0,
+    "comparison_failure": 0,
+    "malformed_output": 0,
+    "missing_scenario": 0,
+    "ml4t_failure": 0,
+    "pass": 62,
+    "skipped": 0,
+    "subprocess_failure": 0,
+    "timeout": 0,
+    "unavailable": 0,
+    "unsupported": 2
+  }
+}

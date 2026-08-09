@@ -442,6 +442,54 @@ class TestShortCashPolicy:
         assert pos is not None
         assert pos.quantity == pytest.approx(3.333333333333334)
 
+    def test_lock_notional_reversal_reserves_collateral_for_other_shorts(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": 100.0, "B": 100.0})
+        broker.submit_order("A", 5, OrderSide.SELL)
+        broker.submit_order("B", 5, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 150.0, "B": 100.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 10, OrderSide.BUY)
+        broker._process_orders()
+
+        position_a = broker.get_position("A")
+        position_b = broker.get_position("B")
+        assert position_a is not None
+        assert position_b is not None
+        assert position_a.quantity == pytest.approx(5.0 / 3.0)
+        assert position_b.quantity == -5.0
+
+    def test_lock_notional_long_to_short_reversal_reuses_long_sale_proceeds(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 10, OrderSide.BUY)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 200.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 20, OrderSide.SELL)
+        broker._process_orders()
+
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == -10.0
+
 
 # ---------------------------------------------------------------------------
 # partial_fills_allowed

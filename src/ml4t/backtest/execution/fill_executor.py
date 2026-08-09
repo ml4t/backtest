@@ -48,6 +48,25 @@ def _is_position_flip(old_quantity: float, new_quantity: float) -> bool:
     return old_quantity > 0 > new_quantity or old_quantity < 0 < new_quantity
 
 
+def _calculate_position_pnl(
+    entry_price: float,
+    exit_price: float,
+    signed_quantity: float,
+    multiplier: float,
+) -> float:
+    """Calculate PnL from entry and exit notionals in ledger operation order."""
+    return (exit_price * signed_quantity - entry_price * signed_quantity) * multiplier
+
+
+def _add_with_zero_cancellation(left: float, right: float) -> float:
+    """Add values while collapsing tolerance-equivalent opposite amounts to zero."""
+    if math.copysign(1.0, left) != math.copysign(1.0, right) and math.isclose(
+        abs(left), abs(right), rel_tol=1e-9, abs_tol=1e-12
+    ):
+        return 0.0
+    return left + right
+
+
 @dataclass
 class FillContext:
     """Context for a single fill execution.
@@ -207,6 +226,7 @@ class FillExecutor:
                 broker._partial_orders.pop(order.order_id, None)
 
         # Create fill record
+        price_source = "open" if order.child_intent_id is not None else broker.execution_price.value
         fill = Fill(
             order_id=order.order_id,
             rebalance_id=order.rebalance_id,
@@ -220,7 +240,7 @@ class FillExecutor:
             order_type=order.order_type.value,
             limit_price=order.limit_price,
             stop_price=order.stop_price,
-            price_source=broker.execution_price.value,
+            price_source=price_source,
             reference_price=quote_context["reference_price"],
             quote_mid_price=quote_context["quote_mid_price"],
             bid_price=quote_context["bid_price"],
@@ -231,6 +251,9 @@ class FillExecutor:
             available_size=quote_context["available_size"],
             exit_reason=_get_exit_reason(order) if is_exit_fill else "",
             exit_reason_detail=order._risk_exit_reason,
+            target_intent_id=order.target_intent_id,
+            child_intent_id=order.child_intent_id,
+            intent_idempotency_key=order.intent_idempotency_key,
         )
         broker.fills.append(fill)
 
@@ -257,15 +280,26 @@ class FillExecutor:
             slippage=slippage,
             signed_qty=signed_qty,
             is_partial=is_partial,
-            price_source=broker.execution_price.value,
+            price_source=price_source,
             quote_context=quote_context,
             close_commission=close_commission,
             open_commission=open_commission,
         )
 
+        old_position = broker.positions.get(order.asset)
+        old_quantity = old_position.quantity if old_position is not None else 0.0
+        old_entry_price = old_position.entry_price if old_position is not None else 0.0
+
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
         fill.commission = actual_commission
+
+        self._update_lock_notional_free_cash(
+            ctx,
+            old_quantity=old_quantity,
+            old_entry_price=old_entry_price,
+            commission=actual_commission,
+        )
 
         # Update cash (include multiplier for futures/derivatives)
         multiplier = broker.get_multiplier(order.asset)
@@ -294,6 +328,42 @@ class FillExecutor:
                     broker.pending_orders.remove(o)
 
         return not is_partial
+
+    def _update_lock_notional_free_cash(
+        self,
+        ctx: FillContext,
+        *,
+        old_quantity: float,
+        old_entry_price: float,
+        commission: float,
+    ) -> None:
+        broker = self.broker
+        policy = broker.account.policy
+        if policy.allow_leverage or policy.short_cash_policy != "lock_notional":
+            return
+
+        remaining = ctx.signed_qty
+        free_cash = broker.account._lock_notional_free_cash
+        multiplier = broker.get_multiplier(ctx.order.asset)
+
+        if old_quantity < 0.0 and remaining > 0.0:
+            covered = min(remaining, abs(old_quantity))
+            released_basis = covered * old_entry_price * multiplier
+            required_cash = covered * ctx.fill_price * multiplier
+            free_cash = _add_with_zero_cancellation(free_cash, 2.0 * released_basis - required_cash)
+            remaining -= covered
+        elif old_quantity > 0.0 and remaining < 0.0:
+            closed = min(abs(remaining), old_quantity)
+            free_cash = _add_with_zero_cancellation(free_cash, closed * ctx.fill_price * multiplier)
+            remaining += closed
+
+        if remaining != 0.0:
+            required_cash = abs(remaining) * ctx.fill_price * multiplier
+            free_cash = _add_with_zero_cancellation(free_cash, -required_cash)
+
+        broker.account._lock_notional_free_cash = _add_with_zero_cancellation(
+            free_cash, -commission
+        )
 
     @staticmethod
     def _validate_execution_price(value: float, *, source: str) -> None:
@@ -455,7 +525,10 @@ class FillExecutor:
 
         # PnL includes both entry and exit commission, and multiplier for futures
         total_commission = pos.entry_commission + ctx.commission
-        pnl = (ctx.fill_price - pos.entry_price) * old_qty * pos.multiplier - total_commission
+        pnl = (
+            _calculate_position_pnl(pos.entry_price, ctx.fill_price, old_qty, pos.multiplier)
+            - total_commission
+        )
         raw_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
         pnl_pct = raw_pct if old_qty > 0 else -raw_pct
         entry_quote = pos.context.get("entry_quote_context", {})
@@ -522,7 +595,10 @@ class FillExecutor:
 
         # Close the old position (include multiplier for futures)
         total_close_commission = pos.entry_commission + close_commission
-        pnl = (ctx.fill_price - pos.entry_price) * old_qty * pos.multiplier - total_close_commission
+        pnl = (
+            _calculate_position_pnl(pos.entry_price, ctx.fill_price, old_qty, pos.multiplier)
+            - total_close_commission
+        )
         raw_pct = (ctx.fill_price - pos.entry_price) / pos.entry_price if pos.entry_price else 0.0
         pnl_pct = raw_pct if old_qty > 0 else -raw_pct
         entry_quote = pos.context.get("entry_quote_context", {})
@@ -607,12 +683,13 @@ class FillExecutor:
             exited_qty = abs(old_qty) - abs(new_qty)
 
             # Calculate P&L for the exited portion (include multiplier for futures)
-            # For long positions: pnl = (exit_price - entry_price) * exited_qty * multiplier
-            # For short positions: pnl = (entry_price - exit_price) * exited_qty * multiplier
-            if old_qty > 0:  # Long position
-                pnl = (ctx.fill_price - pos.entry_price) * exited_qty * pos.multiplier
-            else:  # Short position
-                pnl = (pos.entry_price - ctx.fill_price) * exited_qty * pos.multiplier
+            signed_exited_qty = math.copysign(exited_qty, old_qty)
+            pnl = _calculate_position_pnl(
+                pos.entry_price,
+                ctx.fill_price,
+                signed_exited_qty,
+                pos.multiplier,
+            )
 
             # Allocate the current position's entry costs in proportion to the quantity
             # removed. The residual cost remains attached to the residual position.

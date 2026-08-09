@@ -41,27 +41,34 @@ def run_ml4t(
     import polars as pl
 
     from ml4t.backtest._validation_imports import (
-        BacktestConfig,
         DataFeed,
         Engine,
-        ExecutionMode,
-        Strategy,
     )
-    from ml4t.backtest.config import CommissionType, ExecutionPrice, SlippageType
+    from ml4t.backtest.config import SlippageType
+
+    if framework == "zipline":
+        # Zipline's daily-bar writer stores OHLC at three-decimal precision. Compare against the
+        # data the reference engine actually consumes, not the higher-precision source frame.
+        prices_df = prices_df.copy()
+        prices_df.loc[:, ["open", "high", "low", "close"]] = prices_df[
+            ["open", "high", "low", "close"]
+        ].round(3)
 
     asset = _get_asset_name(scenario, framework)
 
     # Build prices polars DataFrame
     timestamps = _extract_timestamps(prices_df)
-    prices_pl = pl.DataFrame({
-        "timestamp": timestamps,
-        "asset": [asset] * len(prices_df),
-        "open": prices_df["open"].tolist(),
-        "high": prices_df["high"].tolist(),
-        "low": prices_df["low"].tolist(),
-        "close": prices_df["close"].tolist(),
-        "volume": prices_df["volume"].astype(float).tolist(),
-    })
+    prices_pl = pl.DataFrame(
+        {
+            "timestamp": timestamps,
+            "asset": [asset] * len(prices_df),
+            "open": prices_df["open"].tolist(),
+            "high": prices_df["high"].tolist(),
+            "low": prices_df["low"].tolist(),
+            "close": prices_df["close"].tolist(),
+            "volume": prices_df["volume"].astype(float).tolist(),
+        }
+    )
 
     # Build signals polars DataFrame
     signals_dict: dict[str, list] = {
@@ -87,6 +94,11 @@ def run_ml4t(
 
     # Build config
     config = _build_config(scenario, framework)
+    if framework in {"vectorbt_pro", "vectorbt_oss"} and "slippage_fixed" in scenario.constants:
+        # VectorBT exposes percentage slippage only. Its fixed-slippage scenario converts the
+        # requested absolute amount using the same input-frame mean before both runs.
+        config.slippage_type = SlippageType.PERCENTAGE
+        config.slippage_rate = scenario.constants["slippage_fixed"] / prices_df["close"].mean()
 
     feed = DataFeed(prices_df=prices_pl, signals_df=signals_pl)
     engine = Engine(feed, strategy, config)
@@ -112,6 +124,8 @@ def run_ml4t(
     extra = {}
     if "commission" in scenario.extra_checks:
         extra["total_commission"] = sum(f.commission for f in results["fills"])
+    if "exit_price" in scenario.extra_checks and trade_list:
+        extra["exit_price"] = trade_list[0]["exit_price"]
 
     return FrameworkResult(
         framework="ml4t.backtest",
@@ -183,9 +197,12 @@ def _build_strategy(scenario: ScenarioConfig, asset: str):
 
             elif scenario.strategy_type == "long_short":
                 # Exit first
-                if signals.get("long_exit") and current_qty > 0:
-                    broker.close_position(asset)
-                elif signals.get("short_exit") and current_qty < 0:
+                if (
+                    signals.get("long_exit")
+                    and current_qty > 0
+                    or signals.get("short_exit")
+                    and current_qty < 0
+                ):
                     broker.close_position(asset)
                 # Then entry
                 if signals.get("long_entry") and current_qty == 0:
@@ -193,20 +210,24 @@ def _build_strategy(scenario: ScenarioConfig, asset: str):
                 elif signals.get("short_entry") and current_qty == 0:
                     broker.submit_order(asset, scenario.shares, OrderSide.SELL)
 
-            elif scenario.strategy_type == "risk_entry_only":
+            elif (
+                scenario.strategy_type == "risk_entry_only"
+                and signals.get("entry")
+                and current_qty == 0
+                and (not self._entered or scenario.constants.get("allow_reentry", True))
+            ):
                 # Entry only on first signal, exits handled by risk rules
-                if signals.get("entry") and current_qty == 0:
-                    if not self._entered or scenario.constants.get("allow_reentry", True):
-                        side = OrderSide.SELL if is_short else OrderSide.BUY
-                        broker.submit_order(asset, scenario.shares, side)
-                        self._entered = True
+                side = OrderSide.SELL if is_short else OrderSide.BUY
+                broker.submit_order(asset, scenario.shares, side)
+                self._entered = True
 
-            elif scenario.strategy_type == "single_entry":
+            elif (
+                scenario.strategy_type == "single_entry" and not self._entered and current_qty == 0
+            ):
                 # One-time entry, exits handled by risk rules
-                if not self._entered and current_qty == 0:
-                    side = OrderSide.SELL if is_short else OrderSide.BUY
-                    broker.submit_order(asset, scenario.shares, side)
-                    self._entered = True
+                side = OrderSide.SELL if is_short else OrderSide.BUY
+                broker.submit_order(asset, scenario.shares, side)
+                self._entered = True
 
     return ValidationStrategy()
 
@@ -259,9 +280,7 @@ def _build_config(scenario: ScenarioConfig, framework: str):
     if framework in ("vectorbt_pro", "vectorbt_oss"):
         config_kwargs.setdefault("execution_mode", ExecutionMode.SAME_BAR)
         config_kwargs.setdefault("execution_price", ExecutionPrice.CLOSE)
-    elif framework == "backtrader":
-        config_kwargs.setdefault("execution_mode", ExecutionMode.NEXT_BAR)
-    elif framework == "zipline":
+    elif framework == "backtrader" or framework == "zipline":
         config_kwargs.setdefault("execution_mode", ExecutionMode.NEXT_BAR)
     else:
         config_kwargs.setdefault("execution_mode", ExecutionMode.NEXT_BAR)
