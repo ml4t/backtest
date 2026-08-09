@@ -175,6 +175,42 @@ class TestResolveRebalanceTimestamps:
         assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
         assert calls == 1
 
+    def test_stateless_explicit_matching_caches_normalized_schedule_instants(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        start = datetime(2024, 1, 2, 16, 0)
+        schedule = RebalanceSchedule.explicit_timestamps(
+            [start + timedelta(hours=index) for index in range(2_500)]
+        )
+        calls = 0
+        event_time_utc = schedule_module._event_time_utc
+
+        def count_conversion(timestamp: datetime, timezone: str | None) -> datetime:
+            nonlocal calls
+            calls += 1
+            return event_time_utc(timestamp, timezone)
+
+        schedule_module._explicit_schedule_instants.cache_clear()
+        monkeypatch.setattr(schedule_module, "_event_time_utc", count_conversion)
+
+        assert is_rebalance_timestamp(
+            datetime(2024, 1, 2, 21, 0, tzinfo=UTC),
+            schedule,
+            session_index=1,
+            timezone="America/New_York",
+        )
+        first_call_count = calls
+        assert not is_rebalance_timestamp(
+            datetime(2024, 1, 2, 21, 30, tzinfo=UTC),
+            schedule,
+            session_index=1,
+            timezone="America/New_York",
+        )
+
+        assert first_call_count == len(schedule.timestamps) + 1
+        assert calls == first_call_count + 1
+
     def test_fixed_n_sessions_thins_session_closes(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-10")
 

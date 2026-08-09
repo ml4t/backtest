@@ -134,10 +134,7 @@ def _evaluate_rebalance_timestamp(
         return True
     if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
         event_time = _event_time_utc(timestamp, timezone)
-        return any(
-            _event_time_utc(scheduled, timezone) == event_time
-            for scheduled in resolved._timestamp_set
-        )
+        return event_time in _explicit_schedule_instants(resolved, timezone)
     _validate_schedule_calendar(resolved, calendar)
     if is_session_close is None:
         is_session_close = _is_session_close_timestamp(
@@ -298,6 +295,14 @@ def _localize_event_time(timestamp: datetime, timezone: str | None) -> datetime:
 
 def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
     return _localize_event_time(timestamp, timezone).astimezone(ZoneInfo("UTC"))
+
+
+@lru_cache(maxsize=64)
+def _explicit_schedule_instants(
+    schedule: RebalanceSchedule,
+    timezone: str | None,
+) -> frozenset[datetime]:
+    return frozenset(_event_time_utc(timestamp, timezone) for timestamp in schedule.timestamps)
 
 
 def _raise_explicit_alignment_error(
