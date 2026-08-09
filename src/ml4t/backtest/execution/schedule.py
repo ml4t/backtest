@@ -39,7 +39,13 @@ class RebalanceSchedule:
     cadence: RebalanceCadence = RebalanceCadence.EVERY_BAR
     every_n: int = 1
     timestamps: tuple[datetime, ...] = ()
-    _timestamp_set: frozenset[datetime] = field(init=False, repr=False, compare=False)
+    _instant_sets_by_timezone: dict[str | None, frozenset[datetime]] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        compare=False,
+        hash=False,
+    )
 
     def __post_init__(self) -> None:
         if self.cadence == RebalanceCadence.FIXED_N_SESSIONS and self.every_n < 1:
@@ -56,7 +62,6 @@ class RebalanceSchedule:
         if self.cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS and not timestamps:
             raise ValueError("Explicit timestamp schedules require at least one timestamp")
         object.__setattr__(self, "timestamps", timestamps)
-        object.__setattr__(self, "_timestamp_set", frozenset(timestamps))
 
     @classmethod
     def every_bar(cls) -> RebalanceSchedule:
@@ -297,12 +302,17 @@ def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
     return _localize_event_time(timestamp, timezone).astimezone(ZoneInfo("UTC"))
 
 
-@lru_cache(maxsize=64)
 def _explicit_schedule_instants(
     schedule: RebalanceSchedule,
     timezone: str | None,
 ) -> frozenset[datetime]:
-    return frozenset(_event_time_utc(timestamp, timezone) for timestamp in schedule.timestamps)
+    cached = schedule._instant_sets_by_timezone.get(timezone)
+    if cached is not None:
+        return cached
+    normalized = frozenset(
+        _event_time_utc(timestamp, timezone) for timestamp in schedule.timestamps
+    )
+    return schedule._instant_sets_by_timezone.setdefault(timezone, normalized)
 
 
 def _raise_explicit_alignment_error(
@@ -414,9 +424,9 @@ class _OnlineRebalanceEvaluator:
             event_time = _event_time_utc(timestamp, self.timezone)
             if self._last_explicit_instant is not None and event_time < self._last_explicit_instant:
                 raise ValueError(
-                    f"event timestamp moved backward from {self._last_explicit_event!r} to "
-                    f"{timestamp!r}; start a new evaluator or call TargetWeightExecutor.reset() "
-                    "before another run"
+                    f"event timestamp moved backward from "
+                    f"{self._last_explicit_instant.isoformat()} to {event_time.isoformat()}; "
+                    "start a new evaluator or call TargetWeightExecutor.reset() before another run"
                 )
             if self._first_explicit_instant is None:
                 self._first_explicit_instant = event_time

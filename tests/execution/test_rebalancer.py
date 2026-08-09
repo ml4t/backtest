@@ -1,7 +1,7 @@
 """Tests for portfolio rebalancing utilities."""
 
 import warnings
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -735,6 +735,57 @@ class TestTargetWeightExecutorScheduling:
             r"2024-01-02T21:59:00\+00:00",
         ):
             executor.validate_completed_run()
+
+    def test_online_explicit_matching_traverses_only_reached_schedule_instants(self):
+        start = datetime(2024, 1, 2, 16, 0)
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps(
+                    [start + timedelta(hours=index) for index in range(2_500)]
+                ),
+                timezone="America/New_York",
+            )
+        )
+        evaluator = executor._schedule_evaluator
+        assert evaluator is not None
+
+        class CountingSequence:
+            def __init__(self, values):
+                self.values = values
+                self.accesses = 0
+
+            def __len__(self):
+                return len(self.values)
+
+            def __getitem__(self, index):
+                self.accesses += 1
+                return self.values[index]
+
+        instants = CountingSequence(evaluator._explicit_sorted_instants)
+        evaluator._explicit_sorted_instants = instants
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 20, 0, tzinfo=UTC))
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 30, tzinfo=UTC))
+
+        assert evaluator._explicit_cursor == 1
+        assert instants.accesses <= 6
+
+    def test_online_explicit_timestamp_rejects_backward_events_with_iso_instants(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        with pytest.raises(
+            ValueError,
+            match=r"moved backward from 2024-01-02T21:00:00\+00:00 to "
+            r"2024-01-02T20:00:00\+00:00",
+        ):
+            executor.should_rebalance(datetime(2024, 1, 2, 20, 0, tzinfo=UTC))
 
     def test_nyse_premarket_bar_does_not_create_a_phantom_session(self):
         executor = TargetWeightExecutor(

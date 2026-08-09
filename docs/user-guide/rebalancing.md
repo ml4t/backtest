@@ -136,7 +136,8 @@ configured `timezone`, so it can match an aware feed timestamp expressed in anot
 scheduled instant falls between the first and last observed feed instants but no event matches it,
 batch resolution and final online validation raise an alignment error. Scheduled instants before
 or after the observed window are ignored, including a schedule earlier than the first event on a
-partially observed day.
+partially observed day. Online evaluation requires chronological events and rejects a timestamp
+that moves backward.
 
 `TargetWeightExecutor.prepare_schedule()` was removed before 0.1.0 because it required the future
 feed timestamp sequence. Put the metadata shown above on `RebalanceConfig`; `should_rebalance()`
