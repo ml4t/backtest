@@ -133,8 +133,9 @@ feed timestamp sequence. Put the metadata shown above on `RebalanceConfig`; `sho
 then evaluates only the current event and prior evaluator state. Call `should_rebalance()` or
 scheduled `execute()` for every event in chronological order, including warm-up periods. After the
 final event, call `validate_completed_run()` so a missing close in the final session is reported.
-Call `reset()` before reusing an executor for another run. A backward session date also resets the
-evaluator automatically, and changes to the public `RebalanceConfig` rebuild it.
+Call `reset()` before reusing an executor for another run or changing its public
+`RebalanceConfig`. Backward session dates and mid-run configuration changes raise instead of
+silently restarting session counters.
 `LongShortStrategy` performs final validation from `on_end()` automatically.
 
 ## See It in Action

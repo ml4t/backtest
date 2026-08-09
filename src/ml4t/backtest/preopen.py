@@ -342,6 +342,8 @@ class PreOpenTargetManager:
 
     def process_opening(self, timestamp: datetime) -> None:
         """Lower and execute targets eligible for the current opening."""
+        if len(self._processed_targets) == len(self._targets):
+            return
         session = self._session_date(timestamp)
         eligible = [
             intent

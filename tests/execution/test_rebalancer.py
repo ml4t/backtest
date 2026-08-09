@@ -535,7 +535,7 @@ class TestTargetWeightExecutorScheduling:
         with pytest.raises(ValueError, match="require calendar metadata"):
             TargetWeightExecutor(config=RebalanceConfig(schedule=RebalanceSchedule.weekly()))
 
-    def test_mutated_schedule_configuration_rebuilds_online_evaluator(self):
+    def test_mutated_schedule_configuration_requires_explicit_reset(self):
         config = RebalanceConfig(
             schedule=RebalanceSchedule.every_session(),
             data_frequency="daily",
@@ -545,10 +545,13 @@ class TestTargetWeightExecutorScheduling:
 
         config.schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 4)])
 
+        with pytest.raises(ValueError, match=r"RebalanceConfig changed.*reset"):
+            executor.should_rebalance(datetime(2024, 1, 3))
+        executor.reset()
         assert not executor.should_rebalance(datetime(2024, 1, 3))
         assert executor.should_rebalance(datetime(2024, 1, 4))
 
-    def test_reused_executor_resets_when_session_dates_move_backward(self):
+    def test_reused_executor_requires_reset_before_session_dates_move_backward(self):
         executor = TargetWeightExecutor(
             config=RebalanceConfig(
                 schedule=RebalanceSchedule.fixed_n_sessions(2),
@@ -558,7 +561,38 @@ class TestTargetWeightExecutorScheduling:
 
         assert executor.should_rebalance(datetime(2024, 1, 2))
         assert not executor.should_rebalance(datetime(2024, 1, 3))
+        with pytest.raises(ValueError, match=r"session date moved backward.*reset"):
+            executor.should_rebalance(datetime(2024, 1, 2))
+        executor.reset()
         assert executor.should_rebalance(datetime(2024, 1, 2))
+
+    def test_validate_completed_run_rejects_config_mutation(self):
+        config = RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            data_frequency="daily",
+        )
+        executor = TargetWeightExecutor(config=config)
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+        config.data_frequency = "15m"
+
+        with pytest.raises(ValueError, match=r"RebalanceConfig changed.*reset"):
+            executor.validate_completed_run()
+
+    def test_nyse_premarket_bar_does_not_create_a_phantom_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 9, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 9, 30))
+        assert executor.should_rebalance(datetime(2024, 1, 2, 16, 0))
+        executor.validate_completed_run()
 
     def test_midnight_daily_labels_do_not_warn_without_optional_metadata(self):
         executor = TargetWeightExecutor(

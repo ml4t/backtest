@@ -114,7 +114,11 @@ class Engine:
         )
         self.equity_curve: list[tuple[datetime, float]] = []
         self.portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
-        self.lifecycle_dispatcher = LifecycleDispatcher(strategy, LIFECYCLE_V1)
+        self.lifecycle_dispatcher = LifecycleDispatcher(
+            strategy,
+            LIFECYCLE_V1,
+            retain_invocations=self.config.retain_lifecycle_history,
+        )
         self.preopen_target_manager = self.broker._create_preopen_target_manager(
             self.execution_policy,
             self.lifecycle_version,
@@ -593,8 +597,13 @@ class Engine:
         from .types import Trade
 
         retain_intent_history = self.config.retain_intent_history
+        callback_counts = self.lifecycle_dispatcher.callback_counts
         contract_evidence = {
             "lifecycle_version": self.lifecycle_version.value,
+            "lifecycle_callback_counts": {
+                phase.value: callback_counts[phase] for phase in LifecyclePhase
+            },
+            "lifecycle_invocations": [],
             "execution_policy": self.execution_policy.to_dict(),
             "target_intent_count": self.preopen_target_manager.target_count,
             "child_order_intent_count": self.preopen_target_manager.child_count,
@@ -617,6 +626,17 @@ class Engine:
                     ],
                 }
             )
+        if self.config.retain_lifecycle_history:
+            contract_evidence["lifecycle_invocations"] = [
+                {
+                    "phase": invocation.phase.value,
+                    "callback": invocation.callback,
+                    "event_time": invocation.event_time.isoformat()
+                    if invocation.event_time is not None
+                    else None,
+                }
+                for invocation in self.lifecycle_dispatcher.invocations
+            ]
 
         if not self.equity_curve:
             # Return empty result for no-data case

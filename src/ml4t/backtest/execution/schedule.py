@@ -226,7 +226,8 @@ def _session_requires_close(
     if cadence not in {RebalanceCadence.WEEKLY, RebalanceCadence.MONTH_END}:
         return False
     _validate_schedule_calendar(schedule, calendar)
-    assert calendar is not None
+    if calendar is None:
+        raise ValueError("weekly and month_end schedules require calendar metadata")
     period_start, period_end = _period_bounds(cadence, session_date)
     return session_date == _calendar_period_end(calendar, period_start, period_end)
 
@@ -298,12 +299,6 @@ class _OnlineRebalanceEvaluator:
         self._session_index = 0
         self._required_close_matched = False
 
-    def reset(self) -> None:
-        """Clear causal state before evaluating a new run."""
-        self._session_date = None
-        self._session_index = 0
-        self._required_close_matched = False
-
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
         session_date = session_date_for_timestamp(
             timestamp,
@@ -314,7 +309,10 @@ class _OnlineRebalanceEvaluator:
             timestamp_semantics=self.timestamp_semantics,
         )
         if self._session_date is not None and session_date < self._session_date:
-            self.reset()
+            raise ValueError(
+                f"session date moved backward from {self._session_date} to {session_date}; "
+                "start a new evaluator or call TargetWeightExecutor.reset() before another run"
+            )
         if session_date != self._session_date:
             if (
                 self._session_date is not None
@@ -348,6 +346,11 @@ class _OnlineRebalanceEvaluator:
         if matched:
             self._required_close_matched = True
         return matched
+
+    @property
+    def has_observations(self) -> bool:
+        """Return whether at least one event has been evaluated."""
+        return self._session_date is not None
 
     def validate_completed_run(self) -> None:
         """Validate the final observed session after every event has been evaluated."""

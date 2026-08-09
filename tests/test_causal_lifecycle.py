@@ -47,9 +47,13 @@ class TraceStrategy(Strategy):
 
 def test_engine_dispatches_one_causal_versioned_callback_trace() -> None:
     strategy = TraceStrategy()
-    engine = Engine(DataFeed(prices_df=prices(bars=2)), strategy)
+    engine = Engine(
+        DataFeed(prices_df=prices(bars=2)),
+        strategy,
+        BacktestConfig(retain_lifecycle_history=True),
+    )
 
-    engine.run()
+    result = engine.run()
 
     assert strategy.trace == ["on_start", "on_prepare", "on_data", "on_data", "on_end"]
     assert strategy.prepare_config is engine.config
@@ -61,6 +65,19 @@ def test_engine_dispatches_one_causal_versioned_callback_trace() -> None:
         ("run_end", "on_end", None),
     )
     assert engine.lifecycle_dispatcher.callback_counts[LifecyclePhase.MARKET_EVENT] == 2
+    assert result.metrics["lifecycle_callback_counts"]["market_event"] == 2
+    assert len(result.metrics["lifecycle_invocations"]) == 5
+
+
+def test_default_lifecycle_history_is_bounded_to_counts() -> None:
+    engine = Engine(DataFeed(prices_df=prices(bars=2)), TraceStrategy())
+
+    result = engine.run()
+
+    assert engine.lifecycle_dispatcher.invocations == []
+    assert engine.lifecycle_dispatcher.callback_counts[LifecyclePhase.MARKET_EVENT] == 2
+    assert result.metrics["lifecycle_callback_counts"]["market_event"] == 2
+    assert result.metrics["lifecycle_invocations"] == []
 
 
 def test_completed_close_cannot_create_a_same_timestamp_open_fill() -> None:
@@ -309,7 +326,11 @@ def test_failed_stats_reconfiguration_restores_all_asset_histories() -> None:
 def test_non_utc_event_timestamps_remain_feed_values() -> None:
     strategy = TraceStrategy()
     aware = prices().with_columns(pl.col("timestamp").dt.replace_time_zone("UTC"))
-    engine = Engine(DataFeed(prices_df=aware), strategy)
+    engine = Engine(
+        DataFeed(prices_df=aware),
+        strategy,
+        BacktestConfig(retain_lifecycle_history=True),
+    )
 
     engine.run()
 

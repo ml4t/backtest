@@ -289,12 +289,8 @@ def assign_session_date(
             # Before session start -> current calendar day's session
             session_date = ts_local.date()
     else:
-        # Regular session (starts in morning)
-        if bar_time >= session_start_time:
-            session_date = ts_local.date()
-        else:
-            # Before session start -> previous day's session
-            session_date = ts_local.date() - timedelta(days=1)
+        # Morning-start sessions use the local calendar date for regular and pre-market bars.
+        session_date = ts_local.date()
 
     return datetime(session_date.year, session_date.month, session_date.day)
 

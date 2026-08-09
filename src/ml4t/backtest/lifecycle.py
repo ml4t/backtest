@@ -43,9 +43,16 @@ class _BrokerTransaction:
 class LifecycleDispatcher:
     """Invoke strategy callbacks under one versioned contract."""
 
-    def __init__(self, strategy: Any, contract: LifecycleContract = LIFECYCLE_V1) -> None:
+    def __init__(
+        self,
+        strategy: Any,
+        contract: LifecycleContract = LIFECYCLE_V1,
+        *,
+        retain_invocations: bool = False,
+    ) -> None:
         self.strategy = strategy
         self.contract = contract
+        self.retain_invocations = retain_invocations
         self.invocations: list[LifecycleInvocation] = []
         self._counts = dict.fromkeys(LifecyclePhase, 0)
 
@@ -67,7 +74,8 @@ class LifecycleDispatcher:
         transaction = _BrokerTransaction(broker)
         previous_phase = broker._begin_lifecycle_dispatch(phase, transaction)
         self._counts[phase] += 1
-        self.invocations.append(LifecycleInvocation(phase, specification.callback, event_time))
+        if self.retain_invocations:
+            self.invocations.append(LifecycleInvocation(phase, specification.callback, event_time))
         try:
             return callback(*args)
         except BaseException:

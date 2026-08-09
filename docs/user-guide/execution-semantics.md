@@ -104,6 +104,10 @@ child-intent, and reconciliation records in the result artifact. The default avo
 unbounded event history into results from long-running or high-asset simulations. The broker
 accessors and `export_target_intent_state()` remain available during and after a run.
 
+Lifecycle callback counts are always retained for contract validation. Set
+`BacktestConfig(retain_lifecycle_history=True)` only when a per-callback trace is needed for parity
+analysis or debugging. The default does not retain one record per market event.
+
 For fractional-share accounts, `ResidualPolicy.LARGEST_REMAINDER` allocates the fractional
 remainder up to each raw target after applying the selected rounding policy. The final quantity can
 therefore include the fraction removed by the initial rounding step. Use `KEEP_CASH` when that

@@ -215,6 +215,7 @@ friction:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `retain_intent_history` | bool | False | Include full target, child-order, and reconciliation histories in result artifacts; counts are always retained |
+| `retain_lifecycle_history` | bool | False | Include the per-callback lifecycle trace in result artifacts; callback counts are always retained |
 
 ### Cash Management
 

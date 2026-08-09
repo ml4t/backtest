@@ -896,6 +896,8 @@ class TestPresetRoundTrip:
 
     def test_to_dict_from_dict_roundtrip(self):
         config = BacktestConfig.from_preset("backtrader")
+        config.retain_intent_history = True
+        config.retain_lifecycle_history = True
         d = config.to_dict()
         restored = BacktestConfig.from_dict(d)
         assert restored.fill_ordering == config.fill_ordering
@@ -904,6 +906,8 @@ class TestPresetRoundTrip:
         assert restored.reject_on_insufficient_cash == config.reject_on_insufficient_cash
         assert restored.partial_fills_allowed == config.partial_fills_allowed
         assert restored.next_bar_queue_shadow_validation == config.next_bar_queue_shadow_validation
+        assert restored.retain_intent_history is True
+        assert restored.retain_lifecycle_history is True
 
     def test_sizing_method_removed_from_fields(self):
         """sizing_method was removed from BacktestConfig fields."""

@@ -30,8 +30,8 @@
   no longer move a rebalance earlier.
 - Online session schedules require evaluation on every event and expose validate_completed_run()
   to diagnose a missing final session close.
-- Result artifacts retain intent counts by default. Set retain_intent_history to include full
-  target, child-order, and reconciliation histories.
+- Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or
+  retain_lifecycle_history to include the corresponding event histories.
 
 ### Fixed
 

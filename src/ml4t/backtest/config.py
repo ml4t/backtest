@@ -756,6 +756,7 @@ class BacktestConfig:
 
     # === Result Evidence ===
     retain_intent_history: bool = False
+    retain_lifecycle_history: bool = False
     _explicit_timezone: bool = field(default=False, init=False, repr=False, compare=False)
     _explicit_data_frequency: bool = field(default=False, init=False, repr=False, compare=False)
 
@@ -933,7 +934,10 @@ class BacktestConfig:
                 "enforce_sessions": self.enforce_sessions,
             },
             "feed": _feed_spec_to_dict(self.resolved_feed_spec),
-            "result": {"retain_intent_history": self.retain_intent_history},
+            "result": {
+                "retain_intent_history": self.retain_intent_history,
+                "retain_lifecycle_history": self.retain_lifecycle_history,
+            },
             "metadata": serialize_artifact_value(self.metadata),
         }
 
@@ -1048,7 +1052,7 @@ class BacktestConfig:
                     "timestamp_semantics",
                     "session_start_time",
                 },
-                "result": {"retain_intent_history"},
+                "result": {"retain_intent_history", "retain_lifecycle_history"},
             }
             for section, cfg in data.items():
                 if section == "metadata":
@@ -1179,6 +1183,7 @@ class BacktestConfig:
             preset_name=preset_name,
             feed_spec=FeedSpec.from_any(feed_cfg) if feed_cfg else None,
             retain_intent_history=result_cfg.get("retain_intent_history", False),
+            retain_lifecycle_history=result_cfg.get("retain_lifecycle_history", False),
             metadata=dict(metadata),
         )
 

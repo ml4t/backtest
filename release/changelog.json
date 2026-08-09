@@ -18,7 +18,7 @@
           "Stable distribution metadata, release-critical static analysis, and the 250-asset performance workload now match the 0.1 release contract.",
           "Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled exchange session rather than the last available feed bar; holidays and missing period-end data no longer move a rebalance earlier.",
           "Online session schedules require evaluation on every event and expose validate_completed_run() to diagnose a missing final session close.",
-          "Result artifacts retain intent counts by default. Set retain_intent_history to include full target, child-order, and reconciliation histories."
+          "Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or retain_lifecycle_history to include the corresponding event histories."
         ],
         "Fixed": [
           "Financial-accounting, order-rejection, artifact-integrity, quantity-tolerance, and parity-comparison defects found during the stable-release audit.",

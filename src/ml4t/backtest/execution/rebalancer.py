@@ -134,22 +134,30 @@ class TargetWeightExecutor:
         self.config = config or RebalanceConfig()
         self._schedule_evaluator: _OnlineRebalanceEvaluator | None = None
         self._schedule_evaluator_config: tuple[object, ...] | None = None
-        self._current_schedule_evaluator()
+        self._ensure_schedule_evaluator()
 
-    def _current_schedule_evaluator(self) -> _OnlineRebalanceEvaluator | None:
-        schedule = self.config.schedule
-        if schedule is None:
-            self.reset()
-            return None
-        evaluator_config = (
-            schedule,
+    def _schedule_config(self) -> tuple[object, ...]:
+        return (
+            self.config.schedule,
             self.config.calendar,
             self.config.timezone,
             self.config.session_start_time,
             self.config.data_frequency,
             self.config.timestamp_semantics,
         )
+
+    def _ensure_schedule_evaluator(self) -> _OnlineRebalanceEvaluator | None:
+        schedule = self.config.schedule
+        if schedule is None:
+            if self._schedule_evaluator is not None and self._schedule_evaluator.has_observations:
+                raise ValueError("RebalanceConfig changed during evaluation; call reset() first")
+            self._schedule_evaluator = None
+            self._schedule_evaluator_config = self._schedule_config()
+            return None
+        evaluator_config = self._schedule_config()
         if evaluator_config != self._schedule_evaluator_config:
+            if self._schedule_evaluator is not None and self._schedule_evaluator.has_observations:
+                raise ValueError("RebalanceConfig changed during evaluation; call reset() first")
             self._schedule_evaluator = _OnlineRebalanceEvaluator(
                 schedule,
                 calendar=self.config.calendar,
@@ -173,7 +181,7 @@ class TargetWeightExecutor:
         is_session_close: bool | None = None,
     ) -> bool:
         """Evaluate one event in order; call this for every event when a schedule is set."""
-        evaluator = self._current_schedule_evaluator()
+        evaluator = self._ensure_schedule_evaluator()
         if evaluator is None:
             return True
         return evaluator.evaluate(
@@ -183,9 +191,11 @@ class TargetWeightExecutor:
 
     def validate_completed_run(self) -> None:
         """Validate schedule alignment after the final event in a complete run."""
-        evaluator = self._current_schedule_evaluator()
-        if evaluator is not None:
-            evaluator.validate_completed_run()
+        if self._schedule_evaluator is None:
+            return
+        if self._schedule_config() != self._schedule_evaluator_config:
+            raise ValueError("RebalanceConfig changed during evaluation; call reset() first")
+        self._schedule_evaluator.validate_completed_run()
 
     def execute(
         self,

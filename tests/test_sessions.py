@@ -105,14 +105,12 @@ class TestAssignSessionDate:
         assert session_date == datetime(2024, 1, 8, 0, 0)
 
     def test_nyse_before_session(self):
-        """Test NYSE: 8am ET -> previous day session (edge case)."""
+        """Test NYSE: pre-market data remains in the same-day session."""
         ny_tz = ZoneInfo("America/New_York")
         ts = datetime(2024, 1, 8, 8, 0)  # Monday 8am ET
         session_date = assign_session_date(ts, ny_tz, 9, 30)
 
-        # 8am is before 9:30am, belongs to previous day's session
-        # (though in practice NYSE wouldn't have data before 9:30)
-        assert session_date == datetime(2024, 1, 7, 0, 0)
+        assert session_date == datetime(2024, 1, 8, 0, 0)
 
     def test_timezone_aware_input(self, chicago_tz: ZoneInfo):
         """Test with timezone-aware timestamp input."""

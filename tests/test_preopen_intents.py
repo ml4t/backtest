@@ -115,6 +115,19 @@ def test_target_intent_api_requires_an_engine_configured_broker() -> None:
         broker.restore_target_intent_state({})
 
 
+def test_opening_processing_skips_session_resolution_without_outstanding_targets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = Engine(DataFeed(prices_df=prices()), InitialTargetStrategy(target_intent()))
+
+    def fail_if_called(timestamp):
+        raise AssertionError("session resolution must be skipped")
+
+    monkeypatch.setattr(engine.preopen_target_manager, "_session_date", fail_if_called)
+
+    engine.preopen_target_manager.process_opening(datetime(2026, 8, 3))
+
+
 def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> None:
     intent = target_intent(position_rule_policy_id="stop-5")
 
