@@ -66,16 +66,16 @@ def target_intent(
     *,
     intent_id: str = "initial-portfolio",
     session: date = date(2026, 8, 3),
+    decision_time: datetime = datetime(2026, 8, 2, 23, tzinfo=UTC),
     weight: float = 0.5,
     rounding: RoundingPolicy = RoundingPolicy.TOWARD_ZERO,
     residual: ResidualPolicy = ResidualPolicy.KEEP_CASH,
     position_rule_policy_id: str | None = None,
 ) -> CanonicalTargetIntent:
-    decision = datetime(2026, 8, 2, 23, tzinfo=UTC)
     return CanonicalTargetIntent(
         intent_id=intent_id,
-        decision_time=decision,
-        information_cutoff=decision,
+        decision_time=decision_time,
+        information_cutoff=decision_time,
         effective_session=session,
         effective_phase=LifecyclePhase.PRE_OPEN,
         targets=(AssetTarget("SPY", TargetMeasure.WEIGHT, weight),),
@@ -338,7 +338,9 @@ def test_initial_weight_target_lowers_at_open_and_rules_see_only_later_movement(
 
     child = engine.broker.get_child_order_intents()[0]
     assert child.quantity == 500
-    assert child.eligibility_phase is LifecyclePhase.OPENING_AUCTION
+    assert child.decision_session == intent.effective_session
+    assert child.effective_session == intent.effective_session
+    assert child.eligibility_phase is LifecyclePhase.PRE_OPEN
     assert [fill.price for fill in result.fills] == [100.0, 95.0]
     assert result.fills[0].target_intent_id == intent.intent_id
     assert result.fills[0].child_intent_id == child.child_intent_id
@@ -431,10 +433,9 @@ def test_opening_target_marks_existing_non_target_position_at_open() -> None:
 
 
 def test_opening_target_uses_exchange_session_date_across_utc_calendar_boundary() -> None:
-    intent = replace(
-        target_intent(session=date(2024, 1, 8)),
+    intent = target_intent(
+        session=date(2024, 1, 8),
         decision_time=datetime(2024, 1, 7, 22, tzinfo=UTC),
-        information_cutoff=datetime(2024, 1, 7, 22, tzinfo=UTC),
     )
     frame = pl.DataFrame(
         {
@@ -505,6 +506,7 @@ def test_disabled_opening_capability_rejects_registration() -> None:
     config = BacktestConfig()
     policy = replace(
         default_execution_policy(config),
+        market_fill_phase=LifecyclePhase.MARKET_EVENT,
         opening_auction=ExecutionBehavior.DISABLED,
     )
     engine = Engine(

@@ -84,9 +84,6 @@ dependencies = [
     "pandas-market-calendars>=5.2.4",
 ]
 
-[tool.uv.sources]
-ml4t-specs = { git = "https://github.com/ml4t/specs.git", rev = "85d3476683a70b4f17e5e8cb82dd23d05b373dc8" }
-
 [project.optional-dependencies]
 # Visualization and reporting
 viz = [
