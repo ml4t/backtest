@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import polars as pl
+import pytest
 from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.execution import (
@@ -164,6 +165,24 @@ class TestResolveRebalanceTimestamps:
 
 
 class TestCausalScheduleEvaluation:
+    def test_schedule_can_carry_calendar_without_runtime_configuration(self) -> None:
+        schedule = RebalanceSchedule.weekly(calendar="NYSE")
+
+        assert is_rebalance_timestamp(
+            datetime(2024, 3, 28),
+            schedule,
+            session_index=4,
+        )
+        assert not is_rebalance_timestamp(
+            datetime(2024, 3, 29),
+            schedule,
+            session_index=5,
+        )
+
+    def test_schedule_rejects_blank_calendar(self) -> None:
+        with pytest.raises(ValueError, match="calendar"):
+            RebalanceSchedule.weekly(calendar=" ")
+
     def test_bar_session_explicit_and_fixed_cadences_use_current_state(self) -> None:
         timestamp = datetime(2024, 1, 5)
 

@@ -388,13 +388,17 @@ class LongShortStrategy(Strategy):
         self.bar_count += 1
 
         if self.rebalance_schedule is not None:
-            if self._schedule_config is None:
-                raise ValueError("rebalance_schedule is set but was not prepared before execution")
+            calendar = self.rebalance_schedule.calendar
+            if (
+                self._schedule_config is not None
+                and self._schedule_config.resolved_calendar is not None
+            ):
+                calendar = self._schedule_config.resolved_calendar
             if not is_rebalance_timestamp(
                 timestamp,
                 self.rebalance_schedule,
                 session_index=self.bar_count,
-                calendar=self._schedule_config.resolved_calendar,
+                calendar=calendar,
             ):
                 return
         elif self.bar_count % self.rebalance_frequency != 1:

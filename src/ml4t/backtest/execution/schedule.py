@@ -35,12 +35,15 @@ class RebalanceSchedule:
     cadence: RebalanceCadence = RebalanceCadence.EVERY_BAR
     every_n: int = 1
     timestamps: tuple[datetime, ...] = ()
+    calendar: str | None = None
 
     def __post_init__(self) -> None:
         if self.cadence == RebalanceCadence.FIXED_N_SESSIONS and self.every_n < 1:
             raise ValueError("RebalanceSchedule.every_n must be >= 1")
         if self.cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS and not self.timestamps:
             raise ValueError("Explicit timestamp schedules require at least one timestamp")
+        if self.calendar is not None and not self.calendar.strip():
+            raise ValueError("RebalanceSchedule.calendar must be non-empty or None")
 
     @classmethod
     def every_bar(cls) -> RebalanceSchedule:
@@ -55,12 +58,12 @@ class RebalanceSchedule:
         return cls(cadence=RebalanceCadence.FIXED_N_SESSIONS, every_n=n)
 
     @classmethod
-    def weekly(cls) -> RebalanceSchedule:
-        return cls(cadence=RebalanceCadence.WEEKLY)
+    def weekly(cls, *, calendar: str | None = None) -> RebalanceSchedule:
+        return cls(cadence=RebalanceCadence.WEEKLY, calendar=calendar)
 
     @classmethod
-    def month_end(cls) -> RebalanceSchedule:
-        return cls(cadence=RebalanceCadence.MONTH_END)
+    def month_end(cls, *, calendar: str | None = None) -> RebalanceSchedule:
+        return cls(cadence=RebalanceCadence.MONTH_END, calendar=calendar)
 
     @classmethod
     def explicit_timestamps(cls, timestamps: Sequence[datetime]) -> RebalanceSchedule:
@@ -80,6 +83,7 @@ def is_rebalance_timestamp(
     """Evaluate a schedule from current calendar metadata without future feed timestamps."""
     resolved = _coerce_schedule(schedule)
     cadence = resolved.cadence
+    calendar = calendar if calendar is not None else resolved.calendar
     if cadence in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EVERY_SESSION}:
         return True
     if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
