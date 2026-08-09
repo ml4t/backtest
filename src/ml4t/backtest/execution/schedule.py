@@ -326,7 +326,7 @@ def _raise_explicit_alignment_error(
     raise ValueError(
         f"explicit_timestamps schedule instant {scheduled_instant} did not match an observed feed "
         f"event within the observed instant window; nearest observed instant is {nearest_instant}. "
-        f"Naive timestamps use timezone {timezone or 'UTC'!r}"
+        f"{_naive_timezone_hint(timezone)}"
     )
 
 
@@ -460,7 +460,7 @@ class _OnlineRebalanceEvaluator:
                     f"event timestamp moved backward from "
                     f"{self._last_explicit_instant.isoformat()} to {event_time.isoformat()}; "
                     "start a new evaluator or call TargetWeightExecutor.reset() before another "
-                    f"run. Naive timestamps use timezone {self.timezone or 'UTC'!r}"
+                    f"run. {_naive_timezone_hint(self.timezone)}"
                 )
             if self._first_explicit_instant is None:
                 self._first_explicit_instant = event_time
@@ -908,9 +908,12 @@ def _raise_short_implicit_daily_interval(
     raise ValueError(
         f"schedule events {previous.isoformat()} and {current.isoformat()} are less than "
         f"{minimum_hours} hours apart while data_frequency and timestamp_semantics are omitted; "
-        f"configure both fields for intraday data. If timestamps are naive, they use timezone "
-        f"{timezone or 'UTC'!r}"
+        f"configure both fields for intraday data. {_naive_timezone_hint(timezone)}"
     )
+
+
+def _naive_timezone_hint(timezone: str | None) -> str:
+    return f"If timestamps are naive, they use timezone {timezone or 'UTC'!r}"
 
 
 def _normalize_timestamps(available_timestamps: Sequence[datetime] | pl.Series) -> list[datetime]:
