@@ -31,20 +31,6 @@ if TYPE_CHECKING:
     pass
 
 
-_DEFAULT_SESSION_STARTS = {
-    "CME_Equity": (17, 0),
-    "CME_Agriculture": (17, 0),
-    "CME_Interest_Rate": (17, 0),
-    "CBOT": (17, 0),
-    "NYMEX": (18, 0),
-    "COMEX": (18, 0),
-    "NYSE": (9, 30),
-    "NASDAQ": (9, 30),
-    "LSE": (8, 0),
-    "XETRA": (9, 0),
-}
-
-
 @dataclass
 class SessionConfig:
     """Configuration for trading session alignment.
@@ -54,8 +40,9 @@ class SessionConfig:
         timezone: Calendar timezone (e.g., "America/Chicago", "America/New_York")
         session_start_time: Override an evening session boundary (e.g., "17:00" for CME),
             or restate the calendar's standard morning open. Custom morning boundaries are
-            rejected because morning-start sessions use the local calendar date. If None,
-            uses the calendar's default session time.
+            rejected because morning-start sessions use the local calendar date. Evening
+            overrides require an evening-start calendar or no exchange calendar. If None,
+            uses the calendar's authoritative standard open.
     """
 
     calendar: str
@@ -72,31 +59,43 @@ class SessionConfig:
         if self.session_start_time:
             parts = self.session_start_time.split(":")
             return int(parts[0])
-        return _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))[0]
+        return _default_session_start(self.calendar).hour
 
     def get_session_start_minute(self) -> int:
         """Get session start minute (0-59)."""
         if self.session_start_time:
             parts = self.session_start_time.split(":")
             return int(parts[1]) if len(parts) > 1 else 0
-        return _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))[1]
+        return _default_session_start(self.calendar).minute
+
+
+def _default_session_start(calendar: str) -> time:
+    from .calendar import get_standard_market_open_time
+
+    try:
+        return get_standard_market_open_time(calendar)
+    except ValueError:
+        return time.min
 
 
 def _validate_session_start_time(calendar: str | None, session_start_time: str) -> None:
     parts = session_start_time.split(":")
     start = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
     time(*start)
-    if start[0] >= 12:
-        return
     if calendar is None:
+        if start[0] >= 12:
+            return
         raise ValueError("morning session_start_time requires exchange calendar metadata")
     from .calendar import get_standard_market_open_time
 
     market_open = get_standard_market_open_time(calendar)
     standard_open = (market_open.hour, market_open.minute)
+    if start == standard_open or (start[0] >= 12 and market_open.hour >= 12):
+        return
+    boundary = "morning" if start[0] < 12 else "evening"
     if start != standard_open:
         raise ValueError(
-            f"custom morning session_start_time {session_start_time!r} is unsupported for "
+            f"custom {boundary} session_start_time {session_start_time!r} is unsupported for "
             f"calendar {calendar!r}; its standard market open is {market_open:%H:%M}"
         )
 

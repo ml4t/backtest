@@ -143,6 +143,9 @@ feed timestamp sequence. Put the metadata shown above on `RebalanceConfig`; `sho
 then evaluates only the current event and prior evaluator state. Call `should_rebalance()` or
 scheduled `execute()` for every event in chronological order, including warm-up periods. After the
 final event, call `validate_completed_run()` so a missing close in the final session is reported.
+When scheduled `execute()` receives an Engine broker, the Engine registers and runs this final
+validation automatically. Standalone use and direct `should_rebalance()` calls still require the
+explicit completion call.
 Call `reset()` before reusing an executor for another run or changing its public
 `RebalanceConfig`. Backward session dates and mid-run configuration changes raise instead of
 silently restarting session counters.

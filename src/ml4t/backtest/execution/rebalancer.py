@@ -246,7 +246,8 @@ class TargetWeightExecutor:
             timestamp: Current event time, required when a schedule is configured.
             is_session_close: Explicit boundary signal for intraday feeds without a calendar.
                 When a schedule is configured, call ``execute`` for every event in order and call
-                ``validate_completed_run`` after the final event.
+                ``validate_completed_run`` after the final event in standalone use. An Engine
+                broker registers and runs completion validation automatically.
 
         Returns:
             List of submitted orders.
@@ -254,6 +255,7 @@ class TargetWeightExecutor:
         if self.config.schedule is not None:
             if timestamp is None:
                 raise ValueError("timestamp is required when RebalanceConfig.schedule is set")
+            broker._register_completion_validator(self, self.validate_completed_run)
             if not self.should_rebalance(timestamp, is_session_close=is_session_close):
                 return []
 

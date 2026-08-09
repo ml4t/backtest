@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 
@@ -226,6 +227,7 @@ class Broker:
         self._lifecycle_transaction: Any | None = None
         self._active_lifecycle_phase: LifecyclePhase | None = None
         self._preopen_target_manager: PreOpenTargetManager | None = None
+        self._completion_validators: dict[int, Callable[[], None]] = {}
 
         # Execution model (volume limits and market impact)
         self.execution_limits = execution_limits  # ExecutionLimits instance
@@ -906,6 +908,17 @@ class Broker:
         )
         self._preopen_target_manager = manager
         return manager
+
+    def _register_completion_validator(
+        self,
+        owner: object,
+        validator: Callable[[], None],
+    ) -> None:
+        self._completion_validators.setdefault(id(owner), validator)
+
+    def _validate_completed_run(self) -> None:
+        for validator in tuple(self._completion_validators.values()):
+            validator()
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Return the configured contract specification, or None when absent."""

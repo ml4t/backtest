@@ -1245,8 +1245,8 @@ class TestFeedSpecConfigResolution:
             timezone="UTC",
             data_frequency=DataFrequency.DAILY,
             feed_spec=FeedSpec(
-                calendar="NYSE",
-                timezone="America/New_York",
+                calendar="CME_Equity",
+                timezone="America/Chicago",
                 data_frequency="minute",
                 session_start_time="17:00",
                 timestamp_semantics="event_time",
@@ -1254,16 +1254,16 @@ class TestFeedSpecConfigResolution:
         )
 
         assert config.feed_spec is not None
-        assert config.feed_spec.timezone == "America/New_York"
+        assert config.feed_spec.timezone == "America/Chicago"
         assert config.timezone == "UTC"
         assert config.data_frequency == DataFrequency.DAILY
-        assert config.resolved_calendar == "NYSE"
+        assert config.resolved_calendar == "CME_Equity"
         assert config.resolved_timezone == "UTC"
         assert config.resolved_data_frequency == DataFrequency.DAILY
         assert config.resolved_session_start_time == "17:00"
         assert config.resolved_timestamp_semantics is not None
         assert config.resolved_timestamp_semantics.value == "event_time"
-        assert config.resolved_feed_spec.calendar == "NYSE"
+        assert config.resolved_feed_spec.calendar == "CME_Equity"
         assert config.resolved_feed_spec.timezone == "UTC"
         assert config.resolved_feed_spec.data_frequency == DataFrequency.DAILY
         assert config.resolved_feed_spec.session_start_time == "17:00"

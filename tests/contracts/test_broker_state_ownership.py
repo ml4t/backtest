@@ -29,6 +29,7 @@ FORBIDDEN_BROKER_STATE = {
     "_current_time",
     "_current_volumes",
     "_contract_specs",
+    "_completion_validators",
     "_execution_engine",
     "_execution_journal",
     "_fill_engine",

@@ -8,6 +8,7 @@ from ml4t.specs import HistoricalStrategyCompatibilityError, LifecyclePhase
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, Strategy, callback_trace
 from ml4t.backtest.broker import Broker
+from ml4t.backtest.execution import RebalanceConfig, RebalanceSchedule, TargetWeightExecutor
 from ml4t.backtest.types import OrderStatus, OrderType, Position
 
 
@@ -81,6 +82,28 @@ def test_default_lifecycle_history_is_bounded_to_counts() -> None:
     assert result.metrics["lifecycle_invocations"] == []
     assert result.to_spec_dict()["lifecycle_callback_counts"]["market_event"] == 2
     assert result.to_spec_dict()["lifecycle_invocations"] == []
+
+
+def test_engine_validates_a_scheduled_target_weight_executor_after_the_final_event() -> None:
+    class ScheduledExecutorStrategy(Strategy):
+        def __init__(self) -> None:
+            self.executor = TargetWeightExecutor(
+                RebalanceConfig(
+                    schedule=RebalanceSchedule.every_session(),
+                    calendar="NYSE",
+                    timezone="America/New_York",
+                    data_frequency="15m",
+                    timestamp_semantics="bar_close",
+                )
+            )
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            self.executor.execute({}, data, broker, timestamp=timestamp)
+
+    feed = prices().with_columns(pl.lit(datetime(2024, 1, 2, 16, 15)).alias("timestamp"))
+
+    with pytest.raises(ValueError, match="resolved no session closes"):
+        Engine(DataFeed(prices_df=feed), ScheduledExecutorStrategy()).run()
 
 
 def test_completed_close_cannot_create_a_same_timestamp_open_fill() -> None:

@@ -43,7 +43,7 @@ class TestSessionConfig:
         assert nyse.get_session_start_minute() == 30
 
         nymex = SessionConfig(calendar="NYMEX")
-        assert nymex.get_session_start_hour() == 18
+        assert nymex.get_session_start_hour() == 17
 
     def test_get_session_start_hour_unknown_calendar(self):
         """Test unknown calendar defaults to midnight."""
@@ -82,6 +82,10 @@ class TestSessionConfig:
     def test_nonstandard_morning_boundary_names_the_calendar_open(self):
         with pytest.raises(ValueError, match=r"XTKS.*standard market open is 09:00"):
             SessionConfig(calendar="XTKS", session_start_time="09:30")
+
+    def test_evening_boundary_is_rejected_for_a_morning_start_calendar(self):
+        with pytest.raises(ValueError, match=r"custom evening.*NYSE.*09:30"):
+            SessionConfig(calendar="NYSE", session_start_time="23:00")
 
     def test_morning_boundary_without_exchange_calendar_has_a_concise_error(self):
         with pytest.raises(ValueError, match="requires exchange calendar metadata"):
@@ -180,6 +184,27 @@ class TestAssignSessionDate:
             )
             == datetime(2024, 1, 9).date()
         )
+
+    def test_default_nymex_boundary_matches_authoritative_session_assignment(self):
+        timestamp = datetime(2024, 1, 8, 17, 30)
+        config = SessionConfig(calendar="NYMEX", timezone="America/Chicago")
+
+        assigned = assign_session_date(
+            timestamp,
+            ZoneInfo(config.timezone),
+            config.get_session_start_hour(),
+            config.get_session_start_minute(),
+        ).date()
+
+        assert assigned == session_date_for_timestamp(
+            timestamp,
+            calendar="NYMEX",
+            timezone=config.timezone,
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+        assert assigned == datetime(2024, 1, 9).date()
 
     def test_session_lookup_does_not_load_the_next_year_for_ordinary_dates(
         self,
