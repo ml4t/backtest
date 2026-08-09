@@ -814,7 +814,10 @@ class PreOpenTargetManager:
         prices: dict[str, float],
         cash_buffer: float,
     ) -> None:
-        assert self.broker.share_type is ShareType.INTEGER
+        if self.broker.share_type is not ShareType.INTEGER:
+            raise UnsupportedPreOpenPolicyError(
+                "largest_remainder allocation requires integer shares"
+            )
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
         target_notional = sum(
@@ -863,8 +866,8 @@ class PreOpenTargetManager:
             and intent.residual is ResidualPolicy.LARGEST_REMAINDER
         ):
             raise UnsupportedPreOpenPolicyError(
-                "largest_remainder is unsupported with fractional shares regardless of rounding; "
-                "use keep_cash"
+                "largest_remainder is unsupported with fractional shares regardless of rounding "
+                f"for target {intent.intent_id!r}; use keep_cash"
             )
 
     def _round_quantity(self, value: float, policy: RoundingPolicy) -> float:

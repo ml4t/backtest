@@ -1083,11 +1083,34 @@ def test_fractional_largest_remainder_is_rejected_when_state_is_restored() -> No
 
     with pytest.raises(
         UnsupportedPreOpenPolicyError,
-        match=r"unsupported with fractional shares regardless of rounding",
+        match=r"unsupported with fractional shares.*target 'initial-portfolio'",
     ):
-        destination.preopen_target_manager.restore_state(state)
+        destination.broker.restore_target_intent_state(state)
 
-    assert destination.preopen_target_manager.targets == ()
+    assert destination.broker.get_target_intents() == ()
+    assert destination.broker.get_child_order_intents() == ()
+    assert destination.broker.get_intent_reconciliations() == ()
+    assert destination.preopen_target_manager._idempotency == {}
+
+
+def test_fractional_accounts_cannot_enter_largest_remainder_allocator() -> None:
+    intent = target_intent()
+    engine = Engine(
+        DataFeed(prices_df=prices()),
+        InitialTargetStrategy(intent),
+        BacktestConfig(share_type=ShareType.FRACTIONAL),
+    )
+
+    with pytest.raises(
+        UnsupportedPreOpenPolicyError,
+        match="largest_remainder allocation requires integer shares",
+    ):
+        engine.preopen_target_manager._allocate_largest_remainders(
+            {"SPY": 1.5},
+            {"SPY": 1.0},
+            {"SPY": 100.0},
+            0.0,
+        )
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:
