@@ -489,6 +489,7 @@ class TestTargetWeightExecutorScheduling:
         resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
 
         assert resolved == [datetime(2024, 1, 5, 21, 0, tzinfo=UTC)]
+        executor.validate_completed_run()
 
     def test_explicit_session_close_signal_supports_calendar_free_intraday_data(self):
         executor = TargetWeightExecutor(
@@ -512,7 +513,7 @@ class TestTargetWeightExecutorScheduling:
             )
         )
 
-        assert not executor.should_rebalance(datetime(2024, 1, 2, 15, 45))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 16, 15))
         with pytest.raises(ValueError, match="resolved no session close"):
             executor.should_rebalance(datetime(2024, 1, 3, 9, 30))
 
@@ -527,7 +528,7 @@ class TestTargetWeightExecutorScheduling:
             )
         )
 
-        assert not executor.should_rebalance(datetime(2024, 1, 2, 15, 45))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 16, 15))
         with pytest.raises(ValueError, match="resolved no session closes"):
             executor.validate_completed_run()
 
@@ -592,6 +593,37 @@ class TestTargetWeightExecutorScheduling:
         assert not executor.should_rebalance(datetime(2024, 1, 2, 9, 0))
         assert not executor.should_rebalance(datetime(2024, 1, 2, 9, 30))
         assert executor.should_rebalance(datetime(2024, 1, 2, 16, 0))
+        executor.validate_completed_run()
+
+    def test_incomplete_final_session_does_not_fail_validation(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 12, 0))
+        executor.validate_completed_run()
+
+    def test_exchange_holiday_is_not_counted_as_a_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 12, 16, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 15, 16, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 16, 16, 0))
+        assert executor.should_rebalance(datetime(2024, 1, 17, 16, 0))
         executor.validate_completed_run()
 
     def test_midnight_daily_labels_do_not_warn_without_optional_metadata(self):

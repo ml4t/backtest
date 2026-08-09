@@ -250,6 +250,28 @@ def _calendar_close_for_session(calendar: str, session_date: date) -> datetime |
     return None if schedule.is_empty() else schedule["market_close"][0]
 
 
+def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
+    source_timezone = ZoneInfo(timezone or "UTC")
+    localized = (
+        timestamp.replace(tzinfo=source_timezone)
+        if timestamp.tzinfo is None
+        else timestamp.astimezone(source_timezone)
+    )
+    return localized.astimezone(ZoneInfo("UTC"))
+
+
+def _session_reached_expected_close(
+    calendar: str | None,
+    session_date: date,
+    last_event_time: datetime | None,
+    timezone: str | None,
+) -> bool:
+    if last_event_time is None or calendar is None:
+        return True
+    expected = _calendar_close_for_session(calendar, session_date)
+    return expected is None or _event_time_utc(last_event_time, timezone) >= expected
+
+
 def _raise_close_alignment_error(
     cadence: RebalanceCadence,
     calendar: str | None,
@@ -298,6 +320,7 @@ class _OnlineRebalanceEvaluator:
         self._session_date: date | None = None
         self._session_index = 0
         self._required_close_matched = False
+        self._last_event_time: datetime | None = None
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
         session_date = session_date_for_timestamp(
@@ -308,6 +331,11 @@ class _OnlineRebalanceEvaluator:
             data_frequency=self.data_frequency,
             timestamp_semantics=self.timestamp_semantics,
         )
+        if (
+            self.calendar is not None
+            and _calendar_close_for_session(self.calendar, session_date) is None
+        ):
+            return False
         if self._session_date is not None and session_date < self._session_date:
             raise ValueError(
                 f"session date moved backward from {self._session_date} to {session_date}; "
@@ -323,6 +351,12 @@ class _OnlineRebalanceEvaluator:
                     self.calendar,
                 )
                 and not self._required_close_matched
+                and _session_reached_expected_close(
+                    self.calendar,
+                    self._session_date,
+                    self._last_event_time,
+                    self.timezone,
+                )
             ):
                 _raise_close_alignment_error(
                     self.schedule.cadence,
@@ -332,6 +366,7 @@ class _OnlineRebalanceEvaluator:
             self._session_date = session_date
             self._session_index += 1
             self._required_close_matched = False
+        self._last_event_time = timestamp
         matched = is_rebalance_timestamp(
             timestamp,
             self.schedule,
@@ -363,6 +398,12 @@ class _OnlineRebalanceEvaluator:
                 self.calendar,
             )
             and not self._required_close_matched
+            and _session_reached_expected_close(
+                self.calendar,
+                self._session_date,
+                self._last_event_time,
+                self.timezone,
+            )
         ):
             _raise_close_alignment_error(
                 self.schedule.cadence,
@@ -423,6 +464,7 @@ def resolve_rebalance_timestamps(
     _validate_schedule_calendar(schedule, metadata["calendar"])
     session_indices: dict[date, int] = {}
     matched_sessions: set[date] = set()
+    last_event_by_session: dict[date, datetime] = {}
     resolved: list[datetime] = []
     for timestamp in ts_list:
         session_date = session_date_for_timestamp(
@@ -433,7 +475,13 @@ def resolve_rebalance_timestamps(
             data_frequency=metadata["data_frequency"],
             timestamp_semantics=metadata["timestamp_semantics"],
         )
+        if (
+            metadata["calendar"] is not None
+            and _calendar_close_for_session(metadata["calendar"], session_date) is None
+        ):
+            continue
         session_index = session_indices.setdefault(session_date, len(session_indices) + 1)
+        last_event_by_session[session_date] = timestamp
         if _evaluate_rebalance_timestamp(
             timestamp,
             schedule,
@@ -463,6 +511,12 @@ def resolve_rebalance_timestamps(
                 metadata["calendar"],
             )
             and session_date not in matched_sessions
+            and _session_reached_expected_close(
+                metadata["calendar"],
+                session_date,
+                last_event_by_session[session_date],
+                metadata["timezone"],
+            )
         ]
         if missing_required_sessions:
             _raise_close_alignment_error(

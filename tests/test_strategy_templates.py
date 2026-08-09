@@ -459,7 +459,7 @@ class TestLongShortStrategy:
         class ClosingLongShort(LongShortStrategy):
             rebalance_schedule = RebalanceSchedule.every_session()
 
-        timestamp = datetime(2024, 1, 2, 15, 45)
+        timestamp = datetime(2024, 1, 2, 16, 15)
         rows = [
             {"timestamp": timestamp, "asset": asset, "close": 100.0, "signal": signal}
             for asset, signal in (("A", 1.0), ("B", 0.0), ("C", -1.0))
@@ -482,6 +482,35 @@ class TestLongShortStrategy:
                 ClosingLongShort(),
                 BacktestConfig(data_frequency="15m"),
             ).run()
+
+    def test_intraday_schedule_accepts_aligned_final_session_from_on_end(self):
+        class ClosingLongShort(LongShortStrategy):
+            rebalance_schedule = RebalanceSchedule.every_session()
+
+        timestamp = datetime(2024, 1, 2, 16, 0)
+        rows = [
+            {"timestamp": timestamp, "asset": asset, "close": 100.0, "signal": signal}
+            for asset, signal in (("A", 1.0), ("B", 0.0), ("C", -1.0))
+        ]
+        frame = pl.DataFrame(rows)
+        feed = DataFeed(
+            prices_df=frame,
+            signals_df=frame.select(["timestamp", "asset", "signal"]),
+            feed_spec=FeedSpec(
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            ),
+        )
+
+        result = Engine.from_config(
+            feed,
+            ClosingLongShort(),
+            BacktestConfig(data_frequency="15m"),
+        ).run()
+
+        assert result.equity_curve
 
 
 class TestStrategyImports:

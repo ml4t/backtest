@@ -124,9 +124,10 @@ the exchange timezone. Weekly and month-end schedules fire only on the final sch
 session in the period. A missing final session in the feed does not move the rebalance to an
 earlier bar.
 
-For intraday schedules, the feed must contain timestamps aligned with the exchange close. Batch
-resolution raises immediately when no close can be matched. Online evaluation raises when it
-crosses a required session whose close never matched, rather than completing with no rebalances.
+For intraday schedules, every complete exchange session that requires a rebalance must contain a
+timestamp aligned with the exchange close. Batch and online evaluation identify the first complete
+required session whose close was reached but never matched. Exchange holidays and a final session
+whose data ends before its close are not alignment failures.
 
 `TargetWeightExecutor.prepare_schedule()` was removed before 0.1.0 because it required the future
 feed timestamp sequence. Put the metadata shown above on `RebalanceConfig`; `should_rebalance()`

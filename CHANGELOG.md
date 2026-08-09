@@ -28,8 +28,9 @@
 - Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled
   exchange session rather than the last available feed bar; holidays and missing period-end data
   no longer move a rebalance earlier.
-- Online session schedules require evaluation on every event and expose validate_completed_run()
-  to diagnose a missing final session close.
+- Batch and online session schedules require every complete exchange session to match its required
+  close; online evaluation exposes validate_completed_run() for the final session, while holidays
+  and truncated sessions remain valid.
 - Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or
   retain_lifecycle_history to include the corresponding event histories.
 

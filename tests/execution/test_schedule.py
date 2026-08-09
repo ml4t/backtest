@@ -183,7 +183,7 @@ class TestResolveRebalanceTimestamps:
         assert result.to_list() == [timestamps[1]]
 
     def test_intraday_batch_schedule_rejects_total_close_alignment_miss(self) -> None:
-        timestamps = [datetime(2024, 1, 8, 15, 58), datetime(2024, 1, 8, 15, 59)]
+        timestamps = [datetime(2024, 1, 8, 16, 1), datetime(2024, 1, 8, 16, 2)]
 
         with pytest.raises(ValueError, match="resolved no session closes"):
             resolve_rebalance_timestamps(
@@ -198,7 +198,7 @@ class TestResolveRebalanceTimestamps:
     def test_intraday_batch_schedule_rejects_one_missing_required_close(self) -> None:
         timestamps = [
             datetime(2024, 1, 2, 16, 0),
-            datetime(2024, 1, 3, 15, 45),
+            datetime(2024, 1, 3, 16, 15),
             datetime(2024, 1, 4, 16, 0),
         ]
 
@@ -218,8 +218,8 @@ class TestResolveRebalanceTimestamps:
     @pytest.mark.parametrize(
         "schedule,timestamp",
         [
-            (RebalanceSchedule.weekly(), datetime(2024, 1, 5, 15, 45)),
-            (RebalanceSchedule.month_end(), datetime(2024, 1, 31, 15, 45)),
+            (RebalanceSchedule.weekly(), datetime(2024, 1, 5, 16, 15)),
+            (RebalanceSchedule.month_end(), datetime(2024, 1, 31, 16, 15)),
         ],
     )
     def test_intraday_period_schedule_rejects_required_close_alignment_miss(
@@ -288,6 +288,38 @@ class TestResolveRebalanceTimestamps:
         )
 
         assert result.to_list() == [datetime(2024, 1, 5), datetime(2024, 1, 12)]
+
+    def test_incomplete_trailing_intraday_session_is_not_an_alignment_error(self) -> None:
+        timestamps = [datetime(2024, 1, 2, 16, 0), datetime(2024, 1, 3, 12, 0)]
+
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceSchedule.every_session(),
+            calendar="NYSE",
+            timezone="America/New_York",
+            data_frequency="15m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert result.to_list() == [datetime(2024, 1, 2, 16, 0)]
+
+    def test_intraday_exchange_holiday_is_ignored(self) -> None:
+        timestamps = [
+            datetime(2024, 1, 12, 16, 0),
+            datetime(2024, 1, 15, 16, 0),
+            datetime(2024, 1, 16, 16, 0),
+        ]
+
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceSchedule.every_session(),
+            calendar="NYSE",
+            timezone="America/New_York",
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert result.to_list() == [timestamps[0], timestamps[2]]
 
 
 class TestCausalScheduleEvaluation:
