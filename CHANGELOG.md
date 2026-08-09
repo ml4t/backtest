@@ -52,8 +52,9 @@
   supported scenarios.
 - Batch and online session schedules apply the same daily-close fallback when data frequency and
   timestamp semantics are both omitted. Batch evaluation and flagless online evaluation reject
-  repeated dates and short intervals as ambiguous intraday data; online events may instead carry
-  is_session_close consistently, but mixing explicit and inferred boundaries on one date raises.
+  repeated dates and intervals under 12 hours as ambiguous intraday data; online events may
+  instead carry is_session_close consistently, but mixing explicit and inferred boundaries on one
+  date raises.
 - Session-aligned P&L and broker statistics interpret naive timestamps in the configured data
   timezone before applying the authoritative exchange timezone.
 

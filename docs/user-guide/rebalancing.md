@@ -106,7 +106,10 @@ Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and `timestamp
 `session_start_time` for a custom evening boundary. Morning-start sessions use the local calendar
 date, so a morning value may only restate the configured calendar's standard open. Intraday feeds
 without calendar boundary metadata may instead pass `is_session_close=True` or `False` on every
-event. Do not mix explicit and inferred boundaries on one date.
+event. Under this option, session identity uses the timestamp's raw date, so it is valid only when
+sessions do not cross local midnight. Overnight sessions must provide `data_frequency` and
+`timestamp_semantics`. Do not mix explicit and inferred boundaries on one date. Without either
+form of intraday metadata, events less than 12 hours apart are rejected.
 
 ```python
 from ml4t.backtest import RebalanceSchedule

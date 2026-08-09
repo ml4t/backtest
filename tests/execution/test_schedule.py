@@ -709,14 +709,33 @@ class TestCausalScheduleEvaluation:
         ]
         schedule = RebalanceSchedule.every_session()
 
-        with pytest.raises(ValueError, match="multiple schedule events observed on 2024-01-03"):
+        with pytest.raises(ValueError, match="less than 12 hours apart.*intraday data"):
             resolve_rebalance_timestamps(timestamps, schedule, timezone="UTC")
 
         executor = TargetWeightExecutor(RebalanceConfig(schedule=schedule, timezone="UTC"))
         with pytest.warns(UserWarning, match="treated as daily session closes"):
             assert executor.should_rebalance(timestamps[0])
-        with pytest.raises(ValueError, match="multiple schedule events observed on 2024-01-03"):
+        with pytest.raises(ValueError, match="less than 12 hours apart.*intraday data"):
             executor.should_rebalance(timestamps[1])
+
+    def test_missing_metadata_accepts_a_shortened_daily_close_interval(self) -> None:
+        new_york = ZoneInfo("America/New_York")
+        timestamps = [
+            datetime(2024, 1, 2, 16, 0, tzinfo=new_york),
+            datetime(2024, 1, 3, 13, 0, tzinfo=new_york),
+        ]
+        schedule = RebalanceSchedule.every_session()
+
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            resolved = resolve_rebalance_timestamps(timestamps, schedule)
+        assert resolved.to_list() == timestamps
+
+    def test_missing_metadata_preserves_the_backward_session_error(self) -> None:
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))
+
+        assert executor.should_rebalance(datetime(2024, 1, 3))
+        with pytest.raises(ValueError, match="session date moved backward.*reset"):
+            executor.should_rebalance(datetime(2024, 1, 2))
 
     def test_explicit_boundary_signal_needs_no_intraday_metadata(self) -> None:
         executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))
