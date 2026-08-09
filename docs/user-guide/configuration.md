@@ -210,6 +210,12 @@ friction:
 |-----------|------|---------|-------------|
 | `share_type` | ShareType | INTEGER | FRACTIONAL or INTEGER |
 
+### Result evidence
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `retain_intent_history` | bool | False | Include full target, child-order, and reconciliation histories in result artifacts; counts are always retained |
+
 ### Cash Management
 
 | Parameter | Type | Default | Description |

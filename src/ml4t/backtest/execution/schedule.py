@@ -9,15 +9,16 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import polars as pl
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
-from ..calendar import get_calendar, get_schedule
+from ..calendar import get_schedule
 from ..config import DataFrequency, _to_backtest_frequency
-from ..sessions import SessionConfig, assign_session_date
+from ..sessions import session_date_for_timestamp
 
 
 class RebalanceCadence(str, Enum):
@@ -150,7 +151,11 @@ def _is_session_close_timestamp(
     if semantics is None and frequency is None:
         _warn_missing_boundary_metadata()
         return True
-    if timestamp.time() == time.min and frequency in {None, DataFrequency.DAILY}:
+    if (
+        timestamp.time() == time.min
+        and semantics is None
+        and frequency in {None, DataFrequency.DAILY}
+    ):
         return True
     if calendar is None:
         raise ValueError("intraday session schedules require calendar metadata or is_session_close")
@@ -176,56 +181,14 @@ def _calendar_closes(calendar: str, start: date, end: date) -> frozenset[datetim
     return frozenset(get_schedule(calendar, start, end)["market_close"])
 
 
-@lru_cache(maxsize=1)
 def _warn_missing_boundary_metadata() -> None:
     warnings.warn(
         "session cadence has no data_frequency or timestamp_semantics; events are treated as "
         "daily session closes",
         UserWarning,
-        stacklevel=4,
+        stacklevel=2,
+        skip_file_prefixes=(str(Path(__file__).parents[1]),),
     )
-
-
-def session_date_for_timestamp(
-    timestamp: datetime,
-    *,
-    calendar: str | None,
-    timezone: str | None,
-    session_start_time: str | None,
-    data_frequency: Any | None,
-    timestamp_semantics: TimestampSemantics | str | None,
-) -> date:
-    frequency, semantics = _normalize_schedule_metadata(data_frequency, timestamp_semantics)
-    if (
-        semantics is TimestampSemantics.SESSION_LABEL
-        or frequency is DataFrequency.DAILY
-        or (semantics is None and frequency is None)
-        or (timestamp.time() == time.min and frequency in {None, DataFrequency.DAILY})
-    ):
-        return timestamp.date()
-
-    resolved_calendar = _normalize_session_calendar(calendar or "UTC")
-    data_timezone = ZoneInfo(timezone or "UTC")
-    exchange_timezone = (
-        ZoneInfo(str(get_calendar(calendar).tz)) if calendar is not None else data_timezone
-    )
-    event_time = (
-        timestamp.replace(tzinfo=data_timezone)
-        if timestamp.tzinfo is None
-        else timestamp.astimezone(data_timezone)
-    ).astimezone(exchange_timezone)
-    session_config = SessionConfig(
-        calendar=resolved_calendar,
-        timezone=str(exchange_timezone),
-        session_start_time=session_start_time,
-    )
-    session_date = assign_session_date(
-        event_time,
-        exchange_timezone,
-        session_config.get_session_start_hour(),
-        session_config.get_session_start_minute(),
-    )
-    return session_date.date()
 
 
 def _normalize_schedule_metadata(
@@ -278,36 +241,30 @@ def resolve_rebalance_timestamps(
         data_frequency=data_frequency,
         timestamp_semantics=timestamp_semantics,
     )
-    session_config = _build_session_config(
-        ts_list,
-        calendar=metadata["calendar"],
-        timezone=metadata["timezone"],
-        timezone_explicit=metadata["timezone_explicit"],
-        session_start_time=metadata["session_start_time"],
-    )
-    session_dates, session_closes = _resolve_sessions(
-        ts_list,
-        session_config=session_config,
-        timestamp_semantics=metadata["timestamp_semantics"],
-    )
-
-    if cadence == RebalanceCadence.EVERY_SESSION:
-        return pl.Series("timestamp", session_closes)
-
-    if cadence == RebalanceCadence.FIXED_N_SESSIONS:
-        return pl.Series("timestamp", session_closes[:: schedule.every_n])
-
-    grouped: dict[tuple[int, int], datetime] = {}
-    for session_date, ts in zip(session_dates, session_closes, strict=False):
-        if cadence == RebalanceCadence.WEEKLY:
-            key = session_date.isocalendar()[:2]
-        elif cadence == RebalanceCadence.MONTH_END:
-            key = (session_date.year, session_date.month)
-        else:
-            raise ValueError(f"Unsupported rebalance cadence: {cadence}")
-        grouped[key] = ts
-
-    return pl.Series("timestamp", list(grouped.values()))
+    session_indices: dict[date, int] = {}
+    resolved: list[datetime] = []
+    for timestamp in ts_list:
+        session_date = session_date_for_timestamp(
+            timestamp,
+            calendar=metadata["calendar"],
+            timezone=metadata["timezone"],
+            session_start_time=metadata["session_start_time"],
+            data_frequency=metadata["data_frequency"],
+            timestamp_semantics=metadata["timestamp_semantics"],
+        )
+        session_index = session_indices.setdefault(session_date, len(session_indices) + 1)
+        if is_rebalance_timestamp(
+            timestamp,
+            schedule,
+            session_index=session_index,
+            calendar=metadata["calendar"],
+            timezone=metadata["timezone"],
+            session_start_time=metadata["session_start_time"],
+            data_frequency=metadata["data_frequency"],
+            timestamp_semantics=metadata["timestamp_semantics"],
+        ):
+            resolved.append(timestamp)
+    return pl.Series("timestamp", resolved)
 
 
 def _normalize_timestamps(available_timestamps: Sequence[datetime] | pl.Series) -> list[datetime]:
@@ -348,7 +305,6 @@ def _resolve_schedule_metadata(
 
     resolved_calendar = calendar if calendar is not None else (spec.calendar if spec else None)
     resolved_timezone = timezone if timezone is not None else (spec.timezone if spec else None)
-    timezone_explicit = resolved_timezone is not None
     if resolved_timezone is None:
         resolved_timezone = "UTC"
     resolved_session_start = (
@@ -373,7 +329,6 @@ def _resolve_schedule_metadata(
     return {
         "calendar": resolved_calendar,
         "timezone": resolved_timezone,
-        "timezone_explicit": timezone_explicit,
         "session_start_time": resolved_session_start,
         "data_frequency": resolved_frequency,
         "timestamp_semantics": semantics,
@@ -400,78 +355,3 @@ def _timestamps_look_date_labeled(timestamps: Sequence[datetime]) -> bool:
         ts.hour == 0 and ts.minute == 0 and ts.second == 0 and ts.microsecond == 0
         for ts in timestamps
     )
-
-
-def _build_session_config(
-    timestamps: Sequence[datetime],
-    *,
-    calendar: str | None,
-    timezone: str,
-    timezone_explicit: bool,
-    session_start_time: str | None,
-) -> SessionConfig:
-    if calendar is None:
-        return SessionConfig(
-            calendar="UTC", timezone=timezone, session_start_time=session_start_time
-        )
-
-    inferred_timezone = timezone
-    if not timezone_explicit:
-        schedule = get_schedule(calendar, timestamps[0].date(), timestamps[-1].date())
-        if not schedule.is_empty():
-            inferred_timezone = schedule["timezone"][0]
-
-    return SessionConfig(
-        calendar=_normalize_session_calendar(calendar),
-        timezone=inferred_timezone,
-        session_start_time=session_start_time,
-    )
-
-
-def _normalize_session_calendar(calendar: str) -> str:
-    normalized = calendar.upper()
-    if normalized in {"NYSE", "XNYS", "AMEX"}:
-        return "NYSE"
-    if normalized == "NASDAQ":
-        return "NASDAQ"
-    if normalized in {"CME", "CME_EQUITY"}:
-        return "CME_Equity"
-    if normalized == "CBOT":
-        return "CBOT"
-    if normalized == "NYMEX":
-        return "NYMEX"
-    if normalized == "COMEX":
-        return "COMEX"
-    return calendar
-
-
-def _resolve_sessions(
-    timestamps: Sequence[datetime],
-    *,
-    session_config: SessionConfig,
-    timestamp_semantics: TimestampSemantics,
-) -> tuple[list[datetime], list[datetime]]:
-    tz = _session_config_timezone(session_config)
-    session_start_hour = session_config.get_session_start_hour()
-    session_start_minute = session_config.get_session_start_minute()
-
-    session_closes: dict[datetime, datetime] = {}
-    for ts in timestamps:
-        if timestamp_semantics == TimestampSemantics.SESSION_LABEL:
-            session_date = _session_label_date(ts, tz)
-        else:
-            session_date = assign_session_date(ts, tz, session_start_hour, session_start_minute)
-        session_closes[session_date] = ts
-    session_dates = list(session_closes.keys())
-    return session_dates, list(session_closes.values())
-
-
-def _session_label_date(timestamp: datetime, timezone) -> datetime:
-    ts_local = timestamp if timestamp.tzinfo is None else timestamp.astimezone(timezone)
-    return datetime(ts_local.year, ts_local.month, ts_local.day)
-
-
-def _session_config_timezone(session_config: SessionConfig):
-    from zoneinfo import ZoneInfo
-
-    return ZoneInfo(session_config.timezone)

@@ -68,6 +68,13 @@ class RebalanceConfig:
             SNAPSHOT (default): Freeze value, batch fills (backward compatible).
             INCREMENTAL: Recompute value after each fill (most accurate).
             HYBRID: Frozen targets, sequential fills (VBT-style).
+        schedule: Optional event, session, weekly, month-end, or explicit schedule.
+        calendar: Exchange calendar used to identify session closes and period ends.
+        timezone: Timezone used to interpret naive feed timestamps.
+        session_start_time: Optional exchange-local session boundary in ``HH:MM`` form.
+        data_frequency: Feed frequency. Set this with ``timestamp_semantics`` for intraday data.
+        timestamp_semantics: Whether timestamps are session labels, bar closes, or event times.
+            Both metadata fields may be omitted only when each event is a daily session close.
     """
 
     # Trade thresholds
@@ -92,7 +99,6 @@ class RebalanceConfig:
     calendar: str | None = None
     timezone: str | None = None
     session_start_time: str | None = None
-    # Omit both fields only for daily data; session cadences then treat each event as a close.
     data_frequency: DataFrequency | str | None = None
     timestamp_semantics: TimestampSemantics | str | None = None
 

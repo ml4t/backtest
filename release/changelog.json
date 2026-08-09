@@ -15,7 +15,9 @@
           "Broker state now has explicit account, market, order, risk, and execution-journal owners while the Broker remains the public facade.",
           "Intraday session enforcement now filters actual exchange intervals, including early closes and breaks, using the configured timezone for naive timestamps.",
           "DataFeed now rejects a missing resolved reference-price column at construction and documents close-only fallbacks explicitly.",
-          "Stable distribution metadata, release-critical static analysis, and the 250-asset performance workload now match the 0.1 release contract."
+          "Stable distribution metadata, release-critical static analysis, and the 250-asset performance workload now match the 0.1 release contract.",
+          "Weekly and month-end rebalance schedules use the final scheduled exchange session rather than the last available feed bar; missing period-end data no longer moves a rebalance earlier.",
+          "Result artifacts retain intent counts by default. Set retain_intent_history to include full target, child-order, and reconciliation histories."
         ],
         "Fixed": [
           "Financial-accounting, order-rejection, artifact-integrity, quantity-tolerance, and parity-comparison defects found during the stable-release audit.",

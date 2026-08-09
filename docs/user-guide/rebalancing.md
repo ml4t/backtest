@@ -98,6 +98,31 @@ By default, `RebalanceConfig` uses `min_trade_value=0.0` and
 `min_weight_change=0.0`, so no trade-size or weight-delta filter is applied
 unless you opt into one explicitly.
 
+### Schedule metadata
+
+Session-based schedules need enough metadata to identify exchange session closes. Daily feeds can
+set `data_frequency="daily"`. Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and
+`timestamp_semantics`. Set `session_start_time` when the exchange session boundary differs from the
+calendar default.
+
+```python
+from ml4t.backtest import RebalanceSchedule
+
+rebalance_config = RebalanceConfig(
+    schedule=RebalanceSchedule.fixed_n_sessions(5),
+    calendar="CME_Equity",
+    timezone="UTC",
+    session_start_time="17:00",
+    data_frequency="1m",
+    timestamp_semantics="bar_close",
+)
+```
+
+Naive timestamps use `timezone` as their source timezone. Session boundaries are then applied in
+the exchange timezone. Weekly and month-end schedules fire only on the final scheduled exchange
+session in the period. A missing final session in the feed does not move the rebalance to an
+earlier bar.
+
 ## See It in Action
 
 The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses TargetWeightExecutor extensively:

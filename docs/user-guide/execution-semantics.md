@@ -92,8 +92,11 @@ has already observed information after the opening phase.
 For a rule activated after an opening fill, `ExecutionPolicy.bar_path` controls daily OHLC
 ambiguity. Use `REJECT_AMBIGUOUS` to fail when high-low order changes the result,
 `OPEN_HIGH_LOW_CLOSE` or `OPEN_LOW_HIGH_CLOSE` to declare an order, or `CONSERVATIVE` to select the
-more adverse supported outcome. The result artifact retains the lifecycle version, execution
-policy, target intents, child intents, and reconciliation records.
+more adverse supported outcome. Every result retains the lifecycle version, execution policy, and
+intent record counts. Set `BacktestConfig(retain_intent_history=True)` to include full target,
+child-intent, and reconciliation records in the result artifact. The default avoids copying an
+unbounded event history into results from long-running or high-asset simulations. The broker
+accessors and `export_target_intent_state()` remain available during and after a run.
 
 `export_target_intent_state()` does not contain account or order-book state. Restoring state that
 already contains child orders therefore requires those orders and the corresponding account state

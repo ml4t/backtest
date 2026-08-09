@@ -135,9 +135,12 @@ def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
 
 def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
     required_scopes = {
+        "cash": set(),
+        "_next_rebalance_id": set(),
         "mark_account_positions": {"all_positions"},
         "configure_stats": {"all_asset_stats"},
         "get_asset_stats": {"asset"},
+        "set_session_config": set(),
         "set_position_rules": {"risk_rules"},
         "update_position_context": {"asset"},
         "register_target_intent": {"target_intents"},
@@ -158,6 +161,7 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
             "risk_rules",
             "all_asset_stats",
         },
+        "_update_time": set(),
         "_update_water_marks": {"all_positions"},
         "_process_orders": {"all_positions", "all_pending_orders", "all_asset_stats"},
     }
@@ -165,16 +169,32 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
     broker_class = next(
         node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Broker"
     )
-    methods = {node.name: node for node in broker_class.body if isinstance(node, ast.FunctionDef)}
-
-    for method_name, expected in required_scopes.items():
-        captures = [
+    methods = {
+        node.name: node
+        for node in broker_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    missing_methods = set(required_scopes).difference(methods)
+    assert not missing_methods, f"missing Broker mutators: {sorted(missing_methods)}"
+    captures_by_method = {
+        method_name: [
             node
-            for node in ast.walk(methods[method_name])
+            for node in ast.walk(method)
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and node.func.attr == "_capture_lifecycle_mutation"
         ]
+        for method_name, method in methods.items()
+    }
+    captures_by_method = {
+        method_name: captures for method_name, captures in captures_by_method.items() if captures
+    }
+    assert set(captures_by_method) == set(required_scopes), (
+        "every Broker lifecycle mutator must declare a reviewed rollback scope"
+    )
+
+    for method_name, expected in required_scopes.items():
+        captures = captures_by_method[method_name]
         assert len(captures) == 1, method_name
         declared = {keyword.arg for keyword in captures[0].keywords}
         assert declared >= expected, method_name

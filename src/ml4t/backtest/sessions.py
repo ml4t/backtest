@@ -20,11 +20,12 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
-from typing import TYPE_CHECKING
+from datetime import date, datetime, time, timedelta
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from ml4t.specs.market_data import TimestampSemantics
 
 if TYPE_CHECKING:
     pass
@@ -74,6 +75,72 @@ class SessionConfig:
         if self.calendar in ("NYSE", "NASDAQ"):
             return 30
         return 0
+
+
+def session_date_for_timestamp(
+    timestamp: datetime,
+    *,
+    calendar: str | None,
+    timezone: str | None,
+    session_start_time: str | None,
+    data_frequency: Any | None,
+    timestamp_semantics: TimestampSemantics | str | None,
+) -> date:
+    """Return the exchange session date for one feed timestamp."""
+    from .calendar import get_calendar
+    from .config import DataFrequency, _to_backtest_frequency
+
+    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
+    semantics = (
+        timestamp_semantics
+        if isinstance(timestamp_semantics, TimestampSemantics)
+        else TimestampSemantics(timestamp_semantics)
+        if timestamp_semantics is not None
+        else None
+    )
+    if (
+        semantics is TimestampSemantics.SESSION_LABEL
+        or frequency is DataFrequency.DAILY
+        or (semantics is None and frequency is None)
+    ):
+        return timestamp.date()
+
+    data_timezone = ZoneInfo(timezone or "UTC")
+    exchange_timezone = (
+        ZoneInfo(str(get_calendar(calendar).tz)) if calendar is not None else data_timezone
+    )
+    event_time = (
+        timestamp.replace(tzinfo=data_timezone)
+        if timestamp.tzinfo is None
+        else timestamp.astimezone(exchange_timezone)
+    )
+    if event_time.tzinfo != exchange_timezone:
+        event_time = event_time.astimezone(exchange_timezone)
+    session_config = SessionConfig(
+        calendar=_normalize_session_calendar(calendar or "UTC"),
+        timezone=str(exchange_timezone),
+        session_start_time=session_start_time,
+    )
+    session_date = assign_session_date(
+        event_time,
+        exchange_timezone,
+        session_config.get_session_start_hour(),
+        session_config.get_session_start_minute(),
+    )
+    return session_date.date()
+
+
+def _normalize_session_calendar(calendar: str) -> str:
+    normalized = calendar.upper()
+    if normalized in {"NYSE", "XNYS", "AMEX"}:
+        return "NYSE"
+    if normalized == "NASDAQ":
+        return "NASDAQ"
+    if normalized in {"CME", "CME_EQUITY"}:
+        return "CME_Equity"
+    if normalized in {"CBOT", "NYMEX", "COMEX"}:
+        return normalized
+    return calendar
 
 
 def compute_session_pnl(

@@ -125,6 +125,10 @@ class Engine:
             self.execution_policy,
             self.lifecycle_version,
             calendar=self.config.resolved_calendar,
+            timezone=self.config.resolved_timezone,
+            session_start_time=self.config.resolved_session_start_time,
+            data_frequency=self.config.resolved_data_frequency,
+            timestamp_semantics=self.config.resolved_timestamp_semantics,
         )
         if target_intent_state is not None:
             self.preopen_target_manager.restore_state(target_intent_state)
@@ -149,6 +153,20 @@ class Engine:
         if self._has_run:
             raise RuntimeError("Engine.run() was already started; create a new Engine for each run")
         self._has_run = True
+        try:
+            return self._run_once()
+        except BaseException as failure:
+            try:
+                self._finalize_strategy()
+            except BaseException as finalization_failure:
+                failure.add_note(
+                    "on_end also failed during cleanup: "
+                    f"{type(finalization_failure).__name__}: {finalization_failure}"
+                )
+            raise
+
+    def _run_once(self) -> BacktestResult:
+        """Execute one guarded engine run."""
 
         # Lazy calendar initialization (zero cost if unused)
         is_trading_day_fn = None
@@ -457,35 +475,25 @@ class Engine:
         assets_data: Any,
         context: dict[str, Any],
     ) -> None:
-        try:
-            self.lifecycle_dispatcher.dispatch(
-                LifecyclePhase.MARKET_EVENT,
-                self.broker,
-                timestamp,
-                assets_data,
-                context,
-                self.broker,
-                event_time=timestamp,
-            )
-        except BaseException as failure:
-            try:
-                self._finalize_strategy()
-            except BaseException as finalization_failure:
-                failure.add_note(
-                    "on_end also failed during cleanup: "
-                    f"{type(finalization_failure).__name__}: {finalization_failure}"
-                )
-            raise
+        self.lifecycle_dispatcher.dispatch(
+            LifecyclePhase.MARKET_EVENT,
+            self.broker,
+            timestamp,
+            assets_data,
+            context,
+            self.broker,
+            event_time=timestamp,
+        )
 
     def _finalize_strategy(self) -> None:
         if self._strategy_finalized:
             return
+        self._strategy_finalized = True
         self.lifecycle_dispatcher.dispatch(
             LifecyclePhase.RUN_END,
             self.broker,
             self.broker,
         )
-        self._strategy_finalized = True
 
     def run_dict(self) -> dict[str, Any]:
         """Run backtest and return dictionary (backward compatible).
@@ -587,17 +595,31 @@ class Engine:
         from .result import BacktestResult
         from .types import Trade
 
+        retain_intent_history = self.config.retain_intent_history
         contract_evidence = {
             "lifecycle_version": self.lifecycle_version.value,
             "execution_policy": self.execution_policy.to_dict(),
-            "target_intents": [intent.to_dict() for intent in self.preopen_target_manager.targets],
-            "child_order_intents": [
-                child.to_dict() for child in self.preopen_target_manager.children
-            ],
-            "intent_reconciliations": [
-                record.to_dict() for record in self.preopen_target_manager.reconciliations
-            ],
+            "target_intent_count": self.preopen_target_manager.target_count,
+            "child_order_intent_count": self.preopen_target_manager.child_count,
+            "intent_reconciliation_count": self.preopen_target_manager.reconciliation_count,
+            "target_intents": [],
+            "child_order_intents": [],
+            "intent_reconciliations": [],
         }
+        if retain_intent_history:
+            contract_evidence.update(
+                {
+                    "target_intents": [
+                        intent.to_dict() for intent in self.preopen_target_manager.targets
+                    ],
+                    "child_order_intents": [
+                        child.to_dict() for child in self.preopen_target_manager.children
+                    ],
+                    "intent_reconciliations": [
+                        record.to_dict() for record in self.preopen_target_manager.reconciliations
+                    ],
+                }
+            )
 
         if not self.equity_curve:
             # Return empty result for no-data case

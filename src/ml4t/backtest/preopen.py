@@ -39,6 +39,7 @@ from .config import (
 )
 from .core.shared import SubmitOrderOptions
 from .models import calculate_commission, calculate_slippage
+from .sessions import session_date_for_timestamp
 from .types import OrderSide, OrderStatus, OrderType
 
 if TYPE_CHECKING:
@@ -129,16 +130,18 @@ class IntentReconciliation:
 
 @dataclass(slots=True)
 class _PreOpenTransactionState:
-    targets: dict[str, CanonicalTargetIntent]
-    idempotency: dict[str, str]
-    children: dict[str, CanonicalChildOrderIntent]
-    order_by_child: dict[str, str]
-    processed_targets: set[str]
-    reconciliations: list[IntentReconciliation]
-    latest_reconciliation: dict[str, IntentReconciliation]
-    terminal_children: set[str]
-    rule_activations: dict[str, datetime]
-    position_rules: dict[str, PositionRule]
+    targets_length: int
+    target_by_session_asset_length: int
+    idempotency_length: int
+    children_length: int
+    order_by_child_length: int
+    active_children_length: int
+    processed_targets_length: int
+    reconciliations_length: int
+    latest_reconciliation_length: int
+    terminal_children_length: int
+    rule_activations_length: int
+    position_rules_length: int
 
 
 def default_execution_policy(config: BacktestConfig) -> ExecutionPolicy:
@@ -189,6 +192,10 @@ class PreOpenTargetManager:
         account: AccountState,
         market: MarketState,
         calendar: str | None,
+        timezone: str | None = None,
+        session_start_time: str | None = None,
+        data_frequency: Any | None = None,
+        timestamp_semantics: Any | None = None,
     ) -> None:
         self.broker = broker
         self.account = account
@@ -196,10 +203,16 @@ class PreOpenTargetManager:
         self.policy = policy
         self.lifecycle_version = lifecycle_version
         self.calendar = calendar
+        self.timezone = timezone
+        self.session_start_time = session_start_time
+        self.data_frequency = data_frequency
+        self.timestamp_semantics = timestamp_semantics
         self._targets: dict[str, CanonicalTargetIntent] = {}
+        self._target_by_session_asset: dict[tuple[date, str], str] = {}
         self._idempotency: dict[str, str] = {}
         self._children: dict[str, CanonicalChildOrderIntent] = {}
         self._order_by_child: dict[str, str] = {}
+        self._active_children: set[str] = set()
         self._processed_targets: set[str] = set()
         self._reconciliations: list[IntentReconciliation] = []
         self._latest_reconciliation: dict[str, IntentReconciliation] = {}
@@ -221,6 +234,21 @@ class PreOpenTargetManager:
     def reconciliations(self) -> tuple[IntentReconciliation, ...]:
         """Return retained reconciliation history."""
         return tuple(self._reconciliations)
+
+    @property
+    def target_count(self) -> int:
+        """Return the number of accepted targets without copying them."""
+        return len(self._targets)
+
+    @property
+    def child_count(self) -> int:
+        """Return the number of derived child intents without copying them."""
+        return len(self._children)
+
+    @property
+    def reconciliation_count(self) -> int:
+        """Return the number of retained reconciliation records without copying them."""
+        return len(self._reconciliations)
 
     def register(
         self,
@@ -275,14 +303,32 @@ class PreOpenTargetManager:
         if intent.intent_id in self._targets:
             raise PreOpenIntentError(f"duplicate target intent_id {intent.intent_id!r}")
         assets = {target.asset for target in intent.targets}
-        for registered in self._targets.values():
-            overlap = assets.intersection(target.asset for target in registered.targets)
-            if registered.effective_session == intent.effective_session and overlap:
-                raise PreOpenIntentError(
-                    f"target {intent.intent_id!r} overlaps target {registered.intent_id!r} for "
-                    f"{', '.join(sorted(overlap))} in session {intent.effective_session}"
+        overlapping_ids = {
+            registered_id
+            for asset in assets
+            if (
+                registered_id := self._target_by_session_asset.get(
+                    (intent.effective_session, asset)
                 )
+            )
+            is not None
+        }
+        if overlapping_ids:
+            registered_id = min(overlapping_ids)
+            overlap = {
+                asset
+                for asset in assets
+                if self._target_by_session_asset.get((intent.effective_session, asset))
+                == registered_id
+            }
+            raise PreOpenIntentError(
+                f"target {intent.intent_id!r} overlaps target {registered_id!r} for "
+                f"{', '.join(sorted(overlap))} in session {intent.effective_session}"
+            )
         self._targets[intent.intent_id] = intent
+        self._target_by_session_asset.update(
+            ((intent.effective_session, asset), intent.intent_id) for asset in assets
+        )
         self._idempotency[intent.idempotency_key] = intent.intent_id
         return intent
 
@@ -291,13 +337,17 @@ class PreOpenTargetManager:
         if not policy_id:
             raise ValueError("policy_id must be non-empty")
         existing = self._position_rules.get(policy_id)
-        if existing is not None and existing != rules:
-            raise PreOpenIntentError(f"position rule policy {policy_id!r} is already registered")
+        if existing is not None:
+            if existing != rules:
+                raise PreOpenIntentError(
+                    f"position rule policy {policy_id!r} is already registered"
+                )
+            return
         self._position_rules[policy_id] = rules
 
     def process_opening(self, timestamp: datetime) -> None:
         """Lower and execute targets eligible for the current opening."""
-        session = timestamp.date()
+        session = self._session_date(timestamp)
         eligible = [
             intent
             for intent in self._targets.values()
@@ -367,6 +417,7 @@ class PreOpenTargetManager:
                 )
                 if order is not None:
                     self._order_by_child[child.child_intent_id] = order.order_id
+                    self._active_children.add(child.child_intent_id)
                     order_ids.add(order.order_id)
             if order_ids:
                 self.broker._process_orders(use_open=True, order_ids=order_ids)
@@ -379,9 +430,8 @@ class PreOpenTargetManager:
 
     def reconcile(self, timestamp: datetime, *, target_intent_id: str | None = None) -> None:
         """Record current child outcomes and activate rules after observed fills."""
-        for child in self._children.values():
-            if child.child_intent_id in self._terminal_children:
-                continue
+        for child_id in tuple(self._active_children):
+            child = self._children[child_id]
             if target_intent_id is not None and child.target_intent_id != target_intent_id:
                 continue
             order_id = self._order_by_child.get(child.child_intent_id)
@@ -423,6 +473,7 @@ class PreOpenTargetManager:
                 self._latest_reconciliation[child.child_intent_id] = record
             if outcome in {IntentOutcome.FULL, IntentOutcome.REJECTED, IntentOutcome.CANCELLED}:
                 self._terminal_children.add(child.child_intent_id)
+                self._active_children.discard(child.child_intent_id)
 
     def to_state(self) -> dict[str, Any]:
         """Serialize target state for restart without duplicating accepted intent."""
@@ -487,53 +538,66 @@ class PreOpenTargetManager:
             raise PreOpenIntentError("target intent state contains unknown target or child ids")
 
         self._targets.update(targets)
+        self._target_by_session_asset.update(
+            ((intent.effective_session, target.asset), intent.intent_id)
+            for intent in targets.values()
+            for target in intent.targets
+        )
         self._idempotency.update(
             (intent.idempotency_key, intent.intent_id) for intent in targets.values()
         )
         self._children.update(children)
-        self._order_by_child = order_by_child
-        self._processed_targets = processed_targets
-        self._reconciliations = reconciliations
-        self._latest_reconciliation = latest_reconciliation
-        self._rule_activations = rule_activations
-        self._terminal_children = set(latest_reconciliation)
+        self._order_by_child.update(order_by_child)
+        self._processed_targets.update(processed_targets)
+        self._reconciliations.extend(reconciliations)
+        self._latest_reconciliation.update(latest_reconciliation)
+        self._rule_activations.update(rule_activations)
+        self._terminal_children.update(latest_reconciliation)
 
     def capture_transaction_state(self) -> _PreOpenTransactionState:
         """Capture manager state for callback rollback."""
         return _PreOpenTransactionState(
-            targets=copy.deepcopy(self._targets),
-            idempotency=dict(self._idempotency),
-            children=copy.deepcopy(self._children),
-            order_by_child=dict(self._order_by_child),
-            processed_targets=set(self._processed_targets),
-            reconciliations=list(self._reconciliations),
-            latest_reconciliation=dict(self._latest_reconciliation),
-            terminal_children=set(self._terminal_children),
-            rule_activations=dict(self._rule_activations),
-            position_rules=copy.deepcopy(self._position_rules),
+            targets_length=len(self._targets),
+            target_by_session_asset_length=len(self._target_by_session_asset),
+            idempotency_length=len(self._idempotency),
+            children_length=len(self._children),
+            order_by_child_length=len(self._order_by_child),
+            active_children_length=len(self._active_children),
+            processed_targets_length=len(self._processed_targets),
+            reconciliations_length=len(self._reconciliations),
+            latest_reconciliation_length=len(self._latest_reconciliation),
+            terminal_children_length=len(self._terminal_children),
+            rule_activations_length=len(self._rule_activations),
+            position_rules_length=len(self._position_rules),
         )
 
     def restore_transaction_state(self, state: _PreOpenTransactionState) -> None:
         """Restore manager state after a callback failure."""
-        self._targets.clear()
-        self._idempotency.clear()
-        self._children.clear()
-        self._order_by_child.clear()
-        self._processed_targets.clear()
-        self._reconciliations.clear()
-        self._latest_reconciliation.clear()
-        self._terminal_children.clear()
-        self._rule_activations.clear()
-        self._targets.update(state.targets)
-        self._idempotency.update(state.idempotency)
-        self._children.update(state.children)
-        self._order_by_child.update(state.order_by_child)
-        self._processed_targets.update(state.processed_targets)
-        self._reconciliations.extend(state.reconciliations)
-        self._latest_reconciliation.update(state.latest_reconciliation)
-        self._terminal_children.update(state.terminal_children)
-        self._rule_activations.update(state.rule_activations)
-        self._position_rules = state.position_rules
+        self._truncate_mapping(self._targets, state.targets_length)
+        self._truncate_mapping(self._target_by_session_asset, state.target_by_session_asset_length)
+        self._truncate_mapping(self._idempotency, state.idempotency_length)
+        self._truncate_mapping(self._children, state.children_length)
+        self._truncate_mapping(self._order_by_child, state.order_by_child_length)
+        self._restore_add_only_set(self._active_children, state.active_children_length)
+        self._restore_add_only_set(self._processed_targets, state.processed_targets_length)
+        del self._reconciliations[state.reconciliations_length :]
+        self._truncate_mapping(self._latest_reconciliation, state.latest_reconciliation_length)
+        self._restore_add_only_set(self._terminal_children, state.terminal_children_length)
+        self._truncate_mapping(self._rule_activations, state.rule_activations_length)
+        self._truncate_mapping(self._position_rules, state.position_rules_length)
+
+    @staticmethod
+    def _truncate_mapping(mapping: dict[Any, Any], length: int) -> None:
+        while len(mapping) > length:
+            mapping.popitem()
+
+    @staticmethod
+    def _restore_add_only_set(values: set[str], length: int) -> None:
+        if len(values) == length:
+            return
+        if length != 0:
+            raise RuntimeError("pre-open transaction changed a non-empty add-only set")
+        values.clear()
 
     def _registration_is_causal(
         self, intent: CanonicalTargetIntent, active_phase: LifecyclePhase
@@ -543,7 +607,19 @@ class PreOpenTargetManager:
         if active_phase is LifecyclePhase.PRE_OPEN:
             return True
         current_time = self.market.time
-        return current_time is not None and intent.effective_session > current_time.date()
+        return current_time is not None and intent.effective_session > self._session_date(
+            current_time
+        )
+
+    def _session_date(self, timestamp: datetime) -> date:
+        return session_date_for_timestamp(
+            timestamp,
+            calendar=self.calendar,
+            timezone=self.timezone,
+            session_start_time=self.session_start_time,
+            data_frequency=self.data_frequency,
+            timestamp_semantics=self.timestamp_semantics,
+        )
 
     def _lower(self, intent: CanonicalTargetIntent) -> list[CanonicalChildOrderIntent]:
         open_prices: dict[str, float] = {}
@@ -707,9 +783,33 @@ class PreOpenTargetManager:
             rounded.update(raw)
             return
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
-        target_notional = sum(max(0.0, quantity) * prices[asset] for asset, quantity in raw.items())
-        committed = sum(max(0.0, quantity) * prices[asset] for asset, quantity in rounded.items())
-        residual_cash = max(0.0, min(available_cash, target_notional) - committed)
+        multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
+        target_notional = sum(
+            max(0.0, quantity) * prices[asset] * multipliers[asset]
+            for asset, quantity in raw.items()
+        )
+        committed_notional = sum(
+            max(0.0, quantity) * prices[asset] * multipliers[asset]
+            for asset, quantity in rounded.items()
+        )
+        committed_delta = sum(
+            (
+                quantity
+                - (
+                    self.account.positions[asset].quantity
+                    if asset in self.account.positions
+                    else 0.0
+                )
+            )
+            * prices[asset]
+            * multipliers[asset]
+            for asset, quantity in rounded.items()
+        )
+        cash_after_committed = max(0.0, available_cash - committed_delta)
+        residual_cash = max(
+            0.0,
+            min(cash_after_committed, target_notional - committed_notional),
+        )
         candidates = sorted(
             (
                 (abs(raw[asset] - rounded[asset]), asset)

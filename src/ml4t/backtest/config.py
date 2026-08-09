@@ -749,6 +749,9 @@ class BacktestConfig:
     data_frequency: DataFrequency = DataFrequency.DAILY  # Data frequency
     enforce_sessions: bool = False  # Skip bars outside trading sessions (requires calendar)
 
+    # === Result Evidence ===
+    retain_intent_history: bool = False
+
     # === Metadata ===
     preset_name: str | None = None  # Name of preset this was loaded from
     feed_spec: FeedSpec | None = field(default=None, repr=False, compare=False)
@@ -930,6 +933,7 @@ class BacktestConfig:
                 "enforce_sessions": self.enforce_sessions,
             },
             "feed": _feed_spec_to_dict(self.resolved_feed_spec),
+            "result": {"retain_intent_history": self.retain_intent_history},
             "metadata": serialize_artifact_value(self.metadata),
         }
 
@@ -960,6 +964,7 @@ class BacktestConfig:
                 "orders",
                 "calendar",
                 "feed",
+                "result",
                 "metadata",
             }
             unknown_sections = set(data) - allowed_sections
@@ -1043,6 +1048,7 @@ class BacktestConfig:
                     "timestamp_semantics",
                     "session_start_time",
                 },
+                "result": {"retain_intent_history"},
             }
             for section, cfg in data.items():
                 if section == "metadata":
@@ -1070,6 +1076,7 @@ class BacktestConfig:
         order_cfg = data.get("orders", {})
         cal_cfg = data.get("calendar", {})
         feed_cfg = data.get("feed", {})
+        result_cfg = data.get("result", {})
         metadata = data.get("metadata", {})
 
         if metadata is None:
@@ -1171,6 +1178,7 @@ class BacktestConfig:
             # Metadata
             preset_name=preset_name,
             feed_spec=FeedSpec.from_any(feed_cfg) if feed_cfg else None,
+            retain_intent_history=result_cfg.get("retain_intent_history", False),
             metadata=dict(metadata),
         )
 

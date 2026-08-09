@@ -399,6 +399,12 @@
         "name": "enforce_sessions"
       },
       {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "retain_intent_history"
+      },
+      {
         "annotation": "str | None",
         "default": null,
         "keyword_only": false,
@@ -515,6 +521,9 @@
       "position_sizing": {
         "share_type": "integer"
       },
+      "result": {
+        "retain_intent_history": false
+      },
       "settlement": {
         "delay": 0,
         "reduces_buying_power": true
@@ -552,6 +561,7 @@
     "from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed",
     "from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest",
     "from ml4t.backtest import ExecutionMode, StopFillMode",
+    "from ml4t.backtest import RebalanceSchedule",
     "from ml4t.backtest import RuleChain, StopLoss, TakeProfit, TrailingStop",
     "from ml4t.backtest import StopLoss",
     "from ml4t.backtest import StopLoss, TakeProfit, TrailingStop, RuleChain",
@@ -1048,12 +1058,14 @@
       "avg_win",
       "cagr",
       "calmar",
+      "child_order_intent_count",
       "child_order_intents",
       "execution_policy",
       "expectancy",
       "final_value",
       "gross_profit_factor",
       "initial_cash",
+      "intent_reconciliation_count",
       "intent_reconciliations",
       "largest_loss",
       "largest_win",
@@ -1073,6 +1085,7 @@
       "sharpe",
       "skipped_bars",
       "sortino",
+      "target_intent_count",
       "target_intents",
       "total_commission",
       "total_costs",

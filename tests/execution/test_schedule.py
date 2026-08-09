@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -10,7 +11,9 @@ from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest.execution import (
     RebalanceCadence,
+    RebalanceConfig,
     RebalanceSchedule,
+    TargetWeightExecutor,
     is_rebalance_timestamp,
     resolve_rebalance_timestamps,
 )
@@ -62,14 +65,19 @@ class TestResolveRebalanceTimestamps:
         expected = [datetime.combine(ts, datetime.min.time()) for ts in timestamps.to_list()[::2]]
         assert result.to_list() == expected
 
-    def test_weekly_uses_last_available_session_in_week(self) -> None:
+    def test_weekly_uses_scheduled_week_end(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-31")
 
         result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.weekly())
 
-        assert all(ts.weekday() == 4 for ts in result.to_list()[:-1])
+        assert result.to_list() == [
+            datetime(2024, 1, 5),
+            datetime(2024, 1, 12),
+            datetime(2024, 1, 19),
+            datetime(2024, 1, 26),
+        ]
 
-    def test_month_end_uses_last_available_session_in_month(self) -> None:
+    def test_month_end_uses_scheduled_month_end(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-03-31")
 
         result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.month_end())
@@ -80,12 +88,31 @@ class TestResolveRebalanceTimestamps:
         assert resolved[1].month == 2 and resolved[1].day == 29
         assert resolved[2].month == 3 and resolved[2].day == 29
 
+    def test_incomplete_month_does_not_move_rebalance_to_last_available_bar(self) -> None:
+        timestamps = _make_weekday_series("2024-01-01", "2024-01-30")
+
+        result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.month_end())
+
+        assert result.to_list() == []
+
+    def test_calendar_week_end_uses_last_exchange_session_before_holiday(self) -> None:
+        timestamps = _make_weekday_series("2024-03-25", "2024-03-28")
+
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceSchedule.weekly(),
+            calendar="NYSE",
+            data_frequency="daily",
+        )
+
+        assert result.to_list() == [datetime(2024, 3, 28)]
+
     def test_cme_session_grouping_uses_session_boundaries(self) -> None:
         timestamps = [
             datetime(2024, 1, 7, 18, 0),
-            datetime(2024, 1, 8, 10, 0),
+            datetime(2024, 1, 8, 16, 0),
             datetime(2024, 1, 8, 18, 0),
-            datetime(2024, 1, 9, 10, 0),
+            datetime(2024, 1, 9, 16, 0),
         ]
 
         result = resolve_rebalance_timestamps(
@@ -95,22 +122,38 @@ class TestResolveRebalanceTimestamps:
             timezone="America/Chicago",
         )
 
-        assert result.to_list() == [datetime(2024, 1, 8, 10, 0), datetime(2024, 1, 9, 10, 0)]
+        assert result.to_list() == [datetime(2024, 1, 8, 16, 0), datetime(2024, 1, 9, 16, 0)]
 
-    def test_explicit_timezone_is_not_overridden_by_calendar(self) -> None:
+    def test_naive_intraday_timestamps_default_to_utc(self) -> None:
+        timestamps = [datetime(2024, 1, 7, 23), datetime(2024, 1, 8, 22)]
+
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceCadence.EVERY_SESSION,
+            calendar="CME_Equity",
+            session_start_time="17:00",
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert result.to_list() == [datetime(2024, 1, 8, 22)]
+
+    def test_intraday_batch_schedule_requires_the_exchange_close(self) -> None:
         timestamps = [
             datetime(2024, 1, 8, 15, 0, tzinfo=UTC),
-            datetime(2024, 1, 8, 16, 0, tzinfo=UTC),
+            datetime(2024, 1, 8, 21, 0, tzinfo=UTC),
         ]
 
         result = resolve_rebalance_timestamps(
             timestamps,
             RebalanceCadence.EVERY_SESSION,
             calendar="NYSE",
-            timezone="America/Chicago",
+            timezone="UTC",
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
         )
 
-        assert result.to_list() == [timestamps[0], timestamps[1]]
+        assert result.to_list() == [timestamps[1]]
 
     def test_weekly_daily_session_labels_use_labeled_dates_not_prior_sessions(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-12")
@@ -281,8 +324,7 @@ class TestCausalScheduleEvaluation:
     def test_unspecified_metadata_preserves_daily_non_midnight_labels(self) -> None:
         timestamp = datetime(2024, 1, 31, 16, 0)
 
-        schedule_module._warn_missing_boundary_metadata.cache_clear()
-        with pytest.warns(UserWarning, match="treated as daily session closes"):
+        with pytest.warns(UserWarning, match="treated as daily session closes") as captured:
             assert is_rebalance_timestamp(
                 timestamp,
                 RebalanceSchedule.month_end(),
@@ -294,9 +336,10 @@ class TestCausalScheduleEvaluation:
                 RebalanceSchedule.every_session(),
                 session_index=22,
             )
+        assert Path(captured[0].filename).name == "test_schedule.py"
 
-    def test_midnight_daily_label_overrides_explicit_bar_close_semantics(self) -> None:
-        assert is_rebalance_timestamp(
+    def test_midnight_is_not_a_daily_label_with_explicit_bar_semantics(self) -> None:
+        assert not is_rebalance_timestamp(
             datetime(2024, 1, 31),
             RebalanceSchedule.every_session(),
             session_index=22,
@@ -313,6 +356,59 @@ class TestCausalScheduleEvaluation:
             timezone="UTC",
             data_frequency="1m",
             timestamp_semantics="event_time",
+        )
+
+    def test_event_time_semantics_are_sufficient_to_reject_midnight_as_close(self) -> None:
+        assert not is_rebalance_timestamp(
+            datetime(2024, 1, 5, tzinfo=UTC),
+            RebalanceSchedule.every_session(),
+            session_index=5,
+            calendar="CME_Equity",
+            timezone="UTC",
+            timestamp_semantics="event_time",
+        )
+
+    def test_batch_and_incremental_fixed_session_schedules_agree(self) -> None:
+        timestamps = [
+            datetime(2024, 1, 7, 23, 0),
+            datetime(2024, 1, 8, 22, 0),
+            datetime(2024, 1, 8, 23, 0),
+            datetime(2024, 1, 9, 22, 0),
+            datetime(2024, 1, 9, 23, 0),
+            datetime(2024, 1, 10, 22, 0),
+        ]
+        schedule = RebalanceSchedule.fixed_n_sessions(2)
+
+        batch = resolve_rebalance_timestamps(
+            timestamps,
+            schedule,
+            calendar="CME_Equity",
+            timezone="UTC",
+            session_start_time="17:00",
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        ).to_list()
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=schedule,
+                calendar="CME_Equity",
+                timezone="UTC",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+        incremental = [
+            timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)
+        ]
+
+        assert (
+            batch
+            == incremental
+            == [
+                datetime(2024, 1, 8, 22, 0),
+                datetime(2024, 1, 10, 22, 0),
+            ]
         )
 
     def test_intraday_calendar_closes_are_cached_per_event_date(

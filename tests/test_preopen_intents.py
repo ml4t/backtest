@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import UTC, date, datetime
 
 import polars as pl
@@ -19,14 +19,17 @@ from ml4t.specs import (
 
 from ml4t.backtest import (
     AmbiguousBarPathError,
+    AssetClass,
     BacktestConfig,
     BacktestResult,
     Broker,
+    ContractSpec,
     DataFeed,
     Engine,
     ExecutionMode,
     IntentOutcome,
     LateAuctionIntentError,
+    Position,
     PreOpenIntentError,
     Strategy,
     UnsupportedPreOpenPolicyError,
@@ -154,6 +157,16 @@ def test_callback_rollback_does_not_run_public_restart_validation(
     assert engine.broker.get_target_intents() == ()
 
 
+def test_preopen_transaction_checkpoint_retains_only_collection_lengths() -> None:
+    engine = Engine(DataFeed(prices_df=prices()), InitialTargetStrategy(target_intent()))
+    engine.preopen_target_manager.register(target_intent())
+
+    state = engine.preopen_target_manager.capture_transaction_state()
+
+    assert all(field.name.endswith("_length") for field in fields(state))
+    assert all(isinstance(getattr(state, field.name), int) for field in fields(state))
+
+
 def test_opening_target_registration_from_on_start_names_on_prepare_migration() -> None:
     intent = target_intent()
 
@@ -177,6 +190,7 @@ def test_initial_weight_target_lowers_at_open_and_rules_see_only_later_movement(
     engine = Engine(
         DataFeed(prices_df=prices()),
         InitialTargetStrategy(intent, StopLoss(0.05)),
+        BacktestConfig(retain_intent_history=True),
     )
 
     result = engine.run()
@@ -239,6 +253,44 @@ def test_scheduled_target_registered_from_prior_event_fills_next_open() -> None:
     assert len(result.fills) == 1
     assert result.fills[0].timestamp == datetime(2026, 8, 4)
     assert result.fills[0].price == 100.0
+
+
+def test_opening_target_uses_exchange_session_date_across_utc_calendar_boundary() -> None:
+    intent = replace(
+        target_intent(session=date(2024, 1, 8)),
+        decision_time=datetime(2024, 1, 7, 22, tzinfo=UTC),
+        information_cutoff=datetime(2024, 1, 7, 22, tzinfo=UTC),
+    )
+    frame = pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, 7, 23)],
+            "asset": ["SPY"],
+            "open": [100.0],
+            "high": [101.0],
+            "low": [99.0],
+            "close": [100.0],
+            "volume": [1_000_000.0],
+        }
+    )
+    feed = DataFeed(
+        prices_df=frame,
+        feed_spec={
+            "calendar": "CME_Equity",
+            "timezone": "UTC",
+            "data_frequency": "1m",
+            "timestamp_semantics": "bar_close",
+            "session_start_time": "17:00",
+        },
+    )
+
+    result = Engine(
+        feed,
+        InitialTargetStrategy(intent),
+        BacktestConfig(data_frequency="1m"),
+    ).run()
+
+    assert len(result.fills) == 1
+    assert result.fills[0].timestamp == datetime(2024, 1, 7, 23)
 
 
 def test_same_session_target_registered_after_market_event_is_rejected_without_orders() -> None:
@@ -549,6 +601,46 @@ def test_reject_residual_policy_fails_before_child_order() -> None:
     assert engine.broker.orders == []
 
 
+def test_largest_remainder_allocation_accounts_for_contract_multipliers() -> None:
+    specs = {
+        asset: ContractSpec(asset, AssetClass.FUTURE, multiplier=50.0) for asset in ("ES", "NQ")
+    }
+    engine = Engine(
+        DataFeed(prices_df=prices()),
+        InitialTargetStrategy(target_intent()),
+        BacktestConfig(initial_cash=300_000.0),
+        contract_specs=specs,
+    )
+    rounded = {"ES": 1.0, "NQ": 1.0}
+
+    engine.preopen_target_manager._allocate_largest_remainders(
+        {"ES": 1.6, "NQ": 1.6},
+        rounded,
+        {"ES": 1_000.0, "NQ": 1_000.0},
+        0.0,
+    )
+
+    assert rounded == {"ES": 2.0, "NQ": 1.0}
+
+
+def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> None:
+    engine = Engine(DataFeed(prices_df=prices()), InitialTargetStrategy(target_intent()))
+    engine.broker.positions.update(
+        {asset: Position(asset, 10.0, 100.0, datetime(2026, 8, 1)) for asset in ("A", "B")}
+    )
+    engine.broker.cash = 0.0
+    rounded = {"A": 4.0, "B": 4.0}
+
+    engine.preopen_target_manager._allocate_largest_remainders(
+        {"A": 4.6, "B": 4.6},
+        rounded,
+        {"A": 100.0, "B": 100.0},
+        0.0,
+    )
+
+    assert rounded == {"A": 5.0, "B": 4.0}
+
+
 def test_restart_state_requires_matching_broker_order_state() -> None:
     config = BacktestConfig()
     policy = replace(
@@ -599,6 +691,7 @@ def test_result_artifact_round_trip_retains_contract_and_intent_evidence(tmp_pat
     result = Engine(
         DataFeed(prices_df=prices(low=100.0)),
         InitialTargetStrategy(intent),
+        BacktestConfig(retain_intent_history=True),
     ).run()
 
     result.to_parquet(tmp_path)
@@ -609,6 +702,20 @@ def test_result_artifact_round_trip_retains_contract_and_intent_evidence(tmp_pat
     assert loaded.metrics["target_intents"] == [intent.to_dict()]
     assert loaded.metrics["child_order_intents"] == result.metrics["child_order_intents"]
     assert loaded.metrics["intent_reconciliations"] == result.metrics["intent_reconciliations"]
+
+
+def test_default_result_retains_intent_counts_without_full_history() -> None:
+    result = Engine(
+        DataFeed(prices_df=prices(low=100.0)),
+        InitialTargetStrategy(target_intent()),
+    ).run()
+
+    assert result.metrics["target_intent_count"] == 1
+    assert result.metrics["child_order_intent_count"] == 1
+    assert result.metrics["intent_reconciliation_count"] == 1
+    assert result.metrics["target_intents"] == []
+    assert result.metrics["child_order_intents"] == []
+    assert result.metrics["intent_reconciliations"] == []
 
 
 def test_ambiguous_opening_bar_path_requires_declared_resolution() -> None:

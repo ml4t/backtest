@@ -718,7 +718,7 @@ class Broker:
                 "positions_created_this_bar": set(self._risk_state.positions_created_this_bar),
             },
             "risk_rules": None,
-            "orders": tuple(self.orders),
+            "orders_length": len(self.orders),
             "pending_orders": tuple(self.pending_orders),
             "pending_order_state": {},
             "order_counter": self._order_state.counter,
@@ -817,7 +817,7 @@ class Broker:
             if order_state is not None:
                 order.__dict__.clear()
                 order.__dict__.update(copy.deepcopy(order_state))
-        self._order_state.orders[:] = state["orders"]
+        del self._order_state.orders[state["orders_length"] :]
         self._order_state.pending[:] = state["pending_orders"]
         self._order_state.counter = state["order_counter"]
         self._order_state.partial_quantities.clear()
@@ -867,6 +867,10 @@ class Broker:
         lifecycle_version: LifecycleVersion,
         *,
         calendar: str | None,
+        timezone: str | None = None,
+        session_start_time: str | None = None,
+        data_frequency: Any | None = None,
+        timestamp_semantics: Any | None = None,
     ) -> PreOpenTargetManager:
         from .preopen import PreOpenTargetManager
 
@@ -877,6 +881,10 @@ class Broker:
             account=self.account,
             market=self._market_state,
             calendar=calendar,
+            timezone=timezone,
+            session_start_time=session_start_time,
+            data_frequency=data_frequency,
+            timestamp_semantics=timestamp_semantics,
         )
         self._preopen_target_manager = manager
         return manager

@@ -191,6 +191,21 @@ def test_callback_failure_rolls_back_immediate_fill_and_runs_end_once() -> None:
     assert engine.preopen_target_manager.account is account
 
 
+def test_non_callback_engine_failure_runs_end_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    strategy = TraceStrategy()
+    engine = Engine(DataFeed(prices_df=prices()), strategy)
+
+    def fail_opening(timestamp):
+        raise RuntimeError("opening failed")
+
+    monkeypatch.setattr(engine.preopen_target_manager, "process_opening", fail_opening)
+
+    with pytest.raises(RuntimeError, match="opening failed"):
+        engine.run()
+
+    assert strategy.trace == ["on_start", "on_prepare", "on_end"]
+
+
 def test_callback_failure_restores_updated_and_cancelled_pending_order() -> None:
     class FailingStrategy(Strategy):
         def on_data(self, timestamp, data, context, broker) -> None:
@@ -237,6 +252,8 @@ def test_scoped_lifecycle_snapshot_copies_only_the_position_being_mutated() -> N
     assert set(state["positions"]) == {"SPY"}
     assert state["risk_rules"] is None
     assert state["target_intent_state"] is None
+    assert state["orders_length"] == 0
+    assert "orders" not in state
 
 
 def test_failed_stats_reconfiguration_restores_all_asset_histories() -> None:

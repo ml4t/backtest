@@ -29,6 +29,7 @@ from .schedule import (
     RebalanceSchedule,
     is_rebalance_timestamp,
     resolve_rebalance_timestamps,
+    session_date_for_timestamp,
 )
 
 __all__ = [
@@ -51,6 +52,7 @@ __all__ = [
     "RebalanceSchedule",
     "is_rebalance_timestamp",
     "resolve_rebalance_timestamps",
+    "session_date_for_timestamp",
     # Result
     "ExecutionResult",
 ]
