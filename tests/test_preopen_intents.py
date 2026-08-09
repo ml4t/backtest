@@ -35,7 +35,13 @@ from ml4t.backtest import (
     UnsupportedPreOpenPolicyError,
     default_execution_policy,
 )
-from ml4t.backtest.config import CommissionType, ExecutionPrice, SlippageType, TrailStopTiming
+from ml4t.backtest.config import (
+    CommissionType,
+    ExecutionPrice,
+    ShareType,
+    SlippageType,
+    TrailStopTiming,
+)
 from ml4t.backtest.execution import VolumeParticipationLimit
 from ml4t.backtest.risk.position import StopLoss, TrailingStop
 from ml4t.backtest.types import OrderType
@@ -167,6 +173,20 @@ def test_preopen_transaction_checkpoint_retains_only_collection_lengths() -> Non
     assert all(isinstance(getattr(state, field.name), int) for field in fields(state))
 
 
+def test_target_intent_state_restore_is_rejected_inside_lifecycle_callback() -> None:
+    class RestoreDuringPrepare(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.restore_target_intent_state({})
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(DataFeed(prices_df=prices()), RestoreDuringPrepare())
+
+    with pytest.raises(RuntimeError, match="cannot be restored during a lifecycle callback"):
+        engine.run()
+
+
 def test_opening_target_registration_from_on_start_names_on_prepare_migration() -> None:
     intent = target_intent()
 
@@ -253,6 +273,40 @@ def test_scheduled_target_registered_from_prior_event_fills_next_open() -> None:
     assert len(result.fills) == 1
     assert result.fills[0].timestamp == datetime(2026, 8, 4)
     assert result.fills[0].price == 100.0
+
+
+def test_opening_target_marks_existing_non_target_position_at_open() -> None:
+    scheduled = target_intent(intent_id="scheduled", session=date(2026, 8, 5))
+
+    class ExistingPositionStrategy(Strategy):
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if timestamp.date() == date(2026, 8, 3):
+                broker.submit_order("HELD", 100)
+            elif timestamp.date() == date(2026, 8, 4):
+                broker.register_target_intent(scheduled)
+
+    rows = []
+    for timestamp in (datetime(2026, 8, 3), datetime(2026, 8, 4), datetime(2026, 8, 5)):
+        for asset in ("SPY", "HELD"):
+            close = 200.0 if asset == "HELD" and timestamp.date() == date(2026, 8, 5) else 100.0
+            rows.append(
+                {
+                    "timestamp": timestamp,
+                    "asset": asset,
+                    "open": 100.0,
+                    "high": max(100.0, close),
+                    "low": 100.0,
+                    "close": close,
+                    "volume": 1_000_000.0,
+                }
+            )
+
+    engine = Engine(DataFeed(prices_df=pl.DataFrame(rows)), ExistingPositionStrategy())
+    engine.run()
+
+    child = engine.broker.get_child_order_intents()[0]
+    assert child.asset == "SPY"
+    assert child.quantity == 500
 
 
 def test_opening_target_uses_exchange_session_date_across_utc_calendar_boundary() -> None:
@@ -402,6 +456,27 @@ def test_partial_opening_fill_cancels_opg_remainder_and_retains_lineage() -> Non
     assert reconciliation.remaining_quantity == 490
     assert engine.broker.pending_orders == []
     assert engine.broker._order_state.partial_quantities == {}
+
+
+def test_opening_reconciliation_rejects_a_nonterminal_opg_child(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = BacktestConfig()
+    policy = replace(
+        default_execution_policy(config),
+        liquidity_fraction=0.1,
+        allow_partial_fills=True,
+    )
+    engine = Engine(
+        DataFeed(prices_df=prices(volume=100)),
+        InitialTargetStrategy(target_intent()),
+        config,
+        execution_policy=policy,
+    )
+    monkeypatch.setattr(engine.broker, "cancel_order", lambda _: False)
+
+    with pytest.raises(RuntimeError, match="must be terminal after the OPG cancel sweep"):
+        engine.run()
 
 
 def test_non_integral_liquidity_limit_is_rounded_consistently() -> None:
@@ -679,11 +754,11 @@ def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> 
     assert rounded == {"A": 5.0, "B": 4.0}
 
 
-def test_fractional_largest_remainder_preserves_declared_rounding() -> None:
+def test_fractional_largest_remainder_allocates_the_fractional_residual() -> None:
     engine = Engine(
         DataFeed(prices_df=prices()),
         InitialTargetStrategy(target_intent()),
-        BacktestConfig(share_type="fractional"),
+        BacktestConfig(share_type=ShareType.FRACTIONAL),
     )
     rounded = {"SPY": 1.0}
 
@@ -694,7 +769,7 @@ def test_fractional_largest_remainder_preserves_declared_rounding() -> None:
         0.0,
     )
 
-    assert rounded == {"SPY": 1.0}
+    assert rounded == {"SPY": 1.75}
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:

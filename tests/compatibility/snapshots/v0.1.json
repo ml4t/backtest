@@ -2495,9 +2495,17 @@
           "kind": "method",
           "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker') -> 'list[dict]'"
         },
+        "reset": {
+          "kind": "method",
+          "signature": "(self) -> 'None'"
+        },
         "should_rebalance": {
           "kind": "method",
           "signature": "(self, timestamp: 'datetime', *, is_session_close: 'bool | None' = None) -> 'bool'"
+        },
+        "validate_completed_run": {
+          "kind": "method",
+          "signature": "(self) -> 'None'"
         }
       },
       "module": "ml4t.backtest.execution.rebalancer",
@@ -3012,6 +3020,10 @@
         "on_data": {
           "kind": "method",
           "signature": "(self, timestamp: 'datetime', data: 'dict[str, dict]', context: 'dict[str, Any]', broker: 'Broker') -> 'None'"
+        },
+        "on_end": {
+          "kind": "method",
+          "signature": "(self, broker: 'Broker') -> 'None'"
         },
         "on_prepare": {
           "kind": "method",
@@ -3986,9 +3998,17 @@
           "kind": "method",
           "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker') -> 'list[dict]'"
         },
+        "reset": {
+          "kind": "method",
+          "signature": "(self) -> 'None'"
+        },
         "should_rebalance": {
           "kind": "method",
           "signature": "(self, timestamp: 'datetime', *, is_session_close: 'bool | None' = None) -> 'bool'"
+        },
+        "validate_completed_run": {
+          "kind": "method",
+          "signature": "(self) -> 'None'"
         }
       },
       "module": "ml4t.backtest.execution.rebalancer",

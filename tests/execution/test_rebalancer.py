@@ -516,6 +516,50 @@ class TestTargetWeightExecutorScheduling:
         with pytest.raises(ValueError, match="resolved no session close"):
             executor.should_rebalance(datetime(2024, 1, 3, 9, 30))
 
+    def test_intraday_schedule_validates_the_final_observed_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 15, 45))
+        with pytest.raises(ValueError, match="resolved no session closes"):
+            executor.validate_completed_run()
+
+    def test_period_schedule_requires_calendar_when_executor_is_constructed(self):
+        with pytest.raises(ValueError, match="require calendar metadata"):
+            TargetWeightExecutor(config=RebalanceConfig(schedule=RebalanceSchedule.weekly()))
+
+    def test_mutated_schedule_configuration_rebuilds_online_evaluator(self):
+        config = RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            data_frequency="daily",
+        )
+        executor = TargetWeightExecutor(config=config)
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+
+        config.schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 4)])
+
+        assert not executor.should_rebalance(datetime(2024, 1, 3))
+        assert executor.should_rebalance(datetime(2024, 1, 4))
+
+    def test_reused_executor_resets_when_session_dates_move_backward(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                data_frequency="daily",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+        assert not executor.should_rebalance(datetime(2024, 1, 3))
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+
     def test_midnight_daily_labels_do_not_warn_without_optional_metadata(self):
         executor = TargetWeightExecutor(
             config=RebalanceConfig(schedule=RebalanceSchedule.every_session())

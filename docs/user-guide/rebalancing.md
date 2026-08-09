@@ -130,7 +130,12 @@ crosses a required session whose close never matched, rather than completing wit
 
 `TargetWeightExecutor.prepare_schedule()` was removed before 0.1.0 because it required the future
 feed timestamp sequence. Put the metadata shown above on `RebalanceConfig`; `should_rebalance()`
-then evaluates only the current event and prior evaluator state.
+then evaluates only the current event and prior evaluator state. Call `should_rebalance()` or
+scheduled `execute()` for every event in chronological order, including warm-up periods. After the
+final event, call `validate_completed_run()` so a missing close in the final session is reported.
+Call `reset()` before reusing an executor for another run. A backward session date also resets the
+evaluator automatically, and changes to the public `RebalanceConfig` rebuild it.
+`LongShortStrategy` performs final validation from `on_end()` automatically.
 
 ## See It in Action
 

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import polars as pl
+import pytest
 from ml4t.specs.market_data import FeedSpec
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine
@@ -453,6 +454,34 @@ class TestLongShortStrategy:
         Engine.from_config(feed, strategy, BacktestConfig(data_frequency="1m")).run()
 
         assert strategy.rank_calls == 2
+
+    def test_intraday_schedule_validates_final_session_from_on_end(self):
+        class ClosingLongShort(LongShortStrategy):
+            rebalance_schedule = RebalanceSchedule.every_session()
+
+        timestamp = datetime(2024, 1, 2, 15, 45)
+        rows = [
+            {"timestamp": timestamp, "asset": asset, "close": 100.0, "signal": signal}
+            for asset, signal in (("A", 1.0), ("B", 0.0), ("C", -1.0))
+        ]
+        frame = pl.DataFrame(rows)
+        feed = DataFeed(
+            prices_df=frame,
+            signals_df=frame.select(["timestamp", "asset", "signal"]),
+            feed_spec=FeedSpec(
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            ),
+        )
+
+        with pytest.raises(ValueError, match="required session 2024-01-02"):
+            Engine.from_config(
+                feed,
+                ClosingLongShort(),
+                BacktestConfig(data_frequency="15m"),
+            ).run()
 
 
 class TestStrategyImports:

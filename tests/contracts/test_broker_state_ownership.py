@@ -194,7 +194,6 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
         "update_position_context": {"asset"},
         "register_target_intent": {"target_intents"},
         "register_position_rule_policy": {"target_intents"},
-        "restore_target_intent_state": {"target_intents"},
         "evaluate_position_rules": {
             "all_positions",
             "all_pending_orders",

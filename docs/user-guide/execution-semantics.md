@@ -104,6 +104,11 @@ child-intent, and reconciliation records in the result artifact. The default avo
 unbounded event history into results from long-running or high-asset simulations. The broker
 accessors and `export_target_intent_state()` remain available during and after a run.
 
+For fractional-share accounts, `ResidualPolicy.LARGEST_REMAINDER` allocates the fractional
+remainder up to each raw target after applying the selected rounding policy. The final quantity can
+therefore include the fraction removed by the initial rounding step. Use `KEEP_CASH` when that
+fraction should remain unallocated.
+
 `export_target_intent_state()` does not contain account or order-book state. Restoring state that
 already contains child orders therefore requires those orders and the corresponding account state
 to exist in the destination broker. A fresh `Engine` cannot resume a post-opening state from the

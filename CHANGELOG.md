@@ -28,6 +28,8 @@
 - Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled
   exchange session rather than the last available feed bar; holidays and missing period-end data
   no longer move a rebalance earlier.
+- Online session schedules require evaluation on every event and expose validate_completed_run()
+  to diagnose a missing final session close.
 - Result artifacts retain intent counts by default. Set retain_intent_history to include full
   target, child-order, and reconciliation histories.
 
@@ -55,6 +57,8 @@
 - TargetWeightExecutor.prepare_schedule was removed. Configure calendar, timezone,
   session_start_time, data_frequency, and timestamp_semantics on RebalanceConfig for causal
   schedule evaluation.
+- ExecutionPolicy.liquidity_fraction now applies only to opening-auction target children.
+  Configure Engine execution_limits explicitly to constrain ordinary strategy orders.
 
 ### Validation
 

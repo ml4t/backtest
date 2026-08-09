@@ -1364,7 +1364,6 @@ class Broker:
         """Restore target intent state before strategy initialization."""
         if self._active_lifecycle_phase is not None:
             raise RuntimeError("target intent state cannot be restored during a lifecycle callback")
-        self._capture_lifecycle_mutation(target_intents=True)
         if self._preopen_target_manager is None:
             raise RuntimeError("target intents require an Engine-configured broker")
         self._preopen_target_manager.restore_state(state)

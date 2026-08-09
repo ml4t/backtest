@@ -32,7 +32,7 @@ class Strategy(ABC):
         broker: Any,
         config: Any | None = None,
     ) -> None:
-        """Called before on_start with causal calendar and execution configuration."""
+        """Called after on_start with causal configuration and no future feed data."""
         return None
 
     def on_end(self, broker: Any) -> None:  # noqa: B027

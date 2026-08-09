@@ -348,6 +348,7 @@ class LongShortStrategy(Strategy):
     ) -> None:
         """Retain causal calendar metadata for online schedule evaluation."""
         self._schedule_config = config
+        self._schedule_evaluator = None
         if self.rebalance_schedule is not None and config is not None:
             self._schedule_evaluator = _OnlineRebalanceEvaluator(
                 self.rebalance_schedule,
@@ -446,3 +447,8 @@ class LongShortStrategy(Strategy):
 
             if position is None and target_shares > 0:
                 broker.submit_order(asset, -target_shares)
+
+    def on_end(self, broker: Broker) -> None:
+        """Validate that the final required scheduled session matched its close."""
+        if self._schedule_evaluator is not None:
+            self._schedule_evaluator.validate_completed_run()

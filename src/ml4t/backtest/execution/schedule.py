@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from calendar import monthrange
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from enum import Enum
 from functools import lru_cache
@@ -39,12 +39,16 @@ class RebalanceSchedule:
     cadence: RebalanceCadence = RebalanceCadence.EVERY_BAR
     every_n: int = 1
     timestamps: tuple[datetime, ...] = ()
+    _timestamp_set: frozenset[datetime] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.cadence == RebalanceCadence.FIXED_N_SESSIONS and self.every_n < 1:
             raise ValueError("RebalanceSchedule.every_n must be >= 1")
-        if self.cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS and not self.timestamps:
+        timestamps = tuple(sorted({_coerce_timestamp(ts) for ts in self.timestamps}))
+        if self.cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS and not timestamps:
             raise ValueError("Explicit timestamp schedules require at least one timestamp")
+        object.__setattr__(self, "timestamps", timestamps)
+        object.__setattr__(self, "_timestamp_set", frozenset(timestamps))
 
     @classmethod
     def every_bar(cls) -> RebalanceSchedule:
@@ -70,7 +74,7 @@ class RebalanceSchedule:
     def explicit_timestamps(cls, timestamps: Sequence[datetime]) -> RebalanceSchedule:
         return cls(
             cadence=RebalanceCadence.EXPLICIT_TIMESTAMPS,
-            timestamps=tuple(sorted({_coerce_timestamp(ts) for ts in timestamps})),
+            timestamps=tuple(timestamps),
         )
 
 
@@ -121,7 +125,8 @@ def _evaluate_rebalance_timestamp(
     if cadence is RebalanceCadence.EVERY_BAR:
         return True
     if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
-        return timestamp in resolved.timestamps
+        return timestamp in resolved._timestamp_set
+    _validate_schedule_calendar(resolved, calendar)
     if is_session_close is None:
         is_session_close = _is_session_close_timestamp(
             timestamp,
@@ -137,8 +142,6 @@ def _evaluate_rebalance_timestamp(
     if cadence is RebalanceCadence.FIXED_N_SESSIONS:
         return (session_index - 1) % resolved.every_n == 0
 
-    if calendar is None:
-        raise ValueError("weekly and month_end schedules require calendar metadata")
     if session_date is None:
         session_date = session_date_for_timestamp(
             timestamp,
@@ -148,14 +151,7 @@ def _evaluate_rebalance_timestamp(
             data_frequency=data_frequency,
             timestamp_semantics=timestamp_semantics,
         )
-    if cadence is RebalanceCadence.WEEKLY:
-        period_start = session_date - timedelta(days=session_date.weekday())
-        period_end = period_start + timedelta(days=6)
-    elif cadence is RebalanceCadence.MONTH_END:
-        period_start = session_date.replace(day=1)
-        period_end = session_date.replace(day=monthrange(session_date.year, session_date.month)[1])
-    else:
-        raise ValueError(f"Unsupported rebalance cadence: {cadence}")
+    period_start, period_end = _period_bounds(cadence, session_date)
 
     return session_date == _calendar_period_end(calendar, period_start, period_end)
 
@@ -175,12 +171,6 @@ def _is_session_close_timestamp(
         return True
     if semantics is None and frequency is None:
         _warn_missing_boundary_metadata()
-        return True
-    if (
-        timestamp.time() == time.min
-        and semantics is None
-        and frequency in {None, DataFrequency.DAILY}
-    ):
         return True
     if calendar is None:
         raise ValueError("intraday session schedules require calendar metadata or is_session_close")
@@ -235,23 +225,53 @@ def _session_requires_close(
         return (session_index - 1) % schedule.every_n == 0
     if cadence not in {RebalanceCadence.WEEKLY, RebalanceCadence.MONTH_END}:
         return False
-    if calendar is None:
-        raise ValueError("weekly and month_end schedules require calendar metadata")
-    if cadence is RebalanceCadence.WEEKLY:
-        period_start = session_date - timedelta(days=session_date.weekday())
-        period_end = period_start + timedelta(days=6)
-    else:
-        period_start = session_date.replace(day=1)
-        period_end = session_date.replace(day=monthrange(session_date.year, session_date.month)[1])
+    _validate_schedule_calendar(schedule, calendar)
+    assert calendar is not None
+    period_start, period_end = _period_bounds(cadence, session_date)
     return session_date == _calendar_period_end(calendar, period_start, period_end)
 
 
-def _raise_close_alignment_error(cadence: RebalanceCadence, calendar: str | None) -> None:
+def _period_bounds(cadence: RebalanceCadence, session_date: date) -> tuple[date, date]:
+    if cadence is RebalanceCadence.WEEKLY:
+        period_start = session_date - timedelta(days=session_date.weekday())
+        return period_start, period_start + timedelta(days=6)
+    if cadence is RebalanceCadence.MONTH_END:
+        return (
+            session_date.replace(day=1),
+            session_date.replace(day=monthrange(session_date.year, session_date.month)[1]),
+        )
+    raise ValueError(f"Unsupported period cadence: {cadence}")
+
+
+@lru_cache(maxsize=512)
+def _calendar_close_for_session(calendar: str, session_date: date) -> datetime | None:
+    schedule = get_schedule(calendar, session_date, session_date)
+    return None if schedule.is_empty() else schedule["market_close"][0]
+
+
+def _raise_close_alignment_error(
+    cadence: RebalanceCadence,
+    calendar: str | None,
+    session_date: date,
+) -> None:
+    expected = _calendar_close_for_session(calendar, session_date) if calendar is not None else None
+    expected_text = expected.isoformat() if expected is not None else "unavailable"
     raise ValueError(
-        f"{cadence.value} resolved no session closes for calendar {calendar!r}; verify that "
-        "intraday timestamps align with the exchange market_close and declared timestamp "
-        "semantics"
+        f"{cadence.value} resolved no session closes for required session {session_date} on "
+        f"calendar {calendar!r}; expected market_close {expected_text}. Verify that intraday "
+        "timestamps align with the exchange close and declared timestamp semantics"
     )
+
+
+def _validate_schedule_calendar(
+    schedule: RebalanceSchedule,
+    calendar: str | None,
+) -> None:
+    if (
+        schedule.cadence in {RebalanceCadence.WEEKLY, RebalanceCadence.MONTH_END}
+        and calendar is None
+    ):
+        raise ValueError("weekly and month_end schedules require calendar metadata")
 
 
 class _OnlineRebalanceEvaluator:
@@ -267,6 +287,7 @@ class _OnlineRebalanceEvaluator:
         data_frequency: Any | None,
         timestamp_semantics: TimestampSemantics | str | None,
     ) -> None:
+        _validate_schedule_calendar(schedule, calendar)
         self.schedule = schedule
         self.calendar = calendar
         self.timezone = timezone
@@ -274,6 +295,12 @@ class _OnlineRebalanceEvaluator:
         self.data_frequency = data_frequency
         self.timestamp_semantics = timestamp_semantics
         self._session_date: date | None = None
+        self._session_index = 0
+        self._required_close_matched = False
+
+    def reset(self) -> None:
+        """Clear causal state before evaluating a new run."""
+        self._session_date = None
         self._session_index = 0
         self._required_close_matched = False
 
@@ -286,6 +313,8 @@ class _OnlineRebalanceEvaluator:
             data_frequency=self.data_frequency,
             timestamp_semantics=self.timestamp_semantics,
         )
+        if self._session_date is not None and session_date < self._session_date:
+            self.reset()
         if session_date != self._session_date:
             if (
                 self._session_date is not None
@@ -297,7 +326,11 @@ class _OnlineRebalanceEvaluator:
                 )
                 and not self._required_close_matched
             ):
-                _raise_close_alignment_error(self.schedule.cadence, self.calendar)
+                _raise_close_alignment_error(
+                    self.schedule.cadence,
+                    self.calendar,
+                    self._session_date,
+                )
             self._session_date = session_date
             self._session_index += 1
             self._required_close_matched = False
@@ -315,6 +348,24 @@ class _OnlineRebalanceEvaluator:
         if matched:
             self._required_close_matched = True
         return matched
+
+    def validate_completed_run(self) -> None:
+        """Validate the final observed session after every event has been evaluated."""
+        if (
+            self._session_date is not None
+            and _session_requires_close(
+                self.schedule,
+                self._session_date,
+                self._session_index,
+                self.calendar,
+            )
+            and not self._required_close_matched
+        ):
+            _raise_close_alignment_error(
+                self.schedule.cadence,
+                self.calendar,
+                self._session_date,
+            )
 
 
 def _normalize_schedule_metadata(
@@ -355,8 +406,7 @@ def resolve_rebalance_timestamps(
         return pl.Series("timestamp", ts_list)
 
     if cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS:
-        explicit = set(schedule.timestamps)
-        return pl.Series("timestamp", [ts for ts in ts_list if ts in explicit])
+        return pl.Series("timestamp", [ts for ts in ts_list if ts in schedule._timestamp_set])
 
     metadata = _resolve_schedule_metadata(
         ts_list,
@@ -367,7 +417,9 @@ def resolve_rebalance_timestamps(
         data_frequency=data_frequency,
         timestamp_semantics=timestamp_semantics,
     )
+    _validate_schedule_calendar(schedule, metadata["calendar"])
     session_indices: dict[date, int] = {}
+    matched_sessions: set[date] = set()
     resolved: list[datetime] = []
     for timestamp in ts_list:
         session_date = session_date_for_timestamp(
@@ -392,13 +444,29 @@ def resolve_rebalance_timestamps(
             session_date=session_date,
         ):
             resolved.append(timestamp)
-    if (
-        not resolved
-        and cadence in {RebalanceCadence.EVERY_SESSION, RebalanceCadence.FIXED_N_SESSIONS}
-        and metadata["timestamp_semantics"] is not TimestampSemantics.SESSION_LABEL
+            matched_sessions.add(session_date)
+    is_intraday = (
+        metadata["timestamp_semantics"] is not TimestampSemantics.SESSION_LABEL
         and _to_backtest_frequency(metadata["data_frequency"]) is not DataFrequency.DAILY
-    ):
-        _raise_close_alignment_error(cadence, metadata["calendar"])
+    )
+    if is_intraday:
+        missing_required_sessions = [
+            session_date
+            for session_date, session_index in session_indices.items()
+            if _session_requires_close(
+                schedule,
+                session_date,
+                session_index,
+                metadata["calendar"],
+            )
+            and session_date not in matched_sessions
+        ]
+        if missing_required_sessions:
+            _raise_close_alignment_error(
+                cadence,
+                metadata["calendar"],
+                missing_required_sessions[0],
+            )
     return pl.Series("timestamp", resolved)
 
 

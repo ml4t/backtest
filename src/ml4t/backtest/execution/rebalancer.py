@@ -132,18 +132,39 @@ class TargetWeightExecutor:
             config: Rebalancing configuration. Uses defaults if not provided.
         """
         self.config = config or RebalanceConfig()
-        self._schedule_evaluator = (
-            _OnlineRebalanceEvaluator(
-                self.config.schedule,
+        self._schedule_evaluator: _OnlineRebalanceEvaluator | None = None
+        self._schedule_evaluator_config: tuple[object, ...] | None = None
+        self._current_schedule_evaluator()
+
+    def _current_schedule_evaluator(self) -> _OnlineRebalanceEvaluator | None:
+        schedule = self.config.schedule
+        if schedule is None:
+            self.reset()
+            return None
+        evaluator_config = (
+            schedule,
+            self.config.calendar,
+            self.config.timezone,
+            self.config.session_start_time,
+            self.config.data_frequency,
+            self.config.timestamp_semantics,
+        )
+        if evaluator_config != self._schedule_evaluator_config:
+            self._schedule_evaluator = _OnlineRebalanceEvaluator(
+                schedule,
                 calendar=self.config.calendar,
                 timezone=self.config.timezone,
                 session_start_time=self.config.session_start_time,
                 data_frequency=self.config.data_frequency,
                 timestamp_semantics=self.config.timestamp_semantics,
             )
-            if self.config.schedule is not None
-            else None
-        )
+            self._schedule_evaluator_config = evaluator_config
+        return self._schedule_evaluator
+
+    def reset(self) -> None:
+        """Clear schedule state before reusing this executor for another run."""
+        self._schedule_evaluator = None
+        self._schedule_evaluator_config = None
 
     def should_rebalance(
         self,
@@ -151,13 +172,20 @@ class TargetWeightExecutor:
         *,
         is_session_close: bool | None = None,
     ) -> bool:
-        """Evaluate the current timestamp without a future feed sequence."""
-        if self._schedule_evaluator is None:
+        """Evaluate one event in order; call this for every event when a schedule is set."""
+        evaluator = self._current_schedule_evaluator()
+        if evaluator is None:
             return True
-        return self._schedule_evaluator.evaluate(
+        return evaluator.evaluate(
             timestamp,
             is_session_close=is_session_close,
         )
+
+    def validate_completed_run(self) -> None:
+        """Validate schedule alignment after the final event in a complete run."""
+        evaluator = self._current_schedule_evaluator()
+        if evaluator is not None:
+            evaluator.validate_completed_run()
 
     def execute(
         self,
@@ -188,6 +216,8 @@ class TargetWeightExecutor:
             broker: Broker instance for order submission.
             timestamp: Current event time, required when a schedule is configured.
             is_session_close: Explicit boundary signal for intraday feeds without a calendar.
+                When a schedule is configured, call ``execute`` for every event in order and call
+                ``validate_completed_run`` after the final event.
 
         Returns:
             List of submitted orders.

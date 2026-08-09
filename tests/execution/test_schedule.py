@@ -57,6 +57,18 @@ class TestResolveRebalanceTimestamps:
         ]
         assert result.to_list() == expected
 
+    def test_explicit_constructor_normalizes_and_deduplicates_timestamps(self) -> None:
+        first = datetime(2024, 1, 1)
+        second = datetime(2024, 1, 2)
+
+        schedule = RebalanceSchedule(
+            cadence=RebalanceCadence.EXPLICIT_TIMESTAMPS,
+            timestamps=(second, first, second),
+        )
+
+        assert schedule.timestamps == (first, second)
+        assert is_rebalance_timestamp(first, schedule, session_index=1)
+
     def test_fixed_n_sessions_thins_session_closes(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-10")
 
@@ -181,6 +193,48 @@ class TestResolveRebalanceTimestamps:
                 timezone="America/New_York",
                 data_frequency="1m",
                 timestamp_semantics="event_time",
+            )
+
+    def test_intraday_batch_schedule_rejects_one_missing_required_close(self) -> None:
+        timestamps = [
+            datetime(2024, 1, 2, 16, 0),
+            datetime(2024, 1, 3, 15, 45),
+            datetime(2024, 1, 4, 16, 0),
+        ]
+
+        with pytest.raises(
+            ValueError,
+            match=r"required session 2024-01-03.*expected market_close",
+        ):
+            resolve_rebalance_timestamps(
+                timestamps,
+                RebalanceCadence.EVERY_SESSION,
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+
+    @pytest.mark.parametrize(
+        "schedule,timestamp",
+        [
+            (RebalanceSchedule.weekly(), datetime(2024, 1, 5, 15, 45)),
+            (RebalanceSchedule.month_end(), datetime(2024, 1, 31, 15, 45)),
+        ],
+    )
+    def test_intraday_period_schedule_rejects_required_close_alignment_miss(
+        self,
+        schedule: RebalanceSchedule,
+        timestamp: datetime,
+    ) -> None:
+        with pytest.raises(ValueError, match="resolved no session closes"):
+            resolve_rebalance_timestamps(
+                [timestamp],
+                schedule,
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
             )
 
     def test_weekly_daily_session_labels_use_labeled_dates_not_prior_sessions(self) -> None:

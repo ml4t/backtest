@@ -430,6 +430,17 @@ class PreOpenTargetManager:
                     order = self.broker.get_order(order_id)
                     if order is not None and order.status is OrderStatus.PENDING:
                         self.broker.cancel_order(order_id)
+                nonterminal = [
+                    order_id
+                    for order_id in order_ids
+                    if (order := self.broker.get_order(order_id)) is None
+                    or order.status is OrderStatus.PENDING
+                ]
+                if nonterminal:
+                    raise RuntimeError(
+                        "opening-auction child orders must be terminal after the OPG cancel sweep: "
+                        + ", ".join(sorted(nonterminal))
+                    )
             self._processed_targets.add(intent.intent_id)
             self.reconcile(timestamp, target_intent_id=intent.intent_id)
 
@@ -629,12 +640,12 @@ class PreOpenTargetManager:
                 )
             open_prices[target.asset] = price
 
-        equity = self.account.cash + sum(
-            position.quantity
-            * open_prices.get(asset, self.market.last_prices.get(asset, position.entry_price))
-            * position.multiplier
-            for asset, position in self.account.positions.items()
-        )
+        equity = self.account.cash
+        for asset, position in self.account.positions.items():
+            mark_price = self.market.opens.get(asset)
+            if mark_price is None:
+                mark_price = self.market.last_prices.get(asset, position.entry_price)
+            equity += position.quantity * mark_price * position.multiplier
         desired: dict[str, float] = {}
         raw_desired: dict[str, float] = {}
         effective_cash_buffer = max(intent.cash_buffer, self.broker.cash_buffer_pct)
@@ -778,6 +789,7 @@ class PreOpenTargetManager:
         cash_buffer: float,
     ) -> None:
         if self.broker.share_type is ShareType.FRACTIONAL:
+            rounded.update(raw)
             return
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
