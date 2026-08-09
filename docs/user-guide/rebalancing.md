@@ -131,6 +131,13 @@ timestamp aligned with the exchange close. Batch and online evaluation identify 
 required session whose close was reached but never matched. Exchange holidays and a final session
 whose data ends before its close are not alignment failures.
 
+Explicit timestamp schedules match absolute instants. A naive scheduled timestamp uses the
+configured `timezone`, so it can match an aware feed timestamp expressed in another timezone. If a
+scheduled instant falls between the first and last observed feed instants but no event matches it,
+batch resolution and final online validation raise an alignment error. Scheduled instants before
+or after the observed window are ignored, including a schedule earlier than the first event on a
+partially observed day.
+
 `TargetWeightExecutor.prepare_schedule()` was removed before 0.1.0 because it required the future
 feed timestamp sequence. Put the metadata shown above on `RebalanceConfig`; `should_rebalance()`
 then evaluates only the current event and prior evaluator state. Call `should_rebalance()` or

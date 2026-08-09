@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import polars as pl
@@ -93,10 +93,14 @@ class TestResolveRebalanceTimestamps:
 
         with pytest.raises(
             ValueError,
-            match=r"2024-01-02T16:00:00.*nearest observed timestamp is 2024-01-02T20:59:00",
+            match=r"2024-01-02T21:00:00\+00:00.*nearest observed instant is "
+            r"2024-01-02T20:59:00\+00:00",
         ):
             resolve_rebalance_timestamps(
-                [datetime(2024, 1, 2, 20, 59, tzinfo=UTC)],
+                [
+                    datetime(2024, 1, 2, 20, 59, tzinfo=UTC),
+                    datetime(2024, 1, 2, 21, 1, tzinfo=UTC),
+                ],
                 schedule,
                 timezone="America/New_York",
             )
@@ -112,6 +116,64 @@ class TestResolveRebalanceTimestamps:
         )
 
         assert result.to_list() == []
+
+    def test_explicit_timestamp_outside_a_partial_day_feed_slice_is_ignored(self) -> None:
+        schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 9, 30)])
+
+        result = resolve_rebalance_timestamps(
+            [
+                datetime(2024, 1, 2, 15, 0, tzinfo=UTC),
+                datetime(2024, 1, 2, 21, 0, tzinfo=UTC),
+            ],
+            schedule,
+            timezone="America/New_York",
+        )
+
+        assert result.to_list() == []
+
+    def test_explicit_timestamp_reports_a_later_miss_after_an_earlier_match(self) -> None:
+        schedule = RebalanceSchedule.explicit_timestamps(
+            [datetime(2024, 1, 2, 16, 0), datetime(2024, 1, 2, 17, 0)]
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"2024-01-02T22:00:00\+00:00.*nearest observed instant is "
+            r"2024-01-02T21:59:00\+00:00",
+        ):
+            resolve_rebalance_timestamps(
+                [
+                    datetime(2024, 1, 2, 21, 0, tzinfo=UTC),
+                    datetime(2024, 1, 2, 21, 59, tzinfo=UTC),
+                    datetime(2024, 1, 2, 22, 1, tzinfo=UTC),
+                ],
+                schedule,
+                timezone="America/New_York",
+            )
+
+    def test_online_explicit_matching_does_not_scan_the_schedule_per_event(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        start = datetime(2024, 1, 2, 16, 0)
+        schedule = RebalanceSchedule.explicit_timestamps(
+            [start + timedelta(hours=index) for index in range(2_500)]
+        )
+        executor = TargetWeightExecutor(
+            RebalanceConfig(schedule=schedule, timezone="America/New_York")
+        )
+        calls = 0
+        event_time_utc = schedule_module._event_time_utc
+
+        def count_conversion(timestamp: datetime, timezone: str | None) -> datetime:
+            nonlocal calls
+            calls += 1
+            return event_time_utc(timestamp, timezone)
+
+        monkeypatch.setattr(schedule_module, "_event_time_utc", count_conversion)
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        assert calls == 1
 
     def test_fixed_n_sessions_thins_session_closes(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-10")

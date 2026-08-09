@@ -300,20 +300,17 @@ def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
     return _localize_event_time(timestamp, timezone).astimezone(ZoneInfo("UTC"))
 
 
-def _explicit_local_date(timestamp: datetime, timezone: str | None) -> date:
-    return _localize_event_time(timestamp, timezone).date()
-
-
 def _raise_explicit_alignment_error(
     scheduled: datetime,
     nearest_observed: datetime,
     timezone: str | None,
 ) -> None:
+    scheduled_instant = _event_time_utc(scheduled, timezone).isoformat()
+    nearest_instant = _event_time_utc(nearest_observed, timezone).isoformat()
     raise ValueError(
-        f"explicit_timestamps schedule timestamp {scheduled.isoformat()} did not match an "
-        f"observed feed event within the local feed window for timezone "
-        f"{timezone or 'UTC'!r}; nearest observed timestamp is "
-        f"{nearest_observed.isoformat()}"
+        f"explicit_timestamps schedule instant {scheduled_instant} did not match an observed feed "
+        f"event within the observed instant window; nearest observed instant is {nearest_instant}. "
+        f"Naive timestamps use timezone {timezone or 'UTC'!r}"
     )
 
 
@@ -393,13 +390,16 @@ class _OnlineRebalanceEvaluator:
         self._observed_event_count = 0
         self._observed_exchange_session = False
         self._matched_period_ends: set[date] = set()
-        self._explicit_instants = {
-            scheduled: _event_time_utc(scheduled, timezone) for scheduled in schedule.timestamps
+        self._explicit_schedule_by_instant = {
+            _event_time_utc(scheduled, timezone): scheduled for scheduled in schedule.timestamps
         }
-        self._matched_explicit_timestamps: set[datetime] = set()
-        self._first_explicit_local_date: date | None = None
-        self._last_explicit_local_date: date | None = None
-        self._nearest_explicit_events: dict[datetime, tuple[float, datetime]] = {}
+        self._explicit_sorted_instants = tuple(sorted(self._explicit_schedule_by_instant))
+        self._matched_explicit_instants: set[datetime] = set()
+        self._first_explicit_instant: datetime | None = None
+        self._last_explicit_instant: datetime | None = None
+        self._last_explicit_event: datetime | None = None
+        self._explicit_cursor = 0
+        self._nearest_explicit_events: dict[datetime, datetime] = {}
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
         self._observed_event_count += 1
@@ -407,20 +407,37 @@ class _OnlineRebalanceEvaluator:
             return True
         if self.schedule.cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
             event_time = _event_time_utc(timestamp, self.timezone)
-            event_date = _explicit_local_date(timestamp, self.timezone)
-            if self._first_explicit_local_date is None:
-                self._first_explicit_local_date = event_date
-            self._last_explicit_local_date = event_date
-            matched = False
-            for scheduled, scheduled_time in self._explicit_instants.items():
-                distance = abs((event_time - scheduled_time).total_seconds())
-                nearest = self._nearest_explicit_events.get(scheduled)
-                if nearest is None or distance < nearest[0]:
-                    self._nearest_explicit_events[scheduled] = (distance, timestamp)
-                if event_time == scheduled_time:
-                    self._matched_explicit_timestamps.add(scheduled)
-                    matched = True
-            return matched
+            if self._last_explicit_instant is not None and event_time < self._last_explicit_instant:
+                raise ValueError(
+                    f"event timestamp moved backward from {self._last_explicit_event!r} to "
+                    f"{timestamp!r}; start a new evaluator or call TargetWeightExecutor.reset() "
+                    "before another run"
+                )
+            if self._first_explicit_instant is None:
+                self._first_explicit_instant = event_time
+            while (
+                self._explicit_cursor < len(self._explicit_sorted_instants)
+                and self._explicit_sorted_instants[self._explicit_cursor] <= event_time
+            ):
+                scheduled_time = self._explicit_sorted_instants[self._explicit_cursor]
+                if scheduled_time >= self._first_explicit_instant:
+                    nearest_event = timestamp
+                    if self._last_explicit_instant is not None:
+                        previous_distance = abs(
+                            (scheduled_time - self._last_explicit_instant).total_seconds()
+                        )
+                        current_distance = abs((event_time - scheduled_time).total_seconds())
+                        if previous_distance <= current_distance:
+                            nearest_event = self._last_explicit_event
+                    if nearest_event is not None:
+                        self._nearest_explicit_events[scheduled_time] = nearest_event
+                self._explicit_cursor += 1
+            self._last_explicit_instant = event_time
+            self._last_explicit_event = timestamp
+            if event_time not in self._explicit_schedule_by_instant:
+                return False
+            self._matched_explicit_instants.add(event_time)
+            return True
         session_date = session_date_for_timestamp(
             timestamp,
             calendar=self.calendar,
@@ -505,22 +522,18 @@ class _OnlineRebalanceEvaluator:
         if self.schedule.cadence is RebalanceCadence.EVERY_BAR:
             return
         if self.schedule.cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
-            if self._first_explicit_local_date is None or self._last_explicit_local_date is None:
+            if self._first_explicit_instant is None or self._last_explicit_instant is None:
                 return
-            unmatched = sorted(
-                (
-                    scheduled
-                    for scheduled in self.schedule.timestamps
-                    if scheduled not in self._matched_explicit_timestamps
-                    and self._first_explicit_local_date
-                    <= _explicit_local_date(scheduled, self.timezone)
-                    <= self._last_explicit_local_date
-                ),
-                key=lambda scheduled: self._explicit_instants[scheduled],
-            )
+            unmatched = [
+                instant
+                for instant in self._explicit_sorted_instants
+                if instant not in self._matched_explicit_instants
+                and self._first_explicit_instant <= instant <= self._last_explicit_instant
+            ]
             if unmatched:
-                scheduled = unmatched[0]
-                nearest = self._nearest_explicit_events[scheduled][1]
+                scheduled_instant = unmatched[0]
+                scheduled = self._explicit_schedule_by_instant[scheduled_instant]
+                nearest = self._nearest_explicit_events[scheduled_instant]
                 _raise_explicit_alignment_error(scheduled, nearest, self.timezone)
             return
         if (
@@ -610,14 +623,13 @@ def resolve_rebalance_timestamps(
             scheduled: _event_time_utc(scheduled, resolved_timezone)
             for scheduled in schedule.timestamps
         }
-        first_date = _explicit_local_date(ts_list[0], resolved_timezone)
-        last_date = _explicit_local_date(ts_list[-1], resolved_timezone)
+        first_instant = _event_time_utc(ts_list[0], resolved_timezone)
+        last_instant = _event_time_utc(ts_list[-1], resolved_timezone)
         unmatched = sorted(
             (
                 scheduled
                 for scheduled, instant in scheduled_instants.items()
-                if instant not in observed_by_instant
-                and first_date <= _explicit_local_date(scheduled, resolved_timezone) <= last_date
+                if instant not in observed_by_instant and first_instant <= instant <= last_instant
             ),
             key=lambda scheduled: scheduled_instants[scheduled],
         )

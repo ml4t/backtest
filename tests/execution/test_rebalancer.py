@@ -697,9 +697,11 @@ class TestTargetWeightExecutorScheduling:
         )
 
         assert not executor.should_rebalance(datetime(2024, 1, 2, 20, 59, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 1, tzinfo=UTC))
         with pytest.raises(
             ValueError,
-            match=r"2024-01-02T16:00:00.*nearest observed timestamp is 2024-01-02T20:59:00",
+            match=r"2024-01-02T21:00:00\+00:00.*nearest observed instant is "
+            r"2024-01-02T20:59:00\+00:00",
         ):
             executor.validate_completed_run()
 
@@ -713,6 +715,26 @@ class TestTargetWeightExecutorScheduling:
 
         assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
         executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_reports_a_later_miss_after_an_earlier_match(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps(
+                    [datetime(2024, 1, 2, 16, 0), datetime(2024, 1, 2, 17, 0)]
+                ),
+                timezone="America/New_York",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 59, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 22, 1, tzinfo=UTC))
+        with pytest.raises(
+            ValueError,
+            match=r"2024-01-02T22:00:00\+00:00.*nearest observed instant is "
+            r"2024-01-02T21:59:00\+00:00",
+        ):
+            executor.validate_completed_run()
 
     def test_nyse_premarket_bar_does_not_create_a_phantom_session(self):
         executor = TargetWeightExecutor(

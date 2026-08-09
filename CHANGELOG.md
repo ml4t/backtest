@@ -28,6 +28,9 @@
 - Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled
   exchange session rather than the last available feed bar. Holidays do not move a rebalance
   earlier, and a missing completed period-end session raises a feed-completeness error.
+- Explicit rebalance timestamps match absolute instants across timezone representations. A
+  scheduled instant inside the observed feed window that has no matching event raises an alignment
+  error instead of being skipped silently.
 - Batch and online session schedules require every complete exchange session to match its required
   close; only an incomplete final session is exempt, and calendar mismatches fail explicitly.
 - Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or
