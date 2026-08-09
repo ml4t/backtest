@@ -153,9 +153,9 @@ No large-scale claim is published for Backtrader, Zipline, VectorBT OSS, or LEAN
 
 ## Performance
 
-Performance comparisons are valid only when each framework runs the same workload with equivalent
-execution semantics. The project does not publish cross-framework speed ratios without a retained
-benchmark artifact meeting those conditions.
+The stable release does not publish cross-framework speed ratios. Release performance evidence is
+limited to the deterministic workloads and measurement boundaries in
+`validation/performance_baselines.json`; framework parity uses correctness evidence instead.
 
 ## Listing Profiles
 

@@ -10,10 +10,13 @@ from abc import abstractmethod
 from collections import defaultdict
 from datetime import datetime
 from statistics import mean, stdev
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, final
 
 from ..config import ShareType
-from ..execution.schedule import RebalanceSchedule, is_rebalance_timestamp
+from ..execution.schedule import (
+    RebalanceSchedule,
+    _OnlineRebalanceEvaluator,
+)
 from ..strategy import Strategy
 
 if TYPE_CHECKING:
@@ -336,6 +339,7 @@ class LongShortStrategy(Strategy):
     def __init__(self) -> None:
         self.bar_count = 0
         self._schedule_config: BacktestConfig | None = None
+        self._schedule_evaluator: _OnlineRebalanceEvaluator | None = None
 
     def on_prepare(
         self,
@@ -344,6 +348,16 @@ class LongShortStrategy(Strategy):
     ) -> None:
         """Retain causal calendar metadata for online schedule evaluation."""
         self._schedule_config = config
+        self._schedule_evaluator = None
+        if self.rebalance_schedule is not None and config is not None:
+            self._schedule_evaluator = _OnlineRebalanceEvaluator(
+                self.rebalance_schedule,
+                calendar=config.resolved_calendar,
+                timezone=config.resolved_timezone,
+                session_start_time=config.resolved_session_start_time,
+                data_frequency=config.resolved_data_frequency,
+                timestamp_semantics=config.resolved_timestamp_semantics,
+            )
 
     def rank_assets(self, data: dict[str, dict]) -> tuple[list[str], list[str]]:
         """Rank assets by signal and return long/short lists.
@@ -388,18 +402,11 @@ class LongShortStrategy(Strategy):
         self.bar_count += 1
 
         if self.rebalance_schedule is not None:
-            calendar = self.rebalance_schedule.calendar
-            if (
-                self._schedule_config is not None
-                and self._schedule_config.resolved_calendar is not None
-            ):
-                calendar = self._schedule_config.resolved_calendar
-            if not is_rebalance_timestamp(
-                timestamp,
-                self.rebalance_schedule,
-                session_index=self.bar_count,
-                calendar=calendar,
-            ):
+            if self._schedule_config is None:
+                raise ValueError("rebalance_schedule is set but was not prepared before execution")
+            if self._schedule_evaluator is None:
+                raise RuntimeError("rebalance schedule evaluator was not initialized")
+            if not self._schedule_evaluator.evaluate(timestamp):
                 return
         elif self.bar_count % self.rebalance_frequency != 1:
             return
@@ -440,3 +447,9 @@ class LongShortStrategy(Strategy):
 
             if position is None and target_shares > 0:
                 broker.submit_order(asset, -target_shares)
+
+    @final
+    def _validate_completed_run(self) -> None:
+        """Validate final schedule alignment independently of lifecycle callbacks."""
+        if self._schedule_evaluator is not None:
+            self._schedule_evaluator.validate_completed_run()

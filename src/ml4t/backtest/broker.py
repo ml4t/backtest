@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import copy
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict, Unpack
+from zoneinfo import ZoneInfo
 
 from .config import (
     EntryOrderPriority,
@@ -21,10 +24,14 @@ from .config import (
 )
 from .core import (
     ExecutionEngine,
+    ExecutionJournal,
     FillEngine,
+    MarketState,
     OrderBook,
+    OrderState,
     PortfolioLedger,
     RiskEngine,
+    RiskState,
     SubmitOrderOptions,
 )
 from .execution.fill_executor import FillExecutor
@@ -45,13 +52,29 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from ml4t.specs import CanonicalChildOrderIntent, CanonicalTargetIntent, LifecyclePhase
+    from ml4t.specs import (
+        CanonicalChildOrderIntent,
+        CanonicalTargetIntent,
+        ExecutionPolicy,
+        LifecyclePhase,
+        LifecycleVersion,
+    )
 
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
     from .execution import ExecutionLimits, MarketImpactModel
     from .preopen import IntentReconciliation, PreOpenTargetManager
     from .risk.position import PositionRule
+    from .sessions import SessionConfig
+
+
+class OrderUpdate(TypedDict, total=False):
+    """Fields accepted by :meth:`Broker.update_order`."""
+
+    quantity: float
+    limit_price: float | None
+    stop_price: float | None
+    trail_amount: float | None
 
 
 class Broker:
@@ -145,7 +168,10 @@ class Broker:
         self.late_asset_min_bars = late_asset_min_bars
         self.settlement_delay = settlement_delay
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
-        self._bar_index: int = 0
+        self._market_state = MarketState()
+        self._order_state = OrderState()
+        self._risk_state = RiskState()
+        self._execution_journal = ExecutionJournal()
 
         # Auto-populate margin schedules from ContractSpec settings
         # This lets users specify margin once on ContractSpec rather than duplicating
@@ -198,71 +224,73 @@ class Broker:
             multiplier_resolver=self.get_multiplier,
         )
 
-        self.positions: dict[str, Position] = {}
-        self.orders: list[Order] = []
-        self.pending_orders: list[Order] = []
-        self.fills: list[Fill] = []
-        self.trades: list[Trade] = []
-        self._order_counter = 0
-        self._current_time: datetime | None = None
-        self._current_prices: dict[str, float] = {}  # FeedSpec.price_col values
-        self._current_opens: dict[str, float] = {}  # open prices for next-bar execution
-        self._current_highs: dict[str, float] = {}  # high prices for limit/stop checks
-        self._current_lows: dict[str, float] = {}  # low prices for limit/stop checks
-        self._current_closes: dict[str, float] = {}
-        self._current_volumes: dict[str, float] = {}
-        self._current_bids: dict[str, float] = {}
-        self._current_asks: dict[str, float] = {}
-        self._current_mids: dict[str, float] = {}
-        self._current_bid_sizes: dict[str, float] = {}
-        self._current_ask_sizes: dict[str, float] = {}
-        self._current_signals: dict[str, dict[str, float]] = {}
-        self._last_prices: dict[str, float] = {}
-        self._asset_bars_seen: dict[str, int] = {}
         self._rebalance_counter = 0
-        self._orders_this_bar: list[Order] = []  # Orders placed this bar (for next-bar mode)
-        self._orders_this_bar_ids: set[str] = set()
         self._lifecycle_transaction: Any | None = None
         self._active_lifecycle_phase: LifecyclePhase | None = None
         self._preopen_target_manager: PreOpenTargetManager | None = None
-
-        # Risk management
-        self._position_rules: Any = None  # Global position rules
-        self._position_rules_by_asset: dict[str, Any] = {}  # Per-asset rules
-        self._pending_exits: dict[str, dict] = {}  # asset -> {reason, pct} for NEXT_BAR_OPEN mode
+        self._completion_validators: dict[int, Callable[[int], None]] = {}
 
         # Execution model (volume limits and market impact)
         self.execution_limits = execution_limits  # ExecutionLimits instance
         self.market_impact_model = market_impact_model  # MarketImpactModel instance
-        self._partial_orders: dict[str, float] = {}  # order_id -> remaining quantity
-        self._filled_this_bar: set[str] = set()  # order_ids that had fills this bar
-
-        # VBT Pro compatibility: prevent same-bar re-entry after stop exit
-        self._stop_exits_this_bar: set[str] = set()  # assets that had stop exits this bar
-
-        # VBT Pro compatibility: track positions created this bar
-        # New positions should NOT have HWM updated from entry bar's high
-        # VBT Pro uses CLOSE for initial HWM on entry bar, then updates from HIGH next bar
-        self._positions_created_this_bar: set[str] = set()
 
         # Contract specifications (for futures and other derivatives)
         self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
 
         # Fill execution (extracted from _execute_fill)
-        self._fill_executor = FillExecutor(self)
+        self._fill_executor = FillExecutor(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            risk=self._risk_state,
+            journal=self._execution_journal,
+            record_pnl=self._record_pnl_event,
+        )
 
         # Per-asset trading statistics for stateful decision-making
         self._asset_stats: dict[str, AssetTradingStats] = {}
         self._stats_config = StatsConfig()
         self._session_config = None  # Optional SessionConfig for session boundary detection
+        self._session_boundary: tuple[ZoneInfo, ZoneInfo, int, int] | None = None
         self._last_session_id: int | None = None  # Track current session for boundary detection
 
         # Extracted orchestration components (Phase B1 alpha-reset)
-        self._order_book = OrderBook(self)
-        self._risk_engine = RiskEngine(self)
-        self._fill_engine = FillEngine(self)
-        self._execution_engine = ExecutionEngine(self)
-        self._portfolio_ledger = PortfolioLedger(self)
+        self._fill_engine = FillEngine(
+            self,
+            market=self._market_state,
+            orders=self._order_state,
+            executor=self._fill_executor,
+        )
+        self._fill_executor.fill_engine = self._fill_engine
+        self._order_book = OrderBook(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            risk=self._risk_state,
+            fill_engine=self._fill_engine,
+        )
+        self._risk_engine = RiskEngine(
+            self,
+            account=self.account,
+            market=self._market_state,
+            risk=self._risk_state,
+            fill_engine=self._fill_engine,
+        )
+        self._execution_engine = ExecutionEngine(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            fill_engine=self._fill_engine,
+        )
+        self._portfolio_ledger = PortfolioLedger(
+            self,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+        )
 
     @classmethod
     def from_config(
@@ -407,7 +435,11 @@ class Broker:
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
     @property
     def cash(self) -> float:
-        """Current cash balance (delegates to AccountState)."""
+        """Return the cash balance owned by the account ledger.
+
+        The value can be negative for a configured margin account. Assignment is
+        retained for compatibility and updates the same account ledger.
+        """
         return self.account.cash
 
     @cash.setter
@@ -416,13 +448,484 @@ class Broker:
         self._capture_lifecycle_mutation()
         self.account.cash = value
 
-    def _capture_lifecycle_mutation(self) -> None:
+    @property
+    def positions(self) -> dict[str, Position]:
+        """Return the open-position ledger owned by AccountState."""
+        return self.account.positions
+
+    @positions.setter
+    def positions(self, value: dict[str, Position]) -> None:
+        self._reject_lifecycle_collection_replacement("positions")
+        self.account.positions = value
+
+    @property
+    def orders(self) -> list[Order]:
+        """Return the complete order history owned by OrderState."""
+        return self._order_state.orders
+
+    @orders.setter
+    def orders(self, value: list[Order]) -> None:
+        self._reject_lifecycle_collection_replacement("orders")
+        self._order_state.orders = value
+
+    @property
+    def pending_orders(self) -> list[Order]:
+        """Return the pending-order collection owned by OrderState."""
+        return self._order_state.pending
+
+    @pending_orders.setter
+    def pending_orders(self, value: list[Order]) -> None:
+        self._reject_lifecycle_collection_replacement("pending_orders")
+        self._order_state.pending = value
+
+    @property
+    def fills(self) -> list[Fill]:
+        """Return the fill journal owned by ExecutionJournal."""
+        return self._execution_journal.fills
+
+    @fills.setter
+    def fills(self, value: list[Fill]) -> None:
+        self._reject_lifecycle_collection_replacement("fills")
+        self._execution_journal.fills = value
+
+    @property
+    def trades(self) -> list[Trade]:
+        """Return the trade journal owned by ExecutionJournal."""
+        return self._execution_journal.trades
+
+    @trades.setter
+    def trades(self, value: list[Trade]) -> None:
+        self._reject_lifecycle_collection_replacement("trades")
+        self._execution_journal.trades = value
+
+    def _reject_lifecycle_collection_replacement(self, name: str) -> None:
+        if self._lifecycle_transaction is not None:
+            raise RuntimeError(
+                f"direct Broker.{name} assignment is not allowed during strategy callbacks"
+            )
+
+    @property
+    def _bar_index(self) -> int:
+        return self._market_state.bar_index
+
+    @_bar_index.setter
+    def _bar_index(self, value: int) -> None:
+        self._market_state.bar_index = value
+
+    @property
+    def _current_time(self) -> datetime | None:
+        return self._market_state.time
+
+    @_current_time.setter
+    def _current_time(self, value: datetime | None) -> None:
+        self._market_state.time = value
+
+    @property
+    def _current_prices(self) -> dict[str, float]:
+        return self._market_state.prices
+
+    @_current_prices.setter
+    def _current_prices(self, value: dict[str, float]) -> None:
+        self._market_state.prices = value
+
+    @property
+    def _current_opens(self) -> dict[str, float]:
+        return self._market_state.opens
+
+    @_current_opens.setter
+    def _current_opens(self, value: dict[str, float]) -> None:
+        self._market_state.opens = value
+
+    @property
+    def _current_highs(self) -> dict[str, float]:
+        return self._market_state.highs
+
+    @_current_highs.setter
+    def _current_highs(self, value: dict[str, float]) -> None:
+        self._market_state.highs = value
+
+    @property
+    def _current_lows(self) -> dict[str, float]:
+        return self._market_state.lows
+
+    @_current_lows.setter
+    def _current_lows(self, value: dict[str, float]) -> None:
+        self._market_state.lows = value
+
+    @property
+    def _current_closes(self) -> dict[str, float]:
+        return self._market_state.closes
+
+    @_current_closes.setter
+    def _current_closes(self, value: dict[str, float]) -> None:
+        self._market_state.closes = value
+
+    @property
+    def _current_volumes(self) -> dict[str, float]:
+        return self._market_state.volumes
+
+    @_current_volumes.setter
+    def _current_volumes(self, value: dict[str, float]) -> None:
+        self._market_state.volumes = value
+
+    @property
+    def _current_bids(self) -> dict[str, float]:
+        return self._market_state.bids
+
+    @_current_bids.setter
+    def _current_bids(self, value: dict[str, float]) -> None:
+        self._market_state.bids = value
+
+    @property
+    def _current_asks(self) -> dict[str, float]:
+        return self._market_state.asks
+
+    @_current_asks.setter
+    def _current_asks(self, value: dict[str, float]) -> None:
+        self._market_state.asks = value
+
+    @property
+    def _current_mids(self) -> dict[str, float]:
+        return self._market_state.mids
+
+    @_current_mids.setter
+    def _current_mids(self, value: dict[str, float]) -> None:
+        self._market_state.mids = value
+
+    @property
+    def _current_bid_sizes(self) -> dict[str, float]:
+        return self._market_state.bid_sizes
+
+    @_current_bid_sizes.setter
+    def _current_bid_sizes(self, value: dict[str, float]) -> None:
+        self._market_state.bid_sizes = value
+
+    @property
+    def _current_ask_sizes(self) -> dict[str, float]:
+        return self._market_state.ask_sizes
+
+    @_current_ask_sizes.setter
+    def _current_ask_sizes(self, value: dict[str, float]) -> None:
+        self._market_state.ask_sizes = value
+
+    @property
+    def _current_signals(self) -> dict[str, dict[str, float]]:
+        return self._market_state.signals
+
+    @_current_signals.setter
+    def _current_signals(self, value: dict[str, dict[str, float]]) -> None:
+        self._market_state.signals = value
+
+    @property
+    def _last_prices(self) -> dict[str, float]:
+        return self._market_state.last_prices
+
+    @_last_prices.setter
+    def _last_prices(self, value: dict[str, float]) -> None:
+        self._market_state.last_prices = value
+
+    @property
+    def _asset_bars_seen(self) -> dict[str, int]:
+        return self._market_state.asset_bars_seen
+
+    @_asset_bars_seen.setter
+    def _asset_bars_seen(self, value: dict[str, int]) -> None:
+        self._market_state.asset_bars_seen = value
+
+    @property
+    def _order_counter(self) -> int:
+        return self._order_state.counter
+
+    @_order_counter.setter
+    def _order_counter(self, value: int) -> None:
+        self._order_state.counter = value
+
+    @property
+    def _orders_this_bar(self) -> list[Order]:
+        return self._order_state.current_bar
+
+    @_orders_this_bar.setter
+    def _orders_this_bar(self, value: list[Order]) -> None:
+        self._order_state.current_bar = value
+
+    @property
+    def _orders_this_bar_ids(self) -> set[str]:
+        return self._order_state.current_bar_ids
+
+    @_orders_this_bar_ids.setter
+    def _orders_this_bar_ids(self, value: set[str]) -> None:
+        self._order_state.current_bar_ids = value
+
+    @property
+    def _partial_orders(self) -> dict[str, float]:
+        return self._order_state.partial_quantities
+
+    @_partial_orders.setter
+    def _partial_orders(self, value: dict[str, float]) -> None:
+        self._order_state.partial_quantities = value
+
+    @property
+    def _filled_this_bar(self) -> set[str]:
+        return self._order_state.filled_this_bar
+
+    @_filled_this_bar.setter
+    def _filled_this_bar(self, value: set[str]) -> None:
+        self._order_state.filled_this_bar = value
+
+    @property
+    def _position_rules(self) -> Any:
+        return self._risk_state.position_rules
+
+    @_position_rules.setter
+    def _position_rules(self, value: Any) -> None:
+        self._risk_state.position_rules = value
+
+    @property
+    def _position_rules_by_asset(self) -> dict[str, Any]:
+        return self._risk_state.position_rules_by_asset
+
+    @_position_rules_by_asset.setter
+    def _position_rules_by_asset(self, value: dict[str, Any]) -> None:
+        self._risk_state.position_rules_by_asset = value
+
+    @property
+    def _pending_exits(self) -> dict[str, dict[str, Any]]:
+        return self._risk_state.pending_exits
+
+    @_pending_exits.setter
+    def _pending_exits(self, value: dict[str, dict[str, Any]]) -> None:
+        self._risk_state.pending_exits = value
+
+    @property
+    def _stop_exits_this_bar(self) -> set[str]:
+        return self._risk_state.stop_exits_this_bar
+
+    @_stop_exits_this_bar.setter
+    def _stop_exits_this_bar(self, value: set[str]) -> None:
+        self._risk_state.stop_exits_this_bar = value
+
+    @property
+    def _positions_created_this_bar(self) -> set[str]:
+        return self._risk_state.positions_created_this_bar
+
+    @_positions_created_this_bar.setter
+    def _positions_created_this_bar(self, value: set[str]) -> None:
+        self._risk_state.positions_created_this_bar = value
+
+    def _capture_lifecycle_mutation(self, **scope: Any) -> None:
         transaction = self._lifecycle_transaction
         if transaction is not None:
-            transaction.capture()
+            transaction.capture(**scope)
+
+    def _snapshot_lifecycle_state(self, **scope: Any) -> dict[str, Any]:
+        state = {
+            "account_state": {
+                key: value if key == "policy" else copy.deepcopy(value)
+                for key, value in self.account.__dict__.items()
+                if key != "positions"
+            },
+            "original_position_keys": set(self.account.positions),
+            "positions": {},
+            "all_positions": False,
+            "risk_state": {
+                "pending_exits": copy.deepcopy(self._risk_state.pending_exits),
+                "stop_exits_this_bar": set(self._risk_state.stop_exits_this_bar),
+                "positions_created_this_bar": set(self._risk_state.positions_created_this_bar),
+            },
+            "risk_rules": None,
+            "orders_length": len(self.orders),
+            "pending_orders": tuple(self.pending_orders),
+            "pending_order_state": {},
+            "order_counter": self._order_state.counter,
+            "partial_quantities": copy.deepcopy(self._order_state.partial_quantities),
+            "filled_this_bar": set(self._order_state.filled_this_bar),
+            "orders_this_bar": tuple(self._order_state.current_bar),
+            "orders_this_bar_ids": set(self._order_state.current_bar_ids),
+            "fills_length": len(self._execution_journal.fills),
+            "trades_length": len(self._execution_journal.trades),
+            "rebalance_counter": self._rebalance_counter,
+            "original_asset_stats_keys": set(self._asset_stats),
+            "asset_stats": {},
+            "all_asset_stats": False,
+            "stats_config": copy.deepcopy(self._stats_config),
+            "session_config": self._session_config,
+            "session_boundary": self._session_boundary,
+            "last_session_id": self._last_session_id,
+            "target_intent_state": None,
+        }
+        self._extend_lifecycle_state(state, **scope)
+        return state
+
+    def _extend_lifecycle_state(
+        self,
+        state: dict[str, Any],
+        *,
+        asset: str | None = None,
+        all_positions: bool = False,
+        order_id: str | None = None,
+        all_pending_orders: bool = False,
+        risk_rules: bool = False,
+        all_asset_stats: bool = False,
+        target_intents: bool = False,
+    ) -> None:
+        assets = state["original_position_keys"] if all_positions else ({asset} if asset else ())
+        for asset_name in assets:
+            if asset_name not in state["positions"]:
+                state["positions"][asset_name] = copy.deepcopy(
+                    self.account.positions.get(asset_name)
+                )
+        state["all_positions"] = state["all_positions"] or all_positions
+
+        order_ids = (
+            {order.order_id for order in state["pending_orders"]}
+            if all_pending_orders
+            else ({order_id} if order_id else set())
+        )
+        for order in state["pending_orders"]:
+            if order.order_id in order_ids and id(order) not in state["pending_order_state"]:
+                state["pending_order_state"][id(order)] = copy.deepcopy(vars(order))
+
+        if risk_rules and state["risk_rules"] is None:
+            state["risk_rules"] = (
+                copy.deepcopy(self._risk_state.position_rules),
+                copy.deepcopy(self._risk_state.position_rules_by_asset),
+            )
+
+        stats_assets = (
+            state["original_asset_stats_keys"] if all_asset_stats else ({asset} if asset else ())
+        )
+        for asset_name in stats_assets:
+            if asset_name not in state["asset_stats"]:
+                state["asset_stats"][asset_name] = copy.deepcopy(self._asset_stats.get(asset_name))
+        state["all_asset_stats"] = state["all_asset_stats"] or all_asset_stats
+
+        if (
+            target_intents
+            and state["target_intent_state"] is None
+            and self._preopen_target_manager is not None
+        ):
+            state["target_intent_state"] = self._preopen_target_manager.capture_transaction_state()
+
+    def _restore_lifecycle_state(self, state: dict[str, Any]) -> None:
+        if len(self._order_state.orders) < state["orders_length"]:
+            raise RuntimeError("order history was shortened during lifecycle dispatch")
+        if len(self._execution_journal.fills) < state["fills_length"]:
+            raise RuntimeError("fill history was shortened during lifecycle dispatch")
+        if len(self._execution_journal.trades) < state["trades_length"]:
+            raise RuntimeError("trade history was shortened during lifecycle dispatch")
+
+        positions = self.account.positions
+        if state["all_positions"]:
+            positions.clear()
+        for asset, position in state["positions"].items():
+            if position is None:
+                positions.pop(asset, None)
+            else:
+                positions[asset] = position
+        self.account.__dict__.clear()
+        self.account.__dict__.update({**state["account_state"], "positions": positions})
+
+        if state["risk_rules"] is not None:
+            self._risk_state.position_rules, self._risk_state.position_rules_by_asset = state[
+                "risk_rules"
+            ]
+        self._risk_state.pending_exits = state["risk_state"]["pending_exits"]
+        self._risk_state.stop_exits_this_bar = state["risk_state"]["stop_exits_this_bar"]
+        self._risk_state.positions_created_this_bar = state["risk_state"][
+            "positions_created_this_bar"
+        ]
+
+        for order in state["pending_orders"]:
+            order_state = state["pending_order_state"].get(id(order))
+            if order_state is not None:
+                order.__dict__.clear()
+                order.__dict__.update(copy.deepcopy(order_state))
+        del self._order_state.orders[state["orders_length"] :]
+        self._order_state.pending[:] = state["pending_orders"]
+        self._order_state.counter = state["order_counter"]
+        self._order_state.partial_quantities.clear()
+        self._order_state.partial_quantities.update(state["partial_quantities"])
+        self._order_state.filled_this_bar.clear()
+        self._order_state.filled_this_bar.update(state["filled_this_bar"])
+        self._order_state.current_bar[:] = state["orders_this_bar"]
+        self._order_state.current_bar_ids.clear()
+        self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
+        del self._execution_journal.fills[state["fills_length"] :]
+        del self._execution_journal.trades[state["trades_length"] :]
+
+        self._rebalance_counter = state["rebalance_counter"]
+        if state["all_asset_stats"]:
+            self._asset_stats.clear()
+        for asset, stats in state["asset_stats"].items():
+            if stats is None:
+                self._asset_stats.pop(asset, None)
+            else:
+                self._asset_stats[asset] = stats
+        self._stats_config = state["stats_config"]
+        self._session_config = state["session_config"]
+        self._session_boundary = state["session_boundary"]
+        self._last_session_id = state["last_session_id"]
+        target_intent_state = state["target_intent_state"]
+        if target_intent_state is not None and self._preopen_target_manager is not None:
+            self._preopen_target_manager.restore_transaction_state(target_intent_state)
+
+    def _begin_lifecycle_dispatch(
+        self,
+        phase: LifecyclePhase,
+        transaction: Any,
+    ) -> LifecyclePhase | None:
+        if self._lifecycle_transaction is not None:
+            raise RuntimeError("nested lifecycle dispatch is not supported")
+        previous_phase = self._active_lifecycle_phase
+        self._lifecycle_transaction = transaction
+        self._active_lifecycle_phase = phase
+        return previous_phase
+
+    def _end_lifecycle_dispatch(self, previous_phase: LifecyclePhase | None) -> None:
+        self._active_lifecycle_phase = previous_phase
+        self._lifecycle_transaction = None
+
+    def _create_preopen_target_manager(
+        self,
+        policy: ExecutionPolicy,
+        lifecycle_version: LifecycleVersion,
+        *,
+        calendar: str | None,
+        timezone: str | None = None,
+        session_start_time: str | None = None,
+        data_frequency: Any | None = None,
+        timestamp_semantics: Any | None = None,
+    ) -> PreOpenTargetManager:
+        from .preopen import PreOpenTargetManager
+
+        manager = PreOpenTargetManager(
+            self,
+            policy,
+            lifecycle_version,
+            account=self.account,
+            market=self._market_state,
+            calendar=calendar,
+            timezone=timezone,
+            session_start_time=session_start_time,
+            data_frequency=data_frequency,
+            timestamp_semantics=timestamp_semantics,
+        )
+        self._preopen_target_manager = manager
+        return manager
+
+    def _register_completion_validator(
+        self,
+        owner: object,
+        validator: Callable[[int], None],
+    ) -> None:
+        self._completion_validators.setdefault(id(owner), validator)
+
+    def _validate_completed_run(self, market_event_count: int) -> None:
+        for validator in tuple(self._completion_validators.values()):
+            validator(market_event_count)
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
-        """Get contract specification for an asset."""
+        """Return the configured contract specification, or None when absent."""
         return self._contract_specs.get(asset)
 
     def get_multiplier(self, asset: str) -> float:
@@ -505,6 +1008,10 @@ class Broker:
             return self.get_quote_mid(asset) or self._current_prices.get(asset)
         return self._current_prices.get(asset, self._current_closes.get(asset))
 
+    def get_last_price(self, asset: str) -> float | None:
+        """Return the most recent positive reference price observed for an asset."""
+        return self._last_prices.get(asset)
+
     def get_mark_price(
         self,
         asset: str,
@@ -553,7 +1060,7 @@ class Broker:
 
     def mark_account_positions(self, use_open: bool = False) -> None:
         """Synchronize account position marks using configured price semantics."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_positions=True)
         for asset, position in self.account.positions.items():
             mark_price = self.get_mark_price(asset, quantity=position.quantity, use_open=use_open)
             if mark_price is not None:
@@ -589,7 +1096,7 @@ class Broker:
                 track_session_stats=True,
             ))
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_asset_stats=True)
         if config is not None:
             self._stats_config = config
         else:
@@ -643,7 +1150,7 @@ class Broker:
                 return
         """
         if asset not in self._asset_stats:
-            self._capture_lifecycle_mutation()
+            self._capture_lifecycle_mutation(asset=asset)
             self._asset_stats[asset] = AssetTradingStats(
                 recent_pnls=deque(maxlen=self._stats_config.recent_window_size)
             )
@@ -669,7 +1176,7 @@ class Broker:
         stats = self.get_asset_stats(asset)
         stats.record_pnl(pnl)
 
-    def set_session_config(self, config) -> None:
+    def set_session_config(self, config: SessionConfig | None) -> None:
         """Set session configuration for session-aware statistics.
 
         When a session config is set, trading statistics are reset at
@@ -677,7 +1184,8 @@ class Broker:
         want to track performance within each trading session.
 
         Args:
-            config: SessionConfig object from ml4t.backtest.sessions
+            config: SessionConfig object from ml4t.backtest.sessions, or None to
+                disable session-aware statistics resets.
 
         Example:
             from ml4t.backtest.sessions import SessionConfig
@@ -692,6 +1200,16 @@ class Broker:
         """
         self._capture_lifecycle_mutation()
         self._session_config = config
+        self._session_boundary = (
+            None
+            if config is None
+            else (
+                ZoneInfo(config.timezone),
+                config.get_session_timezone(),
+                config.get_session_start_hour(),
+                config.get_session_start_minute(),
+            )
+        )
         self._last_session_id = None
 
     def _check_session_boundary(self, timestamp: datetime) -> None:
@@ -704,23 +1222,24 @@ class Broker:
         Args:
             timestamp: Current bar timestamp
         """
-        if self._session_config is None:
+        if self._session_config is None or self._session_boundary is None:
             return
 
         if not self._stats_config.track_session_stats:
             return
 
-        from zoneinfo import ZoneInfo
+        from .sessions import _timestamp_in_session_timezone, assign_session_date
 
-        from .sessions import assign_session_date
-
-        # Get session timezone and times
-        tz = ZoneInfo(self._session_config.timezone)
-        session_start_hour = self._session_config.get_session_start_hour()
-        session_start_minute = self._session_config.get_session_start_minute()
+        data_tz, tz, session_start_hour, session_start_minute = self._session_boundary
 
         # Compute session date for current timestamp
-        session_date = assign_session_date(timestamp, tz, session_start_hour, session_start_minute)
+        session_timestamp = _timestamp_in_session_timezone(timestamp, data_tz, tz)
+        session_date = assign_session_date(
+            session_timestamp,
+            tz,
+            session_start_hour,
+            session_start_minute,
+        )
         # Use ordinal as session ID for comparison
         current_session_id = session_date.toordinal()
 
@@ -760,11 +1279,11 @@ class Broker:
         return self.cash
 
     def equity(self) -> float:
-        """Calculate current marked account equity."""
+        """Return cash plus positions marked from the configured price source."""
         return self._portfolio_ledger.get_account_value()
 
     def get_account_value(self) -> float:
-        """Alias for equity()."""
+        """Return marked account equity using the compatibility method name."""
         return self.equity()
 
     def get_rejected_orders(self, asset: str | None = None) -> list[Order]:
@@ -801,7 +1320,7 @@ class Broker:
                 disables rules for the selected scope.
             asset: If provided, apply only to this asset; otherwise global
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(risk_rules=True)
         if asset is not None:
             self._position_rules_by_asset[asset] = rules
         else:
@@ -811,6 +1330,15 @@ class Broker:
         """Disable position rules globally or for one asset."""
         self.set_position_rules(None, asset=asset)
 
+    def _remove_position_rule_override(self, asset: str) -> None:
+        """Remove a manager-owned override so the global rule applies again."""
+        self._capture_lifecycle_mutation(risk_rules=True)
+        self._position_rules_by_asset.pop(asset, None)
+
+    def _get_position_rule_override(self, asset: str) -> PositionRule | None:
+        """Return the current per-asset override for an internal collaborator."""
+        return self._position_rules_by_asset.get(asset)
+
     def update_position_context(self, asset: str, context: dict) -> None:
         """Update context data for a position (used by signal-based rules).
 
@@ -818,7 +1346,7 @@ class Broker:
             asset: Asset symbol
             context: Dict of signal/indicator values (e.g., {'exit_signal': -0.5, 'atr': 2.5})
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(asset=asset)
         pos = self.positions.get(asset)
         if pos:
             pos.context.update(context)
@@ -830,14 +1358,18 @@ class Broker:
         position_rules: PositionRule | None = None,
     ) -> CanonicalTargetIntent:
         """Register an idempotent target for a causal opening phase."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(target_intents=True)
         if self._preopen_target_manager is None:
             raise RuntimeError("target intents require an Engine-configured broker")
-        return self._preopen_target_manager.register(intent, position_rules=position_rules)
+        return self._preopen_target_manager.register(
+            intent,
+            position_rules=position_rules,
+            active_phase=self._active_lifecycle_phase,
+        )
 
     def register_position_rule_policy(self, policy_id: str, rules: PositionRule) -> None:
         """Bind a position-rule implementation to a portable policy identity."""
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(target_intents=True)
         if self._preopen_target_manager is None:
             raise RuntimeError("position rule policies require an Engine-configured broker")
         self._preopen_target_manager.register_position_rule_policy(policy_id, rules)
@@ -868,19 +1400,25 @@ class Broker:
 
     def restore_target_intent_state(self, state: dict[str, Any]) -> None:
         """Restore target intent state before strategy initialization."""
-        self._capture_lifecycle_mutation()
+        if self._active_lifecycle_phase is not None:
+            raise RuntimeError("target intent state cannot be restored during a lifecycle callback")
         if self._preopen_target_manager is None:
             raise RuntimeError("target intents require an Engine-configured broker")
         self._preopen_target_manager.restore_state(state)
 
-    def evaluate_position_rules(self, *, skip_assets: set[str] | None = None) -> list[Order]:
+    def evaluate_position_rules(self) -> list[Order]:
         """Evaluate position rules for all open positions.
 
         Called by Engine before processing orders. Returns list of exit orders.
         Handles defer_fill=True by storing pending exits for next bar.
         """
-        self._capture_lifecycle_mutation()
-        return self._risk_engine.evaluate_position_rules(skip_assets=skip_assets)
+        self._capture_lifecycle_mutation(
+            all_positions=True,
+            all_pending_orders=True,
+            risk_rules=True,
+            all_asset_stats=True,
+        )
+        return self._risk_engine.evaluate_position_rules()
 
     def submit_order(
         self,
@@ -927,7 +1465,7 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(asset=asset)
         return self._order_book.submit_order(
             asset=asset,
             quantity=quantity,
@@ -1043,7 +1581,7 @@ class Broker:
 
         return entry, tp, sl
 
-    def update_order(self, order_id: str, **kwargs) -> bool:
+    def update_order(self, order_id: str, **kwargs: Unpack[OrderUpdate]) -> bool:
         """Update pending order parameters.
 
         Only the following fields can be updated:
@@ -1062,11 +1600,16 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.update_order(order_id, **kwargs)
 
     def cancel_order(self, order_id: str) -> bool:
-        self._capture_lifecycle_mutation()
+        """Cancel a pending order.
+
+        Returns True only when the identifier names a pending order. Filled,
+        rejected, cancelled, and unknown orders return False.
+        """
+        self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.cancel_order(order_id)
 
     def close_position(
@@ -1693,11 +2236,11 @@ class Broker:
         return orders
 
     def get_order(self, order_id: str) -> Order | None:
-        """Get order by ID."""
+        """Return an order from the complete order history, or None when unknown."""
         return self._order_book.get_order(order_id)
 
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
-        """Get pending orders, optionally filtered by asset."""
+        """Return a copy of pending orders, optionally filtered by asset."""
         return self._order_book.get_pending_orders(asset=asset)
 
     def _process_pending_exits(self) -> list[Order]:
@@ -1711,7 +2254,12 @@ class Broker:
 
         Returns list of exit orders that were created and will be filled.
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(
+            all_positions=True,
+            all_pending_orders=True,
+            risk_rules=True,
+            all_asset_stats=True,
+        )
         return self._risk_engine.process_pending_exits()
 
     def _update_time(
@@ -1758,7 +2306,7 @@ class Broker:
         if highs is None or lows is None:
             raise TypeError("_update_time requires highs and lows")
 
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_positions=True, all_asset_stats=True)
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens
@@ -1822,7 +2370,7 @@ class Broker:
         - trail_include_entry_bar_extremes: Include a completed entry bar's
           extreme in the watermark used from the next bar onward
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_positions=True)
         for asset, pos in self.positions.items():
             if asset in self._current_prices:
                 # For new positions (created this bar), skip updating from entry bar's HIGH/LOW
@@ -1839,6 +2387,7 @@ class Broker:
                     use_high_for_hwm=use_extremes,
                     use_low_for_lwm=use_extremes,
                 )
+        self.mark_account_positions()
 
     def _process_orders(
         self,
@@ -1847,7 +2396,6 @@ class Broker:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         """Process pending orders against current prices.
 
@@ -1862,11 +2410,14 @@ class Broker:
         Args:
             use_open: If True, use open prices (for next-bar mode at bar start).
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(
+            all_positions=True,
+            all_pending_orders=True,
+            all_asset_stats=True,
+        )
         self._execution_engine.process_orders(
             use_open=use_open,
             order_types=order_types,
             order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
-            defer_policy_rejections=defer_policy_rejections,
         )

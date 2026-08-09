@@ -3,17 +3,36 @@
 from __future__ import annotations
 
 import copy
+from typing import TYPE_CHECKING
 
 from ..models import calculate_commission
-from ..types import ExecutionMode, OrderSide, OrderStatus, OrderType, Position
+from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import is_exit_order, quantity_zero_tolerance
+from .state import MarketState, OrderState
+
+if TYPE_CHECKING:
+    from ..accounting import AccountState
+    from ..broker import Broker
+    from .fill_engine import FillEngine
 
 
 class ExecutionEngine:
     """Executes pending orders using configured fill ordering."""
 
-    def __init__(self, broker):
+    def __init__(
+        self,
+        broker: Broker,
+        *,
+        account: AccountState,
+        market: MarketState,
+        orders: OrderState,
+        fill_engine: FillEngine,
+    ) -> None:
         self.broker = broker
+        self.account = account
+        self.market = market
+        self.orders = orders
+        self.fill_engine = fill_engine
 
     def process_orders(
         self,
@@ -22,7 +41,6 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         if self._should_use_next_bar_queue_shadow_validation(
             use_open,
@@ -35,7 +53,6 @@ class ExecutionEngine:
                 order_types=order_types,
                 order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
-                defer_policy_rejections=defer_policy_rejections,
             )
             return
 
@@ -46,7 +63,6 @@ class ExecutionEngine:
                 order_types=order_types,
                 order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
-                defer_policy_rejections=defer_policy_rejections,
             )
         elif ordering == "sequential":
             self._process_orders_sequential(
@@ -54,7 +70,6 @@ class ExecutionEngine:
                 order_types=order_types,
                 order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
-                defer_policy_rejections=defer_policy_rejections,
             )
         else:
             self._process_orders_fifo(
@@ -62,12 +77,11 @@ class ExecutionEngine:
                 order_types=order_types,
                 order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
-                defer_policy_rejections=defer_policy_rejections,
             )
 
     def _is_exit_order(self, order) -> bool:
         """Check if an order reduces an existing position without reversing."""
-        return is_exit_order(order, self.broker.positions)
+        return is_exit_order(order, self.account.positions)
 
     def _process_orders_exit_first(
         self,
@@ -76,10 +90,9 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         broker = self.broker
-        fill = broker._fill_engine
+        fill = self.fill_engine
         exit_orders = []
         entry_orders = []
         eligible_orders = self._eligible_orders(
@@ -123,7 +136,7 @@ class ExecutionEngine:
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
-                    broker._partial_orders.pop(order.order_id, None)
+                    self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     fill.update_partial_order(order)
 
@@ -139,7 +152,6 @@ class ExecutionEngine:
                 order,
                 use_open,
                 filled_orders,
-                defer_policy_rejections=defer_policy_rejections,
             )
 
         self._cleanup_filled_orders(filled_orders)
@@ -162,7 +174,7 @@ class ExecutionEngine:
         if order_types is not None or order_ids is not None or include_orders_this_bar:
             return False
 
-        current_bar_index = broker._bar_index
+        current_bar_index = self.market.bar_index
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
@@ -182,10 +194,9 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         broker = self.broker
-        fill = broker._fill_engine
+        fill = self.fill_engine
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
@@ -196,17 +207,17 @@ class ExecutionEngine:
         if not eligible_orders:
             return
 
-        shadow_cash = broker.account.cash
+        shadow_cash = self.account.cash
         shadow_positions = {
-            asset: copy.deepcopy(position) for asset, position in broker.account.positions.items()
+            asset: copy.deepcopy(position) for asset, position in self.account.positions.items()
         }
         for asset, position in shadow_positions.items():
-            mark = broker._current_prices.get(asset)
+            mark = self.market.prices.get(asset)
             if mark is not None:
                 position.current_price = mark
 
-        accepted_orders: list[tuple[object, float]] = []
-        filled_orders: list = []
+        accepted_orders: list[tuple[Order, float]] = []
+        filled_orders: list[Order] = []
 
         for order in eligible_orders:
             price = fill.get_fill_price_for_order(order, use_open)
@@ -225,7 +236,7 @@ class ExecutionEngine:
             if fill_price is None:
                 continue
 
-            validation_price = broker._current_prices.get(order.asset, fill_price)
+            validation_price = self.market.prices.get(order.asset, fill_price)
             valid, rejection_reason, rejection_code = self._validate_shadow_queue_order(
                 order=order,
                 validation_price=validation_price,
@@ -233,8 +244,6 @@ class ExecutionEngine:
                 shadow_positions=shadow_positions,
             )
             if not valid:
-                if defer_policy_rejections:
-                    continue
                 order.reject(
                     rejection_reason,
                     rejection_code or "order_validation_failed",
@@ -253,7 +262,7 @@ class ExecutionEngine:
             fully_filled = fill.execute_fill(order, fill_price)
             if fully_filled:
                 filled_orders.append(order)
-                broker._partial_orders.pop(order.order_id, None)
+                self.orders.partial_quantities.pop(order.order_id, None)
             else:
                 fill.update_partial_order(order)
             broker.mark_account_positions(use_open=use_open)
@@ -269,7 +278,7 @@ class ExecutionEngine:
         shadow_positions: dict[str, Position],
     ) -> tuple[bool, str, str | None]:
         broker = self.broker
-        policy = broker.account.policy
+        policy = self.account.policy
         qty_delta = order.quantity if order.side is OrderSide.BUY else -order.quantity
         current_qty = (
             shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
@@ -348,12 +357,15 @@ class ExecutionEngine:
 
         position = shadow_positions.get(order.asset)
         if position is None:
+            current_time = self.market.time
+            if current_time is None:
+                raise RuntimeError("Cannot create a shadow position before market time is set")
             shadow_positions[order.asset] = Position(
                 asset=order.asset,
                 quantity=new_qty,
                 entry_price=fill_price,
-                entry_time=broker._current_time,
-                current_price=broker._current_prices.get(order.asset, fill_price),
+                entry_time=current_time,
+                current_price=self.market.prices.get(order.asset, fill_price),
                 multiplier=broker.get_multiplier(order.asset),
             )
             return shadow_cash
@@ -364,7 +376,7 @@ class ExecutionEngine:
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
         position.quantity = new_qty
-        position.current_price = broker._current_prices.get(order.asset, fill_price)
+        position.current_price = self.market.prices.get(order.asset, fill_price)
         if abs(current_qty) <= quantity_zero_tolerance(current_qty) or is_reversal:
             position.entry_price = fill_price
 
@@ -377,7 +389,6 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         broker = self.broker
         eligible_orders = self._eligible_orders(
@@ -394,7 +405,6 @@ class ExecutionEngine:
                 order,
                 use_open,
                 filled_orders,
-                defer_policy_rejections=defer_policy_rejections,
             )
             if filled_orders and filled_orders[-1] is order:
                 broker.mark_account_positions(use_open=use_open)
@@ -408,7 +418,6 @@ class ExecutionEngine:
         order_types: set[OrderType] | None = None,
         order_ids: set[str] | None = None,
         include_orders_this_bar: bool = False,
-        defer_policy_rejections: bool = False,
     ):
         """Process orders in submission order without exit/entry separation.
 
@@ -424,7 +433,7 @@ class ExecutionEngine:
         sequential accounting and the gatekeeper's point-in-time accounting.
         """
         broker = self.broker
-        fill = broker._fill_engine
+        fill = self.fill_engine
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
@@ -463,7 +472,7 @@ class ExecutionEngine:
                     fully_filled = fill.execute_fill(order, fill_price)
                     if fully_filled:
                         filled_orders.append(order)
-                        broker._partial_orders.pop(order.order_id, None)
+                        self.orders.partial_quantities.pop(order.order_id, None)
                     else:
                         fill.update_partial_order(order)
             else:
@@ -472,7 +481,6 @@ class ExecutionEngine:
                     order,
                     use_open,
                     filled_orders,
-                    defer_policy_rejections=defer_policy_rejections,
                 )
 
             # Mark-to-market after every fill so the next order sees updated cash
@@ -486,11 +494,9 @@ class ExecutionEngine:
         order,
         use_open: bool,
         filled_orders: list,
-        *,
-        defer_policy_rejections: bool = False,
     ) -> None:
         broker = self.broker
-        fill = broker._fill_engine
+        fill = self.fill_engine
         if order.status is not OrderStatus.PENDING:
             return
         price = fill.get_fill_price_for_order(order, use_open)
@@ -524,7 +530,7 @@ class ExecutionEngine:
                 if (
                     order.side is OrderSide.BUY
                     and broker.short_cash_policy.value == "lock_notional"
-                    and broker.account.get_position_quantity(order.asset) < 0
+                    and self.account.get_position_quantity(order.asset) < 0
                 ):
                     max_qty = fill.get_max_affordable_quantity(order, fill_price)
                     if broker.share_type.value == "integer":
@@ -542,7 +548,7 @@ class ExecutionEngine:
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
-                    broker._partial_orders.pop(order.order_id, None)
+                    self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     fill.update_partial_order(order)
         else:
@@ -551,14 +557,12 @@ class ExecutionEngine:
                 return
 
             if use_simple_cash_check and not self._passes_simple_cash_check(order, fill_price):
-                if defer_policy_rejections:
-                    return
                 order.reject("Insufficient cash (open cash check)", "insufficient_cash")
                 return
 
             # Under locked-short-cash semantics, reversal entries can be
             # cash-constrained and must follow partial-fill sizing.
-            current_qty = broker.account.get_position_quantity(order.asset)
+            current_qty = self.account.get_position_quantity(order.asset)
             is_reversal_entry = broker.short_cash_policy.value == "lock_notional" and (
                 (order.side is OrderSide.BUY and current_qty < 0)
                 or (order.side is OrderSide.SELL and current_qty > 0)
@@ -585,20 +589,18 @@ class ExecutionEngine:
                     broker.gatekeeper.validate_order_with_code(order, fill_price)
                 )
 
-            if not valid and defer_policy_rejections:
-                return
             insufficient_cash = "insufficient" in rejection_reason.lower()
             if valid:
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
-                    broker._partial_orders.pop(order.order_id, None)
+                    self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     fill.update_partial_order(order)
             elif not broker.reject_on_insufficient_cash and insufficient_cash:
                 if broker.partial_fills_allowed and fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
-                    broker._partial_orders.pop(order.order_id, None)
+                    self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     # Permissive mode: silently skip unaffordable orders for this cycle
                     # by cancelling them instead of keeping them pending forever.
@@ -609,7 +611,7 @@ class ExecutionEngine:
             ):
                 if fill.try_partial_fill(order, fill_price):
                     filled_orders.append(order)
-                    broker._partial_orders.pop(order.order_id, None)
+                    self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     order.reject(
                         rejection_reason,
@@ -640,8 +642,8 @@ class ExecutionEngine:
     ) -> list:
         broker = self.broker
         eligible_orders = []
-        orders_this_bar_ids = broker._orders_this_bar_ids
-        for order in broker.pending_orders[:]:
+        orders_this_bar_ids = self.orders.current_bar_ids
+        for order in self.orders.pending[:]:
             if use_open and order.order_type is OrderType.MOC:
                 continue
             if order_types is not None and order.order_type not in order_types:
@@ -664,7 +666,7 @@ class ExecutionEngine:
             if order.quantity <= 0:
                 return False
 
-        current_qty = broker.account.get_position_quantity(order.asset)
+        current_qty = self.account.get_position_quantity(order.asset)
         is_opposite = (order.side is OrderSide.BUY and current_qty < 0) or (
             order.side is OrderSide.SELL and current_qty > 0
         )
@@ -679,31 +681,30 @@ class ExecutionEngine:
         return projected_cash >= 0.0
 
     def _cleanup_filled_orders(self, filled_orders: list) -> None:
-        broker = self.broker
         filled_ids = {o.order_id for o in filled_orders}
         if filled_ids:
-            broker._orders_this_bar_ids.difference_update(filled_ids)
+            self.orders.current_bar_ids.difference_update(filled_ids)
 
         new_pending = []
-        for order in broker.pending_orders:
+        for order in self.orders.pending:
             if order.order_id in filled_ids or order.status in {
                 OrderStatus.REJECTED,
                 OrderStatus.CANCELLED,
             }:
-                broker._orders_this_bar_ids.discard(order.order_id)
+                self.orders.current_bar_ids.discard(order.order_id)
                 continue
             new_pending.append(order)
-        broker.pending_orders = new_pending
+        self.orders.pending[:] = new_pending
 
-        if broker._orders_this_bar:
-            broker._orders_this_bar = [
-                o for o in broker._orders_this_bar if o.order_id in broker._orders_this_bar_ids
+        if self.orders.current_bar:
+            self.orders.current_bar[:] = [
+                o for o in self.orders.current_bar if o.order_id in self.orders.current_bar_ids
             ]
 
     def _sort_entry_orders(self, orders: list, use_open: bool) -> list:
         """Sort entry orders under EXIT_FIRST based on configured priority."""
         broker = self.broker
-        fill = broker._fill_engine
+        fill = self.fill_engine
         priority = broker.entry_order_priority.value
         if priority == "submission":
             return orders
@@ -711,9 +712,7 @@ class ExecutionEngine:
         def notional(order) -> float:
             px = fill.get_fill_price_for_order(order, use_open)
             if px is None:
-                px = broker._current_prices.get(
-                    order.asset, broker._current_opens.get(order.asset, 0.0)
-                )
+                px = self.market.prices.get(order.asset, self.market.opens.get(order.asset, 0.0))
             return abs(order.quantity * px)
 
         reverse = priority == "notional_desc"

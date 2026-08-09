@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+
+import pytest
+
+if importlib.util.find_spec("ml4t.diagnostic") is None:
+    pytest.skip("ml4t-diagnostic is an optional integration", allow_module_level=True)
 
 from ml4t.diagnostic.artifacts import dump_spec, load_market_data_spec, load_spec
 from ml4t.engineer.artifacts import FeatureSpec, LabelSpec, PredictionSpec

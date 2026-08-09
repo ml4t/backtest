@@ -41,7 +41,7 @@ def _run_framework_pair(framework: str, runner_name: str, artifact_dir: Path):
     elif framework == "zipline":
         pytest.importorskip("zipline")
         pytest.importorskip("exchange_calendars")
-        os.environ["ZIPLINE_ROOT"] = "/tmp/zipline-root"
+        os.environ["ZIPLINE_ROOT"] = str(artifact_dir / "zipline-root")
         Path(os.environ["ZIPLINE_ROOT"]).mkdir(parents=True, exist_ok=True)
 
     suite = _load_benchmark_suite()

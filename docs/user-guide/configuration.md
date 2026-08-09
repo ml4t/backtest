@@ -125,6 +125,8 @@ separate assumption layer.
 | `initial_margin` | float | 0.5 | Reg T initial margin (50%) |
 | `long_maintenance_margin` | float | 0.25 | Long position maintenance |
 | `short_maintenance_margin` | float | 0.30 | Short position maintenance |
+| `fixed_margin_schedule` | dict \| None | None | Per-asset `(initial, maintenance)` fixed dollar margin per contract |
+| `margin_pct_schedule` | dict \| None | None | Per-asset `(initial, maintenance)` fractions of notional; cannot overlap the fixed schedule |
 | `short_cash_policy` | ShortCashPolicy | CREDIT | How short proceeds affect cash |
 
 Account type is determined by the flag combination:
@@ -169,6 +171,7 @@ mark source.
 | `stop_fill_mode` | StopFillMode | STOP_PRICE | Stop order fill price (STOP_PRICE, CLOSE_PRICE, BAR_EXTREME, NEXT_BAR_OPEN) |
 | `stop_level_basis` | StopLevelBasis | FILL_PRICE | Base price for stop levels (FILL_PRICE, SIGNAL_PRICE) |
 | `trail_hwm_source` | WaterMarkSource | CLOSE | Water mark update price (CLOSE, BAR_EXTREME) |
+| `trail_include_entry_bar_extremes` | bool | False | Include the completed entry bar's high or low in the next bar's trailing water mark |
 | `initial_hwm_source` | InitialHwmSource | FILL_PRICE | Initial water mark on entry (FILL_PRICE, BAR_CLOSE, BAR_HIGH) |
 | `trail_stop_timing` | TrailStopTiming | LAGGED | Timing of water mark vs stop check (LAGGED, INTRABAR, VBT_PRO) |
 
@@ -207,6 +210,13 @@ friction:
 |-----------|------|---------|-------------|
 | `share_type` | ShareType | INTEGER | FRACTIONAL or INTEGER |
 
+### Result evidence
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `retain_intent_history` | bool | False | Include full target, child-order, and reconciliation histories in result artifacts; counts are always retained |
+| `retain_lifecycle_history` | bool | False | Include the per-callback lifecycle trace in result artifacts; callback counts are always retained |
+
 ### Cash Management
 
 | Parameter | Type | Default | Description |
@@ -232,6 +242,7 @@ friction:
 | `next_bar_submission_precheck` | bool | False | Pre-check cash at submission time |
 | `next_bar_simple_cash_check` | bool | False | Simple cash check for next-bar orders |
 | `buying_power_reservation` | bool | False | Reserve cash at submission (LEAN-style) |
+| `next_bar_queue_shadow_validation` | bool | False | Revalidate aged next-bar entries against the eligible queue before fills |
 | `immediate_fill` | bool | False | Fill same-bar market orders at submit time |
 
 ### Rebalancing
@@ -255,7 +266,8 @@ friction:
 
 ### Feed Contract
 
-`BacktestConfig` can also carry a serialized `FeedSpec` under the top-level `feed`
+`BacktestConfig` can also carry a serialized `FeedSpec` in `feed_spec`, represented
+under the top-level `feed`
 section. This lets you capture how the input data should be interpreted without
 introducing a second config object.
 
@@ -281,6 +293,9 @@ Supported keys mirror `FeedSpec`:
 - `timestamp_semantics`
 - `session_start_time`
 
+`session_start_time` can override an evening session boundary. Morning-start sessions use the
+local calendar date, so morning values must match the configured calendar's standard open.
+
 ### Metadata
 
 Use the top-level `metadata` section for any user-defined provenance that the
@@ -293,6 +308,9 @@ library does not interpret directly, for example:
 
 `metadata` round-trips through `to_dict()`, `from_dict()`, `to_yaml()`, and
 `from_yaml()` unchanged.
+
+`preset_name` records the preset or config source used to construct the config. It
+is provenance metadata and does not change execution by itself.
 
 ## YAML Configuration
 

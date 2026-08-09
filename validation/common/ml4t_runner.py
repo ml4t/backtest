@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -139,9 +139,13 @@ def run_ml4t(
 
 def _extract_timestamps(prices_df: pd.DataFrame) -> list:
     """Extract timestamps handling timezone-aware and naive DatetimeIndex."""
-    if prices_df.index.tz is not None:
-        return [ts.to_pydatetime().replace(tzinfo=None) for ts in prices_df.index]
-    return prices_df.index.to_pydatetime().tolist()
+    index = prices_df.index
+    if not isinstance(index, pd.DatetimeIndex):
+        raise TypeError("prices_df must use a DatetimeIndex")
+    timestamps = [cast(pd.Timestamp, value).to_pydatetime() for value in index]
+    if index.tz is not None:
+        return [timestamp.replace(tzinfo=None) for timestamp in timestamps]
+    return timestamps
 
 
 def _get_asset_name(scenario: ScenarioConfig, framework: str) -> str:

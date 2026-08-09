@@ -285,7 +285,7 @@ def _create_slippage_model(fixed: float = 0.0, pct: float = 0.0):
 
 def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation") -> str:
     """Register and ingest a custom bundle with test data."""
-    from zipline.data.bundles import ingest, register
+    from zipline.data.bundles import bundles, ingest, register, unregister
 
     def make_ingest_func(df):
         def ingest_func(
@@ -349,6 +349,9 @@ def _setup_bundle(prices_df: pd.DataFrame, bundle_name: str = "test_validation")
         start_session = nyse.date_to_session(start_session, direction="next")
     if not nyse.is_session(end_session):
         end_session = nyse.date_to_session(end_session, direction="previous")
+
+    if bundle_name in bundles:
+        unregister(bundle_name)
 
     register(
         bundle_name,

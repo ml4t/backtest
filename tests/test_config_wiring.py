@@ -30,6 +30,7 @@ from ml4t.backtest.config import (
     SlippageType,
     SpreadConvention,
 )
+from ml4t.backtest.execution.limits import VolumeParticipationLimit
 from ml4t.backtest.models import (
     CombinedCommission,
     NoCommission,
@@ -895,6 +896,8 @@ class TestPresetRoundTrip:
 
     def test_to_dict_from_dict_roundtrip(self):
         config = BacktestConfig.from_preset("backtrader")
+        config.retain_intent_history = True
+        config.retain_lifecycle_history = True
         d = config.to_dict()
         restored = BacktestConfig.from_dict(d)
         assert restored.fill_ordering == config.fill_ordering
@@ -903,6 +906,8 @@ class TestPresetRoundTrip:
         assert restored.reject_on_insufficient_cash == config.reject_on_insufficient_cash
         assert restored.partial_fills_allowed == config.partial_fills_allowed
         assert restored.next_bar_queue_shadow_validation == config.next_bar_queue_shadow_validation
+        assert restored.retain_intent_history is True
+        assert restored.retain_lifecycle_history is True
 
     def test_sizing_method_removed_from_fields(self):
         """sizing_method was removed from BacktestConfig fields."""
@@ -976,6 +981,25 @@ class TestImmediateFill:
         assert order.status.value == "filled"
         assert broker.get_position("AAPL") is None
         assert broker.cash == 10_000.0
+
+    def test_immediate_fill_exit_preserves_unfilled_quantity(self):
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+            execution_limits=VolumeParticipationLimit(max_participation=0.5),
+        )
+        _set_prices(broker, {"AAPL": 100.0})
+        broker._current_volumes = {"AAPL": 1_000.0}
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+
+        broker._current_volumes = {"AAPL": 100.0}
+        order = broker.submit_order("AAPL", 100, OrderSide.SELL)
+
+        assert order is not None
+        assert order.status.value == "pending"
+        assert order.quantity == 50.0
+        assert broker.get_position("AAPL").quantity == 50.0
 
     def test_immediate_fill_sequential_cash_tracking(self):
         """Each fill updates cash before the next submit sees it."""
@@ -1203,13 +1227,26 @@ class TestFeedSpecConfigResolution:
         assert config.timezone == "America/New_York"
         assert config.data_frequency == DataFrequency.MINUTE_1
 
+    def test_constructor_rejects_unsupported_morning_session_boundary(self):
+        with pytest.raises(ValueError, match="custom morning session_start_time"):
+            BacktestConfig(
+                feed_spec=FeedSpec(
+                    calendar="CRYPTO",
+                    session_start_time="06:00",
+                )
+            )
+
+    def test_constructor_rejects_unverifiable_morning_session_boundary(self):
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            BacktestConfig(feed_spec=FeedSpec(session_start_time="09:30"))
+
     def test_resolved_feed_spec_preserves_explicit_runtime_over_feed_metadata(self):
         config = BacktestConfig(
             timezone="UTC",
             data_frequency=DataFrequency.DAILY,
             feed_spec=FeedSpec(
-                calendar="NYSE",
-                timezone="America/New_York",
+                calendar="CME_Equity",
+                timezone="America/Chicago",
                 data_frequency="minute",
                 session_start_time="17:00",
                 timestamp_semantics="event_time",
@@ -1217,16 +1254,16 @@ class TestFeedSpecConfigResolution:
         )
 
         assert config.feed_spec is not None
-        assert config.feed_spec.timezone == "America/New_York"
+        assert config.feed_spec.timezone == "America/Chicago"
         assert config.timezone == "UTC"
         assert config.data_frequency == DataFrequency.DAILY
-        assert config.resolved_calendar == "NYSE"
+        assert config.resolved_calendar == "CME_Equity"
         assert config.resolved_timezone == "UTC"
         assert config.resolved_data_frequency == DataFrequency.DAILY
         assert config.resolved_session_start_time == "17:00"
         assert config.resolved_timestamp_semantics is not None
         assert config.resolved_timestamp_semantics.value == "event_time"
-        assert config.resolved_feed_spec.calendar == "NYSE"
+        assert config.resolved_feed_spec.calendar == "CME_Equity"
         assert config.resolved_feed_spec.timezone == "UTC"
         assert config.resolved_feed_spec.data_frequency == DataFrequency.DAILY
         assert config.resolved_feed_spec.session_start_time == "17:00"

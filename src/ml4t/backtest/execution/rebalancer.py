@@ -21,17 +21,28 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from ..broker import Broker
     from ..types import Order
 
-from ..config import RebalanceMode, ShareType
+from ml4t.specs.market_data import TimestampSemantics
+
+from ..config import DataFrequency, ExecutionPrice, RebalanceMode, ShareType
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
-from .schedule import RebalanceSchedule, is_rebalance_timestamp
+from .schedule import RebalanceSchedule, _OnlineRebalanceEvaluator
+
+_SCHEDULE_CONFIG_FIELDS = (
+    "schedule",
+    "calendar",
+    "timezone",
+    "session_start_time",
+    "data_frequency",
+    "timestamp_semantics",
+)
 
 
 class WeightProvider(Protocol):
@@ -66,6 +77,14 @@ class RebalanceConfig:
             SNAPSHOT (default): Freeze value, batch fills (backward compatible).
             INCREMENTAL: Recompute value after each fill (most accurate).
             HYBRID: Frozen targets, sequential fills (VBT-style).
+        schedule: Optional event, session, weekly, month-end, or explicit schedule.
+        calendar: Exchange calendar used to identify session closes and period ends. Required for
+            weekly and month-end schedules.
+        timezone: Timezone used to interpret naive feed timestamps.
+        session_start_time: Optional exchange-local session boundary in ``HH:MM`` form.
+        data_frequency: Feed frequency. Set this with ``timestamp_semantics`` for intraday data.
+        timestamp_semantics: Whether timestamps are session labels, bar closes, or event times.
+            Both metadata fields may be omitted only when each event is a daily session close.
     """
 
     # Trade thresholds
@@ -88,6 +107,17 @@ class RebalanceConfig:
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
     schedule: RebalanceSchedule | None = None
     calendar: str | None = None
+    timezone: str | None = None
+    session_start_time: str | None = None
+    data_frequency: DataFrequency | str | None = None
+    timestamp_semantics: TimestampSemantics | str | None = None
+
+    def __post_init__(self) -> None:
+        if self.session_start_time is None:
+            return
+        from ..sessions import _validate_session_start_time
+
+        _validate_session_start_time(self.calendar, self.session_start_time)
 
 
 class TargetWeightExecutor:
@@ -118,23 +148,79 @@ class TargetWeightExecutor:
             config: Rebalancing configuration. Uses defaults if not provided.
         """
         self.config = config or RebalanceConfig()
-        self._schedule_session_date: date | None = None
-        self._schedule_session_index = 0
+        self._schedule_evaluator: _OnlineRebalanceEvaluator | None = None
+        self._schedule_evaluator_config: tuple[object, ...] | None = None
+        self._ensure_schedule_evaluator()
 
-    def should_rebalance(self, timestamp: datetime) -> bool:
-        """Evaluate the current timestamp without a future feed sequence."""
-        if self.config.schedule is None:
-            return True
-        session_date = timestamp.date()
-        if session_date != self._schedule_session_date:
-            self._schedule_session_date = session_date
-            self._schedule_session_index += 1
-        return is_rebalance_timestamp(
-            timestamp,
-            self.config.schedule,
-            session_index=self._schedule_session_index,
-            calendar=self.config.calendar,
+    def _schedule_config(self) -> tuple[object, ...]:
+        return tuple(getattr(self.config, name) for name in _SCHEDULE_CONFIG_FIELDS)
+
+    def _schedule_config_error(self, current: tuple[object, ...]) -> ValueError:
+        previous = self._schedule_evaluator_config
+        if previous is None:
+            return ValueError("RebalanceConfig changed during evaluation; call reset() first")
+        changes = ", ".join(
+            f"{name}: {old!r} -> {new!r}"
+            for name, old, new in zip(_SCHEDULE_CONFIG_FIELDS, previous, current, strict=True)
+            if old != new
         )
+        return ValueError(
+            f"RebalanceConfig changed during evaluation ({changes}); call reset() first"
+        )
+
+    def _ensure_schedule_evaluator(self) -> _OnlineRebalanceEvaluator | None:
+        schedule = self.config.schedule
+        evaluator_config = self._schedule_config()
+        if evaluator_config != self._schedule_evaluator_config:
+            if self._schedule_evaluator is not None and self._schedule_evaluator.has_observations:
+                raise self._schedule_config_error(evaluator_config)
+            self._schedule_evaluator = (
+                None
+                if schedule is None
+                else _OnlineRebalanceEvaluator(
+                    schedule,
+                    calendar=self.config.calendar,
+                    timezone=self.config.timezone,
+                    session_start_time=self.config.session_start_time,
+                    data_frequency=self.config.data_frequency,
+                    timestamp_semantics=self.config.timestamp_semantics,
+                )
+            )
+            self._schedule_evaluator_config = evaluator_config
+        return self._schedule_evaluator
+
+    def reset(self) -> None:
+        """Clear schedule state before reusing this executor for another run."""
+        self._schedule_evaluator = None
+        self._schedule_evaluator_config = None
+
+    def should_rebalance(
+        self,
+        timestamp: datetime,
+        *,
+        is_session_close: bool | None = None,
+    ) -> bool:
+        """Evaluate one event in order; call this for every event when a schedule is set."""
+        evaluator = self._ensure_schedule_evaluator()
+        if evaluator is None:
+            return True
+        return evaluator.evaluate(
+            timestamp,
+            is_session_close=is_session_close,
+        )
+
+    def validate_completed_run(self) -> None:
+        """Validate schedule alignment after the final event in a complete run."""
+        evaluator = self._schedule_evaluator
+        if evaluator is None:
+            return
+        evaluator.validate_completed_run()
+
+    def _validate_engine_run(self, market_event_count: int) -> None:
+        evaluator = self._schedule_evaluator
+        if evaluator is None:
+            return
+        evaluator.validate_engine_run(market_event_count)
 
     def execute(
         self,
@@ -143,6 +229,7 @@ class TargetWeightExecutor:
         broker: Broker,
         *,
         timestamp: datetime | None = None,
+        is_session_close: bool | None = None,
     ) -> list[Order]:
         """Execute rebalancing to target weights.
 
@@ -162,6 +249,11 @@ class TargetWeightExecutor:
                 control the allowed exposure.
             data: Current bar data (for prices). Format: {asset: {'close': price, ...}}
             broker: Broker instance for order submission.
+            timestamp: Current event time, required when a schedule is configured.
+            is_session_close: Explicit boundary signal for intraday feeds without a calendar.
+                When a schedule is configured, call ``execute`` for every event in order and call
+                ``validate_completed_run`` after the final event in standalone use. An Engine
+                broker registers and runs completion validation automatically.
 
         Returns:
             List of submitted orders.
@@ -169,12 +261,13 @@ class TargetWeightExecutor:
         if self.config.schedule is not None:
             if timestamp is None:
                 raise ValueError("timestamp is required when RebalanceConfig.schedule is set")
-            if not self.should_rebalance(timestamp):
+            broker._register_completion_validator(self, self._validate_engine_run)
+            if not self.should_rebalance(timestamp, is_session_close=is_session_close):
                 return []
 
         # 1. Cancel pending orders if configured (prevents double-allocation)
         if self.config.cancel_before_rebalance:
-            for pending_order in list(broker.pending_orders):
+            for pending_order in broker.get_pending_orders():
                 broker.cancel_order(pending_order.order_id)
 
         equity = broker.get_account_value()
@@ -369,9 +462,9 @@ class TargetWeightExecutor:
         """Return a mark price for an existing position, tolerating sparse bars."""
         price = self._get_rebalance_price(asset, data)
         if price is None:
-            price = broker._current_prices.get(asset)
+            price = broker.get_price_for_source(ExecutionPrice.PRICE, asset)
         if price is None:
-            price = broker._last_prices.get(asset)
+            price = broker.get_last_price(asset)
         if price is None:
             price = pos.current_price
         if price is None:
@@ -393,7 +486,7 @@ class TargetWeightExecutor:
             return {}
 
         weights = {}
-        for asset, pos in broker.positions.items():
+        for asset, pos in broker.get_positions().items():
             price = self._get_position_price(asset, pos, data, broker)
             if price is None or price <= 0:
                 continue
@@ -422,7 +515,7 @@ class TargetWeightExecutor:
 
         # Start with actual positions
         effective_value: dict[str, float] = {}
-        for asset, pos in broker.positions.items():
+        for asset, pos in broker.get_positions().items():
             price = self._get_position_price(asset, pos, data, broker)
             if price is None or price <= 0:
                 continue
@@ -430,7 +523,7 @@ class TargetWeightExecutor:
             effective_value[asset] = pos.quantity * price * multiplier
 
         # Add net value of pending orders
-        for order in broker.pending_orders:
+        for order in broker.get_pending_orders():
             price = order.limit_price or data.get(order.asset, {}).get("close")
             if price is not None and price > 0:
                 multiplier = broker.get_multiplier(order.asset)

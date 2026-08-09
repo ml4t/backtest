@@ -1,0 +1,870 @@
+from __future__ import annotations
+
+import ast
+from dataclasses import fields
+from pathlib import Path
+
+import pytest
+from ml4t.specs import LIFECYCLE_V1, LifecyclePhase
+
+from ml4t.backtest import Broker
+from ml4t.backtest.core.state import OrderState, RiskState
+
+SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
+BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
+FORBIDDEN_BROKER_STATE = {
+    "_asset_stats",
+    "_asset_bars_seen",
+    "_bar_index",
+    "_current_ask_sizes",
+    "_current_asks",
+    "_current_bid_sizes",
+    "_current_bids",
+    "_current_closes",
+    "_current_highs",
+    "_current_lows",
+    "_current_mids",
+    "_current_opens",
+    "_current_prices",
+    "_current_signals",
+    "_current_time",
+    "_current_volumes",
+    "_contract_specs",
+    "_completion_validators",
+    "_execution_engine",
+    "_execution_journal",
+    "_fill_engine",
+    "_fill_executor",
+    "_filled_this_bar",
+    "_last_prices",
+    "_last_session_id",
+    "_lifecycle_transaction",
+    "_market_state",
+    "_order_book",
+    "_order_counter",
+    "_order_state",
+    "_orders_this_bar",
+    "_orders_this_bar_ids",
+    "_partial_orders",
+    "_pending_exits",
+    "_portfolio_ledger",
+    "_position_rules",
+    "_position_rules_by_asset",
+    "_positions_created_this_bar",
+    "_preopen_target_manager",
+    "_rebalance_counter",
+    "_risk_engine",
+    "_risk_state",
+    "_session_config",
+    "_session_boundary",
+    "_stats_config",
+    "_stop_exits_this_bar",
+    "_active_lifecycle_phase",
+}
+STRATEGY_CALLBACKS = {"on_data", "on_end", "on_prepare", "on_start"}
+COLLECTION_MUTATORS = {
+    "add",
+    "append",
+    "clear",
+    "discard",
+    "extend",
+    "insert",
+    "pop",
+    "popitem",
+    "remove",
+    "reverse",
+    "setdefault",
+    "sort",
+    "update",
+}
+COLLECTION_CONSUMER_CALLS = {
+    "all",
+    "any",
+    "bool",
+    "len",
+    "str",
+    "sum",
+}
+COLLECTION_COPY_OR_VIEW_CALLS = {
+    "dict",
+    "enumerate",
+    "frozenset",
+    "iter",
+    "list",
+    "max",
+    "min",
+    "next",
+    "reversed",
+    "set",
+    "sorted",
+    "tuple",
+    "zip",
+}
+# fill_engine.py passes positions to this read-only accounting policy method.
+COLLECTION_READ_METHOD_SUFFIX = ("account", "policy", "get_spendable_cash")
+MUTATING_COLLECTION_METHODS = {
+    "add",
+    "append",
+    "clear",
+    "discard",
+    "extend",
+    "pop",
+    "popitem",
+    "remove",
+    "setdefault",
+    "update",
+}
+
+
+def _parse(path: Path) -> ast.Module:
+    return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _owned_state_fields(function: ast.FunctionDef, owner: str) -> set[str]:
+    return {
+        node.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Attribute)
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id == "self"
+        and node.value.attr == owner
+    }
+
+
+def _references_owner(node: ast.AST, owner: str, field: str | None = None) -> bool:
+    for candidate in ast.walk(node):
+        if not isinstance(candidate, ast.Attribute):
+            continue
+        if field is None:
+            if (
+                candidate.attr == owner
+                and isinstance(candidate.value, ast.Name)
+                and candidate.value.id == "self"
+            ):
+                return True
+        elif (
+            candidate.attr == field
+            and isinstance(candidate.value, ast.Attribute)
+            and candidate.value.attr == owner
+            and isinstance(candidate.value.value, ast.Name)
+            and candidate.value.value.id == "self"
+        ):
+            return True
+    return False
+
+
+def _mutation_expressions(function: ast.AST) -> list[ast.AST]:
+    expressions: list[ast.AST] = []
+    for node in ast.walk(function):
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            expressions.extend(targets)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in MUTATING_COLLECTION_METHODS
+        ):
+            expressions.append(node.func.value)
+    return expressions
+
+
+def _property_owned_fields(broker_class: ast.ClassDef) -> dict[str, tuple[str, str]]:
+    owned_fields: dict[str, tuple[str, str]] = {}
+    for function in broker_class.body:
+        if not isinstance(function, ast.FunctionDef):
+            continue
+        if not any(
+            isinstance(decorator, ast.Name) and decorator.id == "property"
+            for decorator in function.decorator_list
+        ):
+            continue
+        returned = next(
+            (
+                node.value
+                for node in ast.walk(function)
+                if isinstance(node, ast.Return) and node.value is not None
+            ),
+            None,
+        )
+        path = _attribute_path(returned) if returned is not None else None
+        if path is not None and len(path) == 3 and path[0] == "self":
+            owned_fields[function.name] = (path[1], path[2])
+    return owned_fields
+
+
+def _owned_field_references(
+    node: ast.AST,
+    property_owned_fields: dict[str, tuple[str, str]],
+) -> set[tuple[str, str]]:
+    references: set[tuple[str, str]] = set()
+    for candidate in ast.walk(node):
+        path = _attribute_path(candidate)
+        if path is None or path[0] != "self":
+            continue
+        if len(path) == 3:
+            references.add((path[1], path[2]))
+        elif len(path) == 2 and path[1] in property_owned_fields:
+            references.add(property_owned_fields[path[1]])
+    return references
+
+
+def _target_names(node: ast.AST) -> set[str]:
+    return {
+        candidate.id
+        for candidate in ast.walk(node)
+        if isinstance(candidate, ast.Name) and isinstance(candidate.ctx, ast.Store)
+    }
+
+
+def _mutation_owned_fields(
+    function: ast.FunctionDef,
+    property_owned_fields: dict[str, tuple[str, str]],
+) -> set[tuple[str, str]]:
+    aliases: dict[str, set[tuple[str, str]]] = {}
+    bindings: list[tuple[ast.AST, ast.AST]] = []
+    for node in ast.walk(function):
+        if isinstance(node, ast.Assign):
+            bindings.extend((target, node.value) for target in node.targets)
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            bindings.append((node.target, node.value))
+        elif isinstance(node, ast.For):
+            bindings.append((node.target, node.iter))
+
+    changed = True
+    while changed:
+        changed = False
+        for target, value in bindings:
+            references = _owned_field_references(value, property_owned_fields)
+            references.update(
+                owned
+                for candidate in ast.walk(value)
+                if isinstance(candidate, ast.Name)
+                for owned in aliases.get(candidate.id, set())
+            )
+            for name in _target_names(target):
+                before = len(aliases.get(name, set()))
+                aliases.setdefault(name, set()).update(references)
+                changed |= len(aliases[name]) != before
+
+    owned_fields: set[tuple[str, str]] = set()
+    for mutation in _mutation_expressions(function):
+        owned_fields.update(_owned_field_references(mutation, property_owned_fields))
+        owned_fields.update(
+            owned
+            for candidate in ast.walk(mutation)
+            if isinstance(candidate, ast.Name)
+            for owned in aliases.get(candidate.id, set())
+        )
+    return owned_fields
+
+
+def _assert_derived_mutation_scope(
+    method_name: str,
+    method: ast.FunctionDef,
+    declared: set[str | None],
+    property_owned_fields: dict[str, tuple[str, str]],
+) -> None:
+    mutations = _mutation_expressions(method)
+    if any(_references_owner(node, "_asset_stats") for node in mutations):
+        assert declared.intersection({"asset", "all_asset_stats"}), method_name
+    owned_fields = _mutation_owned_fields(method, property_owned_fields)
+    if ("account", "positions") in owned_fields:
+        assert declared.intersection({"asset", "all_positions"}), method_name
+    if owned_fields.intersection(
+        {
+            ("_risk_state", "position_rules"),
+            ("_risk_state", "position_rules_by_asset"),
+        }
+    ):
+        assert "risk_rules" in declared, method_name
+
+
+def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
+    tree = _parse(SOURCE_ROOT / "broker.py")
+    restore = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_restore_lifecycle_state"
+    )
+
+    assert _owned_state_fields(restore, "_order_state") == {
+        field.name for field in fields(OrderState)
+    }
+    assert _owned_state_fields(restore, "_risk_state") == {
+        field.name for field in fields(RiskState)
+    }
+
+
+def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
+    required_scopes = {
+        "cash": set(),
+        "_next_rebalance_id": set(),
+        "mark_account_positions": {"all_positions"},
+        "configure_stats": {"all_asset_stats"},
+        "get_asset_stats": {"asset"},
+        "set_session_config": set(),
+        "set_position_rules": {"risk_rules"},
+        "_remove_position_rule_override": {"risk_rules"},
+        "update_position_context": {"asset"},
+        "register_target_intent": {"target_intents"},
+        "register_position_rule_policy": {"target_intents"},
+        "evaluate_position_rules": {
+            "all_positions",
+            "all_pending_orders",
+            "risk_rules",
+            "all_asset_stats",
+        },
+        "submit_order": {"asset"},
+        "update_order": {"order_id"},
+        "cancel_order": {"order_id"},
+        "_process_pending_exits": {
+            "all_positions",
+            "all_pending_orders",
+            "risk_rules",
+            "all_asset_stats",
+        },
+        "_update_time": {"all_positions", "all_asset_stats"},
+        "_update_water_marks": {"all_positions"},
+        "_process_orders": {"all_positions", "all_pending_orders", "all_asset_stats"},
+    }
+    tree = _parse(SOURCE_ROOT / "broker.py")
+    broker_class = next(
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Broker"
+    )
+    methods = {
+        node.name: node
+        for node in broker_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    missing_methods = set(required_scopes).difference(methods)
+    assert not missing_methods, f"missing Broker mutators: {sorted(missing_methods)}"
+    property_owned_fields = _property_owned_fields(broker_class)
+    captures_by_method = {
+        method_name: [
+            node
+            for node in ast.walk(method)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "_capture_lifecycle_mutation"
+        ]
+        for method_name, method in methods.items()
+    }
+    captures_by_method = {
+        method_name: captures for method_name, captures in captures_by_method.items() if captures
+    }
+    assert set(captures_by_method) == set(required_scopes), (
+        "every Broker lifecycle mutator must declare a reviewed rollback scope"
+    )
+
+    for method_name, expected in required_scopes.items():
+        captures = captures_by_method[method_name]
+        assert len(captures) == 1, method_name
+        declared = {keyword.arg for keyword in captures[0].keywords}
+        assert declared >= expected, method_name
+        _assert_derived_mutation_scope(
+            method_name,
+            methods[method_name],
+            declared,
+            property_owned_fields,
+        )
+
+
+def test_derived_scope_check_rejects_an_under_scoped_property_mutation() -> None:
+    tree = ast.parse(
+        """
+class Broker:
+    @property
+    def positions(self):
+        return self.account.positions
+
+    def mutate_position(self):
+        self._capture_lifecycle_mutation()
+        position = self.positions["SPY"]
+        position.quantity = 2
+"""
+    )
+    broker_class = next(node for node in tree.body if isinstance(node, ast.ClassDef))
+    method = next(
+        node
+        for node in broker_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "mutate_position"
+    )
+
+    with pytest.raises(AssertionError, match="mutate_position"):
+        _assert_derived_mutation_scope(
+            method.name,
+            method,
+            set(),
+            _property_owned_fields(broker_class),
+        )
+
+
+def _references_broker(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Name)
+        and node.id == "broker"
+        or isinstance(node, ast.Attribute)
+        and (node.attr == "broker" or _references_broker(node.value))
+    )
+
+
+def _references_strategy(node: ast.AST) -> bool:
+    return any(
+        isinstance(child, ast.Name)
+        and child.id == "strategy"
+        or isinstance(child, ast.Attribute)
+        and child.attr == "strategy"
+        for child in ast.walk(node)
+    )
+
+
+def _attribute_path(node: ast.AST) -> tuple[str, ...] | None:
+    if isinstance(node, ast.Name):
+        return (node.id,)
+    if isinstance(node, ast.Attribute):
+        parent = _attribute_path(node.value)
+        return (*parent, node.attr) if parent is not None else None
+    return None
+
+
+def _private_state_names(broker_class: ast.ClassDef) -> set[str]:
+    assigned = {
+        node.attr
+        for node in ast.walk(broker_class)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.ctx, ast.Store)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "self"
+        and node.attr.startswith("_")
+    }
+    properties = {
+        node.name
+        for node in broker_class.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name.startswith("_")
+        and any(
+            isinstance(decorator, ast.Name)
+            and decorator.id.endswith("property")
+            or isinstance(decorator, ast.Attribute)
+            and (
+                decorator.attr.endswith("property")
+                or decorator.attr in {"getter", "setter", "deleter"}
+            )
+            for decorator in node.decorator_list
+        )
+    }
+    annotated = {
+        node.target.id
+        for node in broker_class.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id.startswith("_")
+    }
+    dynamic_assignments = {
+        node.args[1].value
+        for node in ast.walk(broker_class)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "setattr"
+        and len(node.args) >= 2
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == "self"
+        and isinstance(node.args[1], ast.Constant)
+        and isinstance(node.args[1].value, str)
+        and node.args[1].value.startswith("_")
+    }
+    return assigned | properties | annotated | dynamic_assignments
+
+
+def _broker_private_assignments() -> set[str]:
+    broker_tree = _parse(SOURCE_ROOT / "broker.py")
+    broker_class = next(
+        node
+        for node in broker_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "Broker"
+    )
+    return _private_state_names(broker_class)
+
+
+def _direct_broker_collection_access(node: ast.AST) -> str | None:
+    if (
+        isinstance(node, ast.Attribute)
+        and node.attr in BROKER_MUTABLE_COLLECTIONS
+        and _references_broker(node.value)
+    ):
+        return node.attr
+    return None
+
+
+def _broker_collection_access(node: ast.AST) -> str | None:
+    if (collection := _direct_broker_collection_access(node)) is not None:
+        return collection
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        for element in node.elts:
+            if (collection := _broker_collection_access(element)) is not None:
+                return collection
+    if isinstance(node, ast.Dict):
+        for key, value in zip(node.keys, node.values, strict=True):
+            if key is not None and (collection := _broker_collection_access(key)) is not None:
+                return collection
+            if key is None and _direct_broker_collection_access(value) is not None:
+                continue
+            if (collection := _broker_collection_access(value)) is not None:
+                return collection
+    if isinstance(node, ast.Starred):
+        if _direct_broker_collection_access(node.value) is not None:
+            return None
+        return _broker_collection_access(node.value)
+    if isinstance(node, ast.IfExp):
+        return _broker_collection_access(node.body) or _broker_collection_access(node.orelse)
+    if isinstance(node, ast.BoolOp):
+        for value in node.values:
+            if (collection := _broker_collection_access(value)) is not None:
+                return collection
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+        return _broker_collection_access(node.elt)
+    if isinstance(node, ast.DictComp):
+        return _broker_collection_access(node.key) or _broker_collection_access(node.value)
+    return None
+
+
+def _copy_or_view_argument_access(node: ast.AST) -> str | None:
+    if _direct_broker_collection_access(node) is not None:
+        return None
+    if isinstance(node, ast.Starred) and isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+        for element in node.value.elts:
+            if (collection := _copy_or_view_argument_access(element)) is not None:
+                return collection
+        return None
+    return _broker_collection_access(node)
+
+
+def _mutable_collection_access(node: ast.AST) -> str | None:
+    if (
+        isinstance(node, ast.Attribute)
+        and _broker_collection_access(node) is not None
+        and isinstance(node.ctx, (ast.Store, ast.Del))
+    ):
+        return node.attr
+    if (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.ctx, (ast.Store, ast.Del))
+        and (collection := _broker_collection_access(node.value)) is not None
+    ):
+        return collection
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in COLLECTION_MUTATORS
+        and (collection := _broker_collection_access(node.func.value)) is not None
+    ):
+        return collection
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_CONSUMER_CALLS:
+            return None
+        if isinstance(node.func, ast.Name) and node.func.id in COLLECTION_COPY_OR_VIEW_CALLS:
+            for argument in node.args:
+                if (collection := _copy_or_view_argument_access(argument)) is not None:
+                    return collection
+            for keyword in node.keywords:
+                if (
+                    keyword.arg is None
+                    and _direct_broker_collection_access(keyword.value) is not None
+                ):
+                    continue
+                if (collection := _broker_collection_access(keyword.value)) is not None:
+                    return collection
+            return None
+        method_path = _attribute_path(node.func)
+        if (
+            method_path is not None
+            and method_path[-3:] == COLLECTION_READ_METHOD_SUFFIX
+            and isinstance(node.func, ast.Attribute)
+            and _references_broker(node.func.value)
+        ):
+            return None
+        arguments = [*node.args]
+        for keyword in node.keywords:
+            if keyword.arg is None and _direct_broker_collection_access(keyword.value) is not None:
+                continue
+            arguments.append(keyword.value)
+        for argument in arguments:
+            if (collection := _broker_collection_access(argument)) is not None:
+                return collection
+    if (
+        isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+        and node.value is not None
+        and (collection := _broker_collection_access(node.value)) is not None
+    ):
+        return collection
+    if isinstance(node, (ast.Return, ast.Yield, ast.YieldFrom)) and node.value is not None:
+        return _broker_collection_access(node.value)
+    return None
+
+
+def _strategy_callback_access(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Attribute) and node.attr in STRATEGY_CALLBACKS:
+        return node.attr if _references_strategy(node.value) else None
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "getattr"
+        and len(node.args) >= 2
+        and _references_strategy(node.args[0])
+        and isinstance(node.args[1], ast.Constant)
+        and node.args[1].value in STRATEGY_CALLBACKS
+    ):
+        return str(node.args[1].value)
+    return None
+
+
+def test_account_state_is_the_only_position_ledger() -> None:
+    broker = Broker()
+
+    assert broker.positions is broker.account.positions
+
+
+def test_mutable_domain_state_delegates_to_its_owner() -> None:
+    broker = Broker()
+    assert broker.orders is broker._order_state.orders
+    assert broker.pending_orders is broker._order_state.pending
+    assert broker.fills is broker._execution_journal.fills
+    assert broker.trades is broker._execution_journal.trades
+    assert broker._current_prices is broker._market_state.prices
+    assert broker._pending_exits is broker._risk_state.pending_exits
+
+    replacement: list = []
+    broker.fills = replacement
+    assert broker.fills is broker._execution_journal.fills is replacement
+
+    replacement_positions = {}
+    broker.positions = replacement_positions
+    assert broker.positions is broker.account.positions is replacement_positions
+
+    replacement_pending = []
+    broker._order_state.pending = replacement_pending
+    assert broker.pending_orders is replacement_pending
+
+    replacement_trades = []
+    broker._execution_journal.trades = replacement_trades
+    assert broker.trades is replacement_trades
+
+
+def test_new_broker_private_state_requires_an_explicit_boundary_decision() -> None:
+    discovered = _broker_private_assignments()
+
+    assert discovered == FORBIDDEN_BROKER_STATE, (
+        f"Broker private state differs: missing decisions="
+        f"{sorted(discovered - FORBIDDEN_BROKER_STATE)}, "
+        f"stale decisions={sorted(FORBIDDEN_BROKER_STATE - discovered)}"
+    )
+
+
+def test_private_state_discovery_covers_property_variants_and_setattr() -> None:
+    tree = ast.parse(
+        "class Broker:\n"
+        "    @cached_property\n"
+        "    def _cached(self): ...\n"
+        "    @_cached.getter\n"
+        "    def _getter(self): ...\n"
+        "    def configure(self):\n"
+        "        setattr(self, '_dynamic', {})\n"
+    )
+    broker_class = next(node for node in tree.body if isinstance(node, ast.ClassDef))
+
+    assert _private_state_names(broker_class) == {"_cached", "_dynamic", "_getter"}
+
+
+def test_mutable_collection_contract_flags_mutation_alias_and_escape() -> None:
+    tree = ast.parse(
+        "def inspect():\n"
+        "    broker.account.positions['AAPL'] = position\n"
+        "    broker.fills.append(fill)\n"
+        "    orders = broker.orders\n"
+        "    order_count = len(broker.orders)\n"
+        "    fills_copy = list(broker.fills)\n"
+        "    positions_copy = dict(broker.positions)\n"
+        "    unpacked_copy = dict(**broker.positions)\n"
+        "    dict(fills=broker.orders)\n"
+        "    consume(broker.trades)\n"
+        "    consume({'fills': broker.fills})\n"
+        "    unrelated.get_spendable_cash(broker.trades)\n"
+        "    broker.account.policy.get_spendable_cash(cash, broker.positions)\n"
+        "    self.broker.account.policy.get_spendable_cash(cash, self.broker.positions)\n"
+        "    conditional = broker.fills if replay else []\n"
+        "    fallback = broker.orders or []\n"
+        "    yield broker.fills\n"
+        "    yield from (broker.fills,)\n"
+        "    return [broker.fills]\n"
+    )
+
+    assert sorted(
+        (node.lineno, access)
+        for node in ast.walk(tree)
+        if (access := _mutable_collection_access(node)) is not None
+    ) == [
+        (2, "positions"),
+        (3, "fills"),
+        (4, "orders"),
+        (9, "orders"),
+        (10, "trades"),
+        (11, "fills"),
+        (12, "trades"),
+        (15, "fills"),
+        (16, "orders"),
+        (17, "fills"),
+        (18, "fills"),
+        (19, "fills"),
+    ]
+
+
+def test_mutable_collection_contract_allows_argument_unpacking() -> None:
+    tree = ast.parse(
+        "def copies():\n"
+        "    helper(*broker.fills, **broker.positions)\n"
+        "    return dict(**broker.positions), [*broker.fills], {**broker.positions}\n"
+    )
+
+    assert all(_mutable_collection_access(node) is None for node in ast.walk(tree))
+
+
+def test_mutable_collection_contract_follows_nested_keyword_unpacking() -> None:
+    call = ast.parse("helper(**{'data': broker.fills})").body[0].value
+
+    assert _mutable_collection_access(call) == "fills"
+
+
+def test_mutable_collection_contract_follows_nested_positional_unpacking() -> None:
+    for source in (
+        "helper(*[broker.fills])",
+        "helper(*(broker.fills, other))",
+        "escaped = [*(broker.fills,)]",
+    ):
+        node = ast.parse(source).body[0]
+        if isinstance(node, ast.Expr):
+            node = node.value
+        assert _mutable_collection_access(node) == "fills", source
+
+
+def test_mutable_collection_contract_follows_nested_copy_arguments() -> None:
+    for source in (
+        "list([broker.fills])",
+        "sorted([broker.fills])",
+        "tuple((broker.fills,))",
+        "dict([('fills', broker.fills)])",
+        "max([broker.fills])",
+    ):
+        call = ast.parse(source).body[0].value
+        assert _mutable_collection_access(call) == "fills", source
+
+    for source in (
+        "list(broker.fills)",
+        "iter(*[broker.fills])",
+        "zip(*(broker.fills, broker.orders))",
+        "zip(*{broker.fills})",
+        "zip(*[broker.fills, timestamps])",
+        "zip(*[*[broker.fills]])",
+    ):
+        direct_copy = ast.parse(source).body[0].value
+        assert _mutable_collection_access(direct_copy) is None, source
+
+    for source, expected in (
+        ("zip(*[broker.fills, [broker.orders]])", "orders"),
+        ("zip(*[*[broker.fills, [broker.orders]]])", "orders"),
+        ("zip(*[*[[broker.fills]]])", "fills"),
+    ):
+        nested_escape = ast.parse(source).body[0].value
+        assert _mutable_collection_access(nested_escape) == expected, source
+
+
+def test_mutable_collection_contract_allows_nested_consumer_arguments() -> None:
+    for source in (
+        "all([broker.fills, broker.orders])",
+        "any([broker.fills])",
+        "bool([broker.fills])",
+        "len([broker.fills])",
+        "str([broker.fills])",
+        "sum([broker.fills], [])",
+    ):
+        call = ast.parse(source).body[0].value
+        assert _mutable_collection_access(call) is None, source
+
+
+def test_collaborators_do_not_reach_through_broker_private_state() -> None:
+    violations: list[str] = []
+    broker_path = SOURCE_ROOT / "broker.py"
+
+    for path in SOURCE_ROOT.rglob("*.py"):
+        if path == broker_path:
+            continue
+        tree = _parse(path)
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and node.attr in FORBIDDEN_BROKER_STATE
+                and _references_broker(node.value)
+            ):
+                violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {node.attr}")
+            mutable_collection = _mutable_collection_access(node)
+            if mutable_collection is not None:
+                violations.append(
+                    f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {mutable_collection}"
+                )
+
+    assert not violations, "Broker state bypasses:\n" + "\n".join(violations)
+
+
+def test_lifecycle_dispatcher_is_the_only_strategy_callback_sequencer() -> None:
+    engine_path = SOURCE_ROOT / "engine.py"
+    violations: list[str] = []
+    dynamic_dispatches: list[str] = []
+    engine_phases: set[LifecyclePhase] = set()
+
+    for path in SOURCE_ROOT.rglob("*.py"):
+        tree = _parse(path)
+        for node in ast.walk(tree):
+            callback = _strategy_callback_access(node)
+            if callback is not None:
+                violations.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}: {callback}")
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "getattr"
+                and len(node.args) >= 2
+                and _references_strategy(node.args[0])
+                and isinstance(node.args[1], ast.Attribute)
+                and node.args[1].attr == "callback"
+            ):
+                dynamic_dispatches.append(f"{path.relative_to(SOURCE_ROOT)}:{node.lineno}")
+            if (
+                path == engine_path
+                and isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "dispatch"
+                and node.args
+                and isinstance(node.args[0], ast.Attribute)
+                and isinstance(node.args[0].value, ast.Name)
+                and node.args[0].value.id == "LifecyclePhase"
+            ):
+                engine_phases.add(LifecyclePhase[node.args[0].attr])
+
+    contract_callbacks = {
+        LIFECYCLE_V1.phase_spec(phase).callback
+        for phase in (
+            LifecyclePhase.RUN_START,
+            LifecyclePhase.CAUSAL_INITIALIZATION,
+            LifecyclePhase.MARKET_EVENT,
+            LifecyclePhase.RUN_END,
+        )
+    }
+    assert contract_callbacks == STRATEGY_CALLBACKS
+    assert engine_phases == {
+        LifecyclePhase.RUN_START,
+        LifecyclePhase.CAUSAL_INITIALIZATION,
+        LifecyclePhase.MARKET_EVENT,
+        LifecyclePhase.RUN_END,
+    }
+    assert len(dynamic_dispatches) == 1
+    assert dynamic_dispatches[0].split(":", maxsplit=1)[0] == "lifecycle.py"
+    assert not violations, "Callback sequencing bypasses:\n" + "\n".join(violations)

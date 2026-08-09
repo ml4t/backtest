@@ -4,14 +4,16 @@
 
 ## Required Columns
 
-The prices DataFrame must always include:
+With the default `FeedSpec`, the prices DataFrame must include:
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `timestamp` | Datetime | Bar timestamp |
 | `asset` | String | Asset identifier |
+| `close` | Numeric | Reference and closing price |
 
-Standard OHLCV feeds usually provide:
+The entity column may instead be `symbol`, `product`, or `ticker`, or an explicitly
+configured name. Standard OHLCV feeds also provide:
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -21,7 +23,19 @@ Standard OHLCV feeds usually provide:
 | `close` | Float | Closing price |
 | `volume` | Float | Trading volume |
 
-`DataFeed` also exposes a normalized `bar["price"]` field. By default it follows `close`, but if your `FeedSpec` or constructor sets `price_col`, that column becomes the broker reference price.
+Open, high, low, and volume are optional. Missing OHLC values fall back to the
+configured close; missing volume becomes zero. These fallbacks permit close-only
+feeds, but they do not reconstruct intrabar paths or liquidity.
+
+`DataFeed` also exposes a normalized `bar["price"]` field. By default it follows
+`close`, but if your `FeedSpec` or constructor sets `price_col`, that column becomes
+the broker reference price. If that name is absent but the configured close exists,
+the close becomes the resolved reference price. Construction raises `ValueError`
+when neither exists. For a one-price derived-bar schema, map both `price_col` and
+`close_col` to that column so the contract is explicit.
+
+For each source, pass either its Parquet path or its DataFrame, not both. Conflicting
+sources raise `ValueError` instead of applying implicit precedence.
 
 Optional quote columns are carried through when present:
 
@@ -121,6 +135,10 @@ def on_data(self, timestamp, data, context, broker):
 
 Any column in the signals DataFrame (other than `timestamp` and `asset`) becomes a signal.
 
+The feed iterates the sorted union of price, signal, and context timestamps. A
+signal-only or context-only timestamp therefore invokes the strategy with an empty
+`data` mapping. Signal rows require the resolved timestamp and entity columns.
+
 ## Quote-Aware Execution Inputs
 
 Quote columns are additive: you can keep OHLCV behavior unchanged, or opt into quote-aware execution in config:
@@ -173,6 +191,9 @@ def on_data(self, timestamp, data, context, broker):
         return  # Don't trade in high-vol regimes
 ```
 
+Context is timestamp-level data. When several rows share a context timestamp, the
+first row is used.
+
 ## Loading from Files
 
 DataFeed accepts Parquet file paths:
@@ -210,7 +231,7 @@ result = run_backtest("data/prices.parquet", strategy, signals="data/signals.par
 
 ## Performance
 
-DataFeed pre-partitions data by timestamp at initialization and pre-extracts column indices for O(1) per-bar access. For 1M bars, this uses roughly 100 MB (10x less than converting everything to Python dicts upfront). Quote columns are cached additively, so the legacy OHLCV path stays unchanged unless you provide quote data.
+DataFeed pre-partitions data by timestamp at initialization and pre-extracts column indices for O(1) per-bar access. Quote columns are cached additively, so the OHLCV path stays unchanged unless you provide quote data. The release benchmark records setup separately from engine runtime and measures memory over the complete child process.
 
 ## See It in Action
 

@@ -1,0 +1,82 @@
+{
+  "measurement_contract": {
+    "memory": "child-process peak RSS from interpreter start through completed run",
+    "regression_gate": "instrument-free hotpath benchmark in tests/benchmark",
+    "runtime": "perf_counter around Engine.run only; setup excluded",
+    "sample_deviation_reporting_threshold": 0.1,
+    "setup": "deterministic data, DataFeed, strategy, config, and Engine construction"
+  },
+  "schema_version": 2,
+  "workloads": {
+    "daily_250_assets": {
+      "assets": 250,
+      "bars": 2520,
+      "behavior_sha256": "03ad5690a1910b15b2cbb340cf3ea1752b9444a0b605be5b23cb3338646f73f6",
+      "commission_rate": 0.0,
+      "data_points": 630000,
+      "execution_mode": "same_bar",
+      "expected_fill_count": 2550,
+      "expected_final_value": 10013240.0,
+      "expected_trade_count": 1300,
+      "quote_aware": false,
+      "slippage_rate": 0.0,
+      "strategy": "portfolio_alternating"
+    },
+    "partial_fill": {
+      "assets": 10,
+      "bars": 500,
+      "behavior_sha256": "c4482cf55b677abba42faad0e2cefa4330aec947291bac1aaec895789f09a42d",
+      "commission_rate": 0.0,
+      "data_points": 5000,
+      "execution_mode": "same_bar",
+      "expected_fill_count": 100,
+      "expected_final_value": 10000880.5,
+      "expected_trade_count": 1,
+      "quote_aware": false,
+      "slippage_rate": 0.0,
+      "strategy": "partial_fill"
+    },
+    "quote_aware": {
+      "assets": 20,
+      "bars": 1000,
+      "behavior_sha256": "31499cd07ea8eb7334fd02799548a2f9ebe2dcafaaecb5f9525879789636a931",
+      "commission_rate": 0.0,
+      "data_points": 20000,
+      "execution_mode": "same_bar",
+      "expected_fill_count": 20,
+      "expected_final_value": 10000087.0,
+      "expected_trade_count": 10,
+      "quote_aware": true,
+      "slippage_rate": 0.0,
+      "strategy": "alternating"
+    },
+    "rebalance": {
+      "assets": 50,
+      "bars": 504,
+      "behavior_sha256": "4a520907b6ad281e4c5d87f388affd4329d3739e8c3690ccf5b33c46c7cdf164",
+      "commission_rate": 0.0,
+      "data_points": 25200,
+      "execution_mode": "same_bar",
+      "expected_fill_count": 470,
+      "expected_final_value": 10087875.56,
+      "expected_trade_count": 242,
+      "quote_aware": false,
+      "slippage_rate": 0.0,
+      "strategy": "rebalance"
+    },
+    "single_asset": {
+      "assets": 1,
+      "bars": 2000,
+      "behavior_sha256": "9b10e0f8ac480a0b57efc4e63b0ea990252d1bd0adc27dedae750a385151c379",
+      "commission_rate": 0.0005,
+      "data_points": 2000,
+      "execution_mode": "next_bar",
+      "expected_fill_count": 40,
+      "expected_final_value": 9999911.359,
+      "expected_trade_count": 20,
+      "quote_aware": false,
+      "slippage_rate": 0.0002,
+      "strategy": "alternating"
+    }
+  }
+}

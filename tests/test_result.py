@@ -474,24 +474,24 @@ class TestBacktestResultDailyPnL:
         result = BacktestResult(
             trades=[],
             equity_curve=[
-                (datetime(2024, 1, 1, 18, 0), 100000.0),
-                (datetime(2024, 1, 2, 10, 0), 101000.0),
+                (datetime(2024, 1, 1, 16, 0), 100000.0),
+                (datetime(2024, 1, 1, 18, 0), 101000.0),
             ],
             fills=[],
             metrics={},
             config=BacktestConfig(
-                calendar="NYSE",
-                timezone="America/New_York",
+                calendar="CME_Equity",
+                timezone="America/Chicago",
                 feed_spec=FeedSpec(
-                    calendar="NYSE",
+                    calendar="CME_Equity",
                     session_start_time="17:00",
                     timestamp_semantics="event_time",
                 ),
             ),
         )
 
-        assert len(result.to_daily_pnl()) == 2
-        assert len(result.to_daily_returns()) == 1
+        assert len(result.to_daily_pnl()) == 1
+        assert len(result.to_daily_returns()) == 2
 
 
 class TestBacktestResultReturnsSeries:

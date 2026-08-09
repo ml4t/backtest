@@ -1,0 +1,113 @@
+{
+  "legacy_start": "0.1.0b17",
+  "releases": [
+    {
+      "version": "0.1.0",
+      "date": "Unreleased",
+      "sections": {
+        "Added": [
+          "Versioned compatibility snapshots, beta-artifact migration fixtures, commit-bound release candidates, and exact publication verification.",
+          "Deterministic parity-claim generation and five reproducible performance workloads with behavior checksums.",
+          "Installed-wheel execution checks for the primary installation and quickstart examples.",
+          "A versioned causal strategy lifecycle and canonical pre-open target intents shared with ml4t-live, including child-order lineage, reconciliation evidence, and post-fill position-rule activation."
+        ],
+        "Changed": [
+          "Broker state now has explicit account, market, order, risk, and execution-journal owners while the Broker remains the public facade.",
+          "Intraday session enforcement now filters actual exchange intervals, including early closes and breaks, using the configured timezone for naive timestamps.",
+          "DataFeed now rejects a missing resolved reference-price column at construction and documents close-only fallbacks explicitly.",
+          "Stable distribution metadata, release-critical static analysis, and the 250-asset performance workload now match the 0.1 release contract.",
+          "Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled exchange session rather than the last available feed bar. Holidays do not move a rebalance earlier, and a missing completed period-end session raises a feed-completeness error.",
+          "Explicit rebalance timestamps match absolute instants across timezone representations and online evaluation requires chronological events. A scheduled instant inside the observed feed window that has no matching event raises an alignment error instead of being skipped silently.",
+          "Batch and online session schedules require every complete exchange session to match its required close; only an incomplete final session is exempt, and calendar mismatches fail explicitly.",
+          "Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or retain_lifecycle_history to include the corresponding event histories.",
+          "Morning-start exchange sessions group pre-market and regular-hours events under the same local calendar date; exchange session labels and opens come from cached authoritative calendar schedules.",
+          "Scheduled TargetWeightExecutor.execute calls register completion validation with the Engine, so missing required closes and partial event coverage fail the run with distinct diagnostics.",
+          "Deferred next-open risk exits fill before opening targets are sized. Fractional accounts reject largest-remainder residual handling regardless of rounding because its whole-unit allocation cannot redistribute fractional remainders; use keep-cash instead."
+        ],
+        "Fixed": [
+          "Financial-accounting, order-rejection, artifact-integrity, quantity-tolerance, and parity-comparison defects found during the stable-release audit.",
+          "Cross-framework validation now fails incomplete runs and requires exact retained comparisons for supported scenarios.",
+          "Batch and online session schedules apply the same daily-close fallback when data frequency and timestamp semantics are both omitted. Batch evaluation and flagless online evaluation reject repeated dates and intervals under 12 hours as ambiguous intraday data; online events may instead carry is_session_close consistently, but mixing explicit and inferred boundaries on one date raises.",
+          "Session-aligned P&L and broker statistics interpret naive timestamps in the configured data timezone before applying the authoritative exchange timezone."
+        ],
+        "Compatibility": [
+          "Stable support requires CPython 3.12 through 3.14 on Linux, macOS, and Windows; CPython 3.15 prereleases are blocking compatibility checks until final release.",
+          "Manifest-free 0.1.0b22 result artifacts require explicit recovery mode and can then be rewritten as schema-versioned stable artifacts.",
+          "The ambiguous beta-only Broker(account_type=...) constructor spelling was removed; use explicit short-selling and leverage policy fields.",
+          "Engine instances are single-use in 0.1.0; create a new Engine for each independent run.",
+          "BacktestResult fills, equity_curve, and portfolio_state lists are snapshots instead of aliases to mutable Engine or Broker state.",
+          "The beta-only on_before_risk callback and future-timestamp on_prepare signature are removed. Engine construction raises HistoricalStrategyCompatibilityError for strategies that require either historical behavior.",
+          "TargetWeightExecutor.prepare_schedule was removed. Configure calendar, timezone, session_start_time, data_frequency, and timestamp_semantics on RebalanceConfig for causal schedule evaluation.",
+          "Custom morning session_start_time values are rejected; morning-start sessions always use the local calendar date. Omit the override or restate the configured exchange calendar's standard open.",
+          "Evening session_start_time overrides remain available for calendar-free and evening-start sessions, but are rejected for calendars whose authoritative open is in the morning.",
+          "SessionConfig is immutable; construct and install a replacement instead of mutating calendar, timezone, or session_start_time after configuration.",
+          "ExecutionPolicy.liquidity_fraction now applies only to opening-auction target children. Configure Engine execution_limits explicitly to constrain ordinary strategy orders."
+        ],
+        "Validation": [
+          "Release requires compatibility, correctness, coverage, documentation, lint, packaging, parity, performance, security, and type-check gates bound to one commit.",
+          "The exact wheel and source distribution that pass those gates are retained as the release candidate and verified after publication."
+        ]
+      }
+    },
+    {
+      "version": "0.1.0b22",
+      "date": "2026-07-25",
+      "sections": {
+        "Added": [
+          "Strategy.on_before_risk(), explicit position-rule clearing, and an opt-in entry-bar trailing-watermark mode."
+        ],
+        "Compatibility": [
+          "Strategies that do not override on_before_risk retain their prior behavior. The callback remains beta-only and is scheduled for explicit migration rather than inclusion in the stable lifecycle."
+        ]
+      }
+    },
+    {
+      "version": "0.1.0b21",
+      "date": "2026-06-12",
+      "sections": {
+        "Added": [
+          "Broker.equity() as the preferred marked-account-equity accessor."
+        ],
+        "Compatibility": [
+          "Broker.get_account_value() remains available and delegates to equity()."
+        ]
+      }
+    },
+    {
+      "version": "0.1.0b20",
+      "date": "2026-05-17",
+      "sections": {
+        "Fixed": [
+          "RiskManager.update(..., broker=...) now applies liquidation actions by flattening positions instead of only reporting the breach."
+        ],
+        "Compatibility": [
+          "Liquidation behavior changes only when a portfolio limit returns action='liquidate' and a broker is supplied. Omitting the broker retains reporting behavior and emits a warning."
+        ]
+      }
+    },
+    {
+      "version": "0.1.0b19",
+      "date": "2026-05-17",
+      "sections": {
+        "Added": [
+          "Broker.flatten_all_positions() and the typed risk_liquidation exit reason for portfolio-wide breaches."
+        ],
+        "Compatibility": [
+          "Existing strategy exits are unchanged; portfolio risk integrations can opt into explicit flattening and preserve the liquidation cause."
+        ]
+      }
+    },
+    {
+      "version": "0.1.0b18",
+      "date": "2026-05-16",
+      "sections": {
+        "Added": [
+          "Per-symbol percentage-of-notional margin schedules for price-aware futures margin assumptions."
+        ],
+        "Compatibility": [
+          "Existing global and fixed-dollar margin settings remain valid. Defining the same asset in fixed_margin_schedule and margin_pct_schedule is rejected as ambiguous."
+        ]
+      }
+    }
+  ]
+}

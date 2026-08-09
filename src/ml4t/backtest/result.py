@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import ItemsView, KeysView
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -294,7 +295,12 @@ class BacktestResult:
         return self._trades_df
 
     def to_fills_dataframe(self) -> pl.DataFrame:
-        """Convert fills to Polars DataFrame."""
+        """Convert every execution fill to a stable Polars DataFrame.
+
+        The result includes order identity, quantity, execution costs, price
+        source, nullable quote context, available size, and exit-reason fields.
+        An empty result retains the same typed schema.
+        """
         if self._fills_df is not None:
             return self._fills_df
 
@@ -436,22 +442,11 @@ class BacktestResult:
         if not self.portfolio_state:
             return pl.DataFrame(schema=self._portfolio_state_schema())
 
-        self._portfolio_state_df = (
-            pl.DataFrame(
-                self.portfolio_state,
-                schema=[
-                    "timestamp",
-                    "equity",
-                    "cash",
-                    "gross_exposure",
-                    "net_exposure",
-                    "open_positions",
-                ],
-                orient="row",
-            )
-            .sort("timestamp")
-            .cast(self._portfolio_state_schema())
-        )
+        self._portfolio_state_df = pl.DataFrame(
+            self.portfolio_state,
+            schema=self._portfolio_state_schema(),
+            orient="row",
+        ).sort("timestamp")
         return self._portfolio_state_df
 
     def to_daily_pnl(self, session_aligned: bool = False) -> pl.DataFrame:
@@ -646,7 +641,12 @@ class BacktestResult:
             "version": 1,
             "library_version": __version__,
             "lifecycle_version": self.metrics.get("lifecycle_version"),
+            "lifecycle_callback_counts": self.metrics.get("lifecycle_callback_counts", {}),
+            "lifecycle_invocations": self.metrics.get("lifecycle_invocations", []),
             "execution_policy": self.metrics.get("execution_policy"),
+            "target_intent_count": self.metrics.get("target_intent_count", 0),
+            "child_order_intent_count": self.metrics.get("child_order_intent_count", 0),
+            "intent_reconciliation_count": self.metrics.get("intent_reconciliation_count", 0),
             "target_intents": self.metrics.get("target_intents", []),
             "child_order_intents": self.metrics.get("child_order_intents", []),
             "intent_reconciliations": self.metrics.get("intent_reconciliations", []),
@@ -659,15 +659,19 @@ class BacktestResult:
 
     # Dict-like access keeps validation scripts and older notebook code working.
     def __getitem__(self, key: str) -> Any:
+        """Return a metric or raw result component, raising KeyError if absent."""
         return self.to_dict()[key]
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Return a metric or raw component, or default when the key is absent."""
         return self.to_dict().get(key, default)
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
+        """Return keys from the backward-compatible dictionary representation."""
         return self.to_dict().keys()
 
-    def items(self):
+    def items(self) -> ItemsView[str, Any]:
+        """Return items from the backward-compatible dictionary representation."""
         return self.to_dict().items()
 
     def to_parquet(
@@ -746,6 +750,9 @@ class BacktestResult:
                 raise ArtifactWriteError(f"Failed to serialize metrics: {exc}") from exc
 
         if "config" in selected or "spec" in selected:
+            config = self.config
+            if config is None:
+                raise ArtifactWriteError("Config and spec components require a runtime config")
             try:
                 import yaml
             except ImportError as exc:
@@ -753,7 +760,7 @@ class BacktestResult:
             if "config" in selected:
                 try:
                     text_payloads["config"] = yaml.safe_dump(
-                        self.config.to_dict(),
+                        config.to_dict(),
                         default_flow_style=False,
                     )
                 except Exception as exc:

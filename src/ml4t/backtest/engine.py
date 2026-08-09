@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import inspect
+import warnings
 from datetime import date, datetime
+from math import ceil
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
@@ -22,7 +24,7 @@ from .broker import Broker
 from .config import DataFrequency
 from .datafeed import DataFeed
 from .lifecycle import LifecycleDispatcher
-from .preopen import PreOpenTargetManager, default_execution_policy
+from .preopen import default_execution_policy
 from .strategy import Strategy
 from .types import ExecutionMode, OrderSide, OrderType
 
@@ -30,26 +32,31 @@ if TYPE_CHECKING:
     from .config import BacktestConfig
     from .result import BacktestResult
 
+# Compare at most 20 dates; require min(4, 10% of sample) bars and 25% relative recovery.
+_TIMEZONE_DIAGNOSTIC_MAX_DATES = 20
+_TIMEZONE_DIAGNOSTIC_MAX_RETENTION = 0.5
+_TIMEZONE_DIAGNOSTIC_MAX_REQUIRED_GAIN = 4
+_TIMEZONE_DIAGNOSTIC_MIN_GAIN_FRACTION = 0.1
+_TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN = 1.25
+_TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS = 0.1
+
 
 class Engine:
     """Event-driven backtesting engine.
 
     The Engine orchestrates the backtest by iterating through market data,
     managing the broker, and calling the strategy on each bar.
+    Engine instances are single-use; create a new instance for each run.
 
     Execution Flow:
-        1. Initialize strategy (on_start)
-        2. For each bar:
-           a. Update broker with current prices
-           b. Process pending exits (NEXT_BAR_OPEN mode)
-           c. Evaluate position rules (stops, trails)
-           d. Process pending orders
-           e. Call strategy.on_data()
-           f. Process new orders (SAME_BAR mode)
-           g. Update water marks
-           h. Record equity
-        3. Close open positions
-        4. Finalize strategy (on_end)
+        1. Call on_start before any market bar is registered.
+        2. Call on_prepare with the resolved config and no future feed data.
+        3. For each accepted session bar, register data, process eligible
+           deferred orders and risk, call the per-bar strategy callbacks, process
+           configured current-bar orders, and record marked portfolio state.
+        4. Call on_end after the final timestamp.
+        5. Return closed trades plus marked open positions. The engine does not
+           submit automatic end-of-data liquidation orders.
 
     Attributes:
         feed: DataFeed providing price and signal data
@@ -99,12 +106,6 @@ class Engine:
         self.execution_mode = self.config.execution_mode
         self.lifecycle_version = negotiated_version
         self.execution_policy = execution_policy or default_execution_policy(self.config)
-        if execution_limits is None and self.execution_policy.liquidity_fraction < 1.0:
-            from .execution import VolumeParticipationLimit
-
-            execution_limits = VolumeParticipationLimit(
-                max_participation=self.execution_policy.liquidity_fraction
-            )
         self.broker = Broker.from_config(
             self.config,
             contract_specs=contract_specs,
@@ -113,22 +114,29 @@ class Engine:
         )
         self.equity_curve: list[tuple[datetime, float]] = []
         self.portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
-        self.lifecycle_dispatcher = LifecycleDispatcher(strategy, LIFECYCLE_V1)
-        self.preopen_target_manager = PreOpenTargetManager(
-            self.broker,
+        self.lifecycle_dispatcher = LifecycleDispatcher(
+            strategy,
+            LIFECYCLE_V1,
+            retain_invocations=self.config.retain_lifecycle_history,
+        )
+        self.preopen_target_manager = self.broker._create_preopen_target_manager(
             self.execution_policy,
             self.lifecycle_version,
             calendar=self.config.resolved_calendar,
+            timezone=self.config.resolved_timezone,
+            session_start_time=self.config.resolved_session_start_time,
+            data_frequency=self.config.resolved_data_frequency,
+            timestamp_semantics=self.config.resolved_timestamp_semantics,
         )
-        self.broker._preopen_target_manager = self.preopen_target_manager
         if target_intent_state is not None:
             self.preopen_target_manager.restore_state(target_intent_state)
         self._strategy_finalized = False
-        self._market_event_count = 0
+        self._accepted_market_event_count = 0
 
         # Calendar session enforcement (lazy initialized in run())
         self._calendar = None
         self._skipped_bars = 0
+        self._has_run = False
 
     def run(self) -> BacktestResult:
         """Run backtest and return structured results.
@@ -136,14 +144,155 @@ class Engine:
         Returns:
             BacktestResult with trades, equity curve, metrics, and export methods.
             Call .to_dict() for backward-compatible dictionary output.
+
+        Raises:
+            RuntimeError: If a run was already started on this Engine instance.
         """
+        if self._has_run:
+            raise RuntimeError("Engine.run() was already started; create a new Engine for each run")
+        self._has_run = True
+        try:
+            return self._run_once()
+        except BaseException as failure:
+            try:
+                self._finalize_strategy()
+            except BaseException as finalization_failure:
+                failure.add_note(
+                    "on_end also failed during cleanup: "
+                    f"{type(finalization_failure).__name__}: {finalization_failure}"
+                )
+            raise
+
+    def _run_once(self) -> BacktestResult:
+        """Execute one guarded engine run."""
+
         # Lazy calendar initialization (zero cost if unused)
         is_trading_day_fn = None
+        valid_intraday_bar_mask: bytearray | None = None
+        timestamps = self.feed.timestamps
         if self.config and self.config.resolved_calendar:
-            from .calendar import get_calendar, is_trading_day
+            from .calendar import filter_to_trading_sessions, get_calendar, is_trading_day
 
             self._calendar = get_calendar(self.config.resolved_calendar)
             is_trading_day_fn = is_trading_day
+
+            if (
+                self.config.enforce_sessions
+                and self.config.resolved_data_frequency != DataFrequency.DAILY
+            ):
+                prices_frame = self.feed.prices
+                timestamp_dtype = (
+                    prices_frame.schema[self.feed.feed_spec.timestamp_col]
+                    if prices_frame is not None
+                    else None
+                )
+                naive_timestamps = (
+                    isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None
+                )
+                timestamp_frame = pl.DataFrame(
+                    {
+                        "timestamp": timestamps,
+                        "__feed_bar_index": range(len(timestamps)),
+                    }
+                )
+                filtered = filter_to_trading_sessions(
+                    timestamp_frame,
+                    self.config.resolved_calendar,
+                    naive_tz=self.config.resolved_timezone,
+                )
+                retained_bars = len(filtered)
+                total_bars = len(timestamp_frame)
+                calendar_id = self.config.resolved_calendar
+                retention = retained_bars / total_bars if total_bars else 1.0
+                calendar_timezone = str(self._calendar.tz)
+                compare_calendar_timezone = (
+                    naive_timestamps
+                    and self.config.resolved_timezone != calendar_timezone
+                    and retention <= _TIMEZONE_DIAGNOSTIC_MAX_RETENTION
+                )
+                configured_sample_retained = retained_bars
+                alternative_sample_retained = retained_bars
+                sample_bars = total_bars
+                if compare_calendar_timezone:
+                    sample_dates: set[date] = set()
+                    sample_bars = 0
+                    for sample_bars, timestamp in enumerate(timestamps, start=1):
+                        sample_date = timestamp.date()
+                        if (
+                            sample_date not in sample_dates
+                            and len(sample_dates) == _TIMEZONE_DIAGNOSTIC_MAX_DATES
+                        ):
+                            sample_bars -= 1
+                            break
+                        sample_dates.add(sample_date)
+                    diagnostic_frame = timestamp_frame.head(sample_bars)
+                    if sample_bars != total_bars:
+                        configured_sample_retained = len(
+                            filter_to_trading_sessions(
+                                diagnostic_frame,
+                                calendar_id,
+                                naive_tz=self.config.resolved_timezone,
+                            )
+                        )
+                    alternative_sample_retained = len(
+                        filter_to_trading_sessions(
+                            diagnostic_frame,
+                            calendar_id,
+                            naive_tz=calendar_timezone,
+                        )
+                    )
+                if configured_sample_retained:
+                    relative_retention_gain = (
+                        alternative_sample_retained / configured_sample_retained
+                    )
+                elif alternative_sample_retained:
+                    relative_retention_gain = float("inf")
+                else:
+                    relative_retention_gain = 1.0
+                minimum_absolute_gain = max(
+                    1,
+                    min(
+                        _TIMEZONE_DIAGNOSTIC_MAX_REQUIRED_GAIN,
+                        ceil(sample_bars * _TIMEZONE_DIAGNOSTIC_MIN_GAIN_FRACTION),
+                    ),
+                )
+                alternative_timezone_explains_loss = (
+                    compare_calendar_timezone
+                    and alternative_sample_retained - configured_sample_retained
+                    >= minimum_absolute_gain
+                    and relative_retention_gain >= _TIMEZONE_DIAGNOSTIC_MIN_RELATIVE_GAIN
+                )
+                possible_session_misconfiguration = (
+                    retention <= _TIMEZONE_DIAGNOSTIC_NEAR_TOTAL_LOSS
+                    or alternative_timezone_explains_loss
+                )
+                should_warn = possible_session_misconfiguration and any(
+                    is_trading_day_fn(calendar_id, feed_date)
+                    for feed_date in {ts.date() for ts in timestamps}
+                )
+                if should_warn:
+                    timezone_note = ""
+                    if alternative_timezone_explains_loss:
+                        timezone_note = (
+                            f" Interpreting naive timestamps as {calendar_timezone!r} would "
+                            f"retain {alternative_sample_retained} bars instead of "
+                            f"{configured_sample_retained} in a {sample_bars}-bar sample."
+                        )
+                    elif naive_timestamps:
+                        timezone_note = (
+                            f" Naive timestamps were interpreted as "
+                            f"{self.config.resolved_timezone!r}."
+                        )
+                    warnings.warn(
+                        f"Session filtering for {self.config.resolved_calendar!r} retained "
+                        f"{retained_bars} of {total_bars} intraday bars.{timezone_note} "
+                        "Verify the configured calendar, data timezone, and session coverage.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                valid_intraday_bar_mask = bytearray(len(timestamps))
+                for index in filtered["__feed_bar_index"]:
+                    valid_intraday_bar_mask[index] = 1
 
         self.lifecycle_dispatcher.dispatch(
             LifecyclePhase.RUN_START,
@@ -157,10 +306,7 @@ class Engine:
             self.config,
         )
 
-        # Date-level cache for trading day checks (significant speedup for intraday data)
-        trading_day_cache: dict[date, bool] = {}
-
-        for timestamp, assets_data, context in self.feed:
+        for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
             if (
@@ -170,19 +316,14 @@ class Engine:
                 and self.config.enforce_sessions
                 and is_trading_day_fn
             ):
-                # For daily data, check trading day; for intraday, check market hours
+                # Daily bars use valid dates. Intraday bars use precomputed session intervals.
                 if self.config.resolved_data_frequency == DataFrequency.DAILY:
                     if not is_trading_day_fn(calendar_id, timestamp.date()):
                         self._skipped_bars += 1
                         continue
-                else:
-                    # Intraday: use cached trading day check (avoid expensive calendar.valid_days per bar)
-                    bar_date = timestamp.date()
-                    if bar_date not in trading_day_cache:
-                        trading_day_cache[bar_date] = is_trading_day_fn(calendar_id, bar_date)
-                    if not trading_day_cache[bar_date]:
-                        self._skipped_bars += 1
-                        continue
+                elif valid_intraday_bar_mask is None or not valid_intraday_bar_mask[feed_bar_index]:
+                    self._skipped_bars += 1
+                    continue
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
@@ -262,12 +403,18 @@ class Engine:
                 ask_sizes,
                 signals,
             )
-
-            self.preopen_target_manager.process_opening(timestamp)
+            self._accepted_market_event_count += 1
 
             # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
-            # This must happen BEFORE evaluate_position_rules() to clear deferred exits
-            self.broker._process_pending_exits()
+            # before opening targets are sized against the resulting positions.
+            pending_exits = self.broker._process_pending_exits()
+            if pending_exits:
+                self.broker._process_orders(
+                    use_open=True,
+                    order_ids={order.order_id for order in pending_exits},
+                )
+
+            self.preopen_target_manager.process_opening(timestamp)
 
             # Evaluate position rules (stops, trails, etc.) - generates exit orders
             self.broker.evaluate_position_rules()
@@ -299,7 +446,9 @@ class Engine:
             self._record_portfolio_state(timestamp)
 
         self._finalize_strategy()
-        self.lifecycle_dispatcher.validate_completed_run(self._market_event_count)
+        self.strategy._validate_completed_run()
+        self.broker._validate_completed_run(self._accepted_market_event_count)
+        self.lifecycle_dispatcher.validate_completed_run(self._accepted_market_event_count)
         return self._generate_results()
 
     @staticmethod
@@ -331,36 +480,28 @@ class Engine:
         assets_data: Any,
         context: dict[str, Any],
     ) -> None:
-        try:
-            self.lifecycle_dispatcher.dispatch(
-                LifecyclePhase.MARKET_EVENT,
-                self.broker,
-                timestamp,
-                assets_data,
-                context,
-                self.broker,
-                event_time=timestamp,
-            )
-            self._market_event_count += 1
-        except BaseException as failure:
-            try:
-                self._finalize_strategy()
-            except BaseException as finalization_failure:
-                failure.add_note(
-                    "on_end also failed during cleanup: "
-                    f"{type(finalization_failure).__name__}: {finalization_failure}"
-                )
-            raise
+        self.lifecycle_dispatcher.dispatch(
+            LifecyclePhase.MARKET_EVENT,
+            self.broker,
+            timestamp,
+            assets_data,
+            context,
+            self.broker,
+            event_time=timestamp,
+        )
 
     def _finalize_strategy(self) -> None:
-        if self._strategy_finalized:
+        if (
+            self._strategy_finalized
+            or self.lifecycle_dispatcher.callback_counts[LifecyclePhase.RUN_START] == 0
+        ):
             return
+        self._strategy_finalized = True
         self.lifecycle_dispatcher.dispatch(
             LifecyclePhase.RUN_END,
             self.broker,
             self.broker,
         )
-        self._strategy_finalized = True
 
     def run_dict(self) -> dict[str, Any]:
         """Run backtest and return dictionary (backward compatible).
@@ -370,6 +511,9 @@ class Engine:
 
         Returns:
             Dictionary with metrics, trades, and equity curve.
+
+        Raises:
+            RuntimeError: If a run was already started on this Engine instance.
         """
         return self.run().to_dict()
 
@@ -382,7 +526,7 @@ class Engine:
         for asset, pos in self.broker.positions.items():
             price = self.broker.get_mark_price(asset, quantity=pos.quantity)
             if price is None:
-                price = self.broker._last_prices.get(asset, pos.current_price or pos.entry_price)
+                price = self.broker.get_last_price(asset) or pos.current_price or pos.entry_price
             position_value = pos.quantity * price * pos.multiplier
             gross_exposure += abs(position_value)
             net_exposure += position_value
@@ -395,8 +539,7 @@ class Engine:
 
     def _build_activity_metrics(self) -> dict[str, int | float]:
         """Compute fill and portfolio activity metrics."""
-        fills = self.broker.fills
-        if not fills:
+        if not self.broker.fills:
             avg_open_positions = (
                 sum(state[5] for state in self.portfolio_state) / len(self.portfolio_state)
                 if self.portfolio_state
@@ -421,7 +564,7 @@ class Engine:
         traded_symbols: set[str] = set()
         rebalance_events: set[str | datetime] = set()
 
-        for fill in fills:
+        for fill in self.broker.fills:
             multiplier = self.broker.get_multiplier(fill.asset)
             notional = abs(fill.quantity) * fill.price * multiplier
             total_filled_notional += notional
@@ -445,7 +588,7 @@ class Engine:
         return {
             "num_orders": len(self.broker.orders),
             "num_rejected_orders": len(self.broker.get_rejected_orders()),
-            "num_fills": len(fills),
+            "num_fills": len(self.broker.fills),
             "num_rebalance_events": len(rebalance_events),
             "unique_symbols_traded": len(traded_symbols),
             "total_filled_notional": total_filled_notional,
@@ -460,17 +603,47 @@ class Engine:
         from .result import BacktestResult
         from .types import Trade
 
+        retain_intent_history = self.config.retain_intent_history
+        callback_counts = self.lifecycle_dispatcher.callback_counts
         contract_evidence = {
             "lifecycle_version": self.lifecycle_version.value,
+            "lifecycle_callback_counts": {
+                phase.value: callback_counts[phase] for phase in LifecyclePhase
+            },
+            "lifecycle_invocations": [],
             "execution_policy": self.execution_policy.to_dict(),
-            "target_intents": [intent.to_dict() for intent in self.preopen_target_manager.targets],
-            "child_order_intents": [
-                child.to_dict() for child in self.preopen_target_manager.children
-            ],
-            "intent_reconciliations": [
-                record.to_dict() for record in self.preopen_target_manager.reconciliations
-            ],
+            "target_intent_count": self.preopen_target_manager.target_count,
+            "child_order_intent_count": self.preopen_target_manager.child_count,
+            "intent_reconciliation_count": self.preopen_target_manager.reconciliation_count,
+            "target_intents": [],
+            "child_order_intents": [],
+            "intent_reconciliations": [],
         }
+        if retain_intent_history:
+            contract_evidence.update(
+                {
+                    "target_intents": [
+                        intent.to_dict() for intent in self.preopen_target_manager.targets
+                    ],
+                    "child_order_intents": [
+                        child.to_dict() for child in self.preopen_target_manager.children
+                    ],
+                    "intent_reconciliations": [
+                        record.to_dict() for record in self.preopen_target_manager.reconciliations
+                    ],
+                }
+            )
+        if self.config.retain_lifecycle_history:
+            contract_evidence["lifecycle_invocations"] = [
+                {
+                    "phase": invocation.phase.value,
+                    "callback": invocation.callback,
+                    "event_time": invocation.event_time.isoformat()
+                    if invocation.event_time is not None
+                    else None,
+                }
+                for invocation in self.lifecycle_dispatcher.invocations
+            ]
 
         if not self.equity_curve:
             # Return empty result for no-data case
@@ -603,11 +776,11 @@ class Engine:
 
         return BacktestResult(
             trades=all_trades,  # Includes both closed and open trades
-            equity_curve=self.equity_curve,
-            fills=self.broker.fills,
+            equity_curve=list(self.equity_curve),
+            fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),
             predictions=self.feed.signals,
-            portfolio_state=self.portfolio_state,
+            portfolio_state=list(self.portfolio_state),
             metrics=metrics,
             config=self.config,
             equity=equity,

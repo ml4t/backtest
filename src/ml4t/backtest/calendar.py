@@ -29,14 +29,27 @@ Example usage:
         print("Market is open")
 """
 
-from datetime import date, datetime
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import date, datetime, time
 from functools import lru_cache
+from types import MappingProxyType
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import polars as pl
 
 # Import pandas_market_calendars with lazy loading to avoid import overhead
 _mcal = None
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarSession:
+    """One exchange session from the authoritative calendar schedule."""
+
+    session_date: date
+    market_open: datetime
+    market_close: datetime
 
 
 def _get_mcal():
@@ -110,6 +123,21 @@ def get_calendar(calendar_id: str):
     return mcal.get_calendar(resolved_id)
 
 
+@lru_cache(maxsize=32)
+def get_standard_market_open_time(calendar_id: str) -> time:
+    """Return the calendar's authoritative regular market-open time."""
+    resolved_id = CALENDAR_ALIASES.get(calendar_id.upper(), calendar_id)
+    if resolved_id not in _get_mcal().get_calendar_names():
+        raise ValueError(f"calendar {calendar_id!r} does not define a standard market open")
+    try:
+        market_open = get_calendar(calendar_id).open_time
+    except NotImplementedError as exc:
+        raise ValueError(
+            f"calendar {calendar_id!r} does not define a standard market open"
+        ) from exc
+    return time(market_open.hour, market_open.minute, market_open.second)
+
+
 def get_schedule(
     calendar_id: str,
     start_date: date | datetime | str,
@@ -121,7 +149,7 @@ def get_schedule(
     """Get trading schedule as a Polars DataFrame.
 
     This is the primary function for retrieving exchange schedules.
-    Uses the efficient pandas -> pyarrow -> polars conversion path.
+    Converts the calendar's pandas schedule to a Polars DataFrame.
 
     Args:
         calendar_id: Exchange MIC code or alias (e.g., 'NYSE', 'XNYS', 'CME_Equity')
@@ -170,8 +198,10 @@ def get_schedule(
             }
         )
 
-    # Convert to Polars via pyarrow (efficient zero-copy path)
-    schedule_pl = pl.from_pandas(schedule_pd.reset_index())
+    schedule_pd = schedule_pd.reset_index()
+    schedule_pl = pl.DataFrame(
+        {str(name): series.to_list() for name, series in schedule_pd.items()}
+    )
 
     # Rename columns to standardized names
     rename_map = {
@@ -219,6 +249,38 @@ def get_schedule(
     )
 
     return result
+
+
+@lru_cache(maxsize=128)
+def get_calendar_sessions(calendar_id: str, year: int) -> Mapping[date, CalendarSession]:
+    """Return an immutable session lookup built once per calendar year."""
+    schedule = get_schedule(calendar_id, date(year, 1, 1), date(year, 12, 31))
+    sessions = {
+        session_date: CalendarSession(session_date, market_open, market_close)
+        for session_date, market_open, market_close in schedule.select(
+            "session_date", "market_open", "market_close"
+        ).iter_rows()
+    }
+    return MappingProxyType(sessions)
+
+
+@lru_cache(maxsize=128)
+def get_calendar_sessions_by_open_date(
+    calendar_id: str,
+    year: int,
+) -> Mapping[date, tuple[CalendarSession, ...]]:
+    """Index one label-year's sessions by exchange-local market-open date."""
+    timezone = ZoneInfo(str(get_calendar(calendar_id).tz))
+    grouped: dict[date, list[CalendarSession]] = {}
+    for session in get_calendar_sessions(calendar_id, year).values():
+        open_date = session.market_open.astimezone(timezone).date()
+        grouped.setdefault(open_date, []).append(session)
+    return MappingProxyType(
+        {
+            open_date: tuple(sorted(sessions, key=lambda session: session.market_open))
+            for open_date, sessions in grouped.items()
+        }
+    )
 
 
 def get_trading_days(
@@ -480,8 +542,7 @@ def get_holidays(
     trading_days = calendar.valid_days(start_date=start, end_date=end)
 
     # Holidays are weekdays that are not trading days
-    # Note: day_of_week is the modern pandas attribute (dayofweek deprecated)
-    weekdays = all_days[all_days.day_of_week < 5]  # ty: ignore[unresolved-attribute]  # Mon-Fri
+    weekdays = all_days[[day.weekday() < 5 for day in all_days]]
     holidays = weekdays.difference(trading_days)
 
     # Build DataFrame
@@ -663,6 +724,8 @@ def filter_to_trading_sessions(
         .drop(["session_open", "session_close"])
         .collect()
     )
+    if not isinstance(result, pl.DataFrame):
+        raise TypeError(f"Expected Polars DataFrame, got {type(result).__name__}")
 
     return result
 

@@ -64,6 +64,8 @@ print(f"Total Return: {result.metrics['total_return_pct']:.1f}%")
 print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
 ```
 
+Each `Engine` instance is single-use. Create a new instance for every independent run.
+
 Or use the convenience function:
 
 ```python
@@ -119,9 +121,13 @@ Large-scale claims are published only when a retained workload has zero canonica
 No large-scale claim is published for Backtrader, Zipline, VectorBT OSS, or LEAN without a passing retained artifact.
 <!-- parity-claims:end -->
 
-Performance regression checks compare the current implementation with the repository's legacy
-data-feed implementation. Cross-framework speed claims require a retained benchmark artifact that
-uses the same workload and execution semantics for every framework.
+Release performance evidence runs deterministic single-asset, 250-asset daily, quote-aware,
+rebalance, and partial-fill workloads in isolated processes. It reports setup and engine runtime
+separately, measures whole-process peak RSS, and verifies retained financial-output checksums and
+counts. The 250-asset workload periodically enters and exits 50 positions. Sample spread is
+reported for diagnosis, while the
+instrument-free hotpath benchmark enforces the runtime regression limit. The project does not
+publish hardware-dependent performance ratios as stable claims.
 
 ## Installation
 

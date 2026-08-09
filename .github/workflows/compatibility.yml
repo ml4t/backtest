@@ -1,0 +1,167 @@
+name: Compatibility
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  UV_NO_SOURCES: "1"
+
+jobs:
+  stable:
+    name: Stable (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the package and test dependencies
+        run: uv sync --dev --locked
+
+      - name: Verify the runtime and package import
+        run: >-
+          uv run --no-sync python -c
+          "import sys; import ml4t.backtest;
+          assert f'{sys.version_info.major}.{sys.version_info.minor}' ==
+          '${{ matrix.python-version }}'"
+
+      - name: Run the non-hardware test suite
+        run: uv run --no-sync pytest tests/ -v --tb=short --no-cov -m "not benchmark"
+
+      - name: Type-check for Python ${{ matrix.python-version }}
+        run: uv run --no-sync ty check --python-version ${{ matrix.python-version }}
+
+      - name: Build the package
+        run: uv build
+
+  prerelease:
+    name: Prerelease (${{ matrix.os }}, Python 3.15)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv and Python 3.15
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+          python-version: "3.15"
+
+      - name: Create the prerelease environment
+        run: uv venv --python 3.15
+
+      - name: Install the CPython 3.15 numerical runtime
+        run: >-
+          uv pip install
+          --index https://pypi.anaconda.org/scientific-python-nightly-wheels/simple
+          --prerelease allow --only-binary :all:
+          "numpy>=2.6.0.dev0"
+
+      - name: Install pandas build dependencies
+        run: >-
+          uv pip install
+          "meson-python>=0.17.1,<1" "meson>=1.2.1,<2" wheel
+          "Cython>3.1.0,<4" "versioneer[toml]" "ninja>=1.8.2"
+
+      - name: Install the package and test dependencies
+        run: >-
+          uv pip install --no-cache --prerelease allow
+          --no-build-isolation-package pandas
+          --editable . --group test
+
+      - name: Verify beta-or-later CPython 3.15 and package import
+        run: >-
+          uv run --no-sync python -c
+          "import sys; import numpy; import pandas; import ml4t.backtest;
+          from packaging.version import Version;
+          assert sys.version_info[:2] == (3, 15);
+          assert sys.version_info.releaselevel in {'beta', 'candidate'};
+          assert Version(numpy.__version__) >= Version('2.6.0.dev0')"
+
+      - name: Run the non-hardware test suite
+        run: uv run --no-sync pytest tests/ -v --tb=short --no-cov -m "not benchmark"
+
+      - name: Record the prerelease dependency set
+        run: uv pip freeze > prerelease-versions-${{ runner.os }}.txt
+
+      - name: Retain prerelease dependency evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prerelease-versions-${{ runner.os }}
+          path: prerelease-versions-${{ runner.os }}.txt
+          if-no-files-found: error
+
+  minimum:
+    name: Minimum Dependencies (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the lowest direct dependency set
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install --resolution lowest-direct --only-binary :all: \
+            --no-binary ml4t-backtest --editable . --group test "ty>=0.0.18"
+
+      - name: Record the resolved versions
+        run: uv pip freeze > minimum-versions-${{ matrix.python-version }}.txt
+
+      - name: Verify package import
+        run: uv run --no-sync python -c "import ml4t.backtest"
+
+      - name: Run the non-hardware test suite
+        run: uv run --no-sync pytest tests/ -v --tb=short --no-cov -m "not benchmark"
+
+      - name: Type-check for Python ${{ matrix.python-version }}
+        run: uv run --no-sync ty check --python-version ${{ matrix.python-version }}
+
+      - name: Build the package
+        run: uv build
+
+      - name: Retain minimum-version evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: minimum-versions-${{ matrix.python-version }}
+          path: minimum-versions-${{ matrix.python-version }}.txt
+          if-no-files-found: error
+
+  gate:
+    name: Compatibility Gate
+    if: always()
+    needs: [stable, prerelease, minimum]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every compatibility job
+        run: |
+          test "${{ needs.stable.result }}" = "success"
+          test "${{ needs.prerelease.result }}" = "success"
+          test "${{ needs.minimum.result }}" = "success"

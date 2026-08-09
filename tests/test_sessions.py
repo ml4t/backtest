@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import polars as pl
 import pytest
 
+from ml4t.backtest import calendar as calendar_module
 from ml4t.backtest.sessions import (
     SessionConfig,
     align_to_sessions,
     assign_session_date,
     compute_session_pnl,
+    session_date_for_timestamp,
 )
 
 
@@ -24,6 +27,12 @@ class TestSessionConfig:
         config = SessionConfig(calendar="NYSE")
         assert config.timezone == "UTC"
         assert config.session_start_time is None
+
+    def test_configuration_is_immutable(self) -> None:
+        config = SessionConfig(calendar="NYSE")
+
+        with pytest.raises(FrozenInstanceError):
+            config.timezone = "America/New_York"
 
     def test_get_session_start_hour_custom(self):
         """Test custom session start hour."""
@@ -41,7 +50,7 @@ class TestSessionConfig:
         assert nyse.get_session_start_minute() == 30
 
         nymex = SessionConfig(calendar="NYMEX")
-        assert nymex.get_session_start_hour() == 18
+        assert nymex.get_session_start_hour() == 17
 
     def test_get_session_start_hour_unknown_calendar(self):
         """Test unknown calendar defaults to midnight."""
@@ -54,6 +63,82 @@ class TestSessionConfig:
         config = SessionConfig(calendar="CME_Equity", session_start_time="17")
         assert config.get_session_start_hour() == 17
         assert config.get_session_start_minute() == 0
+
+    def test_custom_morning_session_boundary_is_rejected(self):
+        with pytest.raises(ValueError, match="custom morning session_start_time"):
+            SessionConfig(calendar="CRYPTO", session_start_time="06:00")
+
+    def test_standard_morning_session_boundary_can_be_repeated(self):
+        config = SessionConfig(calendar="NYSE", session_start_time="09:30")
+
+        assert config.get_session_start_hour() == 9
+        assert config.get_session_start_minute() == 30
+
+    def test_standard_morning_boundary_accepts_calendar_alias(self):
+        config = SessionConfig(calendar="XNYS", session_start_time="09:30")
+
+        assert config.get_session_start_hour() == 9
+        assert config.get_session_start_minute() == 30
+
+    def test_standard_morning_boundary_comes_from_exchange_calendar(self):
+        config = SessionConfig(calendar="XTKS", session_start_time="09:00")
+
+        assert config.get_session_start_hour() == 9
+        assert config.get_session_start_minute() == 0
+
+    def test_nonstandard_morning_boundary_names_the_calendar_open(self):
+        with pytest.raises(ValueError, match=r"XTKS.*standard market open is 09:00"):
+            SessionConfig(calendar="XTKS", session_start_time="09:30")
+
+    def test_evening_boundary_is_rejected_for_a_morning_start_calendar(self):
+        with pytest.raises(ValueError, match=r"custom evening.*NYSE.*09:30"):
+            SessionConfig(calendar="NYSE", session_start_time="23:00")
+
+    def test_morning_boundary_without_exchange_calendar_has_a_concise_error(self):
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            session_date_for_timestamp(
+                datetime(2024, 1, 5, 16, 0),
+                calendar=None,
+                timezone="UTC",
+                session_start_time="09:30",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+
+    def test_utc_calendar_name_is_reported_as_an_unknown_exchange(self):
+        with pytest.raises(ValueError, match="UTC.*standard market open"):
+            SessionConfig(calendar="UTC", session_start_time="09:30")
+
+    def test_unknown_calendar_has_a_concise_standard_open_error(self):
+        with pytest.raises(ValueError, match="UNKNOWN_EXCHANGE.*standard market open"):
+            SessionConfig(calendar="UNKNOWN_EXCHANGE", session_start_time="09:30")
+
+    @pytest.mark.parametrize("calendar", ["UTC", "UNKNOWN_EXCHANGE"])
+    def test_evening_boundary_without_an_authoritative_calendar_is_supported(
+        self,
+        calendar: str,
+    ) -> None:
+        config = SessionConfig(
+            calendar=calendar,
+            timezone="UTC",
+            session_start_time="17:00",
+        )
+
+        assert config.get_session_start_hour() == 17
+        assert config.get_session_timezone() == ZoneInfo("UTC")
+
+    def test_calendar_free_evening_boundary_assigns_the_next_session(self) -> None:
+        assert (
+            session_date_for_timestamp(
+                datetime(2024, 1, 8, 18, 0),
+                calendar=None,
+                timezone="UTC",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+            == datetime(2024, 1, 9).date()
+        )
 
 
 class TestAssignSessionDate:
@@ -105,14 +190,12 @@ class TestAssignSessionDate:
         assert session_date == datetime(2024, 1, 8, 0, 0)
 
     def test_nyse_before_session(self):
-        """Test NYSE: 8am ET -> previous day session (edge case)."""
+        """Test NYSE: pre-market data remains in the same-day session."""
         ny_tz = ZoneInfo("America/New_York")
         ts = datetime(2024, 1, 8, 8, 0)  # Monday 8am ET
         session_date = assign_session_date(ts, ny_tz, 9, 30)
 
-        # 8am is before 9:30am, belongs to previous day's session
-        # (though in practice NYSE wouldn't have data before 9:30)
-        assert session_date == datetime(2024, 1, 7, 0, 0)
+        assert session_date == datetime(2024, 1, 8, 0, 0)
 
     def test_timezone_aware_input(self, chicago_tz: ZoneInfo):
         """Test with timezone-aware timestamp input."""
@@ -120,6 +203,118 @@ class TestAssignSessionDate:
         session_date = assign_session_date(ts, chicago_tz, 17, 0)
 
         assert session_date == datetime(2024, 1, 9, 0, 0)
+
+    def test_registered_calendar_alias_uses_authoritative_market_open(self):
+        timestamp = datetime(2024, 1, 8, 18, 0)
+
+        assert (
+            session_date_for_timestamp(
+                timestamp,
+                calendar="CMES",
+                timezone="America/Chicago",
+                session_start_time=None,
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+            == datetime(2024, 1, 9).date()
+        )
+
+    def test_default_nymex_boundary_matches_authoritative_session_assignment(self):
+        timestamp = datetime(2024, 1, 8, 17, 30)
+        config = SessionConfig(calendar="NYMEX", timezone="America/Chicago")
+
+        assigned = assign_session_date(
+            timestamp,
+            ZoneInfo(config.timezone),
+            config.get_session_start_hour(),
+            config.get_session_start_minute(),
+        ).date()
+
+        assert assigned == session_date_for_timestamp(
+            timestamp,
+            calendar="NYMEX",
+            timezone=config.timezone,
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+        assert assigned == datetime(2024, 1, 9).date()
+
+    def test_default_nymex_boundary_uses_the_calendar_timezone(self):
+        timestamp = datetime(
+            2024,
+            1,
+            8,
+            17,
+            30,
+            tzinfo=ZoneInfo("America/New_York"),
+        )
+        config = SessionConfig(calendar="NYMEX", timezone="America/New_York")
+
+        assigned = assign_session_date(
+            timestamp,
+            config.get_session_timezone(),
+            config.get_session_start_hour(),
+            config.get_session_start_minute(),
+        ).date()
+
+        assert config.get_session_timezone() == ZoneInfo("America/Chicago")
+        assert assigned == session_date_for_timestamp(
+            timestamp,
+            calendar="NYMEX",
+            timezone="America/New_York",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+        assert assigned == datetime(2024, 1, 8).date()
+
+    def test_session_lookup_does_not_load_the_next_year_for_ordinary_dates(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        requested_years = []
+        original = calendar_module.get_calendar_sessions_by_open_date
+
+        def track_year(calendar: str, year: int):
+            requested_years.append(year)
+            return original(calendar, year)
+
+        monkeypatch.setattr(calendar_module, "get_calendar_sessions_by_open_date", track_year)
+
+        session_date_for_timestamp(
+            datetime(2024, 1, 2, 10, 0),
+            calendar="NYSE",
+            timezone="America/New_York",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert requested_years == [2024]
+
+    def test_december_31_session_lookup_includes_next_year_labels(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        requested_years = []
+
+        def track_year(calendar: str, year: int):
+            requested_years.append(year)
+            return {}
+
+        monkeypatch.setattr(calendar_module, "get_calendar_sessions_by_open_date", track_year)
+
+        session_date_for_timestamp(
+            datetime(2024, 12, 31, 10, 0),
+            calendar="NYSE",
+            timezone="America/New_York",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert requested_years == [2024, 2025]
 
 
 class TestComputeSessionPnL:
@@ -141,6 +336,67 @@ class TestComputeSessionPnL:
         assert len(result) == 0
         assert "session_date" in result.columns
         assert "pnl" in result.columns
+
+    def test_nyse_premarket_and_regular_bars_share_the_same_session(self):
+        new_york = ZoneInfo("America/New_York")
+        equity_curve = [
+            (datetime(2024, 1, 8, 8, 0, tzinfo=new_york), 100000.0),
+            (datetime(2024, 1, 8, 10, 0, tzinfo=new_york), 100100.0),
+        ]
+
+        result = compute_session_pnl(
+            equity_curve,
+            SessionConfig(calendar="NYSE", timezone="America/New_York"),
+        )
+
+        assert result["session_date"].to_list() == [datetime(2024, 1, 8)]
+        assert result["num_bars"].to_list() == [2]
+
+    def test_nymex_pnl_uses_the_calendar_timezone_over_the_fallback(self):
+        new_york = ZoneInfo("America/New_York")
+        equity_curve = [
+            (datetime(2024, 1, 8, 17, 15, tzinfo=new_york), 100000.0),
+            (datetime(2024, 1, 8, 17, 45, tzinfo=new_york), 100100.0),
+        ]
+
+        result = compute_session_pnl(
+            equity_curve,
+            SessionConfig(calendar="NYMEX", timezone="America/New_York"),
+        )
+
+        assert result["session_date"].to_list() == [datetime(2024, 1, 8)]
+        assert result["num_bars"].to_list() == [2]
+
+    def test_nymex_pnl_converts_naive_data_timezone_to_the_calendar_timezone(self):
+        timestamp = datetime(2024, 1, 8, 22, 0)
+        config = SessionConfig(calendar="NYMEX", timezone="UTC")
+
+        result = compute_session_pnl([(timestamp, 100000.0)], config)
+
+        expected = session_date_for_timestamp(
+            timestamp,
+            calendar="NYMEX",
+            timezone="UTC",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+        assert result["session_date"].to_list() == [datetime.combine(expected, datetime.min.time())]
+
+    def test_naive_timestamp_reading_depends_on_the_configured_data_timezone(self):
+        timestamp = datetime(2024, 1, 8, 18, 0)
+
+        utc_result = compute_session_pnl(
+            [(timestamp, 100000.0)],
+            SessionConfig(calendar="CME_Equity", timezone="UTC"),
+        )
+        chicago_result = compute_session_pnl(
+            [(timestamp, 100000.0)],
+            SessionConfig(calendar="CME_Equity", timezone="America/Chicago"),
+        )
+
+        assert utc_result["session_date"].to_list() == [datetime(2024, 1, 8)]
+        assert chicago_result["session_date"].to_list() == [datetime(2024, 1, 9)]
 
     def test_single_session(self, cme_config: SessionConfig):
         """Test with single trading session."""

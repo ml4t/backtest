@@ -25,12 +25,28 @@ This page explains the architecture, key abstractions, and execution flow of the
 ```
 
 **Engine** orchestrates the main loop -- iterating bars, calling the strategy, and recording equity.
+Each Engine instance is single-use; create a new instance for each independent run.
 
 **DataFeed** partitions a Polars DataFrame by timestamp and iterates bar-by-bar across all assets. It pre-extracts OHLCV data for O(1) per-bar access.
 
-**Broker** is the strategy's interface to the market. It accepts orders, manages positions, evaluates risk rules, and delegates fills to the execution pipeline.
+**Broker** is the strategy's interface to the market. It accepts orders and delegates state changes to the account, order, risk, and execution components.
 
 **Strategy** is the user's code. It receives `(timestamp, data, context, broker)` on each bar and submits orders through the broker.
+
+### State Ownership
+
+Broker is a facade, not a second ledger. Each mutable domain concept has one state owner:
+
+| State | Owner | Mutation contract |
+|---|---|---|
+| Cash and positions | `AccountState` | Fill execution changes cash and positions through the injected account. Validation and valuation read the same position objects. |
+| Current and historical market values | `MarketState` | `Broker._update_time()` replaces the current bar and advances its index. Execution and risk components receive the state as a read dependency. |
+| Orders, pending queues, and partial quantities | `OrderState` | `OrderBook` creates and queues orders. `ExecutionEngine` and `FillExecutor` update lifecycle and partial-fill state through the same injected object. |
+| Position rules and deferred exits | `RiskState` | Broker configuration methods set rules. `RiskEngine` records and consumes deferred exits. |
+| Fills and completed trades | `ExecutionJournal` | `FillExecutor` appends records. Broker access uses those lists; `BacktestResult` receives list snapshots. |
+| Strategy callback sequence | `LifecycleDispatcher` | `Engine.run()` dispatches versioned phases; the dispatcher invokes callbacks and rolls back broker mutations when a callback fails. |
+
+Broker compatibility attributes reference these owner collections. They do not store copies. Boundary tests reject direct access from collaborators to the legacy Broker private fields.
 
 ## Key Abstractions
 
@@ -77,19 +93,25 @@ Rules are set in `on_start()` and apply globally, or per-asset via `broker.set_p
 
 ## Execution Flow
 
-The engine processes each bar in this order:
+The engine calls `on_start`, then calls `on_prepare` with resolved configuration and
+no future feed data. It processes each accepted session bar in this order:
 
 ```
 for each bar:
     1. Update broker with current OHLCV prices
-    2. Process pending exits from previous bar (NEXT_BAR mode)
-    3. Evaluate position rules (stops, trails) → generate exit orders
-    4. Process pending orders (fills at open or close)
-    5. Call strategy.on_data()
-    6. Process new orders (SAME_BAR mode only)
-    7. Update water marks for trailing stops
-    8. Record equity
+    2. Fill pending exits from the previous bar at the open
+    3. Lower and fill eligible pre-open target intents against the resulting positions
+    4. Evaluate position rules (stops, trails)
+    5. Process eligible pending orders
+    6. Call strategy.on_data()
+    7. Process current-bar MOC or SAME_BAR orders
+    8. Reconcile target-intent child orders
+    9. Update trailing water marks and record portfolio state
 ```
+
+After the last feed timestamp, the engine calls `on_end`, validates lifecycle callback
+counts, and constructs the result. The same versioned callback and target-intent
+contracts are used by `ml4t-live`.
 
 ### NEXT_BAR vs SAME_BAR
 

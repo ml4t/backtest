@@ -11,6 +11,12 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "src/ml4t/backtest/_version.py"
 
+[tool.hatch.build]
+exclude = [
+    "**/AGENTS.md",
+    "**/CLAUDE.md",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/ml4t"]
 namespaces = true
@@ -23,9 +29,6 @@ include = [
     "/LICENSE",
     "/CHANGELOG.md",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [project]
 name = "ml4t-backtest"
@@ -53,7 +56,7 @@ keywords = [
     "polars",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
@@ -72,13 +75,13 @@ requires-python = ">=3.12"
 
 # Core dependencies
 dependencies = [
-    "ml4t-specs @ git+https://github.com/ml4t/specs.git@85d3476683a70b4f17e5e8cb82dd23d05b373dc8",
-    "polars>=0.20.0",
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "pyarrow>=14.0.0",
-    "PyYAML>=6.0.0",
-    "pandas-market-calendars>=4.0.0",
+    "ml4t-specs>=0.1.1,<0.2",
+    "polars>=1.36.1",
+    "pandas>=2.3.3; python_version < '3.15'",
+    "pandas>=3.0.5; python_version >= '3.15'",
+    "numpy>=2.3.2",
+    "PyYAML>=6.0.3",
+    "pandas-market-calendars>=5.2.4",
 ]
 
 [project.optional-dependencies]
@@ -97,10 +100,10 @@ advanced = [
 
 # Comparison libraries (for benchmarking)
 comparison = [
-    "vectorbt>=0.24.0",
-    "backtrader>=1.9.0",
-    "zipline-reloaded>=2.4.0",
-    "pyfolio-reloaded>=0.9.9",
+    "vectorbt>=0.24.0; python_version < '3.15'",
+    "backtrader>=1.9.0; python_version < '3.15'",
+    "zipline-reloaded>=2.4.0; python_version < '3.15'",
+    "pyfolio-reloaded>=0.9.9; python_version < '3.15'",
 ]
 
 # Development dependencies
@@ -138,14 +141,17 @@ Issues = "https://github.com/ml4t/backtest/issues"
 Changelog = "https://github.com/ml4t/backtest/blob/main/CHANGELOG.md"
 
 [dependency-groups]
-dev = [
-    "ml4t-diagnostic>=0.1.0b4",
+test = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.3.0",
     "pytest-timeout>=2.1.0",
     "pytest-benchmark>=4.0.0",
     "hypothesis>=6.80.0",
+]
+dev = [
+    { include-group = "test" },
+    "ml4t-diagnostic>=0.1.0b4",
     "ruff>=0.8.0",
     "ty",
     "pre-commit>=3.3.0",
@@ -176,20 +182,18 @@ markers = [
     "no_invariant_check: skip autouse accounting invariant check for this test",
 ]
 filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
+    "error",
+    "ignore:The 'generic' unit for NumPy timedelta is deprecated.*:DeprecationWarning",
+    "ignore:co_lnotab is deprecated, use co_lines instead.*:DeprecationWarning:zipline.*",
     "ignore::UserWarning:vectorbt",  # VectorBT accessor registration warnings
-    "ignore::tables.NaturalNameWarning",  # PyTables naming warnings
     "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
-    "ignore::pytest.PytestReturnNotNoneWarning",  # Some tests return values for direct execution
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-fix = true
 exclude = [
-    "validation/*",  # Standalone scripts run in isolated venvs
+    "validation/*",  # Release-critical scripts are checked from validation/release_checks.txt
     "docs/*",        # Documentation artifacts
     ".claude/*",     # Claude workspace files
     ".serena/*",     # Serena workspace files
@@ -220,27 +224,24 @@ ignore = [
 
 [tool.ty.environment]
 python-version = "3.12"
-root = ["src"]
+root = ["src", "."]
 
 [tool.ty.src]
 include = ["src"]
 exclude = ["tests", "validation", "docs"]
 
-[tool.ty.rules]
-invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
-invalid-return-type = "ignore"
-unused-ignore-comment = "ignore"
-unresolved-import = "ignore"
-
 [tool.coverage.run]
 source = ["src/ml4t/backtest"]
+branch = true
 omit = [
     "*/tests/*",
     "*/__init__.py",
 ]
 
 [tool.coverage.report]
+fail_under = 84
+precision = 2
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

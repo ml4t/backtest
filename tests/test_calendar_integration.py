@@ -4,10 +4,13 @@ These tests verify that the Engine correctly handles trading session enforcement
 when a calendar is configured with enforce_sessions=True.
 """
 
+import warnings
 from datetime import datetime, timedelta
 
 import polars as pl
+import pytest
 
+import ml4t.backtest.calendar as calendar_module
 from ml4t.backtest import DataFeed, Engine, OrderSide, Strategy
 from ml4t.backtest.config import BacktestConfig, DataFrequency
 
@@ -151,7 +154,9 @@ class TestCalendarEnforcementDaily:
             data_frequency=DataFrequency.DAILY,
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # All 14 bars should be processed
         assert strategy.bars_processed == 14
@@ -177,7 +182,9 @@ class TestCalendarEnforcementDaily:
             data_frequency=DataFrequency.DAILY,
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # Should skip 4 weekend days + 1 MLK Day = 5 non-trading days
         # 14 days - 5 = 9 trading days
@@ -236,15 +243,286 @@ class TestCalendarEnforcementDaily:
 class TestCalendarEnforcementIntraday:
     """Tests for intraday data calendar enforcement.
 
-    Note: Intraday session validation falls back to trading day check when
-    timezone-naive timestamps are used (which is typical). Full intraday
-    session enforcement requires timezone-aware timestamps matching the
-    exchange's timezone.
+    Timezone-naive timestamps use the configured feed timezone.
     """
 
+    def test_session_filter_warns_when_nearly_all_intraday_bars_are_removed(self):
+        timestamps = [
+            datetime(2024, 1, 2, 9, 30),
+            datetime(2024, 1, 2, 10, 0),
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 2,
+                "open": [100.0] * 2,
+                "high": [100.0] * 2,
+                "low": [100.0] * 2,
+                "close": [100.0] * 2,
+                "volume": [100_000] * 2,
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        )
+
+        with pytest.warns(UserWarning, match="retained 0 of 2 intraday bars"):
+            result = engine.run()
+
+        assert result.metrics["skipped_bars"] == 2
+
+    def test_session_filter_warns_when_naive_timezone_causes_partial_loss(self):
+        timestamps = [
+            datetime(2024, 1, 2, 9, 30),
+            datetime(2024, 1, 2, 15, 59),
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 2,
+                "open": [100.0] * 2,
+                "high": [100.0] * 2,
+                "low": [100.0] * 2,
+                "close": [100.0] * 2,
+                "volume": [100_000] * 2,
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        )
+
+        with pytest.warns(
+            UserWarning,
+            match=("Interpreting naive timestamps as 'America/New_York' would retain 2 bars"),
+        ):
+            result = engine.run()
+
+        assert result.metrics["skipped_bars"] == 1
+
+    def test_timezone_diagnostic_is_bounded_to_twenty_dates(self):
+        trading_dates = []
+        current = datetime(2024, 4, 1)
+        while len(trading_dates) < 25:
+            if current.weekday() < 5:
+                trading_dates.append(current)
+            current += timedelta(days=1)
+        timestamps = [
+            trading_date.replace(hour=hour, minute=minute)
+            for trading_date in trading_dates
+            for hour, minute in [(8, 0), (9, 30), (15, 59)]
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        assert len(timestamps) == 75
+        with pytest.warns(UserWarning, match="in a 60-bar sample"):
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
+        assert result.metrics["skipped_bars"] == 50
+
+    def test_timezone_diagnostic_caps_the_required_absolute_gain(self):
+        """Pin the absolute and relative warning thresholds independently.
+
+        A 60-bar sample has an uncapped floor of 6 and a capped floor of 4. Retaining
+        13 bars instead of 8 gives a gain of 5 and a ratio of 1.625, above the 1.25 gate.
+        """
+        trading_dates = []
+        current = datetime(2024, 4, 1)
+        while len(trading_dates) < 20:
+            if current.weekday() < 5:
+                trading_dates.append(current)
+            current += timedelta(days=1)
+        timestamps = []
+        for index, trading_date in enumerate(trading_dates):
+            timestamps.append(trading_date.replace(hour=8, minute=0))
+            timestamps.append(
+                trading_date.replace(hour=9, minute=30)
+                if index < 5
+                else trading_date.replace(hour=8, minute=30)
+            )
+            timestamps.append(
+                trading_date.replace(hour=15, minute=59)
+                if index < 8
+                else trading_date.replace(hour=23, minute=0)
+            )
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        assert len(timestamps) == 60
+        with pytest.warns(UserWarning, match="retain 13 bars instead of 8"):
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
+        assert result.metrics["skipped_bars"] == 52
+
+    def test_naive_utc_bars_do_not_warn_when_session_filter_retains_them(self):
+        timestamps = [
+            datetime(2024, 1, 2, 14, 30),
+            datetime(2024, 1, 2, 20, 59),
+        ]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 2,
+                "open": [100.0] * 2,
+                "high": [100.0] * 2,
+                "low": [100.0] * 2,
+                "close": [100.0] * 2,
+                "volume": [100_000] * 2,
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = engine.run()
+
+        assert result.metrics["skipped_bars"] == 0
+
+    def test_naive_utc_extended_hours_do_not_warn_when_filtering_is_intentional(self):
+        start = datetime(2024, 1, 2, 9, 0)
+        timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+        engine = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_30,
+            ),
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = engine.run()
+
+        assert 0 < result.metrics["skipped_bars"] < len(timestamps)
+
+    def test_naive_utc_partial_day_does_not_warn_for_small_counterfactual_gain(self):
+        start = datetime(2024, 1, 2, 6, 0)
+        timestamps = [start + timedelta(hours=index) for index in range(15)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.HOURLY,
+                ),
+            ).run()
+
+        assert result.metrics["skipped_bars"] == 9
+
+    def test_small_extended_hours_counterfactual_gain_does_not_warn(self):
+        """A 2-bar, 1.167x recovery is deliberately below both warning gates."""
+        start = datetime(2024, 1, 2, 4, 0)
+        timestamps = [start + timedelta(minutes=30 * index) for index in range(33)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = Engine(
+                feed=DataFeed(prices_df=frame),
+                strategy=SimpleStrategy(),
+                config=BacktestConfig(
+                    calendar="NYSE",
+                    enforce_sessions=True,
+                    data_frequency=DataFrequency.MINUTE_30,
+                ),
+            ).run()
+
+        assert result.metrics["skipped_bars"] == 21
+
     def test_intraday_weekend_skipped(self):
-        """Weekend intraday bars are skipped (via trading day fallback)."""
-        # Saturday data - will be caught by trading day check
+        """Weekend intraday bars are skipped by the precomputed session mask."""
         saturday = datetime(2024, 1, 6, 10, 0)  # Saturday 10 AM
         timestamps = [
             saturday,
@@ -253,7 +531,6 @@ class TestCalendarEnforcementIntraday:
         ]
         prices = [100.0, 100.1, 100.2]
         n_bars = len(timestamps)
-
         df = pl.DataFrame(
             {
                 "timestamp": timestamps,
@@ -273,16 +550,55 @@ class TestCalendarEnforcementIntraday:
             calendar="NYSE",
             enforce_sessions=True,
             data_frequency=DataFrequency.MINUTE_1,
+            timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # All bars should be skipped (Saturday)
         assert strategy.bars_processed == 0
         assert results.metrics["skipped_bars"] == 3
 
+    def test_session_warning_checks_each_distinct_date_once(self, monkeypatch: pytest.MonkeyPatch):
+        """A low-retention fixture forces evaluation of every distinct date."""
+        start = datetime(2024, 1, 6, 10, 0)
+        timestamps = [start, start + timedelta(minutes=1), start + timedelta(days=1)]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * len(timestamps),
+                "open": [100.0] * len(timestamps),
+                "high": [100.0] * len(timestamps),
+                "low": [100.0] * len(timestamps),
+                "close": [100.0] * len(timestamps),
+                "volume": [100_000] * len(timestamps),
+            }
+        )
+        checked_dates = []
+
+        def reject_trading_date(_calendar_id, date):
+            checked_dates.append(date)
+            return False
+
+        monkeypatch.setattr(calendar_module, "is_trading_day", reject_trading_date)
+
+        Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=SimpleStrategy(),
+            config=BacktestConfig(
+                calendar="NYSE",
+                timezone="America/New_York",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        ).run()
+
+        assert sorted(checked_dates) == sorted({timestamp.date() for timestamp in timestamps})
+
     def test_intraday_holiday_skipped(self):
-        """Holiday intraday bars are skipped (via trading day fallback)."""
+        """Holiday intraday bars are skipped by the precomputed session mask."""
         # July 4th 2024 - Independence Day
         july4 = datetime(2024, 7, 4, 10, 0)
         timestamps = [
@@ -311,9 +627,12 @@ class TestCalendarEnforcementIntraday:
             calendar="NYSE",
             enforce_sessions=True,
             data_frequency=DataFrequency.MINUTE_1,
+            timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
-        results = engine.run()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            results = engine.run()
 
         # All bars should be skipped (holiday)
         assert strategy.bars_processed == 0
@@ -350,6 +669,7 @@ class TestCalendarEnforcementIntraday:
             calendar="NYSE",
             enforce_sessions=True,
             data_frequency=DataFrequency.MINUTE_1,
+            timezone="America/New_York",
         )
         engine = Engine(feed=feed, strategy=strategy, config=config)
         results = engine.run()
@@ -357,6 +677,42 @@ class TestCalendarEnforcementIntraday:
         # All bars should be processed (regular trading day)
         assert strategy.bars_processed == 3
         assert results.metrics["skipped_bars"] == 0
+
+    def test_intraday_pre_and_post_market_bars_are_skipped(self):
+        """Session enforcement excludes bars outside regular NYSE hours."""
+        timestamps = [
+            datetime(2024, 1, 2, 9, 29),
+            datetime(2024, 1, 2, 9, 30),
+            datetime(2024, 1, 2, 15, 59),
+            datetime(2024, 1, 2, 16, 0),
+        ]
+        prices = [100.0, 100.1, 100.2, 100.3]
+        frame = pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "asset": ["TEST"] * 4,
+                "open": prices,
+                "high": prices,
+                "low": prices,
+                "close": prices,
+                "volume": [100_000] * 4,
+            }
+        )
+        strategy = SimpleStrategy()
+
+        result = Engine(
+            feed=DataFeed(prices_df=frame),
+            strategy=strategy,
+            config=BacktestConfig(
+                calendar="NYSE",
+                timezone="America/New_York",
+                enforce_sessions=True,
+                data_frequency=DataFrequency.MINUTE_1,
+            ),
+        ).run()
+
+        assert strategy.timestamps_seen == timestamps[1:3]
+        assert result.metrics["skipped_bars"] == 2
 
 
 class TestCalendarEdgeCases:

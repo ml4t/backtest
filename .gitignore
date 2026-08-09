@@ -49,3 +49,5 @@ validation/trade_logs/
 validation/lean/workspace/
 validation/nautilus/.venv-nautilus/
 validation/nautilus/catalog/
+performance-evidence.json
+release-performance-evidence.json

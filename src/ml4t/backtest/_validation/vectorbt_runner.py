@@ -10,6 +10,10 @@ import pandas as pd
 import polars as pl
 
 
+def _empty_frame(columns: tuple[str, ...]) -> pd.DataFrame:
+    return pd.DataFrame({column: pd.Series(dtype="object") for column in columns})
+
+
 def load_vectorbt_package(package_name: str = "vectorbt") -> Any:
     """Import and return a VectorBT package."""
     return importlib.import_module(package_name)
@@ -17,13 +21,12 @@ def load_vectorbt_package(package_name: str = "vectorbt") -> Any:
 
 def prices_to_wide(prices: pl.DataFrame, value_col: str = "close") -> pd.DataFrame:
     """Convert long-format Polars prices to a wide pandas price matrix."""
-    wide = (
+    wide_pl = (
         prices.select("timestamp", "symbol", value_col)
         .pivot(on="symbol", index="timestamp", values=value_col)
         .sort("timestamp")
-        .to_pandas()
-        .set_index("timestamp")
     )
+    wide = pd.DataFrame(wide_pl.to_dict(as_series=False)).set_index("timestamp")
     wide.index = pd.DatetimeIndex(wide.index)
     return wide
 
@@ -98,9 +101,7 @@ def extract_order_log(portfolio: Any) -> pd.DataFrame:
             )
 
     if not rows:
-        return pd.DataFrame(
-            columns=["timestamp", "symbol", "side", "quantity", "price", "commission"]
-        )
+        return _empty_frame(("timestamp", "symbol", "side", "quantity", "price", "commission"))
     return pd.DataFrame(rows).sort_values(["timestamp", "symbol"]).reset_index(drop=True)
 
 
@@ -108,8 +109,8 @@ def extract_trade_log(portfolio: Any) -> pd.DataFrame:
     """Extract standardized round-trip trade records from a VectorBT portfolio."""
     trades_readable = portfolio.trades.records_readable
     if len(trades_readable) == 0:
-        return pd.DataFrame(
-            columns=[
+        return _empty_frame(
+            (
                 "timestamp",
                 "exit_time",
                 "asset",
@@ -118,7 +119,7 @@ def extract_trade_log(portfolio: Any) -> pd.DataFrame:
                 "entry_price",
                 "exit_price",
                 "pnl",
-            ]
+            )
         )
 
     entry_col = "Entry Timestamp" if "Entry Timestamp" in trades_readable.columns else "Entry Index"

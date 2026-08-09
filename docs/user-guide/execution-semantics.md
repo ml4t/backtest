@@ -83,15 +83,47 @@ def on_prepare(self, broker, config=None):
 
 The engine validates the cutoff, lowers the target at the opening auction, records canonical child
 intent and order lineage, reconciles fills and remaining quantity, then activates any associated
-position rules. A scheduled target uses the same method from an earlier event with a future
+position rules. Opening child orders use OPG time-in-force: any quantity not filled by the eligible
+opening auction is cancelled and is never carried into a later bar. A scheduled target uses the
+same method from an earlier event with a future
 `effective_session`. Same-session registration from `on_data()` is rejected because that callback
 has already observed information after the opening phase.
+
+`ExecutionPolicy.liquidity_fraction` applies only to opening-auction child orders. A value of 1.0
+means no participation constraint, even when the requested quantity exceeds the bar volume. A
+smaller value creates an opening-only participation limit unless the Engine receives an explicit
+`execution_limits` object. Explicit limits must match the declared opening policy. Ordinary orders
+use only the Engine's explicit `execution_limits` setting.
 
 For a rule activated after an opening fill, `ExecutionPolicy.bar_path` controls daily OHLC
 ambiguity. Use `REJECT_AMBIGUOUS` to fail when high-low order changes the result,
 `OPEN_HIGH_LOW_CLOSE` or `OPEN_LOW_HIGH_CLOSE` to declare an order, or `CONSERVATIVE` to select the
-more adverse supported outcome. The result artifact retains the lifecycle version, execution
-policy, target intents, child intents, and reconciliation records.
+more adverse supported outcome. Every result retains the lifecycle version, execution policy, and
+intent record counts. Set `BacktestConfig(retain_intent_history=True)` to include full target,
+child-intent, and reconciliation records in the result artifact. The default avoids copying an
+unbounded event history into results from long-running or high-asset simulations. The broker
+accessors and `export_target_intent_state()` remain available during and after a run.
+
+Lifecycle callback counts are always retained for contract validation. Set
+`BacktestConfig(retain_lifecycle_history=True)` only when a per-callback trace is needed for parity
+analysis or debugging. The default does not retain one record per market event.
+
+`ResidualPolicy.LARGEST_REMAINDER` is unsupported for fractional-share accounts regardless of the
+rounding policy. Its allocation step adds whole units, so it cannot redistribute a rounded
+fractional remainder, while an unrounded fractional target has no discrete remainder to allocate.
+Use `KEEP_CASH`; unsupported combinations are rejected before opening orders are created or
+restored.
+
+A position rule associated with a target remains active until the position becomes flat or a later
+filled target for that asset replaces it. If the later target does not name a
+`position_rule_policy_id`, the earlier target-managed rule is removed. An explicit rule override
+installed through the broker remains in place because target cleanup removes only the rule object
+installed by the target manager.
+
+`export_target_intent_state()` does not contain account or order-book state. Restoring state that
+already contains child orders therefore requires those orders and the corresponding account state
+to exist in the destination broker. A fresh `Engine` cannot resume a post-opening state from the
+target-intent payload alone. Unprocessed targets can be restored without order state.
 
 ### SAME_BAR
 
@@ -369,16 +401,19 @@ config = BacktestConfig(
 
 ## Settlement
 
-The `settlement_delay` parameter simulates T+N settlement:
+The `settlement_delay` parameter delays when sale proceeds become spendable. The
+unit is processed bars, not calendar or business days:
 
 ```python
 config = BacktestConfig(
-    settlement_delay=2,                    # T+2 (US equities standard)
+    settlement_delay=2,                    # Proceeds held for two processed bars
     settlement_reduces_buying_power=True,  # Unsettled cash not spendable
 )
 ```
 
-With T+2 settlement, cash from selling shares on Monday isn't available for buying until Wednesday.
+Use this as an explicit simulation assumption. A value of two does not by itself
+represent any market's legal settlement calendar because skipped sessions and bar
+frequency change the elapsed time.
 
 ## Cash Management
 

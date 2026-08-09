@@ -262,6 +262,111 @@ class TestDataFeed:
 
         assert count == 10
 
+    def test_minimal_close_feed_defaults_missing_ohlcv_fields(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+
+        _timestamp, data, _context = next(iter(DataFeed(prices_df=prices)))
+
+        assert data["AAPL"] == {
+            "price": 150.0,
+            "open": 150.0,
+            "high": 150.0,
+            "low": 150.0,
+            "close": 150.0,
+            "volume": 0.0,
+            "signals": {},
+        }
+
+    def test_explicit_price_column_supports_non_ohlcv_feed(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "mid_price": [150.0],
+            }
+        )
+
+        _timestamp, data, _context = next(
+            iter(DataFeed(prices_df=prices, price_col="mid_price", close_col="mid_price"))
+        )
+
+        assert data["AAPL"]["price"] == 150.0
+        assert data["AAPL"]["close"] == 150.0
+
+    def test_missing_configured_price_column_fails_at_construction(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "volume": [1_000.0],
+            }
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="price_col='close' and close_col='close' not found in price columns",
+        ):
+            DataFeed(prices_df=prices)
+
+    def test_explicit_missing_price_column_does_not_silently_fall_back_to_close(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="price_col='vwap' not found in price columns",
+        ):
+            DataFeed(prices_df=prices, price_col="vwap")
+
+    @pytest.mark.parametrize("source", ["prices", "signals", "context"])
+    def test_path_and_dataframe_for_same_source_are_rejected(self, source):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+        frame = prices if source != "context" else prices.select("timestamp")
+        kwargs = {f"{source}_path": "unused.parquet", f"{source}_df": frame}
+        if source != "prices":
+            kwargs["prices_df"] = prices
+
+        with pytest.raises(
+            ValueError,
+            match=rf"Pass either {source}_path or {source}_df, not both",
+        ):
+            DataFeed(**kwargs)
+
+    def test_signal_frame_requires_resolved_entity_column(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "asset": ["AAPL"],
+                "close": [150.0],
+            }
+        )
+        signals = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1)],
+                "prediction": [0.8],
+            }
+        )
+
+        with pytest.raises(ValueError, match="entity_col='asset' not found in signal columns"):
+            DataFeed(prices_df=prices, signals_df=signals)
+
     def test_with_signals(self):
         prices = generate_prices(["AAPL"], datetime(2024, 1, 1), 5)
         signals = generate_signals(["AAPL"], datetime(2024, 1, 1), 5, ["ml_score"])
@@ -600,6 +705,41 @@ class TestEngine:
         ]
         assert portfolio_state["open_positions"].to_list() == [1, 0, 0]
         assert portfolio_state["gross_exposure"].to_list() == [1000.0, 0.0, 0.0]
+
+    def test_result_collections_are_isolated_and_engine_is_single_use(self):
+        prices = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+                "asset": ["AAPL", "AAPL"],
+                "open": [100.0, 101.0],
+                "high": [100.0, 101.0],
+                "low": [100.0, 101.0],
+                "close": [100.0, 101.0],
+                "volume": [1000.0, 1000.0],
+            }
+        )
+        engine = Engine(
+            DataFeed(prices_df=prices),
+            BuyAndHoldStrategy("AAPL"),
+            BacktestConfig(
+                execution_mode=ExecutionMode.SAME_BAR,
+                commission_type=CommissionType.NONE,
+                slippage_type=SlippageType.NONE,
+            ),
+        )
+        results = engine.run()
+
+        assert results.fills is not engine.broker.fills
+        assert results.equity_curve is not engine.equity_curve
+        assert results.portfolio_state is not engine.portfolio_state
+        results.fills.clear()
+        results.equity_curve.clear()
+        results.portfolio_state.clear()
+        assert len(engine.broker.fills) == 1
+        assert len(engine.equity_curve) == 2
+        assert len(engine.portfolio_state) == 2
+        with pytest.raises(RuntimeError, match="already started"):
+            engine.run()
 
     def test_activity_metrics_prefer_explicit_rebalance_ids(self):
         prices = pl.DataFrame(

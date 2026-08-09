@@ -20,60 +20,184 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
-from typing import TYPE_CHECKING
+from datetime import date, datetime, time, timedelta
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from ml4t.specs.market_data import TimestampSemantics
 
 if TYPE_CHECKING:
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class SessionConfig:
     """Configuration for trading session alignment.
 
     Attributes:
         calendar: Exchange calendar name (e.g., "CME_Equity", "NYSE")
-        timezone: Calendar timezone (e.g., "America/Chicago", "America/New_York")
-        session_start_time: Override session start time (e.g., "17:00" for CME)
-            If None, uses the calendar's default session times.
+        timezone: Data timezone used to interpret naive timestamps. It is also the session
+            timezone fallback when ``calendar`` has no authoritative metadata. A known calendar
+            uses its exchange timezone for the boundary after naive timestamps are localized.
+        session_start_time: Override an evening session boundary (e.g., "17:00" for CME),
+            or restate the calendar's standard morning open. Custom morning boundaries are
+            rejected because morning-start sessions use the local calendar date. Evening
+            overrides require an evening-start calendar or no authoritative calendar metadata.
+            If None, uses the calendar's authoritative standard open.
     """
 
     calendar: str
     timezone: str = "UTC"
     session_start_time: str | None = None  # Format: "HH:MM"
 
+    def __post_init__(self) -> None:
+        if self.session_start_time is None:
+            return
+        _validate_session_start_time(self.calendar, self.session_start_time)
+
     def get_session_start_hour(self) -> int:
         """Get session start hour (0-23)."""
         if self.session_start_time:
             parts = self.session_start_time.split(":")
             return int(parts[0])
-        # Default session starts (approximate)
-        calendar_defaults = {
-            "CME_Equity": 17,  # 5pm CT
-            "CME_Agriculture": 17,
-            "CME_Interest_Rate": 17,
-            "CBOT": 17,
-            "NYMEX": 18,
-            "COMEX": 18,
-            "NYSE": 9,  # 9:30am ET
-            "NASDAQ": 9,
-            "LSE": 8,
-            "XETRA": 9,
-        }
-        return calendar_defaults.get(self.calendar, 0)
+        return _default_session_start(self.calendar).hour
 
     def get_session_start_minute(self) -> int:
         """Get session start minute (0-59)."""
         if self.session_start_time:
             parts = self.session_start_time.split(":")
             return int(parts[1]) if len(parts) > 1 else 0
-        # NYSE/NASDAQ start at :30
-        if self.calendar in ("NYSE", "NASDAQ"):
-            return 30
-        return 0
+        return _default_session_start(self.calendar).minute
+
+    def get_session_timezone(self) -> ZoneInfo:
+        """Return the authoritative calendar timezone or configured fallback."""
+        from .calendar import get_calendar
+
+        try:
+            calendar = get_calendar(self.calendar)
+        except RuntimeError:
+            return ZoneInfo(self.timezone)
+        return ZoneInfo(str(calendar.tz))
+
+
+def _default_session_start(calendar: str) -> time:
+    from .calendar import get_standard_market_open_time
+
+    try:
+        return get_standard_market_open_time(calendar)
+    except ValueError:
+        return time.min
+
+
+def _validate_session_start_time(calendar: str | None, session_start_time: str) -> None:
+    parts = session_start_time.split(":")
+    start = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+    time(*start)
+    if calendar is None:
+        if start[0] >= 12:
+            return
+        raise ValueError("morning session_start_time requires exchange calendar metadata")
+    from .calendar import get_standard_market_open_time
+
+    try:
+        market_open = get_standard_market_open_time(calendar)
+    except ValueError:
+        if start[0] >= 12:
+            return
+        raise
+    standard_open = (market_open.hour, market_open.minute)
+    if start == standard_open or (start[0] >= 12 and market_open.hour >= 12):
+        return
+    boundary = "morning" if start[0] < 12 else "evening"
+    raise ValueError(
+        f"custom {boundary} session_start_time {session_start_time!r} is unsupported for "
+        f"calendar {calendar!r}; its standard market open is {market_open:%H:%M}"
+    )
+
+
+def session_date_for_timestamp(
+    timestamp: datetime,
+    *,
+    calendar: str | None,
+    timezone: str | None,
+    session_start_time: str | None,
+    data_frequency: Any | None,
+    timestamp_semantics: TimestampSemantics | str | None,
+) -> date:
+    """Return the exchange session date for one feed timestamp."""
+    from .calendar import get_calendar, get_calendar_sessions_by_open_date
+    from .config import DataFrequency, _to_backtest_frequency
+
+    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
+    semantics = (
+        timestamp_semantics
+        if isinstance(timestamp_semantics, TimestampSemantics)
+        else TimestampSemantics(timestamp_semantics)
+        if timestamp_semantics is not None
+        else None
+    )
+    if (
+        semantics is TimestampSemantics.SESSION_LABEL
+        or frequency is DataFrequency.DAILY
+        or (semantics is None and frequency is None)
+    ):
+        return timestamp.date()
+
+    data_timezone = ZoneInfo(timezone or "UTC")
+    exchange_timezone = (
+        ZoneInfo(str(get_calendar(calendar).tz)) if calendar is not None else data_timezone
+    )
+    event_time = (
+        timestamp.replace(tzinfo=data_timezone)
+        if timestamp.tzinfo is None
+        else timestamp.astimezone(exchange_timezone)
+    )
+    if event_time.tzinfo != exchange_timezone:
+        event_time = event_time.astimezone(exchange_timezone)
+    if calendar is not None and session_start_time is None:
+        event_time_utc = event_time.astimezone(ZoneInfo("UTC"))
+        event_date = event_time.date()
+        label_years = (
+            (event_date.year, event_date.year + 1)
+            if event_date.month == 12 and event_date.day == 31
+            else (event_date.year,)
+        )
+        sessions = (
+            session
+            for year in label_years
+            for session in get_calendar_sessions_by_open_date(calendar, year).get(event_date, ())
+            if session.market_open <= event_time_utc
+        )
+        latest = max(sessions, key=lambda session: session.market_open, default=None)
+        return latest.session_date if latest is not None else event_date
+
+    if session_start_time is not None:
+        _validate_session_start_time(calendar, session_start_time)
+    session_config = SessionConfig(
+        calendar=_normalize_session_calendar(calendar or "UTC"),
+        timezone=str(exchange_timezone),
+        session_start_time=session_start_time,
+    )
+    return assign_session_date(
+        event_time,
+        exchange_timezone,
+        session_config.get_session_start_hour(),
+        session_config.get_session_start_minute(),
+    ).date()
+
+
+def _normalize_session_calendar(calendar: str) -> str:
+    normalized = calendar.upper()
+    if normalized in {"NYSE", "XNYS", "AMEX"}:
+        return "NYSE"
+    if normalized == "NASDAQ":
+        return "NASDAQ"
+    if normalized in {"CME", "CME_EQUITY"}:
+        return "CME_Equity"
+    if normalized in {"CBOT", "NYMEX", "COMEX"}:
+        return normalized
+    return calendar
 
 
 def compute_session_pnl(
@@ -113,12 +237,19 @@ def compute_session_pnl(
 
     # Assign session dates
     session_dates = []
-    tz = ZoneInfo(session_config.timezone)
+    tz = session_config.get_session_timezone()
+    data_tz = ZoneInfo(session_config.timezone)
     session_start_hour = session_config.get_session_start_hour()
     session_start_minute = session_config.get_session_start_minute()
 
     for ts in timestamps:
-        session_date = assign_session_date(ts, tz, session_start_hour, session_start_minute)
+        session_timestamp = _timestamp_in_session_timezone(ts, data_tz, tz)
+        session_date = assign_session_date(
+            session_timestamp,
+            tz,
+            session_start_hour,
+            session_start_minute,
+        )
         session_dates.append(session_date)
 
     df = pl.DataFrame(
@@ -184,9 +315,10 @@ def assign_session_date(
 ) -> datetime:
     """Assign a timestamp to its trading session date.
 
-    For sessions that start in the evening (like CME at 5pm),
-    timestamps before the session start belong to the current day's session,
-    and timestamps after belong to the next day's session.
+    For sessions that start in the evening (like CME at 5pm), timestamps before the
+    session start belong to the current day's session, and timestamps after belong to
+    the next day's session. Morning-start sessions use the local calendar date for both
+    pre-market and regular-hours bars; their open time does not define a date boundary.
 
     Args:
         timestamp: Bar timestamp (may be tz-aware or naive)
@@ -222,14 +354,20 @@ def assign_session_date(
             # Before session start -> current calendar day's session
             session_date = ts_local.date()
     else:
-        # Regular session (starts in morning)
-        if bar_time >= session_start_time:
-            session_date = ts_local.date()
-        else:
-            # Before session start -> previous day's session
-            session_date = ts_local.date() - timedelta(days=1)
+        # Morning-start sessions use the local calendar date for regular and pre-market bars.
+        session_date = ts_local.date()
 
     return datetime(session_date.year, session_date.month, session_date.day)
+
+
+def _timestamp_in_session_timezone(
+    timestamp: datetime,
+    data_timezone: ZoneInfo,
+    session_timezone: ZoneInfo,
+) -> datetime:
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=data_timezone)
+    return timestamp.astimezone(session_timezone)
 
 
 def align_to_sessions(
@@ -247,13 +385,20 @@ def align_to_sessions(
     Returns:
         DataFrame with added 'session_date' column
     """
-    tz = ZoneInfo(session_config.timezone)
+    tz = session_config.get_session_timezone()
+    data_tz = ZoneInfo(session_config.timezone)
     session_start_hour = session_config.get_session_start_hour()
     session_start_minute = session_config.get_session_start_minute()
 
     session_dates = []
     for ts in df[timestamp_col]:
-        session_date = assign_session_date(ts, tz, session_start_hour, session_start_minute)
+        session_timestamp = _timestamp_in_session_timezone(ts, data_tz, tz)
+        session_date = assign_session_date(
+            session_timestamp,
+            tz,
+            session_start_hour,
+            session_start_minute,
+        )
         session_dates.append(session_date)
 
     return df.with_columns(pl.Series("session_date", session_dates))

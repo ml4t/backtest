@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import zipfile
 from collections.abc import Mapping
@@ -57,7 +58,7 @@ def encode_sequential_ticker(idx: int) -> str:
 def encode_hashed_ticker(project_slug: str, asset_name: str, attempt: int = 0) -> str:
     """Create a project-scoped hashed ticker namespace."""
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    digest = hashlib.sha1(f"{project_slug}|{asset_name}|{attempt}".encode()).digest()
+    digest = hashlib.sha256(f"{project_slug}|{asset_name}|{attempt}".encode()).digest()
     value = int.from_bytes(digest[:8], "big")
     chars: list[str] = []
     for _ in range(6):
@@ -197,8 +198,9 @@ def resolve_lean_command() -> list[str]:
 def make_lean_env() -> dict[str, str]:
     """Build the subprocess environment for local LEAN runs."""
     env = os.environ.copy()
-    env.setdefault("UV_CACHE_DIR", "/tmp/uv-cache")
-    env.setdefault("UV_TOOL_DIR", "/tmp/uv-tools")
+    temporary_root = Path(tempfile.gettempdir())
+    env.setdefault("UV_CACHE_DIR", str(temporary_root / "ml4t-uv-cache"))
+    env.setdefault("UV_TOOL_DIR", str(temporary_root / "ml4t-uv-tools"))
     return env
 
 
@@ -232,7 +234,7 @@ def export_lean_daily_data(
     (data_root / "factor_files").mkdir(parents=True, exist_ok=True)
     (data_root / "daily").mkdir(parents=True, exist_ok=True)
 
-    signature = hashlib.md5(json.dumps(signature_payload, sort_keys=True).encode()).hexdigest()
+    signature = hashlib.sha256(json.dumps(signature_payload, sort_keys=True).encode()).hexdigest()
     cache_hit = False
     if manifest_path.exists():
         try:
@@ -258,7 +260,9 @@ def export_lean_daily_data(
 
         lines: list[str] = []
         for ts, row in asset_df.iterrows():
-            dt = pd.Timestamp(ts)
+            if not isinstance(ts, pd.Timestamp):
+                raise TypeError(f"Expected a DatetimeIndex, got {type(ts).__name__}")
+            dt = ts
             dt = dt.tz_convert(None) if dt.tz is not None else dt
             open_px = int(round(float(row["open"]) * 10000.0))
             high_px = int(round(float(row["high"]) * 10000.0))

@@ -8,6 +8,10 @@ Every strategy subclasses `Strategy` and implements `on_data`. The broker is you
 from ml4t.backtest import Strategy
 
 class MyStrategy(Strategy):
+    def on_prepare(self, broker, config=None):
+        """Called once with resolved configuration and no future feed data. Optional."""
+        pass
+
     def on_start(self, broker):
         """Called once before the first bar. Optional.
 
@@ -33,6 +37,13 @@ class MyStrategy(Strategy):
         """
         pass
 ```
+
+The callback order is `on_start`, `on_prepare`, one `on_data` call for each accepted
+market event, and finally `on_end`. `on_prepare` receives the resolved config but no
+future feed timestamps. Use `broker.register_target_intent(...)` during `on_prepare`
+for a portfolio decision that was made before an opening auction. The
+[Execution Semantics](execution-semantics.md#causal-strategy-lifecycle) reference
+defines cutoff validation, opening fills, and position-rule activation.
 
 ### What `data` Contains
 

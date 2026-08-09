@@ -1,0 +1,90 @@
+version: 1
+library_version: 0.1.0b22
+config:
+  account:
+    allow_short_selling: false
+    allow_leverage: false
+    initial_margin: 0.5
+    long_maintenance_margin: 0.25
+    short_maintenance_margin: 0.3
+    fixed_margin_schedule: null
+    margin_pct_schedule: null
+    short_cash_policy: credit
+  execution:
+    execution_price: open
+    mark_price: price
+    execution_mode: next_bar
+  stops:
+    stop_fill_mode: stop_price
+    stop_level_basis: fill_price
+    trail_hwm_source: close
+    trail_include_entry_bar_extremes: false
+    initial_hwm_source: fill_price
+    trail_stop_timing: lagged
+  position_sizing:
+    share_type: integer
+  commission:
+    model: none
+    rate: 0.0
+    per_share: 0.0
+    per_trade: 0.0
+    minimum: 0.0
+  slippage:
+    model: none
+    rate: 0.0
+    fixed: 0.0
+    spread: 0.0
+    spread_by_asset: {}
+    spread_convention: full_spread
+    stop_rate: 0.0
+  cash:
+    initial: 100000.0
+    buffer_pct: 0.0
+  settlement:
+    delay: 0
+    reduces_buying_power: true
+  orders:
+    reject_on_insufficient_cash: true
+    skip_cash_validation: false
+    partial_fills_allowed: false
+    fill_ordering: exit_first
+    entry_order_priority: submission
+    next_bar_submission_precheck: false
+    next_bar_simple_cash_check: false
+    buying_power_reservation: false
+    next_bar_queue_shadow_validation: false
+    immediate_fill: false
+    rebalance_mode: incremental
+    rebalance_headroom_pct: 1.0
+    missing_price_policy: skip
+    late_asset_policy: allow
+    late_asset_min_bars: 1
+  calendar:
+    calendar: null
+    timezone: UTC
+    data_frequency: daily
+    enforce_sessions: false
+  feed:
+    timestamp_col: timestamp
+    entity_col: null
+    price_col: close
+    open_col: open
+    high_col: high
+    low_col: low
+    close_col: close
+    volume_col: volume
+    bid_col: null
+    ask_col: null
+    mid_col: null
+    bid_size_col: null
+    ask_size_col: null
+    calendar: null
+    timezone: UTC
+    data_frequency: daily
+    bar_type: null
+    timestamp_semantics: null
+    session_start_time: null
+  metadata: {}
+window:
+  start: '2025-01-02T16:00:00'
+  end: '2025-01-03T16:00:00'

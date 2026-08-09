@@ -12,6 +12,13 @@ import polars as pl
 from ml4t.specs.market_data import FeedSpec
 
 
+def _read_parquet(path: str) -> pl.DataFrame:
+    frame = pl.scan_parquet(path).collect()
+    if not isinstance(frame, pl.DataFrame):
+        raise TypeError(f"Expected Polars DataFrame, got {type(frame).__name__}")
+    return frame
+
+
 class _AssetsData(dict[str, dict[str, Any]]):
     """Internal per-bar payload with pre-extracted broker views."""
 
@@ -56,9 +63,9 @@ class DataFeed:
     avoiding the large memory overhead of materializing one child DataFrame per
     timestamp.
 
-    Memory Efficiency:
-        - 1M bars: ~100 MB (was ~1 GB with pre-converted dicts)
-        - 10M bars: ~1 GB (vs ~10+ GB with dicts)
+    The resolved timestamp, entity, and reference-price columns are required.
+    Open, high, low, and volume columns are optional. Missing OHLC values fall
+    back to the configured close and missing volume becomes zero.
 
     Usage:
         feed = DataFeed(prices_df=prices, signals_df=signals)
@@ -97,27 +104,36 @@ class DataFeed:
     ):
         if feed_spec is not None and contract is not None:
             raise ValueError("Pass either feed_spec or contract, not both")
+        for label, path, frame in (
+            ("prices", prices_path, prices_df),
+            ("signals", signals_path, signals_df),
+            ("context", context_path, context_df),
+        ):
+            if path is not None and frame is not None:
+                raise ValueError(f"Pass either {label}_path or {label}_df, not both")
 
         self.prices = (
             prices_df
             if prices_df is not None
-            else (pl.scan_parquet(prices_path).collect() if prices_path else None)
+            else (_read_parquet(prices_path) if prices_path else None)
         )
         self.signals = (
             signals_df
             if signals_df is not None
-            else (pl.scan_parquet(signals_path).collect() if signals_path else None)
+            else (_read_parquet(signals_path) if signals_path else None)
         )
         self.context = (
             context_df
             if context_df is not None
-            else (pl.scan_parquet(context_path).collect() if context_path else None)
+            else (_read_parquet(context_path) if context_path else None)
         )
 
         if self.prices is None:
             raise ValueError("prices_path or prices_df required")
 
         raw_spec = FeedSpec.from_any(feed_spec if feed_spec is not None else contract)
+        default_price_col = FeedSpec().price_col
+        price_col_is_explicit = price_col is not None or raw_spec.price_col != default_price_col
         self.feed_spec = raw_spec.with_overrides(
             entity_col=entity_col,
             timestamp_col=timestamp_col,
@@ -135,8 +151,25 @@ class DataFeed:
         ).resolve(self.prices.columns, self.ENTITY_COL_CANDIDATES)
         self.contract = self.feed_spec
         self._timestamp_col = self.feed_spec.timestamp_col
-        self._entity_col = self.feed_spec.entity_col
+        resolved_entity_col = self.feed_spec.entity_col
+        if not isinstance(resolved_entity_col, str):
+            raise ValueError("DataFeed requires one resolved string entity column")
+        self._entity_col = resolved_entity_col
         self._price_col = self.feed_spec.price_col
+        if self._price_col not in self.prices.columns:
+            if price_col_is_explicit:
+                raise ValueError(
+                    f"price_col={self._price_col!r} not found in price columns "
+                    f"{self.prices.columns}"
+                )
+            if self.feed_spec.close_col not in self.prices.columns:
+                raise ValueError(
+                    f"price_col={self._price_col!r} and close_col={self.feed_spec.close_col!r} "
+                    f"not found in price columns {self.prices.columns}"
+                )
+            self._price_col = self.feed_spec.close_col
+            self.feed_spec = self.feed_spec.with_overrides(price_col=self._price_col)
+            self.contract = self.feed_spec
         self._open_col = self.feed_spec.open_col
         self._high_col = self.feed_spec.high_col
         self._low_col = self.feed_spec.low_col
@@ -150,6 +183,11 @@ class DataFeed:
 
         self.prices, self._price_ranges_by_ts = self._index_by_timestamp(self.prices)
         if self.signals is not None:
+            if self._entity_col not in self.signals.columns:
+                raise ValueError(
+                    f"entity_col={self._entity_col!r} not found in signal columns "
+                    f"{self.signals.columns}"
+                )
             self.signals, self._signal_ranges_by_ts = self._index_by_timestamp(self.signals)
         else:
             self._signal_ranges_by_ts = {}

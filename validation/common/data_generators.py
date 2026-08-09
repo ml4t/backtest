@@ -119,12 +119,30 @@ def generate_stop_loss_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]:
     np.random.seed(seed)
 
     n_bars = 20
-    closes = np.array([
-        100.0, 99.0, 98.0, 97.0, 96.0,
-        94.5, 93.0, 92.0, 91.0, 90.0,
-        89.0, 88.0, 87.0, 86.0, 85.0,
-        84.0, 83.0, 82.0, 81.0, 80.0,
-    ])
+    closes = np.array(
+        [
+            100.0,
+            99.0,
+            98.0,
+            97.0,
+            96.0,
+            94.5,
+            93.0,
+            92.0,
+            91.0,
+            90.0,
+            89.0,
+            88.0,
+            87.0,
+            86.0,
+            85.0,
+            84.0,
+            83.0,
+            82.0,
+            81.0,
+            80.0,
+        ]
+    )
 
     dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
     opens = closes + 0.5
@@ -156,12 +174,30 @@ def generate_take_profit_data(seed: int = 42) -> tuple[pd.DataFrame, np.ndarray]
     np.random.seed(seed)
 
     n_bars = 20
-    closes = np.array([
-        100.0, 101.0, 102.5, 104.0, 105.5,
-        107.0, 111.0, 112.0, 113.0, 114.0,
-        115.0, 116.0, 117.0, 118.0, 119.0,
-        120.0, 121.0, 122.0, 123.0, 124.0,
-    ])
+    closes = np.array(
+        [
+            100.0,
+            101.0,
+            102.5,
+            104.0,
+            105.5,
+            107.0,
+            111.0,
+            112.0,
+            113.0,
+            114.0,
+            115.0,
+            116.0,
+            117.0,
+            118.0,
+            119.0,
+            120.0,
+            121.0,
+            122.0,
+            123.0,
+            124.0,
+        ]
+    )
 
     dates = pd.date_range(start="2020-01-02", periods=n_bars, freq="D")
     opens = closes - 0.5

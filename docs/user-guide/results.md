@@ -4,6 +4,10 @@
 portfolio state, and computed metrics. Everything is accessible as Python objects,
 Polars DataFrames, or Parquet files.
 
+The `trades`, `fills`, `equity_curve`, `portfolio_state`, and `rejected_orders` lists are
+snapshots: adding to or removing from engine or broker state after `run()` does not change a
+completed result.
+
 This applies to both classic OHLCV backtests and quote-aware backtests. When you run
 with bid/ask-aware execution or marking, the result surface preserves the quote
 context used to produce fills and trade summaries.

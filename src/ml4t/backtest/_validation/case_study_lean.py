@@ -125,14 +125,16 @@ def load_workspace(workspace_dir: Path, data_daily: Path) -> dict:
         if ln.strip()
     }
 
-    start, end = pd.Timestamp(params["start"]), pd.Timestamp(params["end"])
+    start = pd.Timestamp(params["start"]).to_pydatetime()
+    end = pd.Timestamp(params["end"]).to_pydatetime()
     frames = []
     for asset, ticker in asset_to_ticker.items():
         df = _decode_lean_zip(data_daily / f"{ticker.lower()}.zip")
         df["symbol"] = asset
         frames.append(df)
+    prices_pd = pd.concat(frames, ignore_index=True)
     prices = (
-        pl.from_pandas(pd.concat(frames, ignore_index=True))
+        pl.DataFrame({str(name): series.to_list() for name, series in prices_pd.items()})
         .select("symbol", "timestamp", "open", "high", "low", "close", "volume")
         .filter((pl.col("timestamp") >= start) & (pl.col("timestamp") <= end))
         .sort("timestamp", "symbol")
@@ -230,7 +232,8 @@ def run_ml4t_lean(workspace_dir: Path, data_daily: Path) -> dict:
         wd["asset_order"], wd["targets"], wd["rebalance_dates"], last_active
     )
     result = Engine.from_config(feed, strat, config=cfg).run()
-    fills = result.to_fills_dataframe().to_pandas().rename(columns={"symbol": "asset"})
+    fills_pl = result.to_fills_dataframe()
+    fills = pd.DataFrame(fills_pl.to_dict(as_series=False)).rename(columns={"symbol": "asset"})
     return {"final_value": float(result["final_value"]), "fills": _surface(fills)}
 
 

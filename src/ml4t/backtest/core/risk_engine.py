@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from ml4t.specs import BarPathPolicy
 
@@ -12,27 +13,42 @@ from ..preopen import AmbiguousBarPathError
 from ..risk.types import ActionType, PositionAction, PositionState
 from ..types import OrderSide, OrderType
 from .shared import SubmitOrderOptions, reason_to_exit_reason
+from .state import MarketState, RiskState
+
+if TYPE_CHECKING:
+    from ..accounting import AccountState
+    from ..broker import Broker
+    from .fill_engine import FillEngine
 
 
 class RiskEngine:
     """Evaluates position rules and manages deferred exits."""
 
-    def __init__(self, broker):
+    def __init__(
+        self,
+        broker: Broker,
+        *,
+        account: AccountState,
+        market: MarketState,
+        risk: RiskState,
+        fill_engine: FillEngine,
+    ) -> None:
         self.broker = broker
+        self.account = account
+        self.market = market
+        self.risk = risk
+        self.fill_engine = fill_engine
 
-    def evaluate_position_rules(self, *, skip_assets: set[str] | None = None):
+    def evaluate_position_rules(self):
         broker = self.broker
         exit_orders = []
-        skipped = skip_assets or set()
 
-        for asset, pos in list(broker.positions.items()):
-            if asset in skipped:
-                continue
+        for asset, pos in list(self.account.positions.items()):
             rules = self._get_position_rules(asset)
             if rules is None:
                 continue
 
-            price = broker._current_prices.get(asset)
+            price = self.market.prices.get(asset)
             if price is None:
                 continue
 
@@ -41,7 +57,7 @@ class RiskEngine:
 
             if action.action == ActionType.EXIT_FULL:
                 if action.defer_fill:
-                    broker._pending_exits[asset] = {
+                    self.risk.pending_exits[asset] = {
                         "reason": action.reason,
                         "pct": 1.0,
                         "quantity": pos.quantity,
@@ -61,13 +77,13 @@ class RiskEngine:
                     )
                     if order:
                         exit_orders.append(order)
-                        broker._stop_exits_this_bar.add(asset)
+                        self.risk.stop_exits_this_bar.add(asset)
 
             elif action.action == ActionType.EXIT_PARTIAL:
                 if action.defer_fill:
                     exit_qty = abs(pos.quantity) * action.pct
                     if exit_qty > 0:
-                        broker._pending_exits[asset] = {
+                        self.risk.pending_exits[asset] = {
                             "reason": action.reason,
                             "pct": action.pct,
                             "quantity": exit_qty if pos.quantity > 0 else -exit_qty,
@@ -96,7 +112,7 @@ class RiskEngine:
     def _evaluate_rules(self, rules, state: PositionState, position) -> PositionAction:
         activation_bar = position.context.get("rule_activation_bar_index")
         policy = position.context.get("bar_path_policy")
-        if activation_bar != self.broker._bar_index or policy is None:
+        if activation_bar != self.market.bar_index or policy is None:
             return rules.evaluate(state)
         policy = policy if isinstance(policy, BarPathPolicy) else BarPathPolicy(policy)
         if policy is BarPathPolicy.OPEN_HIGH_LOW_CLOSE:
@@ -128,20 +144,27 @@ class RiskEngine:
         previous = state.bar_open
         high_water_mark = state.high_water_mark
         low_water_mark = state.low_water_mark
+        max_favorable_excursion = state.max_favorable_excursion
+        max_adverse_excursion = state.max_adverse_excursion
         for point in points:
             context = dict(state.context)
             context["trail_stop_timing"] = TrailStopTiming.LAGGED
             raw_return = (point - state.entry_price) / state.entry_price
             unrealized_return = raw_return if state.is_long else -raw_return
+            max_favorable_excursion = max(max_favorable_excursion, unrealized_return)
+            max_adverse_excursion = min(max_adverse_excursion, unrealized_return)
             phase_state = replace(
                 state,
                 current_price=point,
                 unrealized_pnl=(point - state.entry_price)
                 * state.quantity
+                * state.multiplier
                 * (1 if state.is_long else -1),
                 unrealized_return=unrealized_return,
                 high_water_mark=high_water_mark,
                 low_water_mark=low_water_mark,
+                max_favorable_excursion=max_favorable_excursion,
+                max_adverse_excursion=max_adverse_excursion,
                 bar_open=previous,
                 bar_high=max(previous, point),
                 bar_low=min(previous, point),
@@ -172,13 +195,11 @@ class RiskEngine:
         return high_price < low_price if state.is_long else high_price > low_price
 
     def _get_position_rules(self, asset: str):
-        broker = self.broker
-        if asset in broker._position_rules_by_asset:
-            return broker._position_rules_by_asset[asset]
-        return broker._position_rules
+        if asset in self.risk.position_rules_by_asset:
+            return self.risk.position_rules_by_asset[asset]
+        return self.risk.position_rules
 
     def _build_position_state(self, pos, current_price: float):
-        broker = self.broker
         asset = pos.asset
         context = pos.context
         initial_qty = pos.initial_quantity if pos.initial_quantity is not None else pos.quantity
@@ -199,34 +220,35 @@ class RiskEngine:
             low_water_mark=pos.low_water_mark
             if pos.low_water_mark is not None
             else pos.entry_price,
-            bar_open=broker._current_opens.get(asset),
-            bar_high=broker._current_highs.get(asset),
-            bar_low=broker._current_lows.get(asset),
+            bar_open=self.market.opens.get(asset),
+            bar_high=self.market.highs.get(asset),
+            bar_low=self.market.lows.get(asset),
             max_favorable_excursion=pos.max_favorable_excursion,
             max_adverse_excursion=pos.max_adverse_excursion,
             entry_time=pos.entry_time,
-            current_time=broker._current_time,
+            current_time=self.market.time,
             context=context,
+            multiplier=pos.multiplier,
         )
 
     def process_pending_exits(self):
         broker = self.broker
         exit_orders = []
 
-        for asset, pending in list(broker._pending_exits.items()):
-            pos = broker.positions.get(asset)
+        for asset, pending in list(self.risk.pending_exits.items()):
+            pos = self.account.positions.get(asset)
             if pos is None:
-                del broker._pending_exits[asset]
+                del self.risk.pending_exits[asset]
                 continue
 
-            open_price = broker._current_opens.get(asset)
+            open_price = self.market.opens.get(asset)
             if open_price is None:
                 continue
 
             stored_fill_price = pending.get("fill_price")
             if broker.stop_fill_mode.value == "stop_price" and stored_fill_price is not None:
                 exit_side = OrderSide.SELL if pending["quantity"] > 0 else OrderSide.BUY
-                gap_price = broker._fill_engine.check_gap_through(
+                gap_price = self.fill_engine.check_gap_through(
                     exit_side, stored_fill_price, open_price
                 )
                 fill_price = gap_price if gap_price is not None else stored_fill_price
@@ -248,6 +270,6 @@ class RiskEngine:
             if order:
                 exit_orders.append(order)
 
-            del broker._pending_exits[asset]
+            del self.risk.pending_exits[asset]
 
         return exit_orders

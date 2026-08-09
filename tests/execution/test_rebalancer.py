@@ -1,6 +1,7 @@
 """Tests for portfolio rebalancing utilities."""
 
-from datetime import datetime
+import warnings
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -8,9 +9,9 @@ from ml4t.backtest import (
     Broker,
     OrderSide,
 )
-from ml4t.backtest.config import RebalanceMode
+from ml4t.backtest.config import ExecutionPrice, RebalanceMode
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
-from ml4t.backtest.execution.schedule import RebalanceSchedule
+from ml4t.backtest.execution.schedule import RebalanceSchedule, resolve_rebalance_timestamps
 from ml4t.backtest.models import NoCommission, NoSlippage
 
 
@@ -462,12 +463,521 @@ class TestTargetWeightExecutorScheduling:
             config=RebalanceConfig(
                 schedule=RebalanceSchedule.weekly(),
                 calendar="NYSE",
+                data_frequency="daily",
             )
         )
 
         resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
 
         assert resolved == [datetime(2024, 1, 5), datetime(2024, 1, 12)]
+
+    def test_online_month_end_rejects_a_missing_interior_period_end(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.month_end(),
+                calendar="NYSE",
+                data_frequency="daily",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 30))
+        with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
+            executor.should_rebalance(datetime(2024, 2, 1))
+
+    def test_matched_week_end_survives_an_explicit_non_session_close(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 5, 16, 0),
+            is_session_close=True,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 6, 12, 0),
+            is_session_close=True,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 8, 16, 0),
+            is_session_close=True,
+        )
+
+    def test_missing_week_end_raises_after_an_earlier_week_was_matched(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 5, 16, 0),
+            is_session_close=True,
+        )
+        with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-12"):
+            executor.should_rebalance(
+                datetime(2024, 1, 22, 16, 0),
+                is_session_close=True,
+            )
+
+    def test_batch_month_end_rejects_a_missing_interior_period_end(self):
+        with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
+            resolve_rebalance_timestamps(
+                [datetime(2024, 1, 30), datetime(2024, 2, 1)],
+                RebalanceSchedule.month_end(),
+                calendar="NYSE",
+                data_frequency="daily",
+            )
+
+    def test_incomplete_final_month_does_not_move_to_an_earlier_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.month_end(),
+                calendar="NYSE",
+                data_frequency="daily",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 30))
+        executor.validate_completed_run()
+
+    def test_intraday_weekly_schedule_fires_once_at_session_close(self):
+        timestamps = [
+            datetime(2024, 1, 5, 20, 58, tzinfo=UTC),
+            datetime(2024, 1, 5, 20, 59, tzinfo=UTC),
+            datetime(2024, 1, 5, 21, 0, tzinfo=UTC),
+        ]
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="UTC",
+                data_frequency="1m",
+            )
+        )
+
+        resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
+
+        assert resolved == [datetime(2024, 1, 5, 21, 0, tzinfo=UTC)]
+        executor.validate_completed_run()
+
+    def test_explicit_session_close_signal_supports_calendar_free_intraday_data(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                data_frequency="1m",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 5, 15, 59), is_session_close=False)
+        assert executor.should_rebalance(datetime(2024, 1, 5, 16, 0), is_session_close=True)
+
+    def test_calendar_free_morning_boundary_has_a_concise_configuration_error(self):
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                session_start_time="09:30",
+                data_frequency="1m",
+            )
+
+    def test_intraday_schedule_raises_after_a_required_close_never_matches(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 16, 15))
+        with pytest.raises(ValueError, match="resolved no session close"):
+            executor.should_rebalance(datetime(2024, 1, 3, 9, 30))
+
+    def test_intraday_schedule_validates_the_final_observed_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 16, 15))
+        with pytest.raises(ValueError, match="resolved no session closes"):
+            executor.validate_completed_run()
+
+    def test_period_schedule_requires_calendar_when_executor_is_constructed(self):
+        with pytest.raises(ValueError, match="require calendar metadata"):
+            TargetWeightExecutor(config=RebalanceConfig(schedule=RebalanceSchedule.weekly()))
+
+    def test_mutated_schedule_configuration_requires_explicit_reset(self):
+        config = RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            data_frequency="daily",
+        )
+        executor = TargetWeightExecutor(config=config)
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+
+        config.schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 4)])
+
+        with pytest.raises(ValueError, match=r"RebalanceConfig changed.*reset"):
+            executor.should_rebalance(datetime(2024, 1, 3))
+        executor.reset()
+        assert not executor.should_rebalance(datetime(2024, 1, 3))
+        assert executor.should_rebalance(datetime(2024, 1, 4))
+
+    def test_reused_executor_requires_reset_before_session_dates_move_backward(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                data_frequency="daily",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+        assert not executor.should_rebalance(datetime(2024, 1, 3))
+        with pytest.raises(ValueError, match=r"session date moved backward.*reset"):
+            executor.should_rebalance(datetime(2024, 1, 2))
+        executor.reset()
+        assert executor.should_rebalance(datetime(2024, 1, 2))
+
+    def test_validate_completed_run_uses_the_evaluator_that_observed_the_run(self):
+        config = RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            calendar="NYSE",
+            timezone="America/New_York",
+            data_frequency="15m",
+            timestamp_semantics="bar_close",
+        )
+        executor = TargetWeightExecutor(config=config)
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 16, 15))
+        config.data_frequency = "daily"
+
+        with pytest.raises(ValueError, match="resolved no session closes"):
+            executor.validate_completed_run()
+
+    def test_validate_completed_run_accepts_config_mutation_before_observation(self):
+        config = RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            data_frequency="daily",
+        )
+        executor = TargetWeightExecutor(config=config)
+        config.data_frequency = "15m"
+
+        executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_matches_the_same_instant_across_timezones(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_rejects_an_unmatched_observed_date(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 20, 59, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 1, tzinfo=UTC))
+        with pytest.raises(
+            ValueError,
+            match=r"2024-01-02T21:00:00\+00:00.*nearest observed instant is "
+            r"2024-01-02T20:59:00\+00:00",
+        ):
+            executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_outside_the_observed_window_is_ignored(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 3, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_reports_a_later_miss_after_an_earlier_match(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps(
+                    [datetime(2024, 1, 2, 16, 0), datetime(2024, 1, 2, 17, 0)]
+                ),
+                timezone="America/New_York",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 59, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 22, 1, tzinfo=UTC))
+        with pytest.raises(
+            ValueError,
+            match=r"2024-01-02T22:00:00\+00:00.*nearest observed instant is "
+            r"2024-01-02T21:59:00\+00:00",
+        ):
+            executor.validate_completed_run()
+
+    def test_online_explicit_matching_traverses_only_reached_schedule_instants(self):
+        start = datetime(2024, 1, 2, 16, 0)
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps(
+                    [start + timedelta(hours=index) for index in range(2_500)]
+                ),
+                timezone="America/New_York",
+            )
+        )
+        evaluator = executor._schedule_evaluator
+        assert evaluator is not None
+
+        class CountingSequence:
+            def __init__(self, values):
+                self.values = values
+                self.accesses = 0
+
+            def __len__(self):
+                return len(self.values)
+
+            def __getitem__(self, index):
+                self.accesses += 1
+                return self.values[index]
+
+        instants = CountingSequence(evaluator._explicit_sorted_instants)
+        evaluator._explicit_sorted_instants = instants
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 20, 0, tzinfo=UTC))
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 30, tzinfo=UTC))
+
+        assert evaluator._explicit_cursor == 1
+        assert instants.accesses <= 6
+
+    def test_online_explicit_timestamp_rejects_backward_events_with_iso_instants(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        with pytest.raises(
+            ValueError,
+            match=r"moved backward from 2024-01-02T21:00:00\+00:00 to "
+            r"2024-01-02T20:00:00\+00:00.*America/New_York",
+        ):
+            executor.should_rebalance(datetime(2024, 1, 2, 20, 0, tzinfo=UTC))
+
+    def test_nyse_premarket_bar_does_not_create_a_phantom_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 9, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 9, 30))
+        assert executor.should_rebalance(datetime(2024, 1, 2, 16, 0))
+        executor.validate_completed_run()
+
+    def test_incomplete_final_session_does_not_fail_validation(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 12, 0))
+        executor.validate_completed_run()
+
+    def test_exchange_holiday_is_not_counted_as_a_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 12, 16, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 15, 16, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 16, 16, 0))
+        assert executor.should_rebalance(datetime(2024, 1, 17, 16, 0))
+        executor.validate_completed_run()
+
+    def test_truncated_interior_session_is_an_alignment_error(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 16, 0))
+        assert not executor.should_rebalance(datetime(2024, 1, 3, 15, 45))
+        with pytest.raises(ValueError, match="required session 2024-01-03"):
+            executor.should_rebalance(datetime(2024, 1, 4, 9, 30))
+
+    @pytest.mark.parametrize(
+        "schedule",
+        [
+            RebalanceSchedule.every_bar(),
+            RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 15, 16, 0)]),
+        ],
+    )
+    def test_non_session_dates_do_not_filter_non_session_cadences(
+        self, schedule: RebalanceSchedule
+    ):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=schedule,
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 15, 16, 0))
+        executor.validate_completed_run()
+
+    def test_calendar_with_no_matching_sessions_fails_final_validation(self):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 13, 12, 0))
+        with pytest.raises(ValueError, match="observed no exchange sessions"):
+            executor.validate_completed_run()
+
+    def test_explicit_close_signal_overrides_non_session_calendar_inference(self):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 13, 12, 0),
+            is_session_close=True,
+        )
+        executor.validate_completed_run()
+
+    def test_explicit_non_close_signal_does_not_count_a_holiday_session(self):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 12, 16, 0),
+            is_session_close=True,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 15, 12, 0),
+            is_session_close=False,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 16, 16, 0),
+            is_session_close=True,
+        )
+        assert executor.should_rebalance(
+            datetime(2024, 1, 17, 16, 0),
+            is_session_close=True,
+        )
+        executor.validate_completed_run()
+
+    def test_midnight_daily_labels_do_not_warn_without_optional_metadata(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(schedule=RebalanceSchedule.every_session())
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert executor.should_rebalance(datetime(2024, 1, 2))
+
+    def test_fixed_session_counter_uses_cme_session_date_across_midnight(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="CME_Equity",
+                timezone="America/Chicago",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 7, 18, 0))
+        assert executor.should_rebalance(datetime(2024, 1, 8, 16, 0))
+
+    def test_fixed_session_counter_converts_data_timezone_to_exchange_timezone(self):
+        timestamps = [
+            datetime(2024, 1, 7, 23, 0),
+            datetime(2024, 1, 8, 22, 0),
+            datetime(2024, 1, 8, 23, 0),
+            datetime(2024, 1, 9, 22, 0),
+            datetime(2024, 1, 9, 23, 0),
+            datetime(2024, 1, 10, 22, 0),
+        ]
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="CME_Equity",
+                timezone="UTC",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        resolved = [timestamp for timestamp in timestamps if executor.should_rebalance(timestamp)]
+
+        assert resolved == [datetime(2024, 1, 8, 22, 0), datetime(2024, 1, 10, 22, 0)]
 
     def test_execute_requires_timestamp_when_schedule_is_configured(self, broker, sample_data):
         executor = TargetWeightExecutor(
@@ -772,6 +1282,55 @@ class TestTargetWeightExecutorEdgeCases:
         orders = executor.execute({"AAPL": 0.15}, {"AAPL": {"close": None}}, broker)
 
         assert orders == []
+
+    def test_sparse_quote_mark_uses_last_reference_price_for_position_weight(self):
+        broker = Broker(
+            initial_cash=100_000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            mark_price=ExecutionPrice.QUOTE_SIDE,
+        )
+        broker._update_time(
+            datetime(2024, 1, 1, 9, 30),
+            {"AAPL": 100.0},
+            {"AAPL": 100.0},
+            {"AAPL": 101.0},
+            {"AAPL": 99.0},
+            closes={"AAPL": 100.0},
+            volumes={"AAPL": 1_000_000.0},
+            bids={"AAPL": 99.0},
+            asks={"AAPL": 101.0},
+            mids={"AAPL": 100.0},
+            bid_sizes={"AAPL": 1_000.0},
+            ask_sizes={"AAPL": 1_000.0},
+            signals={},
+        )
+        broker.submit_order("AAPL", 100, OrderSide.BUY)
+        broker._process_orders()
+        broker.mark_account_positions()
+        position = broker.get_position("AAPL")
+        assert position is not None
+        assert position.current_price == 99.0
+
+        broker._update_time(
+            datetime(2024, 1, 2, 9, 30),
+            {},
+            {},
+            {},
+            {},
+            closes={},
+            volumes={},
+            bids={},
+            asks={},
+            mids={},
+            bid_sizes={},
+            ask_sizes={},
+            signals={},
+        )
+
+        price = TargetWeightExecutor()._get_position_price("AAPL", position, {}, broker)
+
+        assert price == 100.0
 
     def test_execute_effective_weights_handles_null_close_for_existing_positions(self, broker):
         """Pending-aware rebalancing should also tolerate null closes on held positions."""

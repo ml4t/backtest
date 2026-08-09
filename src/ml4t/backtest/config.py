@@ -618,7 +618,7 @@ class BacktestConfig:
         if self.settlement_delay < 0 or self.settlement_delay > 5:
             issues.append(
                 f"settlement_delay ({self.settlement_delay}) should be 0-5. "
-                "Common values: 0 (instant), 1 (T+1), 2 (T+2 US equities)."
+                "Values count processed bars: 0 is instant, 1 delays one bar."
             )
 
         if not 0.0 < self.rebalance_headroom_pct <= 1.0:
@@ -753,6 +753,10 @@ class BacktestConfig:
     preset_name: str | None = None  # Name of preset this was loaded from
     feed_spec: FeedSpec | None = field(default=None, repr=False, compare=False)
     metadata: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    # === Result Evidence ===
+    retain_intent_history: bool = False
+    retain_lifecycle_history: bool = False
     _explicit_timezone: bool = field(default=False, init=False, repr=False, compare=False)
     _explicit_data_frequency: bool = field(default=False, init=False, repr=False, compare=False)
 
@@ -785,6 +789,14 @@ class BacktestConfig:
         if not self._explicit_data_frequency and spec_frequency is not None:
             self.data_frequency = spec_frequency
 
+        if self.feed_spec.session_start_time is not None:
+            from .sessions import _validate_session_start_time
+
+            _validate_session_start_time(
+                self.calendar or self.feed_spec.calendar,
+                self.feed_spec.session_start_time,
+            )
+
     @property
     def resolved_feed_spec(self) -> FeedSpec:
         """Effective feed metadata after applying runtime config precedence."""
@@ -815,7 +827,10 @@ class BacktestConfig:
 
     @property
     def resolved_timestamp_semantics(self) -> TimestampSemantics | None:
-        return self.resolved_feed_spec.timestamp_semantics
+        semantics = self.resolved_feed_spec.timestamp_semantics
+        if semantics is None or isinstance(semantics, TimestampSemantics):
+            return semantics
+        return TimestampSemantics(semantics)
 
     def merge_feed_spec(self, feed_spec: FeedSpec | Any | None) -> BacktestConfig:
         """Fill missing runtime config from feed metadata without mutating user config."""
@@ -927,6 +942,10 @@ class BacktestConfig:
                 "enforce_sessions": self.enforce_sessions,
             },
             "feed": _feed_spec_to_dict(self.resolved_feed_spec),
+            "result": {
+                "retain_intent_history": self.retain_intent_history,
+                "retain_lifecycle_history": self.retain_lifecycle_history,
+            },
             "metadata": serialize_artifact_value(self.metadata),
         }
 
@@ -957,6 +976,7 @@ class BacktestConfig:
                 "orders",
                 "calendar",
                 "feed",
+                "result",
                 "metadata",
             }
             unknown_sections = set(data) - allowed_sections
@@ -1040,6 +1060,7 @@ class BacktestConfig:
                     "timestamp_semantics",
                     "session_start_time",
                 },
+                "result": {"retain_intent_history", "retain_lifecycle_history"},
             }
             for section, cfg in data.items():
                 if section == "metadata":
@@ -1067,6 +1088,7 @@ class BacktestConfig:
         order_cfg = data.get("orders", {})
         cal_cfg = data.get("calendar", {})
         feed_cfg = data.get("feed", {})
+        result_cfg = data.get("result", {})
         metadata = data.get("metadata", {})
 
         if metadata is None:
@@ -1168,6 +1190,8 @@ class BacktestConfig:
             # Metadata
             preset_name=preset_name,
             feed_spec=FeedSpec.from_any(feed_cfg) if feed_cfg else None,
+            retain_intent_history=result_cfg.get("retain_intent_history", False),
+            retain_lifecycle_history=result_cfg.get("retain_lifecycle_history", False),
             metadata=dict(metadata),
         )
 

@@ -1,10 +1,13 @@
 name: CI
 
 on:
+  workflow_call:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+
+permissions:
+  contents: read
 
 env:
   PYTHON_VERSION: "3.12"
@@ -15,10 +18,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
@@ -26,25 +29,46 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --locked
+
+      - name: Prove lint failures do not mutate files
+        run: |
+          violation="$RUNNER_TEMP/ruff-violation.py"
+          printf 'import os\n' > "$violation"
+          before="$(sha256sum "$violation")"
+          if uv run ruff check --no-fix "$violation"; then
+            echo "Ruff accepted an intentional lint violation" >&2
+            exit 1
+          fi
+          after="$(sha256sum "$violation")"
+          test "$before" = "$after"
 
       - name: Run ruff check
-        run: uv run ruff check src/ tests/
+        run: xargs uv run ruff check --no-fix src/ tests/ < validation/release_checks.txt
 
       - name: Run ruff format check
-        run: uv run ruff format --check src/ tests/
+        run: xargs uv run ruff format --check src/ tests/ < validation/release_checks.txt
 
       - name: Verify parity claims match retained evidence
         run: uv run python validation/generate_parity_claims.py --check
+
+      - name: Verify generated release history
+        run: uv run python validation/generate_changelog.py --check
+
+      - name: Verify the stable compatibility snapshot
+        run: uv run python validation/generate_compatibility_snapshot.py
+
+      - name: Verify the committed checkout is unchanged
+        run: git diff --exit-code
 
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
@@ -52,50 +76,112 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --locked
 
       - name: Run ty check
-        run: uv run ty check
+        run: xargs uv run ty check src/ < validation/release_checks.txt
 
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+      - name: Build the wheel for consumer type checking
+        run: uv build --wheel
+
+      - name: Type-check a public API consumer against the wheel
+        run: |
+          cp tests/typing/public_api_consumer.py "$RUNNER_TEMP/public_api_consumer.py"
+          cd "$RUNNER_TEMP"
+          uvx --python "${{ env.PYTHON_VERSION }}" --from ty \
+            --with "$GITHUB_WORKSPACE"/dist/*.whl \
+            ty check public_api_consumer.py
+
+  compatibility:
+    name: Compatibility
+    uses: ./.github/workflows/compatibility.yml
+
+  security:
+    name: Security
+    uses: ./.github/workflows/security.yml
+
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13", "3.14"]
-
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --locked
 
-      - name: Run tests
-        run: uv run pytest tests/ -v --tb=short -x --no-cov -m "not benchmark"
+      - name: Run branch coverage suite
+        run: >-
+          uv run pytest tests/ -q -m "not benchmark"
+          --cov-branch --cov-report=term --cov-report=json:coverage.json
+
+      - name: Enforce global and critical-module coverage
+        run: uv run python validation/check_coverage.py coverage.json
+
+      - name: Retain coverage evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: coverage.json
+          if-no-files-found: error
+
+  runtime:
+    name: Runtime Regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev --locked
 
       - name: Run runtime regression benchmark
+        env:
+          ML4T_PERFORMANCE_EVIDENCE: performance-evidence.json
         run: >-
           uv run pytest
           tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_runtime_vs_legacy_baseline
           -v --tb=short --no-cov
 
+      - name: Run stable-release performance baselines
+        run: >-
+          uv run python validation/performance_baseline.py
+          --manifest validation/performance_baselines.json
+          --output release-performance-evidence.json
+          --samples 3
+
+      - name: Retain performance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-evidence
+          path: |
+            performance-evidence.json
+            release-performance-evidence.json
+          if-no-files-found: error
+
   contracts:
     name: Cross-Engine Contracts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
@@ -105,22 +191,68 @@ jobs:
       - name: Install dependencies (with comparison frameworks)
         run: uv sync --dev --extra comparison
 
-      - name: Run cross-engine contract test (scenario 01)
+      - name: Run cross-engine contract tests
         env:
           ML4T_COMPARISON_INPROC: "1"
-        run: uv run pytest tests/contracts/test_cross_engine_contracts.py -v --tb=short --no-cov
+        run: >-
+          uv run pytest tests/contracts/test_cross_engine_contracts.py -v --tb=short --no-cov
+          --junitxml=parity-contracts.xml
+
+      - name: Retain cross-engine parity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: parity-contracts
+          path: parity-contracts.xml
+          if-no-files-found: error
+
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install documentation dependencies
+        run: uv sync --dev --extra docs --locked
+
+      - name: Build documentation with strict validation
+        run: uv run mkdocs build --strict
+
+      - name: Build candidate wheel for documentation examples
+        run: uv build --wheel --out-dir "$RUNNER_TEMP/docs-wheel"
+
+      - name: Install candidate wheel in an isolated environment
+        run: |
+          uv venv "$RUNNER_TEMP/docs-venv"
+          uv pip install \
+            --python "$RUNNER_TEMP/docs-venv/bin/python" \
+            "$RUNNER_TEMP"/docs-wheel/*.whl
+
+      - name: Execute selected documentation examples against the wheel
+        run: >-
+          "$RUNNER_TEMP/docs-venv/bin/python"
+          validation/check_documentation_examples.py
 
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, contracts]
+    needs:
+      [lint, typecheck, compatibility, security, coverage, runtime, contracts, documentation]
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
@@ -130,8 +262,49 @@ jobs:
       - name: Build package
         run: uv build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7.0.1
+      - name: Rebuild package for reproducibility
+        run: uv build --out-dir dist-rebuild
+
+      - name: Validate distribution contents and reproducibility
+        run: uv run python validation/check_artifacts.py dist --compare dist-rebuild
+
+      - name: Validate package metadata and long description
+        run: uvx twine check dist/*
+
+      - name: Verify source provenance
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+
+      - name: Create commit-bound release candidate
+        run: |
+          mkdir -p release-candidate/dist
+          cp dist/* release-candidate/dist/
+          uv run python validation/release_candidate.py create \
+            --dist release-candidate/dist \
+            --commit "$GITHUB_SHA" \
+            --repository "$GITHUB_REPOSITORY" \
+            --gate compatibility=${{ needs.compatibility.result }} \
+            --gate correctness=${{ needs.coverage.result }} \
+            --gate coverage=${{ needs.coverage.result }} \
+            --gate documentation=${{ needs.documentation.result }} \
+            --gate lint=${{ needs.lint.result }} \
+            --gate packaging=success \
+            --gate parity=${{ needs.contracts.result }} \
+            --gate performance=${{ needs.runtime.result }} \
+            --gate security=${{ needs.security.result }} \
+            --gate typecheck=${{ needs.typecheck.result }} \
+            --output release-candidate/release-candidate.json
+          uv run python validation/release_candidate.py verify \
+            --dist release-candidate/dist \
+            --manifest release-candidate/release-candidate.json \
+            --expected-commit "$GITHUB_SHA" \
+            --expected-repository "$GITHUB_REPOSITORY"
+
+      - name: Upload exact release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: dist
-          path: dist/
+          name: release-candidate-${{ github.sha }}
+          path: release-candidate/
+          if-no-files-found: error
+          retention-days: 90

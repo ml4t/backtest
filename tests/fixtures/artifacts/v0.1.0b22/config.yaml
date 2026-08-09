@@ -1,0 +1,84 @@
+account:
+  allow_leverage: false
+  allow_short_selling: false
+  fixed_margin_schedule: null
+  initial_margin: 0.5
+  long_maintenance_margin: 0.25
+  margin_pct_schedule: null
+  short_cash_policy: credit
+  short_maintenance_margin: 0.3
+calendar:
+  calendar: null
+  data_frequency: daily
+  enforce_sessions: false
+  timezone: UTC
+cash:
+  buffer_pct: 0.0
+  initial: 100000.0
+commission:
+  minimum: 0.0
+  model: none
+  per_share: 0.0
+  per_trade: 0.0
+  rate: 0.0
+execution:
+  execution_mode: next_bar
+  execution_price: open
+  mark_price: price
+feed:
+  ask_col: null
+  ask_size_col: null
+  bar_type: null
+  bid_col: null
+  bid_size_col: null
+  calendar: null
+  close_col: close
+  data_frequency: daily
+  entity_col: null
+  high_col: high
+  low_col: low
+  mid_col: null
+  open_col: open
+  price_col: close
+  session_start_time: null
+  timestamp_col: timestamp
+  timestamp_semantics: null
+  timezone: UTC
+  volume_col: volume
+metadata: {}
+orders:
+  buying_power_reservation: false
+  entry_order_priority: submission
+  fill_ordering: exit_first
+  immediate_fill: false
+  late_asset_min_bars: 1
+  late_asset_policy: allow
+  missing_price_policy: skip
+  next_bar_queue_shadow_validation: false
+  next_bar_simple_cash_check: false
+  next_bar_submission_precheck: false
+  partial_fills_allowed: false
+  rebalance_headroom_pct: 1.0
+  rebalance_mode: incremental
+  reject_on_insufficient_cash: true
+  skip_cash_validation: false
+position_sizing:
+  share_type: integer
+settlement:
+  delay: 0
+  reduces_buying_power: true
+slippage:
+  fixed: 0.0
+  model: none
+  rate: 0.0
+  spread: 0.0
+  spread_by_asset: {}
+  spread_convention: full_spread
+  stop_rate: 0.0
+stops:
+  initial_hwm_source: fill_price
+  stop_fill_mode: stop_price
+  stop_level_basis: fill_price
+  trail_hwm_source: close
+  trail_include_entry_bar_extremes: false
+  trail_stop_timing: lagged

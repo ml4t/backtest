@@ -456,6 +456,49 @@ class TestSessionBoundaryDetection:
         assert stats.total_trades == 1
         assert stats.total_realized_pnl == 100.0
 
+    def test_session_boundary_reset_uses_the_calendar_timezone(self, broker):
+        broker.set_session_config(SessionConfig(calendar="NYMEX", timezone="America/New_York"))
+        stats = broker.get_asset_stats("BTC")
+        stats.record_pnl(100.0)
+        new_york = ZoneInfo("America/New_York")
+
+        for timestamp in (
+            datetime(2024, 1, 8, 17, 30, tzinfo=new_york),
+            datetime(2024, 1, 8, 18, 0, tzinfo=new_york),
+        ):
+            broker._update_time(
+                timestamp=timestamp,
+                prices={"BTC": 50000.0},
+                opens={"BTC": 50000.0},
+                highs={"BTC": 50000.0},
+                lows={"BTC": 50000.0},
+                volumes={"BTC": 100.0},
+                signals={},
+            )
+
+        assert stats.session_trades == 0
+        assert stats.session_pnl == 0.0
+        assert stats.total_trades == 1
+
+    def test_session_boundary_converts_naive_data_timezone_before_reset(self, broker):
+        broker.set_session_config(SessionConfig(calendar="NYMEX", timezone="UTC"))
+        stats = broker.get_asset_stats("BTC")
+        stats.record_pnl(100.0)
+
+        for timestamp in (datetime(2024, 1, 8, 22, 0), datetime(2024, 1, 8, 23, 0)):
+            broker._update_time(
+                timestamp=timestamp,
+                prices={"BTC": 50000.0},
+                opens={"BTC": 50000.0},
+                highs={"BTC": 50000.0},
+                lows={"BTC": 50000.0},
+                volumes={"BTC": 100.0},
+                signals={},
+            )
+
+        assert stats.session_trades == 0
+        assert stats.total_trades == 1
+
     def test_no_session_config_no_reset(self, broker):
         """Test without session config, stats are not reset."""
         stats = broker.get_asset_stats("BTC")

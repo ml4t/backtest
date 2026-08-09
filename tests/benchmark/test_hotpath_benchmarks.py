@@ -8,7 +8,12 @@ materially changes the comparison. CI invokes its exact pytest node ID.
 
 from __future__ import annotations
 
+import json
+import os
+import platform
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from statistics import median
 from time import perf_counter
 from typing import Any
@@ -196,15 +201,47 @@ def test_optimized_feed_runtime_vs_legacy_baseline():
     _ = _run_engine(DataFeed, prices, signals)
     _ = _run_engine(_LegacyDataFeed, prices, signals)
 
-    optimized_runs = [_run_engine(DataFeed, prices, signals) for _ in range(3)]
-    legacy_runs = [_run_engine(_LegacyDataFeed, prices, signals) for _ in range(3)]
+    samples: list[dict[str, float | int | str]] = []
+    for sample_index in range(7):
+        if sample_index % 2 == 0:
+            order = "optimized-first"
+            optimized_seconds = _run_engine(DataFeed, prices, signals)
+            legacy_seconds = _run_engine(_LegacyDataFeed, prices, signals)
+        else:
+            order = "legacy-first"
+            legacy_seconds = _run_engine(_LegacyDataFeed, prices, signals)
+            optimized_seconds = _run_engine(DataFeed, prices, signals)
+        samples.append(
+            {
+                "sample": sample_index + 1,
+                "order": order,
+                "optimized_seconds": optimized_seconds,
+                "legacy_seconds": legacy_seconds,
+                "ratio": optimized_seconds / legacy_seconds,
+            }
+        )
 
-    optimized_median = median(optimized_runs)
-    legacy_median = median(legacy_runs)
-    ratio = optimized_median / legacy_median if legacy_median > 0 else 1.0
+    ratios = [float(sample["ratio"]) for sample in samples]
+    median_ratio = median(ratios)
+    evidence = {
+        "schema_version": 1,
+        "threshold_ratio": 1.10,
+        "median_ratio": median_ratio,
+        "python": sys.version,
+        "platform": platform.platform(),
+        "processor": platform.processor(),
+        "cpu_count": os.cpu_count(),
+        "load_average": list(os.getloadavg()) if hasattr(os, "getloadavg") else None,
+        "samples": samples,
+    }
+    evidence_path = os.environ.get("ML4T_PERFORMANCE_EVIDENCE")
+    if evidence_path:
+        Path(evidence_path).write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
-    # Benchmark regression guard: optimized path should not be materially slower.
-    assert ratio <= 1.15, (
-        f"Optimized median {optimized_median:.4f}s vs legacy {legacy_median:.4f}s "
-        f"(ratio={ratio:.3f})."
+    assert median_ratio <= 1.10, (
+        f"Interleaved median optimized/legacy ratio {median_ratio:.3f} exceeds 1.100; "
+        f"paired ratios={ratios}"
     )
