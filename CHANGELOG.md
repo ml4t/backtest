@@ -52,6 +52,9 @@
 - The beta-only on_before_risk callback and future-timestamp on_prepare signature are removed.
   Engine construction raises HistoricalStrategyCompatibilityError for strategies that require
   either historical behavior.
+- TargetWeightExecutor.prepare_schedule was removed. Configure calendar, timezone,
+  session_start_time, data_frequency, and timestamp_semantics on RebalanceConfig for causal
+  schedule evaluation.
 
 ### Validation
 

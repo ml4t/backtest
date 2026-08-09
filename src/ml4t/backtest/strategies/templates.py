@@ -8,15 +8,14 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import datetime
 from statistics import mean, stdev
 from typing import TYPE_CHECKING, Any
 
 from ..config import ShareType
 from ..execution.schedule import (
     RebalanceSchedule,
-    is_rebalance_timestamp,
-    session_date_for_timestamp,
+    _OnlineRebalanceEvaluator,
 )
 from ..strategy import Strategy
 
@@ -340,8 +339,7 @@ class LongShortStrategy(Strategy):
     def __init__(self) -> None:
         self.bar_count = 0
         self._schedule_config: BacktestConfig | None = None
-        self._schedule_session_date: date | None = None
-        self._schedule_session_index = 0
+        self._schedule_evaluator: _OnlineRebalanceEvaluator | None = None
 
     def on_prepare(
         self,
@@ -350,6 +348,15 @@ class LongShortStrategy(Strategy):
     ) -> None:
         """Retain causal calendar metadata for online schedule evaluation."""
         self._schedule_config = config
+        if self.rebalance_schedule is not None and config is not None:
+            self._schedule_evaluator = _OnlineRebalanceEvaluator(
+                self.rebalance_schedule,
+                calendar=config.resolved_calendar,
+                timezone=config.resolved_timezone,
+                session_start_time=config.resolved_session_start_time,
+                data_frequency=config.resolved_data_frequency,
+                timestamp_semantics=config.resolved_timestamp_semantics,
+            )
 
     def rank_assets(self, data: dict[str, dict]) -> tuple[list[str], list[str]]:
         """Rank assets by signal and return long/short lists.
@@ -396,27 +403,9 @@ class LongShortStrategy(Strategy):
         if self.rebalance_schedule is not None:
             if self._schedule_config is None:
                 raise ValueError("rebalance_schedule is set but was not prepared before execution")
-            session_date = session_date_for_timestamp(
-                timestamp,
-                calendar=self._schedule_config.resolved_calendar,
-                timezone=self._schedule_config.resolved_timezone,
-                session_start_time=self._schedule_config.resolved_session_start_time,
-                data_frequency=self._schedule_config.resolved_data_frequency,
-                timestamp_semantics=self._schedule_config.resolved_timestamp_semantics,
-            )
-            if session_date != self._schedule_session_date:
-                self._schedule_session_date = session_date
-                self._schedule_session_index += 1
-            if not is_rebalance_timestamp(
-                timestamp,
-                self.rebalance_schedule,
-                session_index=self._schedule_session_index,
-                calendar=self._schedule_config.resolved_calendar,
-                timezone=self._schedule_config.resolved_timezone,
-                session_start_time=self._schedule_config.resolved_session_start_time,
-                data_frequency=self._schedule_config.resolved_data_frequency,
-                timestamp_semantics=self._schedule_config.resolved_timestamp_semantics,
-            ):
+            if self._schedule_evaluator is None:
+                raise RuntimeError("rebalance schedule evaluator was not initialized")
+            if not self._schedule_evaluator.evaluate(timestamp):
                 return
         elif self.bar_count % self.rebalance_frequency != 1:
             return

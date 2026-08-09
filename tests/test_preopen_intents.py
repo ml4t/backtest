@@ -396,7 +396,7 @@ def test_partial_opening_fill_cancels_opg_remainder_and_retains_lineage() -> Non
     assert result.fills[0].quantity == 10
     assert len(result.fills) == 1
     reconciliation = engine.broker.get_intent_reconciliations()[0]
-    assert reconciliation.outcome is IntentOutcome.CANCELLED
+    assert reconciliation.outcome is IntentOutcome.PARTIAL
     assert reconciliation.requested_quantity == 500
     assert reconciliation.filled_quantity == 10
     assert reconciliation.remaining_quantity == 490
@@ -421,7 +421,45 @@ def test_non_integral_liquidity_limit_is_rounded_consistently() -> None:
     result = engine.run()
 
     assert result.fills[0].quantity == 100
-    assert engine.broker.get_intent_reconciliations()[0].outcome is IntentOutcome.CANCELLED
+    assert engine.broker.get_intent_reconciliations()[0].outcome is IntentOutcome.PARTIAL
+
+
+def test_default_policy_does_not_cap_opening_fill_at_bar_volume() -> None:
+    result = Engine(
+        DataFeed(prices_df=prices(volume=100)),
+        InitialTargetStrategy(target_intent()),
+    ).run()
+
+    assert result.fills[0].quantity == 500
+    assert result.metrics["intent_reconciliation_count"] == 1
+    assert result.metrics["target_intent_count"] == 1
+
+
+def test_opening_liquidity_policy_does_not_cap_regular_strategy_orders() -> None:
+    class RegularOrderStrategy(Strategy):
+        def __init__(self) -> None:
+            self.submitted = False
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if not self.submitted:
+                broker.submit_order("SPY", 500)
+                self.submitted = True
+
+    config = BacktestConfig()
+    policy = replace(
+        default_execution_policy(config),
+        liquidity_fraction=0.1,
+        allow_partial_fills=True,
+    )
+
+    result = Engine(
+        DataFeed(prices_df=prices(bars=2, volume=100)),
+        RegularOrderStrategy(),
+        config,
+        execution_policy=policy,
+    ).run()
+
+    assert [fill.quantity for fill in result.fills] == [500]
 
 
 def test_immediate_same_bar_mode_still_executes_opening_child_at_open() -> None:
@@ -516,7 +554,7 @@ def test_terminal_reconciliation_is_not_duplicated_on_later_bars() -> None:
 
     reconciliations = engine.broker.get_intent_reconciliations()
     assert len(reconciliations) == 1
-    assert reconciliations[0].outcome is IntentOutcome.CANCELLED
+    assert reconciliations[0].outcome is IntentOutcome.PARTIAL
     assert reconciliations[0].remaining_quantity == 490
 
 
@@ -639,6 +677,24 @@ def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> 
     )
 
     assert rounded == {"A": 5.0, "B": 4.0}
+
+
+def test_fractional_largest_remainder_preserves_declared_rounding() -> None:
+    engine = Engine(
+        DataFeed(prices_df=prices()),
+        InitialTargetStrategy(target_intent()),
+        BacktestConfig(share_type="fractional"),
+    )
+    rounded = {"SPY": 1.0}
+
+    engine.preopen_target_manager._allocate_largest_remainders(
+        {"SPY": 1.75},
+        rounded,
+        {"SPY": 100.0},
+        0.0,
+    )
+
+    assert rounded == {"SPY": 1.0}
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:

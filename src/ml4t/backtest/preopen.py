@@ -38,6 +38,7 @@ from .config import (
     SlippageType,
 )
 from .core.shared import SubmitOrderOptions
+from .execution.limits import VolumeParticipationLimit
 from .models import calculate_commission, calculate_slippage
 from .sessions import session_date_for_timestamp
 from .types import OrderSide, OrderStatus, OrderType
@@ -130,19 +131,11 @@ class IntentReconciliation:
 
 @dataclass(slots=True)
 class _PreOpenTransactionState:
-    """Constant-size checkpoint for manager operations that only append new state."""
+    """Constant-size checkpoint for append-only callback registrations."""
 
     targets_length: int
     target_by_session_asset_length: int
     idempotency_length: int
-    children_length: int
-    order_by_child_length: int
-    active_children_length: int
-    processed_targets_length: int
-    reconciliations_length: int
-    latest_reconciliation_length: int
-    terminal_children_length: int
-    rule_activations_length: int
     position_rules_length: int
 
 
@@ -369,21 +362,26 @@ class PreOpenTargetManager:
                     f"opening {opening_time.isoformat()}"
                 )
             children = self._lower(intent)
+            opening_limits = self.broker.execution_limits
+            if opening_limits is None and self.policy.liquidity_fraction < 1.0:
+                opening_limits = VolumeParticipationLimit(
+                    max_participation=self.policy.liquidity_fraction
+                )
             validated_children: list[tuple[CanonicalChildOrderIntent, OrderSide]] = []
             for child in children:
                 side = OrderSide.BUY if child.side is SpecOrderSide.BUY else OrderSide.SELL
                 available_size = self.broker.get_available_size(child.asset, side)
-                policy_fill = min(
-                    child.quantity,
-                    available_size * self.policy.liquidity_fraction
-                    if available_size is not None
-                    else child.quantity,
-                )
+                policy_fill = child.quantity
+                if self.policy.liquidity_fraction < 1.0 and available_size is not None:
+                    policy_fill = min(
+                        child.quantity,
+                        available_size * self.policy.liquidity_fraction,
+                    )
                 if self.broker.share_type is ShareType.INTEGER:
                     policy_fill = float(int(policy_fill))
                 actual_fill = child.quantity
-                if self.broker.execution_limits is not None:
-                    actual_fill = self.broker.execution_limits.calculate(
+                if opening_limits is not None:
+                    actual_fill = opening_limits.calculate(
                         child.quantity,
                         available_size,
                         self.market.opens[child.asset],
@@ -422,7 +420,12 @@ class PreOpenTargetManager:
                     self._active_children.add(child.child_intent_id)
                     order_ids.add(order.order_id)
             if order_ids:
-                self.broker._process_orders(use_open=True, order_ids=order_ids)
+                original_limits = self.broker.execution_limits
+                self.broker.execution_limits = opening_limits
+                try:
+                    self.broker._process_orders(use_open=True, order_ids=order_ids)
+                finally:
+                    self.broker.execution_limits = original_limits
                 for order_id in order_ids:
                     order = self.broker.get_order(order_id)
                     if order is not None and order.status is OrderStatus.PENDING:
@@ -446,12 +449,12 @@ class PreOpenTargetManager:
             remaining = child.remaining_after_fill(min(filled, child.quantity))
             if order.status is OrderStatus.REJECTED:
                 outcome = IntentOutcome.REJECTED
-            elif order.status is OrderStatus.CANCELLED:
-                outcome = IntentOutcome.CANCELLED
             elif remaining == 0:
                 outcome = IntentOutcome.FULL
             elif filled > 0:
                 outcome = IntentOutcome.PARTIAL
+            elif order.status is OrderStatus.CANCELLED:
+                outcome = IntentOutcome.CANCELLED
             else:
                 outcome = IntentOutcome.PENDING
             intent = self._targets[child.target_intent_id]
@@ -473,7 +476,12 @@ class PreOpenTargetManager:
             if previous is None or not self._same_reconciliation_state(previous, record):
                 self._reconciliations.append(record)
                 self._latest_reconciliation[child.child_intent_id] = record
-            if outcome in {IntentOutcome.FULL, IntentOutcome.REJECTED, IntentOutcome.CANCELLED}:
+            if outcome in {
+                IntentOutcome.FULL,
+                IntentOutcome.PARTIAL,
+                IntentOutcome.REJECTED,
+                IntentOutcome.CANCELLED,
+            }:
                 self._terminal_children.add(child.child_intent_id)
                 self._active_children.discard(child.child_intent_id)
 
@@ -538,7 +546,7 @@ class PreOpenTargetManager:
         nonterminal_children = {
             child_id
             for child_id, record in latest_reconciliation.items()
-            if record.outcome in {IntentOutcome.PENDING, IntentOutcome.PARTIAL}
+            if record.outcome is IntentOutcome.PENDING
         }
         if nonterminal_children:
             names = ", ".join(sorted(nonterminal_children))
@@ -574,14 +582,6 @@ class PreOpenTargetManager:
             targets_length=len(self._targets),
             target_by_session_asset_length=len(self._target_by_session_asset),
             idempotency_length=len(self._idempotency),
-            children_length=len(self._children),
-            order_by_child_length=len(self._order_by_child),
-            active_children_length=len(self._active_children),
-            processed_targets_length=len(self._processed_targets),
-            reconciliations_length=len(self._reconciliations),
-            latest_reconciliation_length=len(self._latest_reconciliation),
-            terminal_children_length=len(self._terminal_children),
-            rule_activations_length=len(self._rule_activations),
             position_rules_length=len(self._position_rules),
         )
 
@@ -590,25 +590,12 @@ class PreOpenTargetManager:
         self._truncate_mapping(self._targets, state.targets_length)
         self._truncate_mapping(self._target_by_session_asset, state.target_by_session_asset_length)
         self._truncate_mapping(self._idempotency, state.idempotency_length)
-        self._truncate_mapping(self._children, state.children_length)
-        self._truncate_mapping(self._order_by_child, state.order_by_child_length)
-        self._restore_add_only_set(self._active_children, state.active_children_length)
-        self._restore_add_only_set(self._processed_targets, state.processed_targets_length)
-        del self._reconciliations[state.reconciliations_length :]
-        self._truncate_mapping(self._latest_reconciliation, state.latest_reconciliation_length)
-        self._restore_add_only_set(self._terminal_children, state.terminal_children_length)
-        self._truncate_mapping(self._rule_activations, state.rule_activations_length)
         self._truncate_mapping(self._position_rules, state.position_rules_length)
 
     @staticmethod
     def _truncate_mapping(mapping: dict[Any, Any], length: int) -> None:
         while len(mapping) > length:
             mapping.popitem()
-
-    @staticmethod
-    def _restore_add_only_set(values: set[str], length: int) -> None:
-        if length == 0:
-            values.clear()
 
     def _registration_is_causal(
         self, intent: CanonicalTargetIntent, active_phase: LifecyclePhase
@@ -791,7 +778,6 @@ class PreOpenTargetManager:
         cash_buffer: float,
     ) -> None:
         if self.broker.share_type is ShareType.FRACTIONAL:
-            rounded.update(raw)
             return
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}

@@ -121,6 +121,7 @@ class PositionState:
     entry_time: datetime | None = None
     current_time: datetime | None = None
     context: dict[str, Any] = field(default_factory=dict)
+    multiplier: float = 1.0
 
     @property
     def is_long(self) -> bool:

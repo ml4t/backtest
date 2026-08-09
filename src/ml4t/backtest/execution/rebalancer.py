@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ from ml4t.specs.market_data import TimestampSemantics
 from ..config import DataFrequency, ExecutionPrice, RebalanceMode, ShareType
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
-from .schedule import RebalanceSchedule, is_rebalance_timestamp, session_date_for_timestamp
+from .schedule import RebalanceSchedule, _OnlineRebalanceEvaluator
 
 
 class WeightProvider(Protocol):
@@ -132,8 +132,18 @@ class TargetWeightExecutor:
             config: Rebalancing configuration. Uses defaults if not provided.
         """
         self.config = config or RebalanceConfig()
-        self._schedule_session_date: date | None = None
-        self._schedule_session_index = 0
+        self._schedule_evaluator = (
+            _OnlineRebalanceEvaluator(
+                self.config.schedule,
+                calendar=self.config.calendar,
+                timezone=self.config.timezone,
+                session_start_time=self.config.session_start_time,
+                data_frequency=self.config.data_frequency,
+                timestamp_semantics=self.config.timestamp_semantics,
+            )
+            if self.config.schedule is not None
+            else None
+        )
 
     def should_rebalance(
         self,
@@ -142,28 +152,10 @@ class TargetWeightExecutor:
         is_session_close: bool | None = None,
     ) -> bool:
         """Evaluate the current timestamp without a future feed sequence."""
-        if self.config.schedule is None:
+        if self._schedule_evaluator is None:
             return True
-        session_date = session_date_for_timestamp(
+        return self._schedule_evaluator.evaluate(
             timestamp,
-            calendar=self.config.calendar,
-            timezone=self.config.timezone,
-            session_start_time=self.config.session_start_time,
-            data_frequency=self.config.data_frequency,
-            timestamp_semantics=self.config.timestamp_semantics,
-        )
-        if session_date != self._schedule_session_date:
-            self._schedule_session_date = session_date
-            self._schedule_session_index += 1
-        return is_rebalance_timestamp(
-            timestamp,
-            self.config.schedule,
-            session_index=self._schedule_session_index,
-            calendar=self.config.calendar,
-            timezone=self.config.timezone,
-            session_start_time=self.config.session_start_time,
-            data_frequency=self.config.data_frequency,
-            timestamp_semantics=self.config.timestamp_semantics,
             is_session_close=is_session_close,
         )
 

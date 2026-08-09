@@ -1,5 +1,6 @@
 """Tests for portfolio rebalancing utilities."""
 
+import warnings
 from datetime import UTC, datetime
 
 import pytest
@@ -499,6 +500,30 @@ class TestTargetWeightExecutorScheduling:
 
         assert not executor.should_rebalance(datetime(2024, 1, 5, 15, 59), is_session_close=False)
         assert executor.should_rebalance(datetime(2024, 1, 5, 16, 0), is_session_close=True)
+
+    def test_intraday_schedule_raises_after_a_required_close_never_matches(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 15, 45))
+        with pytest.raises(ValueError, match="resolved no session close"):
+            executor.should_rebalance(datetime(2024, 1, 3, 9, 30))
+
+    def test_midnight_daily_labels_do_not_warn_without_optional_metadata(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(schedule=RebalanceSchedule.every_session())
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert executor.should_rebalance(datetime(2024, 1, 2))
 
     def test_fixed_session_counter_uses_cme_session_date_across_midnight(self):
         executor = TargetWeightExecutor(

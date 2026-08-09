@@ -89,6 +89,12 @@ same method from an earlier event with a future
 `effective_session`. Same-session registration from `on_data()` is rejected because that callback
 has already observed information after the opening phase.
 
+`ExecutionPolicy.liquidity_fraction` applies only to opening-auction child orders. A value of 1.0
+means no participation constraint, even when the requested quantity exceeds the bar volume. A
+smaller value creates an opening-only participation limit unless the Engine receives an explicit
+`execution_limits` object. Explicit limits must match the declared opening policy. Ordinary orders
+use only the Engine's explicit `execution_limits` setting.
+
 For a rule activated after an opening fill, `ExecutionPolicy.bar_path` controls daily OHLC
 ambiguity. Use `REJECT_AMBIGUOUS` to fail when high-low order changes the result,
 `OPEN_HIGH_LOW_CLOSE` or `OPEN_LOW_HIGH_CLOSE` to declare an order, or `CONSERVATIVE` to select the

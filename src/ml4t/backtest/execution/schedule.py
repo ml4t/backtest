@@ -171,6 +171,8 @@ def _is_session_close_timestamp(
     frequency, semantics = _normalize_schedule_metadata(data_frequency, timestamp_semantics)
     if semantics is TimestampSemantics.SESSION_LABEL or frequency is DataFrequency.DAILY:
         return True
+    if timestamp.time() == time.min and semantics is None and frequency is None:
+        return True
     if semantics is None and frequency is None:
         _warn_missing_boundary_metadata()
         return True
@@ -218,6 +220,101 @@ def _warn_missing_boundary_metadata() -> None:
         stacklevel=2,
         skip_file_prefixes=(str(Path(__file__).parents[1]),),
     )
+
+
+def _session_requires_close(
+    schedule: RebalanceSchedule,
+    session_date: date,
+    session_index: int,
+    calendar: str | None,
+) -> bool:
+    cadence = schedule.cadence
+    if cadence is RebalanceCadence.EVERY_SESSION:
+        return True
+    if cadence is RebalanceCadence.FIXED_N_SESSIONS:
+        return (session_index - 1) % schedule.every_n == 0
+    if cadence not in {RebalanceCadence.WEEKLY, RebalanceCadence.MONTH_END}:
+        return False
+    if calendar is None:
+        raise ValueError("weekly and month_end schedules require calendar metadata")
+    if cadence is RebalanceCadence.WEEKLY:
+        period_start = session_date - timedelta(days=session_date.weekday())
+        period_end = period_start + timedelta(days=6)
+    else:
+        period_start = session_date.replace(day=1)
+        period_end = session_date.replace(day=monthrange(session_date.year, session_date.month)[1])
+    return session_date == _calendar_period_end(calendar, period_start, period_end)
+
+
+def _raise_close_alignment_error(cadence: RebalanceCadence, calendar: str | None) -> None:
+    raise ValueError(
+        f"{cadence.value} resolved no session closes for calendar {calendar!r}; verify that "
+        "intraday timestamps align with the exchange market_close and declared timestamp "
+        "semantics"
+    )
+
+
+class _OnlineRebalanceEvaluator:
+    """Evaluate a schedule causally and diagnose missed required session closes."""
+
+    def __init__(
+        self,
+        schedule: RebalanceSchedule,
+        *,
+        calendar: str | None,
+        timezone: str | None,
+        session_start_time: str | None,
+        data_frequency: Any | None,
+        timestamp_semantics: TimestampSemantics | str | None,
+    ) -> None:
+        self.schedule = schedule
+        self.calendar = calendar
+        self.timezone = timezone
+        self.session_start_time = session_start_time
+        self.data_frequency = data_frequency
+        self.timestamp_semantics = timestamp_semantics
+        self._session_date: date | None = None
+        self._session_index = 0
+        self._required_close_matched = False
+
+    def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
+        session_date = session_date_for_timestamp(
+            timestamp,
+            calendar=self.calendar,
+            timezone=self.timezone,
+            session_start_time=self.session_start_time,
+            data_frequency=self.data_frequency,
+            timestamp_semantics=self.timestamp_semantics,
+        )
+        if session_date != self._session_date:
+            if (
+                self._session_date is not None
+                and _session_requires_close(
+                    self.schedule,
+                    self._session_date,
+                    self._session_index,
+                    self.calendar,
+                )
+                and not self._required_close_matched
+            ):
+                _raise_close_alignment_error(self.schedule.cadence, self.calendar)
+            self._session_date = session_date
+            self._session_index += 1
+            self._required_close_matched = False
+        matched = is_rebalance_timestamp(
+            timestamp,
+            self.schedule,
+            session_index=self._session_index,
+            calendar=self.calendar,
+            timezone=self.timezone,
+            session_start_time=self.session_start_time,
+            data_frequency=self.data_frequency,
+            timestamp_semantics=self.timestamp_semantics,
+            is_session_close=is_session_close,
+        )
+        if matched:
+            self._required_close_matched = True
+        return matched
 
 
 def _normalize_schedule_metadata(
@@ -301,11 +398,7 @@ def resolve_rebalance_timestamps(
         and metadata["timestamp_semantics"] is not TimestampSemantics.SESSION_LABEL
         and _to_backtest_frequency(metadata["data_frequency"]) is not DataFrequency.DAILY
     ):
-        raise ValueError(
-            f"{cadence.value} resolved no session closes for calendar "
-            f"{metadata['calendar']!r}; verify that intraday timestamps align with the "
-            "exchange market_close and declared timestamp semantics"
-        )
+        _raise_close_alignment_error(cadence, metadata["calendar"])
     return pl.Series("timestamp", resolved)
 
 

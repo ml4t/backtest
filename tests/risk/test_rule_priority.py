@@ -12,10 +12,11 @@ This test module validates:
 
 from datetime import datetime
 
+from ml4t.backtest.core.risk_engine import RiskEngine
 from ml4t.backtest.risk.position.composite import RuleChain
 from ml4t.backtest.risk.position.dynamic import TrailingStop
 from ml4t.backtest.risk.position.static import StopLoss, TakeProfit, TimeExit
-from ml4t.backtest.risk.types import ActionType, PositionState
+from ml4t.backtest.risk.types import ActionType, PositionAction, PositionState
 
 
 def make_position_state(
@@ -62,6 +63,30 @@ def make_position_state(
         current_time=datetime.now(),
         context=context or {},
     )
+
+
+def test_intrabar_path_state_includes_multiplier_and_updates_excursions() -> None:
+    states: list[PositionState] = []
+
+    class RecordingRule:
+        def evaluate(self, state: PositionState) -> PositionAction:
+            states.append(state)
+            return PositionAction.hold()
+
+    state = make_position_state(
+        entry_price=100.0,
+        current_price=105.0,
+        bar_open=100.0,
+        bar_high=110.0,
+        bar_low=90.0,
+    )
+    state.multiplier = 50.0
+
+    RiskEngine._evaluate_path(RecordingRule(), state, high_first=True)
+
+    assert [item.unrealized_pnl for item in states] == [50_000.0, -50_000.0, 25_000.0]
+    assert [item.max_favorable_excursion for item in states] == [0.1, 0.1, 0.1]
+    assert [item.max_adverse_excursion for item in states] == [0.0, -0.1, -0.1]
 
 
 class TestRuleChainPriority:

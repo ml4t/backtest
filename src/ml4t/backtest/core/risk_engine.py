@@ -144,20 +144,27 @@ class RiskEngine:
         previous = state.bar_open
         high_water_mark = state.high_water_mark
         low_water_mark = state.low_water_mark
+        max_favorable_excursion = state.max_favorable_excursion
+        max_adverse_excursion = state.max_adverse_excursion
         for point in points:
             context = dict(state.context)
             context["trail_stop_timing"] = TrailStopTiming.LAGGED
             raw_return = (point - state.entry_price) / state.entry_price
             unrealized_return = raw_return if state.is_long else -raw_return
+            max_favorable_excursion = max(max_favorable_excursion, unrealized_return)
+            max_adverse_excursion = min(max_adverse_excursion, unrealized_return)
             phase_state = replace(
                 state,
                 current_price=point,
                 unrealized_pnl=(point - state.entry_price)
                 * state.quantity
+                * state.multiplier
                 * (1 if state.is_long else -1),
                 unrealized_return=unrealized_return,
                 high_water_mark=high_water_mark,
                 low_water_mark=low_water_mark,
+                max_favorable_excursion=max_favorable_excursion,
+                max_adverse_excursion=max_adverse_excursion,
                 bar_open=previous,
                 bar_high=max(previous, point),
                 bar_low=min(previous, point),
@@ -221,6 +228,7 @@ class RiskEngine:
             entry_time=pos.entry_time,
             current_time=self.market.time,
             context=context,
+            multiplier=pos.multiplier,
         )
 
     def process_pending_exits(self):

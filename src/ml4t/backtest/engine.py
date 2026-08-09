@@ -106,12 +106,6 @@ class Engine:
         self.execution_mode = self.config.execution_mode
         self.lifecycle_version = negotiated_version
         self.execution_policy = execution_policy or default_execution_policy(self.config)
-        if execution_limits is None and self.execution_policy.liquidity_fraction < 1.0:
-            from .execution import VolumeParticipationLimit
-
-            execution_limits = VolumeParticipationLimit(
-                max_participation=self.execution_policy.liquidity_fraction
-            )
         self.broker = Broker.from_config(
             self.config,
             contract_specs=contract_specs,
