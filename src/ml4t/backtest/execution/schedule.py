@@ -585,13 +585,17 @@ class _OnlineRebalanceEvaluator:
                 _raise_ambiguous_missing_metadata(event_date)
         if not explicit_boundary:
             event_instant = _event_time_utc(timestamp, self.timezone)
-            if self._last_implicit_daily_instant is not None:
-                interval = event_instant - self._last_implicit_daily_instant
-                if timedelta(0) < interval < _MIN_IMPLICIT_DAILY_INTERVAL:
-                    _raise_short_implicit_daily_interval(
-                        self._last_implicit_daily_instant,
-                        event_instant,
-                    )
+            if self._last_implicit_daily_instant is not None and (
+                _is_short_implicit_daily_interval(
+                    self._last_implicit_daily_instant,
+                    event_instant,
+                )
+            ):
+                _raise_short_implicit_daily_interval(
+                    self._last_implicit_daily_instant,
+                    event_instant,
+                    self.timezone,
+                )
             self._last_implicit_daily_instant = event_instant
         self._implicit_daily_boundary_modes[event_date] = explicit_boundary
 
@@ -869,8 +873,8 @@ def _validate_implicit_daily_timestamps(
         if event_date in observed_dates:
             _raise_ambiguous_missing_metadata(event_date)
         instant = _event_time_utc(timestamp, metadata["timezone"])
-        if last_instant is not None and instant - last_instant < _MIN_IMPLICIT_DAILY_INTERVAL:
-            _raise_short_implicit_daily_interval(last_instant, instant)
+        if last_instant is not None and _is_short_implicit_daily_interval(last_instant, instant):
+            _raise_short_implicit_daily_interval(last_instant, instant, metadata["timezone"])
         observed_dates.add(event_date)
         last_instant = instant
 
@@ -890,12 +894,22 @@ def _raise_mixed_boundary_modes(event_date: date) -> None:
     )
 
 
-def _raise_short_implicit_daily_interval(previous: datetime, current: datetime) -> None:
+def _is_short_implicit_daily_interval(previous: datetime, current: datetime) -> bool:
+    interval = current - previous
+    return timedelta(0) < interval < _MIN_IMPLICIT_DAILY_INTERVAL
+
+
+def _raise_short_implicit_daily_interval(
+    previous: datetime,
+    current: datetime,
+    timezone: str | None,
+) -> None:
     minimum_hours = int(_MIN_IMPLICIT_DAILY_INTERVAL.total_seconds() // 3600)
     raise ValueError(
         f"schedule events {previous.isoformat()} and {current.isoformat()} are less than "
         f"{minimum_hours} hours apart while data_frequency and timestamp_semantics are omitted; "
-        "configure both fields for intraday data"
+        f"configure both fields for intraday data. Naive timestamps use timezone "
+        f"{timezone or 'UTC'!r}"
     )
 
 

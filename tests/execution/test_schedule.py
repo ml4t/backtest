@@ -730,6 +730,11 @@ class TestCausalScheduleEvaluation:
             resolved = resolve_rebalance_timestamps(timestamps, schedule)
         assert resolved.to_list() == timestamps
 
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=schedule))
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert executor.should_rebalance(timestamps[0])
+            assert executor.should_rebalance(timestamps[1])
+
     def test_missing_metadata_preserves_the_backward_session_error(self) -> None:
         executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))
 
