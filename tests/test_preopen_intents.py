@@ -1024,6 +1024,7 @@ def test_largest_remainder_allocation_accounts_for_contract_multipliers() -> Non
         rounded,
         {"ES": 1_000.0, "NQ": 1_000.0},
         0.0,
+        "multiplier-target",
     )
 
     assert rounded == {"ES": 2.0, "NQ": 1.0}
@@ -1042,6 +1043,7 @@ def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> 
         rounded,
         {"A": 100.0, "B": 100.0},
         0.0,
+        "trim-target",
     )
 
     assert rounded == {"A": 5.0, "B": 4.0}
@@ -1103,13 +1105,14 @@ def test_fractional_accounts_cannot_enter_largest_remainder_allocator() -> None:
 
     with pytest.raises(
         UnsupportedPreOpenPolicyError,
-        match="largest_remainder allocation requires integer shares",
+        match=r"target 'initial-portfolio'.*fractional shares; use keep_cash",
     ):
         engine.preopen_target_manager._allocate_largest_remainders(
             {"SPY": 1.5},
             {"SPY": 1.0},
             {"SPY": 100.0},
             0.0,
+            intent.intent_id,
         )
 
 

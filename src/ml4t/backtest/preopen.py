@@ -708,6 +708,7 @@ class PreOpenTargetManager:
                 desired,
                 open_prices,
                 effective_cash_buffer,
+                intent.intent_id,
             )
 
         children: list[CanonicalChildOrderIntent] = []
@@ -813,10 +814,12 @@ class PreOpenTargetManager:
         rounded: dict[str, float],
         prices: dict[str, float],
         cash_buffer: float,
+        intent_id: str,
     ) -> None:
         if self.broker.share_type is not ShareType.INTEGER:
             raise UnsupportedPreOpenPolicyError(
-                "largest_remainder allocation requires integer shares"
+                f"target {intent_id!r} cannot use largest_remainder allocation with fractional "
+                "shares; use keep_cash"
             )
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
