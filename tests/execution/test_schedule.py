@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import polars as pl
 import pytest
@@ -667,6 +668,31 @@ class TestCausalScheduleEvaluation:
             assert executor.should_rebalance(timestamps[0])
         with pytest.raises(ValueError, match="multiple schedule events.*intraday data"):
             executor.should_rebalance(timestamps[1])
+
+    def test_missing_metadata_uses_aware_timestamp_dates_for_ambiguity(self) -> None:
+        new_york = ZoneInfo("America/New_York")
+        same_date = [
+            datetime(2024, 1, 2, 9, 0, tzinfo=new_york),
+            datetime(2024, 1, 2, 20, 0, tzinfo=new_york),
+        ]
+        different_dates = [
+            datetime(2024, 1, 2, 23, 0, tzinfo=new_york),
+            datetime(2024, 1, 3, 2, 0, tzinfo=new_york),
+        ]
+        schedule = RebalanceSchedule.every_session()
+
+        with pytest.raises(ValueError, match="multiple schedule events observed on 2024-01-02"):
+            resolve_rebalance_timestamps(same_date, schedule, timezone="UTC")
+
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            resolved = resolve_rebalance_timestamps(different_dates, schedule, timezone="UTC")
+        assert resolved.to_list() == different_dates
+
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=schedule, timezone="UTC"))
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert executor.should_rebalance(same_date[0])
+        with pytest.raises(ValueError, match="multiple schedule events observed on 2024-01-02"):
+            executor.should_rebalance(same_date[1])
 
     def test_explicit_boundary_signal_needs_no_intraday_metadata(self) -> None:
         executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))

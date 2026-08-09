@@ -539,7 +539,7 @@ class _OnlineRebalanceEvaluator:
             self._session_index += 1
             self._required_close_matched = False
         self._last_event_time = timestamp
-        matched = is_rebalance_timestamp(
+        matched = _evaluate_rebalance_timestamp(
             timestamp,
             self.schedule,
             session_index=self._session_index,
@@ -549,6 +549,7 @@ class _OnlineRebalanceEvaluator:
             data_frequency=self.data_frequency,
             timestamp_semantics=self.timestamp_semantics,
             is_session_close=is_session_close,
+            session_date=session_date,
         )
         if matched:
             self._required_close_matched = True
@@ -573,7 +574,7 @@ class _OnlineRebalanceEvaluator:
             or self.timestamp_semantics is not None
         ):
             return
-        event_date = _localize_event_time(timestamp, self.timezone).date()
+        event_date = timestamp.date()
         if event_date in self._implicit_daily_dates:
             _raise_ambiguous_missing_metadata(event_date)
         self._implicit_daily_dates.add(event_date)
@@ -641,7 +642,8 @@ class _OnlineRebalanceEvaluator:
             raise ValueError(
                 "scheduled TargetWeightExecutor.execute() was called for "
                 f"{self._observed_event_count} of {market_event_count} market events; call "
-                "execute() for every event in chronological order, including warm-up periods"
+                "should_rebalance() (or execute()) for every event in chronological order, "
+                "including warm-up periods"
             )
         self.validate_completed_run()
 
@@ -846,7 +848,7 @@ def _validate_implicit_daily_timestamps(
         return
     observed_dates: set[date] = set()
     for timestamp in timestamps:
-        event_date = _localize_event_time(timestamp, metadata["timezone"]).date()
+        event_date = timestamp.date()
         if event_date in observed_dates:
             _raise_ambiguous_missing_metadata(event_date)
         observed_dates.add(event_date)
