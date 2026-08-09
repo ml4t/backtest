@@ -31,7 +31,7 @@ Example usage:
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from functools import lru_cache
 from types import MappingProxyType
 from zoneinfo import ZoneInfo
@@ -121,6 +121,15 @@ def get_calendar(calendar_id: str):
     resolved_id = CALENDAR_ALIASES.get(calendar_id.upper(), calendar_id)
 
     return mcal.get_calendar(resolved_id)
+
+
+@lru_cache(maxsize=32)
+def get_standard_market_open_time(calendar_id: str) -> time:
+    """Return the calendar's authoritative regular market-open time."""
+    market_open = get_calendar(calendar_id).open_time
+    if market_open is None:
+        raise ValueError(f"calendar {calendar_id!r} does not define a regular market open")
+    return time(market_open.hour, market_open.minute, market_open.second)
 
 
 def get_schedule(

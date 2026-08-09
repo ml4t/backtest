@@ -1227,6 +1227,15 @@ class TestFeedSpecConfigResolution:
         assert config.timezone == "America/New_York"
         assert config.data_frequency == DataFrequency.MINUTE_1
 
+    def test_constructor_rejects_unsupported_morning_session_boundary(self):
+        with pytest.raises(ValueError, match="custom morning session_start_time"):
+            BacktestConfig(
+                feed_spec=FeedSpec(
+                    calendar="CRYPTO",
+                    session_start_time="06:00",
+                )
+            )
+
     def test_resolved_feed_spec_preserves_explicit_runtime_over_feed_metadata(self):
         config = BacktestConfig(
             timezone="UTC",

@@ -66,6 +66,22 @@ class TestSessionConfig:
         assert config.get_session_start_hour() == 9
         assert config.get_session_start_minute() == 30
 
+    def test_standard_morning_boundary_accepts_calendar_alias(self):
+        config = SessionConfig(calendar="XNYS", session_start_time="09:30")
+
+        assert config.get_session_start_hour() == 9
+        assert config.get_session_start_minute() == 30
+
+    def test_standard_morning_boundary_comes_from_exchange_calendar(self):
+        config = SessionConfig(calendar="XTKS", session_start_time="09:00")
+
+        assert config.get_session_start_hour() == 9
+        assert config.get_session_start_minute() == 0
+
+    def test_nonstandard_morning_boundary_names_the_calendar_open(self):
+        with pytest.raises(ValueError, match=r"XTKS.*standard market open is 09:00"):
+            SessionConfig(calendar="XTKS", session_start_time="09:30")
+
 
 class TestAssignSessionDate:
     """Tests for assign_session_date()."""

@@ -293,6 +293,9 @@ Supported keys mirror `FeedSpec`:
 - `timestamp_semantics`
 - `session_start_time`
 
+`session_start_time` can override an evening session boundary. Morning-start sessions use the
+local calendar date, so morning values must match the configured calendar's standard open.
+
 ### Metadata
 
 Use the top-level `metadata` section for any user-defined provenance that the

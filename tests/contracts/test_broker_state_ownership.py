@@ -191,6 +191,7 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
         "get_asset_stats": {"asset"},
         "set_session_config": set(),
         "set_position_rules": {"risk_rules"},
+        "_remove_position_rule_override": {"risk_rules"},
         "update_position_context": {"asset"},
         "register_target_intent": {"target_intents"},
         "register_position_rule_policy": {"target_intents"},

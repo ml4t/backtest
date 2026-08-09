@@ -35,6 +35,15 @@ from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
 from .schedule import RebalanceSchedule, _OnlineRebalanceEvaluator
 
+_SCHEDULE_CONFIG_FIELDS = (
+    "schedule",
+    "calendar",
+    "timezone",
+    "session_start_time",
+    "data_frequency",
+    "timestamp_semantics",
+)
+
 
 class WeightProvider(Protocol):
     """Protocol for anything that produces target weights."""
@@ -137,29 +146,15 @@ class TargetWeightExecutor:
         self._ensure_schedule_evaluator()
 
     def _schedule_config(self) -> tuple[object, ...]:
-        return (
-            self.config.schedule,
-            self.config.calendar,
-            self.config.timezone,
-            self.config.session_start_time,
-            self.config.data_frequency,
-            self.config.timestamp_semantics,
-        )
+        return tuple(getattr(self.config, name) for name in _SCHEDULE_CONFIG_FIELDS)
 
     def _schedule_config_error(self, current: tuple[object, ...]) -> ValueError:
-        fields = (
-            "schedule",
-            "calendar",
-            "timezone",
-            "session_start_time",
-            "data_frequency",
-            "timestamp_semantics",
-        )
         previous = self._schedule_evaluator_config
-        assert previous is not None
+        if previous is None:
+            return ValueError("RebalanceConfig changed during evaluation; call reset() first")
         changes = ", ".join(
             f"{name}: {old!r} -> {new!r}"
-            for name, old, new in zip(fields, previous, current, strict=True)
+            for name, old, new in zip(_SCHEDULE_CONFIG_FIELDS, previous, current, strict=True)
             if old != new
         )
         return ValueError(

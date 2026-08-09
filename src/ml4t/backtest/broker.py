@@ -1301,6 +1301,11 @@ class Broker:
         """Disable position rules globally or for one asset."""
         self.set_position_rules(None, asset=asset)
 
+    def _remove_position_rule_override(self, asset: str) -> None:
+        """Remove a manager-owned override so the global rule applies again."""
+        self._capture_lifecycle_mutation(risk_rules=True)
+        self._position_rules_by_asset.pop(asset, None)
+
     def update_position_context(self, asset: str, context: dict) -> None:
         """Update context data for a position (used by signal-based rules).
 

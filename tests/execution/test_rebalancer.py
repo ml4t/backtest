@@ -11,7 +11,7 @@ from ml4t.backtest import (
 )
 from ml4t.backtest.config import ExecutionPrice, RebalanceMode
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
-from ml4t.backtest.execution.schedule import RebalanceSchedule
+from ml4t.backtest.execution.schedule import RebalanceSchedule, resolve_rebalance_timestamps
 from ml4t.backtest.models import NoCommission, NoSlippage
 
 
@@ -471,6 +471,40 @@ class TestTargetWeightExecutorScheduling:
 
         assert resolved == [datetime(2024, 1, 5), datetime(2024, 1, 12)]
 
+    def test_online_month_end_rejects_a_missing_interior_period_end(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.month_end(),
+                calendar="NYSE",
+                data_frequency="daily",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 30))
+        with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
+            executor.should_rebalance(datetime(2024, 2, 1))
+
+    def test_batch_month_end_rejects_a_missing_interior_period_end(self):
+        with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
+            resolve_rebalance_timestamps(
+                [datetime(2024, 1, 30), datetime(2024, 2, 1)],
+                RebalanceSchedule.month_end(),
+                calendar="NYSE",
+                data_frequency="daily",
+            )
+
+    def test_incomplete_final_month_does_not_move_to_an_earlier_session(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.month_end(),
+                calendar="NYSE",
+                data_frequency="daily",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 30))
+        executor.validate_completed_run()
+
     def test_intraday_weekly_schedule_fires_once_at_session_close(self):
         timestamps = [
             datetime(2024, 1, 5, 20, 58, tzinfo=UTC),
@@ -704,6 +738,34 @@ class TestTargetWeightExecutorScheduling:
 
         assert executor.should_rebalance(
             datetime(2024, 1, 13, 12, 0),
+            is_session_close=True,
+        )
+        executor.validate_completed_run()
+
+    def test_explicit_non_close_signal_does_not_count_a_holiday_session(self):
+        executor = TargetWeightExecutor(
+            RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 12, 16, 0),
+            is_session_close=True,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 15, 12, 0),
+            is_session_close=False,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 16, 16, 0),
+            is_session_close=True,
+        )
+        assert executor.should_rebalance(
+            datetime(2024, 1, 17, 16, 0),
             is_session_close=True,
         )
         executor.validate_completed_run()

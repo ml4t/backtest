@@ -99,8 +99,8 @@ no future feed data. It processes each accepted session bar in this order:
 ```
 for each bar:
     1. Update broker with current OHLCV prices
-    2. Lower and fill eligible pre-open target intents
-    3. Process pending exits from the previous bar
+    2. Fill pending exits from the previous bar at the open
+    3. Lower and fill eligible pre-open target intents against the resulting positions
     4. Evaluate position rules (stops, trails)
     5. Process eligible pending orders
     6. Call strategy.on_data()

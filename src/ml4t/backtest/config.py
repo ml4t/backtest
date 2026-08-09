@@ -789,6 +789,15 @@ class BacktestConfig:
         if not self._explicit_data_frequency and spec_frequency is not None:
             self.data_frequency = spec_frequency
 
+        if self.feed_spec.session_start_time is not None:
+            from .sessions import SessionConfig
+
+            SessionConfig(
+                calendar=self.calendar or self.feed_spec.calendar or "UTC",
+                timezone=self.timezone,
+                session_start_time=self.feed_spec.session_start_time,
+            )
+
     @property
     def resolved_feed_spec(self) -> FeedSpec:
         """Effective feed metadata after applying runtime config precedence."""

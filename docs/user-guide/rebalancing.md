@@ -103,7 +103,8 @@ unless you opt into one explicitly.
 Session-based schedules need enough metadata to identify exchange session closes. Weekly and
 month-end schedules require `calendar`. Daily feeds must also set `data_frequency="daily"`.
 Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and `timestamp_semantics`. Set
-`session_start_time` when the exchange session boundary differs from the calendar default.
+`session_start_time` for a custom evening boundary. Morning-start sessions use the local calendar
+date, so a morning value may only restate the configured calendar's standard open.
 
 ```python
 from ml4t.backtest import RebalanceSchedule
@@ -121,8 +122,9 @@ rebalance_config = RebalanceConfig(
 
 Naive timestamps use `timezone` as their source timezone. Session boundaries are then applied in
 the exchange timezone. Weekly and month-end schedules fire only on the final scheduled exchange
-session in the period. A missing final session in the feed does not move the rebalance to an
-earlier bar.
+session in the period. If the feed advances into a later period without the completed period's
+final exchange session, evaluation raises a feed-completeness error. An incomplete final period
+does not move the rebalance to an earlier bar.
 
 For intraday schedules, every complete exchange session that requires a rebalance must contain a
 timestamp aligned with the exchange close. Batch and online evaluation identify the first complete
@@ -137,7 +139,8 @@ final event, call `validate_completed_run()` so a missing close in the final ses
 Call `reset()` before reusing an executor for another run or changing its public
 `RebalanceConfig`. Backward session dates and mid-run configuration changes raise instead of
 silently restarting session counters.
-`LongShortStrategy` performs final validation from `on_end()` automatically.
+The engine validates `LongShortStrategy` schedule alignment after `on_end`, independently of any
+callback override.
 
 ## See It in Action
 

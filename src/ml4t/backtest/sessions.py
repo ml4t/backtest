@@ -67,11 +67,17 @@ class SessionConfig:
             return
         start = (self.get_session_start_hour(), self.get_session_start_minute())
         time(*start)
-        default = _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))
-        if start[0] < 12 and start != default:
+        if start[0] >= 12:
+            return
+        from .calendar import get_standard_market_open_time
+
+        market_open = get_standard_market_open_time(self.calendar)
+        standard_open = (market_open.hour, market_open.minute)
+        if start != standard_open:
             raise ValueError(
-                "custom morning session_start_time values are unsupported because "
-                "morning-start sessions use the local calendar date"
+                f"custom morning session_start_time {self.session_start_time!r} is unsupported "
+                f"for calendar {self.calendar!r}; its standard market open is "
+                f"{market_open:%H:%M}"
             )
 
     def get_session_start_hour(self) -> int:

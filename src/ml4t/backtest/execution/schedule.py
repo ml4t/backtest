@@ -249,6 +249,26 @@ def _period_bounds(cadence: RebalanceCadence, session_date: date) -> tuple[date,
     raise ValueError(f"Unsupported period cadence: {cadence}")
 
 
+def _completed_period_ends_between(
+    cadence: RebalanceCadence,
+    previous_session: date,
+    current_session: date,
+    calendar: str,
+) -> tuple[date, ...]:
+    """Return exchange period ends completed before the current observed session."""
+    if cadence not in {RebalanceCadence.WEEKLY, RebalanceCadence.MONTH_END}:
+        return ()
+    period_start, period_end = _period_bounds(cadence, previous_session)
+    current_period_start, _ = _period_bounds(cadence, current_session)
+    completed: list[date] = []
+    while period_start < current_period_start:
+        expected = _calendar_period_end(calendar, period_start, period_end)
+        if expected is not None:
+            completed.append(expected)
+        period_start, period_end = _period_bounds(cadence, period_end + timedelta(days=1))
+    return tuple(completed)
+
+
 @lru_cache(maxsize=512)
 def _calendar_close_for_session(calendar: str, session_date: date) -> datetime | None:
     session = get_calendar_sessions(calendar, session_date.year).get(session_date)
@@ -291,6 +311,18 @@ def _raise_close_alignment_error(
         f"{cadence.value} resolved no session closes for required session {session_date} on "
         f"calendar {calendar!r}; expected market_close {expected_text}. Verify that intraday "
         "timestamps align with the exchange close and declared timestamp semantics"
+    )
+
+
+def _raise_missing_period_end_error(
+    cadence: RebalanceCadence,
+    calendar: str,
+    period_end: date,
+    next_observed_session: date,
+) -> None:
+    raise ValueError(
+        f"{cadence.value} feed is missing calendar period-end session {period_end} on calendar "
+        f"{calendar!r} before observed session {next_observed_session}; verify feed completeness"
     )
 
 
@@ -347,7 +379,7 @@ class _OnlineRebalanceEvaluator:
             timestamp_semantics=self.timestamp_semantics,
         )
         if (
-            is_session_close is None
+            is_session_close is not True
             and self.calendar is not None
             and _calendar_close_for_session(self.calendar, session_date) is None
         ):
@@ -374,6 +406,23 @@ class _OnlineRebalanceEvaluator:
                     self.calendar,
                     self._session_date,
                 )
+            if self._session_date is not None and self.calendar is not None:
+                for expected_period_end in _completed_period_ends_between(
+                    self.schedule.cadence,
+                    self._session_date,
+                    session_date,
+                    self.calendar,
+                ):
+                    if (
+                        expected_period_end != self._session_date
+                        or not self._required_close_matched
+                    ):
+                        _raise_missing_period_end_error(
+                            self.schedule.cadence,
+                            self.calendar,
+                            expected_period_end,
+                            session_date,
+                        )
             self._session_date = session_date
             self._session_index += 1
             self._required_close_matched = False
@@ -526,6 +575,26 @@ def resolve_rebalance_timestamps(
             f"{cadence.value} observed no exchange sessions for calendar "
             f"{metadata['calendar']!r}; verify the calendar and feed timestamps"
         )
+    if metadata["calendar"] is not None:
+        observed_sessions = tuple(session_indices)
+        for previous_session, current_session in zip(
+            observed_sessions,
+            observed_sessions[1:],
+            strict=False,
+        ):
+            for expected_period_end in _completed_period_ends_between(
+                cadence,
+                previous_session,
+                current_session,
+                metadata["calendar"],
+            ):
+                if expected_period_end not in matched_sessions:
+                    _raise_missing_period_end_error(
+                        cadence,
+                        metadata["calendar"],
+                        expected_period_end,
+                        current_session,
+                    )
     is_intraday = (
         metadata["timestamp_semantics"] is not TimestampSemantics.SESSION_LABEL
         and _to_backtest_frequency(metadata["data_frequency"]) is not DataFrequency.DAILY

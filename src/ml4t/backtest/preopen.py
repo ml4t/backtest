@@ -214,6 +214,7 @@ class PreOpenTargetManager:
         self._terminal_children: set[str] = set()
         self._rule_activations: dict[str, datetime] = {}
         self._position_rules: dict[str, PositionRule] = {}
+        self._active_rule_policy_by_asset: dict[str, str] = {}
 
     @property
     def targets(self) -> tuple[CanonicalTargetIntent, ...]:
@@ -276,13 +277,18 @@ class PreOpenTargetManager:
                 f"{active_phase.value} after its pre-open decision phase"
             )
         policy_id = intent.position_rule_policy_id
+        policy_registration: tuple[str, PositionRule] | None = None
         if position_rules is not None and policy_id is None:
             raise PreOpenIntentError(
                 "position_rules require CanonicalTargetIntent.position_rule_policy_id"
             )
-        if position_rules is not None:
-            assert policy_id is not None
-            self.register_position_rule_policy(policy_id, position_rules)
+        if position_rules is not None and policy_id is not None:
+            policy_registration = (policy_id, position_rules)
+            existing_rules = self._position_rules.get(policy_registration[0])
+            if existing_rules is not None and existing_rules != position_rules:
+                raise PreOpenIntentError(
+                    f"position rule policy {policy_id!r} is already registered"
+                )
         elif policy_id is not None and policy_id not in self._position_rules:
             raise UnsupportedPreOpenPolicyError(
                 f"position rule policy {policy_id!r} has no registered implementation"
@@ -294,6 +300,8 @@ class PreOpenTargetManager:
                 raise PreOpenIntentError(
                     f"idempotency key {intent.idempotency_key!r} identifies a different target"
                 )
+            if policy_registration is not None:
+                self.register_position_rule_policy(*policy_registration)
             return existing
         if intent.intent_id in self._targets:
             raise PreOpenIntentError(f"duplicate target intent_id {intent.intent_id!r}")
@@ -320,6 +328,8 @@ class PreOpenTargetManager:
                 f"target {intent.intent_id!r} overlaps target {registered_id!r} for "
                 f"{', '.join(sorted(overlap))} in session {intent.effective_session}"
             )
+        if policy_registration is not None:
+            self.register_position_rule_policy(*policy_registration)
         self._targets[intent.intent_id] = intent
         self._target_by_session_asset.update(
             ((intent.effective_session, asset), intent.intent_id) for asset in assets
@@ -497,6 +507,7 @@ class PreOpenTargetManager:
             }:
                 self._terminal_children.add(child.child_intent_id)
                 self._active_children.discard(child.child_intent_id)
+        self._clear_rules_for_flat_positions()
 
     def to_state(self) -> dict[str, Any]:
         """Serialize target state for restart without duplicating accepted intent."""
@@ -506,6 +517,7 @@ class PreOpenTargetManager:
             "order_by_child": dict(self._order_by_child),
             "processed_targets": sorted(self._processed_targets),
             "reconciliations": [record.to_dict() for record in self._reconciliations],
+            "active_rule_policy_by_asset": dict(self._active_rule_policy_by_asset),
         }
 
     def restore_state(self, state: dict[str, Any]) -> None:
@@ -522,6 +534,7 @@ class PreOpenTargetManager:
             or self._latest_reconciliation
             or self._terminal_children
             or self._rule_activations
+            or self._active_rule_policy_by_asset
         ):
             raise PreOpenIntentError(
                 "target intent state can only be restored into an empty manager"
@@ -588,6 +601,7 @@ class PreOpenTargetManager:
         self._latest_reconciliation.update(latest_reconciliation)
         self._rule_activations.update(rule_activations)
         self._terminal_children.update(latest_reconciliation)
+        self._active_rule_policy_by_asset.update(state.get("active_rule_policy_by_asset", {}))
 
     def capture_transaction_state(self) -> _PreOpenTransactionState:
         """Capture manager state for callback rollback."""
@@ -791,6 +805,13 @@ class PreOpenTargetManager:
         cash_buffer: float,
     ) -> None:
         if self.broker.share_type is ShareType.FRACTIONAL:
+            if any(
+                not math.isclose(raw[asset], quantity, abs_tol=1e-12)
+                for asset, quantity in rounded.items()
+            ):
+                raise UnsupportedPreOpenPolicyError(
+                    "largest_remainder with fractional shares requires rounding=none"
+                )
             return
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
@@ -854,31 +875,56 @@ class PreOpenTargetManager:
         filled_quantity: float,
     ) -> datetime | None:
         policy_id = intent.position_rule_policy_id
-        if policy_id is None or filled_quantity <= 0:
+        if filled_quantity <= 0:
             return None
         child_intent_id = f"{intent.intent_id}:{asset}"
+        existing_activation = self._rule_activations.get(child_intent_id)
+        if existing_activation is not None:
+            return existing_activation
+        position = self.broker.get_position(asset)
+        if position is None:
+            self._clear_target_managed_rule(asset)
+            return None
+        if policy_id is None:
+            self._clear_target_managed_rule(asset)
+            return None
         rules = self._position_rules.get(policy_id)
         if rules is None:
             raise UnsupportedPreOpenPolicyError(
                 f"position rule policy {policy_id!r} has no registered implementation"
             )
-        position = self.broker.get_position(asset)
-        if position is None:
-            return self._rule_activations.get(child_intent_id)
-        existing = position.context.get("rule_activation_time")
-        if existing is not None:
-            return datetime.fromisoformat(existing)
         activated_at = self._as_utc(timestamp)
         position.context.update(
             {
                 "rule_activation_time": activated_at.isoformat(),
                 "rule_activation_bar_index": self.market.bar_index,
                 "bar_path_policy": self.policy.bar_path,
+                "position_rule_policy_id": policy_id,
             }
         )
         self.broker.set_position_rules(copy.deepcopy(rules), asset=asset)
+        self._active_rule_policy_by_asset[asset] = policy_id
         self._rule_activations[child_intent_id] = activated_at
         return activated_at
+
+    def _clear_rules_for_flat_positions(self) -> None:
+        for asset in tuple(self._active_rule_policy_by_asset):
+            if self.broker.get_position(asset) is None:
+                self._clear_target_managed_rule(asset)
+
+    def _clear_target_managed_rule(self, asset: str) -> None:
+        if self._active_rule_policy_by_asset.pop(asset, None) is not None:
+            position = self.broker.get_position(asset)
+            if position is not None:
+                self.broker._capture_lifecycle_mutation(asset=asset)
+                for key in (
+                    "rule_activation_time",
+                    "rule_activation_bar_index",
+                    "bar_path_policy",
+                    "position_rule_policy_id",
+                ):
+                    position.context.pop(key, None)
+            self.broker._remove_position_rule_override(asset)
 
     @staticmethod
     def _same_reconciliation_state(

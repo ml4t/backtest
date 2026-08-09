@@ -38,6 +38,7 @@ from ml4t.backtest import (
 from ml4t.backtest.config import (
     CommissionType,
     ExecutionPrice,
+    FillOrdering,
     ShareType,
     SlippageType,
     TrailStopTiming,
@@ -190,6 +191,49 @@ def test_deferred_risk_exit_fills_before_same_asset_opening_target(
     assert engine.broker.get_position("SPY").quantity == 150
     assert result.metrics["final_value"] == pytest.approx(100_000.0)
     assert result.metrics["num_fills"] == 3
+
+
+def test_deferred_risk_exit_precedes_fifo_entry_and_releases_cash() -> None:
+    class DeferredExitBeforeEntryStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.set_position_rules(StopLoss(0.05), asset="SPY")
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if timestamp == datetime(2026, 8, 3):
+                broker.submit_order("SPY", 100)
+            elif timestamp == datetime(2026, 8, 5):
+                broker.submit_order("QQQ", 100)
+
+    timestamps = [datetime(2026, 8, day) for day in range(3, 7)]
+    rows = [
+        {
+            "timestamp": timestamp,
+            "asset": asset,
+            "open": 100.0,
+            "high": 100.0,
+            "low": 90.0 if asset == "SPY" and timestamp.day == 5 else 100.0,
+            "close": 100.0,
+            "volume": 1_000_000.0,
+        }
+        for timestamp in timestamps
+        for asset in ("SPY", "QQQ")
+    ]
+    engine = Engine(
+        DataFeed(prices_df=pl.DataFrame(rows)),
+        DeferredExitBeforeEntryStrategy(),
+        BacktestConfig(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            stop_fill_mode=StopFillMode.NEXT_BAR_OPEN,
+            fill_ordering=FillOrdering.FIFO,
+        ),
+    )
+
+    result = engine.run()
+
+    assert [fill.asset for fill in result.fills] == ["SPY", "SPY", "QQQ"]
+    assert engine.broker.get_position("SPY") is None
+    assert engine.broker.get_position("QQQ").quantity == 100
 
 
 def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> None:
@@ -506,6 +550,105 @@ def test_overlapping_targets_for_one_session_are_rejected_atomically() -> None:
 
     assert engine.broker.orders == []
     assert engine.broker.get_target_intents() == ()
+
+
+def test_rejected_overlapping_target_does_not_leak_its_rule_policy() -> None:
+    first = target_intent(intent_id="first")
+    overlapping = target_intent(
+        intent_id="overlapping",
+        position_rule_policy_id="leaked-stop",
+    )
+    later = target_intent(
+        intent_id="later",
+        session=date(2026, 8, 4),
+        position_rule_policy_id="leaked-stop",
+    )
+
+    class CaughtOverlapStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(first)
+            with pytest.raises(PreOpenIntentError, match="overlaps target"):
+                broker.register_target_intent(overlapping, position_rules=StopLoss(0.05))
+            broker.register_target_intent(later)
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(DataFeed(prices_df=prices(bars=2)), CaughtOverlapStrategy())
+
+    with pytest.raises(UnsupportedPreOpenPolicyError, match="no registered implementation"):
+        engine.run()
+
+    assert engine.preopen_target_manager._position_rules == {}
+
+
+def test_later_target_replaces_the_active_position_rule_policy() -> None:
+    first = target_intent(
+        intent_id="first",
+        weight=0.5,
+        position_rule_policy_id="stop-50",
+    )
+    second = target_intent(
+        intent_id="second",
+        session=date(2026, 8, 4),
+        weight=0.6,
+        position_rule_policy_id="stop-20",
+    )
+
+    class ReplacingRuleStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(first, position_rules=StopLoss(0.5))
+            broker.register_target_intent(second, position_rules=StopLoss(0.2))
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=prices(bars=2, low=100.0)),
+        ReplacingRuleStrategy(),
+    )
+
+    engine.run()
+
+    assert engine.broker._position_rules_by_asset["SPY"] == StopLoss(0.2)
+    position = engine.broker.get_position("SPY")
+    assert position is not None
+    assert position.context["position_rule_policy_id"] == "stop-20"
+    reconciliations = engine.broker.get_intent_reconciliations()
+    assert [record.rule_policy_id for record in reconciliations] == ["stop-50", "stop-20"]
+    assert [record.rule_activated_at for record in reconciliations] == [
+        datetime(2026, 8, 3, tzinfo=UTC),
+        datetime(2026, 8, 4, tzinfo=UTC),
+    ]
+
+
+def test_target_managed_rule_does_not_apply_after_flat_and_plain_reentry() -> None:
+    intent = target_intent(position_rule_policy_id="stop-50")
+
+    class CloseThenReopenStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intent, position_rules=StopLoss(0.5))
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if timestamp == datetime(2026, 8, 3):
+                position = broker.get_position("SPY")
+                assert position is not None
+                broker.submit_order("SPY", -position.quantity)
+            elif timestamp == datetime(2026, 8, 4):
+                broker.submit_order("SPY", 1)
+
+    engine = Engine(
+        DataFeed(prices_df=prices(bars=2, low=100.0)),
+        CloseThenReopenStrategy(),
+        BacktestConfig(execution_mode=ExecutionMode.SAME_BAR),
+    )
+
+    engine.run()
+
+    position = engine.broker.get_position("SPY")
+    assert position is not None
+    assert position.quantity == 1
+    assert "SPY" not in engine.broker._position_rules_by_asset
 
 
 def test_partial_opening_fill_cancels_opg_remainder_and_retains_lineage() -> None:
@@ -831,22 +974,25 @@ def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> 
     assert rounded == {"A": 5.0, "B": 4.0}
 
 
-def test_fractional_largest_remainder_preserves_declared_rounding() -> None:
+def test_fractional_largest_remainder_rejects_a_discarded_rounding_residual() -> None:
     engine = Engine(
         DataFeed(prices_df=prices()),
-        InitialTargetStrategy(target_intent()),
+        InitialTargetStrategy(
+            target_intent(
+                weight=0.00175,
+                residual=ResidualPolicy.LARGEST_REMAINDER,
+            )
+        ),
         BacktestConfig(share_type=ShareType.FRACTIONAL),
     )
-    rounded = {"SPY": 1.0}
 
-    engine.preopen_target_manager._allocate_largest_remainders(
-        {"SPY": 1.75},
-        rounded,
-        {"SPY": 100.0},
-        0.0,
-    )
+    with pytest.raises(
+        UnsupportedPreOpenPolicyError,
+        match="largest_remainder with fractional shares requires rounding=none",
+    ):
+        engine.run()
 
-    assert rounded == {"SPY": 1.0}
+    assert engine.broker.orders == []
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:
