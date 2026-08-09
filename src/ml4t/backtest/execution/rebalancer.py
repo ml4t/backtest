@@ -112,6 +112,13 @@ class RebalanceConfig:
     data_frequency: DataFrequency | str | None = None
     timestamp_semantics: TimestampSemantics | str | None = None
 
+    def __post_init__(self) -> None:
+        if self.session_start_time is None:
+            return
+        from ..sessions import _validate_session_start_time
+
+        _validate_session_start_time(self.calendar, self.session_start_time)
+
 
 class TargetWeightExecutor:
     """Convert target portfolio weights to orders.

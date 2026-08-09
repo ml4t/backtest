@@ -65,22 +65,7 @@ class SessionConfig:
     def __post_init__(self) -> None:
         if self.session_start_time is None:
             return
-        start = (self.get_session_start_hour(), self.get_session_start_minute())
-        time(*start)
-        if start[0] >= 12:
-            return
-        if self.calendar.upper() == "UTC":
-            raise ValueError("morning session_start_time requires exchange calendar metadata")
-        from .calendar import get_standard_market_open_time
-
-        market_open = get_standard_market_open_time(self.calendar)
-        standard_open = (market_open.hour, market_open.minute)
-        if start != standard_open:
-            raise ValueError(
-                f"custom morning session_start_time {self.session_start_time!r} is unsupported "
-                f"for calendar {self.calendar!r}; its standard market open is "
-                f"{market_open:%H:%M}"
-            )
+        _validate_session_start_time(self.calendar, self.session_start_time)
 
     def get_session_start_hour(self) -> int:
         """Get session start hour (0-23)."""
@@ -95,6 +80,25 @@ class SessionConfig:
             parts = self.session_start_time.split(":")
             return int(parts[1]) if len(parts) > 1 else 0
         return _DEFAULT_SESSION_STARTS.get(self.calendar, (0, 0))[1]
+
+
+def _validate_session_start_time(calendar: str | None, session_start_time: str) -> None:
+    parts = session_start_time.split(":")
+    start = (int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+    time(*start)
+    if start[0] >= 12:
+        return
+    if calendar is None:
+        raise ValueError("morning session_start_time requires exchange calendar metadata")
+    from .calendar import get_standard_market_open_time
+
+    market_open = get_standard_market_open_time(calendar)
+    standard_open = (market_open.hour, market_open.minute)
+    if start != standard_open:
+        raise ValueError(
+            f"custom morning session_start_time {session_start_time!r} is unsupported for "
+            f"calendar {calendar!r}; its standard market open is {market_open:%H:%M}"
+        )
 
 
 def session_date_for_timestamp(
@@ -148,6 +152,8 @@ def session_date_for_timestamp(
         latest = max(sessions, key=lambda session: session.market_open, default=None)
         return latest.session_date if latest is not None else event_date
 
+    if session_start_time is not None:
+        _validate_session_start_time(calendar, session_start_time)
     session_config = SessionConfig(
         calendar=_normalize_session_calendar(calendar or "UTC"),
         timezone=str(exchange_timezone),

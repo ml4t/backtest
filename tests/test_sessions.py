@@ -84,6 +84,17 @@ class TestSessionConfig:
 
     def test_morning_boundary_without_exchange_calendar_has_a_concise_error(self):
         with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            session_date_for_timestamp(
+                datetime(2024, 1, 5, 16, 0),
+                calendar=None,
+                timezone="UTC",
+                session_start_time="09:30",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+
+    def test_utc_calendar_name_is_reported_as_an_unknown_exchange(self):
+        with pytest.raises(ValueError, match="UTC.*standard market open"):
             SessionConfig(calendar="UTC", session_start_time="09:30")
 
     def test_unknown_calendar_has_a_concise_standard_open_error(self):

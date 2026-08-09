@@ -790,12 +790,11 @@ class BacktestConfig:
             self.data_frequency = spec_frequency
 
         if self.feed_spec.session_start_time is not None:
-            from .sessions import SessionConfig
+            from .sessions import _validate_session_start_time
 
-            SessionConfig(
-                calendar=self.calendar or self.feed_spec.calendar or "UTC",
-                timezone=self.timezone,
-                session_start_time=self.feed_spec.session_start_time,
+            _validate_session_start_time(
+                self.calendar or self.feed_spec.calendar,
+                self.feed_spec.session_start_time,
             )
 
     @property

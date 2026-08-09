@@ -35,9 +35,9 @@
 - Morning-start exchange sessions group pre-market and regular-hours events under the same local
   calendar date; exchange session labels and opens come from cached authoritative calendar
   schedules.
-- Deferred next-open risk exits fill before opening targets are sized. Fractional
-  largest-remainder allocation requires rounding=none; use keep-cash residual handling with other
-  rounding policies.
+- Deferred next-open risk exits fill before opening targets are sized. Fractional accounts reject
+  largest-remainder residual handling because unrounded fractional targets leave no discrete
+  remainder; use keep-cash instead.
 
 ### Fixed
 

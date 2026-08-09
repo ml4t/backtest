@@ -507,6 +507,26 @@ class TestTargetWeightExecutorScheduling:
             is_session_close=True,
         )
 
+    def test_missing_week_end_raises_after_an_earlier_week_was_matched(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 5, 16, 0),
+            is_session_close=True,
+        )
+        with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-12"):
+            executor.should_rebalance(
+                datetime(2024, 1, 22, 16, 0),
+                is_session_close=True,
+            )
+
     def test_batch_month_end_rejects_a_missing_interior_period_end(self):
         with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
             resolve_rebalance_timestamps(
@@ -560,18 +580,11 @@ class TestTargetWeightExecutorScheduling:
         assert executor.should_rebalance(datetime(2024, 1, 5, 16, 0), is_session_close=True)
 
     def test_calendar_free_morning_boundary_has_a_concise_configuration_error(self):
-        executor = TargetWeightExecutor(
-            config=RebalanceConfig(
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            RebalanceConfig(
                 schedule=RebalanceSchedule.every_session(),
                 session_start_time="09:30",
                 data_frequency="1m",
-            )
-        )
-
-        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
-            executor.should_rebalance(
-                datetime(2024, 1, 5, 16, 0),
-                is_session_close=True,
             )
 
     def test_intraday_schedule_raises_after_a_required_close_never_matches(self):

@@ -1012,12 +1012,14 @@ def test_largest_remainder_allocation_uses_cash_released_by_position_trims() -> 
     assert rounded == {"A": 5.0, "B": 4.0}
 
 
-def test_fractional_largest_remainder_rejects_a_discarded_rounding_residual() -> None:
+@pytest.mark.parametrize("rounding", [RoundingPolicy.TOWARD_ZERO, RoundingPolicy.NONE])
+def test_fractional_largest_remainder_is_rejected(rounding: RoundingPolicy) -> None:
     engine = Engine(
         DataFeed(prices_df=prices()),
         InitialTargetStrategy(
             target_intent(
                 weight=0.00175,
+                rounding=rounding,
                 residual=ResidualPolicy.LARGEST_REMAINDER,
             )
         ),
@@ -1026,27 +1028,11 @@ def test_fractional_largest_remainder_rejects_a_discarded_rounding_residual() ->
 
     with pytest.raises(
         UnsupportedPreOpenPolicyError,
-        match="largest_remainder with fractional shares requires rounding=none",
+        match="largest_remainder is unsupported with fractional shares",
     ):
         engine.run()
 
     assert engine.broker.orders == []
-
-
-def test_fractional_largest_remainder_accepts_unrounded_targets() -> None:
-    result = Engine(
-        DataFeed(prices_df=prices()),
-        InitialTargetStrategy(
-            target_intent(
-                weight=0.00175,
-                rounding=RoundingPolicy.NONE,
-                residual=ResidualPolicy.LARGEST_REMAINDER,
-            )
-        ),
-        BacktestConfig(share_type=ShareType.FRACTIONAL),
-    ).run()
-
-    assert result.fills[0].quantity == 1.75
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:
@@ -1092,6 +1078,29 @@ def test_restart_registration_reattaches_position_rule_implementation() -> None:
 
     restored.restore_state(state)
     assert restored.register(intent, position_rules=StopLoss(0.05)) is restored.targets[0]
+
+
+def test_restored_manager_preserves_an_explicit_rule_disable_during_cleanup() -> None:
+    intent = target_intent(position_rule_policy_id="stop-50")
+    engine = Engine(
+        DataFeed(prices_df=prices(low=100.0)),
+        InitialTargetStrategy(intent, StopLoss(0.5)),
+    )
+    engine.run()
+    state = engine.preopen_target_manager.to_state()
+    engine.broker.clear_position_rules(asset="SPY")
+    restored = engine.broker._create_preopen_target_manager(
+        engine.execution_policy,
+        engine.lifecycle_version,
+        calendar=None,
+    )
+    restored.restore_state(state)
+
+    engine.broker.positions.clear()
+    restored.reconcile(datetime(2026, 8, 4))
+
+    assert "SPY" in engine.broker._position_rules_by_asset
+    assert engine.broker._position_rules_by_asset["SPY"] is None
 
 
 def test_result_artifact_round_trip_retains_contract_and_intent_evidence(tmp_path) -> None:

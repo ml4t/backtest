@@ -280,10 +280,9 @@ class PreOpenTargetManager:
         if (
             self.broker.share_type is ShareType.FRACTIONAL
             and intent.residual is ResidualPolicy.LARGEST_REMAINDER
-            and intent.rounding is not RoundingPolicy.NONE
         ):
             raise UnsupportedPreOpenPolicyError(
-                "largest_remainder with fractional shares requires rounding=none"
+                "largest_remainder is unsupported with fractional shares; use keep_cash"
             )
         policy_id = intent.position_rule_policy_id
         policy_registration: tuple[str, PositionRule] | None = None
@@ -924,6 +923,7 @@ class PreOpenTargetManager:
 
     def _clear_target_managed_rule(self, asset: str) -> None:
         if self._active_rule_policy_by_asset.pop(asset, None) is not None:
+            had_installed_rule = asset in self._installed_rule_by_asset
             installed_rules = self._installed_rule_by_asset.pop(asset, None)
             position = self.broker.get_position(asset)
             if position is not None:
@@ -935,7 +935,10 @@ class PreOpenTargetManager:
                     "position_rule_policy_id",
                 ):
                     position.context.pop(key, None)
-            if self.broker._get_position_rule_override(asset) is installed_rules:
+            if (
+                had_installed_rule
+                and self.broker._get_position_rule_override(asset) is installed_rules
+            ):
                 self.broker._remove_position_rule_override(asset)
 
     @staticmethod

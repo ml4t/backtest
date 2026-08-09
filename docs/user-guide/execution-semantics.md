@@ -108,9 +108,9 @@ Lifecycle callback counts are always retained for contract validation. Set
 `BacktestConfig(retain_lifecycle_history=True)` only when a per-callback trace is needed for parity
 analysis or debugging. The default does not retain one record per market event.
 
-For fractional-share accounts, `ResidualPolicy.LARGEST_REMAINDER` requires
-`RoundingPolicy.NONE`; combining it with a rounding policy is rejected before opening orders are
-created. Use `KEEP_CASH` when the fraction removed by rounding should remain unallocated.
+`ResidualPolicy.LARGEST_REMAINDER` is unsupported for fractional-share accounts because unrounded
+fractional targets leave no discrete remainder to allocate. Use `KEEP_CASH`; unsupported
+combinations are rejected before opening orders are created.
 
 `export_target_intent_state()` does not contain account or order-book state. Restoring state that
 already contains child orders therefore requires those orders and the corresponding account state
