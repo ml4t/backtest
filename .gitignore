@@ -38,8 +38,7 @@ htmlcov/
 .ipynb_checkpoints/
 src/ml4t/backtest/_version.py
 
-# Claude Code (local development only)
-CLAUDE.md
+# Agent-local state
 .claude/
 
 # Validation-generated local artifacts

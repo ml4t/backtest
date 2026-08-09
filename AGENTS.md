@@ -1,5 +1,7 @@
 # ml4t-backtest
 
+@.workspace/shared-context.md
+
 Event-driven backtesting engine with cross-framework parity validation.
 
 ## Structure
