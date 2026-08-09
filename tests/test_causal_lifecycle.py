@@ -206,6 +206,20 @@ def test_non_callback_engine_failure_runs_end_once(monkeypatch: pytest.MonkeyPat
     assert strategy.trace == ["on_start", "on_prepare", "on_end"]
 
 
+def test_failure_before_run_start_does_not_finalize_strategy() -> None:
+    strategy = TraceStrategy()
+    engine = Engine(
+        DataFeed(prices_df=prices()),
+        strategy,
+        BacktestConfig(calendar="not-a-calendar"),
+    )
+
+    with pytest.raises(RuntimeError, match="not one of the registered classes"):
+        engine.run()
+
+    assert strategy.trace == []
+
+
 def test_callback_failure_restores_updated_and_cancelled_pending_order() -> None:
     class FailingStrategy(Strategy):
         def on_data(self, timestamp, data, context, broker) -> None:
@@ -227,6 +241,22 @@ def test_callback_failure_restores_updated_and_cancelled_pending_order() -> None
     assert pending[0].quantity == 10
     assert pending[0].status is OrderStatus.PENDING
     assert engine.broker.orders == pending
+
+
+def test_strategy_callback_cannot_replace_broker_owned_collections() -> None:
+    class ReplacingStrategy(Strategy):
+        def on_start(self, broker) -> None:
+            broker.submit_order("SPY", 10, order_type=OrderType.LIMIT, limit_price=70)
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            broker.orders = []
+
+    engine = Engine(DataFeed(prices_df=prices()), ReplacingStrategy())
+
+    with pytest.raises(RuntimeError, match="direct Broker.orders assignment"):
+        engine.run()
+
+    assert len(engine.broker.orders) == 1
 
 
 def test_read_only_callbacks_do_not_copy_broker_state(monkeypatch: pytest.MonkeyPatch) -> None:

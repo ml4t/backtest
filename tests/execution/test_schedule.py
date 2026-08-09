@@ -68,7 +68,12 @@ class TestResolveRebalanceTimestamps:
     def test_weekly_uses_scheduled_week_end(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-31")
 
-        result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.weekly())
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceSchedule.weekly(),
+            calendar="NYSE",
+            data_frequency="daily",
+        )
 
         assert result.to_list() == [
             datetime(2024, 1, 5),
@@ -80,18 +85,28 @@ class TestResolveRebalanceTimestamps:
     def test_month_end_uses_scheduled_month_end(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-03-31")
 
-        result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.month_end())
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceSchedule.month_end(),
+            calendar="NYSE",
+            data_frequency="daily",
+        )
 
         resolved = result.to_list()
         assert len(resolved) == 3
         assert resolved[0].month == 1 and resolved[0].day == 31
         assert resolved[1].month == 2 and resolved[1].day == 29
-        assert resolved[2].month == 3 and resolved[2].day == 29
+        assert resolved[2].month == 3 and resolved[2].day == 28
 
     def test_incomplete_month_does_not_move_rebalance_to_last_available_bar(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-30")
 
-        result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.month_end())
+        result = resolve_rebalance_timestamps(
+            timestamps,
+            RebalanceSchedule.month_end(),
+            calendar="NYSE",
+            data_frequency="daily",
+        )
 
         assert result.to_list() == []
 
@@ -154,6 +169,19 @@ class TestResolveRebalanceTimestamps:
         )
 
         assert result.to_list() == [timestamps[1]]
+
+    def test_intraday_batch_schedule_rejects_total_close_alignment_miss(self) -> None:
+        timestamps = [datetime(2024, 1, 8, 15, 58), datetime(2024, 1, 8, 15, 59)]
+
+        with pytest.raises(ValueError, match="resolved no session closes"):
+            resolve_rebalance_timestamps(
+                timestamps,
+                RebalanceCadence.EVERY_SESSION,
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+                timestamp_semantics="event_time",
+            )
 
     def test_weekly_daily_session_labels_use_labeled_dates_not_prior_sessions(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-12")
@@ -263,32 +291,16 @@ class TestCausalScheduleEvaluation:
             calendar="NYSE",
             data_frequency="daily",
         )
-        assert is_rebalance_timestamp(
-            datetime(2024, 1, 5),
-            RebalanceSchedule.weekly(),
-            session_index=5,
-            data_frequency="daily",
-        )
-        assert not is_rebalance_timestamp(
-            datetime(2024, 1, 4),
-            RebalanceSchedule.weekly(),
-            session_index=4,
-            data_frequency="daily",
-        )
 
-    def test_month_end_without_calendar_uses_last_weekday(self) -> None:
-        assert is_rebalance_timestamp(
-            datetime(2024, 3, 29),
-            RebalanceSchedule.month_end(),
-            session_index=20,
-            data_frequency="daily",
-        )
-        assert not is_rebalance_timestamp(
-            datetime(2024, 3, 28),
-            RebalanceSchedule.month_end(),
-            session_index=19,
-            data_frequency="daily",
-        )
+    def test_period_schedules_require_calendar_metadata(self) -> None:
+        for schedule in (RebalanceSchedule.weekly(), RebalanceSchedule.month_end()):
+            with pytest.raises(ValueError, match="require calendar metadata"):
+                is_rebalance_timestamp(
+                    datetime(2024, 3, 29),
+                    schedule,
+                    session_index=20,
+                    data_frequency="daily",
+                )
 
     def test_intraday_session_cadences_fire_only_at_calendar_close(self) -> None:
         before_close = datetime(2024, 1, 5, 20, 59, tzinfo=UTC)
@@ -432,6 +444,30 @@ class TestCausalScheduleEvaluation:
                 calendar="NYSE",
                 timezone="UTC",
                 data_frequency="1m",
+            )
+
+        assert calls == 1
+
+    def test_calendar_period_end_is_cached_within_period(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = 0
+        get_schedule = schedule_module.get_schedule
+
+        def counted_get_schedule(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return get_schedule(*args, **kwargs)
+
+        schedule_module._calendar_period_end.cache_clear()
+        monkeypatch.setattr(schedule_module, "get_schedule", counted_get_schedule)
+        for day in range(25, 29):
+            is_rebalance_timestamp(
+                datetime(2024, 3, day),
+                RebalanceSchedule.weekly(),
+                session_index=day - 24,
+                calendar="NYSE",
+                data_frequency="daily",
             )
 
         assert calls == 1

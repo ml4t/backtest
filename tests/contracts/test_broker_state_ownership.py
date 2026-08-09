@@ -99,6 +99,18 @@ COLLECTION_COPY_OR_VIEW_CALLS = {
 }
 # fill_engine.py passes positions to this read-only accounting policy method.
 COLLECTION_READ_METHOD_SUFFIX = ("account", "policy", "get_spendable_cash")
+MUTATING_COLLECTION_METHODS = {
+    "add",
+    "append",
+    "clear",
+    "discard",
+    "extend",
+    "pop",
+    "popitem",
+    "remove",
+    "setdefault",
+    "update",
+}
 
 
 def _parse(path: Path) -> ast.Module:
@@ -115,6 +127,43 @@ def _owned_state_fields(function: ast.FunctionDef, owner: str) -> set[str]:
         and node.value.value.id == "self"
         and node.value.attr == owner
     }
+
+
+def _references_owner(node: ast.AST, owner: str, field: str | None = None) -> bool:
+    for candidate in ast.walk(node):
+        if not isinstance(candidate, ast.Attribute):
+            continue
+        if field is None:
+            if (
+                candidate.attr == owner
+                and isinstance(candidate.value, ast.Name)
+                and candidate.value.id == "self"
+            ):
+                return True
+        elif (
+            candidate.attr == field
+            and isinstance(candidate.value, ast.Attribute)
+            and candidate.value.attr == owner
+            and isinstance(candidate.value.value, ast.Name)
+            and candidate.value.value.id == "self"
+        ):
+            return True
+    return False
+
+
+def _mutation_expressions(function: ast.AST) -> list[ast.AST]:
+    expressions: list[ast.AST] = []
+    for node in ast.walk(function):
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            expressions.extend(targets)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in MUTATING_COLLECTION_METHODS
+        ):
+            expressions.append(node.func.value)
+    return expressions
 
 
 def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
@@ -198,6 +247,13 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
         assert len(captures) == 1, method_name
         declared = {keyword.arg for keyword in captures[0].keywords}
         assert declared >= expected, method_name
+        mutations = _mutation_expressions(methods[method_name])
+        if any(_references_owner(node, "_asset_stats") for node in mutations):
+            assert declared.intersection({"asset", "all_asset_stats"}), method_name
+        if any(_references_owner(node, "account", "positions") for node in mutations):
+            assert declared.intersection({"asset", "all_positions"}), method_name
+        if any(_references_owner(node, "_risk_state", "position_rules") for node in mutations):
+            assert "risk_rules" in declared, method_name
 
 
 def _references_broker(node: ast.AST) -> bool:

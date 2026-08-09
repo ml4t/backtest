@@ -25,8 +25,9 @@
   close-only fallbacks explicitly.
 - Stable distribution metadata, release-critical static analysis, and the 250-asset performance
   workload now match the 0.1 release contract.
-- Weekly and month-end rebalance schedules use the final scheduled exchange session rather than
-  the last available feed bar; missing period-end data no longer moves a rebalance earlier.
+- Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled
+  exchange session rather than the last available feed bar; holidays and missing period-end data
+  no longer move a rebalance earlier.
 - Result artifacts retain intent counts by default. Set retain_intent_history to include full
   target, child-order, and reconciliation histories.
 

@@ -749,13 +749,13 @@ class BacktestConfig:
     data_frequency: DataFrequency = DataFrequency.DAILY  # Data frequency
     enforce_sessions: bool = False  # Skip bars outside trading sessions (requires calendar)
 
-    # === Result Evidence ===
-    retain_intent_history: bool = False
-
     # === Metadata ===
     preset_name: str | None = None  # Name of preset this was loaded from
     feed_spec: FeedSpec | None = field(default=None, repr=False, compare=False)
     metadata: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    # === Result Evidence ===
+    retain_intent_history: bool = False
     _explicit_timezone: bool = field(default=False, init=False, repr=False, compare=False)
     _explicit_data_frequency: bool = field(default=False, init=False, repr=False, compare=False)
 

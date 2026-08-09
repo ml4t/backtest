@@ -399,12 +399,6 @@
         "name": "enforce_sessions"
       },
       {
-        "annotation": "bool",
-        "default": false,
-        "keyword_only": false,
-        "name": "retain_intent_history"
-      },
-      {
         "annotation": "str | None",
         "default": null,
         "keyword_only": false,
@@ -424,6 +418,12 @@
         },
         "keyword_only": false,
         "name": "metadata"
+      },
+      {
+        "annotation": "bool",
+        "default": false,
+        "keyword_only": false,
+        "name": "retain_intent_history"
       }
     ],
     "StatsConfig": [
@@ -587,6 +587,7 @@
     "from ml4t.backtest.config import TrailStopTiming, WaterMarkSource, InitialHwmSource",
     "from ml4t.backtest.execution import LinearImpact",
     "from ml4t.backtest.execution import LinearImpact, SquareRootImpact, NoImpact",
+    "from ml4t.backtest.execution import RebalanceConfig",
     "from ml4t.backtest.execution import SquareRootImpact",
     "from ml4t.backtest.execution import VolumeParticipationLimit",
     "from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig",
@@ -2534,6 +2535,18 @@
       "module": "ml4t.backtest.execution.impact",
       "qualname": "NoImpact",
       "signature": "() -> None"
+    },
+    "ml4t.backtest.execution:RebalanceConfig": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.execution.rebalancer",
+      "qualname": "RebalanceConfig",
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest.execution:SquareRootImpact": {
       "kind": "class",

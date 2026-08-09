@@ -486,7 +486,10 @@ class Engine:
         )
 
     def _finalize_strategy(self) -> None:
-        if self._strategy_finalized:
+        if (
+            self._strategy_finalized
+            or self.lifecycle_dispatcher.callback_counts[LifecyclePhase.RUN_START] == 0
+        ):
             return
         self._strategy_finalized = True
         self.lifecycle_dispatcher.dispatch(

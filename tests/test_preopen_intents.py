@@ -704,7 +704,7 @@ def test_result_artifact_round_trip_retains_contract_and_intent_evidence(tmp_pat
     assert loaded.metrics["intent_reconciliations"] == result.metrics["intent_reconciliations"]
 
 
-def test_default_result_retains_intent_counts_without_full_history() -> None:
+def test_default_result_retains_intent_counts_without_full_history(tmp_path) -> None:
     result = Engine(
         DataFeed(prices_df=prices(low=100.0)),
         InitialTargetStrategy(target_intent()),
@@ -716,6 +716,13 @@ def test_default_result_retains_intent_counts_without_full_history() -> None:
     assert result.metrics["target_intents"] == []
     assert result.metrics["child_order_intents"] == []
     assert result.metrics["intent_reconciliations"] == []
+    assert result.to_spec_dict()["target_intent_count"] == 1
+
+    result.to_parquet(tmp_path)
+    loaded = BacktestResult.from_parquet(tmp_path)
+    assert loaded.metrics["target_intent_count"] == 1
+    assert loaded.metrics["child_order_intent_count"] == 1
+    assert loaded.metrics["intent_reconciliation_count"] == 1
 
 
 def test_ambiguous_opening_bar_path_requires_declared_resolution() -> None:

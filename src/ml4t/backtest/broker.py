@@ -451,6 +451,7 @@ class Broker:
 
     @positions.setter
     def positions(self, value: dict[str, Position]) -> None:
+        self._reject_lifecycle_collection_replacement("positions")
         self.account.positions = value
 
     @property
@@ -460,6 +461,7 @@ class Broker:
 
     @orders.setter
     def orders(self, value: list[Order]) -> None:
+        self._reject_lifecycle_collection_replacement("orders")
         self._order_state.orders = value
 
     @property
@@ -469,6 +471,7 @@ class Broker:
 
     @pending_orders.setter
     def pending_orders(self, value: list[Order]) -> None:
+        self._reject_lifecycle_collection_replacement("pending_orders")
         self._order_state.pending = value
 
     @property
@@ -478,6 +481,7 @@ class Broker:
 
     @fills.setter
     def fills(self, value: list[Fill]) -> None:
+        self._reject_lifecycle_collection_replacement("fills")
         self._execution_journal.fills = value
 
     @property
@@ -487,7 +491,14 @@ class Broker:
 
     @trades.setter
     def trades(self, value: list[Trade]) -> None:
+        self._reject_lifecycle_collection_replacement("trades")
         self._execution_journal.trades = value
+
+    def _reject_lifecycle_collection_replacement(self, name: str) -> None:
+        if self._lifecycle_transaction is not None:
+            raise RuntimeError(
+                f"direct Broker.{name} assignment is not allowed during strategy callbacks"
+            )
 
     @property
     def _bar_index(self) -> int:
@@ -817,6 +828,8 @@ class Broker:
             if order_state is not None:
                 order.__dict__.clear()
                 order.__dict__.update(copy.deepcopy(order_state))
+        if len(self._order_state.orders) < state["orders_length"]:
+            raise RuntimeError("order history was shortened during lifecycle dispatch")
         del self._order_state.orders[state["orders_length"] :]
         self._order_state.pending[:] = state["pending_orders"]
         self._order_state.counter = state["order_counter"]
@@ -827,6 +840,10 @@ class Broker:
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
+        if len(self._execution_journal.fills) < state["fills_length"]:
+            raise RuntimeError("fill history was shortened during lifecycle dispatch")
+        if len(self._execution_journal.trades) < state["trades_length"]:
+            raise RuntimeError("trade history was shortened during lifecycle dispatch")
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
 

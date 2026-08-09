@@ -69,7 +69,8 @@ class RebalanceConfig:
             INCREMENTAL: Recompute value after each fill (most accurate).
             HYBRID: Frozen targets, sequential fills (VBT-style).
         schedule: Optional event, session, weekly, month-end, or explicit schedule.
-        calendar: Exchange calendar used to identify session closes and period ends.
+        calendar: Exchange calendar used to identify session closes and period ends. Required for
+            weekly and month-end schedules.
         timezone: Timezone used to interpret naive feed timestamps.
         session_start_time: Optional exchange-local session boundary in ``HH:MM`` form.
         data_frequency: Feed frequency. Set this with ``timestamp_semantics`` for intraday data.

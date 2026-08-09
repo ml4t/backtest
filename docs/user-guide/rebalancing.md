@@ -100,13 +100,14 @@ unless you opt into one explicitly.
 
 ### Schedule metadata
 
-Session-based schedules need enough metadata to identify exchange session closes. Daily feeds can
-set `data_frequency="daily"`. Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and
-`timestamp_semantics`. Set `session_start_time` when the exchange session boundary differs from the
-calendar default.
+Session-based schedules need enough metadata to identify exchange session closes. Weekly and
+month-end schedules require `calendar`. Daily feeds must also set `data_frequency="daily"`.
+Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and `timestamp_semantics`. Set
+`session_start_time` when the exchange session boundary differs from the calendar default.
 
 ```python
 from ml4t.backtest import RebalanceSchedule
+from ml4t.backtest.execution import RebalanceConfig
 
 rebalance_config = RebalanceConfig(
     schedule=RebalanceSchedule.fixed_n_sessions(5),
@@ -122,6 +123,10 @@ Naive timestamps use `timezone` as their source timezone. Session boundaries are
 the exchange timezone. Weekly and month-end schedules fire only on the final scheduled exchange
 session in the period. A missing final session in the feed does not move the rebalance to an
 earlier bar.
+
+For intraday batch resolution, the feed must contain timestamps aligned with the exchange close.
+If no close can be matched, schedule resolution raises an error instead of returning an empty
+schedule.
 
 ## See It in Action
 

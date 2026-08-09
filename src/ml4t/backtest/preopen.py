@@ -130,6 +130,8 @@ class IntentReconciliation:
 
 @dataclass(slots=True)
 class _PreOpenTransactionState:
+    """Constant-size checkpoint for manager operations that only append new state."""
+
     targets_length: int
     target_by_session_asset_length: int
     idempotency_length: int
@@ -487,7 +489,19 @@ class PreOpenTargetManager:
 
     def restore_state(self, state: dict[str, Any]) -> None:
         """Restore target evidence and idempotency state into a configured broker."""
-        if self._targets or self._children or self._reconciliations:
+        if (
+            self._targets
+            or self._target_by_session_asset
+            or self._idempotency
+            or self._children
+            or self._order_by_child
+            or self._active_children
+            or self._processed_targets
+            or self._reconciliations
+            or self._latest_reconciliation
+            or self._terminal_children
+            or self._rule_activations
+        ):
             raise PreOpenIntentError(
                 "target intent state can only be restored into an empty manager"
             )
@@ -593,11 +607,8 @@ class PreOpenTargetManager:
 
     @staticmethod
     def _restore_add_only_set(values: set[str], length: int) -> None:
-        if len(values) == length:
-            return
-        if length != 0:
-            raise RuntimeError("pre-open transaction changed a non-empty add-only set")
-        values.clear()
+        if length == 0:
+            values.clear()
 
     def _registration_is_causal(
         self, intent: CanonicalTargetIntent, active_phase: LifecyclePhase
