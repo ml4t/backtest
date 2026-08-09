@@ -407,7 +407,7 @@ class _OnlineRebalanceEvaluator:
         self._last_observed_instant: datetime | None = None
         self._last_boundary_override: bool | None = None
         self._last_evaluation_result = False
-        self._implicit_daily_dates: set[date] = set()
+        self._implicit_daily_boundary_modes: dict[date, bool] = {}
         self._observed_exchange_session = False
         self._matched_period_ends: set[date] = set()
         self._explicit_schedule_by_instant = {
@@ -424,10 +424,9 @@ class _OnlineRebalanceEvaluator:
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
         event_instant = _event_time_utc(timestamp, self.timezone)
         if event_instant == self._last_observed_instant:
-            if (
-                is_session_close is not None
-                and self._last_boundary_override is not None
-                and is_session_close != self._last_boundary_override
+            if is_session_close is not None and (
+                self._last_boundary_override is None
+                or is_session_close != self._last_boundary_override
             ):
                 raise ValueError(
                     f"timestamp {timestamp.isoformat()} was evaluated with conflicting "
@@ -569,15 +568,17 @@ class _OnlineRebalanceEvaluator:
         if (
             self.schedule.cadence
             in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EXPLICIT_TIMESTAMPS}
-            or is_session_close is not None
             or self.data_frequency is not None
             or self.timestamp_semantics is not None
         ):
             return
         event_date = timestamp.date()
-        if event_date in self._implicit_daily_dates:
+        explicit_boundary = is_session_close is not None
+        if event_date in self._implicit_daily_boundary_modes and (
+            not explicit_boundary or not self._implicit_daily_boundary_modes[event_date]
+        ):
             _raise_ambiguous_missing_metadata(event_date)
-        self._implicit_daily_dates.add(event_date)
+        self._implicit_daily_boundary_modes[event_date] = explicit_boundary
 
     @property
     def has_observations(self) -> bool:

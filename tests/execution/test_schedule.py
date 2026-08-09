@@ -714,6 +714,33 @@ class TestCausalScheduleEvaluation:
         with pytest.raises(ValueError, match="conflicting is_session_close"):
             executor.should_rebalance(timestamp, is_session_close=True)
 
+    def test_same_instant_rejects_an_explicit_override_after_inference(self) -> None:
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))
+        timestamp = datetime(2024, 1, 5, 16, 0)
+
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert executor.should_rebalance(timestamp)
+        with pytest.raises(ValueError, match="conflicting is_session_close"):
+            executor.should_rebalance(timestamp, is_session_close=False)
+
+    def test_same_instant_accepts_flagless_reentry_after_an_explicit_boundary(self) -> None:
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))
+        timestamp = datetime(2024, 1, 5, 16, 0)
+
+        assert not executor.should_rebalance(timestamp, is_session_close=False)
+        assert not executor.should_rebalance(timestamp)
+
+    def test_missing_metadata_rejects_mixed_boundary_modes_on_one_date(self) -> None:
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.every_session()))
+
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert executor.should_rebalance(datetime(2024, 1, 5, 15, 59))
+        with pytest.raises(ValueError, match="multiple schedule events.*intraday data"):
+            executor.should_rebalance(
+                datetime(2024, 1, 5, 16, 0),
+                is_session_close=True,
+            )
+
     def test_midnight_is_not_a_daily_label_with_explicit_bar_semantics(self) -> None:
         assert not is_rebalance_timestamp(
             datetime(2024, 1, 31),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -26,6 +27,12 @@ class TestSessionConfig:
         config = SessionConfig(calendar="NYSE")
         assert config.timezone == "UTC"
         assert config.session_start_time is None
+
+    def test_configuration_is_immutable(self) -> None:
+        config = SessionConfig(calendar="NYSE")
+
+        with pytest.raises(FrozenInstanceError):
+            config.timezone = "America/New_York"
 
     def test_get_session_start_hour_custom(self):
         """Test custom session start hour."""
