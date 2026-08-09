@@ -277,13 +277,7 @@ class PreOpenTargetManager:
                 f"target {intent.intent_id!r} for {intent.effective_session} was registered during "
                 f"{active_phase.value} after its pre-open decision phase"
             )
-        if (
-            self.broker.share_type is ShareType.FRACTIONAL
-            and intent.residual is ResidualPolicy.LARGEST_REMAINDER
-        ):
-            raise UnsupportedPreOpenPolicyError(
-                "largest_remainder is unsupported with fractional shares; use keep_cash"
-            )
+        self._validate_residual_policy(intent)
         policy_id = intent.position_rule_policy_id
         policy_registration: tuple[str, PositionRule] | None = None
         if position_rules is not None and policy_id is None:
@@ -560,9 +554,11 @@ class PreOpenTargetManager:
                 "post-opening target intent state cannot be restored without a complete broker "
                 f"checkpoint, which Engine does not support: {names}"
             )
-        restored_targets = (
+        restored_targets = tuple(
             CanonicalTargetIntent.from_mapping(raw) for raw in state.get("targets", ())
         )
+        for intent in restored_targets:
+            self._validate_residual_policy(intent)
         targets = {intent.intent_id: intent for intent in restored_targets}
         restored_children = (
             CanonicalChildOrderIntent.from_mapping(raw) for raw in state.get("children", ())
@@ -818,8 +814,7 @@ class PreOpenTargetManager:
         prices: dict[str, float],
         cash_buffer: float,
     ) -> None:
-        if self.broker.share_type is ShareType.FRACTIONAL:
-            return
+        assert self.broker.share_type is ShareType.INTEGER
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
         target_notional = sum(
@@ -861,6 +856,16 @@ class PreOpenTargetManager:
             if price <= residual_cash:
                 rounded[asset] += 1.0
                 residual_cash -= price
+
+    def _validate_residual_policy(self, intent: CanonicalTargetIntent) -> None:
+        if (
+            self.broker.share_type is ShareType.FRACTIONAL
+            and intent.residual is ResidualPolicy.LARGEST_REMAINDER
+        ):
+            raise UnsupportedPreOpenPolicyError(
+                "largest_remainder is unsupported with fractional shares regardless of rounding; "
+                "use keep_cash"
+            )
 
     def _round_quantity(self, value: float, policy: RoundingPolicy) -> float:
         if policy is RoundingPolicy.NONE:

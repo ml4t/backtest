@@ -36,8 +36,8 @@
   calendar date; exchange session labels and opens come from cached authoritative calendar
   schedules.
 - Deferred next-open risk exits fill before opening targets are sized. Fractional accounts reject
-  largest-remainder residual handling because unrounded fractional targets leave no discrete
-  remainder; use keep-cash instead.
+  largest-remainder residual handling regardless of rounding because its whole-unit allocation
+  cannot redistribute fractional remainders; use keep-cash instead.
 
 ### Fixed
 

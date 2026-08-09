@@ -108,9 +108,11 @@ Lifecycle callback counts are always retained for contract validation. Set
 `BacktestConfig(retain_lifecycle_history=True)` only when a per-callback trace is needed for parity
 analysis or debugging. The default does not retain one record per market event.
 
-`ResidualPolicy.LARGEST_REMAINDER` is unsupported for fractional-share accounts because unrounded
-fractional targets leave no discrete remainder to allocate. Use `KEEP_CASH`; unsupported
-combinations are rejected before opening orders are created.
+`ResidualPolicy.LARGEST_REMAINDER` is unsupported for fractional-share accounts regardless of the
+rounding policy. Its allocation step adds whole units, so it cannot redistribute a rounded
+fractional remainder, while an unrounded fractional target has no discrete remainder to allocate.
+Use `KEEP_CASH`; unsupported combinations are rejected before opening orders are created or
+restored.
 
 A position rule associated with a target remains active until the position becomes flat or a later
 filled target for that asset replaces it. If the later target does not name a

@@ -1070,6 +1070,26 @@ def test_fractional_largest_remainder_is_rejected(rounding: RoundingPolicy) -> N
     assert engine.broker.orders == []
 
 
+def test_fractional_largest_remainder_is_rejected_when_state_is_restored() -> None:
+    intent = target_intent(residual=ResidualPolicy.LARGEST_REMAINDER)
+    source = Engine(DataFeed(prices_df=prices()), InitialTargetStrategy(intent))
+    source.preopen_target_manager.register(intent)
+    state = source.preopen_target_manager.to_state()
+    destination = Engine(
+        DataFeed(prices_df=prices()),
+        InitialTargetStrategy(intent),
+        BacktestConfig(share_type=ShareType.FRACTIONAL),
+    )
+
+    with pytest.raises(
+        UnsupportedPreOpenPolicyError,
+        match=r"unsupported with fractional shares regardless of rounding",
+    ):
+        destination.preopen_target_manager.restore_state(state)
+
+    assert destination.preopen_target_manager.targets == ()
+
+
 def test_restart_state_requires_matching_broker_order_state() -> None:
     config = BacktestConfig()
     policy = replace(
