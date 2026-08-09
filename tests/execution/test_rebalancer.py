@@ -652,19 +652,19 @@ class TestTargetWeightExecutorScheduling:
         executor.reset()
         assert executor.should_rebalance(datetime(2024, 1, 2))
 
-    def test_validate_completed_run_rejects_config_mutation(self):
+    def test_validate_completed_run_uses_the_evaluator_that_observed_the_run(self):
         config = RebalanceConfig(
             schedule=RebalanceSchedule.every_session(),
-            data_frequency="daily",
+            calendar="NYSE",
+            timezone="America/New_York",
+            data_frequency="15m",
+            timestamp_semantics="bar_close",
         )
         executor = TargetWeightExecutor(config=config)
-        assert executor.should_rebalance(datetime(2024, 1, 2))
-        config.data_frequency = "15m"
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 16, 15))
+        config.data_frequency = "daily"
 
-        with pytest.raises(
-            ValueError,
-            match=r"data_frequency: .*daily.* -> .*15m.*; call reset",
-        ):
+        with pytest.raises(ValueError, match="resolved no session closes"):
             executor.validate_completed_run()
 
     def test_validate_completed_run_accepts_config_mutation_before_observation(self):
@@ -675,6 +675,43 @@ class TestTargetWeightExecutorScheduling:
         executor = TargetWeightExecutor(config=config)
         config.data_frequency = "15m"
 
+        executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_matches_the_same_instant_across_timezones(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
+        executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_rejects_an_unmatched_observed_date(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 20, 59, tzinfo=UTC))
+        with pytest.raises(
+            ValueError,
+            match=r"2024-01-02T16:00:00.*nearest observed timestamp is 2024-01-02T20:59:00",
+        ):
+            executor.validate_completed_run()
+
+    def test_online_explicit_timestamp_outside_the_observed_window_is_ignored(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 3, 16, 0)]),
+                timezone="America/New_York",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 2, 21, 0, tzinfo=UTC))
         executor.validate_completed_run()
 
     def test_nyse_premarket_bar_does_not_create_a_phantom_session(self):

@@ -622,6 +622,41 @@ def test_later_target_replaces_the_active_position_rule_policy() -> None:
     ]
 
 
+def test_later_target_without_a_rule_policy_clears_the_target_managed_rule() -> None:
+    first = target_intent(
+        intent_id="first",
+        weight=0.5,
+        position_rule_policy_id="stop-50",
+    )
+    second = target_intent(
+        intent_id="second",
+        session=date(2026, 8, 4),
+        weight=0.6,
+    )
+
+    class ClearingRuleStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(first, position_rules=StopLoss(0.5))
+            broker.register_target_intent(second)
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=prices(bars=2, low=100.0)),
+        ClearingRuleStrategy(),
+    )
+
+    engine.run()
+
+    assert "SPY" not in engine.broker._position_rules_by_asset
+    position = engine.broker.get_position("SPY")
+    assert position is not None
+    assert "position_rule_policy_id" not in position.context
+    reconciliations = engine.broker.get_intent_reconciliations()
+    assert [record.rule_policy_id for record in reconciliations] == ["stop-50", None]
+
+
 def test_target_managed_rule_does_not_apply_after_flat_and_plain_reentry() -> None:
     intent = target_intent(position_rule_policy_id="stop-50")
 

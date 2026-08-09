@@ -44,7 +44,15 @@ class RebalanceSchedule:
     def __post_init__(self) -> None:
         if self.cadence == RebalanceCadence.FIXED_N_SESSIONS and self.every_n < 1:
             raise ValueError("RebalanceSchedule.every_n must be >= 1")
-        timestamps = tuple(sorted({_coerce_timestamp(ts) for ts in self.timestamps}))
+        timestamps = tuple(
+            sorted(
+                {_coerce_timestamp(ts) for ts in self.timestamps},
+                key=lambda timestamp: (
+                    _event_time_utc(timestamp, None),
+                    timestamp.tzinfo is not None,
+                ),
+            )
+        )
         if self.cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS and not timestamps:
             raise ValueError("Explicit timestamp schedules require at least one timestamp")
         object.__setattr__(self, "timestamps", timestamps)
@@ -125,7 +133,11 @@ def _evaluate_rebalance_timestamp(
     if cadence is RebalanceCadence.EVERY_BAR:
         return True
     if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
-        return timestamp in resolved._timestamp_set
+        event_time = _event_time_utc(timestamp, timezone)
+        return any(
+            _event_time_utc(scheduled, timezone) == event_time
+            for scheduled in resolved._timestamp_set
+        )
     _validate_schedule_calendar(resolved, calendar)
     if is_session_close is None:
         is_session_close = _is_session_close_timestamp(
@@ -288,6 +300,23 @@ def _event_time_utc(timestamp: datetime, timezone: str | None) -> datetime:
     return _localize_event_time(timestamp, timezone).astimezone(ZoneInfo("UTC"))
 
 
+def _explicit_local_date(timestamp: datetime, timezone: str | None) -> date:
+    return _localize_event_time(timestamp, timezone).date()
+
+
+def _raise_explicit_alignment_error(
+    scheduled: datetime,
+    nearest_observed: datetime,
+    timezone: str | None,
+) -> None:
+    raise ValueError(
+        f"explicit_timestamps schedule timestamp {scheduled.isoformat()} did not match an "
+        f"observed feed event within the local feed window for timezone "
+        f"{timezone or 'UTC'!r}; nearest observed timestamp is "
+        f"{nearest_observed.isoformat()}"
+    )
+
+
 def _session_reached_expected_close(
     calendar: str | None,
     session_date: date,
@@ -364,13 +393,34 @@ class _OnlineRebalanceEvaluator:
         self._observed_event_count = 0
         self._observed_exchange_session = False
         self._matched_period_ends: set[date] = set()
+        self._explicit_instants = {
+            scheduled: _event_time_utc(scheduled, timezone) for scheduled in schedule.timestamps
+        }
+        self._matched_explicit_timestamps: set[datetime] = set()
+        self._first_explicit_local_date: date | None = None
+        self._last_explicit_local_date: date | None = None
+        self._nearest_explicit_events: dict[datetime, tuple[float, datetime]] = {}
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
         self._observed_event_count += 1
         if self.schedule.cadence is RebalanceCadence.EVERY_BAR:
             return True
         if self.schedule.cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
-            return timestamp in self.schedule._timestamp_set
+            event_time = _event_time_utc(timestamp, self.timezone)
+            event_date = _explicit_local_date(timestamp, self.timezone)
+            if self._first_explicit_local_date is None:
+                self._first_explicit_local_date = event_date
+            self._last_explicit_local_date = event_date
+            matched = False
+            for scheduled, scheduled_time in self._explicit_instants.items():
+                distance = abs((event_time - scheduled_time).total_seconds())
+                nearest = self._nearest_explicit_events.get(scheduled)
+                if nearest is None or distance < nearest[0]:
+                    self._nearest_explicit_events[scheduled] = (distance, timestamp)
+                if event_time == scheduled_time:
+                    self._matched_explicit_timestamps.add(scheduled)
+                    matched = True
+            return matched
         session_date = session_date_for_timestamp(
             timestamp,
             calendar=self.calendar,
@@ -452,10 +502,26 @@ class _OnlineRebalanceEvaluator:
 
     def validate_completed_run(self) -> None:
         """Validate the final observed session after every event has been evaluated."""
-        if self.schedule.cadence in {
-            RebalanceCadence.EVERY_BAR,
-            RebalanceCadence.EXPLICIT_TIMESTAMPS,
-        }:
+        if self.schedule.cadence is RebalanceCadence.EVERY_BAR:
+            return
+        if self.schedule.cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
+            if self._first_explicit_local_date is None or self._last_explicit_local_date is None:
+                return
+            unmatched = sorted(
+                (
+                    scheduled
+                    for scheduled in self.schedule.timestamps
+                    if scheduled not in self._matched_explicit_timestamps
+                    and self._first_explicit_local_date
+                    <= _explicit_local_date(scheduled, self.timezone)
+                    <= self._last_explicit_local_date
+                ),
+                key=lambda scheduled: self._explicit_instants[scheduled],
+            )
+            if unmatched:
+                scheduled = unmatched[0]
+                nearest = self._nearest_explicit_events[scheduled][1]
+                _raise_explicit_alignment_error(scheduled, nearest, self.timezone)
             return
         if (
             self._observed_event_count > 0
@@ -527,7 +593,53 @@ def resolve_rebalance_timestamps(
         return pl.Series("timestamp", ts_list)
 
     if cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS:
-        return pl.Series("timestamp", [ts for ts in ts_list if ts in schedule._timestamp_set])
+        metadata = _resolve_schedule_metadata(
+            ts_list,
+            feed_spec=feed_spec,
+            calendar=calendar,
+            timezone=timezone,
+            session_start_time=session_start_time,
+            data_frequency=data_frequency,
+            timestamp_semantics=timestamp_semantics,
+        )
+        resolved_timezone = metadata["timezone"]
+        observed_by_instant = {
+            _event_time_utc(timestamp, resolved_timezone): timestamp for timestamp in ts_list
+        }
+        scheduled_instants = {
+            scheduled: _event_time_utc(scheduled, resolved_timezone)
+            for scheduled in schedule.timestamps
+        }
+        first_date = _explicit_local_date(ts_list[0], resolved_timezone)
+        last_date = _explicit_local_date(ts_list[-1], resolved_timezone)
+        unmatched = sorted(
+            (
+                scheduled
+                for scheduled, instant in scheduled_instants.items()
+                if instant not in observed_by_instant
+                and first_date <= _explicit_local_date(scheduled, resolved_timezone) <= last_date
+            ),
+            key=lambda scheduled: scheduled_instants[scheduled],
+        )
+        if unmatched:
+            scheduled = unmatched[0]
+            scheduled_time = scheduled_instants[scheduled]
+            nearest = min(
+                ts_list,
+                key=lambda timestamp: abs(
+                    (_event_time_utc(timestamp, resolved_timezone) - scheduled_time).total_seconds()
+                ),
+            )
+            _raise_explicit_alignment_error(scheduled, nearest, resolved_timezone)
+        scheduled_instant_set = frozenset(scheduled_instants.values())
+        return pl.Series(
+            "timestamp",
+            [
+                timestamp
+                for timestamp in ts_list
+                if _event_time_utc(timestamp, resolved_timezone) in scheduled_instant_set
+            ],
+        )
 
     metadata = _resolve_schedule_metadata(
         ts_list,

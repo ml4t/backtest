@@ -211,7 +211,7 @@ class TargetWeightExecutor:
 
     def validate_completed_run(self) -> None:
         """Validate schedule alignment after the final event in a complete run."""
-        evaluator = self._ensure_schedule_evaluator()
+        evaluator = self._schedule_evaluator
         if evaluator is None:
             return
         evaluator.validate_completed_run()

@@ -143,9 +143,14 @@ def session_date_for_timestamp(
     if calendar is not None and session_start_time is None:
         event_time_utc = event_time.astimezone(ZoneInfo("UTC"))
         event_date = event_time.date()
+        label_years = (
+            (event_date.year, event_date.year + 1)
+            if event_date.month == 12 and event_date.day == 31
+            else (event_date.year,)
+        )
         sessions = (
             session
-            for year in (event_date.year, event_date.year + 1)
+            for year in label_years
             for session in get_calendar_sessions_by_open_date(calendar, year).get(event_date, ())
             if session.market_open <= event_time_utc
         )

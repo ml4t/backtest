@@ -112,6 +112,12 @@ analysis or debugging. The default does not retain one record per market event.
 fractional targets leave no discrete remainder to allocate. Use `KEEP_CASH`; unsupported
 combinations are rejected before opening orders are created.
 
+A position rule associated with a target remains active until the position becomes flat or a later
+filled target for that asset replaces it. If the later target does not name a
+`position_rule_policy_id`, the earlier target-managed rule is removed. An explicit rule override
+installed through the broker remains in place because target cleanup removes only the rule object
+installed by the target manager.
+
 `export_target_intent_state()` does not contain account or order-book state. Restoring state that
 already contains child orders therefore requires those orders and the corresponding account state
 to exist in the destination broker. A fresh `Engine` cannot resume a post-opening state from the

@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 import pytest
 
+from ml4t.backtest import calendar as calendar_module
 from ml4t.backtest.sessions import (
     SessionConfig,
     align_to_sessions,
@@ -179,6 +180,53 @@ class TestAssignSessionDate:
             )
             == datetime(2024, 1, 9).date()
         )
+
+    def test_session_lookup_does_not_load_the_next_year_for_ordinary_dates(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        requested_years = []
+        original = calendar_module.get_calendar_sessions_by_open_date
+
+        def track_year(calendar: str, year: int):
+            requested_years.append(year)
+            return original(calendar, year)
+
+        monkeypatch.setattr(calendar_module, "get_calendar_sessions_by_open_date", track_year)
+
+        session_date_for_timestamp(
+            datetime(2024, 1, 2, 10, 0),
+            calendar="NYSE",
+            timezone="America/New_York",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert requested_years == [2024]
+
+    def test_december_31_session_lookup_includes_next_year_labels(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        requested_years = []
+
+        def track_year(calendar: str, year: int):
+            requested_years.append(year)
+            return {}
+
+        monkeypatch.setattr(calendar_module, "get_calendar_sessions_by_open_date", track_year)
+
+        session_date_for_timestamp(
+            datetime(2024, 12, 31, 10, 0),
+            calendar="NYSE",
+            timezone="America/New_York",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+
+        assert requested_years == [2024, 2025]
 
 
 class TestComputeSessionPnL:

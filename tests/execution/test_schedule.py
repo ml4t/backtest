@@ -70,6 +70,49 @@ class TestResolveRebalanceTimestamps:
         assert schedule.timestamps == (first, second)
         assert is_rebalance_timestamp(first, schedule, session_index=1)
 
+    def test_explicit_timestamp_matches_the_same_instant_across_timezones(self) -> None:
+        observed = datetime(2024, 1, 2, 21, 0, tzinfo=UTC)
+        schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)])
+
+        result = resolve_rebalance_timestamps(
+            [observed],
+            schedule,
+            timezone="America/New_York",
+        )
+
+        assert result.to_list() == [observed]
+        assert is_rebalance_timestamp(
+            observed,
+            schedule,
+            session_index=1,
+            timezone="America/New_York",
+        )
+
+    def test_explicit_timestamp_rejects_an_unmatched_event_on_an_observed_date(self) -> None:
+        schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)])
+
+        with pytest.raises(
+            ValueError,
+            match=r"2024-01-02T16:00:00.*nearest observed timestamp is 2024-01-02T20:59:00",
+        ):
+            resolve_rebalance_timestamps(
+                [datetime(2024, 1, 2, 20, 59, tzinfo=UTC)],
+                schedule,
+                timezone="America/New_York",
+            )
+
+    def test_explicit_timestamp_outside_the_observed_date_window_is_ignored(self) -> None:
+        observed = datetime(2024, 1, 2, 21, 0, tzinfo=UTC)
+        schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 3, 16, 0)])
+
+        result = resolve_rebalance_timestamps(
+            [observed],
+            schedule,
+            timezone="America/New_York",
+        )
+
+        assert result.to_list() == []
+
     def test_fixed_n_sessions_thins_session_closes(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-10")
 
