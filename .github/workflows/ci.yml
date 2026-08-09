@@ -58,6 +58,9 @@ jobs:
       - name: Verify the committed checkout is unchanged
         run: git diff --exit-code
 
+      - name: Verify parity claims match retained evidence
+        run: uv run python validation/generate_parity_claims.py --check
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest

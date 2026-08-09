@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from calendar import monthrange
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from enum import Enum
 from typing import Any
 
@@ -34,12 +35,15 @@ class RebalanceSchedule:
     cadence: RebalanceCadence = RebalanceCadence.EVERY_BAR
     every_n: int = 1
     timestamps: tuple[datetime, ...] = ()
+    calendar: str | None = None
 
     def __post_init__(self) -> None:
         if self.cadence == RebalanceCadence.FIXED_N_SESSIONS and self.every_n < 1:
             raise ValueError("RebalanceSchedule.every_n must be >= 1")
         if self.cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS and not self.timestamps:
             raise ValueError("Explicit timestamp schedules require at least one timestamp")
+        if self.calendar is not None and not self.calendar.strip():
+            raise ValueError("RebalanceSchedule.calendar must be non-empty or None")
 
     @classmethod
     def every_bar(cls) -> RebalanceSchedule:
@@ -54,12 +58,12 @@ class RebalanceSchedule:
         return cls(cadence=RebalanceCadence.FIXED_N_SESSIONS, every_n=n)
 
     @classmethod
-    def weekly(cls) -> RebalanceSchedule:
-        return cls(cadence=RebalanceCadence.WEEKLY)
+    def weekly(cls, *, calendar: str | None = None) -> RebalanceSchedule:
+        return cls(cadence=RebalanceCadence.WEEKLY, calendar=calendar)
 
     @classmethod
-    def month_end(cls) -> RebalanceSchedule:
-        return cls(cadence=RebalanceCadence.MONTH_END)
+    def month_end(cls, *, calendar: str | None = None) -> RebalanceSchedule:
+        return cls(cadence=RebalanceCadence.MONTH_END, calendar=calendar)
 
     @classmethod
     def explicit_timestamps(cls, timestamps: Sequence[datetime]) -> RebalanceSchedule:
@@ -67,6 +71,46 @@ class RebalanceSchedule:
             cadence=RebalanceCadence.EXPLICIT_TIMESTAMPS,
             timestamps=tuple(sorted({_coerce_timestamp(ts) for ts in timestamps})),
         )
+
+
+def is_rebalance_timestamp(
+    timestamp: datetime,
+    schedule: RebalanceSchedule | RebalanceCadence | str,
+    *,
+    session_index: int,
+    calendar: str | None = None,
+) -> bool:
+    """Evaluate a schedule from current calendar metadata without future feed timestamps."""
+    resolved = _coerce_schedule(schedule)
+    cadence = resolved.cadence
+    calendar = calendar if calendar is not None else resolved.calendar
+    if cadence in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EVERY_SESSION}:
+        return True
+    if cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
+        return timestamp in resolved.timestamps
+    if cadence is RebalanceCadence.FIXED_N_SESSIONS:
+        return (session_index - 1) % resolved.every_n == 0
+
+    session_date = timestamp.date()
+    if cadence is RebalanceCadence.WEEKLY:
+        period_start = session_date - timedelta(days=session_date.weekday())
+        period_end = period_start + timedelta(days=6)
+    elif cadence is RebalanceCadence.MONTH_END:
+        period_start = session_date.replace(day=1)
+        period_end = session_date.replace(day=monthrange(session_date.year, session_date.month)[1])
+    else:
+        raise ValueError(f"Unsupported rebalance cadence: {cadence}")
+
+    if calendar is not None:
+        calendar_schedule = get_schedule(calendar, period_start, period_end)
+        if calendar_schedule.is_empty():
+            return False
+        return session_date == calendar_schedule["session_date"][-1]
+    if cadence is RebalanceCadence.WEEKLY:
+        return session_date.weekday() == 4
+    while period_end.weekday() >= 5:
+        period_end -= timedelta(days=1)
+    return session_date == period_end
 
 
 def resolve_rebalance_timestamps(

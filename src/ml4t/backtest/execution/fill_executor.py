@@ -226,6 +226,7 @@ class FillExecutor:
                 broker._partial_orders.pop(order.order_id, None)
 
         # Create fill record
+        price_source = "open" if order.child_intent_id is not None else broker.execution_price.value
         fill = Fill(
             order_id=order.order_id,
             rebalance_id=order.rebalance_id,
@@ -239,7 +240,7 @@ class FillExecutor:
             order_type=order.order_type.value,
             limit_price=order.limit_price,
             stop_price=order.stop_price,
-            price_source=broker.execution_price.value,
+            price_source=price_source,
             reference_price=quote_context["reference_price"],
             quote_mid_price=quote_context["quote_mid_price"],
             bid_price=quote_context["bid_price"],
@@ -250,6 +251,9 @@ class FillExecutor:
             available_size=quote_context["available_size"],
             exit_reason=_get_exit_reason(order) if is_exit_fill else "",
             exit_reason_detail=order._risk_exit_reason,
+            target_intent_id=order.target_intent_id,
+            child_intent_id=order.child_intent_id,
+            intent_idempotency_key=order.intent_idempotency_key,
         )
         broker.fills.append(fill)
 
@@ -276,7 +280,7 @@ class FillExecutor:
             slippage=slippage,
             signed_qty=signed_qty,
             is_partial=is_partial,
-            price_source=broker.execution_price.value,
+            price_source=price_source,
             quote_context=quote_context,
             close_commission=close_commission,
             open_commission=open_commission,

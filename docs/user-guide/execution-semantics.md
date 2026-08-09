@@ -25,34 +25,73 @@ config = BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR)  # default
 `OrderType.MOC` is the exception. In `NEXT_BAR` mode, `MOC` orders submitted during
 `on_data()` still fill on the current bar, at the close, after strategy logic runs.
 
-### Pre-Risk Callback State
+### Causal Strategy Lifecycle
 
-`Strategy.on_before_risk()` runs after the current bar has been registered and immediately before
-position rules are evaluated. The state visible to the callback depends on execution mode:
+The engine invokes `on_start(broker)`, `on_prepare(broker, config)`, `on_data(...)` once for each
+accepted market event, and `on_end(broker)`. All callbacks pass through the versioned lifecycle
+dispatcher. `on_prepare` receives calendar and execution configuration, but it does not receive the
+feed's future timestamps. Built-in rebalance schedules evaluate the current event against calendar
+metadata instead of resolving the complete run schedule before the run starts.
 
-| Mode | Positions visible to `on_before_risk()` | Ordinary orders submitted there |
-|------|------------------------------------------|----------------------------------|
-| `NEXT_BAR` | All open positions, plus any fills from priced, policy-valid prior market entries submitted by this callback | Pending until the next bar |
-| `SAME_BAR` | State before regular pending-order processing | Processed during the current bar |
+The former `on_before_risk()` callback was removed because its backtest-only position in the bar
+cycle could not be reproduced by a live engine. A strategy that still defines it fails during
+engine construction, before the broker or account is created. Move decisions based on an accepted
+market event to `on_data()`. Under `NEXT_BAR`, an ordinary order submitted by `on_data()` becomes
+eligible at the next bar's open. It cannot fill at the current bar's open after the strategy has
+observed that bar's completed values.
 
-In `SAME_BAR`, set `immediate_fill=True` when a position opened in `on_before_risk()` must receive
-stop or trailing-rule evaluation on that same bar. In `NEXT_BAR`, newly opened positions start risk
-evaluation on the following bar, matching ordinary next-bar entry timing. A prior market entry
-fills before the callback only when a current price is available and policy and execution limits
-permit it. Partial fills are visible to the callback while the remaining quantity stays pending.
-Limit and stop orders can remain pending, so a guarded entry checks both position and pending intent:
+Initial and scheduled opening-auction target intents use the separate pre-open contract. They must
+be decided from information available before the auction cutoff and do not use `on_data()` to
+recover an earlier fill price.
+
+Register an initial target during causal initialization. The target records the decision and
+information cutoff, but quantity lowering waits for the eligible opening price:
 
 ```python
-def on_before_risk(self, timestamp, data, context, broker):
-    if broker.get_position("SPY") is None and not broker.get_pending_orders("SPY"):
-        broker.submit_order("SPY", 10)
+from datetime import UTC, date, datetime
+
+from ml4t.specs import (
+    AssetTarget,
+    CanonicalTargetIntent,
+    IntentReason,
+    LifecyclePhase,
+    ResidualPolicy,
+    RoundingPolicy,
+    TargetMeasure,
+)
+
+
+def on_prepare(self, broker, config=None):
+    decision = datetime(2026, 8, 2, 20, 0, tzinfo=UTC)
+    broker.register_target_intent(
+        CanonicalTargetIntent(
+            intent_id="initial-portfolio",
+            decision_time=decision,
+            information_cutoff=decision,
+            effective_session=date(2026, 8, 3),
+            effective_phase=LifecyclePhase.PRE_OPEN,
+            targets=(AssetTarget("SPY", TargetMeasure.WEIGHT, 0.95),),
+            idempotency_key="initial-portfolio-2026-08-03",
+            measure=TargetMeasure.WEIGHT,
+            cash_buffer=0.05,
+            rounding=RoundingPolicy.TOWARD_ZERO,
+            residual=ResidualPolicy.KEEP_CASH,
+            reason=IntentReason.REBALANCE,
+        )
+    )
 ```
 
-Orders submitted by `on_data()` retain the configured within-bar fill ordering with risk exits. A
-pre-risk market entry that lacks buying power remains pending during the callback and
-then participates in the normal ordered batch, so a same-bar exit can fund it. Limit and stop
-orders stay in the normal ordered batch. Explicit pyramiding remains available by submitting an
-additional order without the flat-position and pending-order guard.
+The engine validates the cutoff, lowers the target at the opening auction, records canonical child
+intent and order lineage, reconciles fills and remaining quantity, then activates any associated
+position rules. A scheduled target uses the same method from an earlier event with a future
+`effective_session`. Same-session registration from `on_data()` is rejected because that callback
+has already observed information after the opening phase.
+
+For a rule activated after an opening fill, `ExecutionPolicy.bar_path` controls daily OHLC
+ambiguity. Use `REJECT_AMBIGUOUS` to fail when high-low order changes the result,
+`OPEN_HIGH_LOW_CLOSE` or `OPEN_LOW_HIGH_CLOSE` to declare an order, or `CONSERVATIVE` to select the
+more adverse supported outcome. The result artifact retains the lifecycle version, execution
+policy, target intents, child intents, and reconciliation records.
 
 ### SAME_BAR
 
@@ -367,9 +406,9 @@ config = BacktestConfig(share_type=ShareType.INTEGER)
 
 The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates execution semantics across chapters:
 
-- **Ch16 / NB11** (`engine_divergence_anatomy`) — detailed analysis of how SAME_BAR vs NEXT_BAR and fill ordering affect backtest results
-- **Ch18** (`portfolio_construction`) — LinearImpact and SquareRootImpact market impact models with VolumeParticipationLimit
-- **Ch16 case studies** — each case study uses setup.yaml to configure commission_rate, slippage_rate, and execution_mode
+- **Ch16 / NB11** (`engine_divergence_anatomy`) - detailed analysis of how SAME_BAR vs NEXT_BAR and fill ordering affect backtest results
+- **Ch18** (`portfolio_construction`) - LinearImpact and SquareRootImpact market impact models with VolumeParticipationLimit
+- **Ch16 case studies** - each case study uses setup.yaml to configure commission_rate, slippage_rate, and execution_mode
 
 ## Next Steps
 

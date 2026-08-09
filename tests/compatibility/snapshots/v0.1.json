@@ -1048,12 +1048,16 @@
       "avg_win",
       "cagr",
       "calmar",
+      "child_order_intents",
+      "execution_policy",
       "expectancy",
       "final_value",
       "gross_profit_factor",
       "initial_cash",
+      "intent_reconciliations",
       "largest_loss",
       "largest_win",
+      "lifecycle_version",
       "losing_trades",
       "max_drawdown",
       "max_drawdown_pct",
@@ -1069,6 +1073,7 @@
       "sharpe",
       "skipped_bars",
       "sortino",
+      "target_intents",
       "total_commission",
       "total_costs",
       "total_filled_notional",
@@ -1824,7 +1829,18 @@
     "TargetWeightExecutor",
     "RebalanceCadence",
     "RebalanceSchedule",
+    "is_rebalance_timestamp",
     "resolve_rebalance_timestamps",
+    "LifecycleDispatcher",
+    "LifecycleInvocation",
+    "callback_trace",
+    "AmbiguousBarPathError",
+    "IntentOutcome",
+    "IntentReconciliation",
+    "LateAuctionIntentError",
+    "PreOpenIntentError",
+    "UnsupportedPreOpenPolicyError",
+    "default_execution_policy",
     "StopLoss",
     "TakeProfit",
     "TrailingStop",
@@ -2452,7 +2468,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None) -> None"
     },
     "ml4t.backtest.execution.rebalancer:TargetWeightExecutor": {
       "kind": "class",
@@ -2460,10 +2476,6 @@
         "execute": {
           "kind": "method",
           "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None) -> 'list[Order]'"
-        },
-        "prepare_schedule": {
-          "kind": "method",
-          "signature": "(self, available_timestamps: 'Sequence[datetime] | pl.Series', *, feed_spec: 'FeedSpec | Any | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None) -> 'frozenset[datetime] | None'"
         },
         "preview": {
           "kind": "method",
@@ -2977,7 +2989,7 @@
         },
         "on_prepare": {
           "kind": "method",
-          "signature": "(self, broker: 'Any', timestamps: 'Sequence[datetime]', config: 'BacktestConfig | None' = None) -> 'None'"
+          "signature": "(self, broker: 'Any', config: 'BacktestConfig | None' = None) -> 'None'"
         },
         "rank_assets": {
           "kind": "method",
@@ -3062,6 +3074,13 @@
       "module": "ml4t.backtest.types",
       "qualname": "OrderType",
       "signature": "(*values)"
+    },
+    "ml4t.backtest:AmbiguousBarPathError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.preopen",
+      "qualname": "AmbiguousBarPathError",
+      "signature": null
     },
     "ml4t.backtest:ArtifactDiagnostic": {
       "kind": "class",
@@ -3327,6 +3346,10 @@
           "kind": "method",
           "signature": "(self, *, skip_assets: 'set[str] | None' = None) -> 'list[Order]'"
         },
+        "export_target_intent_state": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        },
         "flatten_all_positions": {
           "kind": "method",
           "signature": "(self, reason: 'str', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
@@ -3355,9 +3378,17 @@
           "kind": "method",
           "signature": "(self) -> 'float'"
         },
+        "get_child_order_intents": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[CanonicalChildOrderIntent, ...]'"
+        },
         "get_contract_spec": {
           "kind": "method",
           "signature": "(self, asset: 'str') -> 'ContractSpec | None'"
+        },
+        "get_intent_reconciliations": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[IntentReconciliation, ...]'"
         },
         "get_last_trade": {
           "kind": "method",
@@ -3403,6 +3434,10 @@
           "kind": "method",
           "signature": "(self, asset: 'str | None' = None) -> 'list[Order]'"
         },
+        "get_target_intents": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[CanonicalTargetIntent, ...]'"
+        },
         "get_trades": {
           "kind": "method",
           "signature": "(self, asset: 'str | None' = None, last_n: 'int | None' = None) -> 'list[Trade]'"
@@ -3430,6 +3465,18 @@
         "reduce_position": {
           "kind": "method",
           "signature": "(self, asset: 'str', fraction: 'float', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
+        },
+        "register_position_rule_policy": {
+          "kind": "method",
+          "signature": "(self, policy_id: 'str', rules: 'PositionRule') -> 'None'"
+        },
+        "register_target_intent": {
+          "kind": "method",
+          "signature": "(self, intent: 'CanonicalTargetIntent', *, position_rules: 'PositionRule | None' = None) -> 'CanonicalTargetIntent'"
+        },
+        "restore_target_intent_state": {
+          "kind": "method",
+          "signature": "(self, state: 'dict[str, Any]') -> 'None'"
         },
         "sell": {
           "kind": "method",
@@ -3521,7 +3568,7 @@
       "members": {
         "from_config": {
           "kind": "method",
-          "signature": "(cls, feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig', *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None) -> 'Engine'"
+          "signature": "(cls, feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig', *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None) -> 'Engine'"
         },
         "run": {
           "kind": "method",
@@ -3534,7 +3581,7 @@
       },
       "module": "ml4t.backtest.engine",
       "qualname": "Engine",
-      "signature": "(feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig | None' = None, *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None)"
+      "signature": "(feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig | None' = None, *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None)"
     },
     "ml4t.backtest:ExecutionMode": {
       "kind": "class",
@@ -3570,7 +3617,73 @@
       },
       "module": "ml4t.backtest.types",
       "qualname": "Fill",
-      "signature": "(order_id: str, asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, price: float, timestamp: datetime.datetime, rebalance_id: str | None = None, commission: float = 0.0, slippage: float = 0.0, order_type: str = '', limit_price: float | None = None, stop_price: float | None = None, price_source: str = '', reference_price: float | None = None, quote_mid_price: float | None = None, bid_price: float | None = None, ask_price: float | None = None, spread: float | None = None, bid_size: float | None = None, ask_size: float | None = None, available_size: float | None = None, exit_reason: str = '', exit_reason_detail: str | None = None) -> None"
+      "signature": "(order_id: str, asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, price: float, timestamp: datetime.datetime, rebalance_id: str | None = None, commission: float = 0.0, slippage: float = 0.0, order_type: str = '', limit_price: float | None = None, stop_price: float | None = None, price_source: str = '', reference_price: float | None = None, quote_mid_price: float | None = None, bid_price: float | None = None, ask_price: float | None = None, spread: float | None = None, bid_size: float | None = None, ask_size: float | None = None, available_size: float | None = None, exit_reason: str = '', exit_reason_detail: str | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None) -> None"
+    },
+    "ml4t.backtest:IntentOutcome": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.preopen",
+      "qualname": "IntentOutcome",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:IntentReconciliation": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "from_mapping": {
+          "kind": "method",
+          "signature": "(cls, value: 'dict[str, Any]') -> 'IntentReconciliation'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "module": "ml4t.backtest.preopen",
+      "qualname": "IntentReconciliation",
+      "signature": "(target_intent_id: 'str', child_intent_id: 'str', order_id: 'str', event_time: 'datetime', requested_quantity: 'float', filled_quantity: 'float', remaining_quantity: 'float', outcome: 'IntentOutcome', rejection_reason: 'str | None' = None, rule_policy_id: 'str | None' = None, rule_activated_at: 'datetime | None' = None) -> None"
+    },
+    "ml4t.backtest:LateAuctionIntentError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.preopen",
+      "qualname": "LateAuctionIntentError",
+      "signature": null
+    },
+    "ml4t.backtest:LifecycleDispatcher": {
+      "kind": "class",
+      "members": {
+        "callback_counts": {
+          "kind": "property",
+          "signature": "(self) -> 'dict[LifecyclePhase, int]'"
+        },
+        "dispatch": {
+          "kind": "method",
+          "signature": "(self, phase: 'LifecyclePhase', broker: 'Any', *args: 'Any', event_time: 'datetime | None' = None) -> 'Any'"
+        },
+        "validate_completed_run": {
+          "kind": "method",
+          "signature": "(self, market_event_count: 'int') -> 'None'"
+        }
+      },
+      "module": "ml4t.backtest.lifecycle",
+      "qualname": "LifecycleDispatcher",
+      "signature": "(strategy: 'Any', contract: 'LifecycleContract' = LifecycleContract(version=<LifecycleVersion.V1: '1'>, phases=(LifecyclePhaseSpec(phase=<LifecyclePhase.RUN_START: 'run_start'>, callback='on_start', visible_fields=(), intents_allowed=False, cardinality=<CallbackCardinality.EXACTLY_ONCE: 'exactly_once'>, exception_semantics=<CallbackExceptionSemantics.ABORT_BEFORE_SIDE_EFFECTS: 'abort_before_side_effects'>, causal_rank=0, current_phase_fill_conflicts=()), LifecyclePhaseSpec(phase=<LifecyclePhase.CAUSAL_INITIALIZATION: 'causal_initialization'>, callback='on_prepare', visible_fields=(<InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>,), intents_allowed=True, cardinality=<CallbackCardinality.EXACTLY_ONCE: 'exactly_once'>, exception_semantics=<CallbackExceptionSemantics.ABORT_BEFORE_SIDE_EFFECTS: 'abort_before_side_effects'>, causal_rank=1, current_phase_fill_conflicts=()), LifecyclePhaseSpec(phase=<LifecyclePhase.PRE_OPEN: 'pre_open'>, callback='on_pre_open', visible_fields=(<InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>,), intents_allowed=True, cardinality=<CallbackCardinality.ONCE_PER_EVENT: 'once_per_event'>, exception_semantics=<CallbackExceptionSemantics.ROLLBACK_AND_ABORT: 'rollback_and_abort'>, causal_rank=2, current_phase_fill_conflicts=()), LifecyclePhaseSpec(phase=<LifecyclePhase.OPENING_AUCTION: 'opening_auction'>, callback='on_open', visible_fields=(<InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>, <InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>), intents_allowed=True, cardinality=<CallbackCardinality.ONCE_PER_EVENT: 'once_per_event'>, exception_semantics=<CallbackExceptionSemantics.ROLLBACK_AND_ABORT: 'rollback_and_abort'>, causal_rank=3, current_phase_fill_conflicts=(<InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>)), LifecyclePhaseSpec(phase=<LifecyclePhase.FILL_RECONCILIATION: 'fill_reconciliation'>, callback='on_fill_reconciliation', visible_fields=(<InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>, <InformationField.POST_FILL_STATE: 'post_fill_state'>, <InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>), intents_allowed=False, cardinality=<CallbackCardinality.ONCE_PER_EVENT: 'once_per_event'>, exception_semantics=<CallbackExceptionSemantics.ROLLBACK_AND_ABORT: 'rollback_and_abort'>, causal_rank=4, current_phase_fill_conflicts=()), LifecyclePhaseSpec(phase=<LifecyclePhase.INTRABAR: 'intrabar'>, callback='on_intrabar', visible_fields=(<InformationField.CURRENT_HIGH: 'current_high'>, <InformationField.CURRENT_LOW: 'current_low'>, <InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>, <InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>), intents_allowed=True, cardinality=<CallbackCardinality.ONCE_PER_EVENT: 'once_per_event'>, exception_semantics=<CallbackExceptionSemantics.ROLLBACK_AND_ABORT: 'rollback_and_abort'>, causal_rank=5, current_phase_fill_conflicts=(<InformationField.CURRENT_HIGH: 'current_high'>, <InformationField.CURRENT_LOW: 'current_low'>)), LifecyclePhaseSpec(phase=<LifecyclePhase.CLOSE: 'close'>, callback='on_close', visible_fields=(<InformationField.CURRENT_CLOSE: 'current_close'>, <InformationField.CURRENT_HIGH: 'current_high'>, <InformationField.CURRENT_LOW: 'current_low'>, <InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>, <InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>), intents_allowed=True, cardinality=<CallbackCardinality.ONCE_PER_EVENT: 'once_per_event'>, exception_semantics=<CallbackExceptionSemantics.ROLLBACK_AND_ABORT: 'rollback_and_abort'>, causal_rank=6, current_phase_fill_conflicts=(<InformationField.CURRENT_CLOSE: 'current_close'>,)), LifecyclePhaseSpec(phase=<LifecyclePhase.MARKET_EVENT: 'market_event'>, callback='on_data', visible_fields=(<InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>, <InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>, <InformationField.RUNNING_HIGH: 'running_high'>, <InformationField.RUNNING_LOW: 'running_low'>), intents_allowed=True, cardinality=<CallbackCardinality.ONCE_PER_EVENT: 'once_per_event'>, exception_semantics=<CallbackExceptionSemantics.ROLLBACK_AND_ABORT: 'rollback_and_abort'>, causal_rank=5, current_phase_fill_conflicts=()), LifecyclePhaseSpec(phase=<LifecyclePhase.RUN_END: 'run_end'>, callback='on_end', visible_fields=(<InformationField.CURRENT_CLOSE: 'current_close'>, <InformationField.CURRENT_HIGH: 'current_high'>, <InformationField.CURRENT_LOW: 'current_low'>, <InformationField.CURRENT_OPEN: 'current_open'>, <InformationField.OFFICIAL_OPEN: 'official_open'>, <InformationField.POST_FILL_STATE: 'post_fill_state'>, <InformationField.PRIOR_COMPLETED_DATA: 'prior_completed_data'>), intents_allowed=False, cardinality=<CallbackCardinality.EXACTLY_ONCE: 'exactly_once'>, exception_semantics=<CallbackExceptionSemantics.CLEANUP_AND_RERAISE: 'cleanup_and_reraise'>, causal_rank=7, current_phase_fill_conflicts=())))) -> 'None'"
+    },
+    "ml4t.backtest:LifecycleInvocation": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.lifecycle",
+      "qualname": "LifecycleInvocation",
+      "signature": "(phase: 'LifecyclePhase', callback: 'str', event_time: 'datetime | None') -> None"
     },
     "ml4t.backtest:Order": {
       "kind": "class",
@@ -3590,7 +3703,7 @@
       },
       "module": "ml4t.backtest.types",
       "qualname": "Order",
-      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None, _submitted_before_risk: bool = False, _submitted_from_flat: bool = False) -> None"
+      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None) -> None"
     },
     "ml4t.backtest:OrderSide": {
       "kind": "class",
@@ -3649,6 +3762,13 @@
       "qualname": "Position",
       "signature": "(asset: str, quantity: float, entry_price: float, entry_time: datetime.datetime, current_price: float | None = None, bars_held: int = 0, high_water_mark: float | None = None, low_water_mark: float | None = None, max_favorable_excursion: float = 0.0, max_adverse_excursion: float = 0.0, initial_quantity: float | None = None, context: dict = <factory>, multiplier: float = 1.0, entry_commission: float = 0.0, entry_slippage: float = 0.0) -> None"
     },
+    "ml4t.backtest:PreOpenIntentError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.preopen",
+      "qualname": "PreOpenIntentError",
+      "signature": null
+    },
     "ml4t.backtest:RebalanceCadence": {
       "kind": "class",
       "members": {
@@ -3671,7 +3791,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None) -> None"
     },
     "ml4t.backtest:RebalanceSchedule": {
       "kind": "class",
@@ -3698,16 +3818,16 @@
         },
         "month_end": {
           "kind": "method",
-          "signature": "(cls) -> 'RebalanceSchedule'"
+          "signature": "(cls, *, calendar: 'str | None' = None) -> 'RebalanceSchedule'"
         },
         "weekly": {
           "kind": "method",
-          "signature": "(cls) -> 'RebalanceSchedule'"
+          "signature": "(cls, *, calendar: 'str | None' = None) -> 'RebalanceSchedule'"
         }
       },
       "module": "ml4t.backtest.execution.schedule",
       "qualname": "RebalanceSchedule",
-      "signature": "(cadence: 'RebalanceCadence' = <RebalanceCadence.EVERY_BAR: 'every_bar'>, every_n: 'int' = 1, timestamps: 'tuple[datetime, ...]' = ()) -> None"
+      "signature": "(cadence: 'RebalanceCadence' = <RebalanceCadence.EVERY_BAR: 'every_bar'>, every_n: 'int' = 1, timestamps: 'tuple[datetime, ...]' = (), calendar: 'str | None' = None) -> None"
     },
     "ml4t.backtest:RuleChain": {
       "kind": "class",
@@ -3768,10 +3888,6 @@
     "ml4t.backtest:Strategy": {
       "kind": "class",
       "members": {
-        "on_before_risk": {
-          "kind": "method",
-          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, Any], broker: Any) -> None"
-        },
         "on_data": {
           "kind": "method",
           "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict], context: dict[str, Any], broker: Any) -> None"
@@ -3782,7 +3898,7 @@
         },
         "on_prepare": {
           "kind": "method",
-          "signature": "(self, broker: Any, timestamps: collections.abc.Sequence[datetime.datetime], config: Any | None = None) -> None"
+          "signature": "(self, broker: Any, config: Any | None = None) -> None"
         },
         "on_start": {
           "kind": "method",
@@ -3815,10 +3931,6 @@
         "execute": {
           "kind": "method",
           "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None) -> 'list[Order]'"
-        },
-        "prepare_schedule": {
-          "kind": "method",
-          "signature": "(self, available_timestamps: 'Sequence[datetime] | pl.Series', *, feed_spec: 'FeedSpec | Any | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None) -> 'frozenset[datetime] | None'"
         },
         "preview": {
           "kind": "method",
@@ -3904,6 +4016,31 @@
       "qualname": "UnsupportedArtifactVersionError",
       "signature": null
     },
+    "ml4t.backtest:UnsupportedPreOpenPolicyError": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.preopen",
+      "qualname": "UnsupportedPreOpenPolicyError",
+      "signature": null
+    },
+    "ml4t.backtest:callback_trace": {
+      "kind": "function",
+      "module": "ml4t.backtest.lifecycle",
+      "qualname": "callback_trace",
+      "signature": "(invocations: 'Sequence[LifecycleInvocation]') -> 'tuple[tuple[str, str, datetime | None], ...]'"
+    },
+    "ml4t.backtest:default_execution_policy": {
+      "kind": "function",
+      "module": "ml4t.backtest.preopen",
+      "qualname": "default_execution_policy",
+      "signature": "(config: 'BacktestConfig') -> 'ExecutionPolicy'"
+    },
+    "ml4t.backtest:is_rebalance_timestamp": {
+      "kind": "function",
+      "module": "ml4t.backtest.execution.schedule",
+      "qualname": "is_rebalance_timestamp",
+      "signature": "(timestamp: 'datetime', schedule: 'RebalanceSchedule | RebalanceCadence | str', *, session_index: 'int', calendar: 'str | None' = None) -> 'bool'"
+    },
     "ml4t.backtest:resolve_rebalance_timestamps": {
       "kind": "function",
       "module": "ml4t.backtest.execution.schedule",
@@ -3914,7 +4051,7 @@
       "kind": "function",
       "module": "ml4t.backtest.engine",
       "qualname": "run_backtest",
-      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None) -> 'BacktestResult'"
+      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None) -> 'BacktestResult'"
     }
   }
 }

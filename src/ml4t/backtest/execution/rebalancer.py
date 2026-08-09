@@ -20,23 +20,18 @@ Example:
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol
-
-import polars as pl
+from datetime import date, datetime
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from ml4t.specs.market_data import FeedSpec
-
     from ..broker import Broker
     from ..types import Order
 
 from ..config import RebalanceMode, ShareType
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
-from .schedule import RebalanceSchedule, resolve_rebalance_timestamps
+from .schedule import RebalanceSchedule, is_rebalance_timestamp
 
 
 class WeightProvider(Protocol):
@@ -92,6 +87,7 @@ class RebalanceConfig:
     account_for_pending: bool = True
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
     schedule: RebalanceSchedule | None = None
+    calendar: str | None = None
 
 
 class TargetWeightExecutor:
@@ -122,39 +118,23 @@ class TargetWeightExecutor:
             config: Rebalancing configuration. Uses defaults if not provided.
         """
         self.config = config or RebalanceConfig()
-        self._resolved_schedule: frozenset[datetime] | None = None
-
-    def prepare_schedule(
-        self,
-        available_timestamps: Sequence[datetime] | pl.Series,
-        *,
-        feed_spec: FeedSpec | Any | None = None,
-        calendar: str | None = None,
-        timezone: str | None = None,
-        session_start_time: str | None = None,
-    ) -> frozenset[datetime] | None:
-        """Resolve the configured schedule against a feed's available timestamps."""
-        if self.config.schedule is None:
-            self._resolved_schedule = None
-            return None
-        resolved = resolve_rebalance_timestamps(
-            available_timestamps,
-            self.config.schedule,
-            feed_spec=feed_spec,
-            calendar=calendar,
-            timezone=timezone,
-            session_start_time=session_start_time,
-        )
-        self._resolved_schedule = frozenset(resolved.to_list())
-        return self._resolved_schedule
+        self._schedule_session_date: date | None = None
+        self._schedule_session_index = 0
 
     def should_rebalance(self, timestamp: datetime) -> bool:
-        """Return whether the current timestamp is on the prepared schedule."""
+        """Evaluate the current timestamp without a future feed sequence."""
         if self.config.schedule is None:
             return True
-        if self._resolved_schedule is None:
-            raise ValueError("prepare_schedule() must be called before scheduled execution")
-        return timestamp in self._resolved_schedule
+        session_date = timestamp.date()
+        if session_date != self._schedule_session_date:
+            self._schedule_session_date = session_date
+            self._schedule_session_index += 1
+        return is_rebalance_timestamp(
+            timestamp,
+            self.config.schedule,
+            session_index=self._schedule_session_index,
+            calendar=self.config.calendar,
+        )
 
     def execute(
         self,

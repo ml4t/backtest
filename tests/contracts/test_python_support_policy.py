@@ -97,7 +97,7 @@ def test_minimum_dependency_matrix_proves_declared_lower_bounds() -> None:
     assert any("actions/upload-artifact" in step.get("uses", "") for step in minimum["steps"])
     assert set(gate["needs"]) == {"stable", "prerelease", "minimum"}
     assert set(project["dependencies"]) >= {
-        "ml4t-specs>=0.1.0",
+        "ml4t-specs>=0.1.1,<0.2",
         "polars>=1.36.1",
         "pandas>=2.3.3; python_version < '3.15'",
         "numpy>=2.3.2",
