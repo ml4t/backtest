@@ -129,6 +129,36 @@ def test_engine_accepts_a_scheduled_executor_with_an_aligned_final_close() -> No
     assert len(result.equity_curve) == 1
 
 
+def test_engine_identifies_a_conditionally_skipped_scheduled_executor_event() -> None:
+    class ConditionalExecutorStrategy(Strategy):
+        def __init__(self) -> None:
+            self.executor = TargetWeightExecutor(
+                RebalanceConfig(
+                    schedule=RebalanceSchedule.every_session(),
+                    calendar="NYSE",
+                    timezone="America/New_York",
+                    data_frequency="15m",
+                    timestamp_semantics="bar_close",
+                )
+            )
+            self.calls = 0
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                self.executor.execute({}, data, broker, timestamp=timestamp)
+
+    feed = pl.concat(
+        [
+            prices().with_columns(pl.lit(datetime(2024, 1, 2, 15, 45)).alias("timestamp")),
+            prices().with_columns(pl.lit(datetime(2024, 1, 2, 16, 0)).alias("timestamp")),
+        ]
+    )
+
+    with pytest.raises(ValueError, match=r"called for 1 of 2 market events.*every event"):
+        Engine(DataFeed(prices_df=feed), ConditionalExecutorStrategy()).run()
+
+
 def test_completed_close_cannot_create_a_same_timestamp_open_fill() -> None:
     class CloseAwareStrategy(Strategy):
         def on_data(self, timestamp, data, context, broker) -> None:

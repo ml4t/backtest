@@ -288,6 +288,8 @@ class TestResolveRebalanceTimestamps:
             RebalanceCadence.EVERY_SESSION,
             calendar="CME_Equity",
             timezone="America/Chicago",
+            data_frequency="1h",
+            timestamp_semantics="bar_close",
         )
 
         assert result.to_list() == [datetime(2024, 1, 8, 16, 0), datetime(2024, 1, 9, 16, 0)]
@@ -640,6 +642,18 @@ class TestCausalScheduleEvaluation:
                 session_index=22,
             )
         assert Path(captured[0].filename).name == "test_schedule.py"
+
+    def test_batch_and_online_agree_for_unspecified_non_midnight_daily_labels(self) -> None:
+        timestamp = datetime(2024, 1, 31, 16, 0)
+        schedule = RebalanceSchedule.every_session()
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=schedule, calendar="NYSE"))
+
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            online = executor.should_rebalance(timestamp)
+            batch = resolve_rebalance_timestamps([timestamp], schedule, calendar="NYSE")
+
+        assert online
+        assert batch.to_list() == [timestamp]
 
     def test_midnight_is_not_a_daily_label_with_explicit_bar_semantics(self) -> None:
         assert not is_rebalance_timestamp(

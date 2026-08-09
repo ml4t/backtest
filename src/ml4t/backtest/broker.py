@@ -227,7 +227,7 @@ class Broker:
         self._lifecycle_transaction: Any | None = None
         self._active_lifecycle_phase: LifecyclePhase | None = None
         self._preopen_target_manager: PreOpenTargetManager | None = None
-        self._completion_validators: dict[int, Callable[[], None]] = {}
+        self._completion_validators: dict[int, Callable[[int], None]] = {}
 
         # Execution model (volume limits and market impact)
         self.execution_limits = execution_limits  # ExecutionLimits instance
@@ -912,13 +912,13 @@ class Broker:
     def _register_completion_validator(
         self,
         owner: object,
-        validator: Callable[[], None],
+        validator: Callable[[int], None],
     ) -> None:
         self._completion_validators.setdefault(id(owner), validator)
 
-    def _validate_completed_run(self) -> None:
+    def _validate_completed_run(self, market_event_count: int) -> None:
         for validator in tuple(self._completion_validators.values()):
-            validator()
+            validator(market_event_count)
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
         """Return the configured contract specification, or None when absent."""
@@ -2291,7 +2291,7 @@ class Broker:
         if highs is None or lows is None:
             raise TypeError("_update_time requires highs and lows")
 
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_positions=True)
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens

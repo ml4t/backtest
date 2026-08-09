@@ -216,6 +216,12 @@ class TargetWeightExecutor:
             return
         evaluator.validate_completed_run()
 
+    def _validate_engine_run(self, market_event_count: int) -> None:
+        evaluator = self._schedule_evaluator
+        if evaluator is None:
+            return
+        evaluator.validate_engine_run(market_event_count)
+
     def execute(
         self,
         target_weights: dict[str, float],
@@ -255,7 +261,7 @@ class TargetWeightExecutor:
         if self.config.schedule is not None:
             if timestamp is None:
                 raise ValueError("timestamp is required when RebalanceConfig.schedule is set")
-            broker._register_completion_validator(self, self.validate_completed_run)
+            broker._register_completion_validator(self, self._validate_engine_run)
             if not self.should_rebalance(timestamp, is_session_close=is_session_close):
                 return []
 

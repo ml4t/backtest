@@ -39,7 +39,7 @@
   calendar date; exchange session labels and opens come from cached authoritative calendar
   schedules.
 - Scheduled TargetWeightExecutor.execute calls register completion validation with the Engine, so
-  a missing required close in the final observed session fails the run automatically.
+  missing required closes and partial event coverage fail the run with distinct diagnostics.
 - Deferred next-open risk exits fill before opening targets are sized. Fractional accounts reject
   largest-remainder residual handling regardless of rounding because its whole-unit allocation
   cannot redistribute fractional remainders; use keep-cash instead.
@@ -50,6 +50,8 @@
   parity-comparison defects found during the stable-release audit.
 - Cross-framework validation now fails incomplete runs and requires exact retained comparisons for
   supported scenarios.
+- Batch and online session schedules now apply the same daily-close fallback when data frequency
+  and timestamp semantics are both omitted.
 
 ### Compatibility
 

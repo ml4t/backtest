@@ -582,6 +582,16 @@ class _OnlineRebalanceEvaluator:
                 self._session_date,
             )
 
+    def validate_engine_run(self, market_event_count: int) -> None:
+        """Validate complete event coverage before schedule alignment."""
+        if self._observed_event_count != market_event_count:
+            raise ValueError(
+                "scheduled TargetWeightExecutor.execute() was called for "
+                f"{self._observed_event_count} of {market_event_count} market events; call "
+                "execute() for every event in chronological order, including warm-up periods"
+            )
+        self.validate_completed_run()
+
 
 def _normalize_schedule_metadata(
     data_frequency: Any | None,
@@ -622,7 +632,6 @@ def resolve_rebalance_timestamps(
 
     if cadence == RebalanceCadence.EXPLICIT_TIMESTAMPS:
         metadata = _resolve_schedule_metadata(
-            ts_list,
             feed_spec=feed_spec,
             calendar=calendar,
             timezone=timezone,
@@ -669,7 +678,6 @@ def resolve_rebalance_timestamps(
         )
 
     metadata = _resolve_schedule_metadata(
-        ts_list,
         feed_spec=feed_spec,
         calendar=calendar,
         timezone=timezone,
@@ -797,7 +805,6 @@ def _coerce_schedule(schedule: RebalanceSchedule | RebalanceCadence | str) -> Re
 
 
 def _resolve_schedule_metadata(
-    timestamps: Sequence[datetime],
     *,
     feed_spec: FeedSpec | Any | None,
     calendar: str | None,
@@ -826,9 +833,7 @@ def _resolve_schedule_metadata(
         else (spec.timestamp_semantics if spec else None)
     )
 
-    if semantics is None:
-        semantics = _infer_timestamp_semantics(timestamps, resolved_frequency)
-    elif not isinstance(semantics, TimestampSemantics):
+    if semantics is not None and not isinstance(semantics, TimestampSemantics):
         semantics = TimestampSemantics(str(semantics))
 
     return {
@@ -838,25 +843,3 @@ def _resolve_schedule_metadata(
         "data_frequency": resolved_frequency,
         "timestamp_semantics": semantics,
     }
-
-
-def _infer_timestamp_semantics(
-    timestamps: Sequence[datetime],
-    data_frequency: Any | None,
-) -> TimestampSemantics:
-    if data_frequency is not None:
-        frequency = _to_backtest_frequency(data_frequency)
-        if frequency == DataFrequency.DAILY and _timestamps_look_date_labeled(timestamps):
-            return TimestampSemantics.SESSION_LABEL
-
-    if _timestamps_look_date_labeled(timestamps):
-        return TimestampSemantics.SESSION_LABEL
-
-    return TimestampSemantics.EVENT_TIME
-
-
-def _timestamps_look_date_labeled(timestamps: Sequence[datetime]) -> bool:
-    return all(
-        ts.hour == 0 and ts.minute == 0 and ts.second == 0 and ts.microsecond == 0
-        for ts in timestamps
-    )

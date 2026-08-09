@@ -447,7 +447,7 @@ class Engine:
 
         self._finalize_strategy()
         self.strategy._validate_completed_run()
-        self.broker._validate_completed_run()
+        self.broker._validate_completed_run(self._accepted_market_event_count)
         self.lifecycle_dispatcher.validate_completed_run(self._accepted_market_event_count)
         return self._generate_results()
 

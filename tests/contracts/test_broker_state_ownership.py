@@ -4,6 +4,7 @@ import ast
 from dataclasses import fields
 from pathlib import Path
 
+import pytest
 from ml4t.specs import LIFECYCLE_V1, LifecyclePhase
 
 from ml4t.backtest import Broker
@@ -167,6 +168,117 @@ def _mutation_expressions(function: ast.AST) -> list[ast.AST]:
     return expressions
 
 
+def _property_owned_fields(broker_class: ast.ClassDef) -> dict[str, tuple[str, str]]:
+    owned_fields: dict[str, tuple[str, str]] = {}
+    for function in broker_class.body:
+        if not isinstance(function, ast.FunctionDef):
+            continue
+        if not any(
+            isinstance(decorator, ast.Name) and decorator.id == "property"
+            for decorator in function.decorator_list
+        ):
+            continue
+        returned = next(
+            (
+                node.value
+                for node in ast.walk(function)
+                if isinstance(node, ast.Return) and node.value is not None
+            ),
+            None,
+        )
+        path = _attribute_path(returned) if returned is not None else None
+        if path is not None and len(path) == 3 and path[0] == "self":
+            owned_fields[function.name] = (path[1], path[2])
+    return owned_fields
+
+
+def _owned_field_references(
+    node: ast.AST,
+    property_owned_fields: dict[str, tuple[str, str]],
+) -> set[tuple[str, str]]:
+    references: set[tuple[str, str]] = set()
+    for candidate in ast.walk(node):
+        path = _attribute_path(candidate)
+        if path is None or path[0] != "self":
+            continue
+        if len(path) == 3:
+            references.add((path[1], path[2]))
+        elif len(path) == 2 and path[1] in property_owned_fields:
+            references.add(property_owned_fields[path[1]])
+    return references
+
+
+def _target_names(node: ast.AST) -> set[str]:
+    return {
+        candidate.id
+        for candidate in ast.walk(node)
+        if isinstance(candidate, ast.Name) and isinstance(candidate.ctx, ast.Store)
+    }
+
+
+def _mutation_owned_fields(
+    function: ast.FunctionDef,
+    property_owned_fields: dict[str, tuple[str, str]],
+) -> set[tuple[str, str]]:
+    aliases: dict[str, set[tuple[str, str]]] = {}
+    bindings: list[tuple[ast.AST, ast.AST]] = []
+    for node in ast.walk(function):
+        if isinstance(node, ast.Assign):
+            bindings.extend((target, node.value) for target in node.targets)
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            bindings.append((node.target, node.value))
+        elif isinstance(node, ast.For):
+            bindings.append((node.target, node.iter))
+
+    changed = True
+    while changed:
+        changed = False
+        for target, value in bindings:
+            references = _owned_field_references(value, property_owned_fields)
+            references.update(
+                owned
+                for candidate in ast.walk(value)
+                if isinstance(candidate, ast.Name)
+                for owned in aliases.get(candidate.id, set())
+            )
+            for name in _target_names(target):
+                before = len(aliases.get(name, set()))
+                aliases.setdefault(name, set()).update(references)
+                changed |= len(aliases[name]) != before
+
+    owned_fields: set[tuple[str, str]] = set()
+    for mutation in _mutation_expressions(function):
+        owned_fields.update(_owned_field_references(mutation, property_owned_fields))
+        owned_fields.update(
+            owned
+            for candidate in ast.walk(mutation)
+            if isinstance(candidate, ast.Name)
+            for owned in aliases.get(candidate.id, set())
+        )
+    return owned_fields
+
+
+def _assert_derived_mutation_scope(
+    method_name: str,
+    method: ast.FunctionDef,
+    declared: set[str | None],
+    property_owned_fields: dict[str, tuple[str, str]],
+) -> None:
+    mutations = _mutation_expressions(method)
+    if any(_references_owner(node, "_asset_stats") for node in mutations):
+        assert declared.intersection({"asset", "all_asset_stats"}), method_name
+    owned_fields = _mutation_owned_fields(method, property_owned_fields)
+    if ("account", "positions") in owned_fields:
+        assert declared.intersection({"asset", "all_positions"}), method_name
+    if owned_fields.intersection(
+        {
+            ("_risk_state", "position_rules"),
+            ("_risk_state", "position_rules_by_asset"),
+        }
+    ):
+        assert "risk_rules" in declared, method_name
+
+
 def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
     tree = _parse(SOURCE_ROOT / "broker.py")
     restore = next(
@@ -211,7 +323,7 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
             "risk_rules",
             "all_asset_stats",
         },
-        "_update_time": set(),
+        "_update_time": {"all_positions"},
         "_update_water_marks": {"all_positions"},
         "_process_orders": {"all_positions", "all_pending_orders", "all_asset_stats"},
     }
@@ -226,6 +338,7 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
     }
     missing_methods = set(required_scopes).difference(methods)
     assert not missing_methods, f"missing Broker mutators: {sorted(missing_methods)}"
+    property_owned_fields = _property_owned_fields(broker_class)
     captures_by_method = {
         method_name: [
             node
@@ -248,13 +361,42 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
         assert len(captures) == 1, method_name
         declared = {keyword.arg for keyword in captures[0].keywords}
         assert declared >= expected, method_name
-        mutations = _mutation_expressions(methods[method_name])
-        if any(_references_owner(node, "_asset_stats") for node in mutations):
-            assert declared.intersection({"asset", "all_asset_stats"}), method_name
-        if any(_references_owner(node, "account", "positions") for node in mutations):
-            assert declared.intersection({"asset", "all_positions"}), method_name
-        if any(_references_owner(node, "_risk_state", "position_rules") for node in mutations):
-            assert "risk_rules" in declared, method_name
+        _assert_derived_mutation_scope(
+            method_name,
+            methods[method_name],
+            declared,
+            property_owned_fields,
+        )
+
+
+def test_derived_scope_check_rejects_an_under_scoped_property_mutation() -> None:
+    tree = ast.parse(
+        """
+class Broker:
+    @property
+    def positions(self):
+        return self.account.positions
+
+    def mutate_position(self):
+        self._capture_lifecycle_mutation()
+        position = self.positions["SPY"]
+        position.quantity = 2
+"""
+    )
+    broker_class = next(node for node in tree.body if isinstance(node, ast.ClassDef))
+    method = next(
+        node
+        for node in broker_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "mutate_position"
+    )
+
+    with pytest.raises(AssertionError, match="mutate_position"):
+        _assert_derived_mutation_scope(
+            method.name,
+            method,
+            set(),
+            _property_owned_fields(broker_class),
+        )
 
 
 def _references_broker(node: ast.AST) -> bool:
