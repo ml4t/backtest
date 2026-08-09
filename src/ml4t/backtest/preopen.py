@@ -215,6 +215,7 @@ class PreOpenTargetManager:
         self._rule_activations: dict[str, datetime] = {}
         self._position_rules: dict[str, PositionRule] = {}
         self._active_rule_policy_by_asset: dict[str, str] = {}
+        self._installed_rule_by_asset: dict[str, PositionRule] = {}
 
     @property
     def targets(self) -> tuple[CanonicalTargetIntent, ...]:
@@ -275,6 +276,14 @@ class PreOpenTargetManager:
             raise LateAuctionIntentError(
                 f"target {intent.intent_id!r} for {intent.effective_session} was registered during "
                 f"{active_phase.value} after its pre-open decision phase"
+            )
+        if (
+            self.broker.share_type is ShareType.FRACTIONAL
+            and intent.residual is ResidualPolicy.LARGEST_REMAINDER
+            and intent.rounding is not RoundingPolicy.NONE
+        ):
+            raise UnsupportedPreOpenPolicyError(
+                "largest_remainder with fractional shares requires rounding=none"
             )
         policy_id = intent.position_rule_policy_id
         policy_registration: tuple[str, PositionRule] | None = None
@@ -535,6 +544,7 @@ class PreOpenTargetManager:
             or self._terminal_children
             or self._rule_activations
             or self._active_rule_policy_by_asset
+            or self._installed_rule_by_asset
         ):
             raise PreOpenIntentError(
                 "target intent state can only be restored into an empty manager"
@@ -602,6 +612,11 @@ class PreOpenTargetManager:
         self._rule_activations.update(rule_activations)
         self._terminal_children.update(latest_reconciliation)
         self._active_rule_policy_by_asset.update(state.get("active_rule_policy_by_asset", {}))
+        self._installed_rule_by_asset.update(
+            (asset, rules)
+            for asset in self._active_rule_policy_by_asset
+            if (rules := self.broker._get_position_rule_override(asset)) is not None
+        )
 
     def capture_transaction_state(self) -> _PreOpenTransactionState:
         """Capture manager state for callback rollback."""
@@ -805,13 +820,6 @@ class PreOpenTargetManager:
         cash_buffer: float,
     ) -> None:
         if self.broker.share_type is ShareType.FRACTIONAL:
-            if any(
-                not math.isclose(raw[asset], quantity, abs_tol=1e-12)
-                for asset, quantity in rounded.items()
-            ):
-                raise UnsupportedPreOpenPolicyError(
-                    "largest_remainder with fractional shares requires rounding=none"
-                )
             return
         available_cash = max(0.0, self.account.cash * (1.0 - cash_buffer))
         multipliers = {asset: self.broker.get_multiplier(asset) for asset in raw}
@@ -902,8 +910,10 @@ class PreOpenTargetManager:
                 "position_rule_policy_id": policy_id,
             }
         )
-        self.broker.set_position_rules(copy.deepcopy(rules), asset=asset)
+        installed_rules = copy.deepcopy(rules)
+        self.broker.set_position_rules(installed_rules, asset=asset)
         self._active_rule_policy_by_asset[asset] = policy_id
+        self._installed_rule_by_asset[asset] = installed_rules
         self._rule_activations[child_intent_id] = activated_at
         return activated_at
 
@@ -914,6 +924,7 @@ class PreOpenTargetManager:
 
     def _clear_target_managed_rule(self, asset: str) -> None:
         if self._active_rule_policy_by_asset.pop(asset, None) is not None:
+            installed_rules = self._installed_rule_by_asset.pop(asset, None)
             position = self.broker.get_position(asset)
             if position is not None:
                 self.broker._capture_lifecycle_mutation(asset=asset)
@@ -924,7 +935,8 @@ class PreOpenTargetManager:
                     "position_rule_policy_id",
                 ):
                     position.context.pop(key, None)
-            self.broker._remove_position_rule_override(asset)
+            if self.broker._get_position_rule_override(asset) is installed_rules:
+                self.broker._remove_position_rule_override(asset)
 
     @staticmethod
     def _same_reconciliation_state(

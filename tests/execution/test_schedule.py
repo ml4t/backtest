@@ -255,6 +255,25 @@ class TestResolveRebalanceTimestamps:
                 timestamp_semantics="bar_close",
             )
 
+    def test_present_week_end_with_wrong_close_reports_alignment_error(self) -> None:
+        timestamps = [
+            datetime(2024, 1, 5, 16, 15),
+            datetime(2024, 1, 8, 16, 0),
+        ]
+
+        with pytest.raises(
+            ValueError,
+            match=r"required session 2024-01-05.*expected market_close",
+        ):
+            resolve_rebalance_timestamps(
+                timestamps,
+                RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="15m",
+                timestamp_semantics="bar_close",
+            )
+
     def test_weekly_daily_session_labels_use_labeled_dates_not_prior_sessions(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-12")
 

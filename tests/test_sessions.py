@@ -82,6 +82,14 @@ class TestSessionConfig:
         with pytest.raises(ValueError, match=r"XTKS.*standard market open is 09:00"):
             SessionConfig(calendar="XTKS", session_start_time="09:30")
 
+    def test_morning_boundary_without_exchange_calendar_has_a_concise_error(self):
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            SessionConfig(calendar="UTC", session_start_time="09:30")
+
+    def test_unknown_calendar_has_a_concise_standard_open_error(self):
+        with pytest.raises(ValueError, match="UNKNOWN_EXCHANGE.*standard market open"):
+            SessionConfig(calendar="UNKNOWN_EXCHANGE", session_start_time="09:30")
+
 
 class TestAssignSessionDate:
     """Tests for assign_session_date()."""

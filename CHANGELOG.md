@@ -26,8 +26,8 @@
 - Stable distribution metadata, release-critical static analysis, and the 250-asset performance
   workload now match the 0.1 release contract.
 - Weekly and month-end rebalance schedules require calendar metadata and use the final scheduled
-  exchange session rather than the last available feed bar; holidays and missing period-end data
-  no longer move a rebalance earlier.
+  exchange session rather than the last available feed bar. Holidays do not move a rebalance
+  earlier, and a missing completed period-end session raises a feed-completeness error.
 - Batch and online session schedules require every complete exchange session to match its required
   close; only an incomplete final session is exempt, and calendar mismatches fail explicitly.
 - Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or
@@ -35,8 +35,9 @@
 - Morning-start exchange sessions group pre-market and regular-hours events under the same local
   calendar date; exchange session labels and opens come from cached authoritative calendar
   schedules.
-- Deferred next-open risk exits fill before opening targets are sized, and fractional target
-  allocation preserves the declared rounding policy.
+- Deferred next-open risk exits fill before opening targets are sized. Fractional
+  largest-remainder allocation requires rounding=none; use keep-cash residual handling with other
+  rounding policies.
 
 ### Fixed
 
@@ -62,6 +63,9 @@
 - TargetWeightExecutor.prepare_schedule was removed. Configure calendar, timezone,
   session_start_time, data_frequency, and timestamp_semantics on RebalanceConfig for causal
   schedule evaluation.
+- Custom morning session_start_time values are rejected; morning-start sessions always use the
+  local calendar date. Omit the override or restate the configured exchange calendar's standard
+  open.
 - ExecutionPolicy.liquidity_fraction now applies only to opening-auction target children.
   Configure Engine execution_limits explicitly to constrain ordinary strategy orders.
 

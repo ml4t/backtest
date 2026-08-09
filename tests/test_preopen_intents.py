@@ -651,6 +651,44 @@ def test_target_managed_rule_does_not_apply_after_flat_and_plain_reentry() -> No
     assert "SPY" not in engine.broker._position_rules_by_asset
 
 
+@pytest.mark.parametrize(
+    ("disable_rules", "replacement"),
+    [(False, StopLoss(0.25)), (True, None)],
+)
+def test_user_rule_override_survives_target_managed_cleanup(
+    disable_rules: bool,
+    replacement: StopLoss | None,
+) -> None:
+    intent = target_intent(position_rule_policy_id="stop-50")
+
+    class OverrideThenReopenStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intent, position_rules=StopLoss(0.5))
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if timestamp == datetime(2026, 8, 3):
+                if disable_rules:
+                    broker.clear_position_rules(asset="SPY")
+                else:
+                    broker.set_position_rules(replacement, asset="SPY")
+                position = broker.get_position("SPY")
+                assert position is not None
+                broker.submit_order("SPY", -position.quantity)
+            elif timestamp == datetime(2026, 8, 4):
+                broker.submit_order("SPY", 1)
+
+    engine = Engine(
+        DataFeed(prices_df=prices(bars=2, low=100.0)),
+        OverrideThenReopenStrategy(),
+        BacktestConfig(execution_mode=ExecutionMode.SAME_BAR),
+    )
+
+    engine.run()
+
+    assert "SPY" in engine.broker._position_rules_by_asset
+    assert engine.broker._position_rules_by_asset["SPY"] == replacement
+
+
 def test_partial_opening_fill_cancels_opg_remainder_and_retains_lineage() -> None:
     config = BacktestConfig()
     policy = replace(
@@ -993,6 +1031,22 @@ def test_fractional_largest_remainder_rejects_a_discarded_rounding_residual() ->
         engine.run()
 
     assert engine.broker.orders == []
+
+
+def test_fractional_largest_remainder_accepts_unrounded_targets() -> None:
+    result = Engine(
+        DataFeed(prices_df=prices()),
+        InitialTargetStrategy(
+            target_intent(
+                weight=0.00175,
+                rounding=RoundingPolicy.NONE,
+                residual=ResidualPolicy.LARGEST_REMAINDER,
+            )
+        ),
+        BacktestConfig(share_type=ShareType.FRACTIONAL),
+    ).run()
+
+    assert result.fills[0].quantity == 1.75
 
 
 def test_restart_state_requires_matching_broker_order_state() -> None:

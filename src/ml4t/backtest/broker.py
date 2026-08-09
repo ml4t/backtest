@@ -802,6 +802,13 @@ class Broker:
             state["target_intent_state"] = self._preopen_target_manager.capture_transaction_state()
 
     def _restore_lifecycle_state(self, state: dict[str, Any]) -> None:
+        if len(self._order_state.orders) < state["orders_length"]:
+            raise RuntimeError("order history was shortened during lifecycle dispatch")
+        if len(self._execution_journal.fills) < state["fills_length"]:
+            raise RuntimeError("fill history was shortened during lifecycle dispatch")
+        if len(self._execution_journal.trades) < state["trades_length"]:
+            raise RuntimeError("trade history was shortened during lifecycle dispatch")
+
         positions = self.account.positions
         if state["all_positions"]:
             positions.clear()
@@ -828,8 +835,6 @@ class Broker:
             if order_state is not None:
                 order.__dict__.clear()
                 order.__dict__.update(copy.deepcopy(order_state))
-        if len(self._order_state.orders) < state["orders_length"]:
-            raise RuntimeError("order history was shortened during lifecycle dispatch")
         del self._order_state.orders[state["orders_length"] :]
         self._order_state.pending[:] = state["pending_orders"]
         self._order_state.counter = state["order_counter"]
@@ -840,10 +845,6 @@ class Broker:
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
-        if len(self._execution_journal.fills) < state["fills_length"]:
-            raise RuntimeError("fill history was shortened during lifecycle dispatch")
-        if len(self._execution_journal.trades) < state["trades_length"]:
-            raise RuntimeError("trade history was shortened during lifecycle dispatch")
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
 
@@ -1305,6 +1306,10 @@ class Broker:
         """Remove a manager-owned override so the global rule applies again."""
         self._capture_lifecycle_mutation(risk_rules=True)
         self._position_rules_by_asset.pop(asset, None)
+
+    def _get_position_rule_override(self, asset: str) -> PositionRule | None:
+        """Return the current per-asset override for an internal collaborator."""
+        return self._position_rules_by_asset.get(asset)
 
     def update_position_context(self, asset: str, context: dict) -> None:
         """Update context data for a position (used by signal-based rules).

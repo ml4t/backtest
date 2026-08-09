@@ -69,6 +69,8 @@ class SessionConfig:
         time(*start)
         if start[0] >= 12:
             return
+        if self.calendar.upper() == "UTC":
+            raise ValueError("morning session_start_time requires exchange calendar metadata")
         from .calendar import get_standard_market_open_time
 
         market_open = get_standard_market_open_time(self.calendar)

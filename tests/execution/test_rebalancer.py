@@ -484,6 +484,29 @@ class TestTargetWeightExecutorScheduling:
         with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
             executor.should_rebalance(datetime(2024, 2, 1))
 
+    def test_matched_week_end_survives_an_explicit_non_session_close(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.weekly(),
+                calendar="NYSE",
+                timezone="America/New_York",
+                data_frequency="1m",
+            )
+        )
+
+        assert executor.should_rebalance(
+            datetime(2024, 1, 5, 16, 0),
+            is_session_close=True,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 6, 12, 0),
+            is_session_close=True,
+        )
+        assert not executor.should_rebalance(
+            datetime(2024, 1, 8, 16, 0),
+            is_session_close=True,
+        )
+
     def test_batch_month_end_rejects_a_missing_interior_period_end(self):
         with pytest.raises(ValueError, match="missing calendar period-end session 2024-01-31"):
             resolve_rebalance_timestamps(
@@ -535,6 +558,21 @@ class TestTargetWeightExecutorScheduling:
 
         assert not executor.should_rebalance(datetime(2024, 1, 5, 15, 59), is_session_close=False)
         assert executor.should_rebalance(datetime(2024, 1, 5, 16, 0), is_session_close=True)
+
+    def test_calendar_free_morning_boundary_has_a_concise_configuration_error(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                session_start_time="09:30",
+                data_frequency="1m",
+            )
+        )
+
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            executor.should_rebalance(
+                datetime(2024, 1, 5, 16, 0),
+                is_session_close=True,
+            )
 
     def test_intraday_schedule_raises_after_a_required_close_never_matches(self):
         executor = TargetWeightExecutor(

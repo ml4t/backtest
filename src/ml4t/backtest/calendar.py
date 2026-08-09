@@ -126,9 +126,12 @@ def get_calendar(calendar_id: str):
 @lru_cache(maxsize=32)
 def get_standard_market_open_time(calendar_id: str) -> time:
     """Return the calendar's authoritative regular market-open time."""
-    market_open = get_calendar(calendar_id).open_time
-    if market_open is None:
-        raise ValueError(f"calendar {calendar_id!r} does not define a regular market open")
+    try:
+        market_open = get_calendar(calendar_id).open_time
+    except (NotImplementedError, RuntimeError) as exc:
+        raise ValueError(
+            f"calendar {calendar_id!r} does not define a standard market open"
+        ) from exc
     return time(market_open.hour, market_open.minute, market_open.second)
 
 

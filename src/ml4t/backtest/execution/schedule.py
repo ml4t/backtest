@@ -363,6 +363,7 @@ class _OnlineRebalanceEvaluator:
         self._last_event_time: datetime | None = None
         self._observed_event_count = 0
         self._observed_exchange_session = False
+        self._matched_period_ends: set[date] = set()
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
         self._observed_event_count += 1
@@ -413,10 +414,7 @@ class _OnlineRebalanceEvaluator:
                     session_date,
                     self.calendar,
                 ):
-                    if (
-                        expected_period_end != self._session_date
-                        or not self._required_close_matched
-                    ):
+                    if expected_period_end not in self._matched_period_ends:
                         _raise_missing_period_end_error(
                             self.schedule.cadence,
                             self.calendar,
@@ -440,6 +438,11 @@ class _OnlineRebalanceEvaluator:
         )
         if matched:
             self._required_close_matched = True
+            if self.schedule.cadence in {
+                RebalanceCadence.WEEKLY,
+                RebalanceCadence.MONTH_END,
+            }:
+                self._matched_period_ends.add(session_date)
         return matched
 
     @property
@@ -588,7 +591,7 @@ def resolve_rebalance_timestamps(
                 current_session,
                 metadata["calendar"],
             ):
-                if expected_period_end not in matched_sessions:
+                if expected_period_end not in session_indices:
                     _raise_missing_period_end_error(
                         cadence,
                         metadata["calendar"],

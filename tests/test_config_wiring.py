@@ -1236,6 +1236,10 @@ class TestFeedSpecConfigResolution:
                 )
             )
 
+    def test_constructor_rejects_unverifiable_morning_session_boundary(self):
+        with pytest.raises(ValueError, match="requires exchange calendar metadata"):
+            BacktestConfig(feed_spec=FeedSpec(session_start_time="09:30"))
+
     def test_resolved_feed_spec_preserves_explicit_runtime_over_feed_metadata(self):
         config = BacktestConfig(
             timezone="UTC",

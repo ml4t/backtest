@@ -209,6 +209,33 @@ def test_callback_failure_rolls_back_immediate_fill_and_runs_end_once() -> None:
     assert engine.preopen_target_manager.account is account
 
 
+def test_shortened_fill_history_rejects_rollback_before_mutating_state() -> None:
+    class CorruptingStrategy(Strategy):
+        def on_data(self, timestamp, data, context, broker) -> None:
+            broker.submit_order("SPY", 10)
+            if timestamp == datetime(2026, 8, 4):
+                broker.fills.clear()
+                raise RuntimeError("strategy failed")
+
+    engine = Engine(
+        DataFeed(prices_df=prices(bars=2)),
+        CorruptingStrategy(),
+        BacktestConfig(
+            execution_mode=ExecutionMode.SAME_BAR,
+            immediate_fill=True,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="fill history was shortened"):
+        engine.run()
+
+    position = engine.broker.get_position("SPY")
+    assert position is not None
+    assert position.quantity == 20
+    assert len(engine.broker.orders) == 2
+    assert engine.broker.fills == []
+
+
 def test_non_callback_engine_failure_runs_end_once(monkeypatch: pytest.MonkeyPatch) -> None:
     strategy = TraceStrategy()
     engine = Engine(DataFeed(prices_df=prices()), strategy)
