@@ -718,6 +718,29 @@ class TestCausalScheduleEvaluation:
         with pytest.raises(ValueError, match="less than 12 hours apart.*intraday data"):
             executor.should_rebalance(timestamps[1])
 
+    def test_short_interval_error_explains_naive_timestamp_normalization(self) -> None:
+        timestamps = [datetime(2024, 1, 2, 23, 0), datetime(2024, 1, 3, 2, 0)]
+        schedule = RebalanceSchedule.every_session()
+        message = (
+            r"2024-01-03T04:00:00\+00:00 and 2024-01-03T07:00:00\+00:00.*"
+            r"If timestamps are naive, they use timezone 'America/New_York'"
+        )
+
+        with pytest.raises(ValueError, match=message):
+            resolve_rebalance_timestamps(
+                timestamps,
+                schedule,
+                timezone="America/New_York",
+            )
+
+        executor = TargetWeightExecutor(
+            RebalanceConfig(schedule=schedule, timezone="America/New_York")
+        )
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert executor.should_rebalance(timestamps[0])
+        with pytest.raises(ValueError, match=message):
+            executor.should_rebalance(timestamps[1])
+
     def test_missing_metadata_accepts_a_shortened_daily_close_interval(self) -> None:
         new_york = ZoneInfo("America/New_York")
         timestamps = [

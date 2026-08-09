@@ -908,7 +908,7 @@ def _raise_short_implicit_daily_interval(
     raise ValueError(
         f"schedule events {previous.isoformat()} and {current.isoformat()} are less than "
         f"{minimum_hours} hours apart while data_frequency and timestamp_semantics are omitted; "
-        f"configure both fields for intraday data. Naive timestamps use timezone "
+        f"configure both fields for intraday data. If timestamps are naive, they use timezone "
         f"{timezone or 'UTC'!r}"
     )
 
