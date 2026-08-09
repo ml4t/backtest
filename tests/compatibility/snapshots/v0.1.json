@@ -2468,14 +2468,14 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, data_frequency: 'str | None' = None, timestamp_semantics: 'str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest.execution.rebalancer:TargetWeightExecutor": {
       "kind": "class",
       "members": {
         "execute": {
           "kind": "method",
-          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None) -> 'list[Order]'"
+          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None, is_session_close: 'bool | None' = None) -> 'list[Order]'"
         },
         "preview": {
           "kind": "method",
@@ -2483,7 +2483,7 @@
         },
         "should_rebalance": {
           "kind": "method",
-          "signature": "(self, timestamp: 'datetime') -> 'bool'"
+          "signature": "(self, timestamp: 'datetime', *, is_session_close: 'bool | None' = None) -> 'bool'"
         }
       },
       "module": "ml4t.backtest.execution.rebalancer",
@@ -3815,7 +3815,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, data_frequency: 'str | None' = None, timestamp_semantics: 'str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest:RebalanceSchedule": {
       "kind": "class",
@@ -3954,7 +3954,7 @@
       "members": {
         "execute": {
           "kind": "method",
-          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None) -> 'list[Order]'"
+          "signature": "(self, target_weights: 'dict[str, float]', data: 'dict[str, dict]', broker: 'Broker', *, timestamp: 'datetime | None' = None, is_session_close: 'bool | None' = None) -> 'list[Order]'"
         },
         "preview": {
           "kind": "method",
@@ -3962,7 +3962,7 @@
         },
         "should_rebalance": {
           "kind": "method",
-          "signature": "(self, timestamp: 'datetime') -> 'bool'"
+          "signature": "(self, timestamp: 'datetime', *, is_session_close: 'bool | None' = None) -> 'bool'"
         }
       },
       "module": "ml4t.backtest.execution.rebalancer",

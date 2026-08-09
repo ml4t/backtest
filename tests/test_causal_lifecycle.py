@@ -239,6 +239,26 @@ def test_scoped_lifecycle_snapshot_copies_only_the_position_being_mutated() -> N
     assert state["target_intent_state"] is None
 
 
+def test_failed_stats_reconfiguration_restores_all_asset_histories() -> None:
+    class FailingStrategy(Strategy):
+        def on_data(self, timestamp, data, context, broker) -> None:
+            broker.configure_stats(recent_window_size=2)
+            raise RuntimeError("strategy failed")
+
+    engine = Engine(DataFeed(prices_df=prices()), FailingStrategy())
+    stats = engine.broker.get_asset_stats("SPY")
+    stats.recent_pnls.extend([1.0, -1.0, 2.0])
+    stats.recent_wins = 2
+
+    with pytest.raises(RuntimeError, match="strategy failed"):
+        engine.run()
+
+    restored = engine.broker.get_asset_stats("SPY")
+    assert list(restored.recent_pnls) == [1.0, -1.0, 2.0]
+    assert restored.recent_pnls.maxlen == 50
+    assert restored.recent_wins == 2
+
+
 def test_non_utc_event_timestamps_remain_feed_values() -> None:
     strategy = TraceStrategy()
     aware = prices().with_columns(pl.col("timestamp").dt.replace_time_zone("UTC"))

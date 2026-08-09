@@ -435,19 +435,17 @@ class PreOpenTargetManager:
         if missing_orders:
             names = ", ".join(missing_orders)
             raise PreOpenIntentError(
-                "target intent state references orders that are not present in this broker; "
-                f"restore the broker account and order state first: {names}"
+                "post-opening target intent state cannot be restored without a complete broker "
+                f"checkpoint, which Engine does not support: {names}"
             )
-        targets = {
-            intent.intent_id: intent
-            for raw in state.get("targets", ())
-            if (intent := CanonicalTargetIntent.from_mapping(raw))
-        }
-        children = {
-            child.child_intent_id: child
-            for raw in state.get("children", ())
-            if (child := CanonicalChildOrderIntent.from_mapping(raw))
-        }
+        restored_targets = (
+            CanonicalTargetIntent.from_mapping(raw) for raw in state.get("targets", ())
+        )
+        targets = {intent.intent_id: intent for intent in restored_targets}
+        restored_children = (
+            CanonicalChildOrderIntent.from_mapping(raw) for raw in state.get("children", ())
+        )
+        children = {child.child_intent_id: child for child in restored_children}
         processed_targets = set(state.get("processed_targets", ()))
         reconciliations = [
             IntentReconciliation.from_mapping(raw) for raw in state.get("reconciliations", ())
@@ -488,7 +486,20 @@ class PreOpenTargetManager:
 
     def capture_transaction_state(self) -> tuple[dict[str, Any], dict[str, PositionRule]]:
         """Capture manager state for callback rollback."""
-        return self.to_state(), copy.deepcopy(self._position_rules)
+        return (
+            {
+                "targets": copy.deepcopy(self._targets),
+                "idempotency": dict(self._idempotency),
+                "children": copy.deepcopy(self._children),
+                "order_by_child": dict(self._order_by_child),
+                "processed_targets": set(self._processed_targets),
+                "reconciliations": list(self._reconciliations),
+                "latest_reconciliation": dict(self._latest_reconciliation),
+                "terminal_children": set(self._terminal_children),
+                "rule_activations": dict(self._rule_activations),
+            },
+            copy.deepcopy(self._position_rules),
+        )
 
     def restore_transaction_state(
         self, state: tuple[dict[str, Any], dict[str, PositionRule]]
@@ -503,7 +514,16 @@ class PreOpenTargetManager:
         self._latest_reconciliation.clear()
         self._terminal_children.clear()
         self._rule_activations.clear()
-        self.restore_state(state[0])
+        manager_state = state[0]
+        self._targets.update(manager_state["targets"])
+        self._idempotency.update(manager_state["idempotency"])
+        self._children.update(manager_state["children"])
+        self._order_by_child.update(manager_state["order_by_child"])
+        self._processed_targets.update(manager_state["processed_targets"])
+        self._reconciliations.extend(manager_state["reconciliations"])
+        self._latest_reconciliation.update(manager_state["latest_reconciliation"])
+        self._terminal_children.update(manager_state["terminal_children"])
+        self._rule_activations.update(manager_state["rule_activations"])
         self._position_rules = state[1]
 
     def _registration_is_causal(

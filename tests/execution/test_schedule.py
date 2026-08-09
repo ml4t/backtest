@@ -14,6 +14,7 @@ from ml4t.backtest.execution import (
     is_rebalance_timestamp,
     resolve_rebalance_timestamps,
 )
+from ml4t.backtest.execution import schedule as schedule_module
 
 
 def _make_weekday_series(start: str, end: str) -> pl.Series:
@@ -248,3 +249,52 @@ class TestCausalScheduleEvaluation:
                 session_index=1,
                 data_frequency="1m",
             )
+
+    def test_unspecified_metadata_preserves_daily_non_midnight_labels(self) -> None:
+        timestamp = datetime(2024, 1, 31, 16, 0)
+
+        assert is_rebalance_timestamp(
+            timestamp,
+            RebalanceSchedule.month_end(),
+            session_index=22,
+            calendar="NYSE",
+        )
+        assert is_rebalance_timestamp(
+            timestamp,
+            RebalanceSchedule.every_session(),
+            session_index=22,
+        )
+
+    def test_midnight_daily_label_overrides_explicit_bar_close_semantics(self) -> None:
+        assert is_rebalance_timestamp(
+            datetime(2024, 1, 31),
+            RebalanceSchedule.every_session(),
+            session_index=22,
+            calendar="NYSE",
+            timestamp_semantics="bar_close",
+        )
+
+    def test_intraday_calendar_closes_are_cached_per_event_date(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = 0
+        get_schedule = schedule_module.get_schedule
+
+        def counted_get_schedule(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return get_schedule(*args, **kwargs)
+
+        schedule_module._calendar_closes.cache_clear()
+        monkeypatch.setattr(schedule_module, "get_schedule", counted_get_schedule)
+        for minute in (58, 59):
+            is_rebalance_timestamp(
+                datetime(2024, 1, 5, 20, minute, tzinfo=UTC),
+                RebalanceSchedule.weekly(),
+                session_index=5,
+                calendar="NYSE",
+                timezone="UTC",
+                data_frequency="1m",
+            )
+
+        assert calls == 1

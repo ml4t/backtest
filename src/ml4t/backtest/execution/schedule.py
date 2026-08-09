@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from enum import Enum
+from functools import lru_cache
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -144,7 +145,9 @@ def _is_session_close_timestamp(
     frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
     if semantics is TimestampSemantics.SESSION_LABEL or frequency is DataFrequency.DAILY:
         return True
-    if semantics is None and timestamp.time() == time.min:
+    if semantics is None and frequency is None:
+        return True
+    if timestamp.time() == time.min:
         return True
     if calendar is None:
         raise ValueError("intraday session schedules require calendar metadata or is_session_close")
@@ -157,12 +160,17 @@ def _is_session_close_timestamp(
     )
     event_time = localized.astimezone(ZoneInfo("UTC"))
     event_date = localized.date()
-    schedule = get_schedule(
+    closes = _calendar_closes(
         calendar,
         event_date - timedelta(days=1),
         event_date + timedelta(days=1),
     )
-    return any(close == event_time for close in schedule["market_close"])
+    return event_time in closes
+
+
+@lru_cache(maxsize=512)
+def _calendar_closes(calendar: str, start: date, end: date) -> frozenset[datetime]:
+    return frozenset(get_schedule(calendar, start, end)["market_close"])
 
 
 def resolve_rebalance_timestamps(

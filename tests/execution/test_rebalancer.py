@@ -488,6 +488,17 @@ class TestTargetWeightExecutorScheduling:
 
         assert resolved == [datetime(2024, 1, 5, 21, 0, tzinfo=UTC)]
 
+    def test_explicit_session_close_signal_supports_calendar_free_intraday_data(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.every_session(),
+                data_frequency="1m",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 5, 15, 59), is_session_close=False)
+        assert executor.should_rebalance(datetime(2024, 1, 5, 16, 0), is_session_close=True)
+
     def test_execute_requires_timestamp_when_schedule_is_configured(self, broker, sample_data):
         executor = TargetWeightExecutor(
             config=RebalanceConfig(

@@ -95,6 +95,11 @@ ambiguity. Use `REJECT_AMBIGUOUS` to fail when high-low order changes the result
 more adverse supported outcome. The result artifact retains the lifecycle version, execution
 policy, target intents, child intents, and reconciliation records.
 
+`export_target_intent_state()` does not contain account or order-book state. Restoring state that
+already contains child orders therefore requires those orders and the corresponding account state
+to exist in the destination broker. A fresh `Engine` cannot resume a post-opening state from the
+target-intent payload alone. Unprocessed targets can be restored without order state.
+
 ### SAME_BAR
 
 Orders fill at the **current bar's close** price, in the same bar they are submitted.

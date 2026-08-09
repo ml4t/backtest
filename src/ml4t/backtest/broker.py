@@ -1053,7 +1053,7 @@ class Broker:
                 track_session_stats=True,
             ))
         """
-        self._capture_lifecycle_mutation()
+        self._capture_lifecycle_mutation(all_asset_stats=True)
         if config is not None:
             self._stats_config = config
         else:

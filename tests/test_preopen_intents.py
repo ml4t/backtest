@@ -128,6 +128,32 @@ def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> No
     assert engine.preopen_target_manager._position_rules == {}
 
 
+def test_callback_rollback_does_not_run_public_restart_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    intent = target_intent()
+
+    class FailingPrepare(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intent)
+            raise RuntimeError("prepare failed")
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(DataFeed(prices_df=prices()), FailingPrepare())
+
+    def fail_restart_validation(state):
+        raise AssertionError("transaction rollback must not call restore_state")
+
+    monkeypatch.setattr(engine.preopen_target_manager, "restore_state", fail_restart_validation)
+
+    with pytest.raises(RuntimeError, match="prepare failed"):
+        engine.run()
+
+    assert engine.broker.get_target_intents() == ()
+
+
 def test_opening_target_registration_from_on_start_names_on_prepare_migration() -> None:
     intent = target_intent()
 
@@ -540,7 +566,7 @@ def test_restart_state_requires_matching_broker_order_state() -> None:
     engine.run()
     state = engine.broker.export_target_intent_state()
 
-    with pytest.raises(PreOpenIntentError, match="restore the broker account and order state"):
+    with pytest.raises(PreOpenIntentError, match="complete broker checkpoint"):
         Engine(
             DataFeed(prices_df=prices(volume=100)),
             InitialTargetStrategy(intent),

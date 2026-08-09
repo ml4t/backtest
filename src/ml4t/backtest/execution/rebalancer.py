@@ -28,7 +28,9 @@ if TYPE_CHECKING:
     from ..broker import Broker
     from ..types import Order
 
-from ..config import ExecutionPrice, RebalanceMode, ShareType
+from ml4t.specs.market_data import TimestampSemantics
+
+from ..config import DataFrequency, ExecutionPrice, RebalanceMode, ShareType
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
 from .schedule import RebalanceSchedule, is_rebalance_timestamp
@@ -89,8 +91,8 @@ class RebalanceConfig:
     schedule: RebalanceSchedule | None = None
     calendar: str | None = None
     timezone: str | None = None
-    data_frequency: str | None = None
-    timestamp_semantics: str | None = None
+    data_frequency: DataFrequency | str | None = None
+    timestamp_semantics: TimestampSemantics | str | None = None
 
 
 class TargetWeightExecutor:
@@ -124,7 +126,12 @@ class TargetWeightExecutor:
         self._schedule_session_date: date | None = None
         self._schedule_session_index = 0
 
-    def should_rebalance(self, timestamp: datetime) -> bool:
+    def should_rebalance(
+        self,
+        timestamp: datetime,
+        *,
+        is_session_close: bool | None = None,
+    ) -> bool:
         """Evaluate the current timestamp without a future feed sequence."""
         if self.config.schedule is None:
             return True
@@ -140,6 +147,7 @@ class TargetWeightExecutor:
             timezone=self.config.timezone,
             data_frequency=self.config.data_frequency,
             timestamp_semantics=self.config.timestamp_semantics,
+            is_session_close=is_session_close,
         )
 
     def execute(
@@ -149,6 +157,7 @@ class TargetWeightExecutor:
         broker: Broker,
         *,
         timestamp: datetime | None = None,
+        is_session_close: bool | None = None,
     ) -> list[Order]:
         """Execute rebalancing to target weights.
 
@@ -168,6 +177,8 @@ class TargetWeightExecutor:
                 control the allowed exposure.
             data: Current bar data (for prices). Format: {asset: {'close': price, ...}}
             broker: Broker instance for order submission.
+            timestamp: Current event time, required when a schedule is configured.
+            is_session_close: Explicit boundary signal for intraday feeds without a calendar.
 
         Returns:
             List of submitted orders.
@@ -175,7 +186,7 @@ class TargetWeightExecutor:
         if self.config.schedule is not None:
             if timestamp is None:
                 raise ValueError("timestamp is required when RebalanceConfig.schedule is set")
-            if not self.should_rebalance(timestamp):
+            if not self.should_rebalance(timestamp, is_session_close=is_session_close):
                 return []
 
         # 1. Cancel pending orders if configured (prevents double-allocation)
