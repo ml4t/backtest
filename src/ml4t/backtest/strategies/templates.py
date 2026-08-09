@@ -13,7 +13,11 @@ from statistics import mean, stdev
 from typing import TYPE_CHECKING, Any
 
 from ..config import ShareType
-from ..execution.schedule import RebalanceSchedule, is_rebalance_timestamp
+from ..execution.schedule import (
+    RebalanceSchedule,
+    _session_date_for_timestamp,
+    is_rebalance_timestamp,
+)
 from ..strategy import Strategy
 
 if TYPE_CHECKING:
@@ -392,7 +396,14 @@ class LongShortStrategy(Strategy):
         if self.rebalance_schedule is not None:
             if self._schedule_config is None:
                 raise ValueError("rebalance_schedule is set but was not prepared before execution")
-            session_date = timestamp.date()
+            session_date = _session_date_for_timestamp(
+                timestamp,
+                calendar=self._schedule_config.resolved_calendar,
+                timezone=self._schedule_config.resolved_timezone,
+                session_start_time=self._schedule_config.resolved_session_start_time,
+                data_frequency=self._schedule_config.resolved_data_frequency,
+                timestamp_semantics=self._schedule_config.resolved_timestamp_semantics,
+            )
             if session_date != self._schedule_session_date:
                 self._schedule_session_date = session_date
                 self._schedule_session_index += 1

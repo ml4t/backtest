@@ -2468,7 +2468,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest.execution.rebalancer:TargetWeightExecutor": {
       "kind": "class",
@@ -3815,7 +3815,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest:RebalanceSchedule": {
       "kind": "class",

@@ -499,6 +499,21 @@ class TestTargetWeightExecutorScheduling:
         assert not executor.should_rebalance(datetime(2024, 1, 5, 15, 59), is_session_close=False)
         assert executor.should_rebalance(datetime(2024, 1, 5, 16, 0), is_session_close=True)
 
+    def test_fixed_session_counter_uses_cme_session_date_across_midnight(self):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                schedule=RebalanceSchedule.fixed_n_sessions(2),
+                calendar="CME_Equity",
+                timezone="America/Chicago",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+        )
+
+        assert not executor.should_rebalance(datetime(2024, 1, 7, 18, 0))
+        assert executor.should_rebalance(datetime(2024, 1, 8, 16, 0))
+
     def test_execute_requires_timestamp_when_schedule_is_configured(self, broker, sample_data):
         executor = TargetWeightExecutor(
             config=RebalanceConfig(

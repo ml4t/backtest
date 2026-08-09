@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import polars as pl
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
-from ..calendar import get_schedule
+from ..calendar import get_calendar, get_schedule
 from ..config import DataFrequency, _to_backtest_frequency
 from ..sessions import SessionConfig, assign_session_date
 
@@ -171,6 +171,50 @@ def _is_session_close_timestamp(
 @lru_cache(maxsize=512)
 def _calendar_closes(calendar: str, start: date, end: date) -> frozenset[datetime]:
     return frozenset(get_schedule(calendar, start, end)["market_close"])
+
+
+def _session_date_for_timestamp(
+    timestamp: datetime,
+    *,
+    calendar: str | None,
+    timezone: str | None,
+    session_start_time: str | None,
+    data_frequency: Any | None,
+    timestamp_semantics: TimestampSemantics | str | None,
+) -> date:
+    semantics = (
+        timestamp_semantics
+        if isinstance(timestamp_semantics, TimestampSemantics)
+        else TimestampSemantics(timestamp_semantics)
+        if timestamp_semantics is not None
+        else None
+    )
+    frequency = _to_backtest_frequency(data_frequency) if data_frequency is not None else None
+    if (
+        semantics is TimestampSemantics.SESSION_LABEL
+        or frequency is DataFrequency.DAILY
+        or semantics is None
+        and frequency is None
+        or timestamp.time() == time.min
+    ):
+        return timestamp.date()
+
+    resolved_calendar = _normalize_session_calendar(calendar or "UTC")
+    resolved_timezone = timezone or (
+        str(get_calendar(calendar).tz) if calendar is not None else "UTC"
+    )
+    session_config = SessionConfig(
+        calendar=resolved_calendar,
+        timezone=resolved_timezone,
+        session_start_time=session_start_time,
+    )
+    session_date = assign_session_date(
+        timestamp,
+        ZoneInfo(resolved_timezone),
+        session_config.get_session_start_hour(),
+        session_config.get_session_start_minute(),
+    )
+    return session_date.date()
 
 
 def resolve_rebalance_timestamps(

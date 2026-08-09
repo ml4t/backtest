@@ -33,7 +33,7 @@ from ml4t.specs.market_data import TimestampSemantics
 from ..config import DataFrequency, ExecutionPrice, RebalanceMode, ShareType
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
-from .schedule import RebalanceSchedule, is_rebalance_timestamp
+from .schedule import RebalanceSchedule, _session_date_for_timestamp, is_rebalance_timestamp
 
 
 class WeightProvider(Protocol):
@@ -91,6 +91,7 @@ class RebalanceConfig:
     schedule: RebalanceSchedule | None = None
     calendar: str | None = None
     timezone: str | None = None
+    session_start_time: str | None = None
     data_frequency: DataFrequency | str | None = None
     timestamp_semantics: TimestampSemantics | str | None = None
 
@@ -135,7 +136,14 @@ class TargetWeightExecutor:
         """Evaluate the current timestamp without a future feed sequence."""
         if self.config.schedule is None:
             return True
-        session_date = timestamp.date()
+        session_date = _session_date_for_timestamp(
+            timestamp,
+            calendar=self.config.calendar,
+            timezone=self.config.timezone,
+            session_start_time=self.config.session_start_time,
+            data_frequency=self.config.data_frequency,
+            timestamp_semantics=self.config.timestamp_semantics,
+        )
         if session_date != self._schedule_session_date:
             self._schedule_session_date = session_date
             self._schedule_session_index += 1
