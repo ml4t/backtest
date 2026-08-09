@@ -88,6 +88,30 @@ class TestResolveRebalanceTimestamps:
             timezone="America/New_York",
         )
 
+    def test_one_schedule_caches_each_naive_timestamp_timezone_independently(self) -> None:
+        schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)])
+        event = datetime(2024, 1, 2, 21, 0, tzinfo=UTC)
+
+        assert is_rebalance_timestamp(
+            event,
+            schedule,
+            session_index=1,
+            timezone="America/New_York",
+        )
+        assert not is_rebalance_timestamp(
+            event,
+            schedule,
+            session_index=1,
+            timezone="UTC",
+        )
+        assert is_rebalance_timestamp(
+            datetime(2024, 1, 2, 16, 0, tzinfo=UTC),
+            schedule,
+            session_index=1,
+            timezone="UTC",
+        )
+        assert set(schedule._instant_sets_by_timezone) == {"America/New_York", "UTC"}
+
     def test_explicit_timestamp_rejects_an_unmatched_event_on_an_observed_date(self) -> None:
         schedule = RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)])
 

@@ -783,7 +783,7 @@ class TestTargetWeightExecutorScheduling:
         with pytest.raises(
             ValueError,
             match=r"moved backward from 2024-01-02T21:00:00\+00:00 to "
-            r"2024-01-02T20:00:00\+00:00",
+            r"2024-01-02T20:00:00\+00:00.*America/New_York",
         ):
             executor.should_rebalance(datetime(2024, 1, 2, 20, 0, tzinfo=UTC))
 

@@ -106,6 +106,33 @@ class TestSessionConfig:
         with pytest.raises(ValueError, match="UNKNOWN_EXCHANGE.*standard market open"):
             SessionConfig(calendar="UNKNOWN_EXCHANGE", session_start_time="09:30")
 
+    @pytest.mark.parametrize("calendar", ["UTC", "UNKNOWN_EXCHANGE"])
+    def test_evening_boundary_without_an_authoritative_calendar_is_supported(
+        self,
+        calendar: str,
+    ) -> None:
+        config = SessionConfig(
+            calendar=calendar,
+            timezone="UTC",
+            session_start_time="17:00",
+        )
+
+        assert config.get_session_start_hour() == 17
+        assert config.get_session_timezone() == ZoneInfo("UTC")
+
+    def test_calendar_free_evening_boundary_assigns_the_next_session(self) -> None:
+        assert (
+            session_date_for_timestamp(
+                datetime(2024, 1, 8, 18, 0),
+                calendar=None,
+                timezone="UTC",
+                session_start_time="17:00",
+                data_frequency="1m",
+                timestamp_semantics="bar_close",
+            )
+            == datetime(2024, 1, 9).date()
+        )
+
 
 class TestAssignSessionDate:
     """Tests for assign_session_date()."""
@@ -205,6 +232,35 @@ class TestAssignSessionDate:
             timestamp_semantics="bar_close",
         )
         assert assigned == datetime(2024, 1, 9).date()
+
+    def test_default_nymex_boundary_uses_the_calendar_timezone(self):
+        timestamp = datetime(
+            2024,
+            1,
+            8,
+            17,
+            30,
+            tzinfo=ZoneInfo("America/New_York"),
+        )
+        config = SessionConfig(calendar="NYMEX", timezone="America/New_York")
+
+        assigned = assign_session_date(
+            timestamp,
+            config.get_session_timezone(),
+            config.get_session_start_hour(),
+            config.get_session_start_minute(),
+        ).date()
+
+        assert config.get_session_timezone() == ZoneInfo("America/Chicago")
+        assert assigned == session_date_for_timestamp(
+            timestamp,
+            calendar="NYMEX",
+            timezone="America/New_York",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+        assert assigned == datetime(2024, 1, 8).date()
 
     def test_session_lookup_does_not_load_the_next_year_for_ordinary_dates(
         self,

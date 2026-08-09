@@ -106,6 +106,29 @@ def test_engine_validates_a_scheduled_target_weight_executor_after_the_final_eve
         Engine(DataFeed(prices_df=feed), ScheduledExecutorStrategy()).run()
 
 
+def test_engine_accepts_a_scheduled_executor_with_an_aligned_final_close() -> None:
+    class ScheduledExecutorStrategy(Strategy):
+        def __init__(self) -> None:
+            self.executor = TargetWeightExecutor(
+                RebalanceConfig(
+                    schedule=RebalanceSchedule.every_session(),
+                    calendar="NYSE",
+                    timezone="America/New_York",
+                    data_frequency="15m",
+                    timestamp_semantics="bar_close",
+                )
+            )
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            self.executor.execute({}, data, broker, timestamp=timestamp)
+
+    feed = prices().with_columns(pl.lit(datetime(2024, 1, 2, 16, 0)).alias("timestamp"))
+
+    result = Engine(DataFeed(prices_df=feed), ScheduledExecutorStrategy()).run()
+
+    assert len(result.equity_curve) == 1
+
+
 def test_completed_close_cannot_create_a_same_timestamp_open_fill() -> None:
     class CloseAwareStrategy(Strategy):
         def on_data(self, timestamp, data, context, broker) -> None:

@@ -38,6 +38,8 @@
 - Morning-start exchange sessions group pre-market and regular-hours events under the same local
   calendar date; exchange session labels and opens come from cached authoritative calendar
   schedules.
+- Scheduled TargetWeightExecutor.execute calls register completion validation with the Engine, so
+  a missing required close in the final observed session fails the run automatically.
 - Deferred next-open risk exits fill before opening targets are sized. Fractional accounts reject
   largest-remainder residual handling regardless of rounding because its whole-unit allocation
   cannot redistribute fractional remainders; use keep-cash instead.
@@ -69,6 +71,8 @@
 - Custom morning session_start_time values are rejected; morning-start sessions always use the
   local calendar date. Omit the override or restate the configured exchange calendar's standard
   open.
+- Evening session_start_time overrides remain available for calendar-free and evening-start
+  sessions, but are rejected for calendars whose authoritative open is in the morning.
 - ExecutionPolicy.liquidity_fraction now applies only to opening-auction target children.
   Configure Engine execution_limits explicitly to constrain ordinary strategy orders.
 

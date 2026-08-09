@@ -44,7 +44,6 @@ class RebalanceSchedule:
         init=False,
         repr=False,
         compare=False,
-        hash=False,
     )
 
     def __post_init__(self) -> None:
@@ -426,7 +425,8 @@ class _OnlineRebalanceEvaluator:
                 raise ValueError(
                     f"event timestamp moved backward from "
                     f"{self._last_explicit_instant.isoformat()} to {event_time.isoformat()}; "
-                    "start a new evaluator or call TargetWeightExecutor.reset() before another run"
+                    "start a new evaluator or call TargetWeightExecutor.reset() before another "
+                    f"run. Naive timestamps use timezone {self.timezone or 'UTC'!r}"
                 )
             if self._first_explicit_instant is None:
                 self._first_explicit_instant = event_time

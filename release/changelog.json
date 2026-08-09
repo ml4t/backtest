@@ -21,6 +21,7 @@
           "Batch and online session schedules require every complete exchange session to match its required close; only an incomplete final session is exempt, and calendar mismatches fail explicitly.",
           "Result artifacts retain intent and lifecycle counts by default. Set retain_intent_history or retain_lifecycle_history to include the corresponding event histories.",
           "Morning-start exchange sessions group pre-market and regular-hours events under the same local calendar date; exchange session labels and opens come from cached authoritative calendar schedules.",
+          "Scheduled TargetWeightExecutor.execute calls register completion validation with the Engine, so a missing required close in the final observed session fails the run automatically.",
           "Deferred next-open risk exits fill before opening targets are sized. Fractional accounts reject largest-remainder residual handling regardless of rounding because its whole-unit allocation cannot redistribute fractional remainders; use keep-cash instead."
         ],
         "Fixed": [
@@ -36,6 +37,7 @@
           "The beta-only on_before_risk callback and future-timestamp on_prepare signature are removed. Engine construction raises HistoricalStrategyCompatibilityError for strategies that require either historical behavior.",
           "TargetWeightExecutor.prepare_schedule was removed. Configure calendar, timezone, session_start_time, data_frequency, and timestamp_semantics on RebalanceConfig for causal schedule evaluation.",
           "Custom morning session_start_time values are rejected; morning-start sessions always use the local calendar date. Omit the override or restate the configured exchange calendar's standard open.",
+          "Evening session_start_time overrides remain available for calendar-free and evening-start sessions, but are rejected for calendars whose authoritative open is in the morning.",
           "ExecutionPolicy.liquidity_fraction now applies only to opening-auction target children. Configure Engine execution_limits explicitly to constrain ordinary strategy orders."
         ],
         "Validation": [

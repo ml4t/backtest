@@ -68,6 +68,15 @@ class SessionConfig:
             return int(parts[1]) if len(parts) > 1 else 0
         return _default_session_start(self.calendar).minute
 
+    def get_session_timezone(self) -> ZoneInfo:
+        """Return the authoritative calendar timezone or configured fallback."""
+        from .calendar import get_calendar
+
+        try:
+            return ZoneInfo(str(get_calendar(self.calendar).tz))
+        except RuntimeError:
+            return ZoneInfo(self.timezone)
+
 
 def _default_session_start(calendar: str) -> time:
     from .calendar import get_standard_market_open_time
@@ -88,16 +97,20 @@ def _validate_session_start_time(calendar: str | None, session_start_time: str) 
         raise ValueError("morning session_start_time requires exchange calendar metadata")
     from .calendar import get_standard_market_open_time
 
-    market_open = get_standard_market_open_time(calendar)
+    try:
+        market_open = get_standard_market_open_time(calendar)
+    except ValueError:
+        if start[0] >= 12:
+            return
+        raise
     standard_open = (market_open.hour, market_open.minute)
     if start == standard_open or (start[0] >= 12 and market_open.hour >= 12):
         return
     boundary = "morning" if start[0] < 12 else "evening"
-    if start != standard_open:
-        raise ValueError(
-            f"custom {boundary} session_start_time {session_start_time!r} is unsupported for "
-            f"calendar {calendar!r}; its standard market open is {market_open:%H:%M}"
-        )
+    raise ValueError(
+        f"custom {boundary} session_start_time {session_start_time!r} is unsupported for "
+        f"calendar {calendar!r}; its standard market open is {market_open:%H:%M}"
+    )
 
 
 def session_date_for_timestamp(
@@ -221,7 +234,7 @@ def compute_session_pnl(
 
     # Assign session dates
     session_dates = []
-    tz = ZoneInfo(session_config.timezone)
+    tz = session_config.get_session_timezone()
     session_start_hour = session_config.get_session_start_hour()
     session_start_minute = session_config.get_session_start_minute()
 
@@ -352,7 +365,7 @@ def align_to_sessions(
     Returns:
         DataFrame with added 'session_date' column
     """
-    tz = ZoneInfo(session_config.timezone)
+    tz = session_config.get_session_timezone()
     session_start_hour = session_config.get_session_start_hour()
     session_start_minute = session_config.get_session_start_minute()
 
