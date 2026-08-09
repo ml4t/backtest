@@ -37,12 +37,13 @@ class SessionConfig:
 
     Attributes:
         calendar: Exchange calendar name (e.g., "CME_Equity", "NYSE")
-        timezone: Calendar timezone (e.g., "America/Chicago", "America/New_York")
+        timezone: Fallback timezone when ``calendar`` has no authoritative metadata. A known
+            calendar always uses its exchange timezone for session boundaries.
         session_start_time: Override an evening session boundary (e.g., "17:00" for CME),
             or restate the calendar's standard morning open. Custom morning boundaries are
             rejected because morning-start sessions use the local calendar date. Evening
-            overrides require an evening-start calendar or no exchange calendar. If None,
-            uses the calendar's authoritative standard open.
+            overrides require an evening-start calendar or no authoritative calendar metadata.
+            If None, uses the calendar's authoritative standard open.
     """
 
     calendar: str
@@ -73,9 +74,10 @@ class SessionConfig:
         from .calendar import get_calendar
 
         try:
-            return ZoneInfo(str(get_calendar(self.calendar).tz))
+            calendar = get_calendar(self.calendar)
         except RuntimeError:
             return ZoneInfo(self.timezone)
+        return ZoneInfo(str(calendar.tz))
 
 
 def _default_session_start(calendar: str) -> time:

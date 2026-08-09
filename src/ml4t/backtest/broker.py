@@ -1214,12 +1214,10 @@ class Broker:
         if not self._stats_config.track_session_stats:
             return
 
-        from zoneinfo import ZoneInfo
-
         from .sessions import assign_session_date
 
         # Get session timezone and times
-        tz = ZoneInfo(self._session_config.timezone)
+        tz = self._session_config.get_session_timezone()
         session_start_hour = self._session_config.get_session_start_hour()
         session_start_minute = self._session_config.get_session_start_minute()
 

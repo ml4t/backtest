@@ -345,6 +345,21 @@ class TestComputeSessionPnL:
         assert result["session_date"].to_list() == [datetime(2024, 1, 8)]
         assert result["num_bars"].to_list() == [2]
 
+    def test_nymex_pnl_uses_the_calendar_timezone_over_the_fallback(self):
+        new_york = ZoneInfo("America/New_York")
+        equity_curve = [
+            (datetime(2024, 1, 8, 17, 15, tzinfo=new_york), 100000.0),
+            (datetime(2024, 1, 8, 17, 45, tzinfo=new_york), 100100.0),
+        ]
+
+        result = compute_session_pnl(
+            equity_curve,
+            SessionConfig(calendar="NYMEX", timezone="America/New_York"),
+        )
+
+        assert result["session_date"].to_list() == [datetime(2024, 1, 8)]
+        assert result["num_bars"].to_list() == [2]
+
     def test_single_session(self, cme_config: SessionConfig):
         """Test with single trading session."""
         # All bars on Monday after 5pm CT (Tuesday session)
