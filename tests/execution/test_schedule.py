@@ -655,6 +655,19 @@ class TestCausalScheduleEvaluation:
         assert online
         assert batch.to_list() == [timestamp]
 
+    def test_missing_metadata_rejects_multiple_events_on_one_date(self) -> None:
+        timestamps = [datetime(2024, 1, 31, 10, 0), datetime(2024, 1, 31, 16, 0)]
+        schedule = RebalanceSchedule.every_session()
+        executor = TargetWeightExecutor(RebalanceConfig(schedule=schedule, calendar="NYSE"))
+
+        with pytest.raises(ValueError, match="multiple schedule events.*intraday data"):
+            resolve_rebalance_timestamps(timestamps, schedule, calendar="NYSE")
+
+        with pytest.warns(UserWarning, match="treated as daily session closes"):
+            assert executor.should_rebalance(timestamps[0])
+        with pytest.raises(ValueError, match="multiple schedule events.*intraday data"):
+            executor.should_rebalance(timestamps[1])
+
     def test_midnight_is_not_a_daily_label_with_explicit_bar_semantics(self) -> None:
         assert not is_rebalance_timestamp(
             datetime(2024, 1, 31),

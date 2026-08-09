@@ -51,7 +51,10 @@
 - Cross-framework validation now fails incomplete runs and requires exact retained comparisons for
   supported scenarios.
 - Batch and online session schedules now apply the same daily-close fallback when data frequency
-  and timestamp semantics are both omitted.
+  and timestamp semantics are both omitted, and reject multiple events on one date as ambiguous
+  intraday data.
+- Session-aligned P&L and broker statistics interpret naive timestamps in the configured data
+  timezone before applying the authoritative exchange timezone.
 
 ### Compatibility
 

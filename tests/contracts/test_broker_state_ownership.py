@@ -56,6 +56,7 @@ FORBIDDEN_BROKER_STATE = {
     "_risk_engine",
     "_risk_state",
     "_session_config",
+    "_session_boundary",
     "_stats_config",
     "_stop_exits_this_bar",
     "_active_lifecycle_phase",
@@ -323,7 +324,7 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
             "risk_rules",
             "all_asset_stats",
         },
-        "_update_time": {"all_positions"},
+        "_update_time": {"all_positions", "all_asset_stats"},
         "_update_water_marks": {"all_positions"},
         "_process_orders": {"all_positions", "all_pending_orders", "all_asset_stats"},
     }

@@ -241,7 +241,13 @@ def compute_session_pnl(
     session_start_minute = session_config.get_session_start_minute()
 
     for ts in timestamps:
-        session_date = assign_session_date(ts, tz, session_start_hour, session_start_minute)
+        session_timestamp = _timestamp_in_session_timezone(ts, session_config, tz)
+        session_date = assign_session_date(
+            session_timestamp,
+            tz,
+            session_start_hour,
+            session_start_minute,
+        )
         session_dates.append(session_date)
 
     df = pl.DataFrame(
@@ -352,6 +358,16 @@ def assign_session_date(
     return datetime(session_date.year, session_date.month, session_date.day)
 
 
+def _timestamp_in_session_timezone(
+    timestamp: datetime,
+    session_config: SessionConfig,
+    session_timezone: ZoneInfo,
+) -> datetime:
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=ZoneInfo(session_config.timezone))
+    return timestamp.astimezone(session_timezone)
+
+
 def align_to_sessions(
     df: pl.DataFrame,
     session_config: SessionConfig,
@@ -373,7 +389,13 @@ def align_to_sessions(
 
     session_dates = []
     for ts in df[timestamp_col]:
-        session_date = assign_session_date(ts, tz, session_start_hour, session_start_minute)
+        session_timestamp = _timestamp_in_session_timezone(ts, session_config, tz)
+        session_date = assign_session_date(
+            session_timestamp,
+            tz,
+            session_start_hour,
+            session_start_minute,
+        )
         session_dates.append(session_date)
 
     return df.with_columns(pl.Series("session_date", session_dates))

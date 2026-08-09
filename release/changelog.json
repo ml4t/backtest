@@ -27,7 +27,8 @@
         "Fixed": [
           "Financial-accounting, order-rejection, artifact-integrity, quantity-tolerance, and parity-comparison defects found during the stable-release audit.",
           "Cross-framework validation now fails incomplete runs and requires exact retained comparisons for supported scenarios.",
-          "Batch and online session schedules now apply the same daily-close fallback when data frequency and timestamp semantics are both omitted."
+          "Batch and online session schedules now apply the same daily-close fallback when data frequency and timestamp semantics are both omitted, and reject multiple events on one date as ambiguous intraday data.",
+          "Session-aligned P&L and broker statistics interpret naive timestamps in the configured data timezone before applying the authoritative exchange timezone."
         ],
         "Compatibility": [
           "Stable support requires CPython 3.12 through 3.14 on Linux, macOS, and Windows; CPython 3.15 prereleases are blocking compatibility checks until final release.",

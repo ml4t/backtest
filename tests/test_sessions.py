@@ -360,6 +360,22 @@ class TestComputeSessionPnL:
         assert result["session_date"].to_list() == [datetime(2024, 1, 8)]
         assert result["num_bars"].to_list() == [2]
 
+    def test_nymex_pnl_converts_naive_data_timezone_to_the_calendar_timezone(self):
+        timestamp = datetime(2024, 1, 8, 22, 0)
+        config = SessionConfig(calendar="NYMEX", timezone="UTC")
+
+        result = compute_session_pnl([(timestamp, 100000.0)], config)
+
+        expected = session_date_for_timestamp(
+            timestamp,
+            calendar="NYMEX",
+            timezone="UTC",
+            session_start_time=None,
+            data_frequency="1m",
+            timestamp_semantics="bar_close",
+        )
+        assert result["session_date"].to_list() == [datetime.combine(expected, datetime.min.time())]
+
     def test_single_session(self, cme_config: SessionConfig):
         """Test with single trading session."""
         # All bars on Monday after 5pm CT (Tuesday session)

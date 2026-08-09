@@ -7,6 +7,7 @@ from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
+from zoneinfo import ZoneInfo
 
 from .config import (
     EntryOrderPriority,
@@ -251,6 +252,7 @@ class Broker:
         self._asset_stats: dict[str, AssetTradingStats] = {}
         self._stats_config = StatsConfig()
         self._session_config = None  # Optional SessionConfig for session boundary detection
+        self._session_boundary: tuple[ZoneInfo, int, int] | None = None
         self._last_session_id: int | None = None  # Track current session for boundary detection
 
         # Extracted orchestration components (Phase B1 alpha-reset)
@@ -747,6 +749,7 @@ class Broker:
             "all_asset_stats": False,
             "stats_config": copy.deepcopy(self._stats_config),
             "session_config": self._session_config,
+            "session_boundary": self._session_boundary,
             "last_session_id": self._last_session_id,
             "target_intent_state": None,
         }
@@ -860,6 +863,7 @@ class Broker:
                 self._asset_stats[asset] = stats
         self._stats_config = state["stats_config"]
         self._session_config = state["session_config"]
+        self._session_boundary = state["session_boundary"]
         self._last_session_id = state["last_session_id"]
         target_intent_state = state["target_intent_state"]
         if target_intent_state is not None and self._preopen_target_manager is not None:
@@ -1196,6 +1200,15 @@ class Broker:
         """
         self._capture_lifecycle_mutation()
         self._session_config = config
+        self._session_boundary = (
+            None
+            if config is None
+            else (
+                config.get_session_timezone(),
+                config.get_session_start_hour(),
+                config.get_session_start_minute(),
+            )
+        )
         self._last_session_id = None
 
     def _check_session_boundary(self, timestamp: datetime) -> None:
@@ -1208,21 +1221,24 @@ class Broker:
         Args:
             timestamp: Current bar timestamp
         """
-        if self._session_config is None:
+        if self._session_config is None or self._session_boundary is None:
             return
 
         if not self._stats_config.track_session_stats:
             return
 
-        from .sessions import assign_session_date
+        from .sessions import _timestamp_in_session_timezone, assign_session_date
 
-        # Get session timezone and times
-        tz = self._session_config.get_session_timezone()
-        session_start_hour = self._session_config.get_session_start_hour()
-        session_start_minute = self._session_config.get_session_start_minute()
+        tz, session_start_hour, session_start_minute = self._session_boundary
 
         # Compute session date for current timestamp
-        session_date = assign_session_date(timestamp, tz, session_start_hour, session_start_minute)
+        session_timestamp = _timestamp_in_session_timezone(timestamp, self._session_config, tz)
+        session_date = assign_session_date(
+            session_timestamp,
+            tz,
+            session_start_hour,
+            session_start_minute,
+        )
         # Use ordinal as session ID for comparison
         current_session_id = session_date.toordinal()
 
@@ -2289,7 +2305,7 @@ class Broker:
         if highs is None or lows is None:
             raise TypeError("_update_time requires highs and lows")
 
-        self._capture_lifecycle_mutation(all_positions=True)
+        self._capture_lifecycle_mutation(all_positions=True, all_asset_stats=True)
         self._current_time = timestamp
         self._current_prices = prices
         self._current_opens = opens

@@ -402,6 +402,10 @@ class _OnlineRebalanceEvaluator:
         self._required_close_matched = False
         self._last_event_time: datetime | None = None
         self._observed_event_count = 0
+        self._last_observed_timestamp: datetime | None = None
+        self._last_boundary_override: bool | None = None
+        self._last_evaluation_result: bool | None = None
+        self._implicit_daily_dates: set[date] = set()
         self._observed_exchange_session = False
         self._matched_period_ends: set[date] = set()
         self._explicit_schedule_by_instant = {
@@ -416,7 +420,30 @@ class _OnlineRebalanceEvaluator:
         self._nearest_explicit_events: dict[datetime, datetime] = {}
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
+        if timestamp == self._last_observed_timestamp:
+            if is_session_close != self._last_boundary_override:
+                raise ValueError(
+                    f"timestamp {timestamp.isoformat()} was evaluated with conflicting "
+                    "is_session_close values"
+                )
+            if self._last_evaluation_result is None:
+                raise RuntimeError("schedule evaluation did not retain its prior result")
+            return self._last_evaluation_result
+
+        self._validate_implicit_daily_event(timestamp)
+        result = self._evaluate_new_event(timestamp, is_session_close=is_session_close)
         self._observed_event_count += 1
+        self._last_observed_timestamp = timestamp
+        self._last_boundary_override = is_session_close
+        self._last_evaluation_result = result
+        return result
+
+    def _evaluate_new_event(
+        self,
+        timestamp: datetime,
+        *,
+        is_session_close: bool | None,
+    ) -> bool:
         if self.schedule.cadence is RebalanceCadence.EVERY_BAR:
             return True
         if self.schedule.cadence is RebalanceCadence.EXPLICIT_TIMESTAMPS:
@@ -527,6 +554,23 @@ class _OnlineRebalanceEvaluator:
                 self._matched_period_ends.add(session_date)
         return matched
 
+    def _validate_implicit_daily_event(self, timestamp: datetime) -> None:
+        frequency, semantics = _normalize_schedule_metadata(
+            self.data_frequency,
+            self.timestamp_semantics,
+        )
+        if (
+            self.schedule.cadence
+            in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EXPLICIT_TIMESTAMPS}
+            or frequency is not None
+            or semantics is not None
+        ):
+            return
+        event_date = _localize_event_time(timestamp, self.timezone).date()
+        if event_date in self._implicit_daily_dates:
+            _raise_ambiguous_missing_metadata(event_date)
+        self._implicit_daily_dates.add(event_date)
+
     @property
     def has_observations(self) -> bool:
         """Return whether at least one event has been evaluated."""
@@ -584,6 +628,8 @@ class _OnlineRebalanceEvaluator:
 
     def validate_engine_run(self, market_event_count: int) -> None:
         """Validate complete event coverage before schedule alignment."""
+        if self.schedule.cadence is RebalanceCadence.EVERY_BAR:
+            return
         if self._observed_event_count != market_event_count:
             raise ValueError(
                 "scheduled TargetWeightExecutor.execute() was called for "
@@ -686,6 +732,7 @@ def resolve_rebalance_timestamps(
         timestamp_semantics=timestamp_semantics,
     )
     _validate_schedule_calendar(schedule, metadata["calendar"])
+    _validate_implicit_daily_timestamps(ts_list, metadata)
     session_indices: dict[date, int] = {}
     matched_sessions: set[date] = set()
     last_event_by_session: dict[date, datetime] = {}
@@ -778,6 +825,31 @@ def resolve_rebalance_timestamps(
                 missing_required_sessions[0],
             )
     return pl.Series("timestamp", resolved)
+
+
+def _validate_implicit_daily_timestamps(
+    timestamps: Sequence[datetime],
+    metadata: dict[str, Any],
+) -> None:
+    frequency, semantics = _normalize_schedule_metadata(
+        metadata["data_frequency"],
+        metadata["timestamp_semantics"],
+    )
+    if frequency is not None or semantics is not None:
+        return
+    observed_dates: set[date] = set()
+    for timestamp in timestamps:
+        event_date = _localize_event_time(timestamp, metadata["timezone"]).date()
+        if event_date in observed_dates:
+            _raise_ambiguous_missing_metadata(event_date)
+        observed_dates.add(event_date)
+
+
+def _raise_ambiguous_missing_metadata(event_date: date) -> None:
+    raise ValueError(
+        f"multiple schedule events observed on {event_date} while data_frequency and "
+        "timestamp_semantics are omitted; configure both fields for intraday data"
+    )
 
 
 def _normalize_timestamps(available_timestamps: Sequence[datetime] | pl.Series) -> list[datetime]:
