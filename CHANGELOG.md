@@ -78,6 +78,8 @@
   open.
 - Evening session_start_time overrides remain available for calendar-free and evening-start
   sessions, but are rejected for calendars whose authoritative open is in the morning.
+- SessionConfig is immutable; construct and install a replacement instead of mutating calendar,
+  timezone, or session_start_time after configuration.
 - ExecutionPolicy.liquidity_fraction now applies only to opening-auction target children.
   Configure Engine execution_limits explicitly to constrain ordinary strategy orders.
 

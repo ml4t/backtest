@@ -146,8 +146,9 @@ scheduled `execute()` for every event in chronological order, including warm-up 
 final event, call `validate_completed_run()` so a missing close in the final session is reported.
 When scheduled `execute()` receives an Engine broker, the Engine registers and runs this final
 validation automatically. Standalone use and direct `should_rebalance()` calls still require the
-explicit completion call. Do not call scheduled `execute()` conditionally: skipped events make
-session counters and schedule-completeness validation incorrect.
+explicit completion call. Gating `execute()` on `should_rebalance()` for the same timestamp is
+supported, and `every_bar` schedules impose no event-coverage requirement. Other conditional
+skips fail completion validation because session counters would be incomplete.
 Call `reset()` before reusing an executor for another run or changing its public
 `RebalanceConfig`. Backward session dates and mid-run configuration changes raise instead of
 silently restarting session counters.

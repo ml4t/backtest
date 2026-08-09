@@ -376,6 +376,21 @@ class TestComputeSessionPnL:
         )
         assert result["session_date"].to_list() == [datetime.combine(expected, datetime.min.time())]
 
+    def test_naive_timestamp_reading_depends_on_the_configured_data_timezone(self):
+        timestamp = datetime(2024, 1, 8, 18, 0)
+
+        utc_result = compute_session_pnl(
+            [(timestamp, 100000.0)],
+            SessionConfig(calendar="CME_Equity", timezone="UTC"),
+        )
+        chicago_result = compute_session_pnl(
+            [(timestamp, 100000.0)],
+            SessionConfig(calendar="CME_Equity", timezone="America/Chicago"),
+        )
+
+        assert utc_result["session_date"].to_list() == [datetime(2024, 1, 8)]
+        assert chicago_result["session_date"].to_list() == [datetime(2024, 1, 9)]
+
     def test_single_session(self, cme_config: SessionConfig):
         """Test with single trading session."""
         # All bars on Monday after 5pm CT (Tuesday session)

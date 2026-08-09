@@ -395,16 +395,18 @@ class _OnlineRebalanceEvaluator:
         self.calendar = calendar
         self.timezone = timezone
         self.session_start_time = session_start_time
-        self.data_frequency = data_frequency
-        self.timestamp_semantics = timestamp_semantics
+        self.data_frequency, self.timestamp_semantics = _normalize_schedule_metadata(
+            data_frequency,
+            timestamp_semantics,
+        )
         self._session_date: date | None = None
         self._session_index = 0
         self._required_close_matched = False
         self._last_event_time: datetime | None = None
         self._observed_event_count = 0
-        self._last_observed_timestamp: datetime | None = None
+        self._last_observed_instant: datetime | None = None
         self._last_boundary_override: bool | None = None
-        self._last_evaluation_result: bool | None = None
+        self._last_evaluation_result = False
         self._implicit_daily_dates: set[date] = set()
         self._observed_exchange_session = False
         self._matched_period_ends: set[date] = set()
@@ -420,20 +422,23 @@ class _OnlineRebalanceEvaluator:
         self._nearest_explicit_events: dict[datetime, datetime] = {}
 
     def evaluate(self, timestamp: datetime, *, is_session_close: bool | None = None) -> bool:
-        if timestamp == self._last_observed_timestamp:
-            if is_session_close != self._last_boundary_override:
+        event_instant = _event_time_utc(timestamp, self.timezone)
+        if event_instant == self._last_observed_instant:
+            if (
+                is_session_close is not None
+                and self._last_boundary_override is not None
+                and is_session_close != self._last_boundary_override
+            ):
                 raise ValueError(
                     f"timestamp {timestamp.isoformat()} was evaluated with conflicting "
                     "is_session_close values"
                 )
-            if self._last_evaluation_result is None:
-                raise RuntimeError("schedule evaluation did not retain its prior result")
             return self._last_evaluation_result
 
-        self._validate_implicit_daily_event(timestamp)
+        self._validate_implicit_daily_event(timestamp, is_session_close=is_session_close)
         result = self._evaluate_new_event(timestamp, is_session_close=is_session_close)
         self._observed_event_count += 1
-        self._last_observed_timestamp = timestamp
+        self._last_observed_instant = event_instant
         self._last_boundary_override = is_session_close
         self._last_evaluation_result = result
         return result
@@ -554,16 +559,18 @@ class _OnlineRebalanceEvaluator:
                 self._matched_period_ends.add(session_date)
         return matched
 
-    def _validate_implicit_daily_event(self, timestamp: datetime) -> None:
-        frequency, semantics = _normalize_schedule_metadata(
-            self.data_frequency,
-            self.timestamp_semantics,
-        )
+    def _validate_implicit_daily_event(
+        self,
+        timestamp: datetime,
+        *,
+        is_session_close: bool | None,
+    ) -> None:
         if (
             self.schedule.cadence
             in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EXPLICIT_TIMESTAMPS}
-            or frequency is not None
-            or semantics is not None
+            or is_session_close is not None
+            or self.data_frequency is not None
+            or self.timestamp_semantics is not None
         ):
             return
         event_date = _localize_event_time(timestamp, self.timezone).date()

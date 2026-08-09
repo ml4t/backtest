@@ -252,7 +252,7 @@ class Broker:
         self._asset_stats: dict[str, AssetTradingStats] = {}
         self._stats_config = StatsConfig()
         self._session_config = None  # Optional SessionConfig for session boundary detection
-        self._session_boundary: tuple[ZoneInfo, int, int] | None = None
+        self._session_boundary: tuple[ZoneInfo, ZoneInfo, int, int] | None = None
         self._last_session_id: int | None = None  # Track current session for boundary detection
 
         # Extracted orchestration components (Phase B1 alpha-reset)
@@ -1204,6 +1204,7 @@ class Broker:
             None
             if config is None
             else (
+                ZoneInfo(config.timezone),
                 config.get_session_timezone(),
                 config.get_session_start_hour(),
                 config.get_session_start_minute(),
@@ -1229,10 +1230,10 @@ class Broker:
 
         from .sessions import _timestamp_in_session_timezone, assign_session_date
 
-        tz, session_start_hour, session_start_minute = self._session_boundary
+        data_tz, tz, session_start_hour, session_start_minute = self._session_boundary
 
         # Compute session date for current timestamp
-        session_timestamp = _timestamp_in_session_timezone(timestamp, self._session_config, tz)
+        session_timestamp = _timestamp_in_session_timezone(timestamp, data_tz, tz)
         session_date = assign_session_date(
             session_timestamp,
             tz,

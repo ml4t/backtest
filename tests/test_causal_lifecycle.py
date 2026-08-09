@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import polars as pl
 import pytest
@@ -174,7 +175,10 @@ def test_engine_accepts_should_rebalance_gating_before_scheduled_execute() -> No
 
         def on_data(self, timestamp, data, context, broker) -> None:
             if self.executor.should_rebalance(timestamp):
-                self.executor.execute({}, data, broker, timestamp=timestamp)
+                aware_timestamp = timestamp.replace(tzinfo=ZoneInfo("America/New_York")).astimezone(
+                    UTC
+                )
+                self.executor.execute({}, data, broker, timestamp=aware_timestamp)
 
     feed = pl.concat(
         [
@@ -184,6 +188,32 @@ def test_engine_accepts_should_rebalance_gating_before_scheduled_execute() -> No
     )
 
     result = Engine(DataFeed(prices_df=feed), GatedExecutorStrategy()).run()
+
+    assert len(result.equity_curve) == 2
+
+
+def test_engine_accepts_should_rebalance_gating_for_an_explicit_schedule() -> None:
+    class ExplicitExecutorStrategy(Strategy):
+        def __init__(self) -> None:
+            self.executor = TargetWeightExecutor(
+                RebalanceConfig(
+                    schedule=RebalanceSchedule.explicit_timestamps([datetime(2024, 1, 2, 16, 0)]),
+                    timezone="America/New_York",
+                )
+            )
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            if self.executor.should_rebalance(timestamp):
+                self.executor.execute({}, data, broker, timestamp=timestamp)
+
+    feed = pl.concat(
+        [
+            prices().with_columns(pl.lit(datetime(2024, 1, 2, 15, 45)).alias("timestamp")),
+            prices().with_columns(pl.lit(datetime(2024, 1, 2, 16, 0)).alias("timestamp")),
+        ]
+    )
+
+    result = Engine(DataFeed(prices_df=feed), ExplicitExecutorStrategy()).run()
 
     assert len(result.equity_curve) == 2
 

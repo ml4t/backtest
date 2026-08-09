@@ -31,14 +31,15 @@ if TYPE_CHECKING:
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class SessionConfig:
     """Configuration for trading session alignment.
 
     Attributes:
         calendar: Exchange calendar name (e.g., "CME_Equity", "NYSE")
-        timezone: Fallback timezone when ``calendar`` has no authoritative metadata. A known
-            calendar always uses its exchange timezone for session boundaries.
+        timezone: Data timezone used to interpret naive timestamps. It is also the session
+            timezone fallback when ``calendar`` has no authoritative metadata. A known calendar
+            uses its exchange timezone for the boundary after naive timestamps are localized.
         session_start_time: Override an evening session boundary (e.g., "17:00" for CME),
             or restate the calendar's standard morning open. Custom morning boundaries are
             rejected because morning-start sessions use the local calendar date. Evening
@@ -237,11 +238,12 @@ def compute_session_pnl(
     # Assign session dates
     session_dates = []
     tz = session_config.get_session_timezone()
+    data_tz = ZoneInfo(session_config.timezone)
     session_start_hour = session_config.get_session_start_hour()
     session_start_minute = session_config.get_session_start_minute()
 
     for ts in timestamps:
-        session_timestamp = _timestamp_in_session_timezone(ts, session_config, tz)
+        session_timestamp = _timestamp_in_session_timezone(ts, data_tz, tz)
         session_date = assign_session_date(
             session_timestamp,
             tz,
@@ -360,11 +362,11 @@ def assign_session_date(
 
 def _timestamp_in_session_timezone(
     timestamp: datetime,
-    session_config: SessionConfig,
+    data_timezone: ZoneInfo,
     session_timezone: ZoneInfo,
 ) -> datetime:
     if timestamp.tzinfo is None:
-        timestamp = timestamp.replace(tzinfo=ZoneInfo(session_config.timezone))
+        timestamp = timestamp.replace(tzinfo=data_timezone)
     return timestamp.astimezone(session_timezone)
 
 
@@ -384,12 +386,13 @@ def align_to_sessions(
         DataFrame with added 'session_date' column
     """
     tz = session_config.get_session_timezone()
+    data_tz = ZoneInfo(session_config.timezone)
     session_start_hour = session_config.get_session_start_hour()
     session_start_minute = session_config.get_session_start_minute()
 
     session_dates = []
     for ts in df[timestamp_col]:
-        session_timestamp = _timestamp_in_session_timezone(ts, session_config, tz)
+        session_timestamp = _timestamp_in_session_timezone(ts, data_tz, tz)
         session_date = assign_session_date(
             session_timestamp,
             tz,
