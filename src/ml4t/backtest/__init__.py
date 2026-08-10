@@ -35,6 +35,8 @@ from .preopen import (
     IntentReconciliation,
     LateAuctionIntentError,
     PreOpenIntentError,
+    TargetRuleOutcome,
+    TargetRuleReconciliation,
     UnsupportedPreOpenPolicyError,
     default_execution_policy,
 )
@@ -121,6 +123,8 @@ __all__ = [
     "IntentReconciliation",
     "LateAuctionIntentError",
     "PreOpenIntentError",
+    "TargetRuleOutcome",
+    "TargetRuleReconciliation",
     "UnsupportedPreOpenPolicyError",
     "default_execution_policy",
     # Risk rules

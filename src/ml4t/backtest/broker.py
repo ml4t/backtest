@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 from zoneinfo import ZoneInfo
@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from .accounting.policy import AccountPolicy
     from .config import BacktestConfig
     from .execution import ExecutionLimits, MarketImpactModel
-    from .preopen import IntentReconciliation, PreOpenTargetManager
+    from .preopen import IntentReconciliation, PreOpenTargetManager, TargetRuleReconciliation
     from .risk.position import PositionRule
     from .sessions import SessionConfig
 
@@ -1355,7 +1355,7 @@ class Broker:
         self,
         intent: CanonicalTargetIntent,
         *,
-        position_rules: PositionRule | None = None,
+        position_rules: PositionRule | Mapping[str, PositionRule] | None = None,
     ) -> CanonicalTargetIntent:
         """Register an idempotent target for a causal opening phase."""
         self._capture_lifecycle_mutation(target_intents=True)
@@ -1391,6 +1391,12 @@ class Broker:
         if self._preopen_target_manager is None:
             return ()
         return self._preopen_target_manager.reconciliations
+
+    def get_target_rule_reconciliations(self) -> tuple[TargetRuleReconciliation, ...]:
+        """Return retained per-target rule transition evidence."""
+        if self._preopen_target_manager is None:
+            return ()
+        return self._preopen_target_manager.target_rule_reconciliations
 
     def export_target_intent_state(self) -> dict[str, Any]:
         """Serialize accepted target, child, and reconciliation state."""

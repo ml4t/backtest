@@ -615,9 +615,13 @@ class Engine:
             "target_intent_count": self.preopen_target_manager.target_count,
             "child_order_intent_count": self.preopen_target_manager.child_count,
             "intent_reconciliation_count": self.preopen_target_manager.reconciliation_count,
+            "target_rule_reconciliation_count": (
+                self.preopen_target_manager.target_rule_reconciliation_count
+            ),
             "target_intents": [],
             "child_order_intents": [],
             "intent_reconciliations": [],
+            "target_rule_reconciliations": [],
         }
         if retain_intent_history:
             contract_evidence.update(
@@ -630,6 +634,10 @@ class Engine:
                     ],
                     "intent_reconciliations": [
                         record.to_dict() for record in self.preopen_target_manager.reconciliations
+                    ],
+                    "target_rule_reconciliations": [
+                        record.to_dict()
+                        for record in self.preopen_target_manager.target_rule_reconciliations
                     ],
                 }
             )

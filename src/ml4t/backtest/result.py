@@ -647,9 +647,13 @@ class BacktestResult:
             "target_intent_count": self.metrics.get("target_intent_count", 0),
             "child_order_intent_count": self.metrics.get("child_order_intent_count", 0),
             "intent_reconciliation_count": self.metrics.get("intent_reconciliation_count", 0),
+            "target_rule_reconciliation_count": self.metrics.get(
+                "target_rule_reconciliation_count", 0
+            ),
             "target_intents": self.metrics.get("target_intents", []),
             "child_order_intents": self.metrics.get("child_order_intents", []),
             "intent_reconciliations": self.metrics.get("intent_reconciliations", []),
+            "target_rule_reconciliations": self.metrics.get("target_rule_reconciliations", []),
             "config": config_dict,
             "window": {
                 "start": start,
