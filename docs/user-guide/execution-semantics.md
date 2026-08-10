@@ -95,7 +95,22 @@ registration remains valid. If any target declares a policy, each target's decla
 authoritative and the intent-level field must be absent. Pass a mapping containing exactly the
 policy IDs referenced by that intent. A target without an ID has no target-managed rule.
 
+<!-- ml4t-doc-test: preopen-mixed-rules -->
 ```python
+from datetime import UTC, date, datetime
+
+import polars as pl
+from ml4t.specs import (
+    AssetTarget,
+    CanonicalTargetIntent,
+    IntentReason,
+    LifecyclePhase,
+    ResidualPolicy,
+    RoundingPolicy,
+    TargetMeasure,
+)
+
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
 from ml4t.backtest.risk.position import StopLoss, TrailingStop
 
 decision = datetime(2026, 8, 2, 20, 0, tzinfo=UTC)
@@ -128,13 +143,41 @@ mixed_target = CanonicalTargetIntent(
     reason=IntentReason.REBALANCE,
 )
 
-broker.register_target_intent(
-    mixed_target,
-    position_rules={
-        "spy-stop-5": StopLoss(0.05),
-        "qqq-trail-8": TrailingStop(0.08),
-    },
+class MixedRuleStrategy(Strategy):
+    def on_prepare(self, broker, config=None):
+        broker.register_target_intent(
+            mixed_target,
+            position_rules={
+                "spy-stop-5": StopLoss(0.05),
+                "qqq-trail-8": TrailingStop(0.08),
+            },
+        )
+
+    def on_data(self, timestamp, data, context, broker):
+        pass
+
+
+assets = ("SPY", "QQQ", "IWM")
+prices = pl.DataFrame(
+    {
+        "timestamp": [datetime(2026, 8, 3)] * len(assets),
+        "asset": assets,
+        "open": [100.0] * len(assets),
+        "high": [101.0] * len(assets),
+        "low": [99.0] * len(assets),
+        "close": [100.0] * len(assets),
+        "volume": [1_000_000.0] * len(assets),
+    }
 )
+engine = Engine(
+    DataFeed(prices_df=prices),
+    MixedRuleStrategy(),
+    BacktestConfig(retain_intent_history=True),
+)
+result = engine.run()
+
+assert result.metrics["target_intent_count"] == 1
+assert result.metrics["target_rule_reconciliation_count"] == 3
 ```
 
 Registration validates the complete mapping before changing manager state. Missing

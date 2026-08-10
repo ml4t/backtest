@@ -16,8 +16,16 @@ _DEFAULT_PATHS = (
     _ROOT / "README.md",
     _ROOT / "docs" / "getting-started" / "installation.md",
     _ROOT / "docs" / "getting-started" / "quickstart.md",
+    _ROOT / "docs" / "user-guide" / "execution-semantics.md",
 )
-_REQUIRED_EXAMPLES = frozenset({"installation-import", "readme-quickstart", "quickstart-minimal"})
+_REQUIRED_EXAMPLES = frozenset(
+    {
+        "installation-import",
+        "preopen-mixed-rules",
+        "readme-quickstart",
+        "quickstart-minimal",
+    }
+)
 _EXAMPLE = re.compile(
     r"<!-- ml4t-doc-test: (?P<name>[a-z0-9-]+) -->\s*"
     r"```(?P<language>python|bash)\n(?P<code>.*?)\n```",

@@ -558,6 +558,7 @@
     "from ml4t.backtest import BacktestConfig",
     "from ml4t.backtest import BacktestConfig, CommissionType",
     "from ml4t.backtest import BacktestConfig, DataFeed",
+    "from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy",
     "from ml4t.backtest import BacktestConfig, Engine",
     "from ml4t.backtest import Broker, BacktestConfig",
     "from ml4t.backtest import DataFeed",
