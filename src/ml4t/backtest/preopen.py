@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import copy
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ml4t.specs import (
     BarPathPolicy,
@@ -74,6 +75,57 @@ class IntentOutcome(StrEnum):
     PENDING = "pending"
     REJECTED = "rejected"
     CANCELLED = "cancelled"
+
+
+class TargetRuleOutcome(StrEnum):
+    """Resulting rule state for one asset target after the opening auction."""
+
+    ACTIVATED = "activated"
+    PRESERVED = "preserved"
+    CLEARED = "cleared"
+    NO_POSITION = "no_position"
+
+
+@dataclass(frozen=True, slots=True)
+class TargetRuleReconciliation:
+    """Requested and realized target-managed rule state for one asset."""
+
+    target_intent_id: str
+    asset: str
+    event_time: datetime
+    requested_policy_id: str | None
+    prior_policy_id: str | None
+    resulting_policy_id: str | None
+    outcome: TargetRuleOutcome
+    activated_at: datetime | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible reconciliation record."""
+        return {
+            "target_intent_id": self.target_intent_id,
+            "asset": self.asset,
+            "event_time": self.event_time.isoformat(),
+            "requested_policy_id": self.requested_policy_id,
+            "prior_policy_id": self.prior_policy_id,
+            "resulting_policy_id": self.resulting_policy_id,
+            "outcome": self.outcome.value,
+            "activated_at": self.activated_at.isoformat() if self.activated_at else None,
+        }
+
+    @classmethod
+    def from_mapping(cls, value: dict[str, Any]) -> TargetRuleReconciliation:
+        """Restore one target-rule reconciliation record."""
+        activation = value.get("activated_at")
+        return cls(
+            target_intent_id=value["target_intent_id"],
+            asset=value["asset"],
+            event_time=datetime.fromisoformat(value["event_time"]),
+            requested_policy_id=value.get("requested_policy_id"),
+            prior_policy_id=value.get("prior_policy_id"),
+            resulting_policy_id=value.get("resulting_policy_id"),
+            outcome=TargetRuleOutcome(value["outcome"]),
+            activated_at=datetime.fromisoformat(activation) if activation else None,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,9 +262,10 @@ class PreOpenTargetManager:
         self._active_children: set[str] = set()
         self._processed_targets: set[str] = set()
         self._reconciliations: list[IntentReconciliation] = []
+        self._target_rule_reconciliations: list[TargetRuleReconciliation] = []
+        self._target_rule_by_intent_asset: dict[tuple[str, str], TargetRuleReconciliation] = {}
         self._latest_reconciliation: dict[str, IntentReconciliation] = {}
         self._terminal_children: set[str] = set()
-        self._rule_activations: dict[str, datetime] = {}
         self._position_rules: dict[str, PositionRule] = {}
         self._active_rule_policy_by_asset: dict[str, str] = {}
         self._installed_rule_by_asset: dict[str, PositionRule] = {}
@@ -233,6 +286,11 @@ class PreOpenTargetManager:
         return tuple(self._reconciliations)
 
     @property
+    def target_rule_reconciliations(self) -> tuple[TargetRuleReconciliation, ...]:
+        """Return retained per-target rule reconciliation history."""
+        return tuple(self._target_rule_reconciliations)
+
+    @property
     def target_count(self) -> int:
         """Return the number of accepted targets without copying them."""
         return len(self._targets)
@@ -247,11 +305,16 @@ class PreOpenTargetManager:
         """Return the number of retained reconciliation records without copying them."""
         return len(self._reconciliations)
 
+    @property
+    def target_rule_reconciliation_count(self) -> int:
+        """Return the number of retained target-rule reconciliation records."""
+        return len(self._target_rule_reconciliations)
+
     def register(
         self,
         intent: CanonicalTargetIntent,
         *,
-        position_rules: PositionRule | None = None,
+        position_rules: PositionRule | Mapping[str, PositionRule] | None = None,
         active_phase: LifecyclePhase | None = None,
     ) -> CanonicalTargetIntent:
         """Accept one idempotent target without reading feed prices."""
@@ -278,22 +341,56 @@ class PreOpenTargetManager:
                 f"{active_phase.value} after its pre-open decision phase"
             )
         self._validate_residual_policy(intent)
-        policy_id = intent.position_rule_policy_id
-        policy_registration: tuple[str, PositionRule] | None = None
-        if position_rules is not None and policy_id is None:
-            raise PreOpenIntentError(
-                "position_rules require CanonicalTargetIntent.position_rule_policy_id"
-            )
-        if position_rules is not None and policy_id is not None:
-            policy_registration = (policy_id, position_rules)
-            existing_rules = self._position_rules.get(policy_registration[0])
-            if existing_rules is not None and existing_rules != position_rules:
+        target_policy_ids = {
+            target.position_rule_policy_id
+            for target in intent.targets
+            if target.position_rule_policy_id is not None
+        }
+        target_level_mode = bool(target_policy_ids)
+        referenced_policy_ids = (
+            target_policy_ids
+            if target_level_mode
+            else ({intent.position_rule_policy_id} if intent.position_rule_policy_id else set())
+        )
+        policy_registrations: dict[str, PositionRule] = {}
+        if isinstance(position_rules, Mapping):
+            supplied_rules = cast("Mapping[str, PositionRule]", position_rules)
+            supplied_policy_ids = set(supplied_rules)
+            unreferenced = supplied_policy_ids.difference(referenced_policy_ids)
+            if unreferenced:
+                raise PreOpenIntentError(
+                    "position_rules contains unreferenced policy IDs: "
+                    + ", ".join(sorted(unreferenced))
+                )
+            for policy_id, rules in supplied_rules.items():
+                policy_registrations[policy_id] = rules
+        elif position_rules is not None:
+            if target_level_mode:
+                raise PreOpenIntentError(
+                    "target-level position rule policies require a policy-ID mapping"
+                )
+            if intent.position_rule_policy_id is None:
+                raise PreOpenIntentError(
+                    "position_rules require CanonicalTargetIntent.position_rule_policy_id"
+                )
+            policy_registrations[intent.position_rule_policy_id] = position_rules
+        for policy_id, rules in policy_registrations.items():
+            if not policy_id:
+                raise PreOpenIntentError("position rule policy IDs must be non-empty")
+            existing_rules = self._position_rules.get(policy_id)
+            if existing_rules is not None and existing_rules != rules:
                 raise PreOpenIntentError(
                     f"position rule policy {policy_id!r} is already registered"
                 )
-        elif policy_id is not None and policy_id not in self._position_rules:
+        missing_policy_ids = sorted(
+            policy_id
+            for policy_id in referenced_policy_ids
+            if policy_id not in self._position_rules and policy_id not in policy_registrations
+        )
+        if missing_policy_ids:
             raise UnsupportedPreOpenPolicyError(
-                f"position rule policy {policy_id!r} has no registered implementation"
+                "position rule policies have no registered implementation: "
+                + ", ".join(missing_policy_ids)
             )
         existing_id = self._idempotency.get(intent.idempotency_key)
         if existing_id is not None:
@@ -302,8 +399,8 @@ class PreOpenTargetManager:
                 raise PreOpenIntentError(
                     f"idempotency key {intent.idempotency_key!r} identifies a different target"
                 )
-            if policy_registration is not None:
-                self.register_position_rule_policy(*policy_registration)
+            for policy_id, rules in policy_registrations.items():
+                self.register_position_rule_policy(policy_id, rules)
             return existing
         if intent.intent_id in self._targets:
             raise PreOpenIntentError(f"duplicate target intent_id {intent.intent_id!r}")
@@ -330,8 +427,8 @@ class PreOpenTargetManager:
                 f"target {intent.intent_id!r} overlaps target {registered_id!r} for "
                 f"{', '.join(sorted(overlap))} in session {intent.effective_session}"
             )
-        if policy_registration is not None:
-            self.register_position_rule_policy(*policy_registration)
+        for policy_id, rules in policy_registrations.items():
+            self.register_position_rule_policy(policy_id, rules)
         self._targets[intent.intent_id] = intent
         self._target_by_session_asset.update(
             ((intent.effective_session, asset), intent.intent_id) for asset in assets
@@ -456,10 +553,11 @@ class PreOpenTargetManager:
                         + ", ".join(sorted(nonterminal))
                     )
             self._processed_targets.add(intent.intent_id)
+            self._reconcile_target_rules(intent, timestamp)
             self.reconcile(timestamp, target_intent_id=intent.intent_id)
 
     def reconcile(self, timestamp: datetime, *, target_intent_id: str | None = None) -> None:
-        """Record current child outcomes and activate rules after observed fills."""
+        """Record current child outcomes after observed opening fills."""
         for child_id in tuple(self._active_children):
             child = self._children[child_id]
             if target_intent_id is not None and child.target_intent_id != target_intent_id:
@@ -483,7 +581,9 @@ class PreOpenTargetManager:
             else:
                 outcome = IntentOutcome.PENDING
             intent = self._targets[child.target_intent_id]
-            activation = self._activate_rules(intent, child.asset, timestamp, filled)
+            target_rule = self._target_rule_by_intent_asset.get(
+                (child.target_intent_id, child.asset)
+            )
             record = IntentReconciliation(
                 target_intent_id=child.target_intent_id,
                 child_intent_id=child.child_intent_id,
@@ -494,8 +594,8 @@ class PreOpenTargetManager:
                 remaining_quantity=remaining,
                 outcome=outcome,
                 rejection_reason=order.rejection_reason,
-                rule_policy_id=intent.position_rule_policy_id,
-                rule_activated_at=activation,
+                rule_policy_id=self._policy_id_for_asset(intent, child.asset),
+                rule_activated_at=(target_rule.activated_at if target_rule is not None else None),
             )
             previous = self._latest_reconciliation.get(child.child_intent_id)
             if previous is None or not self._same_reconciliation_state(previous, record):
@@ -519,6 +619,9 @@ class PreOpenTargetManager:
             "order_by_child": dict(self._order_by_child),
             "processed_targets": sorted(self._processed_targets),
             "reconciliations": [record.to_dict() for record in self._reconciliations],
+            "target_rule_reconciliations": [
+                record.to_dict() for record in self._target_rule_reconciliations
+            ],
             "active_rule_policy_by_asset": dict(self._active_rule_policy_by_asset),
         }
 
@@ -533,9 +636,10 @@ class PreOpenTargetManager:
             or self._active_children
             or self._processed_targets
             or self._reconciliations
+            or self._target_rule_reconciliations
+            or self._target_rule_by_intent_asset
             or self._latest_reconciliation
             or self._terminal_children
-            or self._rule_activations
             or self._active_rule_policy_by_asset
             or self._installed_rule_by_asset
         ):
@@ -568,12 +672,13 @@ class PreOpenTargetManager:
         reconciliations = [
             IntentReconciliation.from_mapping(raw) for raw in state.get("reconciliations", ())
         ]
+        target_rule_reconciliations = [
+            TargetRuleReconciliation.from_mapping(raw)
+            for raw in state.get("target_rule_reconciliations", ())
+        ]
         latest_reconciliation: dict[str, IntentReconciliation] = {}
-        rule_activations: dict[str, datetime] = {}
         for record in reconciliations:
             latest_reconciliation[record.child_intent_id] = record
-            if record.rule_activated_at is not None:
-                rule_activations.setdefault(record.child_intent_id, record.rule_activated_at)
         nonterminal_children = {
             child_id
             for child_id, record in latest_reconciliation.items()
@@ -589,6 +694,19 @@ class PreOpenTargetManager:
         unknown_children = set(order_by_child).difference(children)
         if unknown_targets or unknown_children:
             raise PreOpenIntentError("target intent state contains unknown target or child ids")
+        target_rule_by_intent_asset: dict[tuple[str, str], TargetRuleReconciliation] = {}
+        for record in target_rule_reconciliations:
+            intent = targets.get(record.target_intent_id)
+            key = (record.target_intent_id, record.asset)
+            if (
+                intent is None
+                or record.asset not in {target.asset for target in intent.targets}
+                or key in target_rule_by_intent_asset
+            ):
+                raise PreOpenIntentError(
+                    "target intent state contains invalid target-rule reconciliation evidence"
+                )
+            target_rule_by_intent_asset[key] = record
 
         self._targets.update(targets)
         self._target_by_session_asset.update(
@@ -603,8 +721,9 @@ class PreOpenTargetManager:
         self._order_by_child.update(order_by_child)
         self._processed_targets.update(processed_targets)
         self._reconciliations.extend(reconciliations)
+        self._target_rule_reconciliations.extend(target_rule_reconciliations)
+        self._target_rule_by_intent_asset.update(target_rule_by_intent_asset)
         self._latest_reconciliation.update(latest_reconciliation)
-        self._rule_activations.update(rule_activations)
         self._terminal_children.update(latest_reconciliation)
         self._active_rule_policy_by_asset.update(state.get("active_rule_policy_by_asset", {}))
         self._installed_rule_by_asset.update(
@@ -887,47 +1006,83 @@ class PreOpenTargetManager:
         magnitude = math.floor(abs(value) + 0.5)
         return math.copysign(float(magnitude), value)
 
-    def _activate_rules(
+    def _policy_id_for_asset(
         self,
         intent: CanonicalTargetIntent,
         asset: str,
-        timestamp: datetime,
-        filled_quantity: float,
-    ) -> datetime | None:
-        policy_id = intent.position_rule_policy_id
-        if filled_quantity <= 0:
-            return None
-        child_intent_id = f"{intent.intent_id}:{asset}"
-        existing_activation = self._rule_activations.get(child_intent_id)
-        if existing_activation is not None:
-            return existing_activation
-        position = self.broker.get_position(asset)
-        if position is None:
-            self._clear_target_managed_rule(asset)
-            return None
-        if policy_id is None:
-            self._clear_target_managed_rule(asset)
-            return None
-        rules = self._position_rules.get(policy_id)
-        if rules is None:
-            raise UnsupportedPreOpenPolicyError(
-                f"position rule policy {policy_id!r} has no registered implementation"
-            )
-        activated_at = self._as_utc(timestamp)
-        position.context.update(
-            {
-                "rule_activation_time": activated_at.isoformat(),
-                "rule_activation_bar_index": self.market.bar_index,
-                "bar_path_policy": self.policy.bar_path,
-                "position_rule_policy_id": policy_id,
-            }
+    ) -> str | None:
+        target_level_mode = any(
+            target.position_rule_policy_id is not None for target in intent.targets
         )
-        installed_rules = copy.deepcopy(rules)
-        self.broker.set_position_rules(installed_rules, asset=asset)
-        self._active_rule_policy_by_asset[asset] = policy_id
-        self._installed_rule_by_asset[asset] = installed_rules
-        self._rule_activations[child_intent_id] = activated_at
-        return activated_at
+        if target_level_mode:
+            return next(
+                target.position_rule_policy_id for target in intent.targets if target.asset == asset
+            )
+        return intent.position_rule_policy_id
+
+    def _reconcile_target_rules(
+        self,
+        intent: CanonicalTargetIntent,
+        timestamp: datetime,
+    ) -> None:
+        event_time = self._as_utc(timestamp)
+        for target in sorted(intent.targets, key=lambda item: item.asset):
+            key = (intent.intent_id, target.asset)
+            if key in self._target_rule_by_intent_asset:
+                continue
+            requested_policy_id = self._policy_id_for_asset(intent, target.asset)
+            prior_policy_id = self._active_rule_policy_by_asset.get(target.asset)
+            position = self.broker.get_position(target.asset)
+            activated_at: datetime | None = None
+            if position is None:
+                self._clear_target_managed_rule(target.asset)
+                resulting_policy_id = None
+                outcome = TargetRuleOutcome.NO_POSITION
+            elif requested_policy_id is None:
+                self._clear_target_managed_rule(target.asset)
+                resulting_policy_id = None
+                outcome = TargetRuleOutcome.CLEARED
+            elif requested_policy_id == prior_policy_id:
+                resulting_policy_id = prior_policy_id
+                outcome = TargetRuleOutcome.PRESERVED
+                activation_value = position.context.get("rule_activation_time")
+                if isinstance(activation_value, str):
+                    activated_at = datetime.fromisoformat(activation_value)
+            else:
+                rules = self._position_rules.get(requested_policy_id)
+                if rules is None:
+                    raise UnsupportedPreOpenPolicyError(
+                        f"position rule policy {requested_policy_id!r} has no registered "
+                        "implementation"
+                    )
+                self._clear_target_managed_rule(target.asset)
+                activated_at = event_time
+                position.context.update(
+                    {
+                        "rule_activation_time": activated_at.isoformat(),
+                        "rule_activation_bar_index": self.market.bar_index,
+                        "bar_path_policy": self.policy.bar_path,
+                        "position_rule_policy_id": requested_policy_id,
+                    }
+                )
+                installed_rules = copy.deepcopy(rules)
+                self.broker.set_position_rules(installed_rules, asset=target.asset)
+                self._active_rule_policy_by_asset[target.asset] = requested_policy_id
+                self._installed_rule_by_asset[target.asset] = installed_rules
+                resulting_policy_id = requested_policy_id
+                outcome = TargetRuleOutcome.ACTIVATED
+            record = TargetRuleReconciliation(
+                target_intent_id=intent.intent_id,
+                asset=target.asset,
+                event_time=event_time,
+                requested_policy_id=requested_policy_id,
+                prior_policy_id=prior_policy_id,
+                resulting_policy_id=resulting_policy_id,
+                outcome=outcome,
+                activated_at=activated_at,
+            )
+            self._target_rule_reconciliations.append(record)
+            self._target_rule_by_intent_asset[key] = record
 
     def _clear_rules_for_flat_positions(self) -> None:
         for asset in tuple(self._active_rule_policy_by_asset):

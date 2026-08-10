@@ -72,6 +72,7 @@ Auto-generated from source docstrings.
         - get_target_intents
         - get_child_order_intents
         - get_intent_reconciliations
+        - get_target_rule_reconciliations
         - export_target_intent_state
         - restore_target_intent_state
         - update_order

@@ -82,12 +82,106 @@ def on_prepare(self, broker, config=None):
 ```
 
 The engine validates the cutoff, lowers the target at the opening auction, records canonical child
-intent and order lineage, reconciles fills and remaining quantity, then activates any associated
-position rules. Opening child orders use OPG time-in-force: any quantity not filled by the eligible
-opening auction is cancelled and is never carried into a later bar. A scheduled target uses the
-same method from an earlier event with a future
+intent and order lineage, reconciles fills and remaining quantity, then applies each target's
+position rule to the resulting position. Opening child orders use OPG time-in-force: any quantity
+not filled by the eligible opening auction is cancelled and is never carried into a later bar. A
+scheduled target uses the same method from an earlier event with a future
 `effective_session`. Same-session registration from `on_data()` is rejected because that callback
 has already observed information after the opening phase.
+
+Targets support two position-rule declaration modes. If no `AssetTarget` declares a policy, the
+intent-level `position_rule_policy_id` applies to every asset and the existing single-rule
+registration remains valid. If any target declares a policy, each target's declaration is
+authoritative and the intent-level field must be absent. Pass a mapping containing exactly the
+policy IDs referenced by that intent. A target without an ID has no target-managed rule.
+
+<!-- ml4t-doc-test: preopen-mixed-rules -->
+```python
+from datetime import UTC, date, datetime
+
+import polars as pl
+from ml4t.specs import (
+    AssetTarget,
+    CanonicalTargetIntent,
+    IntentReason,
+    LifecyclePhase,
+    ResidualPolicy,
+    RoundingPolicy,
+    TargetMeasure,
+)
+
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.risk.position import StopLoss, TrailingStop
+
+decision = datetime(2026, 8, 2, 20, 0, tzinfo=UTC)
+mixed_target = CanonicalTargetIntent(
+    intent_id="mixed-risk-portfolio",
+    decision_time=decision,
+    information_cutoff=decision,
+    effective_session=date(2026, 8, 3),
+    effective_phase=LifecyclePhase.PRE_OPEN,
+    targets=(
+        AssetTarget(
+            "SPY",
+            TargetMeasure.WEIGHT,
+            0.40,
+            position_rule_policy_id="spy-stop-5",
+        ),
+        AssetTarget(
+            "QQQ",
+            TargetMeasure.WEIGHT,
+            0.40,
+            position_rule_policy_id="qqq-trail-8",
+        ),
+        AssetTarget("IWM", TargetMeasure.WEIGHT, 0.15),
+    ),
+    idempotency_key="mixed-risk-portfolio-2026-08-03",
+    measure=TargetMeasure.WEIGHT,
+    cash_buffer=0.05,
+    rounding=RoundingPolicy.TOWARD_ZERO,
+    residual=ResidualPolicy.KEEP_CASH,
+    reason=IntentReason.REBALANCE,
+)
+
+class MixedRuleStrategy(Strategy):
+    def on_prepare(self, broker, config=None):
+        broker.register_target_intent(
+            mixed_target,
+            position_rules={
+                "spy-stop-5": StopLoss(0.05),
+                "qqq-trail-8": TrailingStop(0.08),
+            },
+        )
+
+    def on_data(self, timestamp, data, context, broker):
+        pass
+
+
+assets = ("SPY", "QQQ", "IWM")
+prices = pl.DataFrame(
+    {
+        "timestamp": [datetime(2026, 8, 3)] * len(assets),
+        "asset": assets,
+        "open": [100.0] * len(assets),
+        "high": [101.0] * len(assets),
+        "low": [99.0] * len(assets),
+        "close": [100.0] * len(assets),
+        "volume": [1_000_000.0] * len(assets),
+    }
+)
+engine = Engine(
+    DataFeed(prices_df=prices),
+    MixedRuleStrategy(),
+    BacktestConfig(retain_intent_history=True),
+)
+result = engine.run()
+
+assert result.metrics["target_intent_count"] == 1
+assert result.metrics["target_rule_reconciliation_count"] == 3
+```
+
+Registration validates the complete mapping before changing manager state. Missing
+implementations, conflicting definitions, and unreferenced mapping keys reject the request.
 
 `ExecutionPolicy.liquidity_fraction` applies only to opening-auction child orders. A value of 1.0
 means no participation constraint, even when the requested quantity exceeds the bar volume. A
@@ -115,10 +209,15 @@ Use `KEEP_CASH`; unsupported combinations are rejected before opening orders are
 restored.
 
 A position rule associated with a target remains active until the position becomes flat or a later
-filled target for that asset replaces it. If the later target does not name a
-`position_rule_policy_id`, the earlier target-managed rule is removed. An explicit rule override
-installed through the broker remains in place because target cleanup removes only the rule object
-installed by the target manager.
+target changes it. Repeating the same policy ID preserves the installed rule object, its state, and
+its activation time. A different ID installs a fresh rule at that opening. A target with no
+resolved ID removes the earlier target-managed rule and its activation context. These transitions
+use the actual post-auction position, including a carried position after a partial fill, rejected
+order, or zero quantity change. A failed new entry does not activate a rule. An explicit rule
+override installed through the broker remains in place during target cleanup because cleanup
+removes only the exact rule object installed by the target manager. Use
+`get_target_rule_reconciliations()` to inspect the requested, prior, and resulting policy ID for
+every asset target.
 
 `export_target_intent_state()` does not contain account or order-book state. Restoring state that
 already contains child orders therefore requires those orders and the corresponding account state

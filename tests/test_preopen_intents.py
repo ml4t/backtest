@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import fields, replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import polars as pl
 import pytest
@@ -32,6 +32,7 @@ from ml4t.backtest import (
     Position,
     PreOpenIntentError,
     Strategy,
+    TargetRuleOutcome,
     UnsupportedPreOpenPolicyError,
     default_execution_policy,
 )
@@ -89,6 +90,60 @@ def target_intent(
     )
 
 
+def portfolio_intent(
+    intent_id: str,
+    session: date,
+    targets: tuple[tuple[str, float, str | None], ...],
+) -> CanonicalTargetIntent:
+    decision_time = datetime.combine(session, datetime.min.time(), tzinfo=UTC) - timedelta(hours=1)
+    return CanonicalTargetIntent(
+        intent_id=intent_id,
+        decision_time=decision_time,
+        information_cutoff=decision_time,
+        effective_session=session,
+        effective_phase=LifecyclePhase.PRE_OPEN,
+        targets=tuple(
+            AssetTarget(
+                asset,
+                TargetMeasure.WEIGHT,
+                weight,
+                position_rule_policy_id=policy_id,
+            )
+            for asset, weight, policy_id in targets
+        ),
+        idempotency_key=f"{intent_id}-key",
+        measure=TargetMeasure.WEIGHT,
+        cash_buffer=0.0,
+        rounding=RoundingPolicy.TOWARD_ZERO,
+        residual=ResidualPolicy.KEEP_CASH,
+        reason=IntentReason.REBALANCE,
+    )
+
+
+def portfolio_prices(
+    sessions: tuple[date, ...],
+    assets: tuple[str, ...],
+    *,
+    overrides: dict[tuple[date, str], dict[str, float]] | None = None,
+) -> pl.DataFrame:
+    overrides = overrides or {}
+    rows = []
+    for session in sessions:
+        for asset in assets:
+            row = {
+                "timestamp": datetime.combine(session, datetime.min.time()),
+                "asset": asset,
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.0,
+                "volume": 1_000_000.0,
+            }
+            row.update(overrides.get((session, asset), {}))
+            rows.append(row)
+    return pl.DataFrame(rows)
+
+
 class InitialTargetStrategy(Strategy):
     def __init__(self, intent: CanonicalTargetIntent, rules=None) -> None:
         self.intent = intent
@@ -101,12 +156,18 @@ class InitialTargetStrategy(Strategy):
         return None
 
 
+class NoOpStrategy(Strategy):
+    def on_data(self, timestamp, data, context, broker) -> None:
+        return None
+
+
 def test_target_intent_api_requires_an_engine_configured_broker() -> None:
     broker = Broker()
 
     assert broker.get_target_intents() == ()
     assert broker.get_child_order_intents() == ()
     assert broker.get_intent_reconciliations() == ()
+    assert broker.get_target_rule_reconciliations() == ()
     assert broker.export_target_intent_state() == {}
     with pytest.raises(RuntimeError, match="Engine-configured broker"):
         broker.register_target_intent(target_intent())
@@ -255,7 +316,42 @@ def test_failed_prepare_rolls_back_target_and_position_rule_registration() -> No
     assert engine.broker.get_target_intents() == ()
     assert engine.broker.get_child_order_intents() == ()
     assert engine.broker.get_intent_reconciliations() == ()
+    assert engine.broker.get_target_rule_reconciliations() == ()
     assert engine.preopen_target_manager._position_rules == {}
+
+
+def test_failed_prepare_rolls_back_all_target_level_policy_registrations() -> None:
+    intent = portfolio_intent(
+        "rollback",
+        date(2026, 8, 3),
+        (("SPY", 0.5, "stop-5"), ("QQQ", 0.5, "trail-5")),
+    )
+
+    class FailingPrepare(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(
+                intent,
+                position_rules={
+                    "stop-5": StopLoss(0.05),
+                    "trail-5": TrailingStop(0.05),
+                },
+            )
+            raise RuntimeError("prepare failed")
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=portfolio_prices((date(2026, 8, 3),), ("SPY", "QQQ"))),
+        FailingPrepare(),
+    )
+
+    with pytest.raises(RuntimeError, match="prepare failed"):
+        engine.run()
+
+    assert engine.broker.get_target_intents() == ()
+    assert engine.preopen_target_manager._position_rules == {}
+    assert engine.broker.get_target_rule_reconciliations() == ()
 
 
 def test_callback_rollback_does_not_run_public_restart_validation(
@@ -659,6 +755,350 @@ def test_later_target_without_a_rule_policy_clears_the_target_managed_rule() -> 
     assert [record.rule_policy_id for record in reconciliations] == ["stop-50", None]
 
 
+def test_one_target_intent_activates_distinct_asset_rule_policies_on_entry_bar() -> None:
+    session = date(2026, 8, 3)
+    intent = portfolio_intent(
+        "mixed-book",
+        session,
+        (
+            ("SPY", 0.25, "stop-5"),
+            ("QQQ", 0.25, "trail-5"),
+            ("IWM", 0.25, None),
+        ),
+    )
+    feed = portfolio_prices(
+        (session,),
+        ("SPY", "QQQ", "IWM"),
+        overrides={
+            (session, "SPY"): {"high": 102.0, "low": 94.0},
+            (session, "QQQ"): {"high": 110.0, "low": 100.0, "close": 105.0},
+        },
+    )
+
+    class MixedRuleStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(
+                intent,
+                position_rules={
+                    "stop-5": StopLoss(0.05),
+                    "trail-5": TrailingStop(0.05),
+                },
+            )
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=feed),
+        MixedRuleStrategy(),
+        BacktestConfig(retain_intent_history=True),
+    )
+
+    result = engine.run()
+
+    assert engine.broker.get_target_intents() == (intent,)
+    assert {trade.symbol: trade.exit_reason for trade in result.trades} == {
+        "IWM": "end_of_backtest",
+        "QQQ": "trailing_stop",
+        "SPY": "stop_loss",
+    }
+    assert engine.broker.get_position("IWM") is not None
+    assert "IWM" not in engine.broker._position_rules_by_asset
+    assert [record.asset for record in engine.broker.get_target_rule_reconciliations()] == [
+        "IWM",
+        "QQQ",
+        "SPY",
+    ]
+
+
+def test_unchanged_carried_position_preserves_replaces_and_clears_rule_policy() -> None:
+    sessions = tuple(date(2026, 8, day) for day in range(3, 7))
+    intents = (
+        portfolio_intent("initial", sessions[0], (("SPY", 0.5, "stop-50"),)),
+        portfolio_intent("preserve", sessions[1], (("SPY", 0.5, "stop-50"),)),
+        portfolio_intent("replace", sessions[2], (("SPY", 0.5, "stop-20"),)),
+        portfolio_intent("clear", sessions[3], (("SPY", 0.5, None),)),
+    )
+
+    class CarriedRuleStrategy(Strategy):
+        def __init__(self) -> None:
+            self.snapshots = []
+
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intents[0], position_rules={"stop-50": StopLoss(0.5)})
+            broker.register_target_intent(intents[1], position_rules={"stop-50": StopLoss(0.5)})
+            broker.register_target_intent(intents[2], position_rules={"stop-20": StopLoss(0.2)})
+            broker.register_target_intent(intents[3])
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            position = broker.get_position("SPY")
+            assert position is not None
+            self.snapshots.append(
+                (
+                    broker._get_position_rule_override("SPY"),
+                    dict(position.context),
+                )
+            )
+
+    strategy = CarriedRuleStrategy()
+    engine = Engine(
+        DataFeed(prices_df=portfolio_prices(sessions, ("SPY",))),
+        strategy,
+        BacktestConfig(retain_intent_history=True),
+    )
+
+    engine.run()
+
+    assert len(engine.broker.get_child_order_intents()) == 1
+    assert strategy.snapshots[0][0] is strategy.snapshots[1][0]
+    assert strategy.snapshots[2][0] is not strategy.snapshots[1][0]
+    assert strategy.snapshots[3][0] is None
+    assert (
+        strategy.snapshots[0][1]["rule_activation_time"]
+        == strategy.snapshots[1][1]["rule_activation_time"]
+    )
+    assert (
+        strategy.snapshots[2][1]["rule_activation_time"]
+        != strategy.snapshots[1][1]["rule_activation_time"]
+    )
+    assert "rule_activation_time" not in strategy.snapshots[3][1]
+    assert [record.outcome.value for record in engine.broker.get_target_rule_reconciliations()] == [
+        "activated",
+        "preserved",
+        "activated",
+        "cleared",
+    ]
+
+
+def test_partial_liquidation_applies_changed_policy_to_remaining_position() -> None:
+    sessions = (date(2026, 8, 3), date(2026, 8, 4))
+    intents = (
+        portfolio_intent("enter", sessions[0], (("SPY", 0.5, "stop-50"),)),
+        portfolio_intent("trim", sessions[1], (("SPY", 0.0, "stop-20"),)),
+    )
+    feed = portfolio_prices(
+        sessions,
+        ("SPY",),
+        overrides={
+            (sessions[0], "SPY"): {"volume": 5_000.0},
+            (sessions[1], "SPY"): {"volume": 100.0},
+        },
+    )
+    config = BacktestConfig()
+    policy = replace(
+        default_execution_policy(config),
+        liquidity_fraction=0.1,
+        allow_partial_fills=True,
+    )
+
+    class PartialRuleStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intents[0], position_rules={"stop-50": StopLoss(0.5)})
+            broker.register_target_intent(intents[1], position_rules={"stop-20": StopLoss(0.2)})
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=feed),
+        PartialRuleStrategy(),
+        config,
+        execution_policy=policy,
+    )
+
+    engine.run()
+
+    position = engine.broker.get_position("SPY")
+    assert position is not None
+    assert position.quantity == 490
+    assert engine.broker._position_rules_by_asset["SPY"] == StopLoss(0.2)
+    assert [record.outcome for record in engine.broker.get_intent_reconciliations()] == [
+        IntentOutcome.FULL,
+        IntentOutcome.PARTIAL,
+    ]
+    assert [
+        record.resulting_policy_id for record in engine.broker.get_target_rule_reconciliations()
+    ] == ["stop-50", "stop-20"]
+
+
+def test_rejected_reversal_applies_changed_policy_to_carried_position() -> None:
+    sessions = (date(2026, 8, 3), date(2026, 8, 4))
+    intents = (
+        portfolio_intent("enter", sessions[0], (("SPY", 0.5, "stop-50"),)),
+        portfolio_intent("rejected", sessions[1], (("SPY", -0.5, "stop-20"),)),
+    )
+
+    class RejectedRuleStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intents[0], position_rules={"stop-50": StopLoss(0.5)})
+            broker.register_target_intent(intents[1], position_rules={"stop-20": StopLoss(0.2)})
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=portfolio_prices(sessions, ("SPY",))),
+        RejectedRuleStrategy(),
+    )
+
+    engine.run()
+
+    position = engine.broker.get_position("SPY")
+    assert position is not None
+    assert position.quantity == 500
+    assert engine.broker.get_intent_reconciliations()[-1].outcome is IntentOutcome.REJECTED
+    rule_record = engine.broker.get_target_rule_reconciliations()[-1]
+    assert rule_record.prior_policy_id == "stop-50"
+    assert rule_record.resulting_policy_id == "stop-20"
+    assert rule_record.outcome is TargetRuleOutcome.ACTIVATED
+    assert engine.broker._position_rules_by_asset["SPY"] == StopLoss(0.2)
+
+
+def test_failed_new_entry_records_no_position_and_does_not_activate_rule() -> None:
+    session = date(2026, 8, 3)
+    intent = portfolio_intent("rejected", session, (("SPY", -0.5, "stop-20"),))
+    engine = Engine(
+        DataFeed(prices_df=portfolio_prices((session,), ("SPY",))),
+        InitialTargetStrategy(intent, {"stop-20": StopLoss(0.2)}),
+    )
+
+    engine.run()
+
+    assert engine.broker.get_position("SPY") is None
+    assert "SPY" not in engine.broker._position_rules_by_asset
+    rule_record = engine.broker.get_target_rule_reconciliations()[0]
+    assert rule_record.outcome is TargetRuleOutcome.NO_POSITION
+    assert rule_record.requested_policy_id == "stop-20"
+    assert rule_record.resulting_policy_id is None
+    assert rule_record.activated_at is None
+
+
+def test_full_liquidation_clears_target_managed_rule_and_records_no_position() -> None:
+    sessions = (date(2026, 8, 3), date(2026, 8, 4))
+    intents = (
+        portfolio_intent("enter", sessions[0], (("SPY", 0.5, "stop-50"),)),
+        portfolio_intent("exit", sessions[1], (("SPY", 0.0, None),)),
+    )
+
+    class LiquidatingRuleStrategy(Strategy):
+        def on_prepare(self, broker, config=None) -> None:
+            broker.register_target_intent(intents[0], position_rules={"stop-50": StopLoss(0.5)})
+            broker.register_target_intent(intents[1])
+
+        def on_data(self, timestamp, data, context, broker) -> None:
+            return None
+
+    engine = Engine(
+        DataFeed(prices_df=portfolio_prices(sessions, ("SPY",))),
+        LiquidatingRuleStrategy(),
+    )
+
+    engine.run()
+
+    assert engine.broker.get_position("SPY") is None
+    assert "SPY" not in engine.broker._position_rules_by_asset
+    record = engine.broker.get_target_rule_reconciliations()[-1]
+    assert record.prior_policy_id == "stop-50"
+    assert record.resulting_policy_id is None
+    assert record.outcome is TargetRuleOutcome.NO_POSITION
+
+
+@pytest.mark.parametrize(
+    ("position_rules", "message"),
+    [
+        (None, "no registered implementation"),
+        (
+            {"stop-5": StopLoss(0.05), "unused": StopLoss(0.1)},
+            "unreferenced.*unused",
+        ),
+    ],
+)
+def test_target_level_policy_registration_rejects_atomically(
+    position_rules,
+    message: str,
+) -> None:
+    intent = portfolio_intent(
+        "atomic",
+        date(2026, 8, 3),
+        (("SPY", 0.5, "stop-5"),),
+    )
+    engine = Engine(DataFeed(prices_df=prices(low=100.0)), NoOpStrategy())
+    manager = engine.preopen_target_manager
+    before = (
+        dict(manager._targets),
+        dict(manager._target_by_session_asset),
+        dict(manager._idempotency),
+        dict(manager._position_rules),
+    )
+
+    with pytest.raises(PreOpenIntentError, match=message):
+        manager.register(intent, position_rules=position_rules)
+
+    assert (
+        manager._targets,
+        manager._target_by_session_asset,
+        manager._idempotency,
+        manager._position_rules,
+    ) == before
+
+
+def test_conflicting_target_level_policy_registration_is_atomic() -> None:
+    intent = portfolio_intent(
+        "conflict",
+        date(2026, 8, 3),
+        (("SPY", 0.5, "stop-5"),),
+    )
+    engine = Engine(DataFeed(prices_df=prices(low=100.0)), NoOpStrategy())
+    manager = engine.preopen_target_manager
+    manager.register_position_rule_policy("stop-5", StopLoss(0.05))
+    before = (
+        dict(manager._targets),
+        dict(manager._target_by_session_asset),
+        dict(manager._idempotency),
+        dict(manager._position_rules),
+    )
+
+    with pytest.raises(PreOpenIntentError, match="already registered"):
+        manager.register(intent, position_rules={"stop-5": StopLoss(0.1)})
+
+    assert (
+        manager._targets,
+        manager._target_by_session_asset,
+        manager._idempotency,
+        manager._position_rules,
+    ) == before
+
+
+def test_target_level_policy_registration_supports_prebinding_and_idempotent_reattachment() -> None:
+    intent = portfolio_intent(
+        "idempotent",
+        date(2026, 8, 3),
+        (("SPY", 0.5, "stop-5"), ("QQQ", 0.5, "trail-5")),
+    )
+    engine = Engine(
+        DataFeed(prices_df=portfolio_prices((date(2026, 8, 3),), ("SPY", "QQQ"))),
+        NoOpStrategy(),
+    )
+    manager = engine.preopen_target_manager
+    manager.register_position_rule_policy("stop-5", StopLoss(0.05))
+
+    accepted = manager.register(
+        intent,
+        position_rules={"trail-5": TrailingStop(0.05)},
+    )
+    repeated = manager.register(
+        intent,
+        position_rules={
+            "stop-5": StopLoss(0.05),
+            "trail-5": TrailingStop(0.05),
+        },
+    )
+
+    assert repeated is accepted
+    assert manager.targets == (intent,)
+    assert set(manager._position_rules) == {"stop-5", "trail-5"}
+
+
 def test_target_managed_rule_does_not_apply_after_flat_and_plain_reentry() -> None:
     intent = target_intent(position_rule_policy_id="stop-50")
 
@@ -926,6 +1366,7 @@ def test_terminal_reconciliation_is_not_duplicated_on_later_bars() -> None:
     assert len(reconciliations) == 1
     assert reconciliations[0].outcome is IntentOutcome.PARTIAL
     assert reconciliations[0].remaining_quantity == 490
+    assert len(engine.broker.get_target_rule_reconciliations()) == 1
 
 
 def test_percentage_fees_are_reserved_during_opening_weight_sizing() -> None:
@@ -1161,6 +1602,7 @@ def test_restart_registration_reattaches_position_rule_implementation() -> None:
 
     restored.restore_state(state)
     assert restored.register(intent, position_rules=StopLoss(0.05)) is restored.targets[0]
+    assert restored.target_rule_reconciliations == engine.broker.get_target_rule_reconciliations()
 
 
 def test_restored_manager_preserves_an_explicit_rule_disable_during_cleanup() -> None:
@@ -1202,6 +1644,14 @@ def test_result_artifact_round_trip_retains_contract_and_intent_evidence(tmp_pat
     assert loaded.metrics["target_intents"] == [intent.to_dict()]
     assert loaded.metrics["child_order_intents"] == result.metrics["child_order_intents"]
     assert loaded.metrics["intent_reconciliations"] == result.metrics["intent_reconciliations"]
+    assert (
+        loaded.metrics["target_rule_reconciliations"]
+        == result.metrics["target_rule_reconciliations"]
+    )
+    assert (
+        loaded.to_spec_dict()["target_rule_reconciliations"]
+        == result.to_spec_dict()["target_rule_reconciliations"]
+    )
 
 
 def test_default_result_retains_intent_counts_without_full_history(tmp_path) -> None:
@@ -1213,9 +1663,11 @@ def test_default_result_retains_intent_counts_without_full_history(tmp_path) -> 
     assert result.metrics["target_intent_count"] == 1
     assert result.metrics["child_order_intent_count"] == 1
     assert result.metrics["intent_reconciliation_count"] == 1
+    assert result.metrics["target_rule_reconciliation_count"] == 1
     assert result.metrics["target_intents"] == []
     assert result.metrics["child_order_intents"] == []
     assert result.metrics["intent_reconciliations"] == []
+    assert result.metrics["target_rule_reconciliations"] == []
     assert result.to_spec_dict()["target_intent_count"] == 1
 
     result.to_parquet(tmp_path)
@@ -1223,6 +1675,7 @@ def test_default_result_retains_intent_counts_without_full_history(tmp_path) -> 
     assert loaded.metrics["target_intent_count"] == 1
     assert loaded.metrics["child_order_intent_count"] == 1
     assert loaded.metrics["intent_reconciliation_count"] == 1
+    assert loaded.metrics["target_rule_reconciliation_count"] == 1
 
 
 def test_ambiguous_opening_bar_path_requires_declared_resolution() -> None:

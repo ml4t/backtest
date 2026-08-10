@@ -558,6 +558,7 @@
     "from ml4t.backtest import BacktestConfig",
     "from ml4t.backtest import BacktestConfig, CommissionType",
     "from ml4t.backtest import BacktestConfig, DataFeed",
+    "from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy",
     "from ml4t.backtest import BacktestConfig, Engine",
     "from ml4t.backtest import Broker, BacktestConfig",
     "from ml4t.backtest import DataFeed",
@@ -614,6 +615,7 @@
     "from ml4t.backtest.risk.position import AnyOf",
     "from ml4t.backtest.risk.position import ScaledExit",
     "from ml4t.backtest.risk.position import SignalExit",
+    "from ml4t.backtest.risk.position import StopLoss, TrailingStop",
     "from ml4t.backtest.risk.position import TighteningTrailingStop",
     "from ml4t.backtest.risk.position import TimeExit",
     "from ml4t.backtest.risk.position import VolatilityStop",
@@ -1097,6 +1099,8 @@
       "sortino",
       "target_intent_count",
       "target_intents",
+      "target_rule_reconciliation_count",
+      "target_rule_reconciliations",
       "total_commission",
       "total_costs",
       "total_filled_notional",
@@ -1862,6 +1866,8 @@
     "IntentReconciliation",
     "LateAuctionIntentError",
     "PreOpenIntentError",
+    "TargetRuleOutcome",
+    "TargetRuleReconciliation",
     "UnsupportedPreOpenPolicyError",
     "default_execution_policy",
     "StopLoss",
@@ -2955,6 +2961,22 @@
       "qualname": "SignalExit",
       "signature": "(signal_name: str = 'exit_signal', threshold: float = 0.0) -> None"
     },
+    "ml4t.backtest.risk.position:StopLoss": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.static",
+      "qualname": "StopLoss",
+      "signature": "(pct: float) -> None"
+    },
     "ml4t.backtest.risk.position:TakeProfit": {
       "kind": "class",
       "members": {
@@ -3002,6 +3024,22 @@
       "module": "ml4t.backtest.risk.position.static",
       "qualname": "TimeExit",
       "signature": "(max_bars: int) -> None"
+    },
+    "ml4t.backtest.risk.position:TrailingStop": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "evaluate": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.types.PositionState) -> ml4t.backtest.risk.types.PositionAction"
+        }
+      },
+      "module": "ml4t.backtest.risk.position.dynamic",
+      "qualname": "TrailingStop",
+      "signature": "(pct: float) -> None"
     },
     "ml4t.backtest.risk.position:VolatilityStop": {
       "kind": "class",
@@ -3489,6 +3527,10 @@
           "kind": "method",
           "signature": "(self) -> 'tuple[CanonicalTargetIntent, ...]'"
         },
+        "get_target_rule_reconciliations": {
+          "kind": "method",
+          "signature": "(self) -> 'tuple[TargetRuleReconciliation, ...]'"
+        },
         "get_trades": {
           "kind": "method",
           "signature": "(self, asset: 'str | None' = None, last_n: 'int | None' = None) -> 'list[Trade]'"
@@ -3535,7 +3577,7 @@
         },
         "register_target_intent": {
           "kind": "method",
-          "signature": "(self, intent: 'CanonicalTargetIntent', *, position_rules: 'PositionRule | None' = None) -> 'CanonicalTargetIntent'"
+          "signature": "(self, intent: 'CanonicalTargetIntent', *, position_rules: 'PositionRule | Mapping[str, PositionRule] | None' = None) -> 'CanonicalTargetIntent'"
         },
         "restore_target_intent_state": {
           "kind": "method",
@@ -3991,6 +4033,33 @@
       "module": "ml4t.backtest.risk.position.static",
       "qualname": "TakeProfit",
       "signature": "(pct: float) -> None"
+    },
+    "ml4t.backtest:TargetRuleOutcome": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.preopen",
+      "qualname": "TargetRuleOutcome",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest:TargetRuleReconciliation": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "from_mapping": {
+          "kind": "method",
+          "signature": "(cls, value: 'dict[str, Any]') -> 'TargetRuleReconciliation'"
+        },
+        "to_dict": {
+          "kind": "method",
+          "signature": "(self) -> 'dict[str, Any]'"
+        }
+      },
+      "module": "ml4t.backtest.preopen",
+      "qualname": "TargetRuleReconciliation",
+      "signature": "(target_intent_id: 'str', asset: 'str', event_time: 'datetime', requested_policy_id: 'str | None', prior_policy_id: 'str | None', resulting_policy_id: 'str | None', outcome: 'TargetRuleOutcome', activated_at: 'datetime | None' = None) -> None"
     },
     "ml4t.backtest:TargetWeightExecutor": {
       "kind": "class",
