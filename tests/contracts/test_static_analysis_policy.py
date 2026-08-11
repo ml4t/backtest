@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -103,11 +104,23 @@ def test_ci_checks_every_release_validation_script() -> None:
         "validation/frameworks/vectorbt_pro.py",
         "validation/frameworks/zipline.py",
     }
-    validation_scripts = {
-        path.relative_to(_ROOT).as_posix()
-        for path in (_ROOT / "validation").rglob("*.py")
-        if path.name != "__init__.py" and "__pycache__" not in path.parts
-    }
+    candidate_files = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            ":(glob)validation/*.py",
+            ":(glob)validation/**/*.py",
+        ],
+        cwd=_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    validation_scripts = {path for path in candidate_files if not path.endswith("/__init__.py")}
 
     assert workflow_scripts <= manifest
     assert not manifest & excluded_validation_scripts
