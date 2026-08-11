@@ -157,7 +157,7 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
         assert f"--gate {gate}=" in build_commands
 
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
-    assert release_jobs["publish"]["needs"] == "qualification"
+    assert release_jobs["publish"]["needs"] == ["ecosystem-qualification", "qualification"]
     assert release_jobs["publish"]["permissions"] == {
         "contents": "read",
         "id-token": "write",

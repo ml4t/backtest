@@ -12,6 +12,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ecosystem-qualification:
+    name: Ecosystem Qualification
+    permissions:
+      contents: read
+    uses: ml4t/ecosystem/.github/workflows/qualify-library.yml@9921873f47ce9beb298ad50814e898f6fa0e6a85 # v0.1.0
+    with:
+      import-package: ml4t.backtest
+
   qualification:
     name: Qualify Release Candidate
     uses: ./.github/workflows/ci.yml
@@ -19,7 +27,7 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: qualification
+    needs: [ecosystem-qualification, qualification]
     environment: pypi
     permissions:
       contents: read
