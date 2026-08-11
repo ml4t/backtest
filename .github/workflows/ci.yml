@@ -13,6 +13,10 @@ env:
   PYTHON_VERSION: "3.12"
   UV_NO_SOURCES: "1"
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint

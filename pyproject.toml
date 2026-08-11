@@ -135,7 +135,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/ml4t/backtest"
-Documentation = "https://ml4trading.io/docs/backtest/"
+Documentation = "https://www.ml4trading.io/docs/backtest/"
 Repository = "https://github.com/ml4t/backtest"
 Issues = "https://github.com/ml4t/backtest/issues"
 Changelog = "https://github.com/ml4t/backtest/blob/main/CHANGELOG.md"

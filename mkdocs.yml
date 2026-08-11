@@ -3,7 +3,7 @@
 
 site_name: ML4T Backtest
 site_description: Event-driven backtesting engine with VectorBT Pro validation
-site_url: https://ml4trading.io/docs/backtest/
+site_url: https://www.ml4trading.io/docs/backtest/
 repo_url: https://github.com/ml4t/backtest
 repo_name: ml4t/backtest
 
