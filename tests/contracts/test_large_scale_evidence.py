@@ -69,7 +69,18 @@ def _complete_report(module, monkeypatch: pytest.MonkeyPatch):
         records.append(
             {
                 "framework": framework,
-                "target": {**target.evidence_metadata(), "actual_version": target.version},
+                "target": {
+                    **target.evidence_metadata(),
+                    "actual_version": target.version,
+                    **(
+                        {
+                            "actual_commit": target.source_commit,
+                            "actual_immutable_id": target.immutable_id,
+                        }
+                        if framework == "vectorbt_pro"
+                        else {}
+                    ),
+                },
                 "python": {"version": "3.12.11", "implementation": "cpython"},
                 "ml4t": {"commit": "a" * 40, "dirty": False},
                 "source_digests": module._source_digests(),
@@ -173,6 +184,40 @@ def test_complete_report_reconstructs(monkeypatch: pytest.MonkeyPatch) -> None:
     report = _complete_report(module, monkeypatch)
 
     assert module.report_failures(report, reconstruct_input=True) == []
+
+
+def test_historical_report_requires_exact_identity_and_matching_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    current_report = _complete_report(module, monkeypatch)
+    current = next(
+        record for record in current_report["frameworks"] if record["framework"] == "vectorbt_pro"
+    )
+    historical = copy.deepcopy(current)
+    target = module._historical_vectorbt_pro_target()
+    historical["target"] = {
+        **target.evidence_metadata(),
+        "actual_version": target.version,
+        "actual_commit": target.source_commit,
+        "actual_immutable_id": target.immutable_id,
+    }
+    report = module.build_historical_report(current, historical, module.WORKLOAD)
+
+    assert module.historical_report_failures(report, reconstruct_input=True) == []
+
+    wrong_identity = copy.deepcopy(report)
+    wrong_identity["historical"]["target"]["actual_version"] = "2026.6.27"
+    assert module.historical_report_failures(wrong_identity)
+
+    changed_output = copy.deepcopy(report)
+    fill_check = next(
+        check
+        for check in changed_output["historical"]["comparison"]["checks"]
+        if check["name"] == "fills"
+    )
+    fill_check["expected_sha256"] = "0" * 64
+    assert module.historical_report_failures(changed_output)
 
 
 @pytest.mark.parametrize(

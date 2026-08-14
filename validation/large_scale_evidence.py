@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_EVEN, Decimal
 from functools import cache
@@ -35,6 +35,12 @@ MONEY_QUANTUM = Decimal("0.000001")
 FRAMEWORKS = ("vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean")
 ACCEPTED_PATH = VALIDATION_DIR / "LARGE_SCALE_RESULTS.json"
 CANDIDATE_PATH = VALIDATION_DIR / "candidates" / "LARGE_SCALE_RESULTS.candidate.json"
+HISTORICAL_ACCEPTED_PATH = VALIDATION_DIR / "vectorbt_pro" / "controlled_replay-2025.12.31.json"
+HISTORICAL_CANDIDATE_PATH = VALIDATION_DIR / "candidates" / "vectorbt_pro-2025.12.31.candidate.json"
+HISTORICAL_VECTORBT_PRO_VERSION = "2025.12.31"
+HISTORICAL_VECTORBT_PRO_COMMIT = "1305a1e1974325db9382eaeacc6452e9b075ca71"
+HISTORICAL_VECTORBT_PRO_ENV = ".venv-vectorbt-pro-312"
+HISTORICAL_VECTORBT_PRO_PYTHON_ENV_VAR = "ML4T_VECTORBT_PRO_HISTORICAL_PYTHON"
 
 
 @dataclass(frozen=True)
@@ -209,7 +215,27 @@ def _actual_target(target: FrameworkTarget) -> dict[str, object]:
         actual_version = target.version
     else:
         actual_version = importlib.metadata.version(target.package)
-    return {**target.evidence_metadata(), "actual_version": actual_version}
+    metadata = {**target.evidence_metadata(), "actual_version": actual_version}
+    if target.package == "vectorbtpro":
+        distribution = importlib.metadata.distribution(target.package)
+        direct_url_text = distribution.read_text("direct_url.json")
+        if direct_url_text is None:
+            raise RuntimeError("Installed vectorbtpro lacks direct_url.json source provenance")
+        direct_url = json.loads(direct_url_text)
+        vcs_info = direct_url.get("vcs_info", {})
+        actual_commit = vcs_info.get("commit_id")
+        if actual_commit != target.source_commit:
+            raise RuntimeError(
+                f"Installed vectorbtpro commit {actual_commit!r} does not match declared target "
+                f"{target.source_commit!r}"
+            )
+        metadata["actual_commit"] = actual_commit
+        metadata["actual_immutable_id"] = f"git:{actual_commit}"
+    return metadata
+
+
+def _declared_target_metadata(target: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in target.items() if not key.startswith("actual_")}
 
 
 def _framework_run(
@@ -284,10 +310,35 @@ def _use_canonical_fill_backed_trades(
         result.num_trades = len(records) if records is not None else 0
 
 
-def run_worker(framework: str, workload: ScaleWorkload = WORKLOAD) -> dict[str, Any]:
+def _historical_vectorbt_pro_target() -> FrameworkTarget:
+    current = load_framework_manifest().targets["vectorbt_pro"]
+    return replace(
+        current,
+        version=HISTORICAL_VECTORBT_PRO_VERSION,
+        source_commit=HISTORICAL_VECTORBT_PRO_COMMIT,
+        immutable_id=f"git:{HISTORICAL_VECTORBT_PRO_COMMIT}",
+        environment=HISTORICAL_VECTORBT_PRO_ENV,
+        python_env_var=HISTORICAL_VECTORBT_PRO_PYTHON_ENV_VAR,
+    )
+
+
+def run_worker(
+    framework: str,
+    workload: ScaleWorkload = WORKLOAD,
+    *,
+    target_override: FrameworkTarget | None = None,
+) -> dict[str, Any]:
     """Execute one external/ML4T scale pair and retain exact digests."""
     manifest = load_framework_manifest()
-    target = manifest.targets[framework]
+    target = target_override or manifest.targets[framework]
+    if target.framework_id != framework:
+        raise ValueError(f"Target {target.framework_id!r} cannot identify framework {framework!r}")
+    actual_target = _actual_target(target)
+    if actual_target["actual_version"] != target.version:
+        raise RuntimeError(
+            f"Installed {target.package} version {actual_target['actual_version']} does not match "
+            f"declared target {target.version}"
+        )
     config = workload.benchmark_config()
     price_data, signals, dates = suite.generate_benchmark_data(config, seed=workload.seed)
     raw_digest = input_digest(price_data, signals, dates)
@@ -318,7 +369,7 @@ def run_worker(framework: str, workload: ScaleWorkload = WORKLOAD) -> dict[str, 
     comparison["passed"] = bool(comparison["passed"] and terminal_check["passed"])
     return {
         "framework": framework,
-        "target": _actual_target(target),
+        "target": actual_target,
         "python": {
             "version": sys.version.split()[0],
             "implementation": sys.implementation.name,
@@ -372,6 +423,60 @@ def build_report(
     }
 
 
+def _comparison_signature(record: dict[str, Any]) -> dict[str, Any]:
+    comparison = cast(dict[str, Any], record["comparison"])
+    checks = cast(list[dict[str, Any]], comparison["checks"])
+    signature: dict[str, Any] = {}
+    for check in checks:
+        name = str(check["name"])
+        if "expected_sha256" in check:
+            signature[name] = {
+                "count": check.get("expected_count"),
+                "sha256": check["expected_sha256"],
+            }
+        else:
+            signature[name] = check["canonical_expected"]
+    return signature
+
+
+def build_historical_report(
+    current_record: dict[str, Any],
+    historical_record: dict[str, Any],
+    workload: ScaleWorkload = WORKLOAD,
+) -> dict[str, Any]:
+    """Build evidence that one historical target matches the accepted current target."""
+    current_signature = _comparison_signature(current_record)
+    historical_signature = _comparison_signature(historical_record)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "audit_trigger": {
+            "ml4t_commit": "488c05d84e74156aba71c4f7ffac28df3881fea9",
+            "cause": "vectorbt collateral semantics missing from the ML4T comparison profile",
+            "external_fill_count": 390_369,
+            "ml4t_fill_count": 418_825,
+            "external_final_value": 716_785.408089,
+            "ml4t_final_value": 1_162_222.354417,
+        },
+        "workload": {
+            "recipe": asdict(workload),
+            "recipe_sha256": _json_digest(asdict(workload)),
+            "data_points": workload.data_points,
+            "generator": "validation.benchmark_suite.generate_benchmark_data",
+            "redistributable": True,
+        },
+        "current": current_record,
+        "historical": historical_record,
+        "framework_output_comparison": {
+            "current": current_signature,
+            "historical": historical_signature,
+            "passed": current_signature == historical_signature,
+        },
+        "release_gate_passed": historical_record.get("comparison", {}).get("passed") is True
+        and current_signature == historical_signature,
+    }
+
+
 @cache
 def _expected_input_digest(workload: ScaleWorkload) -> str:
     config = workload.benchmark_config()
@@ -418,11 +523,15 @@ def report_failures(report: dict[str, Any], *, reconstruct_input: bool = False) 
         expected_target = manifest.targets[framework].evidence_metadata()
         if (
             not isinstance(target, dict)
-            or {key: value for key, value in target.items() if key != "actual_version"}
-            != expected_target
+            or _declared_target_metadata(target) != expected_target
             or target.get("actual_version") != expected_target["version"]
         ):
             failures.append(f"{framework} target identity differs")
+        elif framework == "vectorbt_pro" and (
+            target.get("actual_commit") != expected_target["commit"]
+            or target.get("actual_immutable_id") != expected_target["immutable_id"]
+        ):
+            failures.append(f"{framework} installed source identity differs")
         if record.get("source_digests") != expected_sources:
             failures.append(f"{framework} source digests differ")
         ml4t = record.get("ml4t")
@@ -501,6 +610,75 @@ def report_failures(report: dict[str, Any], *, reconstruct_input: bool = False) 
     return failures
 
 
+def historical_report_failures(
+    report: dict[str, Any], *, reconstruct_input: bool = False
+) -> list[str]:
+    """Return every reason a historical replay candidate cannot be accepted."""
+    failures: list[str] = []
+    if report.get("schema_version") != SCHEMA_VERSION:
+        return [f"Unsupported historical replay schema: {report.get('schema_version')!r}"]
+    workload = report.get("workload")
+    if not isinstance(workload, dict) or workload.get("recipe") != asdict(WORKLOAD):
+        failures.append("Historical replay workload recipe differs")
+    elif workload.get("recipe_sha256") != _json_digest(asdict(WORKLOAD)):
+        failures.append("Historical replay workload recipe digest differs")
+    current = report.get("current")
+    historical = report.get("historical")
+    if not isinstance(current, dict) or not isinstance(historical, dict):
+        return failures + ["Historical replay records are missing"]
+    manifest = load_framework_manifest()
+    current_target = manifest.targets["vectorbt_pro"].evidence_metadata()
+    historical_target = _historical_vectorbt_pro_target().evidence_metadata()
+    for label, record, expected_target in (
+        ("current", current, current_target),
+        ("historical", historical, historical_target),
+    ):
+        target = record.get("target")
+        if (
+            not isinstance(target, dict)
+            or _declared_target_metadata(target) != expected_target
+            or target.get("actual_version") != expected_target["version"]
+        ):
+            failures.append(f"VectorBT Pro {label} target identity differs")
+        elif (
+            target.get("actual_commit") != expected_target["commit"]
+            or target.get("actual_immutable_id") != expected_target["immutable_id"]
+        ):
+            failures.append(f"VectorBT Pro {label} installed source identity differs")
+        if record.get("source_digests") != _source_digests():
+            failures.append(f"VectorBT Pro {label} source digests differ")
+        ml4t = record.get("ml4t")
+        if not isinstance(ml4t, dict) or ml4t.get("dirty") is not False:
+            failures.append(f"VectorBT Pro {label} run used a dirty ML4T tree")
+        comparison = record.get("comparison")
+        if not isinstance(comparison, dict) or comparison.get("passed") is not True:
+            failures.append(f"VectorBT Pro {label} exact comparison did not pass")
+        input_record = record.get("input")
+        if not isinstance(input_record, dict):
+            failures.append(f"VectorBT Pro {label} input evidence is missing")
+        elif reconstruct_input and input_record.get("raw_sha256") != _expected_input_digest(
+            WORKLOAD
+        ):
+            failures.append(f"VectorBT Pro {label} input digest does not reconstruct")
+    if current.get("ml4t") != historical.get("ml4t"):
+        failures.append("Historical replay runs used different ML4T revisions")
+    if current.get("source_digests") != historical.get("source_digests"):
+        failures.append("Historical replay runs used different comparison sources")
+    if current.get("input") != historical.get("input"):
+        failures.append("Historical replay inputs differ")
+    output_comparison = report.get("framework_output_comparison")
+    expected_output_comparison = {
+        "current": _comparison_signature(current),
+        "historical": _comparison_signature(historical),
+        "passed": _comparison_signature(current) == _comparison_signature(historical),
+    }
+    if output_comparison != expected_output_comparison or not expected_output_comparison["passed"]:
+        failures.append("Historical and current VectorBT Pro outputs differ")
+    if report.get("release_gate_passed") is not True:
+        failures.append("Historical replay release gate did not pass")
+    return failures
+
+
 def _resolve_python(framework: str) -> Path:
     target = load_framework_manifest().targets[framework]
     override = os.getenv(target.python_env_var or "")
@@ -511,56 +689,92 @@ def _resolve_python(framework: str) -> Path:
     return PROJECT_ROOT / target.environment / "bin" / "python"
 
 
+def _resolve_historical_vectorbt_pro_python() -> Path:
+    override = os.getenv(HISTORICAL_VECTORBT_PRO_PYTHON_ENV_VAR)
+    if override:
+        return Path(override).expanduser().resolve()
+    return PROJECT_ROOT / HISTORICAL_VECTORBT_PRO_ENV / "bin" / "python"
+
+
+def _run_isolated_worker(
+    framework: str,
+    interpreter: Path,
+    *,
+    historical_target: bool = False,
+) -> dict[str, Any]:
+    if not interpreter.is_file():
+        raise RuntimeError(f"Missing {framework} interpreter: {interpreter}")
+    with tempfile.TemporaryDirectory(prefix=f"ml4t-scale-{framework}-") as directory:
+        output = Path(directory) / "record.json"
+        command = [
+            str(interpreter),
+            str(Path(__file__).resolve()),
+            "--worker",
+            framework,
+            "--output",
+            str(output),
+        ]
+        if historical_target:
+            command.append("--historical-target")
+        environment = os.environ.copy()
+        paths = [str(PROJECT_ROOT / "src"), str(VALIDATION_DIR)]
+        sibling_specs = PROJECT_ROOT.parent / "ml4t-specs" / "src"
+        if sibling_specs.is_dir():
+            paths.append(str(sibling_specs))
+        environment["PYTHONPATH"] = os.pathsep.join(
+            paths + ([environment["PYTHONPATH"]] if environment.get("PYTHONPATH") else [])
+        )
+        completed = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=3_600,
+            check=False,
+        )
+        if completed.returncode != 0 or not output.is_file():
+            details = (completed.stderr or completed.stdout).strip()
+            raise RuntimeError(f"{framework} scale worker failed: {details[-20_000:]}")
+        record = cast(dict[str, Any], json.loads(output.read_text(encoding="utf-8")))
+        if record.get("comparison", {}).get("passed") is not True:
+            raise RuntimeError(
+                f"{framework} large-scale comparison failed: "
+                + json.dumps(record.get("comparison"), indent=2)[-20_000:]
+            )
+        return record
+
+
 def run_all() -> dict[str, Any]:
     """Run every framework in its isolated environment and return a candidate report."""
     records: list[dict[str, Any]] = []
     for framework in FRAMEWORKS:
         interpreter = _resolve_python(framework)
-        if not interpreter.is_file():
-            raise RuntimeError(f"Missing {framework} interpreter: {interpreter}")
-        with tempfile.TemporaryDirectory(prefix=f"ml4t-scale-{framework}-") as directory:
-            output = Path(directory) / "record.json"
-            command = [
-                str(interpreter),
-                str(Path(__file__).resolve()),
-                "--worker",
-                framework,
-                "--output",
-                str(output),
-            ]
-            print(f"Running {framework} large-scale pair...", flush=True)
-            environment = os.environ.copy()
-            paths = [
-                str(PROJECT_ROOT / "src"),
-                str(VALIDATION_DIR),
-            ]
-            sibling_specs = PROJECT_ROOT.parent / "ml4t-specs" / "src"
-            if sibling_specs.is_dir():
-                paths.append(str(sibling_specs))
-            environment["PYTHONPATH"] = os.pathsep.join(
-                paths + ([environment["PYTHONPATH"]] if environment.get("PYTHONPATH") else [])
-            )
-            completed = subprocess.run(
-                command,
-                cwd=PROJECT_ROOT,
-                env=environment,
-                capture_output=True,
-                text=True,
-                timeout=3_600,
-                check=False,
-            )
-            if completed.returncode != 0 or not output.is_file():
-                details = (completed.stderr or completed.stdout).strip()
-                raise RuntimeError(f"{framework} scale worker failed: {details[-20_000:]}")
-            record = json.loads(output.read_text(encoding="utf-8"))
-            if record.get("comparison", {}).get("passed") is not True:
-                raise RuntimeError(
-                    f"{framework} large-scale comparison failed: "
-                    + json.dumps(record.get("comparison"), indent=2)[-20_000:]
-                )
-            records.append(record)
-            print(f"{framework}: PASS", flush=True)
+        print(f"Running {framework} large-scale pair...", flush=True)
+        records.append(_run_isolated_worker(framework, interpreter))
+        print(f"{framework}: PASS", flush=True)
     return build_report(records)
+
+
+def run_historical_vectorbt_pro() -> dict[str, Any]:
+    """Replay the historical Pro target and compare it with accepted current evidence."""
+    current_report = cast(dict[str, Any], json.loads(ACCEPTED_PATH.read_text(encoding="utf-8")))
+    current_failures = report_failures(current_report, reconstruct_input=True)
+    if current_failures:
+        raise RuntimeError(
+            "Current large-scale evidence is not valid: " + "; ".join(current_failures)
+        )
+    current_record = next(
+        record
+        for record in cast(list[dict[str, Any]], current_report["frameworks"])
+        if record["framework"] == "vectorbt_pro"
+    )
+    historical_record = _run_isolated_worker(
+        "vectorbt_pro",
+        _resolve_historical_vectorbt_pro_python(),
+        historical_target=True,
+    )
+    return build_historical_report(current_record, historical_record)
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -592,13 +806,39 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--verify-input", action="store_true")
+    parser.add_argument("--historical-target", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--historical-vectorbt-pro", action="store_true")
+    parser.add_argument("--check-historical-vectorbt-pro", action="store_true")
     args = parser.parse_args()
     if args.worker:
         if args.output is None:
             parser.error("--worker requires --output")
-        record = run_worker(args.worker)
+        if args.historical_target and args.worker != "vectorbt_pro":
+            parser.error("--historical-target requires --worker vectorbt_pro")
+        target = _historical_vectorbt_pro_target() if args.historical_target else None
+        record = run_worker(args.worker, target_override=target)
         _write_json(args.output, record)
         return 0 if record["comparison"]["passed"] else 1
+    if args.historical_target:
+        parser.error("--historical-target requires --worker vectorbt_pro")
+    if args.check_historical_vectorbt_pro:
+        report = json.loads(HISTORICAL_ACCEPTED_PATH.read_text(encoding="utf-8"))
+        failures = historical_report_failures(report, reconstruct_input=args.verify_input)
+        for failure in failures:
+            print(f"- {failure}")
+        return 1 if failures else 0
+    if args.historical_vectorbt_pro:
+        candidate = run_historical_vectorbt_pro()
+        _write_json(HISTORICAL_CANDIDATE_PATH, candidate)
+        failures = historical_report_failures(candidate, reconstruct_input=True)
+        if failures:
+            print("Accepted historical evidence unchanged:")
+            for failure in failures:
+                print(f"- {failure}")
+            return 1
+        _write_json_atomic(HISTORICAL_ACCEPTED_PATH, candidate)
+        print(f"Accepted historical evidence: {HISTORICAL_ACCEPTED_PATH}")
+        return 0
     if args.check:
         report = json.loads(ACCEPTED_PATH.read_text(encoding="utf-8"))
         failures = report_failures(report, reconstruct_input=args.verify_input)
