@@ -133,6 +133,41 @@ def test_vectorbt_scale_pairs_use_the_collateral_aware_strict_profile(
     assert captured["profile_override"] == "vectorbt_strict"
 
 
+def test_scale_trade_surface_is_reconstructed_from_canonical_fills() -> None:
+    module = _load_module()
+    fills = pd.DataFrame(
+        [
+            {
+                "timestamp": "2024-01-01",
+                "asset": "A",
+                "side": "buy",
+                "quantity": 3.0,
+                "price": 10.0,
+                "commission": 0.0,
+            },
+            {
+                "timestamp": "2024-01-02",
+                "asset": "A",
+                "side": "sell",
+                "quantity": 3.0,
+                "price": 11.0,
+                "commission": 0.0,
+            },
+        ]
+    )
+    external = module.suite.BenchmarkResult("external", "scale", 0.0, 999, 0.0, 0.0)
+    ml4t = module.suite.BenchmarkResult("ml4t", "scale", 0.0, 999, 0.0, 0.0)
+    external.fills_df = fills
+    ml4t.fills_df = fills.copy()
+
+    module._use_canonical_fill_backed_trades(external, ml4t)
+
+    assert external.num_trades == ml4t.num_trades == 1
+    assert module.suite.canonical_trade_records(external.trades_df) == (
+        module.suite.canonical_trade_records(ml4t.trades_df)
+    )
+
+
 def test_complete_report_reconstructs(monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load_module()
     report = _complete_report(module, monkeypatch)

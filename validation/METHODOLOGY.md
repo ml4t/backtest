@@ -317,6 +317,11 @@ explicit comparison protocol described above. The native Zipline defaults remain
 `lean` profile represents only the named daily US-equity protocol above. Its stop settings are not
 part of the retained LEAN equivalence claim.
 
+Large-scale evidence compares native ordered fills first, then reconstructs closed trades from the
+canonical 1e-8 fill records for both engines. This prevents sub-quantum differences in a
+framework's post-hoc trade-table arithmetic from changing a trade derived from equivalent fills.
+The scenario suite separately compares each framework's native trade records.
+
 ---
 
 ## Current Parity Status

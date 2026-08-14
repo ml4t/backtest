@@ -274,6 +274,16 @@ def _framework_run(
     return external, ml4t
 
 
+def _use_canonical_fill_backed_trades(
+    external: suite.BenchmarkResult,
+    ml4t: suite.BenchmarkResult,
+) -> None:
+    for result in (external, ml4t):
+        result.trades_df = suite.closed_trades_from_fills(result.fills_df)
+        records = suite.canonical_trade_records(result.trades_df)
+        result.num_trades = len(records) if records is not None else 0
+
+
 def run_worker(framework: str, workload: ScaleWorkload = WORKLOAD) -> dict[str, Any]:
     """Execute one external/ML4T scale pair and retain exact digests."""
     manifest = load_framework_manifest()
@@ -284,6 +294,7 @@ def run_worker(framework: str, workload: ScaleWorkload = WORKLOAD) -> dict[str, 
     effective_prices = _effective_prices(framework, price_data)
     effective_digest = input_digest(effective_prices, signals, dates)
     external, ml4t = _framework_run(framework, config, price_data, signals, dates)
+    _use_canonical_fill_backed_trades(external, ml4t)
     comparison = cast(
         dict[str, Any],
         suite.compare_benchmark_results_exact(
@@ -328,9 +339,7 @@ def run_worker(framework: str, workload: ScaleWorkload = WORKLOAD) -> dict[str, 
         "capabilities": {
             "intents": "canonical strategy trace",
             "fills": "native",
-            "closed_trades": (
-                "native" if framework.startswith("vectorbt") else "reconstructed from native fills"
-            ),
+            "closed_trades": "reconstructed from canonical native fills",
             "terminal_state": "reconstructed from native fills and final marks",
             "fill_order": "session, asset, side, quantity, price",
         },
