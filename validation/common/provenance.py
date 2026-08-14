@@ -40,8 +40,31 @@ def _json_digest(value: object) -> str:
 
 @cache
 def _tree_digest(root: Path) -> str:
+    try:
+        git_root = Path(
+            subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+        relative_root = root.resolve().relative_to(git_root.resolve())
+        tracked = subprocess.run(
+            ["git", "-C", str(git_root), "ls-files", "-z", "--", relative_root.as_posix()],
+            check=True,
+            capture_output=True,
+        ).stdout
+        paths = sorted(
+            git_root / value.decode("utf-8")
+            for value in tracked.split(b"\0")
+            if value and value.endswith(b".py")
+        )
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        paths = sorted(root.rglob("*.py"))
+
     digest = hashlib.sha256()
-    for path in sorted(root.rglob("*.py")):
+    for path in paths:
         digest.update(path.relative_to(root).as_posix().encode("utf-8"))
         digest.update(b"\0")
         digest.update(path.read_bytes())

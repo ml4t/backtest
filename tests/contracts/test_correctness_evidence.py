@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, cast
@@ -23,7 +24,12 @@ from common.correctness_evidence import (  # noqa: E402
     promote_candidate,
 )
 from common.framework_registry import load_framework_manifest  # noqa: E402
-from common.provenance import generate_inputs, input_digest, static_digests  # noqa: E402
+from common.provenance import (  # noqa: E402
+    _tree_digest,
+    generate_inputs,
+    input_digest,
+    static_digests,
+)
 from common.types import FrameworkResult, ValidationRecord, ValidationStatus  # noqa: E402
 from scenarios.definitions import SCENARIOS  # noqa: E402
 
@@ -204,6 +210,21 @@ def test_source_commit_change_without_behavior_change_is_not_stale() -> None:
             record["provenance"]["ml4t"]["commit"] = "b" * 40
 
     assert correctness_report_failures(report) == []
+
+
+def test_tree_digest_excludes_untracked_generated_python(tmp_path: Path) -> None:
+    source = tmp_path / "src" / "package"
+    source.mkdir(parents=True)
+    (source / "engine.py").write_text("VALUE = 1\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "src/package/engine.py"], cwd=tmp_path, check=True)
+
+    _tree_digest.cache_clear()
+    expected = _tree_digest(source)
+    (source / "_version.py").write_text("VERSION = 'generated'\n", encoding="utf-8")
+    _tree_digest.cache_clear()
+
+    assert _tree_digest(source) == expected
 
 
 def test_dirty_source_is_not_acceptable() -> None:
