@@ -651,6 +651,8 @@ def historical_report_failures(
         ml4t = record.get("ml4t")
         if not isinstance(ml4t, dict) or ml4t.get("dirty") is not False:
             failures.append(f"VectorBT Pro {label} run used a dirty ML4T tree")
+        elif not isinstance(ml4t.get("commit"), str) or len(str(ml4t["commit"])) != 40:
+            failures.append(f"VectorBT Pro {label} ML4T commit identity is missing")
         comparison = record.get("comparison")
         if not isinstance(comparison, dict) or comparison.get("passed") is not True:
             failures.append(f"VectorBT Pro {label} exact comparison did not pass")
@@ -661,8 +663,6 @@ def historical_report_failures(
             WORKLOAD
         ):
             failures.append(f"VectorBT Pro {label} input digest does not reconstruct")
-    if current.get("ml4t") != historical.get("ml4t"):
-        failures.append("Historical replay runs used different ML4T revisions")
     if current.get("source_digests") != historical.get("source_digests"):
         failures.append("Historical replay runs used different comparison sources")
     if current.get("input") != historical.get("input"):

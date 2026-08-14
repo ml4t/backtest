@@ -210,9 +210,17 @@ def test_historical_report_requires_exact_identity_and_matching_outputs(
 
     assert module.historical_report_failures(report, reconstruct_input=True) == []
 
+    evidence_only_revision = copy.deepcopy(report)
+    evidence_only_revision["historical"]["ml4t"]["commit"] = "b" * 40
+    assert module.historical_report_failures(evidence_only_revision, reconstruct_input=True) == []
+
     wrong_identity = copy.deepcopy(report)
     wrong_identity["historical"]["target"]["actual_version"] = "2026.6.27"
     assert module.historical_report_failures(wrong_identity)
+
+    missing_ml4t_identity = copy.deepcopy(report)
+    missing_ml4t_identity["historical"]["ml4t"]["commit"] = ""
+    assert module.historical_report_failures(missing_ml4t_identity)
 
     changed_output = copy.deepcopy(report)
     fill_check = next(
