@@ -464,7 +464,11 @@ class FillExecutor:
             return fallback
 
         unit_cost = ctx.fill_price * broker.get_multiplier(ctx.order.asset)
-        requested_open = abs(ctx.signed_qty) - abs(old_quantity)
+        if ctx.fill_quantity == ctx.order.quantity:
+            requested_quantity = ctx.order.requested_quantity or ctx.order.quantity
+            requested_open = abs(requested_quantity) - abs(old_quantity)
+        else:
+            requested_open = abs(ctx.signed_qty) - abs(old_quantity)
         free_cash = self.account._lock_notional_free_cash
         if old_quantity < 0.0:
             short_basis = self.account._lock_notional_short_basis.get(ctx.order.asset, 0.0)

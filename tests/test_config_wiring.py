@@ -568,9 +568,9 @@ class TestShortCashPolicy:
         assert broker.fills[0].quantity == initial_cash / price
 
     def test_lock_notional_partial_reversal_retains_native_open_leg_quantity(self):
-        initial_cash = 10_000.0
-        short_price = 100.0
-        reversal_price = 73.123456789
+        initial_cash = 8_837.873808549472
+        short_price = 88.37873808549472
+        reversal_price = 90.0615227583623
         broker = _make_broker(
             initial_cash=initial_cash,
             allow_short_selling=True,
@@ -585,7 +585,7 @@ class TestShortCashPolicy:
         broker._process_orders()
 
         _set_prices(broker, {"A": reversal_price}, ts=datetime(2024, 1, 2))
-        broker.submit_order("A", 1_000.0, OrderSide.BUY)
+        broker.submit_order("A", 200.0, OrderSide.BUY)
         broker._process_orders()
 
         free_after_cover = initial_cash * 2.0 - 100.0 * reversal_price
