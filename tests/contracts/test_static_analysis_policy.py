@@ -104,6 +104,9 @@ def test_ci_checks_every_release_validation_script() -> None:
         "validation/frameworks/vectorbt_oss.py",
         "validation/frameworks/vectorbt_pro.py",
         "validation/frameworks/zipline.py",
+        "validation/real_strategy_backtrader.py",
+        "validation/real_strategy_vectorbt.py",
+        "validation/real_strategy_zipline.py",
     }
     candidate_files = subprocess.run(
         [

@@ -87,6 +87,13 @@ class ShareType(str, Enum):
     INTEGER = "integer"  # Round down to whole shares (like most real brokers)
 
 
+class ShareRounding(str, Enum):
+    """Integer-share rounding used during target-weight sizing."""
+
+    NEAREST = "nearest"
+    TRUNCATE = "truncate"
+
+
 class FillOrdering(str, Enum):
     """Order processing sequence within a single bar.
 
@@ -712,6 +719,7 @@ class BacktestConfig:
 
     # === Position Sizing ===
     share_type: ShareType = ShareType.INTEGER
+    share_rounding: ShareRounding = ShareRounding.NEAREST
 
     # === Commission ===
     commission_type: CommissionType = CommissionType.NONE
@@ -910,6 +918,7 @@ class BacktestConfig:
             },
             "position_sizing": {
                 "share_type": self.share_type.value,
+                "share_rounding": self.share_rounding.value,
             },
             "commission": {
                 "model": self.commission_type.value,
@@ -1021,7 +1030,7 @@ class BacktestConfig:
                     "initial_hwm_source",
                     "trail_stop_timing",
                 },
-                "position_sizing": {"share_type"},
+                "position_sizing": {"share_type", "share_rounding"},
                 "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
                 "slippage": {
                     "model",
@@ -1157,6 +1166,7 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming(stops_cfg.get("trail_stop_timing", "lagged")),
             # Sizing
             share_type=ShareType(sizing_cfg.get("share_type", "integer")),
+            share_rounding=ShareRounding(sizing_cfg.get("share_rounding", "nearest")),
             # Commission
             commission_type=CommissionType(comm_cfg.get("model", "none")),
             commission_rate=comm_cfg.get("rate", 0.0),

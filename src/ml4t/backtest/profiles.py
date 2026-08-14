@@ -69,6 +69,7 @@ BACKTRADER_PROFILE = {
     },
     "position_sizing": {
         "share_type": "integer",
+        "share_rounding": "truncate",
     },
     "commission": {
         "model": "none",

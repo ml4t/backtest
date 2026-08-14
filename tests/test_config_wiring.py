@@ -588,6 +588,7 @@ class TestShortCashPolicy:
         config = BacktestConfig.from_preset("backtrader_strict")
         assert config.next_bar_submission_precheck is True
         assert config.next_bar_simple_cash_check is True
+        assert config.share_rounding.value == "truncate"
 
     def test_lean_profile_uses_margin_next_bar_open(self):
         config = BacktestConfig.from_preset("lean")

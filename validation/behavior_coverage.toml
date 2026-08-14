@@ -98,7 +98,7 @@ published = true
 
 [[framework.backtrader]]
 name = "sizing"
-fields = ["position_sizing.share_type"]
+fields = ["position_sizing.share_type", "position_sizing.share_rounding"]
 native_checks = ["integer_target_percent"]
 scenarios = []
 published = false
