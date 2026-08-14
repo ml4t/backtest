@@ -1,0 +1,28 @@
+[metadata]
+schema_version = 1
+selection = "current canonical validation rank-1"
+source = "ml4t/public case-study registry and artifacts"
+
+[[case]]
+id = "cme_futures"
+asset_class = "futures"
+production_path = "event_driven"
+required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]
+
+[[case]]
+id = "crypto_perps_funding"
+asset_class = "crypto_perpetual_futures"
+production_path = "event_driven"
+required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]
+
+[[case]]
+id = "etfs"
+asset_class = "etf"
+production_path = "event_driven"
+required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]
+
+[[case]]
+id = "us_equities_panel"
+asset_class = "equity"
+production_path = "event_driven"
+required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]
