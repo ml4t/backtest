@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from common.framework_registry import load_framework_manifest
+
 PROJECT_ROOT = Path(__file__).parent.parent
 CORRECTNESS_EVIDENCE = PROJECT_ROOT / "validation" / "CORRECTNESS_RESULTS.json"
 LARGE_SCALE_EVIDENCE = PROJECT_ROOT / "validation" / "vectorbt_pro" / "large_scale_parity.json"
@@ -21,6 +23,7 @@ TARGETS = (
 START_MARKER = "<!-- parity-claims:start -->"
 END_MARKER = "<!-- parity-claims:end -->"
 GITHUB_EVIDENCE_ROOT = "https://github.com/ml4t/backtest/blob/main/validation"
+SCENARIO_FRAMEWORKS = load_framework_manifest().scenario_framework_ids
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -35,7 +38,7 @@ def _validate_evidence(correctness: dict[str, Any], large_scale: dict[str, Any])
     records = correctness.get("records")
     if not isinstance(frameworks, dict) or not isinstance(records, list):
         raise ValueError("Correctness evidence lacks framework pins or records")
-    expected = {"vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"}
+    expected = set(SCENARIO_FRAMEWORKS)
     if set(frameworks) != expected:
         raise ValueError("Correctness evidence does not cover the required framework matrix")
     for framework in expected:
@@ -55,7 +58,7 @@ def render_claims(correctness: dict[str, Any], large_scale: dict[str, Any]) -> s
     large_scale_url = f"{GITHUB_EVIDENCE_ROOT}/vectorbt_pro/large_scale_parity.json"
 
     rows = []
-    for framework in ("vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"):
+    for framework in SCENARIO_FRAMEWORKS:
         pin = frameworks[framework]
         framework_records = [record for record in records if record["framework"] == framework]
         required = [record for record in framework_records if record["required"]]

@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from common.framework_registry import load_framework_manifest
 from common.types import ScenarioConfig, Tolerance
 
 # ============================================================================
@@ -25,8 +26,8 @@ VBT_TOLERANCE = Tolerance(trade_count=0, value_pct=0.01, pnl_abs=1.0)
 BT_TOLERANCE = Tolerance(trade_count=0, value_pct=0.1, pnl_abs=10.0)
 ZIPLINE_TOLERANCE = Tolerance(trade_count=0, value_pct=0.01, pnl_abs=5.0)
 
-ALL_FRAMEWORKS = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"]
-NO_ZIPLINE = ["vectorbt_pro", "vectorbt_oss", "backtrader"]
+ALL_FRAMEWORKS = list(load_framework_manifest().scenario_framework_ids)
+NO_ZIPLINE = [framework for framework in ALL_FRAMEWORKS if framework != "zipline"]
 
 
 def _fw_tolerances() -> dict[str, Tolerance]:

@@ -6,6 +6,12 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from common.framework_registry import load_framework_manifest
+
+
+def _scenario_frameworks() -> list[str]:
+    return list(load_framework_manifest().scenario_framework_ids)
+
 
 class ValidationStatus(StrEnum):
     """Terminal status for one framework/scenario validation attempt."""
@@ -122,9 +128,7 @@ class ScenarioConfig:
     default_tolerance: Tolerance | None = None
 
     # Which frameworks support this scenario
-    supported_frameworks: list[str] = field(
-        default_factory=lambda: ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"]
-    )
+    supported_frameworks: list[str] = field(default_factory=_scenario_frameworks)
 
     # Extra comparison checks beyond standard (trade count, final value, pnl)
     extra_checks: list[str] = field(default_factory=list)

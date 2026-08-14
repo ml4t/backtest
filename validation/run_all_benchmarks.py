@@ -20,7 +20,6 @@ Output:
 
 import argparse
 import gc
-import json
 import subprocess
 import sys
 import time
@@ -37,40 +36,28 @@ PROJECT_ROOT = VALIDATION_DIR.parent
 
 # Add project root to path for ml4t imports
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(VALIDATION_DIR))
+
+from common.framework_registry import load_framework_manifest  # noqa: E402
 
 # Framework configurations
-FRAMEWORKS = {
+FRAMEWORKS: dict[str, dict[str, str | None]] = {
     "ml4t": {
         "venv": ".venv",
         "display_name": "ml4t.backtest",
         "function": "benchmark_ml4t",
-    },
-    "vectorbt_pro": {
-        "venv": ".venv-vectorbt-pro",
-        "display_name": "VectorBT Pro",
-        "function": "benchmark_vectorbt_pro",
-    },
-    "vectorbt_oss": {
-        "venv": ".venv",
-        "display_name": "VectorBT OSS",
-        "function": "benchmark_vectorbt_oss",
-    },
-    "backtrader": {
-        "venv": ".venv",
-        "display_name": "Backtrader",
-        "function": "benchmark_backtrader",
-    },
-    "zipline": {
-        "venv": ".venv",
-        "display_name": "Zipline",
-        "function": "benchmark_zipline",
-    },
-    "lean": {
-        "venv": None,  # Uses Docker
-        "display_name": "LEAN CLI",
-        "function": "benchmark_lean",
-    },
+    }
 }
+FRAMEWORKS.update(
+    {
+        framework_id: {
+            "venv": target.environment,
+            "display_name": target.display_name,
+            "function": f"benchmark_{framework_id}",
+        }
+        for framework_id, target in load_framework_manifest().targets.items()
+    }
+)
 
 # Test configurations (n_bars, n_assets)
 CONFIGS = {
@@ -125,7 +112,14 @@ def benchmark_ml4t(asset_data: dict, entries: np.ndarray, exits: np.ndarray, dat
     """Benchmark ml4t.backtest."""
     import polars as pl
 
-    from ml4t.backtest._validation_imports import DataFeed, Engine, ExecutionMode, NoCommission, NoSlippage, Strategy
+    from ml4t.backtest._validation_imports import (
+        DataFeed,
+        Engine,
+        ExecutionMode,
+        NoCommission,
+        NoSlippage,
+        Strategy,
+    )
 
     # Prepare data in polars format
     rows = []
@@ -219,7 +213,7 @@ def benchmark_ml4t(asset_data: dict, entries: np.ndarray, exits: np.ndarray, dat
 
 
 def benchmark_vectorbt_oss(
-    asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates
+    asset_data: dict, entries: np.ndarray, exits: np.ndarray, _dates
 ) -> dict:
     """Benchmark VectorBT OSS."""
     try:
@@ -251,10 +245,7 @@ def benchmark_vectorbt_oss(
 
     trades_count = pf.trades.count()
     # Handle both scalar and Series (multi-asset case)
-    if hasattr(trades_count, 'sum'):
-        num_trades = int(trades_count.sum())
-    else:
-        num_trades = int(trades_count)
+    num_trades = int(trades_count.sum()) if hasattr(trades_count, "sum") else int(trades_count)
 
     end_time = time.perf_counter()
     current, peak = tracemalloc.get_traced_memory()
@@ -270,7 +261,7 @@ def benchmark_vectorbt_oss(
 
 
 def benchmark_vectorbt_pro(
-    asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates
+    asset_data: dict, entries: np.ndarray, exits: np.ndarray, _dates
 ) -> dict:
     """Benchmark VectorBT Pro."""
     try:
@@ -302,10 +293,7 @@ def benchmark_vectorbt_pro(
 
     trades_count = pf.trades.count()
     # Handle both scalar and Series (multi-asset case)
-    if hasattr(trades_count, 'sum'):
-        num_trades = int(trades_count.sum())
-    else:
-        num_trades = int(trades_count)
+    num_trades = int(trades_count.sum()) if hasattr(trades_count, "sum") else int(trades_count)
 
     end_time = time.perf_counter()
     current, peak = tracemalloc.get_traced_memory()
@@ -320,9 +308,7 @@ def benchmark_vectorbt_pro(
     }
 
 
-def benchmark_backtrader(
-    asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates
-) -> dict:
+def benchmark_backtrader(asset_data: dict, entries: np.ndarray, exits: np.ndarray, _dates) -> dict:
     """Benchmark Backtrader."""
     try:
         import backtrader as bt
@@ -389,9 +375,7 @@ def benchmark_backtrader(
     }
 
 
-def benchmark_zipline(
-    asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates
-) -> dict:
+def benchmark_zipline(asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates) -> dict:
     """Benchmark Zipline-Reloaded."""
     try:
         from zipline import run_algorithm
@@ -417,7 +401,7 @@ def benchmark_zipline(
         set_commission(NoCommission())
         set_slippage(FixedSlippage(spread=0.0))
 
-    def handle_data(context, data):
+    def handle_data(context, _data):
         if context.bar_idx >= len(context.entries):
             return
 
@@ -470,9 +454,7 @@ def benchmark_zipline(
     }
 
 
-def benchmark_lean(
-    asset_data: dict, entries: np.ndarray, exits: np.ndarray, dates
-) -> dict:
+def benchmark_lean(_asset_data: dict, _entries: np.ndarray, _exits: np.ndarray, _dates) -> dict:
     """Benchmark LEAN CLI (requires Docker)."""
     lean_workspace = VALIDATION_DIR / "lean" / "workspace"
 
@@ -575,9 +557,7 @@ def run_benchmark(config_name: str, framework: str) -> dict:
         }
 
 
-def run_all_benchmarks(
-    frameworks: list = None, configs: list = None
-) -> list:
+def run_all_benchmarks(frameworks: list = None, configs: list = None) -> list:
     """Run all benchmarks and return results."""
     if frameworks is None:
         frameworks = list(FRAMEWORKS.keys())
@@ -592,9 +572,9 @@ def run_all_benchmarks(
             print(f"Unknown framework: {framework}")
             continue
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Framework: {config['display_name']}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         for config_name in configs:
             print(f"\n  Config: {config_name}")
@@ -645,25 +625,29 @@ def generate_report(results: list) -> str:
         lines.append(f"| {framework} | {config} | {runtime} | {trades} | {memory} | {status} |")
 
     # Add comparison table by config
-    lines.extend([
-        "",
-        "## Performance Comparison by Configuration",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Performance Comparison by Configuration",
+            "",
+        ]
+    )
 
     # Group by config
-    configs_seen = set(r.get("config") for r in results if r.get("config"))
+    configs_seen = {r.get("config") for r in results if r.get("config")}
     for config_name in sorted(configs_seen):
         config_results = [r for r in results if r.get("config") == config_name and r.get("success")]
         if not config_results:
             continue
 
-        lines.extend([
-            f"### {config_name}",
-            "",
-            "| Framework | Runtime (s) | vs ml4t |",
-            "|-----------|-------------|---------|",
-        ])
+        lines.extend(
+            [
+                f"### {config_name}",
+                "",
+                "| Framework | Runtime (s) | vs ml4t |",
+                "|-----------|-------------|---------|",
+            ]
+        )
 
         # Find ml4t baseline
         ml4t_time = None
@@ -677,7 +661,7 @@ def generate_report(results: list) -> str:
             runtime = r["runtime_sec"]
             if ml4t_time and ml4t_time > 0:
                 speedup = runtime / ml4t_time
-                vs_ml4t = f"{speedup:.2f}x" if speedup > 1 else f"{1/speedup:.2f}x faster"
+                vs_ml4t = f"{speedup:.2f}x" if speedup > 1 else f"{1 / speedup:.2f}x faster"
             else:
                 vs_ml4t = "-"
             lines.append(f"| {framework} | {runtime:.3f} | {vs_ml4t} |")
@@ -723,7 +707,7 @@ def main():
     output_path = PROJECT_ROOT / args.output
     output_path.write_text(report)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Report saved to: {output_path}")
     print("=" * 60)
 

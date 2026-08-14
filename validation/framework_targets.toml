@@ -1,0 +1,83 @@
+[metadata]
+schema_version = 1
+freeze_date = "2026-08-13"
+scenario_frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"]
+
+[framework.vectorbt_pro]
+display_name = "VectorBT Pro"
+package = "vectorbtpro"
+version = "2026.6.27"
+profile = "vectorbt_strict"
+python = ">=3.11"
+license = "Proprietary"
+access = "licensed"
+source = "https://github.com/polakowo/vectorbt.pro"
+source_commit = "6e18cf0aa37849cfc20848f40f1d26ecfdc771b4"
+immutable_id = "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4"
+environment = ".venv-vectorbt-pro"
+python_env_var = "ML4T_VECTORBT_PRO_PYTHON"
+scenario_matrix = true
+
+[framework.vectorbt_oss]
+display_name = "VectorBT OSS"
+package = "vectorbt"
+version = "1.1.0"
+profile = "vectorbt"
+python = ">=3.11,<3.15"
+license = "Apache-2.0 WITH Commons-Clause"
+access = "public"
+source = "https://pypi.org/project/vectorbt/1.1.0/"
+source_commit = "259d2d89fe2e7638baf3ca76c394937cd32b656d"
+immutable_id = "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b"
+artifact = "vectorbt-1.1.0.tar.gz"
+environment = ".venv-vectorbt-oss"
+python_env_var = "ML4T_VECTORBT_OSS_PYTHON"
+scenario_matrix = true
+
+[framework.backtrader]
+display_name = "Backtrader"
+package = "backtrader"
+version = "1.9.78.123"
+profile = "backtrader_strict"
+python = "3.12 audit interpreter; upstream package metadata does not declare a range"
+license = "GPL-3.0-or-later"
+access = "public"
+source = "https://pypi.org/project/backtrader/1.9.78.123/"
+immutable_id = "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd"
+artifact = "backtrader-1.9.78.123-py2.py3-none-any.whl"
+environment = ".venv-backtrader"
+python_env_var = "ML4T_BACKTRADER_PYTHON"
+scenario_matrix = true
+
+[framework.zipline]
+display_name = "Zipline Reloaded"
+package = "zipline-reloaded"
+version = "3.1.1"
+profile = "zipline_strict"
+python = ">=3.10"
+license = "Apache-2.0"
+access = "public"
+source = "https://pypi.org/project/zipline-reloaded/3.1.1/"
+source_commit = "09885a2ebc7567d40942c891b3879dc03c745070"
+immutable_id = "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f"
+artifact = "zipline_reloaded-3.1.1.tar.gz"
+environment = ".venv-zipline"
+python_env_var = "ML4T_ZIPLINE_PYTHON"
+scenario_matrix = true
+
+[framework.lean]
+display_name = "LEAN"
+package = "lean"
+version = "18001"
+profile = "lean"
+python = "3.11"
+license = "Apache-2.0"
+access = "public"
+source = "https://github.com/QuantConnect/Lean"
+source_commit = "278fcb3d1b815b63ccadba68d7ae54422e34b792"
+immutable_id = "sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70"
+artifact = "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70"
+platform_artifact = "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307"
+cli_version = "1.0.228"
+cli_immutable_id = "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c"
+scenario_matrix = false

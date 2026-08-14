@@ -10,6 +10,7 @@ validation/release_candidate.py
 validation/run_all_correctness.py
 validation/common/comparator.py
 validation/common/data_generators.py
+validation/common/framework_registry.py
 validation/common/ml4t_runner.py
 validation/common/types.py
 validation/scenarios/definitions.py
