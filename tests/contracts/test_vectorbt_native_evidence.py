@@ -13,6 +13,7 @@ _EVIDENCE = _ROOT / "validation/native/evidence"
 EXPECTED_CHECKS = {
     "accumulation",
     "cash_sharing_and_call_sequence",
+    "cash_sharing_short_collateral",
     "defaults",
     "explicit_fill_price",
     "fees_and_slippage",

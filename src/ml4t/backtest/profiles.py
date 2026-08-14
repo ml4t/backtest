@@ -281,6 +281,11 @@ IBKR_US_STOCKS_FIXED_PROFILE = {
 }
 
 VECTORBT_STRICT_PROFILE = deepcopy(VECTORBT_PROFILE)
+VECTORBT_STRICT_PROFILE["account"]["short_cash_policy"] = "lock_notional"
+VECTORBT_STRICT_PROFILE["orders"]["reject_on_insufficient_cash"] = True
+VECTORBT_STRICT_PROFILE["orders"]["partial_fills_allowed"] = True
+VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "fifo"
+VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 
 BACKTRADER_STRICT_PROFILE = deepcopy(BACKTRADER_PROFILE)
 BACKTRADER_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"

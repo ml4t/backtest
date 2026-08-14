@@ -9,7 +9,7 @@ from ml4t.backtest.engine import run_backtest
 from ml4t.backtest.profiles import list_profiles
 from ml4t.backtest.risk.position.dynamic import TrailingStop
 from ml4t.backtest.strategy import Strategy
-from ml4t.backtest.types import StopLevelBasis
+from ml4t.backtest.types import OrderSide, StopLevelBasis
 
 
 def _prices() -> pl.DataFrame:
@@ -45,6 +45,33 @@ class _BuyOnMissingClose(Strategy):
     def on_data(self, timestamp, data, context, broker) -> None:
         if timestamp.day == 2:
             broker.submit_order("AAPL", 1.0)
+
+
+class _ExerciseVectorbtShortCollateral(Strategy):
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if timestamp.day == 1:
+            broker.submit_order("B", 5.0, side=OrderSide.SELL)
+        elif timestamp.day == 2:
+            broker.submit_order("A", 5.0)
+            broker.submit_order("B", 5.0, side=OrderSide.SELL)
+
+
+def _flat_two_asset_prices() -> pl.DataFrame:
+    return pl.DataFrame(
+        [
+            {
+                "timestamp": datetime(2024, 1, day),
+                "asset": asset,
+                "open": 100.0,
+                "high": 100.0,
+                "low": 100.0,
+                "close": 100.0,
+                "volume": 1_000_000.0,
+            }
+            for day in (1, 2, 3)
+            for asset in ("A", "B")
+        ]
+    )
 
 
 def _prices_with_missing_middle() -> pl.DataFrame:
@@ -146,6 +173,22 @@ def test_vectorbt_profile_drops_signal_order_with_missing_close() -> None:
     assert result.fills == []
     assert len(result.rejected_orders) == 1
     assert result.rejected_orders[0].rejection_code == "price_unavailable"
+
+
+def test_vectorbt_strict_locks_short_collateral_from_new_exposure() -> None:
+    config = BacktestConfig.from_preset("vectorbt_strict")
+    config.initial_cash = 1_000.0
+
+    result = run_backtest(
+        prices=_flat_two_asset_prices(),
+        strategy=_ExerciseVectorbtShortCollateral(),
+        config=config,
+    )
+
+    assert [(fill.asset, fill.quantity, fill.side.value) for fill in result.fills] == [
+        ("B", 5.0, "sell"),
+        ("A", 5.0, "buy"),
+    ]
 
 
 def test_zipline_profile_defers_pending_order_across_stale_bar() -> None:

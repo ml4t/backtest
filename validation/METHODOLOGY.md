@@ -307,8 +307,9 @@ percentage slippage overrides.
 
 ### Comparison profiles
 
-`vectorbt_strict` now resolves to the same settings as `vectorbt`. Native evidence does not support
-the prior locked-short-proceeds, rejection, or FIFO overrides. `backtrader` now uses the measured
+`vectorbt_strict` uses locked short collateral, partial fills, and FIFO processing to match the
+controlled `Portfolio.from_orders` protocol. The retained native check verifies that short-sale
+cash is reported in the cash series but cannot fund new exposure. `backtrader` uses the measured
 framework defaults for costs, leverage, target headroom, missing bars, and late feeds.
 `backtrader_strict` adds submission-time cash checks to reproduce Backtrader's enabled
 `checksubmit` path. `zipline_strict` resolves to the same settings as `zipline`; both represent the

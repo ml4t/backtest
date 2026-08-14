@@ -403,12 +403,12 @@ class TestShortCashPolicy:
 
     def test_vectorbt_strict_profile_preserves_native_cash_semantics(self):
         config = BacktestConfig.from_preset("vectorbt_strict")
-        assert config.short_cash_policy == ShortCashPolicy.CREDIT
-        assert config.fill_ordering == FillOrdering.EXIT_FIRST
-        assert config.reject_on_insufficient_cash is False
+        assert config.short_cash_policy == ShortCashPolicy.LOCK_NOTIONAL
+        assert config.fill_ordering == FillOrdering.FIFO
+        assert config.reject_on_insufficient_cash is True
         assert config.partial_fills_allowed is True
         assert config.entry_order_priority == EntryOrderPriority.SUBMISSION
-        assert get_profile_config("vectorbt_strict") == get_profile_config("vectorbt")
+        assert get_profile_config("vectorbt_strict") != get_profile_config("vectorbt")
 
     def test_zipline_strict_profile_uses_credit(self):
         config = BacktestConfig.from_preset("zipline_strict")

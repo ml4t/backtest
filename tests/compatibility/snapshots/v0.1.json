@@ -1568,7 +1568,7 @@
         "account": {
           "allow_leverage": false,
           "allow_short_selling": true,
-          "short_cash_policy": "credit"
+          "short_cash_policy": "lock_notional"
         },
         "cash": {
           "buffer_pct": 0.0,
@@ -1584,7 +1584,7 @@
         },
         "orders": {
           "entry_order_priority": "submission",
-          "fill_ordering": "exit_first",
+          "fill_ordering": "fifo",
           "immediate_fill": true,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
@@ -1592,7 +1592,7 @@
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "hybrid",
-          "reject_on_insufficient_cash": false
+          "reject_on_insufficient_cash": true
         },
         "position_sizing": {
           "share_type": "fractional"

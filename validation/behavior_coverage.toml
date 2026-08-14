@@ -39,7 +39,7 @@ reason = "The scenario matrix submits fixed integer quantities and does not test
 [[framework.vectorbt]]
 name = "buying_power"
 fields = ["account.allow_leverage", "orders.reject_on_insufficient_cash", "orders.partial_fills_allowed"]
-native_checks = ["insufficient_cash_partial_fill"]
+native_checks = ["cash_sharing_short_collateral", "insufficient_cash_partial_fill"]
 scenarios = []
 published = false
 reason = "No cross-engine scenario currently reaches an insufficient-cash boundary."

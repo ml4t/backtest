@@ -50,6 +50,18 @@ def _cash(portfolio: Any) -> list[float]:
     return np.asarray(value, dtype=float).tolist()
 
 
+def _chronological_order_events(portfolio: Any) -> list[dict[str, Any]]:
+    orders = _orders(portfolio)
+    if not orders:
+        return []
+    time_key = next(key for key in ("Fill Index", "Timestamp", "Index") if key in orders[0])
+    ordered = sorted(orders, key=lambda order: (str(order[time_key]), str(order["Column"])))
+    return [
+        {"column": order["Column"], "side": order["Side"], "size": order["Size"]}
+        for order in ordered
+    ]
+
+
 def _source_location(package: Any, function: Any, target: dict[str, str]) -> dict:
     source_file = inspect.getsourcefile(function)
     if source_file is None:
@@ -170,6 +182,19 @@ def _behavior_checks(framework: str, vbt: Any) -> list[tuple[str, Any, Any]]:
         cash_sharing=True,
         group_by=True,
         call_seq="reversed",
+    )
+    collateral_kwargs = {"lock_cash": True} if framework == "vectorbt_oss" else {}
+    collateral_pf = vbt.Portfolio.from_orders(
+        pd.DataFrame(100.0, index=index, columns=pd.Index(["a", "b"])),
+        size=pd.DataFrame(
+            [[0.0, -5.0], [5.0, -10.0], [5.0, -10.0]],
+            index=index,
+            columns=pd.Index(["a", "b"]),
+        ),
+        size_type="targetamount",
+        init_cash=1_000,
+        cash_sharing=True,
+        **collateral_kwargs,
     )
     accumulate_default = vbt.Portfolio.from_signals(
         close, entries=_bool([1, 1, 0]), exits=False, size=1, init_cash=1_000
@@ -297,6 +322,20 @@ def _behavior_checks(framework: str, vbt: Any) -> list[tuple[str, Any, Any]]:
             {"default": ["a"], "reversed": ["b"]},
         ),
         (
+            "cash_sharing_short_collateral",
+            {
+                "cash": _cash(collateral_pf),
+                "orders": _chronological_order_events(collateral_pf),
+            },
+            {
+                "cash": [1_500.0, 1_000.0, 1_000.0],
+                "orders": [
+                    {"column": "b", "side": "Sell", "size": 5.0},
+                    {"column": "a", "side": "Buy", "size": 5.0},
+                ],
+            },
+        ),
+        (
             "accumulation",
             {
                 "default_orders": len(_orders(accumulate_default)),
@@ -398,7 +437,12 @@ def run(framework: str) -> dict[str, Any]:
                 "expected": expected,
                 "passed": _equal(actual, expected),
                 "source": "from_orders"
-                if check_id in {"target_percent_sizing", "cash_sharing_and_call_sequence"}
+                if check_id
+                in {
+                    "target_percent_sizing",
+                    "cash_sharing_and_call_sequence",
+                    "cash_sharing_short_collateral",
+                }
                 else "from_signals",
             }
         )

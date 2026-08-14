@@ -108,6 +108,31 @@ def test_input_digest_is_independent_of_datetime_resolution() -> None:
     assert module.input_digest(converted_prices, converted_signals, converted_dates) == expected
 
 
+@pytest.mark.parametrize("framework", ["vectorbt_pro", "vectorbt_oss"])
+def test_vectorbt_scale_pairs_use_the_collateral_aware_strict_profile(
+    framework: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        module.suite,
+        f"benchmark_{framework}",
+        lambda *_args: "external",
+    )
+
+    def capture_ml4t(*args, **kwargs):
+        captured.update(kwargs)
+        return "ml4t"
+
+    monkeypatch.setattr(module.suite, "benchmark_ml4t", capture_ml4t)
+
+    result = module._framework_run(framework, object(), {}, pd.DataFrame(), pd.DatetimeIndex([]))
+
+    assert result == ("external", "ml4t")
+    assert captured["profile_override"] == "vectorbt_strict"
+
+
 def test_complete_report_reconstructs(monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load_module()
     report = _complete_report(module, monkeypatch)

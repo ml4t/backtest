@@ -113,6 +113,49 @@
     },
     {
       "actual": {
+        "cash": [
+          1500.0,
+          1000.0,
+          1000.0
+        ],
+        "orders": [
+          {
+            "column": "b",
+            "side": "Sell",
+            "size": 5.0
+          },
+          {
+            "column": "a",
+            "side": "Buy",
+            "size": 5.0
+          }
+        ]
+      },
+      "expected": {
+        "cash": [
+          1500.0,
+          1000.0,
+          1000.0
+        ],
+        "orders": [
+          {
+            "column": "b",
+            "side": "Sell",
+            "size": 5.0
+          },
+          {
+            "column": "a",
+            "side": "Buy",
+            "size": 5.0
+          }
+        ]
+      },
+      "id": "cash_sharing_short_collateral",
+      "passed": true,
+      "source": "from_orders"
+    },
+    {
+      "actual": {
         "default_orders": 1,
         "enabled_orders": 2
       },
@@ -297,7 +340,7 @@
     }
   ],
   "framework": "vectorbt_oss",
-  "oracle_sha256": "c15716833162f16d82b3efd3059f2b28a3e1c4b816a3bf721a82d97b95711b98",
+  "oracle_sha256": "47a21499702d7e47761b76c7f7104da8db1e124b27b43957716d175f7b32fd80",
   "package": "vectorbt",
   "passed": true,
   "schema_version": 1,
