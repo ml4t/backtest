@@ -63,7 +63,7 @@
       "version": "3.1.1"
     }
   },
-  "generated_at": "2026-08-14T11:53:11.693665+00:00",
+  "generated_at": "2026-08-14T13:27:15.212023+00:00",
   "records": [
     {
       "comparison": {
@@ -698,7 +698,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 2.9022904271259904,
+      "duration_seconds": 7.501915743108839,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -1368,7 +1368,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -2028,7 +2028,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 2.635350476950407,
+      "duration_seconds": 2.840228463988751,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -2698,7 +2698,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -2855,7 +2855,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 2.3570660441182554,
+      "duration_seconds": 2.3966822780203074,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3016,7 +3016,7 @@
         },
         "input_digest": "c450f8db901151f953d81b05845db8cad686ca7c619cfe7e881485a2228972a7",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -3173,7 +3173,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 2.3704132658895105,
+      "duration_seconds": 2.5000631511211395,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3334,7 +3334,7 @@
         },
         "input_digest": "d62c3c2d015f1ead6bff9d1d3ed7e92b396ddf9e4f7c808cf3ebe3eb7ae7491b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -4004,7 +4004,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 2.29961962508969,
+      "duration_seconds": 2.286233191145584,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -4678,7 +4678,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -5348,7 +5348,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 2.3205984868109226,
+      "duration_seconds": 2.3263101370539516,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -6022,7 +6022,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -6682,7 +6682,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 2.2875159040559083,
+      "duration_seconds": 2.317743237130344,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -7352,7 +7352,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -8012,7 +8012,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 2.3487607061397284,
+      "duration_seconds": 2.34586147707887,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -8682,7 +8682,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -8886,7 +8886,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 2.3469194669742137,
+      "duration_seconds": 2.326087640132755,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9100,7 +9100,7 @@
         },
         "input_digest": "0ab00a6cfc6f76a1d74f0617186a4d5c95d27cb4fd62bd5c535b3b191965369d",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -9361,7 +9361,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 2.341246779076755,
+      "duration_seconds": 2.3380940959323198,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9632,7 +9632,7 @@
         },
         "input_digest": "c46f13757f77a357bcf860856d78551fd3d0b5a707fc379bb9be724a04e1d219",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -10292,7 +10292,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 2.3152057118713856,
+      "duration_seconds": 2.3777460800483823,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -10962,7 +10962,7 @@
         },
         "input_digest": "e0efe74473f286a7ddeb3a4e39d9eb7a2443b69474480e9e4fcf97459672b93b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -11166,7 +11166,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 2.3157475090119988,
+      "duration_seconds": 2.3402557659428567,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11380,7 +11380,7 @@
         },
         "input_digest": "3057fb1181d8b6bde3b0f0c71860dca5701293bcd956920c618e911bce7d0c67",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -11527,7 +11527,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 2.3186875029932708,
+      "duration_seconds": 2.555546288844198,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11684,7 +11684,7 @@
         },
         "input_digest": "6868775136fad190c5e2fffe0cb05f259b244161572731b86777972b78ea5fb5",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -11831,7 +11831,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 2.3047236069105566,
+      "duration_seconds": 2.3249323240015656,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11988,7 +11988,7 @@
         },
         "input_digest": "515cb2ead81157a5d033173889d2a47af873b49bb750c0fedf91036506520aa2",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -12135,7 +12135,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 2.3098256271332502,
+      "duration_seconds": 2.6894931280985475,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -12292,7 +12292,7 @@
         },
         "input_digest": "0e9ac5d663e87ef8d9d42db148ea6b689902b2533884263ccde90d5ba20fc135",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -12895,7 +12895,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 2.355546784121543,
+      "duration_seconds": 4.062867257045582,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -13508,7 +13508,7 @@
         },
         "input_digest": "8b4829a04d740fe6087782188f15eb27044961db12acbcb5f5fdd227e83fde41",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -47798,7 +47798,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 2.431329692946747,
+      "duration_seconds": 5.095168989850208,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -82098,7 +82098,7 @@
         },
         "input_digest": "dd491bc06ca31652f04962d8927c33330abf1b3bedaf108f9d9b222834fb9c4b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -82758,7 +82758,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 3.2446235159877688,
+      "duration_seconds": 6.141330576967448,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -83428,7 +83428,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -84088,7 +84088,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 3.259092109045014,
+      "duration_seconds": 3.2873797880019993,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -84758,7 +84758,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -84915,7 +84915,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 3.2769843318965286,
+      "duration_seconds": 3.2958020658697933,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85076,7 +85076,7 @@
         },
         "input_digest": "c450f8db901151f953d81b05845db8cad686ca7c619cfe7e881485a2228972a7",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -85233,7 +85233,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 3.2421666071750224,
+      "duration_seconds": 3.363994016079232,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85394,7 +85394,7 @@
         },
         "input_digest": "d62c3c2d015f1ead6bff9d1d3ed7e92b396ddf9e4f7c808cf3ebe3eb7ae7491b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -86064,7 +86064,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 3.239228632999584,
+      "duration_seconds": 3.432345259003341,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -86738,7 +86738,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -86768,7 +86768,7 @@
     {
       "comparison": null,
       "detail": "Scenario explicitly excludes this framework",
-      "duration_seconds": 4.461035132408142e-06,
+      "duration_seconds": 6.026122719049454e-06,
       "framework": "vectorbt_oss",
       "framework_result": null,
       "ml4t_result": null,
@@ -87412,7 +87412,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 3.2395296881441027,
+      "duration_seconds": 4.475219384999946,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -88082,7 +88082,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -88742,7 +88742,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 3.2616704050451517,
+      "duration_seconds": 5.516745209228247,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89412,7 +89412,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -89616,7 +89616,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 3.2567403968423605,
+      "duration_seconds": 6.654169207904488,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89830,7 +89830,7 @@
         },
         "input_digest": "0ab00a6cfc6f76a1d74f0617186a4d5c95d27cb4fd62bd5c535b3b191965369d",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -90091,7 +90091,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 3.253674411214888,
+      "duration_seconds": 4.621487139957026,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -90362,7 +90362,7 @@
         },
         "input_digest": "c46f13757f77a357bcf860856d78551fd3d0b5a707fc379bb9be724a04e1d219",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -91022,7 +91022,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 3.2487299130298197,
+      "duration_seconds": 3.383543036878109,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -91692,7 +91692,7 @@
         },
         "input_digest": "e0efe74473f286a7ddeb3a4e39d9eb7a2443b69474480e9e4fcf97459672b93b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -91896,7 +91896,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 3.238377473084256,
+      "duration_seconds": 3.2667726040817797,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92110,7 +92110,7 @@
         },
         "input_digest": "3057fb1181d8b6bde3b0f0c71860dca5701293bcd956920c618e911bce7d0c67",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -92257,7 +92257,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 3.245127772912383,
+      "duration_seconds": 3.2741870610043406,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92414,7 +92414,7 @@
         },
         "input_digest": "6868775136fad190c5e2fffe0cb05f259b244161572731b86777972b78ea5fb5",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -92561,7 +92561,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 3.248155200853944,
+      "duration_seconds": 3.25988736608997,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92718,7 +92718,7 @@
         },
         "input_digest": "515cb2ead81157a5d033173889d2a47af873b49bb750c0fedf91036506520aa2",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -92865,7 +92865,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 3.238037460949272,
+      "duration_seconds": 3.309515391010791,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -93022,7 +93022,7 @@
         },
         "input_digest": "0e9ac5d663e87ef8d9d42db148ea6b689902b2533884263ccde90d5ba20fc135",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -93625,7 +93625,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 3.3207258789334446,
+      "duration_seconds": 3.356127813225612,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -94238,7 +94238,7 @@
         },
         "input_digest": "8b4829a04d740fe6087782188f15eb27044961db12acbcb5f5fdd227e83fde41",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -128528,7 +128528,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 3.3899817462079227,
+      "duration_seconds": 3.4004109750967473,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -162828,7 +162828,7 @@
         },
         "input_digest": "dd491bc06ca31652f04962d8927c33330abf1b3bedaf108f9d9b222834fb9c4b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -163508,7 +163508,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 0.1908741348888725,
+      "duration_seconds": 0.23361050290986896,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -164200,7 +164200,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -164880,7 +164880,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 0.21065902104601264,
+      "duration_seconds": 0.19563005398958921,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165572,7 +165572,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -165730,7 +165730,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 0.1838237678166479,
+      "duration_seconds": 0.19277043011970818,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165892,7 +165892,7 @@
         },
         "input_digest": "c450f8db901151f953d81b05845db8cad686ca7c619cfe7e881485a2228972a7",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -166050,7 +166050,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 0.18742704903706908,
+      "duration_seconds": 0.194934471976012,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -166212,7 +166212,7 @@
         },
         "input_digest": "d62c3c2d015f1ead6bff9d1d3ed7e92b396ddf9e4f7c808cf3ebe3eb7ae7491b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -166902,7 +166902,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 0.1971568139269948,
+      "duration_seconds": 0.19258566293865442,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -167596,7 +167596,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -168286,7 +168286,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 0.19473743089474738,
+      "duration_seconds": 0.1937738349661231,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -168980,7 +168980,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -169660,7 +169660,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 0.1950578459072858,
+      "duration_seconds": 0.20525822788476944,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -170352,7 +170352,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -171032,7 +171032,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 0.20610000379383564,
+      "duration_seconds": 0.2269916799850762,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -171724,7 +171724,7 @@
         },
         "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -171930,7 +171930,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 0.1911431299522519,
+      "duration_seconds": 0.18469420308247209,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172146,7 +172146,7 @@
         },
         "input_digest": "0ab00a6cfc6f76a1d74f0617186a4d5c95d27cb4fd62bd5c535b3b191965369d",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -172410,7 +172410,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 0.1928136378992349,
+      "duration_seconds": 0.20107836206443608,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172684,7 +172684,7 @@
         },
         "input_digest": "c46f13757f77a357bcf860856d78551fd3d0b5a707fc379bb9be724a04e1d219",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -173354,7 +173354,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 0.20458918204531074,
+      "duration_seconds": 0.20415085786953568,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174034,7 +174034,7 @@
         },
         "input_digest": "e0efe74473f286a7ddeb3a4e39d9eb7a2443b69474480e9e4fcf97459672b93b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -174240,7 +174240,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 0.19500821898691356,
+      "duration_seconds": 0.18680671812035143,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174456,7 +174456,7 @@
         },
         "input_digest": "3057fb1181d8b6bde3b0f0c71860dca5701293bcd956920c618e911bce7d0c67",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -174604,7 +174604,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 0.19571567000821233,
+      "duration_seconds": 0.18279441795311868,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174762,7 +174762,7 @@
         },
         "input_digest": "6868775136fad190c5e2fffe0cb05f259b244161572731b86777972b78ea5fb5",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -174910,7 +174910,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 0.19319700193591416,
+      "duration_seconds": 0.18729107710532844,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175068,7 +175068,7 @@
         },
         "input_digest": "515cb2ead81157a5d033173889d2a47af873b49bb750c0fedf91036506520aa2",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -175216,7 +175216,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 0.18348273797892034,
+      "duration_seconds": 0.1859756710473448,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175374,7 +175374,7 @@
         },
         "input_digest": "0e9ac5d663e87ef8d9d42db148ea6b689902b2533884263ccde90d5ba20fc135",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -175986,7 +175986,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 0.31646846095100045,
+      "duration_seconds": 0.30610309494659305,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -176608,7 +176608,7 @@
         },
         "input_digest": "8b4829a04d740fe6087782188f15eb27044961db12acbcb5f5fdd227e83fde41",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -212098,7 +212098,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 0.5051041629631072,
+      "duration_seconds": 0.5112261681351811,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -247600,7 +247600,7 @@
         },
         "input_digest": "dd491bc06ca31652f04962d8927c33330abf1b3bedaf108f9d9b222834fb9c4b",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -247975,7 +247975,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 2.0575591980013996,
+      "duration_seconds": 2.262881443137303,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -248364,7 +248364,7 @@
         },
         "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -248739,7 +248739,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 2.1073191261384636,
+      "duration_seconds": 2.0361781888641417,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249128,7 +249128,7 @@
         },
         "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -249285,7 +249285,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 2.1081440050620586,
+      "duration_seconds": 2.0433920649811625,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249450,7 +249450,7 @@
         },
         "input_digest": "c35f1e258ae4d0cd8eed9125a530bea473632a5bb3f4558583c0818700906e96",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -249607,7 +249607,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 1.9919104760047048,
+      "duration_seconds": 2.0167545839212835,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249772,7 +249772,7 @@
         },
         "input_digest": "9f43427f7ad70fc963aeec58cf8867b5646e88bd608ec489964f802a2c98a57d",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -250157,7 +250157,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 2.0461016981862485,
+      "duration_seconds": 2.077527143061161,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -250550,7 +250550,7 @@
         },
         "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -250935,7 +250935,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 2.044092816999182,
+      "duration_seconds": 2.0570383958984166,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -251328,7 +251328,7 @@
         },
         "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -251703,7 +251703,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 2.0859753768891096,
+      "duration_seconds": 2.1204512647818774,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252092,7 +252092,7 @@
         },
         "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -252467,7 +252467,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 2.0675931749865413,
+      "duration_seconds": 2.0525962188839912,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252856,7 +252856,7 @@
         },
         "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -253060,7 +253060,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 2.194376523140818,
+      "duration_seconds": 2.066368675092235,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -253278,7 +253278,7 @@
         },
         "input_digest": "de6e2060eccdf8f068669911169eb7a3d28af0622a7a840f637acb82db930a7e",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -253308,7 +253308,7 @@
     {
       "comparison": null,
       "detail": "Scenario explicitly excludes this framework",
-      "duration_seconds": 4.029134288430214e-06,
+      "duration_seconds": 3.6580022424459457e-06,
       "framework": "zipline",
       "framework_result": null,
       "ml4t_result": null,
@@ -253667,7 +253667,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 2.1975450550671667,
+      "duration_seconds": 2.0734922022093087,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254056,7 +254056,7 @@
         },
         "input_digest": "517a65764277b104abf7848a9875d5f09febfddffb82d8fd9318f724ff1aaa86",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -254260,7 +254260,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 2.162331265863031,
+      "duration_seconds": 2.1155651970766485,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254478,7 +254478,7 @@
         },
         "input_digest": "b211286d7dde78c905f246c3d56fb3c84b7f7de3c5f4a124c6b33680c37aa37d",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -254625,7 +254625,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 2.2323906030505896,
+      "duration_seconds": 2.061369979986921,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254786,7 +254786,7 @@
         },
         "input_digest": "79590cf03ef0f3e90985c032e8f555ecdf9add3fc21908924a49e7d706b5f041",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -254933,7 +254933,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 2.15216267388314,
+      "duration_seconds": 2.0505735501646996,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255094,7 +255094,7 @@
         },
         "input_digest": "939287c002cf7b640b21c5859335249e1db1400c7d94dd37f62a7f078ba31fad",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -255241,7 +255241,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 2.19005371700041,
+      "duration_seconds": 2.122095908038318,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255402,7 +255402,7 @@
         },
         "input_digest": "935e7e58b70b2ff5c2181016ceae955c9aa4986a9e1d7653b63043d3be82a524",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -255777,7 +255777,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 2.576013322919607,
+      "duration_seconds": 2.5553077140357345,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -256166,7 +256166,7 @@
         },
         "input_digest": "fc4132bd3907c4367265ff478960830680f88ab7df440ad0ec317ff5136c039c",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
@@ -275465,7 +275465,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 2.777995100012049,
+      "duration_seconds": 3.027164909057319,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -294778,7 +294778,7 @@
         },
         "input_digest": "d8119bff0157cd31258a444fec247040af62a78f46aff8b484ad1b9ef8915516",
         "ml4t": {
-          "commit": "ef0d052cc45e041a3bc503256412f892a99bb2cb",
+          "commit": "127893dc58ed2857706a3802798b07fd1a46a48c",
           "dirty": false
         },
         "python": {
