@@ -532,7 +532,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "e1bf3602b5fba83c1ada88675fed86e0e0c4afe8",
+        "commit": "ad62d2bd30f9e3a25a9a205ae60df6b0309ca89a",
         "dirty": false
       },
       "python": {
@@ -540,14 +540,14 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 62.88472085003741,
-        "ml4t": 85.68690094188787,
+        "framework": 67.83662832411937,
+        "ml4t": 122.52686988189816,
         "not_a_performance_claim": true
       },
       "source_digests": {
         "benchmark_suite": "dcafa42216566ff5e83ae0788d53d9789c2b7980956ea656c874684730b40523",
         "framework_manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
-        "large_scale_runner": "d9112b55aa719dd119b822f76ba73e053a24ea95a55c848269ddb3bd727b5b43",
+        "large_scale_runner": "31620bd2b07466f733a6060676707e664881e7b6d4c3ea3f09d8f47354e86706",
         "profiles": "5a8cd8b2568e7e9f524e96fef6bb00ade3310a6f4a71c0c4f7de2f95bbfdb505"
       },
       "target": {
@@ -1098,7 +1098,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "e1bf3602b5fba83c1ada88675fed86e0e0c4afe8",
+        "commit": "ad62d2bd30f9e3a25a9a205ae60df6b0309ca89a",
         "dirty": false
       },
       "python": {
@@ -1106,14 +1106,14 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 41.441031792899594,
-        "ml4t": 84.64774281391874,
+        "framework": 72.04599663615227,
+        "ml4t": 185.34229934494942,
         "not_a_performance_claim": true
       },
       "source_digests": {
         "benchmark_suite": "dcafa42216566ff5e83ae0788d53d9789c2b7980956ea656c874684730b40523",
         "framework_manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
-        "large_scale_runner": "d9112b55aa719dd119b822f76ba73e053a24ea95a55c848269ddb3bd727b5b43",
+        "large_scale_runner": "31620bd2b07466f733a6060676707e664881e7b6d4c3ea3f09d8f47354e86706",
         "profiles": "5a8cd8b2568e7e9f524e96fef6bb00ade3310a6f4a71c0c4f7de2f95bbfdb505"
       },
       "target": {
@@ -1321,22 +1321,22 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "e1bf3602b5fba83c1ada88675fed86e0e0c4afe8",
+        "commit": "ad62d2bd30f9e3a25a9a205ae60df6b0309ca89a",
         "dirty": false
       },
       "python": {
         "implementation": "cpython",
-        "version": "3.11.13"
+        "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 729.4739102870226,
-        "ml4t": 145.95089966920204,
+        "framework": 588.8566795079969,
+        "ml4t": 177.4460704110097,
         "not_a_performance_claim": true
       },
       "source_digests": {
         "benchmark_suite": "dcafa42216566ff5e83ae0788d53d9789c2b7980956ea656c874684730b40523",
         "framework_manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
-        "large_scale_runner": "d9112b55aa719dd119b822f76ba73e053a24ea95a55c848269ddb3bd727b5b43",
+        "large_scale_runner": "31620bd2b07466f733a6060676707e664881e7b6d4c3ea3f09d8f47354e86706",
         "profiles": "5a8cd8b2568e7e9f524e96fef6bb00ade3310a6f4a71c0c4f7de2f95bbfdb505"
       },
       "target": {
@@ -1561,22 +1561,22 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "e1bf3602b5fba83c1ada88675fed86e0e0c4afe8",
+        "commit": "ad62d2bd30f9e3a25a9a205ae60df6b0309ca89a",
         "dirty": false
       },
       "python": {
         "implementation": "cpython",
-        "version": "3.11.13"
+        "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 297.3190433611162,
-        "ml4t": 132.85931095900014,
+        "framework": 313.67492819414474,
+        "ml4t": 109.66853755200282,
         "not_a_performance_claim": true
       },
       "source_digests": {
         "benchmark_suite": "dcafa42216566ff5e83ae0788d53d9789c2b7980956ea656c874684730b40523",
         "framework_manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
-        "large_scale_runner": "d9112b55aa719dd119b822f76ba73e053a24ea95a55c848269ddb3bd727b5b43",
+        "large_scale_runner": "31620bd2b07466f733a6060676707e664881e7b6d4c3ea3f09d8f47354e86706",
         "profiles": "5a8cd8b2568e7e9f524e96fef6bb00ade3310a6f4a71c0c4f7de2f95bbfdb505"
       },
       "target": {
@@ -1766,7 +1766,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "e1bf3602b5fba83c1ada88675fed86e0e0c4afe8",
+        "commit": "ad62d2bd30f9e3a25a9a205ae60df6b0309ca89a",
         "dirty": false
       },
       "python": {
@@ -1774,14 +1774,14 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 137.2150160910096,
-        "ml4t": 195.11730115604587,
+        "framework": 170.06328585091978,
+        "ml4t": 229.72061479417607,
         "not_a_performance_claim": true
       },
       "source_digests": {
         "benchmark_suite": "dcafa42216566ff5e83ae0788d53d9789c2b7980956ea656c874684730b40523",
         "framework_manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
-        "large_scale_runner": "d9112b55aa719dd119b822f76ba73e053a24ea95a55c848269ddb3bd727b5b43",
+        "large_scale_runner": "31620bd2b07466f733a6060676707e664881e7b6d4c3ea3f09d8f47354e86706",
         "profiles": "5a8cd8b2568e7e9f524e96fef6bb00ade3310a6f4a71c0c4f7de2f95bbfdb505"
       },
       "target": {
@@ -1803,7 +1803,7 @@
       }
     }
   ],
-  "generated_at": "2026-08-14T11:35:28.393203+00:00",
+  "generated_at": "2026-08-14T13:16:45.765518+00:00",
   "release_gate_passed": true,
   "schema_version": 1,
   "workload": {
