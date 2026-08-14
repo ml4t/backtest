@@ -86,16 +86,37 @@ def input_digest(
     entries: np.ndarray,
     exits: np.ndarray | None,
 ) -> str:
-    """Hash generated prices and signals without depending on display formatting."""
+    """Hash generated prices and signals independently of pandas hashing internals."""
+    if not isinstance(prices.index, pd.DatetimeIndex):
+        raise TypeError("validation prices must use a DatetimeIndex")
+
     digest = hashlib.sha256()
     frame_identity = {
         "columns": [str(column) for column in prices.columns],
         "dtypes": [str(dtype) for dtype in prices.dtypes],
-        "index_dtype": str(prices.index.dtype),
+        "index": {
+            "dtype": "datetime64[ns]",
+            "name": prices.index.name,
+            "timezone": str(prices.index.tz) if prices.index.tz is not None else None,
+        },
         "shape": prices.shape,
     }
     digest.update(json.dumps(frame_identity, sort_keys=True).encode("utf-8"))
-    digest.update(pd.util.hash_pandas_object(prices, index=True).values.tobytes())
+    normalized_index = (
+        prices.index.tz_convert("UTC").tz_localize(None)
+        if prices.index.tz is not None
+        else prices.index
+    )
+    index_values = np.ascontiguousarray(
+        normalized_index.to_numpy(dtype="datetime64[ns]").view("<i8")
+    )
+    digest.update(index_values.tobytes())
+    for column in prices.columns:
+        values = np.ascontiguousarray(prices[column].to_numpy())
+        digest.update(str(column).encode("utf-8"))
+        digest.update(values.dtype.str.encode("utf-8"))
+        digest.update(str(values.shape).encode("utf-8"))
+        digest.update(values.tobytes())
     for name, values in (("entries", entries), ("exits", exits)):
         digest.update(name.encode("utf-8"))
         if values is None:

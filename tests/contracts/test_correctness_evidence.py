@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
+import pandas as pd
 import pytest
 
 _VALIDATION_DIR = Path(__file__).parents[2] / "validation"
@@ -139,6 +140,22 @@ def test_complete_record_retains_outputs_checks_runtime_and_provenance() -> None
         {"name", "canonical_quantum", "expected", "actual", "difference", "message"} <= check.keys()
         for check in checks
     )
+
+
+def test_input_digest_uses_values_not_pandas_index_metadata() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    assert exits is not None
+    expected = input_digest(prices, entries, exits)
+
+    same_values = prices.copy()
+    same_values.index = pd.DatetimeIndex(same_values.index.to_numpy())
+    assert same_values.index.freq is None
+    assert input_digest(same_values, entries.copy(), exits.copy()) == expected
+
+    changed_values = prices.copy()
+    changed_values.iloc[0, 0] += 0.01
+    assert input_digest(changed_values, entries, exits) != expected
 
 
 def test_complete_current_matrix_is_acceptable() -> None:
