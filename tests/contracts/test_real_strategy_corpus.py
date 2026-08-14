@@ -134,3 +134,33 @@ def test_case_record_detects_prediction_mismatch(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="does not name selected prediction"):
         module.build_case_record(case, lineage, artifact_root=artifact_root)
+
+
+def test_content_addressed_bundle_is_reused_and_mutations_change_identity(tmp_path: Path) -> None:
+    module = _load_module()
+    market = pl.DataFrame(
+        {
+            "timestamp": ["2024-01-01", "2024-01-02"],
+            "symbol": ["SPY", "SPY"],
+            "open": [100.0, 101.0],
+            "close": [101.0, 102.0],
+        }
+    )
+    targets = pl.DataFrame({"timestamp": ["2024-01-01"], "symbol": ["SPY"], "weight": [1.0]})
+    kwargs = {
+        "case_id": "etfs",
+        "selection": {"val_backtest_hash": "a" * 12},
+        "source_prediction_sha256": "b" * 64,
+        "spec": {"strategy": {"rebalance": {"mode": "engine"}}},
+        "market": market,
+        "targets": targets,
+        "output_root": tmp_path,
+    }
+
+    first = module.write_bundle(**kwargs)
+    second = module.write_bundle(**kwargs)
+    changed = module.write_bundle(**{**kwargs, "targets": targets.with_columns(weight=0.5)})
+
+    assert first == second
+    assert first["bundle_sha256"] != changed["bundle_sha256"]
+    assert (tmp_path / "etfs" / first["bundle_sha256"] / "manifest.json").is_file()

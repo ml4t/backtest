@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import enum
+import gc
 import hashlib
 import importlib
 import json
@@ -65,6 +68,10 @@ def load_case_contract(path: Path = DEFAULT_CASES_PATH) -> list[dict[str, Any]]:
         "asset_class",
         "production_path",
         "required_backtest_artifacts",
+        "warmup",
+        "timestamp_shift_hours",
+        "contract_specs",
+        "funding",
     }
     case_ids: list[str] = []
     for index, case in enumerate(cases):
@@ -237,6 +244,234 @@ def write_report(report: Mapping[str, object], output: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _json_value(value: object) -> object:
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {key: _json_value(item) for key, item in dataclasses.asdict(value).items()}
+    if isinstance(value, enum.Enum):
+        return value.value
+    if isinstance(value, Mapping):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_value(item) for item in value]
+    return value
+
+
+def _sanitize_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
+    sanitized = json.loads(json.dumps(spec, default=str))
+    sanitized.pop("_runtime_backtest_config", None)
+    metadata = sanitized.get("backtest_config", {}).get("metadata", {})
+    metadata.pop("preset_path", None)
+    return sanitized
+
+
+def _frame_identity(frame: pl.DataFrame) -> dict[str, object]:
+    return {
+        "rows": frame.height,
+        "schema": {name: str(dtype) for name, dtype in frame.schema.items()},
+    }
+
+
+def _bundle_digest(
+    *,
+    selection: Mapping[str, Any],
+    source_prediction_sha256: str,
+    spec: Mapping[str, Any],
+    frames: Mapping[str, pl.DataFrame],
+    contracts: Mapping[str, object] | None,
+) -> str:
+    digest = hashlib.sha256()
+    metadata = {
+        "selection": selection,
+        "source_prediction_sha256": source_prediction_sha256,
+        "spec": spec,
+        "contracts": contracts,
+    }
+    digest.update(json.dumps(metadata, sort_keys=True, separators=(",", ":"), default=str).encode())
+    for name, frame in sorted(frames.items()):
+        digest.update(name.encode())
+        digest.update(frame.serialize(format="binary"))
+    return digest.hexdigest()
+
+
+def write_bundle(
+    *,
+    case_id: str,
+    selection: Mapping[str, Any],
+    source_prediction_sha256: str,
+    spec: Mapping[str, Any],
+    market: pl.DataFrame,
+    targets: pl.DataFrame,
+    output_root: Path,
+    funding: pl.DataFrame | None = None,
+    contracts: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Write one content-addressed engine-input bundle and return its manifest."""
+    frames = {"market.parquet": market, "targets.parquet": targets}
+    if funding is not None:
+        frames["funding.parquet"] = funding
+    normalized_contracts = cast(Mapping[str, object] | None, _json_value(contracts))
+    sanitized_spec = _sanitize_spec(spec)
+    digest = _bundle_digest(
+        selection=selection,
+        source_prediction_sha256=source_prediction_sha256,
+        spec=sanitized_spec,
+        frames=frames,
+        contracts=normalized_contracts,
+    )
+    destination = output_root / case_id / digest
+    manifest: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "case_study": case_id,
+        "bundle_sha256": digest,
+        "selection": dict(selection),
+        "source_prediction_sha256": source_prediction_sha256,
+        "files": {},
+    }
+    if destination.is_dir():
+        retained = json.loads((destination / "manifest.json").read_text(encoding="utf-8"))
+        if retained.get("bundle_sha256") != digest:
+            raise ValueError(f"Retained {case_id} bundle has the wrong identity")
+        return retained
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{case_id}.", dir=destination.parent))
+    try:
+        for name, frame in frames.items():
+            frame.write_parquet(staging / name, compression="zstd", statistics=True)
+        (staging / "spec.json").write_text(
+            json.dumps(sanitized_spec, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        if normalized_contracts is not None:
+            (staging / "contracts.json").write_text(
+                json.dumps(normalized_contracts, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        files = {
+            path.name: _artifact_identity(path)
+            for path in sorted(staging.iterdir())
+            if path.name != "manifest.json"
+        }
+        manifest["files"] = files
+        (staging / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True, default=str) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(staging, destination)
+    finally:
+        if staging.exists():
+            for path in staging.iterdir():
+                path.unlink()
+            staging.rmdir()
+    return manifest
+
+
+def materialize_bundles(
+    *,
+    corpus_report: Mapping[str, object],
+    artifact_root: Path,
+    output_root: Path,
+) -> dict[str, object]:
+    """Precompute engine inputs for every selected production strategy."""
+    loaders = importlib.import_module("case_studies.utils.backtest_loaders")
+    runner = importlib.import_module("case_studies.utils.backtest_runner")
+    registry = importlib.import_module("case_studies.utils.registry")
+    cv_window = importlib.import_module("case_studies.utils.cv_window")
+    contract_by_id = {case["id"]: case for case in load_case_contract()}
+    records = cast(list[dict[str, Any]], corpus_report["records"])
+    manifests: list[dict[str, object]] = []
+    for record in records:
+        case_id = str(record["case_study"])
+        print(f"Preparing {case_id}", flush=True)
+        contract = contract_by_id[case_id]
+        selection = cast(dict[str, Any], record["selection"])
+        label = str(selection["label"])
+        prediction_hash = str(selection["val_prediction_hash"])
+        backtest_hash = str(selection["val_backtest_hash"])
+        spec_path = (
+            artifact_root
+            / "case_studies"
+            / case_id
+            / "run_log"
+            / "backtest"
+            / backtest_hash
+            / "spec.json"
+        )
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        warmup = int(loaders.warmup_periods_for(case_id)) if contract["warmup"] else 0
+        market = loaders.load_backtest_prices_for(
+            case_id,
+            label,
+            split="validation",
+            warmup_periods=warmup,
+            max_symbols=0,
+        )
+        predictions = registry.read_predictions(case_id, prediction_hash)
+        shift_hours = int(contract["timestamp_shift_hours"])
+        if shift_hours:
+            window = cv_window.canonical_window(case_id, label, split="validation")
+            if window is None:
+                raise ValueError(f"{case_id} lacks a canonical validation window")
+            validation_end = window[1]
+            market = market.with_columns(
+                pl.col("timestamp") + pl.duration(hours=shift_hours)
+            ).filter(pl.col("timestamp").dt.date() <= validation_end)
+            predictions = predictions.with_columns(
+                pl.col("timestamp") + pl.duration(hours=shift_hours)
+            ).filter(pl.col("timestamp").dt.date() <= validation_end)
+        targets = runner.precompute_weights(
+            predictions,
+            spec,
+            market,
+            label=label,
+            case_study=case_id,
+            prediction_hash=prediction_hash,
+        ).sort("timestamp", "symbol")
+        market = market.sort("timestamp", "symbol")
+        funding = None
+        if contract["funding"]:
+            funding_module = importlib.import_module(
+                "case_studies.crypto_perps_funding.funding_data"
+            )
+            funding = (
+                funding_module.load_funding_rates(symbols=market["symbol"].unique().to_list())
+                .with_columns(pl.col("timestamp").cast(market.schema["timestamp"]))
+                .filter(
+                    (pl.col("timestamp") >= market["timestamp"].min())
+                    & (pl.col("timestamp") <= market["timestamp"].max())
+                )
+                .sort("timestamp", "symbol")
+            )
+        contracts = None
+        if contract["contract_specs"]:
+            contracts = loaders.load_contract_specs_from_yaml()
+        prediction_identity = cast(dict[str, Any], record["inputs"])["predictions.parquet"]
+        bundle = write_bundle(
+            case_id=case_id,
+            selection=selection,
+            source_prediction_sha256=str(prediction_identity["sha256"]),
+            spec=spec,
+            market=market,
+            targets=targets,
+            output_root=output_root,
+            funding=funding,
+            contracts=contracts,
+        )
+        manifests.append(bundle)
+        print(
+            f"Prepared {case_id}: {market.height:,} market rows, "
+            f"{targets.height:,} targets, {str(bundle['bundle_sha256'])[:12]}",
+            flush=True,
+        )
+        del market, predictions, targets, funding
+        gc.collect()
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "bundle_root": {"retained_absolute_path": False},
+        "records": manifests,
+    }
+
+
 def _load_public_resolver(public_root: Path) -> Callable[[str], Mapping[str, Any]]:
     sys.path.insert(0, str(public_root))
     os.chdir(public_root)
@@ -253,6 +488,7 @@ def main() -> int:
         type=Path,
         default=VALIDATION_DIR / "candidates" / "REAL_STRATEGY_CORPUS.candidate.json",
     )
+    parser.add_argument("--materialize", type=Path)
     args = parser.parse_args()
     public_root = args.public_root.resolve()
     artifact_root = args.artifact_root.resolve()
@@ -263,6 +499,16 @@ def main() -> int:
         resolver=resolver,
     )
     write_report(report, args.output)
+    if args.materialize is not None:
+        bundle_report = materialize_bundles(
+            corpus_report=report,
+            artifact_root=artifact_root,
+            output_root=args.materialize.resolve(),
+        )
+        bundle_output = args.output.with_name("REAL_STRATEGY_INPUTS.candidate.json")
+        write_report(bundle_report, bundle_output)
+        bundle_records = cast(list[dict[str, object]], bundle_report["records"])
+        print(f"Materialized {len(bundle_records)} engine input bundles")
     summary = cast(Mapping[str, object], report["summary"])
     print(f"Inventoried {summary['case_studies']} current case studies to {args.output}")
     return 0
