@@ -68,6 +68,7 @@ def _run_framework_pair(framework: str, runner_name: str, artifact_dir: Path):
         framework_result,
         ml4t_result,
         initial_cash=config.initial_cash,
+        timestamp_domain="session_date",
     )
     artifact_path = artifact_dir / f"{framework}-exact-comparison.json"
     suite.write_exact_comparison_artifact(artifact, artifact_path)

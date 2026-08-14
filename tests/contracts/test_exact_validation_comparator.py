@@ -290,6 +290,63 @@ def test_fixed_point_zero_fill_and_trade_records_are_omitted() -> None:
     assert suite.canonical_trade_records(dust_trade) == []
 
 
+def test_daily_records_normalize_framework_session_timestamp_and_asset_wrapper() -> None:
+    suite = _load_benchmark_suite()
+    frame = pd.DataFrame(
+        [
+            {
+                "dt": pd.Timestamp("2024-01-02 21:00:00", tz="UTC"),
+                "asset": "Equity(1 [AAPL])",
+                "amount": 10.0,
+                "price": 100.0,
+                "commission": 0.0,
+            }
+        ]
+    )
+
+    records = suite.canonical_fill_records(frame, timestamp_domain="session_date")
+
+    assert records == [
+        {
+            "timestamp": "2024-01-02",
+            "asset": "AAPL",
+            "side": "buy",
+            "quantity": 10.0,
+            "price": 100.0,
+            "commission": 0.0,
+        }
+    ]
+
+
+def test_target_trace_excludes_unchanged_targets() -> None:
+    suite = _load_benchmark_suite()
+    index = pd.date_range("2024-01-02", periods=3, freq="D")
+    targets = pd.DataFrame({"AAPL": [10.0, 10.0, 0.0], "MSFT": [0.0, 5.0, 5.0]}, index=index)
+
+    trace = suite.build_canonical_target_trace(targets)
+
+    assert trace[["timestamp", "asset", "prev_target", "target"]].to_dict("records") == [
+        {
+            "timestamp": index[0],
+            "asset": "AAPL",
+            "prev_target": 0.0,
+            "target": 10.0,
+        },
+        {
+            "timestamp": index[1],
+            "asset": "MSFT",
+            "prev_target": 0.0,
+            "target": 5.0,
+        },
+        {
+            "timestamp": index[2],
+            "asset": "AAPL",
+            "prev_target": 10.0,
+            "target": 0.0,
+        },
+    ]
+
+
 def test_terminal_value_uses_exact_microdollar_representation() -> None:
     suite = _load_benchmark_suite()
     expected = _benchmark_result(suite, "Reference")

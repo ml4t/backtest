@@ -61,6 +61,9 @@ from ml4t.backtest._validation.backtrader_runner import load_backtrader_package 
 from ml4t.backtest._validation.backtrader_runner import (  # noqa: E402
     run_backtrader_target_shares as shared_run_backtrader_target_shares,
 )
+from ml4t.backtest._validation.backtrader_runner import (  # noqa: E402
+    transactions_to_trade_log as reconstruct_closed_trades,
+)
 from ml4t.backtest._validation.lean_runner import (  # noqa: E402
     build_sequential_ticker_map,
     check_lean_cli,
@@ -226,6 +229,7 @@ class BenchmarkConfig:
     lean_security_leverage: float | None = None
     lean_force_zero_fee: bool | None = None
     lean_force_zero_slippage: bool | None = None
+    end_session: str = "2025-12-31"
 
     @property
     def data_points(self) -> int:
@@ -447,7 +451,7 @@ def generate_benchmark_data(config: BenchmarkConfig, seed: int = 42) -> tuple:
                     current += timedelta(days=1)
         dates = pd.DatetimeIndex(dates)
     else:
-        dates = _get_trailing_nyse_sessions(config.n_bars)
+        dates = _get_trailing_nyse_sessions(config.n_bars, end_date=config.end_session)
         if len(dates) < config.n_bars:
             raise ValueError(
                 f"Requested {config.n_bars} bars, but only {len(dates)} NYSE sessions are available"
@@ -706,9 +710,9 @@ def build_canonical_target_trace(target_shares: pd.DataFrame) -> pd.DataFrame:
     delta = target_shares - prev
     changed = delta != 0.0
 
-    trace_targets = target_shares.where(changed).stack()
-    trace_prev = prev.where(changed).stack()
-    trace_delta = delta.where(changed).stack()
+    trace_targets = target_shares.where(changed).stack().dropna()
+    trace_prev = prev.where(changed).stack().dropna()
+    trace_delta = delta.where(changed).stack().dropna()
 
     if len(trace_targets) == 0:
         return pd.DataFrame(
@@ -792,13 +796,27 @@ class BenchmarkResult:
         }
 
 
-def _timestamp_value(value: object) -> str | None:
+def _timestamp_value(value: object, timestamp_domain: str = "timestamp") -> str | None:
     if value is None or pd.isna(value):
         return None
     timestamp = pd.Timestamp(value)
     if timestamp.tz is not None:
         timestamp = timestamp.tz_convert("UTC").tz_localize(None)
+    if timestamp_domain == "session_date":
+        return timestamp.date().isoformat()
+    if timestamp_domain != "timestamp":
+        raise ValueError(f"Unknown timestamp domain: {timestamp_domain}")
     return timestamp.isoformat()
+
+
+def _asset_value(value: object) -> str:
+    symbol = getattr(value, "symbol", None)
+    if isinstance(symbol, str) and symbol:
+        return symbol
+    text = str(value)
+    if " [" in text and text.endswith("])"):
+        return text.rsplit(" [", 1)[1][:-2]
+    return text
 
 
 def _canonical_float(value: object, quantum: Decimal = CANONICAL_QUANTUM) -> float:
@@ -831,7 +849,11 @@ def _frame_with_index(frame: pd.DataFrame) -> pd.DataFrame:
     return work
 
 
-def canonical_fill_records(frame: pd.DataFrame | None) -> list[dict[str, object]] | None:
+def canonical_fill_records(
+    frame: pd.DataFrame | None,
+    *,
+    timestamp_domain: str = "timestamp",
+) -> list[dict[str, object]] | None:
     """Normalize a framework fill log without applying numeric tolerances."""
     if frame is None:
         return None
@@ -846,9 +868,10 @@ def canonical_fill_records(frame: pd.DataFrame | None) -> list[dict[str, object]
         records.append(
             {
                 "timestamp": _timestamp_value(
-                    _row_value(row, ("timestamp", "dt", "date", "index", "filled_at"))
+                    _row_value(row, ("timestamp", "dt", "date", "index", "filled_at")),
+                    timestamp_domain,
                 ),
-                "asset": str(
+                "asset": _asset_value(
                     _row_value(row, ("asset", "symbol", "instrument_id", "sid"), "unknown")
                 ),
                 "side": _side_value(_row_value(row, ("side", "order_side"), ""), signed_quantity),
@@ -859,10 +882,37 @@ def canonical_fill_records(frame: pd.DataFrame | None) -> list[dict[str, object]
                 ),
             }
         )
-    return records
+    return sorted(
+        records,
+        key=lambda record: (
+            record["timestamp"] or "",
+            record["asset"],
+            record["side"],
+            record["quantity"],
+            record["price"],
+        ),
+    )
 
 
-def canonical_trade_records(frame: pd.DataFrame | None) -> list[dict[str, object]] | None:
+def closed_trades_from_fills(frame: pd.DataFrame | None) -> pd.DataFrame | None:
+    """Reconstruct fill-backed closed round trips on a framework-neutral ledger."""
+    records = canonical_fill_records(frame)
+    if not records:
+        return None
+    transactions = pd.DataFrame(records)
+    transactions["amount"] = transactions["quantity"].where(
+        transactions["side"] == "buy", -transactions["quantity"]
+    )
+    transactions["symbol"] = transactions["asset"]
+    transactions = transactions.set_index("timestamp")
+    return reconstruct_closed_trades(transactions[["amount", "price", "symbol"]])
+
+
+def canonical_trade_records(
+    frame: pd.DataFrame | None,
+    *,
+    timestamp_domain: str = "timestamp",
+) -> list[dict[str, object]] | None:
     """Normalize a framework round-trip trade log without applying numeric tolerances."""
     if frame is None:
         return None
@@ -880,10 +930,15 @@ def canonical_trade_records(frame: pd.DataFrame | None) -> list[dict[str, object
         records.append(
             {
                 "entry_time": _timestamp_value(
-                    _row_value(row, ("entry_time", "entry_date", "timestamp", "index"))
+                    _row_value(row, ("entry_time", "entry_date", "timestamp", "index")),
+                    timestamp_domain,
                 ),
-                "exit_time": _timestamp_value(_row_value(row, ("exit_time", "exit_date"))),
-                "asset": str(_row_value(row, ("asset", "symbol", "instrument_id"), "unknown")),
+                "exit_time": _timestamp_value(
+                    _row_value(row, ("exit_time", "exit_date")), timestamp_domain
+                ),
+                "asset": _asset_value(
+                    _row_value(row, ("asset", "symbol", "instrument_id"), "unknown")
+                ),
                 "side": side,
                 "quantity": _canonical_float(abs(quantity)),
                 "entry_price": _canonical_float(_row_value(row, ("entry_price",), 0.0)),
@@ -981,6 +1036,7 @@ def compare_benchmark_results_exact(
     actual: BenchmarkResult,
     *,
     initial_cash: float,
+    timestamp_domain: str = "timestamp",
 ) -> dict[str, object]:
     """Compare every release-covered benchmark surface using exact equality."""
     checks = [
@@ -991,13 +1047,13 @@ def compare_benchmark_results_exact(
         ),
         _surface_check(
             "fills",
-            canonical_fill_records(expected.fills_df),
-            canonical_fill_records(actual.fills_df),
+            canonical_fill_records(expected.fills_df, timestamp_domain=timestamp_domain),
+            canonical_fill_records(actual.fills_df, timestamp_domain=timestamp_domain),
         ),
         _surface_check(
             "trades",
-            canonical_trade_records(expected.trades_df),
-            canonical_trade_records(actual.trades_df),
+            canonical_trade_records(expected.trades_df, timestamp_domain=timestamp_domain),
+            canonical_trade_records(actual.trades_df, timestamp_domain=timestamp_domain),
         ),
         _scalar_check("trade_count", expected.num_trades, actual.num_trades),
         _scalar_check(
@@ -1011,6 +1067,7 @@ def compare_benchmark_results_exact(
         "schema_version": 1,
         "canonical_record_quantum": str(CANONICAL_QUANTUM),
         "canonical_money_quantum": str(CANONICAL_MONEY_QUANTUM),
+        "timestamp_domain": timestamp_domain,
         "scenario": expected.scenario,
         "expected_framework": expected.framework,
         "actual_framework": actual.framework,
@@ -1234,7 +1291,13 @@ def benchmark_ml4t(
     # Convert price data to Polars format using vectorized DataFrame ops.
     price_frames: list[pd.DataFrame] = []
     for asset_name, df in price_data.items():
-        asset_frame = df.reset_index()
+        source_frame = df.copy()
+        if profile_name in {"zipline_strict", "lean"}:
+            decimals = 3 if profile_name == "zipline_strict" else 4
+            source_frame.loc[:, ["open", "high", "low", "close"]] = source_frame[
+                ["open", "high", "low", "close"]
+            ].round(decimals)
+        asset_frame = source_frame.reset_index()
         index_col = asset_frame.columns[0]
         asset_frame = asset_frame.rename(columns={index_col: "timestamp"})
         asset_frame["asset"] = asset_name
@@ -1422,19 +1485,8 @@ def benchmark_ml4t(
     fills_pl = results.to_fills_dataframe()
     fills_df = pd.DataFrame(fills_pl.to_dict(as_series=False))
     trades_df = None
-    if profile_name == "lean":
-        if not fills_df.empty:
-            trades_df = fills_df.rename(
-                columns={
-                    "price": "fill_price",
-                    "commission": "fee",
-                }
-            )
-            if "quantity" in trades_df.columns:
-                trades_df["quantity"] = trades_df["quantity"].abs()
-            if "side" in trades_df.columns:
-                trades_df["side"] = trades_df["side"].astype(str).str.lower()
-            trades_df = trades_df.sort_values(["timestamp", "order_id"]).reset_index(drop=True)
+    if profile_name in {"backtrader_strict", "zipline_strict", "lean"}:
+        trades_df = closed_trades_from_fills(fills_df)
     elif results.get("trades"):
         trade_records = []
         for t in results["trades"]:
@@ -2170,6 +2222,13 @@ def benchmark_lean(
 
     first_date = pd.Timestamp(dates[0]).date()
     last_date = pd.Timestamp(dates[-1]).date()
+    following_sessions = _get_nyse_sessions(
+        pd.Timestamp(last_date) + pd.Timedelta(days=1),
+        pd.Timestamp(last_date) + pd.Timedelta(days=10),
+    )
+    if len(following_sessions) == 0:
+        raise RuntimeError(f"Could not resolve the LEAN settlement session after {last_date}")
+    lean_end_date = pd.Timestamp(following_sessions[0]).date()
     main_code = f"""# region imports
 from AlgorithmImports import *
 # endregion
@@ -2181,7 +2240,7 @@ from pathlib import Path
 class Ml4tBenchmark(QCAlgorithm):
     def initialize(self):
         self.set_start_date({first_date.year}, {first_date.month}, {first_date.day})
-        self.set_end_date({last_date.year}, {last_date.month}, {last_date.day})
+        self.set_end_date({lean_end_date.year}, {lean_end_date.month}, {lean_end_date.day})
         self.set_cash({float(config.initial_cash)})
         {lean_account_stmt}
         self._targets = {{}}
@@ -2393,14 +2452,9 @@ class Ml4tBenchmark(QCAlgorithm):
             target_trace_df=target_trace,
         )
 
-    # Report the decoded fill count as num_trades for an apples-to-apples
-    # cross-engine comparison. load_lean_artifacts prefers LEAN's
-    # tradeStatistics.totalNumberOfTrades, which counts closed round-trip
-    # trades, whereas every other engine in this suite reports individual
-    # fills via len(trades_df). Using fills here keeps the parity surface
-    # consistent (LEAN fills == ml4t fills on the canonical benchmark).
-    if trades_df is not None:
-        num_trades = int(len(trades_df))
+    fills_df = trades_df
+    trades_df = closed_trades_from_fills(fills_df)
+    num_trades = 0 if trades_df is None else len(trades_df)
 
     return BenchmarkResult(
         framework="LEAN CLI",
@@ -2409,7 +2463,7 @@ class Ml4tBenchmark(QCAlgorithm):
         num_trades=num_trades,
         final_value=final_value,
         memory_mb=0.0,
-        fills_df=trades_df,
+        fills_df=fills_df,
         trades_df=trades_df,
         equity_df=equity_df,
         order_events_df=order_events_df,
