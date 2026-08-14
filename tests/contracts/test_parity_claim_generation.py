@@ -16,12 +16,18 @@ import generate_parity_claims  # noqa: E402
 
 
 def test_legacy_accepted_evidence_cannot_generate_current_claims() -> None:
-    before = {path: path.read_bytes() for path in generate_parity_claims.TARGETS}
+    correctness = copy.deepcopy(
+        generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
+    )
+    large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    correctness["schema_version"] = 1
 
     with pytest.raises(ValueError, match="Unsupported correctness schema: 1"):
-        generate_parity_claims.synchronize(check=False)
+        generate_parity_claims._validate_evidence(correctness, large_scale)
 
-    assert {path: path.read_bytes() for path in generate_parity_claims.TARGETS} == before
+
+def test_generated_claims_are_current() -> None:
+    assert generate_parity_claims.synchronize(check=True) == []
 
 
 def test_every_claim_target_uses_the_same_generated_block() -> None:
