@@ -105,6 +105,7 @@ from ml4t.backtest._validation.zipline_runner import load_zipline_modules  # noq
 from ml4t.backtest._validation.zipline_runner import (  # noqa: E402
     run_zipline_target_shares as shared_run_zipline_target_shares,
 )
+from validation.common.framework_registry import load_framework_manifest  # noqa: E402
 
 _BENCHMARK_LOG_FILE = os.getenv("ML4T_BENCHMARK_LOG_FILE")
 DEFAULT_REAL_DATA_PATH = Path(
@@ -2052,6 +2053,17 @@ def benchmark_lean(
             memory_mb=0,
             error=f"LEAN config not found: {lean_config}",
         )
+    lean_target = load_framework_manifest().targets["lean"]
+    if lean_target.artifact is None:
+        return BenchmarkResult(
+            framework="LEAN CLI",
+            scenario=config.name,
+            runtime_sec=0,
+            num_trades=0,
+            final_value=0,
+            memory_mb=0,
+            error="Frozen LEAN target is missing an engine image",
+        )
 
     try:
         lean_cmd = resolve_lean_command()
@@ -2288,7 +2300,10 @@ class Ml4tBenchmark(QCAlgorithm):
 
     env = make_lean_env()
     try:
-        check_lean_cli(lean_cmd, PROJECT_ROOT, env)
+        observed_cli = check_lean_cli(lean_cmd, PROJECT_ROOT, env)
+        expected_cli = f"lean {lean_target.cli_version}"
+        if observed_cli != expected_cli:
+            raise RuntimeError(f"LEAN CLI differs: {observed_cli} != {expected_cli}")
     except RuntimeError as exc:
         return BenchmarkResult(
             framework="LEAN CLI",
@@ -2340,6 +2355,7 @@ class Ml4tBenchmark(QCAlgorithm):
             project_dir=project_dir,
             lean_config=lean_config,
             output_dir=output_dir,
+            image=lean_target.artifact,
             timeout=1800,
             env=env,
         )

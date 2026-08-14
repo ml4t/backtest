@@ -128,10 +128,12 @@ def test_profiles_enforce_expected_entry_timing_contract() -> None:
     vbt = run_backtest(prices=_prices(), strategy=_BuyOnce(), config="vectorbt")
     bt = run_backtest(prices=_prices(), strategy=_BuyOnce(), config="backtrader")
     zl = run_backtest(prices=_prices(), strategy=_BuyOnce(), config="zipline")
+    lean = run_backtest(prices=_prices(), strategy=_BuyOnce(), config="lean")
 
     assert vbt.trades[0].entry_price == 101.0  # same-bar close
     assert bt.trades[0].entry_price == 110.0  # next-bar open with zero default slippage
     assert zl.trades[0].entry_price == 110.0  # configured next-bar open with zero slippage
+    assert lean.trades[0].entry_price == 110.0  # DefaultBrokerageModel has null slippage
 
 
 def test_vectorbt_profile_drops_signal_order_with_missing_close() -> None:
@@ -198,16 +200,23 @@ def test_profile_registry_has_lean_profile() -> None:
     """LEAN profile must be a core profile, not just a strict variant."""
     cfg = BacktestConfig.from_preset("lean")
     assert cfg.preset_name == "lean"
-    assert cfg.fill_ordering.value == "exit_first"
+    assert cfg.execution_mode.value == "next_bar"
+    assert cfg.execution_price.value == "open"
+    assert cfg.fill_ordering.value == "sequential"
     assert cfg.commission_per_share == 0.005
     assert cfg.commission_minimum == 1.0
+    assert cfg.slippage_type.value == "none"
+    assert cfg.initial_margin == 0.5
+    assert cfg.long_maintenance_margin == 0.5
+    assert cfg.short_maintenance_margin == 0.5
+    assert cfg.rebalance_headroom_pct == 0.9975
 
 
 def test_lean_profile_is_independent_of_backtrader() -> None:
     """LEAN profile must remain distinct from Backtrader on execution semantics."""
     lean = BacktestConfig.from_preset("lean")
     bt = BacktestConfig.from_preset("backtrader")
-    assert lean.fill_ordering.value == "exit_first"
+    assert lean.fill_ordering.value == "sequential"
     assert bt.fill_ordering.value == "fifo"
     assert lean.commission_per_share == 0.005
     assert bt.commission_rate == 0.0

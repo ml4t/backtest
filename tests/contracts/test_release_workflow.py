@@ -206,4 +206,8 @@ def test_private_comparison_workflow_pins_and_retains_evidence() -> None:
     assert "--framework vectorbt_pro" in pro_commands
     lean_commands = "\n".join(step.get("run", "") for step in jobs["lean"]["steps"])
     assert "--framework lean" in lean_commands
+    assert "validation/native/lean_behavior.py" in lean_commands
+    assert "validation/run_lean_case_studies.py" in lean_commands
+    assert "lean-native.json" in str(jobs["lean"])
+    assert "lean-case-studies.json" in str(jobs["lean"])
     assert "run_all_correctness.py" not in lean_commands

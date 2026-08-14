@@ -21,8 +21,8 @@ how cash is reserved, and how results change when you match another framework's 
 
 -   :material-check-all:{ .lg .middle } __Validated Against 4 Frameworks__
     ---
-    Compare fills and terminal values against VectorBT, Backtrader, Zipline,
-    and LEAN on the same benchmark scenarios.
+    Compare retained scenario evidence for VectorBT, Backtrader, and Zipline,
+    plus native and Chapter 16 evidence for LEAN.
     [:octicons-arrow-right-24: Profiles](user-guide/profiles.md)
 
 -   :material-book-open-variant:{ .lg .middle } __Chapters 16-19__

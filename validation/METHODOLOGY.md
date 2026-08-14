@@ -38,7 +38,7 @@ replicate that framework's behavior:
 | `vectorbt` / `vectorbt_strict` | VectorBT Pro/OSS | 0% trade gap, 0% value gap |
 | `backtrader` / `backtrader_strict` | Backtrader | 0% trade gap, 0% value gap |
 | `zipline` / `zipline_strict` | Zipline Reloaded | 0% trade gap, 0% value gap |
-| `lean` | QuantConnect LEAN | 0% fill gap, near-0% value gap |
+| `lean` | Frozen LEAN daily US-equity protocol | 0 fill gap, 0 canonical value gap |
 | `default` | ml4t's own opinion | Best-practice defaults |
 | `realistic` | Conservative simulation | Adds costs, integer shares |
 
@@ -134,8 +134,8 @@ Update the behavioral difference matrix, profile diffs, and parity results.
 ## Anti-Patterns
 
 **DO NOT** accept gaps as "structural" or "expected":
-- "LEAN fills at bar close, ml4t at next-bar open -- this is a structural difference" is WRONG
-- CORRECT: "We need to add `execution_price=close` to the lean profile to close this gap"
+- "The engines use different order timing, so the gap is expected" is wrong.
+- Identify the native event sequence, configure the corresponding profile, or narrow the claim.
 
 **DO NOT** say "this is good enough for production":
 - 95% parity is not the goal -- 100% parity is the goal
@@ -217,28 +217,37 @@ trade records in `provenance.comparison_protocol`.
 `final_bar_market_order`. `ZL-V` refers to `volume_share_partial_fills`. `ZL-X` refers to
 `transaction_records_not_native_trades`. `ZL-M` refers to `session_calendar` and `missing_bar`.
 
+`LN-T` refers to LEAN native `timing` and `final_bar_order`. `LN-M` refers to `default_models`,
+`buying_power_allowed`, and `buying_power_rejected`. `LN-O` refers to `submission_sequence` and
+`buying_power_sequence`. `LN-S` refers to `target_sizing`. `LN-C` refers to `explicit_costs`.
+`LN-D` refers to `fill_forward`. `LN-F` refers to `default_full_fill`. `LN-X` refers to
+`terminal_holding` and `liquidation`. These checks use LEAN engine 18001 at commit
+`278fcb3d1b815b63ccadba68d7ae54422e34b792`, CLI 1.0.228, `DefaultBrokerageModel`, a margin
+account, daily adjusted US equities, and 2x security leverage.
+
 ### Execution Timing
 
 | Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline protocol | LEAN |
 |------|-------------|----------|--------------|------------|---------|------|
-| `execution_mode` | next_bar | **same_bar** | VBT-S | next_bar (BT-T) | next_bar (ZL-P) | **same_bar** |
-| `fill_timing` | next_bar_open | **same_bar** | VBT-S | next_bar_open (BT-T) | next_bar_open (ZL-P) | **same_bar** |
-| `execution_price` | open | **close** | VBT-S | open (BT-T) | open (ZL-P) | **close** |
+| `execution_mode` | next_bar | **same_bar** | VBT-S | next_bar (BT-T) | next_bar (ZL-P) | next_bar (LN-T) |
+| `fill_timing` | next_bar_open | **same_bar** | VBT-S | next_bar_open (BT-T) | next_bar_open (ZL-P) | next session (LN-T) |
+| `execution_price` | open | **close** | VBT-S | open (BT-T) | open (ZL-P) | open (LN-T) |
 
-VectorBT and LEAN both use same-bar execution with close fills. VectorBT is vectorized, while LEAN
-processes market orders immediately at bar close in its event-driven loop. Backtrader uses the
-next bar's open. Zipline's native daily default uses the next session's close; the suite explicitly
-replaces that model to fill at the next session's open.
+LEAN emits a daily US-equity bar to `OnData` at the market close. A market order submitted from
+that callback is therefore submitted while the market is closed, converted to market-on-open, and
+filled at the next session's open. A final-bar order remains submitted and unfilled. VectorBT uses
+same-bar close execution. Backtrader and the configured Zipline protocol use the next session's
+open.
 
 ### Stop/Risk Configuration
 
 | Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline protocol | LEAN |
 |------|-------------|----------|--------------|------------|---------|------|
-| `stop_fill_mode` | stop_price | stop_price | VBT-R | stop_price (BT-R) | next_bar_open (adapter) | stop_price |
-| `stop_level_basis` | fill_price | fill_price | VBT-R | **signal_price (BT-R)** | fill_price (adapter) | fill_price |
-| `trail_hwm_source` | close | **bar_extreme** | VBT-R | close (BT-R) | bar_extreme (adapter) | close |
-| `initial_hwm_source` | fill_price | **bar_high** | VBT-R | signal_price (BT-R) | fill_price (adapter) | fill_price |
-| `trail_stop_timing` | lagged | **intrabar** | VBT-R | lagged (BT-R) | intrabar (adapter) | lagged |
+| `stop_fill_mode` | stop_price | stop_price | VBT-R | stop_price (BT-R) | next_bar_open (adapter) | profile fallback; not claimed |
+| `stop_level_basis` | fill_price | fill_price | VBT-R | **signal_price (BT-R)** | fill_price (adapter) | profile fallback; not claimed |
+| `trail_hwm_source` | close | **bar_extreme** | VBT-R | close (BT-R) | bar_extreme (adapter) | profile fallback; not claimed |
+| `initial_hwm_source` | fill_price | **bar_high** | VBT-R | signal_price (BT-R) | fill_price (adapter) | profile fallback; not claimed |
+| `trail_stop_timing` | lagged | **intrabar** | VBT-R | lagged (BT-R) | intrabar (adapter) | profile fallback; not claimed |
 
 Backtrader calculates stop levels from **signal bar close** (the price when the strategy decided
 to trade), not the actual fill price. This matters when next-bar open differs significantly from
@@ -251,36 +260,43 @@ previous close.
 | `allow_short_selling` | false | **true** | VBT-C | **true (BT-C)** | true (ZL-C) | true |
 | `allow_leverage` | false | false | VBT-C | false by default (BT-C) | cash validation disabled (ZL-C) | true |
 | `short_cash_policy` | credit | credit | VBT-C | credit (BT-C) | credit (ZL-C) | credit |
-| `initial_margin` | 0.5 | -- | VBT-C | -- (BT-C) | -- | varies |
-| `long_maint_margin` | 0.25 | -- | VBT-C | -- (BT-C) | -- | varies |
-| `short_maint_margin` | 0.30 | -- | VBT-C | -- (BT-C) | -- | varies |
+| `initial_margin` | 0.5 | -- | VBT-C | -- (BT-C) | -- | 0.5 (LN-M) |
+| `long_maint_margin` | 0.25 | -- | VBT-C | -- (BT-C) | -- | 0.5 (LN-M) |
+| `short_maint_margin` | 0.30 | -- | VBT-C | -- (BT-C) | -- | 0.5 (LN-M) |
+
+These LEAN margin values belong to `SecurityMarginModel` at 2x leverage. Other security and
+brokerage models can select different requirements.
 
 ### Order Handling
 
 | Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline protocol | LEAN |
 |------|-------------|----------|--------------|------------|---------|------|
-| `fill_ordering` | exit_first | exit_first | VBT-C, VBT-O | **fifo (BT-O)** | fifo (ZL-O) | **exit_first** |
+| `fill_ordering` | exit_first | exit_first | VBT-C, VBT-O | **fifo (BT-O)** | fifo (ZL-O) | sequential (LN-O) |
 | `entry_order_priority` | submission | submission | VBT-C | submission (BT-O) | submission (ZL-O) | submission |
-| `immediate_fill` | false | **true** | VBT-S, VBT-O | false (BT-T) | false (ZL-P, ZL-O) | **true** |
+| `immediate_fill` | false | **true** | VBT-S, VBT-O | false (BT-T) | false (ZL-P, ZL-O) | false (LN-T) |
 | `rebalance_mode` | incremental | **hybrid** | VBT-O | **snapshot (BT-O)** | snapshot (ZL-S) | snapshot |
-| `rebalance_headroom_pct` | 1.0 | 1.0 | VBT-O | 1.0 (BT-S) | 1.0 (ZL-S) | 0.998 |
+| `rebalance_headroom_pct` | 1.0 | 1.0 | VBT-O | 1.0 (BT-S) | 1.0 (ZL-S) | 0.9975 (LN-S) |
 | `reject_on_insufficient_cash` | true | **false** | VBT-C | true (BT-C, BT-O) | false (ZL-C) | true |
-| `partial_fills_allowed` | false | **true** | VBT-C | false (BT-C) | false in protocol (ZL-P) | false |
-| `missing_price_policy` | skip | skip order; forward-fill valuation | VBT-O | **use_last (BT-D)** | last price for sizing; stale bar defers fill (ZL-M) | use_last |
+| `partial_fills_allowed` | false | **true** | VBT-C | false (BT-C) | false in protocol (ZL-P) | false in default fill model (LN-F) |
+| `missing_price_policy` | skip | skip order; forward-fill valuation | VBT-O | **use_last (BT-D)** | last price for sizing; stale bar defers fill (ZL-M) | fill-forward data; defer to next real open (LN-D) |
 | `late_asset_policy` | allow after 1 bar | allow after 1 bar | VBT-O | allow after 1 bar (BT-D) | allow (ZL-M) | allow |
 
 ### Position Sizing & Costs
 
 | Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline protocol | LEAN |
 |------|-------------|----------|--------------|------------|---------|------|
-| `share_type` | integer | fractional | VBT-O | integer (BT-S) | integer (ZL-S) | integer |
-| repeated entry | check position | ignore unless accumulation is enabled | VBT-O | adapter checks position | adapter checks position | check position |
-| `commission_model` | none | none | VBT-F | none (BT-C) | none (ZL-P) | per_share |
+| `share_type` | integer | fractional | VBT-O | integer (BT-S) | integer (ZL-S) | integer (LN-S) |
+| repeated entry | check position | ignore unless accumulation is enabled | VBT-O | adapter checks position | adapter checks position | adapter submits target delta |
+| `commission_model` | none | none | VBT-F | none (BT-C) | none (ZL-P) | `InteractiveBrokersFeeModel` (LN-M) |
 | `commission_rate` | 0% | 0% | VBT-F | 0% (BT-C) | -- | -- |
-| `commission_per_share` | -- | -- | VBT-F | -- | -- (ZL-P) | varies |
-| `commission_minimum` | $0 | -- | VBT-F | -- | -- (ZL-P) | varies |
-| `slippage_model` | none | none | VBT-F | none (BT-C) | custom open, zero cost (ZL-P) | volume_based |
-| `slippage_rate` | 0% | 0% | VBT-F | 0% (BT-C) | 0% (ZL-P) | varies |
+| `commission_per_share` | -- | -- | VBT-F | -- | -- (ZL-P) | $0.005 for US equities (LN-M) |
+| `commission_minimum` | $0 | -- | VBT-F | -- | -- (ZL-P) | $1 for US equities (LN-M) |
+| `slippage_model` | none | none | VBT-F | none (BT-C) | custom open, zero cost (ZL-P) | `NullSlippageModel` (LN-M) |
+| `slippage_rate` | 0% | 0% | VBT-F | 0% (BT-C) | 0% (ZL-P) | 0% (LN-M) |
+
+The fee and slippage entries name the models selected by `DefaultBrokerageModel` for a US equity.
+They are not universal LEAN defaults. `LN-C` separately verifies explicit constant fee and
+percentage slippage overrides.
 
 ### Comparison profiles
 
@@ -289,7 +305,9 @@ the prior locked-short-proceeds, rejection, or FIFO overrides. `backtrader` now 
 framework defaults for costs, leverage, target headroom, missing bars, and late feeds.
 `backtrader_strict` adds submission-time cash checks to reproduce Backtrader's enabled
 `checksubmit` path. `zipline_strict` resolves to the same settings as `zipline`; both represent the
-explicit comparison protocol described above. The native Zipline defaults remain separate.
+explicit comparison protocol described above. The native Zipline defaults remain separate. The
+`lean` profile represents only the named daily US-equity protocol above. Its stop settings are not
+part of the retained LEAN equivalence claim.
 
 ---
 

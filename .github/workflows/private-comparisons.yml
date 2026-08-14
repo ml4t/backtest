@@ -70,7 +70,7 @@ jobs:
           retention-days: 90
 
   lean:
-    name: LEAN Engine Identity
+    name: LEAN Native Behavior
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,10 +89,27 @@ jobs:
           --framework lean
           --evidence-output lean-environment.json
 
+      - name: Measure native LEAN behavior
+        run: >-
+          .venv-lean/bin/python
+          validation/native/lean_behavior.py
+          --lean-command .venv-lean/bin/lean
+          --output lean-native.json
+
+      - name: Run the LEAN Chapter 16 comparisons
+        run: >-
+          .venv-lean/bin/python
+          validation/run_lean_case_studies.py
+          --lean-command .venv-lean/bin/lean
+          --output lean-case-studies.json
+
       - name: Retain LEAN provenance
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lean-comparison-${{ github.sha }}
-          path: lean-environment.json
+          path: |
+            lean-environment.json
+            lean-native.json
+            lean-case-studies.json
           if-no-files-found: error
           retention-days: 90

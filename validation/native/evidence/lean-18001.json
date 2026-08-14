@@ -1,0 +1,2276 @@
+{
+  "checks": [
+    {
+      "actual": {
+        "case": "timing",
+        "cash": 9889.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 1.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 10060.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9889.0,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10060.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9889.0,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10060.0
+        }
+      },
+      "id": "timing",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "default_models",
+        "cash": 9889.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 1.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 10060.0
+      },
+      "contract_actual": {
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        }
+      },
+      "expected": {
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        }
+      },
+      "id": "default_models",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "target_sizing",
+        "cash": -781.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 98.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 98.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 98.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": 98.0,
+        "total_fees": 1.0,
+        "total_portfolio_value": 15977.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            98.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -781.0,
+          "position": 98.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 15977.0
+        },
+        "target_quantity": 98.0
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            98.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -781.0,
+          "position": 98.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 15977.0
+        },
+        "target_quantity": 98.0
+      },
+      "id": "target_sizing",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "submission_sequence",
+        "cash": 9998.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "SELL",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 2,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          },
+          {
+            "direction": "SELL",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": -1.0,
+            "message": "",
+            "order_id": 2,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 0.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          },
+          {
+            "order_id": 2,
+            "quantity": -1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 2.0,
+        "total_portfolio_value": 9998.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "SUBMITTED",
+            "SELL",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "FILLED",
+            "SELL",
+            -1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9998.0,
+          "position": 0.0,
+          "total_fees": 2.0,
+          "total_portfolio_value": 9998.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "SUBMITTED",
+            "SELL",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "FILLED",
+            "SELL",
+            -1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9998.0,
+          "position": 0.0,
+          "total_fees": 2.0,
+          "total_portfolio_value": 9998.0
+        }
+      },
+      "id": "submission_sequence",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "buying_power_allowed",
+        "cash": -6501.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 150.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 150.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 150.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 19149.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            150.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -6501.0,
+          "position": 150.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 19149.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            150.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -6501.0,
+          "position": 150.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 19149.0
+        }
+      },
+      "id": "buying_power_allowed",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "buying_power_rejected",
+        "cash": 10000.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "Order Error: ids: [1], Insufficient buying power to complete orders (Value:[25250]), Reason: Id: 1, Initial Margin: 12626.25, Free Margin: 10000.",
+            "order_id": 1,
+            "status": "INVALID",
+            "time": "2024-01-02 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 0.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 250.0,
+            "status": "INVALID"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 0.0,
+        "total_portfolio_value": 10000.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "INVALID",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 10000.0,
+          "position": 0.0,
+          "total_fees": 0.0,
+          "total_portfolio_value": 10000.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "INVALID",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 10000.0,
+          "position": 0.0,
+          "total_fees": 0.0,
+          "total_portfolio_value": 10000.0
+        }
+      },
+      "id": "buying_power_rejected",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "buying_power_sequence",
+        "cash": -6501.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 2,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 150.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "Order Error: ids: [2], Insufficient buying power to complete orders (Value:[16650]), Reason: Id: 2, Initial Margin: 8326, Free Margin: 1824.",
+            "order_id": 2,
+            "status": "INVALID",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 150.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 150.0,
+            "status": "SUBMITTED"
+          },
+          {
+            "order_id": 2,
+            "quantity": 150.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 19149.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            150.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "INVALID",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -6501.0,
+          "position": 150.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 19149.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            150.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "INVALID",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -6501.0,
+          "position": 150.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 19149.0
+        }
+      },
+      "id": "buying_power_sequence",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "explicit_costs",
+        "cash": 9888.889,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.111,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "ConstantFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "ConstantSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 1.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 10059.889
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.111,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9888.889,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10059.889
+        },
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "ConstantFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "ConstantSlippageModel"
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.111,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9888.889,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10059.889
+        },
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "ConstantFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "ConstantSlippageModel"
+        }
+      },
+      "id": "explicit_costs",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "default_full_fill",
+        "cash": -6501.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 150.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 150.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 150.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 19149.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            150.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -6501.0,
+          "position": 150.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 19149.0
+        },
+        "source_volume": 100.0
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            150.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": -6501.0,
+          "position": 150.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 19149.0
+        },
+        "source_volume": 100.0
+      },
+      "id": "default_full_fill",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "fill_forward",
+        "cash": 9879.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-03 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-04 21:00:00",
+            "fee": 1.0,
+            "fill_price": 120.0,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-04 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 101.0,
+            "date": "2024-01-03",
+            "fill_forward": true,
+            "open": 100.0,
+            "volume": 0.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 1.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 10050.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            120.0,
+            1.0,
+            "2024-01-04 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9879.0,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10050.0
+        },
+        "synthetic_bar": {
+          "close": 101.0,
+          "date": "2024-01-03",
+          "fill_forward": true,
+          "open": 100.0,
+          "volume": 0.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            120.0,
+            1.0,
+            "2024-01-04 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9879.0,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10050.0
+        },
+        "synthetic_bar": {
+          "close": 101.0,
+          "date": "2024-01-03",
+          "fill_forward": true,
+          "open": 100.0,
+          "volume": 0.0
+        }
+      },
+      "id": "fill_forward",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "terminal_holding",
+        "cash": 9889.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 1.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 1.0,
+        "total_portfolio_value": 10060.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9889.0,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10060.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 9889.0,
+          "position": 1.0,
+          "total_fees": 1.0,
+          "total_portfolio_value": 10060.0
+        }
+      },
+      "id": "terminal_holding",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "final_bar_order",
+        "cash": 10000.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-11 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-11 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 0.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 0.0,
+        "total_portfolio_value": 10000.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-11 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 10000.0,
+          "position": 0.0,
+          "total_fees": 0.0,
+          "total_portfolio_value": 10000.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-11 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 10000.0,
+          "position": 0.0,
+          "total_fees": 0.0,
+          "total_portfolio_value": 10000.0
+        }
+      },
+      "id": "final_bar_order",
+      "passed": true
+    },
+    {
+      "actual": {
+        "case": "liquidation",
+        "cash": 10058.0,
+        "events": [
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-02 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 1,
+            "status": "SUBMITTED",
+            "time": "2024-01-02 16:00:00"
+          },
+          {
+            "direction": "BUY",
+            "event_time_utc": "2024-01-03 21:00:00",
+            "fee": 1.0,
+            "fill_price": 110.0,
+            "fill_quantity": 1.0,
+            "message": "",
+            "order_id": 1,
+            "status": "FILLED",
+            "time": "2024-01-03 16:00:00"
+          },
+          {
+            "direction": "SELL",
+            "event_time_utc": "2024-01-10 21:00:00",
+            "fee": 0.0,
+            "fill_price": 0.0,
+            "fill_quantity": 0.0,
+            "message": "",
+            "order_id": 2,
+            "status": "SUBMITTED",
+            "time": "2024-01-10 16:00:00"
+          },
+          {
+            "direction": "SELL",
+            "event_time_utc": "2024-01-11 21:00:00",
+            "fee": 1.0,
+            "fill_price": 170.0,
+            "fill_quantity": -1.0,
+            "message": "",
+            "order_id": 2,
+            "status": "FILLED",
+            "time": "2024-01-11 16:00:00"
+          }
+        ],
+        "models": {
+          "brokerage": "DefaultBrokerageModel",
+          "buying_power": "SecurityMarginModel",
+          "fee": "InteractiveBrokersFeeModel",
+          "fill": "EquityFillModel",
+          "leverage": 2.0,
+          "slippage": "NullSlippageModel"
+        },
+        "observations": [
+          {
+            "close": 101.0,
+            "date": "2024-01-02",
+            "fill_forward": false,
+            "open": 100.0,
+            "volume": 100.0
+          },
+          {
+            "close": 111.0,
+            "date": "2024-01-03",
+            "fill_forward": false,
+            "open": 110.0,
+            "volume": 100.0
+          },
+          {
+            "close": 121.0,
+            "date": "2024-01-04",
+            "fill_forward": false,
+            "open": 120.0,
+            "volume": 100.0
+          },
+          {
+            "close": 131.0,
+            "date": "2024-01-05",
+            "fill_forward": false,
+            "open": 130.0,
+            "volume": 100.0
+          },
+          {
+            "close": 141.0,
+            "date": "2024-01-08",
+            "fill_forward": false,
+            "open": 140.0,
+            "volume": 100.0
+          },
+          {
+            "close": 151.0,
+            "date": "2024-01-09",
+            "fill_forward": false,
+            "open": 150.0,
+            "volume": 100.0
+          },
+          {
+            "close": 161.0,
+            "date": "2024-01-10",
+            "fill_forward": false,
+            "open": 160.0,
+            "volume": 100.0
+          },
+          {
+            "close": 171.0,
+            "date": "2024-01-11",
+            "fill_forward": false,
+            "open": 170.0,
+            "volume": 100.0
+          }
+        ],
+        "position": 0.0,
+        "submitted": [
+          {
+            "order_id": 1,
+            "quantity": 1.0,
+            "status": "SUBMITTED"
+          },
+          {
+            "order_id": 2,
+            "quantity": -1.0,
+            "status": "SUBMITTED"
+          }
+        ],
+        "target_quantity": null,
+        "total_fees": 2.0,
+        "total_portfolio_value": 10058.0
+      },
+      "contract_actual": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "SUBMITTED",
+            "SELL",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-10 21:00:00"
+          ],
+          [
+            "FILLED",
+            "SELL",
+            -1.0,
+            170.0,
+            1.0,
+            "2024-01-11 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 10058.0,
+          "position": 0.0,
+          "total_fees": 2.0,
+          "total_portfolio_value": 10058.0
+        }
+      },
+      "expected": {
+        "events": [
+          [
+            "SUBMITTED",
+            "BUY",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-02 21:00:00"
+          ],
+          [
+            "FILLED",
+            "BUY",
+            1.0,
+            110.0,
+            1.0,
+            "2024-01-03 21:00:00"
+          ],
+          [
+            "SUBMITTED",
+            "SELL",
+            0.0,
+            0.0,
+            0.0,
+            "2024-01-10 21:00:00"
+          ],
+          [
+            "FILLED",
+            "SELL",
+            -1.0,
+            170.0,
+            1.0,
+            "2024-01-11 21:00:00"
+          ]
+        ],
+        "final": {
+          "cash": 10058.0,
+          "position": 0.0,
+          "total_fees": 2.0,
+          "total_portfolio_value": 10058.0
+        }
+      },
+      "id": "liquidation",
+      "passed": true
+    }
+  ],
+  "cli": {
+    "immutable_id": "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c",
+    "package": "lean",
+    "version": "1.0.228"
+  },
+  "data": {
+    "format": "LEAN local equity daily zip, raw prices scaled by 10000",
+    "payload_sha256": "b3f483a7d5cb3a2de611bde72b900f8bbb08c13cae86e08d5337edfd33c252fe",
+    "sessions": [
+      "2024-01-02",
+      "2024-01-03",
+      "2024-01-04",
+      "2024-01-05",
+      "2024-01-08",
+      "2024-01-09",
+      "2024-01-10",
+      "2024-01-11"
+    ]
+  },
+  "engine": {
+    "engine_version": "18001",
+    "image": "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+    "image_id": "sha256:1ef05df55300c30a3e75f142b62e858e26b054f75445986e7599edde3c32fc20",
+    "platform_artifact": "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307",
+    "python_version": "3.11",
+    "source_commit": "278fcb3d1b815b63ccadba68d7ae54422e34b792",
+    "target_framework": "net10.0"
+  },
+  "framework": "lean",
+  "models": {
+    "account_type": "Margin",
+    "brokerage": "DefaultBrokerageModel",
+    "security": "Equity USA, daily, adjusted normalization, leverage 2"
+  },
+  "oracle_files": {
+    "config.json": "5b7ec7bf073127d026e6086ec18771dcb700375570ba51def97739d85009351c",
+    "main.py": "04aab940df029bf37e7aa1a9d3d8ab0996fce0bb3a10fa4dd4e15ca685e83e19"
+  },
+  "oracle_sha256": "1675f062ce54f29727d2bf7d17afc5c9db4e439e9f921e270feec49cde065d66",
+  "passed": true,
+  "schema_version": 1,
+  "source_references": {
+    "algorithm_settings": "https://github.com/QuantConnect/Lean/blob/278fcb3d1b815b63ccadba68d7ae54422e34b792/Common/AlgorithmSettings.cs",
+    "brokerage": "https://github.com/QuantConnect/Lean/blob/278fcb3d1b815b63ccadba68d7ae54422e34b792/Common/Brokerages/DefaultBrokerageModel.cs",
+    "fee": "https://github.com/QuantConnect/Lean/blob/278fcb3d1b815b63ccadba68d7ae54422e34b792/Common/Orders/Fees/InteractiveBrokersFeeModel.cs",
+    "fill": "https://github.com/QuantConnect/Lean/blob/278fcb3d1b815b63ccadba68d7ae54422e34b792/Common/Orders/Fills/EquityFillModel.cs",
+    "margin": "https://github.com/QuantConnect/Lean/blob/278fcb3d1b815b63ccadba68d7ae54422e34b792/Common/Securities/SecurityMarginModel.cs",
+    "slippage": "https://github.com/QuantConnect/Lean/blob/278fcb3d1b815b63ccadba68d7ae54422e34b792/Common/Orders/Slippage/ConstantSlippageModel.cs"
+  },
+  "support_files": {
+    "data/market-hours/market-hours-database.json": "935079bc33409373f37163eddb539f09e81a1efbd0e617cbc8fdb487c76dab2b",
+    "data/symbol-properties/symbol-properties-database.csv": "56b6dc80202bca88f212c78c4d4670c2e070e6f1e7386f7436232aafe5000e93",
+    "lean.json": "fa15d6d81f560fd1665b004c338b026458fa834a7645e015d16d861dd73540f4"
+  }
+}

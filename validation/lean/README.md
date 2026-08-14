@@ -1,178 +1,93 @@
 # LEAN Validation Workflow
 
-## Status
+The retained LEAN comparison uses a frozen engine, CLI, data protocol, and account model:
 
-LEAN is part of the validation/parity workflow, but not through the old static
-`scenario_01_long_only/` project in this directory.
+- LEAN engine 18001 at source commit `278fcb3d1b815b63ccadba68d7ae54422e34b792`
+- image `quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70`
+- LEAN CLI 1.0.228 from the locked environment
+- daily adjusted US equities, `DefaultBrokerageModel`, margin account, and 2x security leverage
 
-What actually runs today is the LEAN adapter in
-[`validation/benchmark_suite.py`](../benchmark_suite.py), which:
+This is a scoped comparison protocol. It is not a claim about every LEAN asset class,
+resolution, brokerage model, or order type.
 
-- supports the benchmark/parity workflow, not the old scenario matrix
-- supports daily-data scenarios only
-- generates a temporary LEAN project and LEAN-format data on the fly
-- runs LEAN through the CLI in Docker
+## Build the Locked Environment
 
-The old `scenario_01_long_only/` folder is legacy scaffolding, not the current
-source of truth.
-
-## What Made It Work
-
-These are the pieces that mattered in practice:
-
-1. We used the Dockerized LEAN CLI path, not a direct `.NET` launcher workflow.
-2. We did not require a permanently installed `lean` binary.
-   The adapter falls back to:
-
-   ```bash
-   uvx --python 3.12 --with "setuptools<81" lean
-   ```
-
-3. We required a machine-local LEAN workspace config at:
-
-   ```text
-   validation/lean/workspace/lean.json
-   ```
-
-4. We let `benchmark_suite.py` generate the LEAN project, algorithm, target
-   file, and LEAN-format equity data for each run.
-5. Docker had to be running before invoking the benchmark.
-
-## One-Time Bootstrap
-
-From the repository root:
+Docker must be running. From the repository root:
 
 ```bash
-mkdir -p validation/lean/workspace
-cd validation/lean/workspace
-uvx --python 3.12 --with "setuptools<81" lean init
+uv run python validation/build_framework_env.py --framework lean
 ```
 
-If `lean` is already installed on `PATH`, this also works:
+This creates `.venv-lean`, verifies the exact CLI distribution, and verifies the immutable engine
+image. The runners do not install a CLI dynamically and do not accept a mutable image tag.
+
+## Native Behavior Evidence
+
+Run the native oracle before changing the `lean` profile:
 
 ```bash
-lean init
+.venv-lean/bin/python validation/native/lean_behavior.py \
+  --lean-command .venv-lean/bin/lean \
+  --output /tmp/lean-native.json
 ```
 
-The important outcome is that `validation/lean/workspace/lean.json` exists and
-is valid on the local machine. That file is not committed in the repo.
+The oracle checks the event and model behavior used by the profile, including next-session market
+fills, final-bar orders, model selection, margin, target sizing, submission order, buying power,
+explicit costs, fill-forward data, full fills, and terminal holdings. The retained result is
+`validation/native/evidence/lean-18001.json`.
 
-## Runtime Prerequisites
+The `lean` profile's stop settings are ML4T fallbacks. Stop-order equivalence is not part of this
+native evidence.
 
-- Docker daemon available
-- either `lean` on `PATH` or `uvx` on `PATH`
-- Python 3.12 available for the `uvx` fallback path
-- initialized LEAN workspace config at
-  `validation/lean/workspace/lean.json`
+## Chapter 16 Case Studies
 
-The adapter itself also sets:
-
-```text
-UV_CACHE_DIR=/tmp/uv-cache
-UV_TOOL_DIR=/tmp/uv-tools
-```
-
-to keep the transient LEAN CLI tool environment out of the repo.
-
-## Exact Command We Run
-
-Use the benchmark suite, not the legacy `run_all_correctness.py` LEAN path.
-
-Typical invocation:
+The current large comparison reruns three retained Chapter 16 projects against the frozen image:
 
 ```bash
-python validation/benchmark_suite.py \
+.venv-lean/bin/python validation/run_lean_case_studies.py \
+  --lean-command .venv-lean/bin/lean \
+  --output /tmp/lean-case-studies.json
+```
+
+Add `--promote` only when intentionally replacing the tracked LEAN outputs and retained evidence.
+Promotion is atomic and occurs only after all projects pass.
+
+The three projects compare 47,652 canonical fills. They currently have zero fill-surface gap and
+zero terminal-value gap at a `$0.0001` quantum. The machine-readable result is
+`validation/lean/case_study_evidence.json`.
+
+These projects specify their own percentage fee and zero-slippage settings. They do not test the
+fee and slippage models selected by `DefaultBrokerageModel`; the native oracle tests that model
+selection separately.
+
+## Benchmark Adapter
+
+The daily-data adapter remains available through the benchmark suite:
+
+```bash
+uv run python validation/benchmark_suite.py \
   --framework lean \
   --scenario daily_baseline \
   --data-source real \
   --real-data-path /path/to/us_equities.parquet
 ```
 
-To compare the ml4t side using the LEAN-style profile:
+To run the ML4T side with the corresponding profile, use `--framework ml4t-lean-strict`.
 
-```bash
-python validation/benchmark_suite.py \
-  --framework ml4t-lean-strict \
-  --scenario daily_baseline \
-  --data-source real \
-  --real-data-path /path/to/us_equities.parquet
-```
+The adapter requires an exact CLI version and passes the frozen image digest to every LEAN run.
+It supports daily scenarios only.
 
-Notes:
+## Reproducibility Boundary
 
-- `--framework lean` invokes the LEAN adapter.
-- `--framework ml4t-lean-strict` runs `ml4t-backtest` with the LEAN-strict
-  parity profile.
-- LEAN currently returns an error for non-daily scenarios.
+The native and Chapter 16 runners construct temporary LEAN roots from tracked inputs:
 
-## What The Adapter Generates
+- `validation/lean/support/lean.json`
+- `validation/lean/support/data/market-hours/market-hours-database.json`
+- `validation/lean/support/data/symbol-properties/symbol-properties-database.csv`
+- the tracked project files and daily equity archives under `validation/lean/workspace/`
 
-For each run, `benchmark_suite.py` writes a generated LEAN project under:
+Map and factor files are generated from the first date in each tracked daily archive. No ignored
+machine-local `lean.json`, map file, factor file, or data directory is required.
 
-```text
-validation/lean/workspace/ml4t_benchmark/
-```
-
-Key generated files:
-
-- `main.py`: generated QCAlgorithm using canonical target shares
-- `config.json`: minimal LEAN project config
-- `symbols.csv`: generated synthetic tickers for the selected assets
-- `targets.csv`: daily target share instructions
-
-It also exports LEAN-format daily equity data under:
-
-```text
-validation/lean/workspace/data/equity/usa/
-```
-
-including:
-
-- `daily/*.zip`
-- `map_files/*.csv`
-- `factor_files/*.csv`
-
-To avoid re-exporting identical daily data every run, it maintains:
-
-```text
-validation/lean/workspace/data/equity/usa/ml4t_manifest.json
-```
-
-and uses a signature-based cache check.
-
-## The Exact LEAN Invocation
-
-Once the generated project and data are in place, the adapter runs:
-
-```bash
-lean backtest validation/lean/workspace/ml4t_benchmark \
-  --lean-config validation/lean/workspace/lean.json \
-  --no-update \
-  --output <generated-output-dir>
-```
-
-If `lean` is not installed, the code uses the `uvx` form instead.
-
-Results are read back from the generated LEAN summary JSON in the output
-directory.
-
-## Source Of Truth In Code
-
-The working implementation lives here:
-
-- [`validation/benchmark_suite.py`](../benchmark_suite.py): LEAN adapter,
-  project generation, data export, CLI invocation, result parsing
-
-These files are legacy and should not be treated as the primary workflow:
-
-- [`validation/lean/scenario_01_long_only/main.py`](scenario_01_long_only/main.py)
-- [`validation/run_all_correctness.py`](../run_all_correctness.py)
-
-## Practical Caveats
-
-- LEAN is currently benchmark/parity coverage, not full scenario-matrix coverage.
-- The adapter currently supports daily data only.
-- The local `lean.json` is a manual prerequisite and is intentionally not
-  committed.
-- Docker startup and LEAN container initialization make LEAN slower and more
-  operationally fragile than the Python-native backtest validation paths.
+The old `scenario_01_long_only/` project and `validation/run_all_correctness.py` LEAN path are
+legacy scaffolding. They are not evidence for the current claim.

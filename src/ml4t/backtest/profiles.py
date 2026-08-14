@@ -294,8 +294,8 @@ LEAN_PROFILE = {
         "allow_short_selling": True,
         "allow_leverage": True,
         "initial_margin": 0.5,
-        "long_maintenance_margin": 0.25,
-        "short_maintenance_margin": 0.30,
+        "long_maintenance_margin": 0.5,
+        "short_maintenance_margin": 0.5,
         "short_cash_policy": "credit",
     },
     "execution": {
@@ -318,8 +318,8 @@ LEAN_PROFILE = {
         "minimum": 1.0,
     },
     "slippage": {
-        "model": "percentage",
-        "rate": 0.001,
+        "model": "none",
+        "rate": 0.0,
     },
     "cash": {
         "initial": 100000.0,
@@ -328,11 +328,12 @@ LEAN_PROFILE = {
     "orders": {
         "reject_on_insufficient_cash": True,
         "partial_fills_allowed": False,
-        "fill_ordering": "exit_first",
+        "fill_ordering": "sequential",
         "entry_order_priority": "submission",
+        "buying_power_reservation": False,
         "next_bar_queue_shadow_validation": True,
         "rebalance_mode": "snapshot",
-        "rebalance_headroom_pct": 1.0,
+        "rebalance_headroom_pct": 0.9975,
         "missing_price_policy": "use_last",
         "late_asset_policy": "allow",
         "late_asset_min_bars": 1,

@@ -129,7 +129,7 @@ config = BacktestConfig.from_preset("backtrader")
 # Match the documented Zipline comparison protocol (next-bar open, no default costs)
 config = BacktestConfig.from_preset("zipline")
 
-# Match QuantConnect LEAN behavior (same-bar close fills, integer shares)
+# Match the frozen LEAN daily US-equity protocol (next-session open, integer shares)
 config = BacktestConfig.from_preset("lean")
 
 # Conservative production settings (higher costs, cash buffer)

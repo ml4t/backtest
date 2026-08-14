@@ -15,7 +15,7 @@ exactly and which remain release-blocking.
 | `backtrader` | Match Backtrader's default behavior |
 | `vectorbt` | Match VectorBT's default behavior (including fractional shares) |
 | `zipline` | Match the documented Zipline comparison protocol |
-| `lean` | Match QuantConnect LEAN's default behavior |
+| `lean` | Match the frozen LEAN daily US-equity comparison protocol |
 | `realistic` | Conservative settings for production |
 
 ### Broker Presets
@@ -29,6 +29,11 @@ The broker preset also supports a modular alias:
 | Alias | Resolves To |
 |-------|-------------|
 | `ibkr:us:stocks:fixed` | `ibkr_us_stocks_fixed` |
+
+The `lean` profile is scoped to daily US equities submitted from `OnData` with
+`DefaultBrokerageModel`, a margin account, and 2x security leverage. LEAN delegates fees,
+slippage, margin, and fills to selected brokerage and security models, so this profile is not a
+claim about every LEAN asset class, resolution, or brokerage model.
 
 ### Strict Profiles
 
@@ -83,24 +88,27 @@ Profiles define behavioral defaults. Quote-aware feeds layer on top of them: you
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Execution mode | next_bar | next_bar | same_bar | next_bar | same_bar | next_bar |
-| Execution price | open | open | close | open | close | open |
+| Execution mode | next_bar | next_bar | same_bar | next_bar | next_bar | next_bar |
+| Execution price | open | open | close | open | open | open |
 
 ### Stops
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Fill mode | stop_price | stop_price | stop_price | next_bar_open | stop_price | next_bar_open |
-| Level basis | fill_price | signal_price | fill_price | fill_price | fill_price | fill_price |
-| Trail HWM | close | close | bar_extreme | bar_extreme | close | close |
-| Trail timing | lagged | lagged | intrabar | intrabar | lagged | lagged |
+| Fill mode | stop_price | stop_price | stop_price | next_bar_open | stop_price* | next_bar_open |
+| Level basis | fill_price | signal_price | fill_price | fill_price | fill_price* | fill_price |
+| Trail HWM | close | close | bar_extreme | bar_extreme | close* | close |
+| Trail timing | lagged | lagged | intrabar | intrabar | lagged* | lagged |
+
+`*` The LEAN stop settings are ML4T profile fallbacks. The current native LEAN oracle does not
+claim stop-order parity.
 
 ### Account
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
 | Short selling | No | Yes | Yes | Yes | Yes | No |
-| Leverage | No | No | No | Cash validation disabled | No | No |
+| Leverage | No | No | No | Cash validation disabled | Yes, 2x | No |
 | Share type | integer | integer | fractional | integer | integer | integer |
 
 ### Costs
@@ -108,27 +116,34 @@ Profiles define behavioral defaults. Quote-aware feeds layer on top of them: you
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
 | Commission | none | none | none | none | $0.005/share | 0.2% |
-| Slippage | none | none | none | none | 0.1% | 0.2% |
+| Slippage | none | none | none | none | none | 0.2% |
 | Stop slippage | 0 | 0 | 0 | 0 | 0 | 0.1% |
 | Cash buffer | 0% | 0% | 0% | 0% | 0% | 2% |
+| Target-weight multiplier | 100% | 100% | 100% | 100% | 99.75% | 100% |
 
 ### Order Processing
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Fill ordering | exit_first | fifo | exit_first | fifo | exit_first | exit_first |
+| Fill ordering | exit_first | fifo | exit_first | fifo | sequential | exit_first |
 | Reject insuff. | yes | yes | no | no | yes | yes |
 | Partial fills | no | no | yes | no | no | no |
 | Rebalance mode | incremental | snapshot | hybrid | snapshot | snapshot | incremental |
 
 ## Parity Validation
 
-Framework profiles can be validated at two levels:
+Framework profiles are validated on the workloads each retained artifact declares:
 
-1. **Scenario-level** (16 scenarios per framework): Exact trade-by-trade matching on synthetic data covering entries, exits, stops, trailing stops, brackets, and multi-asset strategies.
+1. **Scenario-level**: Exact trade-by-trade matching on the required synthetic matrix for
+   VectorBT, Backtrader, and Zipline.
 
 2. **Large-scale**: Trade-by-trade comparison on a retained real-data workload. A claim is omitted
    when no passing artifact is retained for that framework.
+
+LEAN has separate native-behavior and Chapter 16 case-study evidence. The frozen engine produced
+47,652 fills across three case studies; ML4T matched every canonical fill and each terminal value
+at the declared $0.0001 quantum. See `validation/native/evidence/lean-18001.json` and
+`validation/lean/case_study_evidence.json`.
 
 <!-- parity-claims:start -->
 <!-- Generated by validation/generate_parity_claims.py. Do not edit by hand. -->

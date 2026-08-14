@@ -187,7 +187,8 @@ config = BacktestConfig.from_preset("realistic")
 
 Each preset configures the measured behavior used by its comparison protocol. The native defaults,
 explicit overrides, and adapter-emulated behavior are listed in the
-[validation methodology](../../validation/METHODOLOGY.md). Strict aliases are also available for
+[validation methodology](https://github.com/ml4t/backtest/blob/main/validation/METHODOLOGY.md).
+Strict aliases are also available for
 the retained comparison commands.
 
 ## Insufficient Funds

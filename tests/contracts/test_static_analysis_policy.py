@@ -93,6 +93,7 @@ def test_ci_checks_every_release_validation_script() -> None:
         "validation/lean/workspace/chapter16_etfs/main.py",
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/main.py",
         "validation/lean/workspace/chapter16_us_equities_panel/main.py",
+        "validation/native/lean_project/main.py",
         # Legacy manual orchestrators require optional framework environments.
         "validation/benchmark_suite.py",
         "validation/run_all_benchmarks.py",

@@ -97,15 +97,24 @@ python validation/build_framework_env.py --all-public
 # Licensed VectorBT Pro requires authorized SSH access to the frozen source commit
 python validation/build_framework_env.py --framework vectorbt_pro
 
-# Verify the locked LEAN data-preparation CLI and immutable engine image separately
+# Verify the locked LEAN CLI and immutable engine image
 python validation/build_framework_env.py --framework lean
+
+# Reproduce the native behavior and Chapter 16 comparison evidence
+.venv-lean/bin/python validation/native/lean_behavior.py \
+  --lean-command .venv-lean/bin/lean \
+  --output /tmp/lean-native.json
+.venv-lean/bin/python validation/run_lean_case_studies.py \
+  --lean-command .venv-lean/bin/lean \
+  --output /tmp/lean-case-studies.json
 ```
 
 The target versions, artifact hashes, source commits, interpreter paths, and expected matrix counts
 are defined in `framework_targets.toml`. Each lock is under `validation/environments/`. CI builds
 those locks and executes all 16 declared pairs for each public framework; an omitted pair fails.
-The release workflow separately requires licensed VectorBT Pro execution and LEAN image
-verification. Repository workflows never store licensed credentials.
+The release workflow separately requires licensed VectorBT Pro execution and fresh LEAN native
+and Chapter 16 execution against the frozen image. Repository workflows never store licensed
+credentials.
 
 ## File Organization
 

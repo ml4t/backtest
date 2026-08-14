@@ -9,6 +9,7 @@ validation/generate_parity_claims.py
 validation/performance_baseline.py
 validation/release_candidate.py
 validation/run_all_correctness.py
+validation/run_lean_case_studies.py
 validation/common/comparator.py
 validation/common/correctness_evidence.py
 validation/common/data_generators.py
@@ -19,4 +20,5 @@ validation/common/types.py
 validation/native/vectorbt_behavior.py
 validation/native/backtrader_behavior.py
 validation/native/zipline_behavior.py
+validation/native/lean_behavior.py
 validation/scenarios/definitions.py

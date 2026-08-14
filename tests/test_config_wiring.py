@@ -900,7 +900,9 @@ class TestPresetRoundTrip:
     def test_lean_preset_values(self):
         config = BacktestConfig.from_preset("lean")
         assert config.share_type == ShareType.INTEGER
-        assert config.fill_ordering == FillOrdering.EXIT_FIRST
+        assert config.fill_ordering == FillOrdering.SEQUENTIAL
+        assert config.rebalance_headroom_pct == 0.9975
+        assert config.slippage_type == SlippageType.NONE
         assert config.next_bar_queue_shadow_validation is True
 
     def test_ibkr_us_stocks_fixed_preset_values(self):

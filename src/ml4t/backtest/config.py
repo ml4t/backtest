@@ -1221,7 +1221,7 @@ class BacktestConfig:
         - "backtrader": Match Backtrader's default behavior
         - "vectorbt": Match VectorBT's default behavior
         - "zipline": Match Zipline's default behavior
-        - "lean": Match QuantConnect LEAN's default behavior
+        - "lean": Match the frozen LEAN daily US-equity comparison protocol
         - "realistic": Conservative settings for realistic simulation
         - "ibkr_us_stocks_fixed": Interactive Brokers US stocks fixed pricing
         """
