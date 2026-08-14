@@ -1,6 +1,6 @@
 # Validation Methodology
 
-*Last updated: 2026-08-13*
+*Last updated: 2026-08-14*
 
 ## Core Principle
 
@@ -11,6 +11,17 @@ There are NO "expected differences." Every trade count gap, every value gap, is 
 configurable knob is missing or misconfigured. The gap must be driven to zero.
 
 ## How It Works
+
+### Evidence scope
+
+The primary cross-framework audit uses frozen inputs from three production case studies: ETF
+allocation, CME futures, and crypto perpetual futures with funding. It compares only combinations
+that the framework and frozen data carrier genuinely support. Model inference and target
+construction happen before either engine runs, so both sides receive the same targets.
+
+The 17 synthetic scenarios test isolated execution conventions. The 250-asset synthetic workload
+tests high event counts and broad state transitions. These two suites are diagnostic and stress
+evidence, not evidence that a realistic strategy is equivalent.
 
 ### 1. Configurable Code Paths
 
@@ -293,6 +304,7 @@ brokerage models can select different requirements.
 | Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline protocol | LEAN |
 |------|-------------|----------|--------------|------------|---------|------|
 | `share_type` | integer | fractional | VBT-O | integer (BT-S) | integer (ZL-S) | integer (LN-S) |
+| `share_rounding` | nearest | nearest | VBT-O | truncate (BT-S) | nearest (ZL-S) | nearest (LN-S) |
 | repeated entry | check position | ignore unless accumulation is enabled | VBT-O | adapter checks position | adapter checks position | adapter submits target delta |
 | `commission_model` | none | none | VBT-F | none (BT-C) | none (ZL-P) | `InteractiveBrokersFeeModel` (LN-M) |
 | `commission_rate` | 0% | 0% | VBT-F | 0% (BT-C) | -- | -- |
@@ -311,13 +323,14 @@ percentage slippage overrides.
 controlled `Portfolio.from_orders` protocol. The retained native check verifies that short-sale
 cash is reported in the cash series but cannot fund new exposure. `backtrader` uses the measured
 framework defaults for costs, leverage, target headroom, missing bars, and late feeds.
-`backtrader_strict` adds submission-time cash checks to reproduce Backtrader's enabled
-`checksubmit` path. `zipline_strict` resolves to the same settings as `zipline`; both represent the
+`backtrader_strict` adds submission-time cash checks and truncates target quantities to reproduce
+Backtrader's enabled `checksubmit` and native integer-sizing paths. `zipline_strict` resolves to
+the same settings as `zipline`; both represent the
 explicit comparison protocol described above. The native Zipline defaults remain separate. The
 `lean` profile represents only the named daily US-equity protocol above. Its stop settings are not
 part of the retained LEAN equivalence claim.
 
-Large-scale evidence compares native ordered fills first, then reconstructs closed trades from the
+Synthetic scale evidence compares native ordered fills first, then reconstructs closed trades from the
 canonical 1e-8 fill records for both engines. This prevents sub-quantum differences in a
 framework's post-hoc trade-table arithmetic from changing a trade derived from equivalent fills.
 The scenario suite separately compares each framework's native trade records.
@@ -353,9 +366,9 @@ The controlled scale workload contains 250 assets and 5,040 daily sessions (1,26
 
 ## Validation Harness
 
-### Scenario Tests (17 scenarios x 4 frameworks)
+### Synthetic Scenario Tests (17 scenarios x 4 frameworks)
 
-The validation suite tests 17 scenarios against 4 external frameworks:
+The validation suite tests 17 isolated conformance scenarios against 4 external frameworks:
 
 | ID | Scenario | What It Tests |
 |----|----------|---------------|
@@ -377,11 +390,11 @@ The validation suite tests 17 scenarios against 4 external frameworks:
 | 16 | Regime Path Coverage | 1500 bars, 9 market regimes and sparse entries |
 | 17 | High Event Count | 1800 bars, up to 600 completed round trips |
 
-### Large-Scale Validation (250 assets x 20 years)
+### Synthetic Stress Validation (250 assets x 20 years)
 
-Beyond scenario tests, the benchmark suite runs a full ranking strategy on 250 US equities
-from 1998-2018. This produces 200K+ trades that are compared trade-by-trade between frameworks.
-See `benchmark_suite.py` for the implementation.
+The benchmark suite runs a generated ranking workload on 250 US equities from 1998-2018. It
+produces more than 200,000 trades for record-volume and state-transition testing. See
+`benchmark_suite.py` for the implementation. It is not a production case study.
 
 ### Running the Suite
 
@@ -397,6 +410,16 @@ python validation/run_scenario.py --all
 
 # Large-scale benchmark
 python validation/benchmark_suite.py --profile backtrader_strict --framework backtrader
+
+# Compare retained real-strategy outputs
+uv run python validation/real_strategy_evidence.py \
+  --evidence-root PATH/TO/REAL_STRATEGY_OUTPUTS \
+  --output validation/candidates/REAL_STRATEGY_RESULTS.candidate.json
+
+# Repeat engine-only timings for correctness-passing real-strategy pairs
+uv run python validation/real_strategy_benchmark.py \
+  --bundle-root PATH/TO/CONTENT_ADDRESSED_BUNDLES \
+  --samples 10
 ```
 
 ---
@@ -411,3 +434,6 @@ python validation/benchmark_suite.py --profile backtrader_strict --framework bac
 | Framework drivers | `validation/frameworks/` |
 | Benchmark suite | `validation/benchmark_suite.py` |
 | Scenario runner | `validation/run_scenario.py` |
+| Real-strategy applicability | `validation/real_strategy_applicability.toml` |
+| Real-strategy correctness evidence | `validation/REAL_STRATEGY_RESULTS.json` |
+| Real-strategy performance evidence | `validation/REAL_STRATEGY_PERFORMANCE.json` |

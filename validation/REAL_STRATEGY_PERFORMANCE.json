@@ -1,0 +1,474 @@
+{
+  "correctness_evidence_generated_at": "2026-08-14T21:50:26.236995+00:00",
+  "environment": {
+    "cpu_count": 24,
+    "frameworks": {
+      "backtrader": {
+        "access": "public",
+        "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+        "display_name": "Backtrader",
+        "environment": ".venv-backtrader",
+        "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+        "license": "GPL-3.0-or-later",
+        "package": "backtrader",
+        "profile": "backtrader_strict",
+        "python": "3.12 audit interpreter; upstream package metadata does not declare a range",
+        "python_env_var": "ML4T_BACKTRADER_PYTHON",
+        "required_scenarios": 17,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/backtrader/1.9.78.123/",
+        "unsupported_scenarios": 0,
+        "version": "1.9.78.123"
+      },
+      "lean": {
+        "access": "public",
+        "artifact": "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+        "cli_immutable_id": "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c",
+        "cli_version": "1.0.228",
+        "display_name": "LEAN",
+        "environment": ".venv-lean",
+        "immutable_id": "sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+        "license": "Apache-2.0",
+        "package": "lean",
+        "platform_artifact": "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307",
+        "profile": "lean",
+        "python": "3.11",
+        "python_env_var": "ML4T_LEAN_PYTHON",
+        "required_scenarios": 0,
+        "scenario_matrix": false,
+        "source": "https://github.com/QuantConnect/Lean",
+        "source_commit": "278fcb3d1b815b63ccadba68d7ae54422e34b792",
+        "unsupported_scenarios": 0,
+        "version": "18001"
+      },
+      "vectorbt_oss": {
+        "access": "public",
+        "artifact": "vectorbt-1.1.0.tar.gz",
+        "display_name": "VectorBT OSS",
+        "environment": ".venv-vectorbt-oss",
+        "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
+        "license": "Apache-2.0 WITH Commons-Clause",
+        "package": "vectorbt",
+        "profile": "vectorbt_oss_strict",
+        "python": ">=3.11,<3.15",
+        "python_env_var": "ML4T_VECTORBT_OSS_PYTHON",
+        "required_scenarios": 16,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/vectorbt/1.1.0/",
+        "source_commit": "259d2d89fe2e7638baf3ca76c394937cd32b656d",
+        "unsupported_scenarios": 1,
+        "version": "1.1.0"
+      },
+      "vectorbt_pro": {
+        "access": "licensed",
+        "display_name": "VectorBT Pro",
+        "environment": ".venv-vectorbt-pro",
+        "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+        "license": "Proprietary",
+        "package": "vectorbtpro",
+        "profile": "vectorbt_strict",
+        "python": ">=3.11",
+        "python_env_var": "ML4T_VECTORBT_PRO_PYTHON",
+        "required_scenarios": 17,
+        "scenario_matrix": true,
+        "source": "https://github.com/polakowo/vectorbt.pro",
+        "source_commit": "6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+        "unsupported_scenarios": 0,
+        "version": "2026.6.27"
+      },
+      "zipline": {
+        "access": "public",
+        "artifact": "zipline_reloaded-3.1.1.tar.gz",
+        "display_name": "Zipline Reloaded",
+        "environment": ".venv-zipline",
+        "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+        "license": "Apache-2.0",
+        "package": "zipline-reloaded",
+        "profile": "zipline_strict",
+        "python": ">=3.10",
+        "python_env_var": "ML4T_ZIPLINE_PYTHON",
+        "required_scenarios": 16,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
+        "source_commit": "09885a2ebc7567d40942c891b3879dc03c745070",
+        "unsupported_scenarios": 1,
+        "version": "3.1.1"
+      }
+    },
+    "machine": "x86_64",
+    "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
+    "processor": "x86_64"
+  },
+  "generated_at": "2026-08-14T22:02:59.708731+00:00",
+  "records": [
+    {
+      "case_study": "etfs",
+      "correctness_status": "pass",
+      "framework": "vectorbt_pro",
+      "framework_engine": {
+        "ci_95_seconds": [
+          0.2877248858567327,
+          0.3143139739986509
+        ],
+        "maximum_seconds": 0.321378983091563,
+        "median_seconds": 0.30129249359015375,
+        "minimum_seconds": 0.2838830230757594,
+        "output_identity": {
+          "equity.parquet": "9bef5099c36b4a61b32670d19340ebb9f4adba07c63359a5c31a345ad51d1cd6",
+          "fills.parquet": "698baf228da467fcce287f6f7da4903b3421d2649b181e3905a3681905251ffd"
+        },
+        "samples_seconds": [
+          0.3078031288459897,
+          0.2877248858567327,
+          0.31535538914613426,
+          0.28730017109774053,
+          0.29972767806611955,
+          0.296694670105353,
+          0.2838830230757594,
+          0.30285730911418796,
+          0.321378983091563,
+          0.3143139739986509
+        ]
+      },
+      "framework_to_ml4t_median_ratio": 0.63734406854925,
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "ml4t_engine": {
+        "ci_95_seconds": [
+          0.46813473547808826,
+          0.48135182401165366
+        ],
+        "maximum_seconds": 0.5062140279915184,
+        "median_seconds": 0.4727313055191189,
+        "minimum_seconds": 0.4654777019750327,
+        "output_identity": {
+          "equity.parquet": "2b3109fecdfbc3beb73440b2cb7b622fea0eadfc420c789e8df0c12a910f204a",
+          "fills.parquet": "c5bc939502eb338df0b625c08d452519ec98613fdf7fcf67a1834e0ca03f0bc1",
+          "rejected_orders.parquet": "043204927e46137ca25cc0fa23883f4868af2b57f48c50d034fd56e113da12e8"
+        },
+        "samples_seconds": [
+          0.46608604094944894,
+          0.4712033399846405,
+          0.4654777019750327,
+          0.47425927105359733,
+          0.5062140279915184,
+          0.4701834300067276,
+          0.46974061895161867,
+          0.4876708099618554,
+          0.4750328380614519,
+          0.47705927421338856
+        ]
+      }
+    },
+    {
+      "case_study": "etfs",
+      "correctness_status": "pass",
+      "framework": "vectorbt_oss",
+      "framework_engine": {
+        "ci_95_seconds": [
+          0.17306407110299915,
+          0.18181957793422043
+        ],
+        "maximum_seconds": 0.21566205006092787,
+        "median_seconds": 0.17451222008094192,
+        "minimum_seconds": 0.1721026541199535,
+        "output_identity": {
+          "equity.parquet": "9bef5099c36b4a61b32670d19340ebb9f4adba07c63359a5c31a345ad51d1cd6",
+          "fills.parquet": "a563dc47e59cc8d1ecf49a490f1e83842e5c4ca67a6a56adb411a58eb0842646"
+        },
+        "samples_seconds": [
+          0.17271609115414321,
+          0.1734120510518551,
+          0.1837726249359548,
+          0.17510798503644764,
+          0.17646493786014616,
+          0.17332790791988373,
+          0.18181957793422043,
+          0.1721026541199535,
+          0.21566205006092787,
+          0.1739164551254362
+        ]
+      },
+      "framework_to_ml4t_median_ratio": 0.36925871041104746,
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "ml4t_engine": {
+        "ci_95_seconds": [
+          0.4680275656282902,
+          0.4801189919235185
+        ],
+        "maximum_seconds": 0.5001788369845599,
+        "median_seconds": 0.47260149905923754,
+        "minimum_seconds": 0.4633619370870292,
+        "output_identity": {
+          "equity.parquet": "2b3109fecdfbc3beb73440b2cb7b622fea0eadfc420c789e8df0c12a910f204a",
+          "fills.parquet": "c5bc939502eb338df0b625c08d452519ec98613fdf7fcf67a1834e0ca03f0bc1",
+          "rejected_orders.parquet": "043204927e46137ca25cc0fa23883f4868af2b57f48c50d034fd56e113da12e8"
+        },
+        "samples_seconds": [
+          0.5001788369845599,
+          0.48318234691396356,
+          0.4722748331259936,
+          0.47093891398981214,
+          0.4633619370870292,
+          0.48009940097108483,
+          0.46378029813058674,
+          0.4770556369330734,
+          0.46870339196175337,
+          0.47292816499248147
+        ]
+      }
+    },
+    {
+      "case_study": "etfs",
+      "correctness_status": "pass",
+      "framework": "backtrader",
+      "framework_engine": {
+        "ci_95_seconds": [
+          9.667390221497044,
+          13.843348437454551
+        ],
+        "maximum_seconds": 15.390819479012862,
+        "median_seconds": 10.112870517419651,
+        "minimum_seconds": 9.50694501097314,
+        "output_identity": {
+          "equity.parquet": "194818b08af3ceac17f2ff8b143d76184b63f95a92ab2db1ee4a13b903843d92",
+          "fills.parquet": "8fbc351395431fcaf3d986c1d72011520394fa202db5b25ea2a79f49f4c013ab",
+          "rejected_orders.parquet": "29756624602e47c7f667e995e892fd158828381420d570a8a8a65d23d84d617b"
+        },
+        "samples_seconds": [
+          10.426955967908725,
+          9.50694501097314,
+          9.725007123081014,
+          15.390819479012862,
+          13.655269084963948,
+          9.798785066930577,
+          13.02946886094287,
+          14.657228013966233,
+          9.702260518912226,
+          9.609773319913074
+        ]
+      },
+      "framework_to_ml4t_median_ratio": 23.220408605374217,
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "ml4t_engine": {
+        "ci_95_seconds": [
+          0.430571055971086,
+          0.46572351013310254
+        ],
+        "maximum_seconds": 0.48355723288841546,
+        "median_seconds": 0.43551647558342665,
+        "minimum_seconds": 0.429133758880198,
+        "output_identity": {
+          "equity.parquet": "c0d9b87df7d1d490134679c571414ee3f5d5dc96cba2fd81e18c24c920ee9b60",
+          "fills.parquet": "11fee07c68fa9550b8c9bfa8590940e33a0247db7640c280043b6eddcaf7fa12",
+          "rejected_orders.parquet": "12abf1f224c27116ad669c98592fc527880414b152e921de2fb362eb8c3815d3"
+        },
+        "samples_seconds": [
+          0.43825321504846215,
+          0.4314290499314666,
+          0.429133758880198,
+          0.4683438939973712,
+          0.48355723288841546,
+          0.43277973611839116,
+          0.46572351013310254,
+          0.4302571520674974,
+          0.430571055971086,
+          0.444610444130376
+        ]
+      }
+    },
+    {
+      "case_study": "etfs",
+      "correctness_status": "pass",
+      "framework": "zipline",
+      "framework_engine": {
+        "ci_95_seconds": [
+          3.956691594561562,
+          4.069972718833014
+        ],
+        "maximum_seconds": 4.293457298073918,
+        "median_seconds": 3.994884098530747,
+        "minimum_seconds": 3.940686154179275,
+        "output_identity": {
+          "equity.parquet": "e67ccdf71043cd216a9d8ea6f96f6cc0eba564907919ef1b867bce4726e36b31",
+          "fills.parquet": "611b2ca3adc8a24484dcee08d5fba4c9219c0c0c6f4b27d701db51ea98390572"
+        },
+        "samples_seconds": [
+          4.018492441158742,
+          4.079541471088305,
+          4.023147796047851,
+          3.9627670240588486,
+          3.9712757559027523,
+          3.940686154179275,
+          3.9475881590042263,
+          4.293457298073918,
+          4.069972718833014,
+          3.9657950301188976
+        ]
+      },
+      "framework_to_ml4t_median_ratio": 9.266386817235245,
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "ml4t_engine": {
+        "ci_95_seconds": [
+          0.4164497200399637,
+          0.4516012701205909
+        ],
+        "maximum_seconds": 0.5047315200790763,
+        "median_seconds": 0.4311156200710684,
+        "minimum_seconds": 0.41364461509510875,
+        "output_identity": {
+          "equity.parquet": "578498185c7abd3b869578c8492937a09ce6cf8904ea64650375587fd397952a",
+          "fills.parquet": "b068c42a1d63409086e4cc638aec586818f9025f661897e7bdd34e5e4d8f9c6f",
+          "rejected_orders.parquet": "043204927e46137ca25cc0fa23883f4868af2b57f48c50d034fd56e113da12e8"
+        },
+        "samples_seconds": [
+          0.41557857510633767,
+          0.4229783359915018,
+          0.5047315200790763,
+          0.43745689396746457,
+          0.42477434617467225,
+          0.4551242580637336,
+          0.437978943111375,
+          0.4516012701205909,
+          0.4164497200399637,
+          0.41364461509510875
+        ]
+      }
+    },
+    {
+      "case_study": "etfs",
+      "correctness_status": "pass",
+      "framework": "lean",
+      "framework_engine": {
+        "ci_95_seconds": [
+          2.887489428045228,
+          3.3646027559880167
+        ],
+        "maximum_seconds": 6.0475188188720495,
+        "median_seconds": 3.0153015080140904,
+        "minimum_seconds": 2.720208310056478,
+        "output_identity": {
+          "equity.parquet": "ce1426438d739bc4f923d852fa9972446ef3acb5906ac70a8a66678495ad7a4f",
+          "fills.parquet": "f987de663e3459a6a9e78c117d93807d2181fb261c375bb3f4d212072f5764cd",
+          "rejected_orders.parquet": "9e7aedba072cbcd23432976f03fb6edef656da961cd2e73dbd75188842b29c36"
+        },
+        "samples_seconds": [
+          2.9472668361850083,
+          6.0475188188720495,
+          3.1162031220737845,
+          2.720208310056478,
+          2.832029588986188,
+          2.887489428045228,
+          3.015350027009845,
+          3.3646027559880167,
+          3.015252989018336,
+          3.454807749018073
+        ]
+      },
+      "framework_to_ml4t_median_ratio": 5.202119620681108,
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "ml4t_engine": {
+        "ci_95_seconds": [
+          0.5633496295195073,
+          0.6195018270518631
+        ],
+        "maximum_seconds": 0.6607448949944228,
+        "median_seconds": 0.579629406449385,
+        "minimum_seconds": 0.5530728748999536,
+        "output_identity": {
+          "equity.parquet": "9d2ae671c05691680de1a947edc07b5805d3d17c4fffdb0d9cb002908d5d9189",
+          "fills.parquet": "6dabab0285fe7d1d41c6008f9db1910fd0eb5117ce132cda2eac13fa47581b18",
+          "rejected_orders.parquet": "043204927e46137ca25cc0fa23883f4868af2b57f48c50d034fd56e113da12e8"
+        },
+        "samples_seconds": [
+          0.5560325291007757,
+          0.5686522379983217,
+          0.5780714668799192,
+          0.5811873460188508,
+          0.5530728748999536,
+          0.62224833201617,
+          0.5947634829208255,
+          0.5706667299382389,
+          0.6607448949944228,
+          0.6195018270518631
+        ]
+      }
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "correctness_status": "pass",
+      "framework": "lean",
+      "framework_engine": {
+        "ci_95_seconds": [
+          2.879764577955939,
+          3.7526830200804397
+        ],
+        "maximum_seconds": 5.715309476945549,
+        "median_seconds": 2.941230505006388,
+        "minimum_seconds": 2.794232564046979,
+        "output_identity": {
+          "equity.parquet": "9fb5d72364e039e75a28a1dcb77c06082418d698cac2467de8dc0c84371d2762",
+          "fills.parquet": "93ca6c8936e944e5f077e5b9b272a5467bac5ae828650029fc198dacd33ef46b",
+          "rejected_orders.parquet": "9e7aedba072cbcd23432976f03fb6edef656da961cd2e73dbd75188842b29c36"
+        },
+        "samples_seconds": [
+          2.9528271581511945,
+          2.906595162814483,
+          4.5487695201300085,
+          2.794232564046979,
+          2.90836218604818,
+          3.0265224468894303,
+          2.956596520030871,
+          2.851166969863698,
+          5.715309476945549,
+          2.929633851861581
+        ]
+      },
+      "framework_to_ml4t_median_ratio": 4.377674960680803,
+      "input_bundle_sha256": "2acee3c8542043266e6f9c0dfc9434c95b4469ef6fcaf0556efc569fc9721cdd",
+      "ml4t_engine": {
+        "ci_95_seconds": [
+          0.662905823905021,
+          0.6844377170782536
+        ],
+        "maximum_seconds": 0.6992742058355361,
+        "median_seconds": 0.671870463527739,
+        "minimum_seconds": 0.6581363650038838,
+        "output_identity": {
+          "equity.parquet": "0b98b8b65e7cc6885a27f9ffff6268d6d15a82b613ab06e4e57bbf96805ef1c9",
+          "fills.parquet": "b19ec75bb792f9109356b3127ea8580935932b00a9fb9dae92a970f643d74705",
+          "rejected_orders.parquet": "043204927e46137ca25cc0fa23883f4868af2b57f48c50d034fd56e113da12e8"
+        },
+        "samples_seconds": [
+          0.6621688180603087,
+          0.6836541260126978,
+          0.6924467631615698,
+          0.662905823905021,
+          0.6581363650038838,
+          0.6674405999947339,
+          0.6681335410103202,
+          0.6764286709949374,
+          0.6992742058355361,
+          0.6756073860451579
+        ]
+      }
+    }
+  ],
+  "schema_version": 1,
+  "timing_policy": {
+    "boundary": "engine call only",
+    "excluded": [
+      "input loading",
+      "model inference",
+      "target construction",
+      "adapter preparation",
+      "result extraction",
+      "serialization",
+      "reporting"
+    ],
+    "interval": "10,000-draw percentile bootstrap of the sample median",
+    "measured_processes": 10,
+    "process_isolation": true,
+    "publication_scope": "only correctness-passing case-study/framework pairs",
+    "warmup_processes": 1
+  }
+}

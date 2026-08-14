@@ -20,10 +20,11 @@ def test_legacy_accepted_evidence_cannot_generate_current_claims() -> None:
         generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
     )
     large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    real_strategy = generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_EVIDENCE)
     correctness["schema_version"] = 1
 
     with pytest.raises(ValueError, match="Unsupported correctness schema: 1"):
-        generate_parity_claims._validate_evidence(correctness, large_scale)
+        generate_parity_claims._validate_evidence(correctness, large_scale, real_strategy)
 
 
 def test_generated_claims_are_current() -> None:
@@ -60,17 +61,19 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
             added["status"] = "pass"
             correctness["records"].append(added)
     large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    real_strategy = generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_EVIDENCE)
     monkeypatch.setattr(generate_parity_claims, "correctness_report_failures", lambda _: [])
     monkeypatch.setattr(generate_parity_claims, "large_scale_report_failures", lambda _: [])
 
-    claims = generate_parity_claims.render_claims(correctness, large_scale)
+    claims = generate_parity_claims.render_claims(correctness, large_scale, real_strategy)
 
     for pin in correctness["frameworks"].values():
         assert pin["version"] in claims
         assert pin["source"] in claims
         assert f"`{pin['profile']}`" in claims
     assert "16/16 exact" in claims
-    assert "250 assets and 5,040 daily sessions (1,260,000 bars)" in claims
+    assert "synthetic stress workload contains 250 assets" in claims
+    assert "6/8 supported pairs pass" in claims
     for record in large_scale["frameworks"]:
         target = record["target"]
         checks = generate_parity_claims._comparison_checks(record)
@@ -88,5 +91,7 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
         if record["framework"] == "zipline" and record["scenario_id"] == "15"
     )
     failed_record["status"] = "comparison_failure"
-    failed_claims = generate_parity_claims.render_claims(failed_correctness, large_scale)
+    failed_claims = generate_parity_claims.render_claims(
+        failed_correctness, large_scale, real_strategy
+    )
     assert "15/16 pass; blocked by scenario 15" in failed_claims

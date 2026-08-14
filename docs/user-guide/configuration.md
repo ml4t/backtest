@@ -210,6 +210,7 @@ friction:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `share_type` | ShareType | INTEGER | FRACTIONAL or INTEGER |
+| `share_rounding` | ShareRounding | NEAREST | NEAREST or TRUNCATE for integer quantities |
 
 ### Result evidence
 

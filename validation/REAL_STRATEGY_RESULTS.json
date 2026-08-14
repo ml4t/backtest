@@ -1,0 +1,783 @@
+{
+  "comparison_policy": {
+    "canonical_quantum": "0.00000001",
+    "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
+    "meaning": "zero numeric gap after canonical quantization, not bit identity",
+    "rounding": "ROUND_HALF_EVEN",
+    "timestamp_domain": {
+      "cme_futures": "session date",
+      "crypto_perps_funding": "exact UTC event timestamp",
+      "etfs": "session date"
+    }
+  },
+  "generated_at": "2026-08-14T21:50:26.236995+00:00",
+  "provenance": {
+    "adapters": {
+      "backtrader": "b71c5faab1aceb6bab1a766c0b5759092f1addda4b36ac92e43d8dd3d3f8eb69",
+      "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+      "lean_equity": "facb2ad161253472ef8f54bf7482cf403b7afadc0fd17cd8c145b16921561ca4",
+      "ml4t": "77fc95575ecbf298eb386967cb5c49629a51efd7269dbdcdaec3c214de04ad8d",
+      "vectorbt_oss": "7c2c296ed741bf4bfba0777861fddfc59ae75367a0305dbb36f6b4bb0f4ffcbe",
+      "vectorbt_pro": "7c2c296ed741bf4bfba0777861fddfc59ae75367a0305dbb36f6b4bb0f4ffcbe",
+      "zipline": "73d98aa4403132353cfbef3b178a35a7a8b349921ff1c82b13c6b0508dcc7fba"
+    },
+    "applicability_sha256": "9449052970c6b76f75775d0b72075b412bf6fd9d0ef24d4af30c34fdf0857a3b",
+    "cpu_count": 24,
+    "frameworks": {
+      "backtrader": {
+        "access": "public",
+        "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+        "display_name": "Backtrader",
+        "environment": ".venv-backtrader",
+        "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+        "license": "GPL-3.0-or-later",
+        "package": "backtrader",
+        "profile": "backtrader_strict",
+        "python": "3.12 audit interpreter; upstream package metadata does not declare a range",
+        "python_env_var": "ML4T_BACKTRADER_PYTHON",
+        "required_scenarios": 17,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/backtrader/1.9.78.123/",
+        "unsupported_scenarios": 0,
+        "version": "1.9.78.123"
+      },
+      "lean": {
+        "access": "public",
+        "artifact": "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+        "cli_immutable_id": "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c",
+        "cli_version": "1.0.228",
+        "display_name": "LEAN",
+        "environment": ".venv-lean",
+        "immutable_id": "sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+        "license": "Apache-2.0",
+        "package": "lean",
+        "platform_artifact": "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307",
+        "profile": "lean",
+        "python": "3.11",
+        "python_env_var": "ML4T_LEAN_PYTHON",
+        "required_scenarios": 0,
+        "scenario_matrix": false,
+        "source": "https://github.com/QuantConnect/Lean",
+        "source_commit": "278fcb3d1b815b63ccadba68d7ae54422e34b792",
+        "unsupported_scenarios": 0,
+        "version": "18001"
+      },
+      "vectorbt_oss": {
+        "access": "public",
+        "artifact": "vectorbt-1.1.0.tar.gz",
+        "display_name": "VectorBT OSS",
+        "environment": ".venv-vectorbt-oss",
+        "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
+        "license": "Apache-2.0 WITH Commons-Clause",
+        "package": "vectorbt",
+        "profile": "vectorbt_oss_strict",
+        "python": ">=3.11,<3.15",
+        "python_env_var": "ML4T_VECTORBT_OSS_PYTHON",
+        "required_scenarios": 16,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/vectorbt/1.1.0/",
+        "source_commit": "259d2d89fe2e7638baf3ca76c394937cd32b656d",
+        "unsupported_scenarios": 1,
+        "version": "1.1.0"
+      },
+      "vectorbt_pro": {
+        "access": "licensed",
+        "display_name": "VectorBT Pro",
+        "environment": ".venv-vectorbt-pro",
+        "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+        "license": "Proprietary",
+        "package": "vectorbtpro",
+        "profile": "vectorbt_strict",
+        "python": ">=3.11",
+        "python_env_var": "ML4T_VECTORBT_PRO_PYTHON",
+        "required_scenarios": 17,
+        "scenario_matrix": true,
+        "source": "https://github.com/polakowo/vectorbt.pro",
+        "source_commit": "6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+        "unsupported_scenarios": 0,
+        "version": "2026.6.27"
+      },
+      "zipline": {
+        "access": "public",
+        "artifact": "zipline_reloaded-3.1.1.tar.gz",
+        "display_name": "Zipline Reloaded",
+        "environment": ".venv-zipline",
+        "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+        "license": "Apache-2.0",
+        "package": "zipline-reloaded",
+        "profile": "zipline_strict",
+        "python": ">=3.10",
+        "python_env_var": "ML4T_ZIPLINE_PYTHON",
+        "required_scenarios": 16,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
+        "source_commit": "09885a2ebc7567d40942c891b3879dc03c745070",
+        "unsupported_scenarios": 1,
+        "version": "3.1.1"
+      }
+    },
+    "machine": "x86_64",
+    "ml4t": {
+      "commit": "ae6eadfb3de3b5cd00425ae8598c839bb2eddcec",
+      "dirty": false,
+      "engine_source_sha256": "d0e58bd4d73e7d942a16c9e162b273a7e123cda55ecc8a262ef0cc5c1169aebe"
+    },
+    "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
+    "python": "3.12.11"
+  },
+  "records": [
+    {
+      "case_study": "etfs",
+      "engine_seconds": {
+        "framework": 0.4040620180312544,
+        "ml4t": 0.629301629960537,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "537c660c711d2a1fd21aa69b4f8532f7fdeeca5b6dcef7ee9511051ce12fdff7",
+        "ml4t_manifest_sha256": "7dea74cbf3c9b8285effdbad1571c03dd50c9fe195f0910ba9abf5090233b6f9"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "vectorbt_pro",
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "vectorbt_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1995
+          },
+          "first_divergence": null,
+          "framework_records": 1995,
+          "framework_sha256": "2a90d6fb0aba61ab170d077e3c648f46bd719a3fd286625e393827b9bd40aef5",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1995,
+          "ml4t_sha256": "35b169e25c0face2b5e714bcef7f8a871eb1202ef26dca0a8e363dde0b9c35f4",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 2466,
+          "framework_sha256": "4fd8e258ca5d6c1b682bbdfc5c36676ab0ba7a50c4b825be460ce628852e5639",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 2466,
+          "ml4t_sha256": "8e7fa6334fe7e70a236ecf5b326cca611cca899a2e578157b4616782b9766a9e",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "11db1c456d36b30c4d6fe19414e21296ed1ea78289f54c50e82b6034b7f8c883",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "57b2a04fa64b67afab474dfd60eb02467ce8f45f4b1a6334192432ff1620eba7",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "etfs",
+      "engine_seconds": {
+        "framework": 0.3250391921028495,
+        "ml4t": 0.5358219449408352,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "42955db895abf309fcacdd0b285d3760b40c1ce56f4d2ccaa379c6e20dc9668c",
+        "ml4t_manifest_sha256": "2f9ba57e88936b70d97c18e0544939dde5129698950df565be350476ad3f69e1"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "vectorbt_oss",
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "vectorbt_oss_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1995
+          },
+          "first_divergence": null,
+          "framework_records": 1995,
+          "framework_sha256": "2a90d6fb0aba61ab170d077e3c648f46bd719a3fd286625e393827b9bd40aef5",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1995,
+          "ml4t_sha256": "35b169e25c0face2b5e714bcef7f8a871eb1202ef26dca0a8e363dde0b9c35f4",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 2466,
+          "framework_sha256": "4fd8e258ca5d6c1b682bbdfc5c36676ab0ba7a50c4b825be460ce628852e5639",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 2466,
+          "ml4t_sha256": "8e7fa6334fe7e70a236ecf5b326cca611cca899a2e578157b4616782b9766a9e",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "11db1c456d36b30c4d6fe19414e21296ed1ea78289f54c50e82b6034b7f8c883",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "57b2a04fa64b67afab474dfd60eb02467ce8f45f4b1a6334192432ff1620eba7",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "etfs",
+      "engine_seconds": {
+        "framework": 10.37365989596583,
+        "ml4t": 0.494711043080315,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "06c7afb82b6f1197105a9262620101d9e497e458e21dfba4981e597ace112389",
+        "ml4t_manifest_sha256": "99085680175eaa147282e4c5cdf588c56890937e4069151e92574f2c3987bbcc"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "backtrader",
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "backtrader_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1995
+          },
+          "first_divergence": null,
+          "framework_records": 1995,
+          "framework_sha256": "e24fb0355c02e8e6fd24c3a050d058244d48d900682f1242e41938482a45affb",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1995,
+          "ml4t_sha256": "2f657ea8deecd915e43d5f207661f1907358bc3172eca4e7f56cfc4b105fbd8f",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 2433,
+          "framework_sha256": "0efdc5bd3df5c4ee32d9e7601a0a0f205ca338c61217271432830cc5728767ea",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 2433,
+          "ml4t_sha256": "3535fd059ff949dafefd38383f3883a273073b0d982f8d19ba682137e5c3e629",
+          "passed": true
+        },
+        "rejection_count": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "cc5553d35594bb9f739671460ea2ddfbc7151b631d07ad81792942dd32c22cf9",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "cc5553d35594bb9f739671460ea2ddfbc7151b631d07ad81792942dd32c22cf9",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "bab10acfe67a203e84aa8ee135c37a84462af6281afc20dc288ccc96a6af1f1a",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "e00b039f6819ab12344af27396c8915f76913726e723c079d6f2c80edb0df0f6",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "etfs",
+      "engine_seconds": {
+        "framework": 5.272912076907232,
+        "ml4t": 0.46331586595624685,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "7d0010410e06ed7a611343cbf39d2f35fe55c4f97d47e7c53aa7ff8daf0a894a",
+        "ml4t_manifest_sha256": "60b202562c59b89c1a8c3b9cb1cbae27ede358d66370fa3b8eed88c4f1442e2a"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "zipline",
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "zipline_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1995
+          },
+          "first_divergence": null,
+          "framework_records": 1995,
+          "framework_sha256": "a5face19b441f6cf41b92e81c4458eff3428a7835cd4465c468c4e3d75ff311d",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1995,
+          "ml4t_sha256": "8bafee4ab985e6e89429cdaa327caabe06d92af700c03587e5d9e6459e499e25",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 2458,
+          "framework_sha256": "e7845f778289a093b7b13703938ac1aff36060e55841c658fa3c4cfaf7d66e80",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 2458,
+          "ml4t_sha256": "c78d44621cdcd2f4b2e1797ba6b0a50a76555f210597189a73ab57ec5f8ea672",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "def79e34efb8b45e3f792ede075b8cdc2bb7e409b26d6e2584f5c5d7f9486726",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "4e87bd8a979d23c1189bde4d37dcbf51f9a32462a653e436223e7cf29dc494b8",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "etfs",
+      "engine_seconds": {
+        "framework": 4.122711522039026,
+        "ml4t": 0.5797442020848393,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "250cf56114937129fb657a4749e9beb026f4e077d356a7a1d7e8cf51c50e2fc2",
+        "ml4t_manifest_sha256": "61b1a6aa4240235b89e4b1b8e3c481081da43047f4a8f5d2fbe5ff67d9cc20ba"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "compared separately for LEAN equities",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "lean",
+      "input_bundle_sha256": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "lean",
+      "status": "pass",
+      "surfaces": {
+        "cash": {
+          "coverage": {
+            "framework_only_timestamps": 5,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1995
+          },
+          "first_divergence": null,
+          "framework_records": 1995,
+          "framework_sha256": "16f270b64f43ed22739d234d1b7abe1611c253828a5964411aae8fa3955b9730",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1995,
+          "ml4t_sha256": "30beda4a3a1167d861ee2c16622ef00c00ded113c1acf6dea0b8eaf0b78fd76e",
+          "passed": true
+        },
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 5,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1995
+          },
+          "first_divergence": null,
+          "framework_records": 1995,
+          "framework_sha256": "7959271a1f6e2dc65ee85a40114db98334a8852941a2fea28948bdf9eaeff5d1",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1995,
+          "ml4t_sha256": "90912934200276e9da497a2ac61e5b459b660815f3b63f43c971e4c4f553b092",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 2457,
+          "framework_sha256": "bb7685c44f3439854f69c28ed45f00cf6590c41fb4186e008bfc5ec8854c8f34",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 2457,
+          "ml4t_sha256": "bb7685c44f3439854f69c28ed45f00cf6590c41fb4186e008bfc5ec8854c8f34",
+          "passed": true
+        },
+        "rejection_count": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "dcdf690e7ea4a122b3ca6a083112a518058dc72bdba2bb120334d4b9636f47fc",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "4e9b140ade6e038a406e3a9332649f239d317a7666468785ce8a1c7f89318bff",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "cme_futures",
+      "engine_seconds": {
+        "framework": 0.4237614271696657,
+        "ml4t": 0.5547289319802076,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "781c018b31759e5eaf2297f7dcf13b36494c3430a334f4fa2e1df5adbfed7b2b",
+        "ml4t_manifest_sha256": "c142a3136033d6f7caf2e40a2603d784d7e858d6eb754829ea328a0a084dc5ca"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "vectorbt_pro",
+      "input_bundle_sha256": "c7191027f550ef1be0c9528dac08e7c2bf6a76c86d935f593efeb1ad8b628c39",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "vectorbt_strict",
+      "status": "fail",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 1,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1595
+          },
+          "first_divergence": {
+            "canonical_gap": "0.00000001",
+            "field": "equity",
+            "framework": {
+              "equity": "10000000.0",
+              "timestamp": "2019-01-04"
+            },
+            "index": 310,
+            "kind": "record",
+            "ml4t": {
+              "equity": "9999999.999999993",
+              "timestamp": "2019-01-04"
+            }
+          },
+          "framework_records": 1595,
+          "framework_sha256": "b1b40cf1cbcbc671db8670a19066dfaa77b497e6d03b06d83f087ad0a8aefc2c",
+          "max_canonical_difference": "0.00000010",
+          "ml4t_records": 1595,
+          "ml4t_sha256": "b3d629a19f386d6688964e89188f3ba27c95d34be5e96e22a1c9c8b83427a98b",
+          "passed": false
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 3545,
+          "framework_sha256": "33a8c1d5aac88de6255f5a23742619e68dcf77804f5158f02a910df265d5c154",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 3545,
+          "ml4t_sha256": "7588d63e48658ce630d22b814df79345ae7a8fdf53be1f133858f44b9f375971",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": {
+            "canonical_gap": "0.00000007",
+            "field": "final_value",
+            "framework": {
+              "final_value": "21780101.163148317"
+            },
+            "index": 0,
+            "kind": "record",
+            "ml4t": {
+              "final_value": "21780101.16314839"
+            }
+          },
+          "framework_records": 1,
+          "framework_sha256": "f0c1745e2a779c7b4127d81f854e355c791224c93f190167be7207250d8fe271",
+          "max_canonical_difference": "0.00000007",
+          "ml4t_records": 1,
+          "ml4t_sha256": "9f2c5af308ff360b1b6987eb84facaeeb98a44d08471480f4eeccb85ef11fc46",
+          "passed": false
+        }
+      }
+    },
+    {
+      "case_study": "cme_futures",
+      "framework": "vectorbt_oss",
+      "reason": "no native futures contract multiplier and margin-account model",
+      "source": "https://vectorbt.dev/api/portfolio/base/",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "cme_futures",
+      "engine_seconds": {
+        "framework": 2.906314143911004,
+        "ml4t": 0.5458641869481653,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "ac82009ee99eecfe9436f521c40ff00414dadd623259e1ea2ab29b307f93151a",
+        "ml4t_manifest_sha256": "bb4c7129768bd4eb6a735d32eb0f57b06188f39961c89c4c3270faa2dd7acf37"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "backtrader",
+      "input_bundle_sha256": "c7191027f550ef1be0c9528dac08e7c2bf6a76c86d935f593efeb1ad8b628c39",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "backtrader_strict",
+      "status": "fail",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 1,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 1595
+          },
+          "first_divergence": {
+            "canonical_gap": "0.00000001",
+            "field": "equity",
+            "framework": {
+              "equity": "8260040.797423724",
+              "timestamp": "2019-02-01"
+            },
+            "index": 330,
+            "kind": "record",
+            "ml4t": {
+              "equity": "8260040.7974237185",
+              "timestamp": "2019-02-01"
+            }
+          },
+          "framework_records": 1595,
+          "framework_sha256": "420284821eb233db8012d42b32f4df081744545df7c98df38e974ef87b8d8d1c",
+          "max_canonical_difference": "0.00000015",
+          "ml4t_records": 1595,
+          "ml4t_sha256": "89ba33c5e41e25db2aec0cb23ce625fbe8b2ff7ff1109f4d461dc9956105b7f1",
+          "passed": false
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 3376,
+          "framework_sha256": "079faf95a56575dca51207bf0587d0d792fe66dff32021f19d85114d8b3dfcb0",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 3376,
+          "ml4t_sha256": "4e8fc7f1acdbf85567d0c8148f2b1532dee362b1f4913058851d29a5e20896ee",
+          "passed": true
+        },
+        "rejection_count": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": {
+            "canonical_gap": "0.00000015",
+            "field": "final_value",
+            "framework": {
+              "final_value": "37957959.26743194"
+            },
+            "index": 0,
+            "kind": "record",
+            "ml4t": {
+              "final_value": "37957959.26743179"
+            }
+          },
+          "framework_records": 1,
+          "framework_sha256": "6ba61c2f2bdff3890ecbfac82425f15f4c2efaec002753bc6c31b52636106e10",
+          "max_canonical_difference": "0.00000015",
+          "ml4t_records": 1,
+          "ml4t_sha256": "66cdabf91ff8007a7010c0f36cf05e84eb4d4944a3bb85d8b296463ebdfe908a",
+          "passed": false
+        }
+      }
+    },
+    {
+      "case_study": "cme_futures",
+      "framework": "zipline",
+      "reason": "the frozen workload has continuous root series but no dated contract chain or roll map",
+      "source": "https://zipline.ml4trading.io/api-reference.html",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "cme_futures",
+      "framework": "lean",
+      "reason": "the frozen workload has continuous root series but no dated contract chain or roll map",
+      "source": "https://www.quantconnect.com/docs/v2/writing-algorithms/securities/asset-classes/futures",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "framework": "vectorbt_pro",
+      "reason": "no native perpetual-futures funding and margin-account model",
+      "source": "https://vectorbt.pro/features/portfolio/",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "framework": "vectorbt_oss",
+      "reason": "no native perpetual-futures funding and margin-account model",
+      "source": "https://vectorbt.dev/api/portfolio/base/",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "framework": "backtrader",
+      "reason": "no native perpetual-futures funding model",
+      "source": "https://www.backtrader.com/docu/commission-schemes/commission-schemes/",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "framework": "zipline",
+      "reason": "no crypto perpetual-futures asset and funding model",
+      "source": "https://zipline.ml4trading.io/api-reference.html",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "engine_seconds": {
+        "framework": 4.180981411831453,
+        "ml4t": 0.7640254779253155,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "a20e2e83439deeecc0e1ab9e1be959a31957dd8393bd15bd1f7e36d3a3c85e7a",
+        "ml4t_manifest_sha256": "65751e1fd35a5ab468c81c07a986193e377e547b8e0a44328f6aed687eaa3043"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "lean",
+      "input_bundle_sha256": "2acee3c8542043266e6f9c0dfc9434c95b4469ef6fcaf0556efc569fc9721cdd",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "lean_crypto_future",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 2426
+          },
+          "first_divergence": null,
+          "framework_records": 2426,
+          "framework_sha256": "e6dd17ae20dd049dc63534d4f83ddd2f663d036811e3aa588644a8a753dc6f22",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 2426,
+          "ml4t_sha256": "6bcc1f4bec12a1bf8cdc8ea800aae99f742295686e2529c5572c7590d863baf7",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 8408,
+          "framework_sha256": "724263fa265d59ef7d650a7f168a35aa056af6db81b7934519a87bbebf281cf0",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 8408,
+          "ml4t_sha256": "b3e3877d7eded50fa0f5d168086fcfb9f1e18856a3506479f2312e48186d234f",
+          "passed": true
+        },
+        "rejection_count": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "59a1167e8efd652cf03b0ce0b34c9612fdd03c2e653c0e282a007ca950140635",
+          "max_canonical_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "66c05a1c0dbc0b8b194846e4f2709cb7c887955f3d86049f6336a992c3967e6b",
+          "passed": true
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "scope": {
+    "case_studies": [
+      "etfs",
+      "cme_futures",
+      "crypto_perps_funding"
+    ],
+    "frameworks": [
+      "vectorbt_pro",
+      "vectorbt_oss",
+      "backtrader",
+      "zipline",
+      "lean"
+    ],
+    "real_strategy_equivalence_gate_passed": false,
+    "required_pairs": 8,
+    "unsupported_pairs": 7
+  }
+}

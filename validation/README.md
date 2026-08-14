@@ -16,6 +16,9 @@ Validation is performed per-framework in isolated, locked environments. VectorBT
 requires pandas 3 while Zipline Reloaded 3.1.1 requires pandas below 3, so a shared comparison
 environment cannot reproduce the current target set.
 
+The primary audit uses frozen market data and model-derived targets from three production case
+studies. The scenario matrix and 250-asset workload are synthetic diagnostic and stress suites.
+
 ## Retained Parity Claims
 
 <!-- parity-claims:start -->
@@ -86,7 +89,26 @@ runtime identity, input digests, adapter identity, and source provenance. Compar
 unavailable environments, adapter failures, subprocess failures, timeouts, skips, malformed
 records, missing pairs, duplicates, and incorrect required or unsupported counts fail the gate.
 
-### Retained large-scale and performance evidence
+### Retained real-strategy evidence
+
+```bash
+# Compare previously generated native and ML4T outputs
+uv run python validation/real_strategy_evidence.py \
+  --evidence-root PATH/TO/REAL_STRATEGY_OUTPUTS \
+  --output validation/candidates/REAL_STRATEGY_RESULTS.candidate.json
+
+# Repeat engine-only timings for correctness-passing pairs
+uv run python validation/real_strategy_benchmark.py \
+  --bundle-root PATH/TO/CONTENT_ADDRESSED_BUNDLES \
+  --samples 10
+```
+
+The content-addressed input bundles are materialized before engine execution. Each pair receives
+the same frozen targets. Timing excludes input loading, inference, target construction, adapter
+preparation, result extraction, serialization, and reporting. The performance runner refuses to
+time a pair that did not pass the retained correctness comparison.
+
+### Retained synthetic scale and performance evidence
 
 ```bash
 # Validate retained reconstructable scale evidence
@@ -144,6 +166,11 @@ validation/
 ├── frameworks/                # Parameterized framework drivers (4 modules)
 ├── run_scenario.py            # Unified CLI runner
 ├── run_all_correctness.py     # Isolated release-gate correctness runner
+├── real_strategy_applicability.toml  # Supported case-study/framework pairs
+├── real_strategy_comparison.py       # Exact real-strategy comparator
+├── real_strategy_benchmark.py        # Repeated engine-only timings
+├── REAL_STRATEGY_RESULTS.json        # Retained correctness evidence
+├── REAL_STRATEGY_PERFORMANCE.json    # Retained engine timing evidence
 ├── large_scale_evidence.py    # Reconstructable exact scale matrix
 ├── cross_framework_performance.py  # Repeated controlled and idiomatic evidence
 ├── run_all_benchmarks.py      # Compatibility route to the retained performance runner

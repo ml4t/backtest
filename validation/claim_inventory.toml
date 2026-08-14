@@ -3,13 +3,23 @@ schema_version = 1
 audit_date = "2026-08-13"
 
 [[claim]]
-id = "library-scenario-equivalence"
+id = "library-synthetic-scenario-conformance"
 repository = "ml4t/backtest"
 paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/CORRECTNESS_RESULTS.json"]
 type = "correctness"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"]
 required_evidence = ["executed_matrix", "canonical_trade_log", "canonical_fill_log", "equity_curve", "environment_identity"]
 status = "verified"
+issue = "ml4t/backtest-dev#3"
+
+[[claim]]
+id = "library-real-strategy-equivalence"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/REAL_STRATEGY_RESULTS.json", "validation/real_strategy_applicability.toml"]
+type = "correctness"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["frozen_real_strategy_inputs", "complete_canonical_fill_log", "equity_curve", "terminal_value", "negative_control", "environment_identity"]
+status = "failed"
 issue = "ml4t/backtest-dev#3"
 
 [[claim]]
@@ -53,7 +63,7 @@ status = "verified"
 issue = "ml4t/backtest-dev#8"
 
 [[claim]]
-id = "library-large-scale-equivalence"
+id = "library-synthetic-scale-conformance"
 repository = "ml4t/backtest"
 paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/LARGE_SCALE_RESULTS.json"]
 type = "correctness"
@@ -69,6 +79,16 @@ paths = ["validation/cross_framework_performance.py", "validation/PERFORMANCE_RE
 type = "performance"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["controlled_workload", "warmup_policy", "repetitions", "machine_identity", "raw_timings"]
+status = "verified"
+issue = "ml4t/backtest-dev#11"
+
+[[claim]]
+id = "library-real-strategy-performance"
+repository = "ml4t/backtest"
+paths = ["validation/real_strategy_benchmark.py", "validation/REAL_STRATEGY_PERFORMANCE.json", "validation/REAL_STRATEGY_RESULTS.json"]
+type = "performance"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["correctness_passing_workload", "engine_only_timer", "warmup_policy", "repetitions", "machine_identity", "raw_timings", "output_identity"]
 status = "verified"
 issue = "ml4t/backtest-dev#11"
 

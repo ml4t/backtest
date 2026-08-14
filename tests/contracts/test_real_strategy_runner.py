@@ -28,6 +28,15 @@ def _load_evidence():
     return module
 
 
+def _load_benchmark():
+    path = Path(__file__).parents[2] / "validation" / "real_strategy_benchmark.py"
+    spec = importlib.util.spec_from_file_location("ml4t_real_strategy_benchmark", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class _Broker:
     def __init__(self) -> None:
         self.cash = 1_000.0
@@ -128,3 +137,14 @@ def test_real_strategy_comparator_detects_one_quantum_mutation() -> None:
         "ml4t": mutated[0],
         "canonical_gap": "0.00000001",
     }
+
+
+def test_real_strategy_benchmark_interval_is_deterministic() -> None:
+    benchmark = _load_benchmark()
+    values = [float(value) for value in range(1, 11)]
+
+    first = benchmark.bootstrap_median_interval(values, draws=1_000, seed=7)
+    second = benchmark.bootstrap_median_interval(values, draws=1_000, seed=7)
+
+    assert first == second
+    assert first[0] <= 5.5 <= first[1]

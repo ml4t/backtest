@@ -141,13 +141,18 @@ claim stop-order parity.
 
 Framework profiles are validated on the workloads each retained artifact declares:
 
-1. **Scenario-level**: Exact ordered trade and fill matching on the required synthetic matrix for
+1. **Real strategies**: Complete canonical fill streams, every shared equity timestamp, and
+   terminal values for supported pairs drawn from ETF allocation, CME futures, and crypto
+   perpetual-funding case studies. Frozen model-derived targets are shared by both engines.
+
+2. **Synthetic scenarios**: Exact ordered trade and fill matching on the required matrix for
    VectorBT, Backtrader, and Zipline. Capability declarations identify reconstructed and
    unavailable result surfaces.
 
-2. **Large-scale**: Exact target-intent, native-fill, fill-derived closed-trade, and terminal-state
-   comparison on a reconstructable 250-asset, 5,040-session workload. Each framework row states
-   the surface it exposes; the claim does not include unavailable order-lifecycle fields.
+3. **Synthetic stress**: Exact target-intent, native-fill, fill-derived closed-trade, and
+   terminal-state comparison on a reconstructable 250-asset, 5,040-session workload. Each
+   framework row states the surface it exposes; the claim does not include unavailable
+   order-lifecycle fields.
 
 LEAN has separate native-behavior and Chapter 16 case-study evidence. The frozen engine produced
 47,652 fills across three case studies; ML4T matched every canonical fill and each terminal value
@@ -184,6 +189,11 @@ defined in `validation/performance_baselines.json`. The separate retained cross-
 uses one warm-up and ten process-isolated measurements per runner, with raw samples, median and 95%
 intervals, process-tree peak RSS, exact output checksums, and an idiomatic view that makes no
 equivalence claim.
+
+`validation/REAL_STRATEGY_PERFORMANCE.json` separately retains engine-only timings for the six
+real-strategy pairs that passed correctness. It excludes data loading, inference, target
+construction, adapter preparation, extraction, and reporting. The results apply only to the named
+versions, bundles, and machine.
 
 ## Listing Profiles
 
