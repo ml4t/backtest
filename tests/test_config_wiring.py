@@ -262,6 +262,54 @@ class TestRejectOnInsufficientCash:
         assert first.status.value != "rejected"
         assert second.status.value == "rejected"
 
+    def test_lean_two_stage_buying_power_validation(self):
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            next_bar_queue_shadow_validation=True,
+            allow_short_selling=True,
+            allow_leverage=True,
+            initial_margin=0.5,
+            long_maintenance_margin=0.5,
+            short_maintenance_margin=0.5,
+            fill_ordering=FillOrdering.SEQUENTIAL,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+        )
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000.0},
+            highs={"AAPL": 100.0},
+            lows={"AAPL": 100.0},
+            signals={},
+        )
+
+        first = broker.submit_order("AAPL", 150, OrderSide.BUY)
+        second = broker.submit_order("AAPL", 150, OrderSide.BUY)
+
+        assert first is not None and first.status.value == "pending"
+        assert second is not None and second.status.value == "pending"
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3),
+            prices={"AAPL": 110.0},
+            opens={"AAPL": 110.0},
+            volumes={"AAPL": 1_000.0},
+            highs={"AAPL": 110.0},
+            lows={"AAPL": 110.0},
+            signals={},
+        )
+        broker._process_orders(use_open=True)
+
+        assert first.status.value == "filled"
+        assert second.status.value == "rejected"
+        assert second.rejection_code == "insufficient_buying_power"
+        assert broker.get_position("AAPL").quantity == 150.0
+        assert broker.cash == -6_500.0
+
     def test_backtrader_precheck_rejects_unaffordable_short_cover(self):
         broker = _make_broker(
             initial_cash=100.0,
@@ -1109,7 +1157,13 @@ class TestPresetRoundTrip:
         assert config.fill_ordering == FillOrdering.SEQUENTIAL
         assert config.rebalance_headroom_pct == 0.9975
         assert config.slippage_type == SlippageType.NONE
+        assert config.next_bar_submission_precheck is True
         assert config.next_bar_queue_shadow_validation is True
+
+    def test_zipline_preset_does_not_apply_buying_power_validation(self):
+        config = BacktestConfig.from_preset("zipline_strict")
+        assert config.skip_cash_validation is True
+        assert config.next_bar_queue_shadow_validation is False
 
     def test_ibkr_us_stocks_fixed_preset_values(self):
         config = BacktestConfig.from_preset("ibkr_us_stocks_fixed")

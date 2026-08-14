@@ -243,7 +243,7 @@ reason = "The current LEAN oracle and case studies do not test stop-order semant
 
 [[framework.lean]]
 name = "buying_power_and_ordering"
-fields = ["orders.reject_on_insufficient_cash", "orders.partial_fills_allowed", "orders.fill_ordering", "orders.entry_order_priority", "orders.buying_power_reservation", "orders.next_bar_queue_shadow_validation"]
+fields = ["orders.reject_on_insufficient_cash", "orders.partial_fills_allowed", "orders.fill_ordering", "orders.entry_order_priority", "orders.buying_power_reservation", "orders.next_bar_submission_precheck", "orders.next_bar_queue_shadow_validation"]
 native_checks = ["submission_sequence", "buying_power_sequence", "default_full_fill"]
 scenarios = []
 published = false

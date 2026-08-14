@@ -128,6 +128,7 @@ separate assumption layer.
 | `fixed_margin_schedule` | dict \| None | None | Per-asset `(initial, maintenance)` fixed dollar margin per contract |
 | `margin_pct_schedule` | dict \| None | None | Per-asset `(initial, maintenance)` fractions of notional; cannot overlap the fixed schedule |
 | `short_cash_policy` | ShortCashPolicy | CREDIT | How short proceeds affect cash |
+| `lock_notional_update_mode` | LockNotionalUpdateMode | POSITION_LEGS | Whether locked short collateral updates by closing/opening legs or by the combined order |
 
 Account type is determined by the flag combination:
 
