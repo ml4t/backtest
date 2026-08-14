@@ -61,6 +61,7 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
             correctness["records"].append(added)
     large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
     monkeypatch.setattr(generate_parity_claims, "correctness_report_failures", lambda _: [])
+    monkeypatch.setattr(generate_parity_claims, "large_scale_report_failures", lambda _: [])
 
     claims = generate_parity_claims.render_claims(correctness, large_scale)
 
@@ -69,8 +70,16 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
         assert pin["source"] in claims
         assert f"`{pin['profile']}`" in claims
     assert "16/16 exact" in claims
-    assert "225,844 trades" in claims
-    assert "No large-scale claim is published for Backtrader" in claims
+    assert "250 assets and 5,040 daily sessions (1,260,000 bars)" in claims
+    for record in large_scale["frameworks"]:
+        target = record["target"]
+        checks = generate_parity_claims._comparison_checks(record)
+        assert f"`{target['profile']}`" in claims
+        assert target["version"] in claims
+        assert f"{checks['fills']['expected_count']:,}" in claims
+        assert f"{checks['trades']['expected_count']:,}" in claims
+    assert "validation/LARGE_SCALE_RESULTS.json" in claims
+    assert "No large-scale claim is published" not in claims
 
     failed_correctness = copy.deepcopy(correctness)
     failed_record = next(
