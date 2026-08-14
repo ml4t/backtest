@@ -84,15 +84,23 @@ runtime identity, input digests, adapter identity, and source provenance. Compar
 unavailable environments, adapter failures, subprocess failures, timeouts, skips, malformed
 records, missing pairs, duplicates, and incorrect required or unsupported counts fail the gate.
 
-### Large-scale benchmarks
+### Retained large-scale and performance evidence
 
 ```bash
-# Framework benchmark
-python validation/benchmark_suite.py --profile backtrader_strict --framework backtrader
+# Validate retained reconstructable scale evidence
+uv run python validation/large_scale_evidence.py --check --verify-input
 
-# Full validation (correctness + benchmarks)
-python validation/run_full_validation.py
+# Validate repeated cross-framework performance evidence
+uv run python validation/cross_framework_performance.py --check
+
+# Regenerate the complete controlled performance artifact
+uv run python validation/cross_framework_performance.py --samples 10
 ```
+
+The performance runner uses one isolated warm-up and ten isolated measurements per runner. It
+retains complete-process wall time, process-tree peak RSS including the LEAN container, raw
+samples, deterministic 95% bootstrap intervals, exact output checksums, immutable framework
+identities, and semantic disclosures for an idiomatic view. No stable ratio claim is generated.
 
 ## Virtual Environment Setup
 
@@ -134,9 +142,10 @@ validation/
 ├── frameworks/                # Parameterized framework drivers (4 modules)
 ├── run_scenario.py            # Unified CLI runner
 ├── run_all_correctness.py     # Isolated release-gate correctness runner
-├── run_all_benchmarks.py      # Framework benchmark loop
-├── benchmark_suite.py         # Large-scale benchmark runner
-├── run_full_validation.py     # Complete validation pipeline
+├── large_scale_evidence.py    # Reconstructable exact scale matrix
+├── cross_framework_performance.py  # Repeated controlled and idiomatic evidence
+├── run_all_benchmarks.py      # Compatibility route to the retained performance runner
+├── benchmark_suite.py         # Shared framework workload adapters
 ├── lean/                      # LEAN integration
 ├── trade_logs/                # Golden file CSVs (gitignored)
 └── nautilus/                  # Nautilus Trader evaluation

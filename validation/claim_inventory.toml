@@ -9,7 +9,7 @@ paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validatio
 type = "correctness"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"]
 required_evidence = ["executed_matrix", "canonical_trade_log", "canonical_fill_log", "equity_curve", "environment_identity"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#3"
 
 [[claim]]
@@ -19,7 +19,7 @@ paths = ["README.md", "docs/concepts/how-it-works.md", "docs/getting-started/qui
 type = "behavioral"
 frameworks = ["vectorbt_pro", "vectorbt_oss"]
 required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#5"
 
 [[claim]]
@@ -29,7 +29,7 @@ paths = ["README.md", "docs/concepts/how-it-works.md", "docs/getting-started/qui
 type = "behavioral"
 frameworks = ["backtrader"]
 required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#6"
 
 [[claim]]
@@ -39,7 +39,7 @@ paths = ["README.md", "docs/concepts/how-it-works.md", "docs/getting-started/qui
 type = "behavioral"
 frameworks = ["zipline"]
 required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#7"
 
 [[claim]]
@@ -49,37 +49,37 @@ paths = ["README.md", "docs/concepts/how-it-works.md", "docs/user-guide/accounts
 type = "behavioral"
 frameworks = ["lean"]
 required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#8"
 
 [[claim]]
 id = "library-large-scale-equivalence"
 repository = "ml4t/backtest"
-paths = ["README.md", "docs/index.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/vectorbt_pro/large_scale_parity.json"]
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/LARGE_SCALE_RESULTS.json"]
 type = "correctness"
-frameworks = ["vectorbt_pro"]
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["public_workload", "canonical_trade_log", "canonical_fill_log", "equity_curve", "environment_identity"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#10"
 
 [[claim]]
 id = "library-controlled-performance"
 repository = "ml4t/backtest"
-paths = ["validation/benchmark_suite.py", "validation/run_all_benchmarks.py", "validation/performance_baseline.py", "validation/performance_baselines.json"]
+paths = ["validation/cross_framework_performance.py", "validation/PERFORMANCE_RESULTS.json", "validation/run_all_benchmarks.py"]
 type = "performance"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["controlled_workload", "warmup_policy", "repetitions", "machine_identity", "raw_timings"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#11"
 
 [[claim]]
 id = "library-idiomatic-performance"
 repository = "ml4t/backtest"
-paths = ["validation/vectorbt_pro/benchmark_performance.py", "validation/backtrader/benchmark_performance.py", "validation/zipline/benchmark_performance.py"]
+paths = ["validation/cross_framework_performance.py", "validation/PERFORMANCE_RESULTS.json", "validation/vectorbt_pro/benchmark_performance.py", "validation/backtrader/benchmark_performance.py", "validation/zipline/benchmark_performance.py"]
 type = "performance"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["idiomatic_workload", "declared_scope", "warmup_policy", "repetitions", "machine_identity", "raw_timings"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#12"
 
 [[claim]]
@@ -89,7 +89,7 @@ paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validatio
 type = "qualitative"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["upstream_source_reference", "scope_qualification"]
-status = "unresolved"
+status = "verified"
 issue = "ml4t/backtest-dev#13"
 
 [[claim]]
@@ -153,51 +153,6 @@ status = "unresolved"
 issue = "ml4t/backtest-dev#15"
 
 [[unresolved]]
-id = "zipline-defaults-table"
-finding = "Zipline commission and slippage defaults are misstated."
-issue = "ml4t/backtest-dev#7"
-
-[[unresolved]]
-id = "defaults-not-exercised"
-finding = "Configured-equivalence scenarios do not test upstream defaults."
-issue = "ml4t/backtest-dev#5"
-
-[[unresolved]]
-id = "empty-correctness-details"
-finding = "Retained pass records omit compared measurements."
-issue = "ml4t/backtest-dev#3"
-
-[[unresolved]]
-id = "stale-correctness-artifact"
-finding = "The retained matrix predates current engine and framework targets."
-issue = "ml4t/backtest-dev#13"
-
-[[unresolved]]
-id = "scenario-scale-language"
-finding = "The scenario matrix covers conventions, not high trade volume."
-issue = "ml4t/backtest-dev#9"
-
-[[unresolved]]
-id = "partial-ci-matrix"
-finding = "CI does not execute every required framework and scenario pair."
-issue = "ml4t/backtest-dev#4"
-
-[[unresolved]]
-id = "mutable-install-ranges"
-finding = "Comparison environments use version floors while claims name exact versions."
-issue = "ml4t/backtest-dev#4"
-
-[[unresolved]]
-id = "missing-vectorbt-oss-environment"
-finding = "The documented VectorBT OSS interpreter path is not provisioned."
-issue = "ml4t/backtest-dev#4"
-
-[[unresolved]]
-id = "exact-means-quantized"
-finding = "Exact comparisons mean equality after canonical quantization, not bit identity."
-issue = "ml4t/backtest-dev#3"
-
-[[unresolved]]
-id = "nonportable-large-scale-data"
-finding = "The retained large-scale artifact points to a temporary local dataset path."
-issue = "ml4t/backtest-dev#10"
+id = "performance-publication-decision"
+finding = "Whether to publish dated cross-framework runtime or memory ratios is deferred until the audit results are reviewed."
+issue = "ml4t/backtest-dev#15"

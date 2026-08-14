@@ -82,8 +82,9 @@ which pinned framework scenarios currently match exactly.
 
 **Quote-aware when you need it.** The feed can cache bid, ask, midpoint, and quote sizes additively. Market execution and position marking can use `price`, `bid`, `ask`, `quote_mid`, or `quote_side`.
 
-**Validated at scale.** The retained 250-asset, 20-year VectorBT Pro workload compares 225,844
-trades with zero canonical gap.
+**Validated at scale.** One reconstructable 250-asset, 5,040-session workload has retained exact
+canonical output evidence for current VectorBT Pro, VectorBT OSS, Backtrader, Zipline Reloaded,
+and LEAN targets.
 
 | Feature | Description |
 |---------|-------------|
@@ -128,6 +129,11 @@ counts. The 250-asset workload periodically enters and exits 50 positions. Sampl
 reported for diagnosis, while the
 instrument-free hotpath benchmark enforces the runtime regression limit. The project does not
 publish hardware-dependent performance ratios as stable claims.
+
+The separate cross-framework performance artifact retains ten isolated measurements per runner
+after one warm-up. It reports complete-process wall time, process-tree and LEAN-container peak RSS,
+raw samples, 95% bootstrap intervals, exact output checksums, and semantic disclosures. It is
+retained as audit evidence without stable speed or memory ratios pending a publication decision.
 
 ## Installation
 

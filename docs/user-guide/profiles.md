@@ -145,8 +145,9 @@ Framework profiles are validated on the workloads each retained artifact declare
    VectorBT, Backtrader, and Zipline. Capability declarations identify reconstructed and
    unavailable result surfaces.
 
-2. **Large-scale**: Trade-by-trade comparison on a retained real-data workload. A claim is omitted
-   when no passing artifact is retained for that framework.
+2. **Large-scale**: Exact target-intent, native-fill, fill-derived closed-trade, and terminal-state
+   comparison on a reconstructable 250-asset, 5,040-session workload. Each framework row states
+   the surface it exposes; the claim does not include unavailable order-lifecycle fields.
 
 LEAN has separate native-behavior and Chapter 16 case-study evidence. The frozen engine produced
 47,652 fills across three case studies; ML4T matched every canonical fill and each terminal value
@@ -176,9 +177,11 @@ No large-scale claim is published for Backtrader, Zipline, VectorBT OSS, or LEAN
 
 ## Performance
 
-The stable release does not publish cross-framework speed ratios. Release performance evidence is
-limited to the deterministic workloads and measurement boundaries in
-`validation/performance_baselines.json`; framework parity uses correctness evidence instead.
+The stable release does not publish cross-framework speed ratios. ML4T-only regression evidence is
+defined in `validation/performance_baselines.json`. The separate retained cross-framework artifact
+uses one warm-up and ten process-isolated measurements per runner, with raw samples, median and 95%
+intervals, process-tree peak RSS, exact output checksums, and an idiomatic view that makes no
+equivalence claim.
 
 ## Listing Profiles
 
