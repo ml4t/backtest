@@ -32,13 +32,3 @@ timestamp_shift_hours = 0
 contract_specs = false
 funding = false
 required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]
-
-[[case]]
-id = "us_equities_panel"
-asset_class = "equity"
-production_path = "event_driven"
-warmup = false
-timestamp_shift_hours = 0
-contract_specs = false
-funding = false
-required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]

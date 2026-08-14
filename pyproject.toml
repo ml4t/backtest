@@ -81,7 +81,7 @@ dependencies = [
     "pandas>=3.0.5; python_version >= '3.15'",
     "numpy>=2.3.2",
     "PyYAML>=6.0.3",
-    "pandas-market-calendars>=5.2.4",
+    "pandas-market-calendars>=5.4.0",
 ]
 
 [project.optional-dependencies]

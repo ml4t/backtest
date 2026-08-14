@@ -271,6 +271,26 @@ def _frame_identity(frame: pl.DataFrame) -> dict[str, object]:
     }
 
 
+def align_funding_to_market_events(funding: pl.DataFrame, market: pl.DataFrame) -> pl.DataFrame:
+    """Retain funding settlements that the frozen engine timeline can present."""
+    market_timestamps = market.select("timestamp").unique()
+    if funding.schema["timestamp"] != market_timestamps.schema["timestamp"]:
+        funding = funding.with_columns(
+            pl.col("timestamp").cast(market_timestamps.schema["timestamp"])
+        )
+    return funding.join(market_timestamps, on="timestamp", how="semi").sort("timestamp", "symbol")
+
+
+def align_targets_to_engine_schedule(targets: pl.DataFrame, schedule: pl.Series) -> pl.DataFrame:
+    """Retain target rows that the production engine schedule can submit."""
+    schedule_frame = schedule.alias("timestamp").to_frame().unique()
+    if targets.schema["timestamp"] != schedule_frame.schema["timestamp"]:
+        schedule_frame = schedule_frame.with_columns(
+            pl.col("timestamp").cast(targets.schema["timestamp"])
+        )
+    return targets.join(schedule_frame, on="timestamp", how="semi").sort("timestamp", "symbol")
+
+
 def _bundle_digest(
     *,
     selection: Mapping[str, Any],
@@ -426,20 +446,26 @@ def materialize_bundles(
             case_study=case_id,
             prediction_hash=prediction_hash,
         ).sort("timestamp", "symbol")
+        cadence = spec["strategy"]["rebalance"]["cadence"]
+        calendar = spec["backtest_config"]["calendar"]["calendar"]
+        schedule = loaders.resolve_rebalance_timestamps(
+            pl.Series("timestamp", predictions["timestamp"].unique().sort().to_list()),
+            cadence,
+            calendar,
+        )
+        step = int(loaders.get_rebalance_step(case_id, label))
+        if step > 1:
+            schedule = schedule.gather_every(step)
+        targets = align_targets_to_engine_schedule(targets, schedule)
         market = market.sort("timestamp", "symbol")
         funding = None
         if contract["funding"]:
             funding_module = importlib.import_module(
                 "case_studies.crypto_perps_funding.funding_data"
             )
-            funding = (
-                funding_module.load_funding_rates(symbols=market["symbol"].unique().to_list())
-                .with_columns(pl.col("timestamp").cast(market.schema["timestamp"]))
-                .filter(
-                    (pl.col("timestamp") >= market["timestamp"].min())
-                    & (pl.col("timestamp") <= market["timestamp"].max())
-                )
-                .sort("timestamp", "symbol")
+            funding = align_funding_to_market_events(
+                funding_module.load_funding_rates(symbols=market["symbol"].unique().to_list()),
+                market,
             )
         contracts = None
         if contract["contract_specs"]:
@@ -492,25 +518,27 @@ def main() -> int:
     args = parser.parse_args()
     public_root = args.public_root.resolve()
     artifact_root = args.artifact_root.resolve()
+    output = args.output.resolve()
+    materialize_root = args.materialize.resolve() if args.materialize is not None else None
     resolver = _load_public_resolver(public_root)
     report = build_report(
         public_root=public_root,
         artifact_root=artifact_root,
         resolver=resolver,
     )
-    write_report(report, args.output)
-    if args.materialize is not None:
+    write_report(report, output)
+    if materialize_root is not None:
         bundle_report = materialize_bundles(
             corpus_report=report,
             artifact_root=artifact_root,
-            output_root=args.materialize.resolve(),
+            output_root=materialize_root,
         )
-        bundle_output = args.output.with_name("REAL_STRATEGY_INPUTS.candidate.json")
+        bundle_output = output.with_name("REAL_STRATEGY_INPUTS.candidate.json")
         write_report(bundle_report, bundle_output)
         bundle_records = cast(list[dict[str, object]], bundle_report["records"])
         print(f"Materialized {len(bundle_records)} engine input bundles")
     summary = cast(Mapping[str, object], report["summary"])
-    print(f"Inventoried {summary['case_studies']} current case studies to {args.output}")
+    print(f"Inventoried {summary['case_studies']} current case studies to {output}")
     return 0
 
 

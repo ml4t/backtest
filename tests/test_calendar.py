@@ -138,6 +138,10 @@ class TestIsTradingDay:
         assert is_trading_day("NYSE", date(2024, 7, 4)) is False  # Independence Day
         assert is_trading_day("NYSE", date(2024, 12, 25)) is False  # Christmas
 
+    def test_cme_good_friday_early_close_is_a_session(self):
+        """CME equity futures traded an abbreviated session on Good Friday 2021."""
+        assert is_trading_day("CME", date(2021, 4, 2)) is True
+
     def test_is_trading_day_with_string(self):
         """Test with string date input."""
         assert is_trading_day("NYSE", "2024-06-03") is True

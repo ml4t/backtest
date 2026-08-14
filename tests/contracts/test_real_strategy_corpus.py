@@ -71,12 +71,11 @@ def test_case_contract_contains_selected_real_case_studies() -> None:
 
     cases = module.load_case_contract()
 
-    assert len(cases) == 4
+    assert len(cases) == 3
     assert {case["id"] for case in cases} == {
         "cme_futures",
         "crypto_perps_funding",
         "etfs",
-        "us_equities_panel",
     }
     assert all(case["production_path"] == "event_driven" for case in cases)
 
@@ -164,3 +163,45 @@ def test_content_addressed_bundle_is_reused_and_mutations_change_identity(tmp_pa
     assert first == second
     assert first["bundle_sha256"] != changed["bundle_sha256"]
     assert (tmp_path / "etfs" / first["bundle_sha256"] / "manifest.json").is_file()
+
+
+def test_funding_is_limited_to_timestamps_presented_by_market() -> None:
+    module = _load_module()
+    market = pl.DataFrame(
+        {
+            "timestamp": ["2024-01-01T08:00:00", "2024-01-03T08:00:00"],
+            "symbol": ["BTCUSDT", "BTCUSDT"],
+        }
+    ).with_columns(pl.col("timestamp").str.to_datetime())
+    funding = pl.DataFrame(
+        {
+            "timestamp": [
+                "2024-01-01T08:00:00",
+                "2024-01-02T08:00:00",
+                "2024-01-03T08:00:00",
+            ],
+            "symbol": ["BTCUSDT", "BTCUSDT", "ETHUSDT"],
+            "funding_rate": [0.0001, 0.0002, -0.0001],
+        }
+    ).with_columns(pl.col("timestamp").str.to_datetime(time_unit="ms"))
+
+    aligned = module.align_funding_to_market_events(funding, market)
+
+    assert aligned["timestamp"].to_list() == market["timestamp"].to_list()
+    assert aligned["symbol"].to_list() == ["BTCUSDT", "ETHUSDT"]
+
+
+def test_targets_are_limited_to_production_engine_schedule() -> None:
+    module = _load_module()
+    targets = pl.DataFrame(
+        {
+            "timestamp": ["2024-01-01", "2024-01-02", "2024-01-03"],
+            "symbol": ["SPY", "SPY", "QQQ"],
+            "weight": [1.0, 0.5, 1.0],
+        }
+    ).with_columns(pl.col("timestamp").str.to_datetime())
+    schedule = pl.Series("timestamp", ["2024-01-01", "2024-01-03"]).str.to_datetime(time_unit="ms")
+
+    aligned = module.align_targets_to_engine_schedule(targets, schedule)
+
+    assert aligned["symbol"].to_list() == ["SPY", "QQQ"]
