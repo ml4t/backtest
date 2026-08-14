@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -257,3 +258,29 @@ def test_accepted_write_is_atomic(tmp_path: Path) -> None:
 
     assert json.loads(target.read_text(encoding="utf-8")) == {"value": 1}
     assert list(tmp_path.iterdir()) == [target]
+
+
+def test_failed_worker_comparison_is_retained(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    interpreter = tmp_path / "python"
+    interpreter.touch()
+    monkeypatch.setattr(module, "CANDIDATE_DIR", tmp_path / "candidates")
+    record = {
+        "framework": "backtrader",
+        "comparison": {"passed": False, "first_difference": {"name": "fills"}},
+    }
+
+    def failed_run(command, **_kwargs):
+        output = Path(command[command.index("--output") + 1])
+        output.write_text(json.dumps(record), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", failed_run)
+
+    with pytest.raises(RuntimeError, match="diagnostic retained"):
+        module._run_isolated_worker("backtrader", interpreter)
+
+    retained = tmp_path / "candidates" / "backtrader.large_scale.candidate.json"
+    assert json.loads(retained.read_text(encoding="utf-8")) == record

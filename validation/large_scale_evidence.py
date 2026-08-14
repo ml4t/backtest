@@ -34,7 +34,8 @@ SCHEMA_VERSION = 1
 MONEY_QUANTUM = Decimal("0.000001")
 FRAMEWORKS = ("vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean")
 ACCEPTED_PATH = VALIDATION_DIR / "LARGE_SCALE_RESULTS.json"
-CANDIDATE_PATH = VALIDATION_DIR / "candidates" / "LARGE_SCALE_RESULTS.candidate.json"
+CANDIDATE_DIR = VALIDATION_DIR / "candidates"
+CANDIDATE_PATH = CANDIDATE_DIR / "LARGE_SCALE_RESULTS.candidate.json"
 HISTORICAL_ACCEPTED_PATH = VALIDATION_DIR / "vectorbt_pro" / "controlled_replay-2025.12.31.json"
 HISTORICAL_CANDIDATE_PATH = VALIDATION_DIR / "candidates" / "vectorbt_pro-2025.12.31.candidate.json"
 HISTORICAL_VECTORBT_PRO_VERSION = "2025.12.31"
@@ -733,18 +734,28 @@ def _run_isolated_worker(
             timeout=3_600,
             check=False,
         )
-        if completed.returncode != 0 or not output.is_file():
+        record: dict[str, Any] | None = None
+        if output.is_file():
+            try:
+                loaded = json.loads(output.read_text(encoding="utf-8"))
+                record = cast(dict[str, Any], loaded) if isinstance(loaded, dict) else None
+            except json.JSONDecodeError:
+                record = None
+        if record is not None and (
+            completed.returncode != 0 or record.get("comparison", {}).get("passed") is not True
+        ):
+            diagnostic_path = CANDIDATE_DIR / f"{framework}.large_scale.candidate.json"
+            _write_json_atomic(diagnostic_path, record)
+            raise RuntimeError(
+                f"{framework} large-scale comparison failed; diagnostic retained at "
+                f"{diagnostic_path}: " + json.dumps(record.get("comparison"), indent=2)[-20_000:]
+            )
+        if completed.returncode != 0 or record is None:
             details = "\n".join(
                 stream.strip() for stream in (completed.stdout, completed.stderr) if stream.strip()
             )
             raise RuntimeError(
                 f"{framework} scale worker exited {completed.returncode}: {details[-20_000:]}"
-            )
-        record = cast(dict[str, Any], json.loads(output.read_text(encoding="utf-8")))
-        if record.get("comparison", {}).get("passed") is not True:
-            raise RuntimeError(
-                f"{framework} large-scale comparison failed: "
-                + json.dumps(record.get("comparison"), indent=2)[-20_000:]
             )
         return record
 
