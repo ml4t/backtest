@@ -1539,9 +1539,10 @@
         "orders": {
           "entry_order_priority": "submission",
           "fill_ordering": "exit_first",
+          "immediate_fill": true,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
-          "missing_price_policy": "use_last",
+          "missing_price_policy": "skip",
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "hybrid",
@@ -1566,7 +1567,7 @@
         "account": {
           "allow_leverage": false,
           "allow_short_selling": true,
-          "short_cash_policy": "lock_notional"
+          "short_cash_policy": "credit"
         },
         "cash": {
           "buffer_pct": 0.0,
@@ -1582,14 +1583,15 @@
         },
         "orders": {
           "entry_order_priority": "submission",
-          "fill_ordering": "fifo",
+          "fill_ordering": "exit_first",
+          "immediate_fill": true,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
-          "missing_price_policy": "use_last",
+          "missing_price_policy": "skip",
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "hybrid",
-          "reject_on_insufficient_cash": true
+          "reject_on_insufficient_cash": false
         },
         "position_sizing": {
           "share_type": "fractional"

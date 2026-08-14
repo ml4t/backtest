@@ -43,6 +43,13 @@ jobs:
           --framework vectorbt_pro
           --evidence-output vectorbt-pro-environment.json
 
+      - name: Measure native VectorBT Pro behavior
+        run: >-
+          .venv-vectorbt-pro/bin/python
+          validation/native/vectorbt_behavior.py
+          --framework vectorbt_pro
+          --output vectorbt-pro-native.json
+
       - name: Run the complete VectorBT Pro scenario matrix
         run: >-
           .venv-vectorbt-pro/bin/python
@@ -57,6 +64,7 @@ jobs:
           name: vectorbt-pro-comparison-${{ github.sha }}
           path: |
             vectorbt-pro-environment.json
+            vectorbt-pro-native.json
             vectorbt-pro-correctness.json
           if-no-files-found: error
           retention-days: 90

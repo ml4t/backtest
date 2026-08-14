@@ -1,6 +1,6 @@
 # Validation Methodology
 
-*Last updated: 2026-08-08*
+*Last updated: 2026-08-13*
 
 ## Core Principle
 
@@ -151,13 +151,35 @@ Update the behavioral difference matrix, profile diffs, and parity results.
 
 Complete matrix of how each framework handles every behavioral dimension.
 
+### VectorBT native evidence
+
+The VectorBT column cites checks from `native/vectorbt_behavior.py`. The checks import only the
+frozen framework and its dependencies. Both current targets passed all checks:
+
+- [VectorBT OSS 1.1.0 evidence](native/evidence/vectorbt_oss-1.1.0.json)
+- [VectorBT Pro 2026.6.27 evidence](native/evidence/vectorbt_pro-2026.6.27.json)
+
+`VBT-S` refers to the `signal_timing_and_default_fill` and `explicit_fill_price` checks. `VBT-R`
+refers to `stop_fill` and `trailing_stop_extreme_and_intrabar_fill`. `VBT-C` refers to
+`short_cash`, `cash_sharing_and_call_sequence`, and `insufficient_cash_partial_fill`. `VBT-O`
+refers to `target_percent_sizing`, `accumulation`, `long_signal_conflict`, and
+`missing_order_price`. `VBT-F` refers to `defaults`, `fees_and_slippage`, and
+`record_construction`.
+
+The evidence records the official source address for each frozen implementation. OSS uses
+[`Portfolio.from_orders`](https://github.com/polakowo/vectorbt/blob/259d2d89fe2e7638baf3ca76c394937cd32b656d/vectorbt/portfolio/base.py#L1616)
+and [`Portfolio.from_signals`](https://github.com/polakowo/vectorbt/blob/259d2d89fe2e7638baf3ca76c394937cd32b656d/vectorbt/portfolio/base.py#L2047).
+Pro uses the corresponding methods at
+[`Portfolio.from_orders`](https://github.com/polakowo/vectorbt.pro/blob/6e18cf0aa37849cfc20848f40f1d26ecfdc771b4/vectorbtpro/portfolio/base.py#L4145)
+and [`Portfolio.from_signals`](https://github.com/polakowo/vectorbt.pro/blob/6e18cf0aa37849cfc20848f40f1d26ecfdc771b4/vectorbtpro/portfolio/base.py#L4646).
+
 ### Execution Timing
 
-| Knob | ml4t Default | VectorBT | Backtrader | Zipline | LEAN |
-|------|-------------|----------|------------|---------|------|
-| `execution_mode` | next_bar | **same_bar** | next_bar | next_bar | **same_bar** |
-| `fill_timing` | next_bar_open | **same_bar** | next_bar_open | next_bar_open | **same_bar** |
-| `execution_price` | open | **close** | open | open | **close** |
+| Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline | LEAN |
+|------|-------------|----------|--------------|------------|---------|------|
+| `execution_mode` | next_bar | **same_bar** | VBT-S | next_bar | next_bar | **same_bar** |
+| `fill_timing` | next_bar_open | **same_bar** | VBT-S | next_bar_open | next_bar_open | **same_bar** |
+| `execution_price` | open | **close** | VBT-S | open | open | **close** |
 
 VectorBT and LEAN both use same-bar execution with close fills. VectorBT is vectorized
 (inherently same-bar), while LEAN processes market orders immediately at bar close in its
@@ -165,13 +187,13 @@ event-driven loop. All event-driven frameworks (BT, Zipline) except LEAN use nex
 
 ### Stop/Risk Configuration
 
-| Knob | ml4t Default | VectorBT | Backtrader | Zipline | LEAN |
-|------|-------------|----------|------------|---------|------|
-| `stop_fill_mode` | stop_price | stop_price | stop_price | stop_price | stop_price |
-| `stop_level_basis` | fill_price | fill_price | **signal_price** | fill_price | fill_price |
-| `trail_hwm_source` | close | **bar_extreme** | close | close | close |
-| `initial_hwm_source` | fill_price | **bar_high** | fill_price | fill_price | fill_price |
-| `trail_stop_timing` | lagged | **intrabar** | lagged | lagged | lagged |
+| Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline | LEAN |
+|------|-------------|----------|--------------|------------|---------|------|
+| `stop_fill_mode` | stop_price | stop_price | VBT-R | stop_price | stop_price | stop_price |
+| `stop_level_basis` | fill_price | fill_price | VBT-R | **signal_price** | fill_price | fill_price |
+| `trail_hwm_source` | close | **bar_extreme** | VBT-R | close | close | close |
+| `initial_hwm_source` | fill_price | **bar_high** | VBT-R | fill_price | fill_price | fill_price |
+| `trail_stop_timing` | lagged | **intrabar** | VBT-R | lagged | lagged | lagged |
 
 Backtrader calculates stop levels from **signal bar close** (the price when the strategy decided
 to trade), not the actual fill price. This matters when next-bar open differs significantly from
@@ -179,54 +201,47 @@ previous close.
 
 ### Account & Cash
 
-| Knob | ml4t Default | VectorBT | Backtrader | Zipline | LEAN |
-|------|-------------|----------|------------|---------|------|
-| `allow_short_selling` | false | **true** | **true** | false | true |
-| `allow_leverage` | false | false | **true** | false | true |
-| `short_cash_policy` | credit | credit | credit | credit | credit |
-| `initial_margin` | 0.5 | -- | **0.5** | -- | varies |
-| `long_maint_margin` | 0.25 | -- | **0.25** | -- | varies |
-| `short_maint_margin` | 0.30 | -- | **0.30** | -- | varies |
+| Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline | LEAN |
+|------|-------------|----------|--------------|------------|---------|------|
+| `allow_short_selling` | false | **true** | VBT-C | **true** | false | true |
+| `allow_leverage` | false | false | VBT-C | **true** | false | true |
+| `short_cash_policy` | credit | credit | VBT-C | credit | credit | credit |
+| `initial_margin` | 0.5 | -- | VBT-C | **0.5** | -- | varies |
+| `long_maint_margin` | 0.25 | -- | VBT-C | **0.25** | -- | varies |
+| `short_maint_margin` | 0.30 | -- | VBT-C | **0.30** | -- | varies |
 
 ### Order Handling
 
-| Knob | ml4t Default | VectorBT | Backtrader | Zipline | LEAN |
-|------|-------------|----------|------------|---------|------|
-| `fill_ordering` | exit_first | exit_first | **fifo** | exit_first | **exit_first** |
-| `entry_order_priority` | submission | submission | submission | submission | submission |
-| `rebalance_mode` | incremental | **hybrid** | **snapshot** | **snapshot** | snapshot |
-| `rebalance_headroom_pct` | 1.0 | 1.0 | **0.998** | **0.998** | 0.998 |
-| `reject_on_insufficient_cash` | true | **false** | true | true | true |
-| `partial_fills_allowed` | false | **true** | false | **true** | false |
-| `missing_price_policy` | skip | **use_last** | **use_last** | **use_last** | use_last |
+| Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline | LEAN |
+|------|-------------|----------|--------------|------------|---------|------|
+| `fill_ordering` | exit_first | exit_first | VBT-C, VBT-O | **fifo** | exit_first | **exit_first** |
+| `entry_order_priority` | submission | submission | VBT-C | submission | submission | submission |
+| `immediate_fill` | false | **true** | VBT-S, VBT-O | false | false | **true** |
+| `rebalance_mode` | incremental | **hybrid** | VBT-O | **snapshot** | **snapshot** | snapshot |
+| `rebalance_headroom_pct` | 1.0 | 1.0 | VBT-O | **0.998** | **0.998** | 0.998 |
+| `reject_on_insufficient_cash` | true | **false** | VBT-C | true | true | true |
+| `partial_fills_allowed` | false | **true** | VBT-C | false | **true** | false |
+| `missing_price_policy` | skip | skip order; forward-fill valuation | VBT-O | **use_last** | **use_last** | use_last |
 
 ### Position Sizing & Costs
 
-| Knob | ml4t Default | VectorBT | Backtrader | Zipline | LEAN |
-|------|-------------|----------|------------|---------|------|
-| `share_type` | fractional | fractional | **integer** | **integer** | **integer** |
-| `signal_processing` | check_position | **process_all** | check_position | check_position | check_position |
-| `commission_model` | percentage | **none** | percentage | **per_share** | per_share |
-| `commission_rate` | 0.1% | 0% | 0.1% | -- | -- |
-| `commission_per_share` | -- | -- | -- | **$0.005** | varies |
-| `commission_minimum` | $0 | -- | -- | **$1.00** | varies |
-| `slippage_model` | percentage | **none** | percentage | **volume_based** | volume_based |
-| `slippage_rate` | 0.1% | 0% | 0.1% | **10%** | varies |
+| Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline | LEAN |
+|------|-------------|----------|--------------|------------|---------|------|
+| `share_type` | fractional | fractional | VBT-O | **integer** | **integer** | **integer** |
+| repeated entry | check position | ignore unless accumulation is enabled | VBT-O | check position | check position | check position |
+| `commission_model` | percentage | **none** | VBT-F | percentage | **per_share** | per_share |
+| `commission_rate` | 0.1% | 0% | VBT-F | 0.1% | -- | -- |
+| `commission_per_share` | -- | -- | VBT-F | -- | **$0.005** | varies |
+| `commission_minimum` | $0 | -- | VBT-F | -- | **$1.00** | varies |
+| `slippage_model` | percentage | **none** | VBT-F | percentage | **volume_based** | volume_based |
+| `slippage_rate` | 0.1% | 0% | VBT-F | 0.1% | **10%** | varies |
 
-### "Strict" Profile Additions (for validation parity)
+### Comparison profiles
 
-| Knob | vbt_strict | bt_strict | zip_strict | lean |
-|------|-----------|-----------|------------|-------------|
-| `short_cash_policy` | **lock_notional** | credit | **credit** | credit |
-| `skip_cash_validation` | false | false | **true** | false |
-| `reject_on_insufficient_cash` | **true** | true | true | true |
-| `fill_ordering` | **fifo** | fifo | exit_first | **exit_first** |
-| `next_bar_submission_precheck` | -- | **true** | -- | false |
-| `next_bar_simple_cash_check` | -- | **true** | -- | false |
-| `allow_short_selling` | -- | -- | **true** | **true** |
-| `allow_leverage` | -- | -- | -- | **true** |
-| `execution_mode` | -- | **next_bar** | **next_bar** | **next_bar** |
-| `execution_price` | -- | **open** | **open** | **open** |
+`vectorbt_strict` now resolves to the same settings as `vectorbt`. Native evidence does not support
+the prior locked-short-proceeds, rejection, or FIFO overrides. Backtrader and Zipline retain
+comparison-specific settings until their native checks and current large-scale workloads verify
+or replace those settings.
 
 ---
 

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from ..config import MissingPricePolicy
 from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
@@ -171,7 +173,10 @@ class OrderBook:
 
         # Get fill price (close price for same-bar)
         price = fill.get_fill_price_for_order(order, use_open=False)
-        if price is None:
+        missing_price = price is None or not math.isfinite(price)
+        if missing_price and broker.missing_price_policy is MissingPricePolicy.USE_LAST:
+            price = broker.get_last_price(order.asset)
+        if price is None or not math.isfinite(price):
             order.reject("No price available", "price_unavailable")
             return order
 

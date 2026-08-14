@@ -40,6 +40,12 @@ class _BuyOnce(Strategy):
             self.done = True
 
 
+class _BuyOnMissingClose(Strategy):
+    def on_data(self, timestamp, data, context, broker) -> None:
+        if timestamp.day == 2:
+            broker.submit_order("AAPL", 1.0)
+
+
 def test_profile_registry_has_expected_core_profiles() -> None:
     assert list_profiles() == ["backtrader", "default", "lean", "realistic", "vectorbt", "zipline"]
 
@@ -64,6 +70,38 @@ def test_profiles_enforce_expected_entry_timing_contract() -> None:
     assert vbt.trades[0].entry_price == 101.0  # same-bar close
     assert 110.0 < bt.trades[0].entry_price < 111.0  # next-bar open with default slippage
     assert 110.0 < zl.trades[0].entry_price < 111.0  # next-bar open with volume slippage
+
+
+def test_vectorbt_profile_drops_signal_order_with_missing_close() -> None:
+    prices = (
+        _prices()
+        .vstack(
+            pl.DataFrame(
+                {
+                    "timestamp": [datetime(2024, 1, 3)],
+                    "asset": ["AAPL"],
+                    "open": [120.0],
+                    "high": [120.0],
+                    "low": [120.0],
+                    "close": [120.0],
+                    "volume": [1_000_000.0],
+                }
+            )
+        )
+        .with_columns(
+            pl.when(pl.col("timestamp") == datetime(2024, 1, 2))
+            .then(float("nan"))
+            .otherwise(pl.col(column))
+            .alias(column)
+            for column in ("open", "high", "low", "close")
+        )
+    )
+
+    result = run_backtest(prices=prices, strategy=_BuyOnMissingClose(), config="vectorbt")
+
+    assert result.fills == []
+    assert len(result.rejected_orders) == 1
+    assert result.rejected_orders[0].rejection_code == "price_unavailable"
 
 
 def test_backtrader_profile_uses_signal_price_stop_basis() -> None:

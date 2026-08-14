@@ -25,6 +25,7 @@ from ml4t.backtest.config import (
     EntryOrderPriority,
     ExecutionPrice,
     FillOrdering,
+    MissingPricePolicy,
     ShareType,
     ShortCashPolicy,
     SlippageType,
@@ -42,6 +43,7 @@ from ml4t.backtest.models import (
     TieredCommission,
     VolumeShareSlippage,
 )
+from ml4t.backtest.profiles import get_profile_config
 from ml4t.backtest.types import OrderSide, Position
 
 # ---------------------------------------------------------------------------
@@ -398,11 +400,14 @@ class TestShortCashPolicy:
         assert pos is not None
         assert pos.quantity == -10.0
 
-    def test_vectorbt_strict_profile_sets_lock_notional(self):
+    def test_vectorbt_strict_profile_preserves_native_cash_semantics(self):
         config = BacktestConfig.from_preset("vectorbt_strict")
-        assert config.short_cash_policy == ShortCashPolicy.LOCK_NOTIONAL
-        assert config.fill_ordering == FillOrdering.FIFO
+        assert config.short_cash_policy == ShortCashPolicy.CREDIT
+        assert config.fill_ordering == FillOrdering.EXIT_FIRST
+        assert config.reject_on_insufficient_cash is False
+        assert config.partial_fills_allowed is True
         assert config.entry_order_priority == EntryOrderPriority.SUBMISSION
+        assert get_profile_config("vectorbt_strict") == get_profile_config("vectorbt")
 
     def test_zipline_strict_profile_uses_credit(self):
         config = BacktestConfig.from_preset("zipline_strict")
@@ -872,6 +877,7 @@ class TestPresetRoundTrip:
         assert config.fill_ordering == FillOrdering.EXIT_FIRST
         assert config.reject_on_insufficient_cash is False
         assert config.partial_fills_allowed is True
+        assert config.missing_price_policy == MissingPricePolicy.SKIP
 
     def test_realistic_preset_values(self):
         config = BacktestConfig.from_preset("realistic")

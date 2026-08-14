@@ -208,6 +208,14 @@ jobs:
           --framework ${{ matrix.framework }}
           --evidence-output environment-evidence.json
 
+      - name: Measure native VectorBT OSS behavior
+        if: matrix.framework == 'vectorbt_oss'
+        run: >-
+          "${{ matrix.environment }}/bin/python"
+          validation/native/vectorbt_behavior.py
+          --framework vectorbt_oss
+          --output native-evidence.json
+
       - name: Run the complete required scenario matrix
         run: >-
           "${{ matrix.environment }}/bin/python"
@@ -223,6 +231,7 @@ jobs:
           path: |
             environment-evidence.json
             correctness-candidate.json
+            native-evidence.json
           if-no-files-found: error
 
   documentation:

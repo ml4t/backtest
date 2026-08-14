@@ -18,7 +18,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.types import FrameworkResult, ScenarioConfig
 
-SUPPORTED_VECTORBT_PRO_VERSION = "2025.12.31"
+SUPPORTED_VECTORBT_PRO_VERSION = "2026.6.27"
 
 
 def _require_supported_version(actual_version: str) -> None:

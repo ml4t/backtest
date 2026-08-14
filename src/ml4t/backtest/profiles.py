@@ -134,9 +134,10 @@ VECTORBT_PROFILE = {
         "partial_fills_allowed": True,
         "fill_ordering": "exit_first",
         "entry_order_priority": "submission",
+        "immediate_fill": True,
         "rebalance_mode": "hybrid",
         "rebalance_headroom_pct": 1.0,
-        "missing_price_policy": "use_last",
+        "missing_price_policy": "skip",
         "late_asset_policy": "allow",
         "late_asset_min_bars": 1,
     },
@@ -281,11 +282,6 @@ IBKR_US_STOCKS_FIXED_PROFILE = {
 }
 
 VECTORBT_STRICT_PROFILE = deepcopy(VECTORBT_PROFILE)
-VECTORBT_STRICT_PROFILE["account"]["short_cash_policy"] = "lock_notional"
-VECTORBT_STRICT_PROFILE["orders"]["reject_on_insufficient_cash"] = True
-VECTORBT_STRICT_PROFILE["orders"]["partial_fills_allowed"] = True
-VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "fifo"
-VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 
 BACKTRADER_STRICT_PROFILE = deepcopy(BACKTRADER_PROFILE)
 BACKTRADER_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
