@@ -23,6 +23,7 @@ import pandas as pd
 
 VALIDATION_DIR = Path(__file__).parent
 PROJECT_ROOT = VALIDATION_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(VALIDATION_DIR))
 
