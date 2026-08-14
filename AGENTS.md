@@ -45,3 +45,8 @@ Event-driven backtesting engine with cross-framework parity validation.
 ```python
 from ml4t.backtest import Engine, Strategy, BacktestConfig, run_backtest
 ```
+
+## Documentation
+
+- `docs/book-guide/index.md` maps book notebook -> concept -> `ml4t.backtest` API -> docs page.
+  Start there for chapter-to-API cross-reference instead of grepping source.
