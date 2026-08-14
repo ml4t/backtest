@@ -380,6 +380,14 @@ class FillExecutor:
             free_cash = add_with_zero_cancellation(free_cash, closed * ctx.fill_price * multiplier)
             remaining += closed
 
+        new_position = self.account.positions.get(asset)
+        if (
+            new_position is not None
+            and old_quantity * new_position.quantity < 0.0
+            and remaining != 0.0
+        ):
+            remaining = new_position.quantity
+
         if remaining != 0.0:
             required_cash = abs(remaining) * ctx.fill_price * multiplier
             free_cash = add_with_zero_cancellation(free_cash, -required_cash)
@@ -433,10 +441,42 @@ class FillExecutor:
                 self._close_position(ctx, pos, old_qty)
                 return ctx.commission
             elif _is_position_flip(old_qty, new_qty):
+                new_qty = self._get_lock_notional_flip_quantity(ctx, old_qty, new_qty)
                 return self._flip_position(ctx, pos, old_qty, new_qty)
             else:
                 self._scale_position(ctx, pos, old_qty, new_qty)
                 return ctx.commission
+
+    def _get_lock_notional_flip_quantity(
+        self,
+        ctx: FillContext,
+        old_quantity: float,
+        fallback: float,
+    ) -> float:
+        broker = self.broker
+        if (
+            broker.share_type != ShareType.FRACTIONAL
+            or broker.short_cash_policy.value != "lock_notional"
+            or broker.account.policy.allow_leverage
+            or broker.cash_buffer_pct != 0.0
+            or ctx.commission != 0.0
+        ):
+            return fallback
+
+        unit_cost = ctx.fill_price * broker.get_multiplier(ctx.order.asset)
+        requested_open = abs(ctx.signed_qty) - abs(old_quantity)
+        free_cash = self.account._lock_notional_free_cash
+        if old_quantity < 0.0:
+            short_basis = self.account._lock_notional_short_basis.get(ctx.order.asset, 0.0)
+            released = short_basis + short_basis - abs(old_quantity) * unit_cost
+            free_after_close = add_with_zero_cancellation(free_cash, released)
+        else:
+            free_after_close = add_with_zero_cancellation(
+                free_cash,
+                abs(old_quantity) * unit_cost,
+            )
+        open_quantity = min(requested_open, max(0.0, free_after_close / unit_cost))
+        return math.copysign(open_quantity, ctx.signed_qty)
 
     def _get_initial_hwm(
         self, asset: str, fill_price: float, signal_price: float | None = None

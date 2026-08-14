@@ -567,6 +567,34 @@ class TestShortCashPolicy:
 
         assert broker.fills[0].quantity == initial_cash / price
 
+    def test_lock_notional_partial_reversal_retains_native_open_leg_quantity(self):
+        initial_cash = 10_000.0
+        short_price = 100.0
+        reversal_price = 73.123456789
+        broker = _make_broker(
+            initial_cash=initial_cash,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": short_price})
+        broker.submit_order("A", 100.0, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": reversal_price}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 1_000.0, OrderSide.BUY)
+        broker._process_orders()
+
+        free_after_cover = initial_cash * 2.0 - 100.0 * reversal_price
+        expected_open_quantity = free_after_cover / reversal_price
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == expected_open_quantity
+        assert position.quantity != broker.fills[-1].quantity - 100.0
+
 
 # ---------------------------------------------------------------------------
 # partial_fills_allowed
