@@ -112,6 +112,7 @@ def test_isolated_timeout_is_retained(
 
     assert record.status is ValidationStatus.TIMEOUT
     assert "7" in (record.detail or "")
+    assert record.duration_seconds is not None
 
 
 def test_isolated_subprocess_failure_without_record_is_retained(
@@ -239,4 +240,5 @@ def test_report_retains_framework_pins(tmp_path: Path) -> None:
     run_all_correctness.write_report(report_path, records)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["schema_version"] == 2
     assert report["frameworks"] == run_all_correctness.FRAMEWORK_PINS

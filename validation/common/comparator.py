@@ -7,6 +7,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from .types import CheckResult, ComparisonResult, FrameworkResult, ScenarioConfig, Tolerance
 
 CANONICAL_QUANTUM = Decimal("0.00000001")
+CANONICAL_QUANTUM_TEXT = format(CANONICAL_QUANTUM, "f")
 
 
 def _canonical_number(value: int | float) -> Decimal:
@@ -55,6 +56,9 @@ def compare_results(
             ),
             expected=framework_result.num_trades,
             actual=ml4t_result.num_trades,
+            difference=trade_diff,
+            canonical_quantum="1",
+            diagnostic_limit=tolerance.trade_count,
         )
     )
 
@@ -74,6 +78,9 @@ def compare_results(
             ),
             expected=fw_value,
             actual=ml4t_value,
+            difference=value_diff,
+            canonical_quantum=CANONICAL_QUANTUM_TEXT,
+            diagnostic_limit=tolerance.value_pct,
         )
     )
 
@@ -92,6 +99,9 @@ def compare_results(
             ),
             expected=fw_pnl,
             actual=ml4t_pnl,
+            difference=pnl_diff,
+            canonical_quantum=CANONICAL_QUANTUM_TEXT,
+            diagnostic_limit=tolerance.pnl_abs,
         )
     )
 
@@ -107,6 +117,9 @@ def compare_results(
                     message="Required commission output is missing",
                     expected=fw_comm,
                     actual=ml4t_comm,
+                    difference="missing",
+                    canonical_quantum=CANONICAL_QUANTUM_TEXT,
+                    diagnostic_limit=tolerance.commission_abs,
                 )
             )
         else:
@@ -122,6 +135,9 @@ def compare_results(
                     ),
                     expected=fw_comm,
                     actual=ml4t_comm,
+                    difference=comm_diff,
+                    canonical_quantum=CANONICAL_QUANTUM_TEXT,
+                    diagnostic_limit=tolerance.commission_abs,
                 )
             )
 
@@ -136,6 +152,9 @@ def compare_results(
                     message="Required exit-price output is missing",
                     expected=fw_exit,
                     actual=ml4t_exit,
+                    difference="missing",
+                    canonical_quantum=CANONICAL_QUANTUM_TEXT,
+                    diagnostic_limit=tolerance.exit_price_abs,
                 )
             )
         else:
@@ -151,6 +170,9 @@ def compare_results(
                     ),
                     expected=fw_exit,
                     actual=ml4t_exit,
+                    difference=exit_diff,
+                    canonical_quantum=CANONICAL_QUANTUM_TEXT,
+                    diagnostic_limit=tolerance.exit_price_abs,
                 )
             )
 
@@ -196,6 +218,9 @@ def compare_results(
             message=trade_detail,
             expected=framework_result.trades,
             actual=ml4t_result.trades,
+            difference=None if trade_level_passed else trade_detail,
+            canonical_quantum=CANONICAL_QUANTUM_TEXT,
+            diagnostic_limit=None,
         )
     )
 

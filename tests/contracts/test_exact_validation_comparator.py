@@ -17,6 +17,8 @@ if str(_VALIDATION_DIR) not in sys.path:
     sys.path.insert(0, str(_VALIDATION_DIR))
 
 from common.comparator import compare_results  # noqa: E402
+from common.ml4t_runner import run_ml4t  # noqa: E402
+from common.provenance import generate_inputs  # noqa: E402
 from common.types import FrameworkResult  # noqa: E402
 from scenarios.definitions import SCENARIOS  # noqa: E402
 
@@ -81,6 +83,19 @@ def test_scenario_trade_fields_require_exact_equality() -> None:
     trade_check = next(check for check in comparison.checks if check.name == "trade_level_match")
     assert trade_check.passed is False
     assert "exit_price" in trade_check.message
+
+
+def test_wrong_execution_profile_remains_a_detected_negative_control() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    reference = run_ml4t(scenario, prices, entries, exits, framework="backtrader")
+    reference.framework = "Backtrader reference"
+    wrong_profile = run_ml4t(scenario, prices, entries, exits, framework="vectorbt_oss")
+
+    comparison = compare_results(scenario, reference, wrong_profile)
+
+    assert comparison.passed is False
+    assert any(not check.passed for check in comparison.checks)
 
 
 def _benchmark_result(suite, framework: str):

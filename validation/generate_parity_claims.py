@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from common.correctness_evidence import correctness_report_failures
 from common.framework_registry import load_framework_manifest
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -34,6 +35,9 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _validate_evidence(correctness: dict[str, Any], large_scale: dict[str, Any]) -> None:
+    failures = correctness_report_failures(correctness)
+    if failures:
+        raise ValueError("Accepted correctness evidence is invalid: " + "; ".join(failures))
     frameworks = correctness.get("frameworks")
     records = correctness.get("records")
     if not isinstance(frameworks, dict) or not isinstance(records, list):
