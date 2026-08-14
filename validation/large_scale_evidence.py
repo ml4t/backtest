@@ -734,8 +734,12 @@ def _run_isolated_worker(
             check=False,
         )
         if completed.returncode != 0 or not output.is_file():
-            details = (completed.stderr or completed.stdout).strip()
-            raise RuntimeError(f"{framework} scale worker failed: {details[-20_000:]}")
+            details = "\n".join(
+                stream.strip() for stream in (completed.stdout, completed.stderr) if stream.strip()
+            )
+            raise RuntimeError(
+                f"{framework} scale worker exited {completed.returncode}: {details[-20_000:]}"
+            )
         record = cast(dict[str, Any], json.loads(output.read_text(encoding="utf-8")))
         if record.get("comparison", {}).get("passed") is not True:
             raise RuntimeError(
