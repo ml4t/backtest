@@ -18,6 +18,7 @@ validation/common/data_generators.py
 validation/common/framework_registry.py
 validation/common/ml4t_runner.py
 validation/common/provenance.py
+validation/large_scale_evidence.py
 validation/common/types.py
 validation/native/vectorbt_behavior.py
 validation/native/backtrader_behavior.py
