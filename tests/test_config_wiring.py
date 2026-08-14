@@ -503,6 +503,70 @@ class TestShortCashPolicy:
         assert position is not None
         assert position.quantity == -10.0
 
+    def test_lock_notional_partial_cover_releases_proportional_aggregate_basis(self):
+        initial_cash = 100_000.0
+        first_qty = 13.436424411240122
+        second_qty = 84.74337369372327
+        first_price = 152.7549237953228
+        second_price = 51.01380514788434
+        covered = 48.64171682480172
+        cover_price = 73.25
+        broker = _make_broker(
+            initial_cash=initial_cash,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+
+        _set_prices(broker, {"A": first_price})
+        broker.submit_order("A", first_qty, OrderSide.SELL)
+        broker._process_orders()
+        _set_prices(broker, {"A": second_price}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", second_qty, OrderSide.SELL)
+        broker._process_orders()
+
+        aggregate_basis = first_qty * first_price + second_qty * second_price
+        total_qty = first_qty + second_qty
+        expected_before_cover = initial_cash - first_qty * first_price - second_qty * second_price
+        assert broker.account._lock_notional_short_basis["A"] == aggregate_basis
+        assert broker.account._lock_notional_free_cash == expected_before_cover
+
+        _set_prices(broker, {"A": cover_price}, ts=datetime(2024, 1, 3))
+        broker.submit_order("A", covered, OrderSide.BUY)
+        broker._process_orders()
+
+        released_basis = (covered / total_qty) * aggregate_basis
+        expected_free_cash = expected_before_cover + (
+            released_basis + released_basis - covered * cover_price
+        )
+        remaining_fraction = (total_qty - covered) / total_qty
+        assert broker.account._lock_notional_free_cash == expected_free_cash
+        assert broker.account._lock_notional_short_basis["A"] == (
+            remaining_fraction * aggregate_basis
+        )
+
+    def test_lock_notional_partial_fill_uses_direct_native_cash_quotient(self):
+        initial_cash = 20_697.596345718113
+        price = 680.4559000307344
+        broker = _make_broker(
+            initial_cash=initial_cash,
+            allow_short_selling=True,
+            allow_leverage=False,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": price})
+
+        broker.submit_order("A", 100.0, OrderSide.SELL)
+        broker._process_orders()
+
+        assert broker.fills[0].quantity == initial_cash / price
+
 
 # ---------------------------------------------------------------------------
 # partial_fills_allowed

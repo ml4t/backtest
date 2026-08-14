@@ -38,6 +38,7 @@ class AccountState:
         """
         self.cash = initial_cash
         self._lock_notional_free_cash = initial_cash
+        self._lock_notional_short_basis: dict[str, float] = {}
         self.positions: dict[str, Position] = {}
         self.policy = policy
 

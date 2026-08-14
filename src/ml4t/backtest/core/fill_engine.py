@@ -6,8 +6,9 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from ..config import ExecutionPrice, ShareType
+from ..models import calculate_commission
 from ..types import OrderSide, OrderType
-from .shared import CASH_TOLERANCE
+from .shared import CASH_TOLERANCE, add_with_zero_cancellation
 from .state import MarketState, OrderState
 
 if TYPE_CHECKING:
@@ -62,6 +63,10 @@ class FillEngine:
         if fill_price <= 0 or order.quantity <= 0:
             return 0.0
 
+        direct_limit = self._get_lock_notional_zero_cost_limit(order, fill_price)
+        if direct_limit is not None:
+            return min(order.quantity, direct_limit)
+
         if self.broker.share_type == ShareType.INTEGER:
             high_int = int(order.quantity)
             if high_int <= 0:
@@ -96,6 +101,46 @@ class FillEngine:
         ):
             cash_tolerance = 0.0
         return max(0.0, low - cash_tolerance / fill_price)
+
+    def _get_lock_notional_zero_cost_limit(self, order, fill_price: float) -> float | None:
+        broker = self.broker
+        if (
+            broker.share_type != ShareType.FRACTIONAL
+            or broker.short_cash_policy.value != "lock_notional"
+            or broker.account.policy.allow_leverage
+            or broker.cash_buffer_pct != 0.0
+            or calculate_commission(
+                broker.commission_model,
+                order.asset,
+                order.quantity,
+                fill_price,
+            )
+            != 0.0
+        ):
+            return None
+
+        free_cash = broker.account._lock_notional_free_cash
+        current_quantity = broker.account.get_position_quantity(order.asset)
+        multiplier = broker.get_multiplier(order.asset)
+        unit_cost = fill_price * multiplier
+
+        if order.side is OrderSide.BUY and current_quantity < 0.0:
+            short_quantity = abs(current_quantity)
+            short_basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
+            cover_budget = free_cash + short_basis + short_basis
+            max_cover = cover_budget / unit_cost
+            if max_cover < short_quantity:
+                return max_cover
+            released = short_basis + short_basis - short_quantity * unit_cost
+            free_after_cover = add_with_zero_cancellation(free_cash, released)
+            return short_quantity + max(0.0, free_after_cover / unit_cost)
+
+        if order.side is OrderSide.SELL and current_quantity > 0.0:
+            sale_proceeds = current_quantity * unit_cost
+            free_after_close = add_with_zero_cancellation(free_cash, sale_proceeds)
+            return current_quantity + max(0.0, free_after_close / unit_cost)
+
+        return max(0.0, free_cash / unit_cost)
 
     def try_partial_fill(self, order, fill_price: float) -> bool:
         max_shares = self.get_max_affordable_quantity(order, fill_price)

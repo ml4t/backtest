@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from math import fabs, isfinite, ulp
+from math import copysign, fabs, isclose, isfinite, ulp
 from typing import TYPE_CHECKING
 
 from ..types import ExitReason, OrderSide
@@ -17,6 +17,15 @@ if TYPE_CHECKING:
 CASH_TOLERANCE: float = 0.01
 QUANTITY_ZERO_FLOOR: float = 1e-12
 QUANTITY_ZERO_ULPS: int = 16
+
+
+def add_with_zero_cancellation(left: float, right: float) -> float:
+    """Add values while collapsing tolerance-equivalent opposite amounts to zero."""
+    if copysign(1.0, left) != copysign(1.0, right) and isclose(
+        abs(left), abs(right), rel_tol=1e-9, abs_tol=1e-12
+    ):
+        return 0.0
+    return left + right
 
 
 def quantity_zero_tolerance(*operands: float) -> float:

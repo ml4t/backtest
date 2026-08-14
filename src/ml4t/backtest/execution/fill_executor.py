@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import InitialHwmSource, ShareType
-from ..core.shared import quantity_zero_tolerance
+from ..core.shared import add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
 from ..models import calculate_commission, calculate_slippage
 from ..types import (
@@ -60,15 +60,6 @@ def _calculate_position_pnl(
 ) -> float:
     """Calculate PnL from entry and exit notionals in ledger operation order."""
     return (exit_price * signed_quantity - entry_price * signed_quantity) * multiplier
-
-
-def _add_with_zero_cancellation(left: float, right: float) -> float:
-    """Add values while collapsing tolerance-equivalent opposite amounts to zero."""
-    if math.copysign(1.0, left) != math.copysign(1.0, right) and math.isclose(
-        abs(left), abs(right), rel_tol=1e-9, abs_tol=1e-12
-    ):
-        return 0.0
-    return left + right
 
 
 @dataclass
@@ -314,7 +305,6 @@ class FillExecutor:
 
         old_position = self.account.positions.get(order.asset)
         old_quantity = old_position.quantity if old_position is not None else 0.0
-        old_entry_price = old_position.entry_price if old_position is not None else 0.0
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
@@ -323,7 +313,6 @@ class FillExecutor:
         self._update_lock_notional_free_cash(
             ctx,
             old_quantity=old_quantity,
-            old_entry_price=old_entry_price,
             commission=actual_commission,
         )
 
@@ -357,7 +346,6 @@ class FillExecutor:
         ctx: FillContext,
         *,
         old_quantity: float,
-        old_entry_price: float,
         commission: float,
     ) -> None:
         broker = self.broker
@@ -368,23 +356,38 @@ class FillExecutor:
         remaining = ctx.signed_qty
         free_cash = self.account._lock_notional_free_cash
         multiplier = broker.get_multiplier(ctx.order.asset)
+        asset = ctx.order.asset
+        short_basis = self.account._lock_notional_short_basis.get(asset, 0.0)
 
         if old_quantity < 0.0 and remaining > 0.0:
             covered = min(remaining, abs(old_quantity))
-            released_basis = covered * old_entry_price * multiplier
+            size_fraction = covered / abs(old_quantity)
+            released_basis = size_fraction * short_basis
             required_cash = covered * ctx.fill_price * multiplier
-            free_cash = _add_with_zero_cancellation(free_cash, 2.0 * released_basis - required_cash)
+            free_cash = add_with_zero_cancellation(
+                free_cash,
+                released_basis + released_basis - required_cash,
+            )
+            new_quantity = old_quantity + covered
+            if new_quantity < 0.0:
+                new_fraction = abs(new_quantity) / abs(old_quantity)
+                self.account._lock_notional_short_basis[asset] = new_fraction * short_basis
+            else:
+                self.account._lock_notional_short_basis.pop(asset, None)
             remaining -= covered
         elif old_quantity > 0.0 and remaining < 0.0:
             closed = min(abs(remaining), old_quantity)
-            free_cash = _add_with_zero_cancellation(free_cash, closed * ctx.fill_price * multiplier)
+            free_cash = add_with_zero_cancellation(free_cash, closed * ctx.fill_price * multiplier)
             remaining += closed
 
         if remaining != 0.0:
             required_cash = abs(remaining) * ctx.fill_price * multiplier
-            free_cash = _add_with_zero_cancellation(free_cash, -required_cash)
+            free_cash = add_with_zero_cancellation(free_cash, -required_cash)
+            if remaining < 0.0:
+                current_basis = self.account._lock_notional_short_basis.get(asset, 0.0)
+                self.account._lock_notional_short_basis[asset] = current_basis + required_cash
 
-        self.account._lock_notional_free_cash = _add_with_zero_cancellation(free_cash, -commission)
+        self.account._lock_notional_free_cash = add_with_zero_cancellation(free_cash, -commission)
 
     @staticmethod
     def _validate_execution_price(value: float, *, source: str) -> None:
