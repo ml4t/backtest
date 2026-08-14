@@ -185,9 +185,10 @@ config = BacktestConfig.from_preset("lean")
 config = BacktestConfig.from_preset("realistic")
 ```
 
-Each preset sets all 40+ behavioral knobs to match the target framework's behavior.
-Strict variants (`backtrader_strict`, `vectorbt_strict`, `zipline_strict`)
-are also available for exact parity testing.
+Each preset configures the measured behavior used by its comparison protocol. The native defaults,
+explicit overrides, and adapter-emulated behavior are listed in the
+[validation methodology](../../validation/METHODOLOGY.md). Strict aliases are also available for
+the retained comparison commands.
 
 ## Insufficient Funds
 

@@ -14,7 +14,7 @@ exactly and which remain release-blocking.
 | `fast` | Zero-cost, integer-share execution -- fastest possible execution |
 | `backtrader` | Match Backtrader's default behavior |
 | `vectorbt` | Match VectorBT's default behavior (including fractional shares) |
-| `zipline` | Match Zipline Reloaded's default behavior |
+| `zipline` | Match the documented Zipline comparison protocol |
 | `lean` | Match QuantConnect LEAN's default behavior |
 | `realistic` | Conservative settings for production |
 
@@ -32,13 +32,13 @@ The broker preset also supports a modular alias:
 
 ### Strict Profiles
 
-Strict variants tune additional knobs (cash validation, settlement, short policies) for maximum parity on large-scale comparisons:
+Strict variants are the names used by retained comparison commands:
 
 | Profile | Base | Additional Tuning |
 |---------|------|-------------------|
 | `backtrader_strict` | backtrader | Submission precheck, simple cash check |
-| `vectorbt_strict` | vectorbt | Lock notional for shorts, FIFO ordering |
-| `zipline_strict` | zipline | Skip cash validation, allow shorts |
+| `vectorbt_strict` | vectorbt | Same settings as `vectorbt` |
+| `zipline_strict` | zipline | Same settings as `zipline` |
 
 ### Aliases
 
@@ -90,25 +90,25 @@ Profiles define behavioral defaults. Quote-aware feeds layer on top of them: you
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Fill mode | stop_price | stop_price | stop_price | stop_price | stop_price | next_bar_open |
+| Fill mode | stop_price | stop_price | stop_price | next_bar_open | stop_price | next_bar_open |
 | Level basis | fill_price | signal_price | fill_price | fill_price | fill_price | fill_price |
-| Trail HWM | close | close | bar_extreme | close | close | close |
-| Trail timing | lagged | lagged | intrabar | lagged | lagged | lagged |
+| Trail HWM | close | close | bar_extreme | bar_extreme | close | close |
+| Trail timing | lagged | lagged | intrabar | intrabar | lagged | lagged |
 
 ### Account
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Short selling | No | Yes (margin) | Yes | No | Yes | No |
-| Leverage | No | Yes (50%) | No | No | No | No |
+| Short selling | No | Yes | Yes | Yes | Yes | No |
+| Leverage | No | No | No | Cash validation disabled | No | No |
 | Share type | integer | integer | fractional | integer | integer | integer |
 
 ### Costs
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Commission | none | 0.1% | none | $0.005/share | $0.005/share | 0.2% |
-| Slippage | none | 0.1% | none | 10% volume | 0.1% | 0.2% |
+| Commission | none | none | none | none | $0.005/share | 0.2% |
+| Slippage | none | none | none | none | 0.1% | 0.2% |
 | Stop slippage | 0 | 0 | 0 | 0 | 0 | 0.1% |
 | Cash buffer | 0% | 0% | 0% | 0% | 0% | 2% |
 
@@ -116,9 +116,9 @@ Profiles define behavioral defaults. Quote-aware feeds layer on top of them: you
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
 |---------|---------|-----------|----------|---------|------|-----------|
-| Fill ordering | exit_first | fifo | exit_first | exit_first | exit_first | exit_first |
-| Reject insuff. | yes | yes | no | yes | yes | yes |
-| Partial fills | no | no | yes | yes | no | no |
+| Fill ordering | exit_first | fifo | exit_first | fifo | exit_first | exit_first |
+| Reject insuff. | yes | yes | no | no | yes | yes |
+| Partial fills | no | no | yes | no | no | no |
 | Rebalance mode | incremental | snapshot | hybrid | snapshot | snapshot | incremental |
 
 ## Parity Validation

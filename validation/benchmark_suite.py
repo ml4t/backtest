@@ -1338,9 +1338,8 @@ def benchmark_ml4t(
         # Clear every direct commission field, not just type+rate. The broker
         # auto-activates a cost model whenever any direct field (per_share /
         # per_trade / rate) is non-zero, even when commission_type is NONE, so a
-        # partial reset would leave a preset's per-share/minimum commission live
-        # (e.g. zipline_strict carries per_share=0.005, minimum=1.0) and silently
-        # re-enable it — breaking parity against the zero-commission reference run.
+        # partial reset could leave direct per-share or per-trade values live and
+        # silently re-enable costs, breaking parity against a zero-cost reference.
         cfg.commission_type = CommissionType.NONE
         cfg.commission_rate = 0.0
         cfg.commission_per_share = 0.0

@@ -143,7 +143,7 @@ VECTORBT_PROFILE = {
 
 ZIPLINE_PROFILE = {
     "account": {
-        "allow_short_selling": False,
+        "allow_short_selling": True,
         "allow_leverage": False,
         "short_cash_policy": "credit",
     },
@@ -152,36 +152,37 @@ ZIPLINE_PROFILE = {
         "execution_mode": "next_bar",
     },
     "stops": {
-        "stop_fill_mode": "stop_price",
+        "stop_fill_mode": "next_bar_open",
         "stop_level_basis": "fill_price",
-        "trail_hwm_source": "close",
-        "trail_stop_timing": "lagged",
+        "trail_hwm_source": "bar_extreme",
+        "trail_stop_timing": "intrabar",
     },
     "position_sizing": {
         "share_type": "integer",
     },
     "commission": {
-        "model": "per_share",
+        "model": "none",
         "rate": 0.0,
-        "per_share": 0.005,
-        "minimum": 1.0,
+        "per_share": 0.0,
+        "minimum": 0.0,
     },
     "slippage": {
-        "model": "volume_based",
-        "rate": 0.1,
+        "model": "none",
+        "rate": 0.0,
     },
     "cash": {
         "initial": 100000.0,
         "buffer_pct": 0.0,
     },
     "orders": {
-        "reject_on_insufficient_cash": True,
-        "partial_fills_allowed": True,
-        "fill_ordering": "exit_first",
+        "reject_on_insufficient_cash": False,
+        "skip_cash_validation": True,
+        "partial_fills_allowed": False,
+        "fill_ordering": "fifo",
         "entry_order_priority": "submission",
         "next_bar_queue_shadow_validation": True,
         "rebalance_mode": "snapshot",
-        "rebalance_headroom_pct": 0.998,
+        "rebalance_headroom_pct": 1.0,
         "missing_price_policy": "use_last",
         "late_asset_policy": "allow",
         "late_asset_min_bars": 1,
@@ -287,10 +288,6 @@ BACKTRADER_STRICT_PROFILE["orders"]["next_bar_submission_precheck"] = True
 BACKTRADER_STRICT_PROFILE["orders"]["next_bar_simple_cash_check"] = True
 
 ZIPLINE_STRICT_PROFILE = deepcopy(ZIPLINE_PROFILE)
-ZIPLINE_STRICT_PROFILE["account"]["allow_short_selling"] = True
-ZIPLINE_STRICT_PROFILE["account"]["short_cash_policy"] = "credit"
-ZIPLINE_STRICT_PROFILE["orders"]["skip_cash_validation"] = True
-ZIPLINE_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 
 LEAN_PROFILE = {
     "account": {

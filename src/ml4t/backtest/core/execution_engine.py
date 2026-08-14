@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING
+import math
+from typing import TYPE_CHECKING, TypeGuard
 
 from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
@@ -14,6 +15,10 @@ if TYPE_CHECKING:
     from ..accounting import AccountState
     from ..broker import Broker
     from .fill_engine import FillEngine
+
+
+def _price_available(price: object) -> TypeGuard[int | float]:
+    return isinstance(price, (int, float)) and math.isfinite(price)
 
 
 class ExecutionEngine:
@@ -129,7 +134,7 @@ class ExecutionEngine:
                 deferred_entries.append(order)
                 continue
             price = fill.get_fill_price_for_order(order, use_open)
-            if price is None:
+            if not _price_available(price):
                 continue
             fill_price = fill.check_fill(order, price)
             if fill_price is not None:
@@ -221,7 +226,7 @@ class ExecutionEngine:
 
         for order in eligible_orders:
             price = fill.get_fill_price_for_order(order, use_open)
-            if price is None:
+            if not _price_available(price):
                 continue
 
             fill.apply_share_rounding(order)
@@ -451,7 +456,7 @@ class ExecutionEngine:
                 continue
 
             price = fill.get_fill_price_for_order(order, use_open)
-            if price is None:
+            if not _price_available(price):
                 continue
 
             fill.apply_share_rounding(order)
@@ -500,7 +505,7 @@ class ExecutionEngine:
         if order.status is not OrderStatus.PENDING:
             return
         price = fill.get_fill_price_for_order(order, use_open)
-        if price is None:
+        if not _price_available(price):
             return
 
         skip_cash = broker.skip_cash_validation
@@ -711,8 +716,10 @@ class ExecutionEngine:
 
         def notional(order) -> float:
             px = fill.get_fill_price_for_order(order, use_open)
-            if px is None:
+            if not _price_available(px):
                 px = self.market.prices.get(order.asset, self.market.opens.get(order.asset, 0.0))
+            if not _price_available(px):
+                return 0.0
             return abs(order.quantity * px)
 
         reverse = priority == "notional_desc"

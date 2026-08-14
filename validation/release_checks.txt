@@ -18,4 +18,5 @@ validation/common/provenance.py
 validation/common/types.py
 validation/native/vectorbt_behavior.py
 validation/native/backtrader_behavior.py
+validation/native/zipline_behavior.py
 validation/scenarios/definitions.py

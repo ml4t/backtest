@@ -480,7 +480,7 @@ config = BacktestConfig(
 | `NONE` | No slippage | |
 | `PERCENTAGE` | % of price | `slippage_rate=0.001` (0.1%) |
 | `FIXED` | Fixed $ per share | `slippage_fixed=0.01` |
-| `VOLUME_BASED` | Size vs volume | `slippage_rate=0.1` (10% volume limit) |
+| `VOLUME_BASED` | Linear size-to-volume impact | `slippage_rate=0.1` (impact coefficient) |
 
 Slippage models remain separate from quote-side execution:
 

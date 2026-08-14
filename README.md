@@ -126,7 +126,7 @@ config = BacktestConfig.from_preset("vectorbt")
 # Match Backtrader behavior (next-bar open fills, integer shares)
 config = BacktestConfig.from_preset("backtrader")
 
-# Match Zipline behavior (next-bar open fills, integer shares, per-share commission)
+# Match the documented Zipline comparison protocol (next-bar open, no default costs)
 config = BacktestConfig.from_preset("zipline")
 
 # Match QuantConnect LEAN behavior (same-bar close fills, integer shares)

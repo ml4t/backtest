@@ -47,6 +47,32 @@ class _BuyOnMissingClose(Strategy):
             broker.submit_order("AAPL", 1.0)
 
 
+def _prices_with_missing_middle() -> pl.DataFrame:
+    return (
+        _prices()
+        .vstack(
+            pl.DataFrame(
+                {
+                    "timestamp": [datetime(2024, 1, 3)],
+                    "asset": ["AAPL"],
+                    "open": [120.0],
+                    "high": [120.0],
+                    "low": [120.0],
+                    "close": [120.0],
+                    "volume": [1_000_000.0],
+                }
+            )
+        )
+        .with_columns(
+            pl.when(pl.col("timestamp") == datetime(2024, 1, 2))
+            .then(float("nan"))
+            .otherwise(pl.col(column))
+            .alias(column)
+            for column in ("open", "high", "low", "close")
+        )
+    )
+
+
 class _BuyWithTrailingStop(Strategy):
     def __init__(self) -> None:
         self.done = False
@@ -105,39 +131,30 @@ def test_profiles_enforce_expected_entry_timing_contract() -> None:
 
     assert vbt.trades[0].entry_price == 101.0  # same-bar close
     assert bt.trades[0].entry_price == 110.0  # next-bar open with zero default slippage
-    assert 110.0 < zl.trades[0].entry_price < 111.0  # next-bar open with volume slippage
+    assert zl.trades[0].entry_price == 110.0  # configured next-bar open with zero slippage
 
 
 def test_vectorbt_profile_drops_signal_order_with_missing_close() -> None:
-    prices = (
-        _prices()
-        .vstack(
-            pl.DataFrame(
-                {
-                    "timestamp": [datetime(2024, 1, 3)],
-                    "asset": ["AAPL"],
-                    "open": [120.0],
-                    "high": [120.0],
-                    "low": [120.0],
-                    "close": [120.0],
-                    "volume": [1_000_000.0],
-                }
-            )
-        )
-        .with_columns(
-            pl.when(pl.col("timestamp") == datetime(2024, 1, 2))
-            .then(float("nan"))
-            .otherwise(pl.col(column))
-            .alias(column)
-            for column in ("open", "high", "low", "close")
-        )
+    result = run_backtest(
+        prices=_prices_with_missing_middle(),
+        strategy=_BuyOnMissingClose(),
+        config="vectorbt",
     )
-
-    result = run_backtest(prices=prices, strategy=_BuyOnMissingClose(), config="vectorbt")
 
     assert result.fills == []
     assert len(result.rejected_orders) == 1
     assert result.rejected_orders[0].rejection_code == "price_unavailable"
+
+
+def test_zipline_profile_defers_pending_order_across_stale_bar() -> None:
+    result = run_backtest(
+        prices=_prices_with_missing_middle(),
+        strategy=_BuyOnce(),
+        config="zipline",
+    )
+
+    assert result.fills[0].timestamp == datetime(2024, 1, 3)
+    assert result.fills[0].price == 120.0
 
 
 def test_backtrader_profile_uses_signal_price_stop_basis() -> None:
@@ -166,7 +183,7 @@ def test_backtrader_profile_parity_order_knobs() -> None:
 
 def test_zipline_profile_parity_order_knobs() -> None:
     cfg = BacktestConfig.from_preset("zipline")
-    assert cfg.rebalance_headroom_pct == 0.998
+    assert cfg.rebalance_headroom_pct == 1.0
     assert cfg.missing_price_policy.value == "use_last"
     assert cfg.late_asset_policy.value == "allow"
 

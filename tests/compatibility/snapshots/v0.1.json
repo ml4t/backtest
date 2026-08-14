@@ -1611,7 +1611,7 @@
       "zipline": {
         "account": {
           "allow_leverage": false,
-          "allow_short_selling": false,
+          "allow_short_selling": true,
           "short_cash_policy": "credit"
         },
         "cash": {
@@ -1619,9 +1619,9 @@
           "initial": 100000.0
         },
         "commission": {
-          "minimum": 1.0,
-          "model": "per_share",
-          "per_share": 0.005,
+          "minimum": 0.0,
+          "model": "none",
+          "per_share": 0.0,
           "rate": 0.0
         },
         "execution": {
@@ -1630,28 +1630,29 @@
         },
         "orders": {
           "entry_order_priority": "submission",
-          "fill_ordering": "exit_first",
+          "fill_ordering": "fifo",
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "next_bar_queue_shadow_validation": true,
-          "partial_fills_allowed": true,
-          "rebalance_headroom_pct": 0.998,
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
-          "reject_on_insufficient_cash": true
+          "reject_on_insufficient_cash": false,
+          "skip_cash_validation": true
         },
         "position_sizing": {
           "share_type": "integer"
         },
         "slippage": {
-          "model": "volume_based",
-          "rate": 0.1
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
-          "stop_fill_mode": "stop_price",
+          "stop_fill_mode": "next_bar_open",
           "stop_level_basis": "fill_price",
-          "trail_hwm_source": "close",
-          "trail_stop_timing": "lagged"
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
         }
       },
       "zipline_strict": {
@@ -1665,9 +1666,9 @@
           "initial": 100000.0
         },
         "commission": {
-          "minimum": 1.0,
-          "model": "per_share",
-          "per_share": 0.005,
+          "minimum": 0.0,
+          "model": "none",
+          "per_share": 0.0,
           "rate": 0.0
         },
         "execution": {
@@ -1676,29 +1677,29 @@
         },
         "orders": {
           "entry_order_priority": "submission",
-          "fill_ordering": "exit_first",
+          "fill_ordering": "fifo",
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "next_bar_queue_shadow_validation": true,
-          "partial_fills_allowed": true,
-          "rebalance_headroom_pct": 0.998,
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
-          "reject_on_insufficient_cash": true,
+          "reject_on_insufficient_cash": false,
           "skip_cash_validation": true
         },
         "position_sizing": {
           "share_type": "integer"
         },
         "slippage": {
-          "model": "volume_based",
-          "rate": 0.1
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
-          "stop_fill_mode": "stop_price",
+          "stop_fill_mode": "next_bar_open",
           "stop_level_basis": "fill_price",
-          "trail_hwm_source": "close",
-          "trail_stop_timing": "lagged"
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
         }
       }
     }

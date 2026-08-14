@@ -155,6 +155,18 @@ def installed_framework_version(target: FrameworkTarget) -> str:
     return importlib.metadata.version(target.package)
 
 
+def comparison_protocol_metadata(scenario: ScenarioConfig, framework: str) -> dict[str, str]:
+    """Identify native and adapter-emulated portions of a comparison."""
+    if framework != "zipline":
+        return {"risk_rules": "framework_adapter"}
+    return {
+        "commission": "explicit scenario model or NoCommission",
+        "execution": "custom next-session open-price slippage model",
+        "risk_rules": "adapter_emulated_daily_ohlc" if scenario.risk_rules else "none",
+        "trade_records": "adapter_reconstructed_from_native_transactions",
+    }
+
+
 def build_record_provenance(
     *,
     scenario: ScenarioConfig,
@@ -183,6 +195,7 @@ def build_record_provenance(
             "module": f"frameworks.{framework}",
             "path": adapter_path.relative_to(PROJECT_ROOT).as_posix(),
         },
+        "comparison_protocol": comparison_protocol_metadata(scenario, framework),
         "digests": static_digests(scenario, framework),
         "input_digest": input_digest(prices, entries, exits),
         "record_counts": {

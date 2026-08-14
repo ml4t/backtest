@@ -159,6 +159,7 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
     assert "validation/build_framework_env.py" in parity_commands
     assert "validation/native/vectorbt_behavior.py" in parity_commands
     assert "validation/native/backtrader_behavior.py" in parity_commands
+    assert "validation/native/zipline_behavior.py" in parity_commands
     assert "validation/run_all_correctness.py" in parity_commands
     assert "--extra comparison" not in parity_commands
     build_commands = "\n".join(step.get("run", "") for step in jobs["build"]["steps"])

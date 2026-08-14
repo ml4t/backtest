@@ -223,6 +223,13 @@ jobs:
           validation/native/backtrader_behavior.py
           --output native-evidence.json
 
+      - name: Measure native Zipline behavior
+        if: matrix.framework == 'zipline'
+        run: >-
+          "${{ matrix.environment }}/bin/python"
+          validation/native/zipline_behavior.py
+          --output native-evidence.json
+
       - name: Run the complete required scenario matrix
         run: >-
           "${{ matrix.environment }}/bin/python"

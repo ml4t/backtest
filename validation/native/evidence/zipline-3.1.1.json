@@ -1,0 +1,608 @@
+{
+  "artifact": "zipline_reloaded-3.1.1.tar.gz",
+  "artifact_sha256": "4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+  "checks": [
+    {
+      "actual": {
+        "commission_class": "PerShare",
+        "commission_minimum": 0,
+        "commission_per_share": 0.001,
+        "slippage_basis_points": 5.0,
+        "slippage_class": "FixedBasisPointsSlippage",
+        "slippage_volume_limit": 0.1,
+        "volume_share_price_impact": 0.1,
+        "volume_share_volume_limit": 0.025
+      },
+      "expected": {
+        "commission_class": "PerShare",
+        "commission_minimum": 0,
+        "commission_per_share": 0.001,
+        "slippage_basis_points": 5.0,
+        "slippage_class": "FixedBasisPointsSlippage",
+        "slippage_volume_limit": 0.1,
+        "volume_share_price_impact": 0.1,
+        "volume_share_volume_limit": 0.025
+      },
+      "id": "defaults",
+      "passed": true
+    },
+    {
+      "actual": {
+        "cash_after_fill": 879.9390000000001,
+        "transactions": [
+          {
+            "amount": 1,
+            "date": "2024-01-03",
+            "price": 120.06,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "expected": {
+        "cash_after_fill": 879.9390000000001,
+        "transactions": [
+          {
+            "amount": 1,
+            "date": "2024-01-03",
+            "price": 120.06,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "id": "default_next_bar_close_fill",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "amount": 1,
+          "date": "2024-01-03",
+          "price": 110.0,
+          "transaction_commission": 0.0
+        }
+      ],
+      "expected": [
+        {
+          "amount": 1,
+          "date": "2024-01-03",
+          "price": 110.0,
+          "transaction_commission": 0.0
+        }
+      ],
+      "id": "configured_next_bar_open_fill",
+      "passed": true
+    },
+    {
+      "actual": {
+        "cash_after_fill": 889.0,
+        "transactions": [
+          {
+            "amount": 1,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "expected": {
+        "cash_after_fill": 889.0,
+        "transactions": [
+          {
+            "amount": 1,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "id": "explicit_minimum_commission",
+      "passed": true
+    },
+    {
+      "actual": {
+        "orders": [
+          {
+            "amount": 5,
+            "date": "2024-01-02",
+            "filled": 0,
+            "status": 0
+          },
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "filled": 5,
+            "status": 1
+          }
+        ],
+        "transactions": [
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "expected": {
+        "orders": [
+          {
+            "amount": 5,
+            "date": "2024-01-02",
+            "filled": 0,
+            "status": 0
+          },
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "filled": 5,
+            "status": 1
+          }
+        ],
+        "transactions": [
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "id": "integer_target_percent",
+      "passed": true
+    },
+    {
+      "actual": {
+        "submitted_amounts": [
+          5,
+          5
+        ],
+        "transactions": [
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          },
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "expected": {
+        "submitted_amounts": [
+          5,
+          5
+        ],
+        "transactions": [
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          },
+          {
+            "amount": 5,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "id": "target_percent_snapshot",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "amount": 1,
+          "date": "2024-01-03",
+          "price": 110.0,
+          "transaction_commission": 0.0
+        },
+        {
+          "amount": -1,
+          "date": "2024-01-03",
+          "price": 110.0,
+          "transaction_commission": 0.0
+        }
+      ],
+      "expected": [
+        {
+          "amount": 1,
+          "date": "2024-01-03",
+          "price": 110.0,
+          "transaction_commission": 0.0
+        },
+        {
+          "amount": -1,
+          "date": "2024-01-03",
+          "price": 110.0,
+          "transaction_commission": 0.0
+        }
+      ],
+      "id": "submission_sequence",
+      "passed": true
+    },
+    {
+      "actual": {
+        "long": {
+          "cash_after_fill": -1200.0,
+          "position_after_fill": 20,
+          "transactions": [
+            {
+              "amount": 20,
+              "date": "2024-01-03",
+              "price": 110.0,
+              "transaction_commission": 0.0
+            }
+          ]
+        },
+        "short": {
+          "cash_after_fill": 1110.0,
+          "position_after_fill": -1,
+          "transactions": [
+            {
+              "amount": -1,
+              "date": "2024-01-03",
+              "price": 110.0,
+              "transaction_commission": 0.0
+            }
+          ]
+        }
+      },
+      "expected": {
+        "long": {
+          "cash_after_fill": -1200.0,
+          "position_after_fill": 20,
+          "transactions": [
+            {
+              "amount": 20,
+              "date": "2024-01-03",
+              "price": 110.0,
+              "transaction_commission": 0.0
+            }
+          ]
+        },
+        "short": {
+          "cash_after_fill": 1110.0,
+          "position_after_fill": -1,
+          "transactions": [
+            {
+              "amount": -1,
+              "date": "2024-01-03",
+              "price": 110.0,
+              "transaction_commission": 0.0
+            }
+          ]
+        }
+      },
+      "id": "cash_and_short_proceeds",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "amount": 2,
+          "date": "2024-01-03",
+          "price": 120.0048,
+          "transaction_commission": 0.0
+        },
+        {
+          "amount": 2,
+          "date": "2024-01-04",
+          "price": 130.0052,
+          "transaction_commission": 0.0
+        },
+        {
+          "amount": 1,
+          "date": "2024-01-05",
+          "price": 140.0014,
+          "transaction_commission": 0.0
+        }
+      ],
+      "expected": [
+        {
+          "amount": 2,
+          "date": "2024-01-03",
+          "price": 120.0048,
+          "transaction_commission": 0.0
+        },
+        {
+          "amount": 2,
+          "date": "2024-01-04",
+          "price": 130.0052,
+          "transaction_commission": 0.0
+        },
+        {
+          "amount": 1,
+          "date": "2024-01-05",
+          "price": 140.0014,
+          "transaction_commission": 0.0
+        }
+      ],
+      "id": "volume_share_partial_fills",
+      "passed": true
+    },
+    {
+      "actual": {
+        "native_output_columns": [
+          "orders",
+          "positions",
+          "transactions"
+        ],
+        "native_trade_column": false,
+        "transactions": [
+          {
+            "amount": 2,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          },
+          {
+            "amount": -2,
+            "date": "2024-01-05",
+            "price": 130.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "expected": {
+        "native_output_columns": [
+          "orders",
+          "positions",
+          "transactions"
+        ],
+        "native_trade_column": false,
+        "transactions": [
+          {
+            "amount": 2,
+            "date": "2024-01-03",
+            "price": 110.0,
+            "transaction_commission": 0.0
+          },
+          {
+            "amount": -2,
+            "date": "2024-01-05",
+            "price": 130.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "id": "transaction_records_not_native_trades",
+      "passed": true
+    },
+    {
+      "actual": [],
+      "expected": [],
+      "id": "final_bar_market_order",
+      "passed": true
+    },
+    {
+      "actual": [
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11"
+      ],
+      "expected": [
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11"
+      ],
+      "id": "session_calendar",
+      "passed": true
+    },
+    {
+      "actual": {
+        "observations": [
+          {
+            "close": 100.0,
+            "date": "2024-01-02",
+            "price": 100.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 120.0,
+            "date": "2024-01-03",
+            "price": 120.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": null,
+            "date": "2024-01-04",
+            "price": 120.0,
+            "stale": true,
+            "volume": 0.0
+          },
+          {
+            "close": 140.0,
+            "date": "2024-01-05",
+            "price": 140.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 150.0,
+            "date": "2024-01-08",
+            "price": 150.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 160.0,
+            "date": "2024-01-09",
+            "price": 160.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 170.0,
+            "date": "2024-01-10",
+            "price": 170.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 180.0,
+            "date": "2024-01-11",
+            "price": 180.0,
+            "stale": false,
+            "volume": 100.0
+          }
+        ],
+        "transactions": [
+          {
+            "amount": 1,
+            "date": "2024-01-05",
+            "price": 130.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "expected": {
+        "observations": [
+          {
+            "close": 100.0,
+            "date": "2024-01-02",
+            "price": 100.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 120.0,
+            "date": "2024-01-03",
+            "price": 120.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": null,
+            "date": "2024-01-04",
+            "price": 120.0,
+            "stale": true,
+            "volume": 0.0
+          },
+          {
+            "close": 140.0,
+            "date": "2024-01-05",
+            "price": 140.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 150.0,
+            "date": "2024-01-08",
+            "price": 150.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 160.0,
+            "date": "2024-01-09",
+            "price": 160.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 170.0,
+            "date": "2024-01-10",
+            "price": 170.0,
+            "stale": false,
+            "volume": 100.0
+          },
+          {
+            "close": 180.0,
+            "date": "2024-01-11",
+            "price": 180.0,
+            "stale": false,
+            "volume": 100.0
+          }
+        ],
+        "transactions": [
+          {
+            "amount": 1,
+            "date": "2024-01-05",
+            "price": 130.0,
+            "transaction_commission": 0.0
+          }
+        ]
+      },
+      "id": "missing_bar",
+      "passed": true
+    }
+  ],
+  "comparison_protocol": {
+    "commission": "NoCommission",
+    "execution": "next-session custom OpenPriceSlippage",
+    "risk_rules": "adapter-emulated from daily OHLC; not Zipline native trade records",
+    "slippage": "no volume cap unless a scenario explicitly configures slippage"
+  },
+  "framework": "zipline",
+  "oracle_sha256": "1804d3fae3a56ec930aba31fc832214d6be6f8a3f6d2e8043b4bd1f0a1040346",
+  "package": "zipline-reloaded",
+  "passed": true,
+  "schema_version": 1,
+  "source_commit": "09885a2ebc7567d40942c891b3879dc03c745070",
+  "source_locations": {
+    "algorithm_target_percent": {
+      "artifact": "zipline_reloaded-3.1.1.tar.gz",
+      "artifact_sha256": "4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+      "line": 1807,
+      "module": "zipline.algorithm",
+      "path": "zipline/utils/api_support.py",
+      "qualname": "TradingAlgorithm.order_target_percent",
+      "source_url": "https://github.com/stefan-jansen/zipline-reloaded/blob/09885a2ebc7567d40942c891b3879dc03c745070/zipline/utils/api_support.py#L1807"
+    },
+    "commission": {
+      "artifact": "zipline_reloaded-3.1.1.tar.gz",
+      "artifact_sha256": "4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+      "line": 163,
+      "module": "zipline.finance.commission",
+      "path": "zipline/finance/commission.py",
+      "qualname": "PerShare.__init__",
+      "source_url": "https://github.com/stefan-jansen/zipline-reloaded/blob/09885a2ebc7567d40942c891b3879dc03c745070/zipline/finance/commission.py#L163"
+    },
+    "default_blotter": {
+      "artifact": "zipline_reloaded-3.1.1.tar.gz",
+      "artifact_sha256": "4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+      "line": 42,
+      "module": "zipline.finance.blotter.simulation_blotter",
+      "path": "zipline/finance/blotter/simulation_blotter.py",
+      "qualname": "SimulationBlotter.__init__",
+      "source_url": "https://github.com/stefan-jansen/zipline-reloaded/blob/09885a2ebc7567d40942c891b3879dc03c745070/zipline/finance/blotter/simulation_blotter.py#L42"
+    },
+    "fixed_basis_points": {
+      "artifact": "zipline_reloaded-3.1.1.tar.gz",
+      "artifact_sha256": "4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+      "line": 663,
+      "module": "zipline.finance.slippage",
+      "path": "zipline/finance/slippage.py",
+      "qualname": "FixedBasisPointsSlippage.process_order",
+      "source_url": "https://github.com/stefan-jansen/zipline-reloaded/blob/09885a2ebc7567d40942c891b3879dc03c745070/zipline/finance/slippage.py#L663"
+    },
+    "volume_share": {
+      "artifact": "zipline_reloaded-3.1.1.tar.gz",
+      "artifact_sha256": "4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+      "line": 288,
+      "module": "zipline.finance.slippage",
+      "path": "zipline/finance/slippage.py",
+      "qualname": "VolumeShareSlippage.process_order",
+      "source_url": "https://github.com/stefan-jansen/zipline-reloaded/blob/09885a2ebc7567d40942c891b3879dc03c745070/zipline/finance/slippage.py#L288"
+    }
+  },
+  "version": "3.1.1"
+}
