@@ -16,6 +16,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from common.capabilities import ML4T_CAPABILITIES  # noqa: E402
 from common.types import FrameworkResult, ScenarioConfig  # noqa: E402
 
 
@@ -110,9 +111,12 @@ def run_ml4t(
         trade_dict: dict[str, Any] = {
             "entry_time": t.entry_time,
             "exit_time": t.exit_time,
+            "asset": t.symbol,
             "entry_price": t.entry_price,
             "exit_price": t.exit_price,
             "pnl": t.pnl,
+            "commission": t.commission,
+            "exit_reason": t.exit_reason,
         }
         if hasattr(t, "quantity"):
             trade_dict["size"] = abs(t.quantity)
@@ -120,6 +124,19 @@ def run_ml4t(
         if hasattr(t, "commission"):
             trade_dict["commission"] = t.commission
         trade_list.append(trade_dict)
+
+    fill_list = [
+        {
+            "timestamp": fill.timestamp,
+            "asset": fill.asset,
+            "side": fill.side.value,
+            "quantity": abs(fill.quantity),
+            "price": fill.price,
+            "commission": fill.commission,
+            "exit_reason": fill.exit_reason,
+        }
+        for fill in results["fills"]
+    ]
 
     extra = {}
     if "commission" in scenario.extra_checks:
@@ -133,6 +150,8 @@ def run_ml4t(
         total_pnl=results["final_value"] - scenario.initial_cash,
         num_trades=results["num_trades"],
         trades=trade_list,
+        fills=fill_list,
+        capabilities=ML4T_CAPABILITIES,
         extra=extra,
     )
 

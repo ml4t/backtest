@@ -225,6 +225,13 @@ trade records in `provenance.comparison_protocol`.
 `278fcb3d1b815b63ccadba68d7ae54422e34b792`, CLI 1.0.228, `DefaultBrokerageModel`, a margin
 account, daily adjusted US equities, and 2x security leverage.
 
+The tables below describe configured profile values. They are not all cross-engine equivalence
+claims. `behavior_coverage.toml` maps every profile field to its native checks and cross-engine
+scenarios. A dimension is publishable only when both references are present. The current scenario
+matrix does not publish equivalence for target-percent sizing, insufficient-cash boundaries,
+competing same-session orders, partial fills, missing bars, or late assets. Those settings remain
+available profile choices backed by native evidence where the map identifies it.
+
 ### Execution Timing
 
 | Knob | ml4t Default | VectorBT | VBT evidence | Backtrader | Zipline protocol | LEAN |
@@ -338,9 +345,9 @@ No large-scale claim is published for Backtrader, Zipline, VectorBT OSS, or LEAN
 
 ## Validation Harness
 
-### Scenario Tests (16 scenarios x 4 frameworks)
+### Scenario Tests (17 scenarios x 4 frameworks)
 
-The validation suite tests 16 scenarios against 4 external frameworks:
+The validation suite tests 17 scenarios against 4 external frameworks:
 
 | ID | Scenario | What It Tests |
 |----|----------|---------------|
@@ -359,7 +366,8 @@ The validation suite tests 16 scenarios against 4 external frameworks:
 | 13 | TSL + TP Combo | Rule chain evaluation order |
 | 14 | TSL + SL Combo | Rule chain evaluation order |
 | 15 | Triple Rule | Three-rule chain with priority |
-| 16 | Stress Test | 1500 bars, 9 market regimes |
+| 16 | Regime Path Coverage | 1500 bars, 9 market regimes and sparse entries |
+| 17 | High Event Count | 1800 bars, up to 600 completed round trips |
 
 ### Large-Scale Validation (250 assets x 20 years)
 

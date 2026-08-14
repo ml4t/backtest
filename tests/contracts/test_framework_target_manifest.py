@@ -60,7 +60,7 @@ def test_scenario_targets_define_reproducible_interpreters() -> None:
         target = manifest.targets[framework_id]
         assert target.environment
         assert target.python_env_var.startswith("ML4T_")
-        assert target.required_scenarios + target.unsupported_scenarios == 16
+        assert target.required_scenarios + target.unsupported_scenarios == 17
 
 
 def test_benchmark_runner_uses_frozen_target_environments() -> None:

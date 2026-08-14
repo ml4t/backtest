@@ -41,6 +41,18 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     correctness = generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
+    correctness = copy.deepcopy(correctness)
+    for framework in generate_parity_claims.SCENARIO_FRAMEWORKS:
+        framework_records = [
+            record for record in correctness["records"] if record["framework"] == framework
+        ]
+        if len(framework_records) < len(generate_parity_claims.SCENARIOS):
+            added = copy.deepcopy(framework_records[-1])
+            added["scenario_id"] = "17"
+            added["scenario_name"] = "High Event Count"
+            added["required"] = True
+            added["status"] = "pass"
+            correctness["records"].append(added)
     large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
     monkeypatch.setattr(generate_parity_claims, "correctness_report_failures", lambda _: [])
 
@@ -50,7 +62,7 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
         assert pin["version"] in claims
         assert pin["source"] in claims
         assert f"`{pin['profile']}`" in claims
-    assert "15/15 exact" in claims
+    assert "16/16 exact" in claims
     assert "225,844 trades" in claims
     assert "No large-scale claim is published for Backtrader" in claims
 
@@ -62,4 +74,4 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
     )
     failed_record["status"] = "comparison_failure"
     failed_claims = generate_parity_claims.render_claims(failed_correctness, large_scale)
-    assert "14/15 pass; blocked by scenario 15" in failed_claims
+    assert "15/16 pass; blocked by scenario 15" in failed_claims

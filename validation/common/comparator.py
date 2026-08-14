@@ -2,17 +2,111 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import ROUND_HALF_EVEN, Decimal
+from typing import Any
 
 from .types import CheckResult, ComparisonResult, FrameworkResult, ScenarioConfig, Tolerance
 
 CANONICAL_QUANTUM = Decimal("0.00000001")
 CANONICAL_QUANTUM_TEXT = format(CANONICAL_QUANTUM, "f")
+TRADE_FIELDS = (
+    "entry_time",
+    "exit_time",
+    "asset",
+    "direction",
+    "size",
+    "entry_price",
+    "exit_price",
+    "pnl",
+    "commission",
+)
+FILL_FIELDS = ("timestamp", "asset", "side", "quantity", "price", "commission")
+_TIMESTAMP_FIELDS = {"entry_time", "exit_time", "timestamp"}
+_CASE_INSENSITIVE_FIELDS = {"direction", "side"}
+_STRING_FIELDS = {"asset", *_CASE_INSENSITIVE_FIELDS}
 
 
 def _canonical_number(value: int | float) -> Decimal:
     """Convert binary framework output to the shared eight-decimal fixed-point domain."""
     return Decimal(str(value)).quantize(CANONICAL_QUANTUM, rounding=ROUND_HALF_EVEN)
+
+
+def _canonical_session(value: object) -> str:
+    """Normalize a daily event timestamp to its ISO session date."""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str):
+        session = value[:10]
+        date.fromisoformat(session)
+        return session
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat):
+        session = str(isoformat())[:10]
+        date.fromisoformat(session)
+        return session
+    raise TypeError(f"unsupported timestamp type {type(value).__name__}")
+
+
+def _canonical_field(field: str, value: Any) -> Decimal | str:
+    if field in _TIMESTAMP_FIELDS:
+        return _canonical_session(value)
+    if field in _STRING_FIELDS:
+        if not isinstance(value, str) or not value:
+            raise TypeError("must be a nonempty string")
+        return value.lower() if field in _CASE_INSENSITIVE_FIELDS else value
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise TypeError("must be numeric")
+    return _canonical_number(value)
+
+
+def _compare_records(
+    *,
+    name: str,
+    expected_records: list[dict[str, Any]],
+    actual_records: list[dict[str, Any]],
+    fields: tuple[str, ...],
+) -> CheckResult:
+    detail = "exact ordered match"
+    passed = len(expected_records) == len(actual_records)
+    if not passed:
+        detail = f"record_count expected={len(expected_records)}, actual={len(actual_records)}"
+    else:
+        for index, (expected_record, actual_record) in enumerate(
+            zip(expected_records, actual_records, strict=True)
+        ):
+            for field in fields:
+                if field not in expected_record or field not in actual_record:
+                    passed = False
+                    detail = f"record {index} missing required field {field}"
+                    break
+                try:
+                    expected = _canonical_field(field, expected_record[field])
+                    actual = _canonical_field(field, actual_record[field])
+                except (ArithmeticError, TypeError, ValueError) as error:
+                    passed = False
+                    detail = f"record {index} field {field} is malformed: {error}"
+                    break
+                if expected != actual:
+                    passed = False
+                    detail = (
+                        f"record {index} field {field}: expected={expected!r}, actual={actual!r}"
+                    )
+                    break
+            if not passed:
+                break
+    return CheckResult(
+        name=name,
+        passed=passed,
+        message=detail,
+        expected=expected_records,
+        actual=actual_records,
+        difference=None if passed else detail,
+        canonical_quantum=CANONICAL_QUANTUM_TEXT,
+        diagnostic_limit=None,
+    )
 
 
 def compare_results(
@@ -176,51 +270,20 @@ def compare_results(
                 )
             )
 
-    # Exact trade-by-trade release surface. Timestamps are excluded until every adapter exposes
-    # them consistently; prices, size, direction, and PnL are mandatory for every reported trade.
-    required_trade_fields = ("entry_price", "exit_price", "pnl", "size", "direction")
-    trade_detail = "exact match"
-    trade_level_passed = len(framework_result.trades) == len(ml4t_result.trades)
-    if trade_level_passed:
-        for index, (fw_trade, ml4t_trade) in enumerate(
-            zip(framework_result.trades, ml4t_result.trades, strict=True)
-        ):
-            for field in required_trade_fields:
-                if field not in fw_trade or field not in ml4t_trade:
-                    trade_level_passed = False
-                    trade_detail = f"trade {index} missing required field {field}"
-                    break
-                expected = fw_trade[field]
-                actual = ml4t_trade[field]
-                if field == "direction":
-                    expected = str(expected).lower()
-                    actual = str(actual).lower()
-                else:
-                    expected = _canonical_number(expected)
-                    actual = _canonical_number(actual)
-                if expected != actual:
-                    trade_level_passed = False
-                    trade_detail = (
-                        f"trade {index} field {field}: expected={expected!r}, actual={actual!r}"
-                    )
-                    break
-            if not trade_level_passed:
-                break
-    else:
-        trade_detail = (
-            f"record_count expected={len(framework_result.trades)}, "
-            f"actual={len(ml4t_result.trades)}"
-        )
     checks.append(
-        CheckResult(
+        _compare_records(
             name="trade_level_match",
-            passed=trade_level_passed,
-            message=trade_detail,
-            expected=framework_result.trades,
-            actual=ml4t_result.trades,
-            difference=None if trade_level_passed else trade_detail,
-            canonical_quantum=CANONICAL_QUANTUM_TEXT,
-            diagnostic_limit=None,
+            expected_records=framework_result.trades,
+            actual_records=ml4t_result.trades,
+            fields=TRADE_FIELDS,
+        )
+    )
+    checks.append(
+        _compare_records(
+            name="fill_level_match",
+            expected_records=framework_result.fills,
+            actual_records=ml4t_result.fills,
+            fields=FILL_FIELDS,
         )
     )
 

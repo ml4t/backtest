@@ -14,6 +14,7 @@ _VALIDATION_DIR = Path(__file__).parents[2] / "validation"
 if str(_VALIDATION_DIR) not in sys.path:
     sys.path.insert(0, str(_VALIDATION_DIR))
 
+from common.capabilities import FRAMEWORK_CAPABILITIES, ML4T_CAPABILITIES  # noqa: E402
 from common.comparator import compare_results  # noqa: E402
 from common.correctness_evidence import (  # noqa: E402
     build_report,
@@ -32,8 +33,22 @@ def _complete_record(framework: str, scenario_id: str) -> ValidationRecord:
     scenario = SCENARIOS[scenario_id]
     prices, entries, exits = generate_inputs(scenario, framework)
     extra = {"total_commission": 0.0, "exit_price": 0.0}
-    expected = FrameworkResult(target.display_name, 100_000.0, 0.0, 0, extra=extra)
-    actual = FrameworkResult("ml4t.backtest", 100_000.0, 0.0, 0, extra=extra)
+    expected = FrameworkResult(
+        target.display_name,
+        100_000.0,
+        0.0,
+        0,
+        capabilities=FRAMEWORK_CAPABILITIES[framework],
+        extra=extra,
+    )
+    actual = FrameworkResult(
+        "ml4t.backtest",
+        100_000.0,
+        0.0,
+        0,
+        capabilities=ML4T_CAPABILITIES,
+        extra=extra,
+    )
     comparison = compare_results(scenario, expected, actual)
     provenance = {
         "framework_target": {
@@ -49,12 +64,23 @@ def _complete_record(framework: str, scenario_id: str) -> ValidationRecord:
         },
         "digests": static_digests(scenario, framework),
         "input_digest": input_digest(prices, entries, exits),
+        "capabilities": {
+            "framework": FRAMEWORK_CAPABILITIES[framework],
+            "ml4t": ML4T_CAPABILITIES,
+        },
         "record_counts": {
             "bars": len(prices),
             "entry_signals": int(entries.sum()),
             "exit_signals": int(exits.sum()) if exits is not None else 0,
-            "framework_trades": 0,
-            "ml4t_trades": 0,
+            "framework_intents": int(entries.sum())
+            + (int(exits.sum()) if exits is not None else 0),
+            "ml4t_intents": int(entries.sum()) + (int(exits.sum()) if exits is not None else 0),
+            "framework_orders": None,
+            "ml4t_orders": None,
+            "framework_fills": 0,
+            "ml4t_fills": 0,
+            "framework_closed_trades": 0,
+            "ml4t_closed_trades": 0,
         },
     }
     return ValidationRecord(
@@ -127,6 +153,7 @@ def test_complete_current_matrix_is_acceptable() -> None:
         ("adapter", "adapter digest"),
         ("profile", "profile digest"),
         ("comparator", "comparator digest"),
+        ("capability", "capability declaration differs"),
         ("expected", "comparison checks differ"),
         ("actual", "comparison checks differ"),
         ("missing", "comparison evidence must be complete"),
@@ -141,6 +168,8 @@ def test_evidence_mutations_fail_closed(mutation: str, expected_failure: str) ->
         record["provenance"]["input_digest"] = "0" * 64
     elif mutation in {"adapter", "profile", "comparator"}:
         record["provenance"]["digests"][mutation] = "0" * 64
+    elif mutation == "capability":
+        record["provenance"]["capabilities"]["framework"]["fills"] = "unavailable"
     elif mutation in {"expected", "actual"}:
         record["comparison"]["checks"][0][mutation] = 12345
     else:

@@ -61,6 +61,12 @@ The command returns nonzero when a required framework or scenario does not execu
 `--result-json PATH` to retain machine-readable terminal records. An explicitly unsupported pair
 is reported as `unsupported`; it is visible in the matrix and does not count as a pass.
 
+Each passing record includes exact ordered closed-trade and fill comparisons. The trade surface
+contains session, symbol, direction, quantity, entry and exit prices, P&L, and commission. The fill
+surface contains session, symbol, side, quantity, price, and commission. Capability declarations
+identify native, reconstructed, aggregate-only, input-only, and unavailable surfaces. See
+`behavior_coverage.toml` for the profile-field evidence map.
+
 ### Isolated release-gate runner
 
 ```bash
@@ -111,7 +117,7 @@ python validation/build_framework_env.py --framework lean
 
 The target versions, artifact hashes, source commits, interpreter paths, and expected matrix counts
 are defined in `framework_targets.toml`. Each lock is under `validation/environments/`. CI builds
-those locks and executes all 16 declared pairs for each public framework; an omitted pair fails.
+those locks and executes all 17 declared pairs for each public framework; an omitted pair fails.
 The release workflow separately requires licensed VectorBT Pro execution and fresh LEAN native
 and Chapter 16 execution against the frozen image. Repository workflows never store licensed
 credentials.
@@ -122,8 +128,9 @@ credentials.
 validation/
 ├── README.md                  # This file
 ├── METHODOLOGY.md             # Validation philosophy and behavioral matrix
+├── behavior_coverage.toml     # Profile fields mapped to native and cross-engine evidence
 ├── common/                    # Shared infrastructure (types, data generators, comparator)
-├── scenarios/                 # Declarative scenario definitions (16 configs)
+├── scenarios/                 # Declarative scenario definitions (17 configs)
 ├── frameworks/                # Parameterized framework drivers (4 modules)
 ├── run_scenario.py            # Unified CLI runner
 ├── run_all_correctness.py     # Isolated release-gate correctness runner

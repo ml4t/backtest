@@ -84,6 +84,13 @@ Profiles define behavioral defaults. Quote-aware feeds layer on top of them: you
 
 ## Profile Comparison
 
+These tables report configured values. A profile value is not automatically an equivalence claim.
+The [behavior coverage map](https://github.com/ml4t/backtest/blob/main/validation/behavior_coverage.toml)
+identifies which field groups have both a native oracle and a cross-engine comparison. Target
+sizing, insufficient-cash boundaries, competing same-session orders, partial fills, missing bars,
+and late assets remain excluded from scenario-level equivalence where the map marks them
+unpublished.
+
 ### Execution
 
 | Setting | default | backtrader | vectorbt | zipline | lean | realistic |
@@ -134,8 +141,9 @@ claim stop-order parity.
 
 Framework profiles are validated on the workloads each retained artifact declares:
 
-1. **Scenario-level**: Exact trade-by-trade matching on the required synthetic matrix for
-   VectorBT, Backtrader, and Zipline.
+1. **Scenario-level**: Exact ordered trade and fill matching on the required synthetic matrix for
+   VectorBT, Backtrader, and Zipline. Capability declarations identify reconstructed and
+   unavailable result surfaces.
 
 2. **Large-scale**: Trade-by-trade comparison on a retained real-data workload. A claim is omitted
    when no passing artifact is retained for that framework.

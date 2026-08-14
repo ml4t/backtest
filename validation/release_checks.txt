@@ -10,6 +10,8 @@ validation/performance_baseline.py
 validation/release_candidate.py
 validation/run_all_correctness.py
 validation/run_lean_case_studies.py
+validation/common/canonical_records.py
+validation/common/capabilities.py
 validation/common/comparator.py
 validation/common/correctness_evidence.py
 validation/common/data_generators.py

@@ -195,11 +195,38 @@ class ValidationSkipped(RuntimeError):
     """Raised by an adapter that elects not to execute a required scenario."""
 
 
+CAPABILITY_KEYS = (
+    "intents",
+    "orders",
+    "rejections",
+    "fills",
+    "positions",
+    "cash_flows",
+    "open_trades",
+    "closed_trades",
+    "exit_reason",
+    "terminal",
+)
+CAPABILITY_VALUES = {
+    "native",
+    "native_filled_only",
+    "reconstructed",
+    "input_only",
+    "aggregate_only",
+    "unavailable",
+}
+
+
+def unavailable_capabilities() -> dict[str, str]:
+    """Return an explicit declaration that no optional result surface is available."""
+    return dict.fromkeys(CAPABILITY_KEYS, "unavailable")
+
+
 @dataclass
 class ScenarioConfig:
     """Declarative definition of a validation scenario."""
 
-    id: str  # "01", "02", ..., "16"
+    id: str  # "01", "02", ..., "17"
     name: str  # Human-readable name
     description: str
 
@@ -264,6 +291,8 @@ class FrameworkResult:
     total_pnl: float
     num_trades: int
     trades: list[dict[str, Any]] = field(default_factory=list)
+    fills: list[dict[str, Any]] = field(default_factory=list)
+    capabilities: dict[str, str] = field(default_factory=unavailable_capabilities)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -273,20 +302,41 @@ class FrameworkResult:
             "total_pnl": self.total_pnl,
             "num_trades": self.num_trades,
             "trades": _json_value(self.trades),
+            "fills": _json_value(self.fills),
+            "capabilities": _json_value(self.capabilities),
             "extra": _json_value(self.extra),
         }
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> FrameworkResult:
-        required = {"framework", "final_value", "total_pnl", "num_trades", "trades", "extra"}
+        required = {
+            "framework",
+            "final_value",
+            "total_pnl",
+            "num_trades",
+            "trades",
+            "fills",
+            "capabilities",
+            "extra",
+        }
         missing = sorted(required - payload.keys())
         if missing:
             raise ValueError(f"Framework result missing fields: {', '.join(missing)}")
         trades = payload["trades"]
+        fills = payload["fills"]
+        capabilities = payload["capabilities"]
         extra = payload["extra"]
         num_trades = payload["num_trades"]
         if not isinstance(trades, list) or not all(isinstance(trade, dict) for trade in trades):
             raise TypeError("Framework result trades must be an object array")
+        if not isinstance(fills, list) or not all(isinstance(fill, dict) for fill in fills):
+            raise TypeError("Framework result fills must be an object array")
+        if not isinstance(capabilities, dict) or set(capabilities) != set(CAPABILITY_KEYS):
+            raise TypeError("Framework result capabilities must declare every canonical surface")
+        if not all(
+            isinstance(value, str) and value in CAPABILITY_VALUES for value in capabilities.values()
+        ):
+            raise ValueError("Framework result capabilities contain an unsupported declaration")
         if not isinstance(extra, dict):
             raise TypeError("Framework result trades and extra have invalid types")
         if not isinstance(num_trades, int) or isinstance(num_trades, bool) or num_trades < 0:
@@ -297,6 +347,8 @@ class FrameworkResult:
             total_pnl=_required_number(payload["total_pnl"], "Framework result total_pnl"),
             num_trades=num_trades,
             trades=trades,
+            fills=fills,
+            capabilities=capabilities,
             extra=extra,
         )
 

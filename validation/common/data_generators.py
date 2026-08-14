@@ -459,7 +459,7 @@ def generate_stress_data(
     n_bars: int = 1500,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, np.ndarray]:
-    """Extended market with multiple regimes for stress testing.
+    """Extended market with multiple regimes for sparse path coverage.
 
     Used by: scenario 16.
     9 regime transitions, 9 entry signals.
@@ -515,3 +515,17 @@ def generate_stress_data(
             entries[b] = True
 
     return df, entries
+
+
+def generate_high_event_data(
+    n_bars: int = 1800,
+    seed: int = 7,
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Generate hundreds of completed round trips for event-surface validation."""
+    return generate_random_walk(
+        n_bars=n_bars,
+        seed=seed,
+        hold_bars=1,
+        trade_spacing=3,
+        daily_vol=0.002,
+    )

@@ -195,7 +195,7 @@ def test_release_gate_fails_for_every_non_optional_nonpass_status() -> None:
     assert run_all_correctness.release_gate_passed(records[:1]) is False
 
 
-def test_unavailable_vectorbt_pro_matrix_cannot_report_sixteen_passes(
+def test_unavailable_vectorbt_pro_matrix_cannot_report_all_passes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def unavailable(framework: str, scenario_id: str, **_kwargs) -> ValidationRecord:
@@ -212,9 +212,9 @@ def test_unavailable_vectorbt_pro_matrix_cannot_report_sixteen_passes(
     records = run_all_correctness.run_all_validations(frameworks=["vectorbt_pro"])
     summary = run_all_correctness.summarize(records)
 
-    assert len(records) == 16
+    assert len(records) == 17
     assert summary["pass"] == 0
-    assert summary["unavailable"] == 16
+    assert summary["unavailable"] == 17
     assert run_all_correctness.release_gate_passed(records) is False
 
 
@@ -240,7 +240,7 @@ def test_report_retains_framework_pins(tmp_path: Path) -> None:
     run_all_correctness.write_report(report_path, records)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["schema_version"] == 2
+    assert report["schema_version"] == 3
     assert report["frameworks"] == run_all_correctness.FRAMEWORK_PINS
 
 

@@ -10,6 +10,7 @@ from typing import Any
 
 from common.correctness_evidence import correctness_report_failures
 from common.framework_registry import load_framework_manifest
+from scenarios.definitions import SCENARIOS
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CORRECTNESS_EVIDENCE = PROJECT_ROOT / "validation" / "CORRECTNESS_RESULTS.json"
@@ -47,8 +48,8 @@ def _validate_evidence(correctness: dict[str, Any], large_scale: dict[str, Any])
         raise ValueError("Correctness evidence does not cover the required framework matrix")
     for framework in expected:
         framework_records = [record for record in records if record.get("framework") == framework]
-        if len(framework_records) != 16:
-            raise ValueError(f"Expected 16 retained records for {framework}")
+        if len(framework_records) != len(SCENARIOS):
+            raise ValueError(f"Expected {len(SCENARIOS)} retained records for {framework}")
     if large_scale.get("exact_comparison", {}).get("passed") is not True:
         raise ValueError("Large-scale evidence is not an exact canonical pass")
 

@@ -123,6 +123,8 @@ def static_digests(scenario: ScenarioConfig, framework: str) -> dict[str, str]:
     }
     return {
         "adapter": file_digest(adapter_path),
+        "canonical_records": file_digest(VALIDATION_DIR / "common" / "canonical_records.py"),
+        "capabilities": file_digest(VALIDATION_DIR / "common" / "capabilities.py"),
         "comparator": file_digest(VALIDATION_DIR / "common" / "comparator.py"),
         "engine": _tree_digest(SOURCE_DIR),
         "manifest": file_digest(DEFAULT_MANIFEST_PATH),
@@ -162,6 +164,7 @@ def comparison_protocol_metadata(scenario: ScenarioConfig, framework: str) -> di
     return {
         "commission": "explicit scenario model or NoCommission",
         "execution": "custom next-session open-price slippage model",
+        "fills": "native transactions with fees reconstructed from the configured model",
         "risk_rules": "adapter_emulated_daily_ohlc" if scenario.risk_rules else "none",
         "trade_records": "adapter_reconstructed_from_native_transactions",
     }
@@ -196,13 +199,24 @@ def build_record_provenance(
             "path": adapter_path.relative_to(PROJECT_ROOT).as_posix(),
         },
         "comparison_protocol": comparison_protocol_metadata(scenario, framework),
+        "capabilities": {
+            "framework": framework_result.capabilities,
+            "ml4t": ml4t_result.capabilities,
+        },
         "digests": static_digests(scenario, framework),
         "input_digest": input_digest(prices, entries, exits),
         "record_counts": {
             "bars": len(prices),
             "entry_signals": int(entries.sum()),
             "exit_signals": int(exits.sum()) if exits is not None else 0,
-            "framework_trades": framework_result.num_trades,
-            "ml4t_trades": ml4t_result.num_trades,
+            "framework_intents": int(entries.sum())
+            + (int(exits.sum()) if exits is not None else 0),
+            "ml4t_intents": int(entries.sum()) + (int(exits.sum()) if exits is not None else 0),
+            "framework_orders": None,
+            "ml4t_orders": None,
+            "framework_fills": len(framework_result.fills),
+            "ml4t_fills": len(ml4t_result.fills),
+            "framework_closed_trades": framework_result.num_trades,
+            "ml4t_closed_trades": ml4t_result.num_trades,
         },
     }

@@ -1,12 +1,12 @@
 """Validation scenarios bridged into pytest CI.
 
-Runs the 16 cross-framework validation scenarios through ml4t only
+Runs the cross-framework validation scenarios through ml4t only
 (no external framework venvs required) and checks:
 1. Each scenario runs without error and produces trades
 2. Each scenario passes all accounting invariants
 3. Smoke: final value is positive
 
-This does NOT compare against external frameworks — that's the separate
+This does NOT compare against external frameworks; that is the separate
 validation suite. This ensures ml4t scenarios don't regress.
 """
 
@@ -28,6 +28,7 @@ from tests.helpers.invariants import assert_result_invariants  # noqa: E402
 try:
     from common.data_generators import (  # noqa: E402
         generate_bracket_data,
+        generate_high_event_data,
         generate_random_walk,
         generate_rule_combo_data,
         generate_short_signals,
@@ -63,6 +64,7 @@ if _HAS_VALIDATION:
         "generate_short_trending_data": generate_short_trending_data,
         "generate_rule_combo_data": generate_rule_combo_data,
         "generate_stress_data": generate_stress_data,
+        "generate_high_event_data": generate_high_event_data,
     }
 
 
@@ -212,7 +214,7 @@ def _run_ml4t_scenario(scenario_config):
     return engine.run(), config
 
 
-# Parameterize over all 16 scenarios
+# Parameterize over all scenarios
 _SCENARIO_PARAMS = list(SCENARIOS.items()) if _HAS_VALIDATION else []
 
 

@@ -36,13 +36,29 @@ def _load_benchmark_suite():
     return module
 
 
-def _trade() -> dict[str, object]:
+def _trade(*, offset: int = 0) -> dict[str, object]:
+    entry_time = pd.Timestamp("2024-01-02") + pd.Timedelta(days=offset)
     return {
+        "entry_time": entry_time,
+        "exit_time": entry_time + pd.Timedelta(days=1),
+        "asset": "AAPL",
         "entry_price": 100.0,
         "exit_price": 101.0,
         "pnl": 10.0,
         "size": 10.0,
         "direction": "Long",
+        "commission": 0.0,
+    }
+
+
+def _fill(*, offset: int = 0) -> dict[str, object]:
+    return {
+        "timestamp": pd.Timestamp("2024-01-02") + pd.Timedelta(days=offset),
+        "asset": "AAPL",
+        "side": "buy" if offset == 0 else "sell",
+        "quantity": 10.0,
+        "price": 100.0 + offset,
+        "commission": 0.0,
     }
 
 
@@ -65,10 +81,24 @@ def test_zipline_nine_dollar_difference_fails_despite_diagnostic_tolerance() -> 
     assert "diagnostic_limit=$10.0" in checks["total_pnl"].message
 
 
-def test_scenario_trade_fields_require_exact_equality() -> None:
+@pytest.mark.parametrize(
+    ("field", "changed"),
+    [
+        ("entry_time", pd.Timestamp("2024-01-03")),
+        ("exit_time", pd.Timestamp("2024-01-04")),
+        ("asset", "MSFT"),
+        ("direction", "short"),
+        ("size", 10.00000001),
+        ("entry_price", 100.00000001),
+        ("exit_price", 101.00000001),
+        ("pnl", 10.00000001),
+        ("commission", 0.00000001),
+    ],
+)
+def test_scenario_trade_fields_require_exact_equality(field: str, changed: object) -> None:
     expected = FrameworkResult("Backtrader", 100_010.0, 10.0, 1, trades=[_trade()])
     changed_trade = _trade()
-    changed_trade["exit_price"] = 101.0000001
+    changed_trade[field] = changed
     actual = FrameworkResult(
         "ml4t.backtest",
         100_010.0,
@@ -82,7 +112,61 @@ def test_scenario_trade_fields_require_exact_equality() -> None:
     assert comparison.passed is False
     trade_check = next(check for check in comparison.checks if check.name == "trade_level_match")
     assert trade_check.passed is False
-    assert "exit_price" in trade_check.message
+    assert field in trade_check.message
+
+
+@pytest.mark.parametrize(
+    ("field", "changed"),
+    [
+        ("timestamp", pd.Timestamp("2024-01-03")),
+        ("asset", "MSFT"),
+        ("side", "sell"),
+        ("quantity", 10.00000001),
+        ("price", 100.00000001),
+        ("commission", 0.00000001),
+    ],
+)
+def test_scenario_fill_fields_require_exact_equality(field: str, changed: object) -> None:
+    expected = FrameworkResult("Backtrader", 100_010.0, 10.0, 1, trades=[_trade()], fills=[_fill()])
+    changed_fill = _fill()
+    changed_fill[field] = changed
+    actual = FrameworkResult(
+        "ml4t.backtest",
+        100_010.0,
+        10.0,
+        1,
+        trades=[_trade()],
+        fills=[changed_fill],
+    )
+
+    comparison = compare_results(SCENARIOS["01"], expected, actual)
+    fill_check = next(check for check in comparison.checks if check.name == "fill_level_match")
+
+    assert comparison.passed is False
+    assert fill_check.passed is False
+    assert field in fill_check.message
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "ordering", "malformed"])
+def test_scenario_record_shape_negative_controls(mutation: str) -> None:
+    expected_trades = [_trade(offset=0), _trade(offset=2)]
+    actual_trades = copy.deepcopy(expected_trades)
+    if mutation == "missing":
+        actual_trades[0].pop("asset")
+    elif mutation == "duplicate":
+        actual_trades.append(copy.deepcopy(actual_trades[-1]))
+    elif mutation == "ordering":
+        actual_trades.reverse()
+    else:
+        actual_trades[0]["pnl"] = float("nan")
+    expected = FrameworkResult("Backtrader", 100_020.0, 20.0, 2, trades=expected_trades)
+    actual = FrameworkResult("ml4t.backtest", 100_020.0, 20.0, 2, trades=actual_trades)
+
+    comparison = compare_results(SCENARIOS["01"], expected, actual)
+    trade_check = next(check for check in comparison.checks if check.name == "trade_level_match")
+
+    assert comparison.passed is False
+    assert trade_check.passed is False
 
 
 def test_wrong_execution_profile_remains_a_detected_negative_control() -> None:

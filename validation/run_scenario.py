@@ -23,7 +23,6 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -90,19 +89,15 @@ def _record(
 def _malformed_result_detail(result: object) -> str | None:
     if not isinstance(result, FrameworkResult):
         return f"Adapter returned {type(result).__name__}, expected FrameworkResult"
-    if not isinstance(result.framework, str) or not result.framework:
-        return "FrameworkResult.framework must be a nonempty string"
-    if not isinstance(result.num_trades, int) or isinstance(result.num_trades, bool):
-        return "FrameworkResult.num_trades must be an integer"
-    if result.num_trades < 0:
-        return "FrameworkResult.num_trades cannot be negative"
-    for name, value in (("final_value", result.final_value), ("total_pnl", result.total_pnl)):
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            return f"FrameworkResult.{name} must be numeric"
-        if not math.isfinite(float(value)):
-            return f"FrameworkResult.{name} must be finite"
-    if not isinstance(result.trades, list):
-        return "FrameworkResult.trades must be a list"
+    try:
+        FrameworkResult.from_dict(result.to_dict())
+    except (TypeError, ValueError) as error:
+        return str(error)
+    if result.num_trades != len(result.trades):
+        return (
+            "FrameworkResult.num_trades must equal the retained closed-trade count: "
+            f"{result.num_trades} != {len(result.trades)}"
+        )
     return None
 
 

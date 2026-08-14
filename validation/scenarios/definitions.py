@@ -1,4 +1,4 @@
-"""All 16 validation scenarios as declarative configs.
+"""All cross-framework validation scenarios as declarative configs.
 
 Each scenario is a ScenarioConfig that fully describes:
 - What data to generate
@@ -488,13 +488,13 @@ SCENARIO_15 = ScenarioConfig(
 )
 
 # ============================================================================
-# Scenario 16: Stress Test (1500 bars)
+# Scenario 16: Regime Path Coverage (1500 bars)
 # ============================================================================
 
 SCENARIO_16 = ScenarioConfig(
     id="16",
-    name="Stress Test",
-    description="1500-bar stress test with 9 market regimes.",
+    name="Regime Path Coverage",
+    description="1500-bar path with 9 market regimes and sparse re-entry signals.",
     data_generator="generate_stress_data",
     data_kwargs={"n_bars": 1500, "seed": 42},
     signal_columns=["entry"],
@@ -524,6 +524,21 @@ SCENARIO_16 = ScenarioConfig(
 )
 
 # ============================================================================
+# Scenario 17: High Event Count
+# ============================================================================
+
+SCENARIO_17 = ScenarioConfig(
+    id="17",
+    name="High Event Count",
+    description="1800-bar lifecycle workload with up to 600 completed round trips.",
+    data_generator="generate_high_event_data",
+    data_kwargs={"n_bars": 1800, "seed": 7},
+    signal_columns=["entry", "exit"],
+    strategy_type="long_signal",
+    tolerances=_fw_tolerances(),
+)
+
+# ============================================================================
 # Registry
 # ============================================================================
 
@@ -544,6 +559,7 @@ SCENARIOS: dict[str, ScenarioConfig] = {
     "14": SCENARIO_14,
     "15": SCENARIO_15,
     "16": SCENARIO_16,
+    "17": SCENARIO_17,
 }
 
 SCENARIO_NAMES: dict[str, str] = {s.id: s.name for s in SCENARIOS.values()}

@@ -17,7 +17,7 @@ immutable_id = "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4"
 environment = ".venv-vectorbt-pro"
 python_env_var = "ML4T_VECTORBT_PRO_PYTHON"
 scenario_matrix = true
-required_scenarios = 16
+required_scenarios = 17
 unsupported_scenarios = 0
 
 [framework.vectorbt_oss]
@@ -35,7 +35,7 @@ artifact = "vectorbt-1.1.0.tar.gz"
 environment = ".venv-vectorbt-oss"
 python_env_var = "ML4T_VECTORBT_OSS_PYTHON"
 scenario_matrix = true
-required_scenarios = 15
+required_scenarios = 16
 unsupported_scenarios = 1
 
 [framework.backtrader]
@@ -52,7 +52,7 @@ artifact = "backtrader-1.9.78.123-py2.py3-none-any.whl"
 environment = ".venv-backtrader"
 python_env_var = "ML4T_BACKTRADER_PYTHON"
 scenario_matrix = true
-required_scenarios = 16
+required_scenarios = 17
 unsupported_scenarios = 0
 
 [framework.zipline]
@@ -70,7 +70,7 @@ artifact = "zipline_reloaded-3.1.1.tar.gz"
 environment = ".venv-zipline"
 python_env_var = "ML4T_ZIPLINE_PYTHON"
 scenario_matrix = true
-required_scenarios = 15
+required_scenarios = 16
 unsupported_scenarios = 1
 
 [framework.lean]

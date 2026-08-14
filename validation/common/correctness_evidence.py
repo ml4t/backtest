@@ -12,12 +12,13 @@ from typing import Any, cast
 
 from scenarios.definitions import SCENARIOS
 
+from common.capabilities import FRAMEWORK_CAPABILITIES, ML4T_CAPABILITIES
 from common.comparator import CANONICAL_QUANTUM_TEXT, compare_results
 from common.framework_registry import FrameworkManifest, load_framework_manifest
 from common.provenance import generate_inputs, input_digest, static_digests
 from common.types import ValidationRecord, ValidationStatus
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _framework_metadata(manifest: FrameworkManifest) -> dict[str, dict[str, object]]:
@@ -44,6 +45,9 @@ def build_report(
             "canonical_quantum": CANONICAL_QUANTUM_TEXT,
             "rounding": "ROUND_HALF_EVEN",
             "meaning": "equality after canonical quantization, not bit identity",
+            "record_order": "significant",
+            "timestamp_domain": "daily session date",
+            "surfaces": ["terminal", "closed_trades", "fills"],
         },
         "frameworks": _framework_metadata(target_manifest),
         "release_gate_passed": release_passed,
@@ -101,6 +105,9 @@ def _record_evidence_failures(
     counts = _mapping(
         provenance.get("record_counts"), label=f"{identity} record_counts", failures=failures
     )
+    capabilities = _mapping(
+        provenance.get("capabilities"), label=f"{identity} capabilities", failures=failures
+    )
     if framework_target is not None:
         expected_target = {
             "version": target.version,
@@ -126,6 +133,16 @@ def _record_evidence_failures(
     }
     if adapter is not None and adapter != expected_adapter:
         failures.append(f"{identity} adapter identity differs")
+    expected_capabilities = {
+        "framework": FRAMEWORK_CAPABILITIES[record.framework],
+        "ml4t": ML4T_CAPABILITIES,
+    }
+    if capabilities != expected_capabilities:
+        failures.append(f"{identity} capability declaration differs")
+    if record.framework_result.capabilities != FRAMEWORK_CAPABILITIES[record.framework]:
+        failures.append(f"{identity} framework result capabilities differ")
+    if record.ml4t_result.capabilities != ML4T_CAPABILITIES:
+        failures.append(f"{identity} ML4T result capabilities differ")
 
     expected_digests = static_digests(scenario, record.framework)
     if digests is not None:
@@ -142,8 +159,14 @@ def _record_evidence_failures(
         "bars": len(prices),
         "entry_signals": int(entries.sum()),
         "exit_signals": int(exits.sum()) if exits is not None else 0,
-        "framework_trades": record.framework_result.num_trades,
-        "ml4t_trades": record.ml4t_result.num_trades,
+        "framework_intents": int(entries.sum()) + (int(exits.sum()) if exits is not None else 0),
+        "ml4t_intents": int(entries.sum()) + (int(exits.sum()) if exits is not None else 0),
+        "framework_orders": None,
+        "ml4t_orders": None,
+        "framework_fills": len(record.framework_result.fills),
+        "ml4t_fills": len(record.ml4t_result.fills),
+        "framework_closed_trades": record.framework_result.num_trades,
+        "ml4t_closed_trades": record.ml4t_result.num_trades,
     }
     if counts is not None and counts != expected_counts:
         failures.append(f"{identity} record counts differ from retained inputs or outputs")
@@ -178,6 +201,9 @@ def correctness_report_failures(
         "canonical_quantum": CANONICAL_QUANTUM_TEXT,
         "rounding": "ROUND_HALF_EVEN",
         "meaning": "equality after canonical quantization, not bit identity",
+        "record_order": "significant",
+        "timestamp_domain": "daily session date",
+        "surfaces": ["terminal", "closed_trades", "fills"],
     }
     if report.get("comparison_policy") != expected_policy:
         failures.append("Correctness comparison policy differs")
