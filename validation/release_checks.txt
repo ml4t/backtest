@@ -2,6 +2,7 @@ validation/check_artifacts.py
 validation/check_coverage.py
 validation/check_documentation_examples.py
 validation/check_security.py
+validation/build_framework_env.py
 validation/generate_changelog.py
 validation/generate_compatibility_snapshot.py
 validation/generate_parity_claims.py

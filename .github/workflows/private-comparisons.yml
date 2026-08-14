@@ -1,0 +1,90 @@
+name: Private Comparison Evidence
+
+on:
+  workflow_call:
+    secrets:
+      VECTORBT_PRO_DEPLOY_KEY:
+        required: true
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  vectorbt-pro:
+    name: VectorBT Pro Parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Configure licensed source access
+        env:
+          VECTORBT_PRO_DEPLOY_KEY: ${{ secrets.VECTORBT_PRO_DEPLOY_KEY }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$VECTORBT_PRO_DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
+
+      - name: Build the locked VectorBT Pro environment
+        run: >-
+          python validation/build_framework_env.py
+          --framework vectorbt_pro
+          --evidence-output vectorbt-pro-environment.json
+
+      - name: Run the complete VectorBT Pro scenario matrix
+        run: >-
+          .venv-vectorbt-pro/bin/python
+          validation/run_all_correctness.py
+          --framework vectorbt_pro
+          --output vectorbt-pro-correctness.json
+
+      - name: Retain VectorBT Pro evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vectorbt-pro-comparison-${{ github.sha }}
+          path: |
+            vectorbt-pro-environment.json
+            vectorbt-pro-correctness.json
+          if-no-files-found: error
+          retention-days: 90
+
+  lean:
+    name: LEAN Engine Identity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Verify locked LEAN CLI and engine image
+        run: >-
+          python validation/build_framework_env.py
+          --framework lean
+          --evidence-output lean-environment.json
+
+      - name: Retain LEAN provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lean-comparison-${{ github.sha }}
+          path: lean-environment.json
+          if-no-files-found: error
+          retention-days: 90

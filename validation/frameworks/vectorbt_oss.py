@@ -38,7 +38,7 @@ def run(
         import vectorbt as vbt
     except ImportError:
         raise ImportError(
-            "VectorBT OSS not installed. Run in .venv-vectorbt environment."
+            "VectorBT OSS not installed. Run in .venv-vectorbt-oss environment."
         ) from None
 
     constants = scenario.constants

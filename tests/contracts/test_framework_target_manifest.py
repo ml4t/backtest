@@ -60,6 +60,7 @@ def test_scenario_targets_define_reproducible_interpreters() -> None:
         target = manifest.targets[framework_id]
         assert target.environment
         assert target.python_env_var.startswith("ML4T_")
+        assert target.required_scenarios + target.unsupported_scenarios == 16
 
 
 def test_benchmark_runner_uses_frozen_target_environments() -> None:
@@ -101,6 +102,8 @@ source = "https://example.com"
 environment = ".venv-example"
 python_env_var = "ML4T_EXAMPLE_PYTHON"
 scenario_matrix = true
+required_scenarios = 1
+unsupported_scenarios = 0
 """
         + replacement
         + "\n",
@@ -130,6 +133,8 @@ access = "public"
 source = "https://example.com"
 immutable_id = "git:abc"
 scenario_matrix = false
+required_scenarios = 0
+unsupported_scenarios = 0
 
 [framework.example]
 version = "2.0"

@@ -36,6 +36,8 @@ class FrameworkTarget:
     source: str
     immutable_id: str
     scenario_matrix: bool
+    required_scenarios: int
+    unsupported_scenarios: int
     source_commit: str | None = None
     artifact: str | None = None
     environment: str | None = None
@@ -173,6 +175,17 @@ def load_framework_manifest(path: Path = DEFAULT_MANIFEST_PATH) -> FrameworkMani
         scenario_matrix = _required(raw_target, "scenario_matrix", context=context)
         if not isinstance(scenario_matrix, bool):
             raise ManifestError(f"{context} scenario_matrix must be a boolean")
+        required_scenarios = _required(raw_target, "required_scenarios", context=context)
+        unsupported_scenarios = _required(raw_target, "unsupported_scenarios", context=context)
+        if (
+            not isinstance(required_scenarios, int)
+            or isinstance(required_scenarios, bool)
+            or required_scenarios < 0
+            or not isinstance(unsupported_scenarios, int)
+            or isinstance(unsupported_scenarios, bool)
+            or unsupported_scenarios < 0
+        ):
+            raise ManifestError(f"{context} scenario counts must be nonnegative integers")
 
         target = FrameworkTarget(
             framework_id=framework_id,
@@ -186,6 +199,8 @@ def load_framework_manifest(path: Path = DEFAULT_MANIFEST_PATH) -> FrameworkMani
             source=_string(raw_target, "source", context=context),
             immutable_id=immutable_id,
             scenario_matrix=scenario_matrix,
+            required_scenarios=required_scenarios,
+            unsupported_scenarios=unsupported_scenarios,
             source_commit=raw_target.get("source_commit"),
             artifact=raw_target.get("artifact"),
             environment=raw_target.get("environment"),

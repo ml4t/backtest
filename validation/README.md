@@ -12,8 +12,9 @@ ml4t-backtest validates framework-specific behavior through configurable profile
 claims require a zero-gap retained result. See [METHODOLOGY.md](METHODOLOGY.md) for the full
 approach.
 
-Validation is performed per-framework in **isolated virtual environments** due to dependency
-conflicts between frameworks (VBT Pro, Backtrader, Zipline).
+Validation is performed per-framework in isolated, locked environments. VectorBT OSS 1.1.0
+requires pandas 3 while Zipline Reloaded 3.1.1 requires pandas below 3, so a shared comparison
+environment cannot reproduce the current target set.
 
 ## Retained Parity Claims
 
@@ -70,10 +71,12 @@ python validation/run_all_correctness.py
 python validation/run_all_correctness.py --framework backtrader --scenarios 01,03,05,09
 ```
 
-The isolated runner writes `validation/CORRECTNESS_RESULTS.json` and distinguishes comparison
-failures, unsupported pairs, unavailable environments, adapter failures, subprocess failures,
-timeouts, skips, malformed records, and missing scenarios. Every status except `pass` and an
-explicitly optional `unsupported` record fails the release gate.
+The isolated runner always writes a diagnostic candidate under `validation/candidates/`. It
+replaces `validation/CORRECTNESS_RESULTS.json` only after the complete required matrix passes with
+the declared pair counts. Records retain both frameworks' measurements, canonical comparisons,
+runtime identity, input digests, adapter identity, and source provenance. Comparison failures,
+unavailable environments, adapter failures, subprocess failures, timeouts, skips, malformed
+records, missing pairs, duplicates, and incorrect required or unsupported counts fail the gate.
 
 ### Large-scale benchmarks
 
@@ -88,28 +91,21 @@ python validation/run_full_validation.py
 ## Virtual Environment Setup
 
 ```bash
-# VectorBT Pro 2025.12.31, commit 1305a1e1974325db9382eaeacc6452e9b075ca71
-# Requires an authorized VectorBT Pro license and GitHub SSH access.
-uv venv .venv-vectorbt-pro --python 3.12
-uv pip install --python .venv-vectorbt-pro/bin/python \
-  "vectorbtpro @ git+ssh://git@github.com/polakowo/vectorbt.pro.git@1305a1e1974325db9382eaeacc6452e9b075ca71"
-uv pip install --python .venv-vectorbt-pro/bin/python -e .
-uv run python validation/run_all_correctness.py --framework vectorbt_pro
+# Build and verify all public targets from their committed uv locks
+python validation/build_framework_env.py --all-public
 
-# VectorBT OSS
-python3 -m venv .venv-vectorbt
-.venv-vectorbt/bin/pip install vectorbt pandas numpy polars pyyaml pydantic numba
+# Licensed VectorBT Pro requires authorized SSH access to the frozen source commit
+python validation/build_framework_env.py --framework vectorbt_pro
 
-# Backtrader
-python3 -m venv .venv-backtrader
-.venv-backtrader/bin/pip install backtrader pandas numpy polars pyyaml pydantic numba exchange_calendars
-
-# Zipline
-python3 -m venv .venv-zipline
-.venv-zipline/bin/pip install zipline-reloaded pandas numpy polars pyyaml pydantic numba exchange_calendars
-
-# Never mix VBT OSS and Pro in the same environment
+# Verify the locked LEAN data-preparation CLI and immutable engine image separately
+python validation/build_framework_env.py --framework lean
 ```
+
+The target versions, artifact hashes, source commits, interpreter paths, and expected matrix counts
+are defined in `framework_targets.toml`. Each lock is under `validation/environments/`. CI builds
+those locks and executes all 16 declared pairs for each public framework; an omitted pair fails.
+The release workflow separately requires licensed VectorBT Pro execution and LEAN image
+verification. Repository workflows never store licensed credentials.
 
 ## File Organization
 

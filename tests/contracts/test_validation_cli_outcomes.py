@@ -242,3 +242,67 @@ def test_report_retains_framework_pins(tmp_path: Path) -> None:
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["schema_version"] == 2
     assert report["frameworks"] == run_all_correctness.FRAMEWORK_PINS
+
+
+def _matrix_records(framework: str) -> list[ValidationRecord]:
+    return [
+        ValidationRecord(
+            framework,
+            scenario_id,
+            scenario.name,
+            (
+                ValidationStatus.PASS
+                if framework in scenario.supported_frameworks
+                else ValidationStatus.UNSUPPORTED
+            ),
+            framework in scenario.supported_frameworks,
+        )
+        for scenario_id, scenario in run_all_correctness.SCENARIOS.items()
+    ]
+
+
+def test_complete_public_matrices_match_declared_counts() -> None:
+    frameworks = ["vectorbt_oss", "backtrader", "zipline"]
+    records = [record for framework in frameworks for record in _matrix_records(framework)]
+
+    failures = run_all_correctness.matrix_coverage_failures(
+        records,
+        frameworks,
+        list(run_all_correctness.SCENARIOS),
+    )
+
+    assert failures == []
+
+
+def test_matrix_coverage_rejects_an_omitted_pair() -> None:
+    records = _matrix_records("backtrader")[:-1]
+
+    failures = run_all_correctness.matrix_coverage_failures(
+        records,
+        ["backtrader"],
+        list(run_all_correctness.SCENARIOS),
+    )
+
+    assert any("Missing matrix pairs" in failure for failure in failures)
+    assert any("required count differs" in failure for failure in failures)
+
+
+def test_matrix_coverage_rejects_a_misclassified_pair() -> None:
+    records = _matrix_records("vectorbt_oss")
+    unsupported = next(record for record in records if not record.required)
+    records[records.index(unsupported)] = ValidationRecord(
+        unsupported.framework,
+        unsupported.scenario_id,
+        unsupported.scenario_name,
+        ValidationStatus.PASS,
+        True,
+    )
+
+    failures = run_all_correctness.matrix_coverage_failures(
+        records,
+        ["vectorbt_oss"],
+        list(run_all_correctness.SCENARIOS),
+    )
+
+    assert any("required count differs" in failure for failure in failures)
+    assert any("unsupported count differs" in failure for failure in failures)

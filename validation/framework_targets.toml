@@ -17,6 +17,8 @@ immutable_id = "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4"
 environment = ".venv-vectorbt-pro"
 python_env_var = "ML4T_VECTORBT_PRO_PYTHON"
 scenario_matrix = true
+required_scenarios = 16
+unsupported_scenarios = 0
 
 [framework.vectorbt_oss]
 display_name = "VectorBT OSS"
@@ -33,6 +35,8 @@ artifact = "vectorbt-1.1.0.tar.gz"
 environment = ".venv-vectorbt-oss"
 python_env_var = "ML4T_VECTORBT_OSS_PYTHON"
 scenario_matrix = true
+required_scenarios = 15
+unsupported_scenarios = 1
 
 [framework.backtrader]
 display_name = "Backtrader"
@@ -48,6 +52,8 @@ artifact = "backtrader-1.9.78.123-py2.py3-none-any.whl"
 environment = ".venv-backtrader"
 python_env_var = "ML4T_BACKTRADER_PYTHON"
 scenario_matrix = true
+required_scenarios = 16
+unsupported_scenarios = 0
 
 [framework.zipline]
 display_name = "Zipline Reloaded"
@@ -64,6 +70,8 @@ artifact = "zipline_reloaded-3.1.1.tar.gz"
 environment = ".venv-zipline"
 python_env_var = "ML4T_ZIPLINE_PYTHON"
 scenario_matrix = true
+required_scenarios = 15
+unsupported_scenarios = 1
 
 [framework.lean]
 display_name = "LEAN"
@@ -80,4 +88,8 @@ artifact = "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c
 platform_artifact = "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307"
 cli_version = "1.0.228"
 cli_immutable_id = "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c"
+environment = ".venv-lean"
+python_env_var = "ML4T_LEAN_PYTHON"
 scenario_matrix = false
+required_scenarios = 0
+unsupported_scenarios = 0

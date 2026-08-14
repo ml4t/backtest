@@ -178,9 +178,19 @@ jobs:
             release-performance-evidence.json
           if-no-files-found: error
 
-  contracts:
-    name: Cross-Engine Contracts
+  public-parity:
+    name: Public Parity (${{ matrix.framework }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - framework: vectorbt_oss
+            environment: .venv-vectorbt-oss
+          - framework: backtrader
+            environment: .venv-backtrader
+          - framework: zipline
+            environment: .venv-zipline
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -192,22 +202,27 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies (with comparison frameworks)
-        run: uv sync --dev --extra comparison
-
-      - name: Run cross-engine contract tests
-        env:
-          ML4T_COMPARISON_INPROC: "1"
+      - name: Build the locked framework environment
         run: >-
-          uv run pytest tests/contracts/test_cross_engine_contracts.py -v --tb=short --no-cov
-          --junitxml=parity-contracts.xml
+          python validation/build_framework_env.py
+          --framework ${{ matrix.framework }}
+          --evidence-output environment-evidence.json
 
-      - name: Retain cross-engine parity evidence
+      - name: Run the complete required scenario matrix
+        run: >-
+          "${{ matrix.environment }}/bin/python"
+          validation/run_all_correctness.py
+          --framework ${{ matrix.framework }}
+          --output correctness-candidate.json
+
+      - name: Retain public parity evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: parity-contracts
-          path: parity-contracts.xml
+          name: parity-${{ matrix.framework }}
+          path: |
+            environment-evidence.json
+            correctness-candidate.json
           if-no-files-found: error
 
   documentation:
@@ -249,7 +264,7 @@ jobs:
     name: Build Package
     runs-on: ubuntu-latest
     needs:
-      [lint, typecheck, compatibility, security, coverage, runtime, contracts, documentation]
+      [lint, typecheck, compatibility, security, coverage, runtime, public-parity, documentation]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -289,12 +304,12 @@ jobs:
             --commit "$GITHUB_SHA" \
             --repository "$GITHUB_REPOSITORY" \
             --gate compatibility=${{ needs.compatibility.result }} \
-            --gate correctness=${{ needs.coverage.result }} \
+            --gate correctness=${{ needs.public-parity.result }} \
             --gate coverage=${{ needs.coverage.result }} \
             --gate documentation=${{ needs.documentation.result }} \
             --gate lint=${{ needs.lint.result }} \
             --gate packaging=success \
-            --gate parity=${{ needs.contracts.result }} \
+            --gate parity=${{ needs.public-parity.result }} \
             --gate performance=${{ needs.runtime.result }} \
             --gate security=${{ needs.security.result }} \
             --gate typecheck=${{ needs.typecheck.result }} \

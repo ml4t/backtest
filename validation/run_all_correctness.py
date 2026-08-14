@@ -243,6 +243,46 @@ def release_gate_passed(records: list[ValidationRecord]) -> bool:
     return bool(required_records) and all(record.passed for record in required_records)
 
 
+def matrix_coverage_failures(
+    records: list[ValidationRecord],
+    frameworks: list[str],
+    scenarios: list[str],
+) -> list[str]:
+    """Reject omitted, duplicate, or misclassified framework/scenario pairs."""
+    failures: list[str] = []
+    expected_pairs = {(framework, scenario) for framework in frameworks for scenario in scenarios}
+    actual_pairs = [(record.framework, record.scenario_id) for record in records]
+    duplicate_pairs = sorted(pair for pair, count in Counter(actual_pairs).items() if count > 1)
+    missing_pairs = sorted(expected_pairs - set(actual_pairs))
+    unexpected_pairs = sorted(set(actual_pairs) - expected_pairs)
+    if duplicate_pairs:
+        failures.append(f"Duplicate matrix pairs: {duplicate_pairs}")
+    if missing_pairs:
+        failures.append(f"Missing matrix pairs: {missing_pairs}")
+    if unexpected_pairs:
+        failures.append(f"Unexpected matrix pairs: {unexpected_pairs}")
+
+    if scenarios == list(SCENARIOS):
+        for framework in frameworks:
+            target = FRAMEWORK_MANIFEST.targets[framework]
+            framework_records = [record for record in records if record.framework == framework]
+            required_count = sum(record.required for record in framework_records)
+            unsupported_count = sum(
+                record.status is ValidationStatus.UNSUPPORTED for record in framework_records
+            )
+            if required_count != target.required_scenarios:
+                failures.append(
+                    f"{framework} required count differs: "
+                    f"{required_count} != {target.required_scenarios}"
+                )
+            if unsupported_count != target.unsupported_scenarios:
+                failures.append(
+                    f"{framework} unsupported count differs: "
+                    f"{unsupported_count} != {target.unsupported_scenarios}"
+                )
+    return failures
+
+
 def write_report(path: Path, records: list[ValidationRecord]) -> None:
     """Retain the complete machine-readable release-gate result."""
     payload = build_report(records, manifest=FRAMEWORK_MANIFEST)
@@ -284,6 +324,18 @@ def main() -> int:
     nonzero = [f"{status}={count}" for status, count in summarize(records).items() if count]
     print(f"Results: {', '.join(nonzero)}")
     print(f"Candidate: {args.output}")
+    selected_frameworks = frameworks or list(FRAMEWORK_MANIFEST.scenario_framework_ids)
+    selected_scenarios = scenarios or list(SCENARIOS)
+    coverage_failures = matrix_coverage_failures(
+        records,
+        selected_frameworks,
+        selected_scenarios,
+    )
+    if coverage_failures:
+        print("Matrix coverage failed:")
+        for failure in coverage_failures:
+            print(f"- {failure}")
+        return 1
     full_matrix = frameworks is None and scenarios is None
     if full_matrix:
         promotion_failures = promote_candidate(args.output, args.accepted_output)
