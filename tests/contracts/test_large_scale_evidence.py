@@ -119,9 +119,12 @@ def test_input_digest_is_independent_of_datetime_resolution() -> None:
     assert module.input_digest(converted_prices, converted_signals, converted_dates) == expected
 
 
-@pytest.mark.parametrize("framework", ["vectorbt_pro", "vectorbt_oss"])
-def test_vectorbt_scale_pairs_use_the_collateral_aware_strict_profile(
-    framework: str, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("framework", "expected_profile"),
+    [("vectorbt_pro", "vectorbt_strict"), ("vectorbt_oss", "vectorbt_oss_strict")],
+)
+def test_vectorbt_scale_pairs_use_version_specific_collateral_profiles(
+    framework: str, expected_profile: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _load_module()
     captured: dict[str, object] = {}
@@ -141,7 +144,7 @@ def test_vectorbt_scale_pairs_use_the_collateral_aware_strict_profile(
     result = module._framework_run(framework, object(), {}, pd.DataFrame(), pd.DatetimeIndex([]))
 
     assert result == ("external", "ml4t")
-    assert captured["profile_override"] == "vectorbt_strict"
+    assert captured["profile_override"] == expected_profile
 
 
 def test_scale_trade_surface_is_reconstructed_from_canonical_fills() -> None:

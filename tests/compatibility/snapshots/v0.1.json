@@ -72,6 +72,15 @@
         "name": "short_cash_policy"
       },
       {
+        "annotation": "LockNotionalUpdateMode",
+        "default": {
+          "enum": "ml4t.backtest.config.LockNotionalUpdateMode.POSITION_LEGS",
+          "value": "position_legs"
+        },
+        "keyword_only": false,
+        "name": "lock_notional_update_mode"
+      },
+      {
         "annotation": "ExecutionPrice",
         "default": {
           "enum": "ml4t.backtest.config.ExecutionPrice.OPEN",
@@ -458,6 +467,7 @@
         "allow_short_selling": false,
         "fixed_margin_schedule": null,
         "initial_margin": 0.5,
+        "lock_notional_update_mode": "position_legs",
         "long_maintenance_margin": 0.25,
         "margin_pct_schedule": null,
         "short_cash_policy": "credit",
@@ -775,6 +785,16 @@
       {
         "name": "REQUIRE_HISTORY",
         "value": "require_history"
+      }
+    ],
+    "ml4t.backtest.config.LockNotionalUpdateMode": [
+      {
+        "name": "POSITION_LEGS",
+        "value": "position_legs"
+      },
+      {
+        "name": "COMBINED_ORDER",
+        "value": "combined_order"
       }
     ],
     "ml4t.backtest.config.MissingPricePolicy": [
@@ -1198,6 +1218,7 @@
       "quantconnect": "lean",
       "vectorbt_compare": "vectorbt_strict",
       "vectorbt_oss": "vectorbt",
+      "vectorbt_oss_compare": "vectorbt_oss_strict",
       "vectorbt_pro": "vectorbt",
       "zipline_compare": "zipline_strict"
     },
@@ -1523,6 +1544,7 @@
         "account": {
           "allow_leverage": false,
           "allow_short_selling": true,
+          "lock_notional_update_mode": "position_legs",
           "short_cash_policy": "credit"
         },
         "cash": {
@@ -1564,10 +1586,57 @@
           "trail_stop_timing": "intrabar"
         }
       },
+      "vectorbt_oss_strict": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "lock_notional_update_mode": "combined_order",
+          "short_cash_policy": "lock_notional"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "same_bar",
+          "execution_price": "close"
+        },
+        "orders": {
+          "entry_order_priority": "submission",
+          "fill_ordering": "fifo",
+          "immediate_fill": true,
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "hybrid",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "fractional"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "initial_hwm_source": "bar_high",
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
+        }
+      },
       "vectorbt_strict": {
         "account": {
           "allow_leverage": false,
           "allow_short_selling": true,
+          "lock_notional_update_mode": "position_legs",
           "short_cash_policy": "lock_notional"
         },
         "cash": {
@@ -3622,7 +3691,7 @@
       },
       "module": "ml4t.backtest.broker",
       "qualname": "Broker",
-      "signature": "(initial_cash: 'float' = 100000.0, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, stop_slippage_rate: 'float' = 0.0, execution_mode: 'ExecutionMode' = <ExecutionMode.SAME_BAR: 'same_bar'>, execution_price: 'ExecutionPrice' = <ExecutionPrice.CLOSE: 'close'>, mark_price: 'ExecutionPrice' = <ExecutionPrice.PRICE: 'price'>, stop_fill_mode: 'StopFillMode' = <StopFillMode.STOP_PRICE: 'stop_price'>, stop_level_basis: 'StopLevelBasis' = <StopLevelBasis.FILL_PRICE: 'fill_price'>, trail_hwm_source: 'WaterMarkSource' = <WaterMarkSource.CLOSE: 'close'>, trail_include_entry_bar_extremes: 'bool' = False, initial_hwm_source: 'InitialHwmSource' = <InitialHwmSource.FILL_PRICE: 'fill_price'>, trail_stop_timing: 'TrailStopTiming' = <TrailStopTiming.LAGGED: 'lagged'>, allow_short_selling: 'bool' = False, allow_leverage: 'bool' = False, initial_margin: 'float' = 0.5, long_maintenance_margin: 'float' = 0.25, short_maintenance_margin: 'float' = 0.3, fixed_margin_schedule: 'dict[str, tuple[float, float]] | None' = None, margin_pct_schedule: 'dict[str, tuple[float, float]] | None' = None, short_cash_policy: 'ShortCashPolicy' = <ShortCashPolicy.CREDIT: 'credit'>, execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, share_type: 'ShareType' = <ShareType.INTEGER: 'integer'>, fill_ordering: 'FillOrdering' = <FillOrdering.EXIT_FIRST: 'exit_first'>, entry_order_priority: 'EntryOrderPriority' = <EntryOrderPriority.SUBMISSION: 'submission'>, next_bar_submission_precheck: 'bool' = False, next_bar_simple_cash_check: 'bool' = False, buying_power_reservation: 'bool' = False, next_bar_queue_shadow_validation: 'bool' = False, immediate_fill: 'bool' = False, reject_on_insufficient_cash: 'bool' = True, skip_cash_validation: 'bool' = False, cash_buffer_pct: 'float' = 0.0, partial_fills_allowed: 'bool' = False, rebalance_headroom_pct: 'float' = 1.0, missing_price_policy: 'MissingPricePolicy' = <MissingPricePolicy.SKIP: 'skip'>, late_asset_policy: 'LateAssetPolicy' = <LateAssetPolicy.ALLOW: 'allow'>, late_asset_min_bars: 'int' = 1, settlement_delay: 'int' = 0, settlement_reduces_buying_power: 'bool' = True)"
+      "signature": "(initial_cash: 'float' = 100000.0, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, stop_slippage_rate: 'float' = 0.0, execution_mode: 'ExecutionMode' = <ExecutionMode.SAME_BAR: 'same_bar'>, execution_price: 'ExecutionPrice' = <ExecutionPrice.CLOSE: 'close'>, mark_price: 'ExecutionPrice' = <ExecutionPrice.PRICE: 'price'>, stop_fill_mode: 'StopFillMode' = <StopFillMode.STOP_PRICE: 'stop_price'>, stop_level_basis: 'StopLevelBasis' = <StopLevelBasis.FILL_PRICE: 'fill_price'>, trail_hwm_source: 'WaterMarkSource' = <WaterMarkSource.CLOSE: 'close'>, trail_include_entry_bar_extremes: 'bool' = False, initial_hwm_source: 'InitialHwmSource' = <InitialHwmSource.FILL_PRICE: 'fill_price'>, trail_stop_timing: 'TrailStopTiming' = <TrailStopTiming.LAGGED: 'lagged'>, allow_short_selling: 'bool' = False, allow_leverage: 'bool' = False, initial_margin: 'float' = 0.5, long_maintenance_margin: 'float' = 0.25, short_maintenance_margin: 'float' = 0.3, fixed_margin_schedule: 'dict[str, tuple[float, float]] | None' = None, margin_pct_schedule: 'dict[str, tuple[float, float]] | None' = None, short_cash_policy: 'ShortCashPolicy' = <ShortCashPolicy.CREDIT: 'credit'>, lock_notional_update_mode: 'LockNotionalUpdateMode' = <LockNotionalUpdateMode.POSITION_LEGS: 'position_legs'>, execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, share_type: 'ShareType' = <ShareType.INTEGER: 'integer'>, fill_ordering: 'FillOrdering' = <FillOrdering.EXIT_FIRST: 'exit_first'>, entry_order_priority: 'EntryOrderPriority' = <EntryOrderPriority.SUBMISSION: 'submission'>, next_bar_submission_precheck: 'bool' = False, next_bar_simple_cash_check: 'bool' = False, buying_power_reservation: 'bool' = False, next_bar_queue_shadow_validation: 'bool' = False, immediate_fill: 'bool' = False, reject_on_insufficient_cash: 'bool' = True, skip_cash_validation: 'bool' = False, cash_buffer_pct: 'float' = 0.0, partial_fills_allowed: 'bool' = False, rebalance_headroom_pct: 'float' = 1.0, missing_price_policy: 'MissingPricePolicy' = <MissingPricePolicy.SKIP: 'skip'>, late_asset_policy: 'LateAssetPolicy' = <LateAssetPolicy.ALLOW: 'allow'>, late_asset_min_bars: 'int' = 1, settlement_delay: 'int' = 0, settlement_reduces_buying_power: 'bool' = True)"
     },
     "ml4t.backtest:CommissionType": {
       "kind": "class",

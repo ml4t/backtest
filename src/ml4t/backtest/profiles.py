@@ -100,6 +100,7 @@ VECTORBT_PROFILE = {
         "allow_short_selling": True,
         "allow_leverage": False,
         "short_cash_policy": "credit",
+        "lock_notional_update_mode": "position_legs",
     },
     "execution": {
         "execution_price": "close",
@@ -287,6 +288,9 @@ VECTORBT_STRICT_PROFILE["orders"]["partial_fills_allowed"] = True
 VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "fifo"
 VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 
+VECTORBT_OSS_STRICT_PROFILE = deepcopy(VECTORBT_STRICT_PROFILE)
+VECTORBT_OSS_STRICT_PROFILE["account"]["lock_notional_update_mode"] = "combined_order"
+
 BACKTRADER_STRICT_PROFILE = deepcopy(BACKTRADER_PROFILE)
 BACKTRADER_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 BACKTRADER_STRICT_PROFILE["orders"]["next_bar_submission_precheck"] = True
@@ -399,6 +403,7 @@ _PROFILES = {
     "realistic": REALISTIC_PROFILE,
     "ibkr_us_stocks_fixed": IBKR_US_STOCKS_FIXED_PROFILE,
     "vectorbt_strict": VECTORBT_STRICT_PROFILE,
+    "vectorbt_oss_strict": VECTORBT_OSS_STRICT_PROFILE,
     "backtrader_strict": BACKTRADER_STRICT_PROFILE,
     "zipline_strict": ZIPLINE_STRICT_PROFILE,
 }
@@ -409,6 +414,7 @@ _ALIASES = {
     "quantconnect": "lean",
     "ibkr:us:stocks:fixed": "ibkr_us_stocks_fixed",
     "vectorbt_compare": "vectorbt_strict",
+    "vectorbt_oss_compare": "vectorbt_oss_strict",
     "backtrader_compare": "backtrader_strict",
     "zipline_compare": "zipline_strict",
     "lean_compare": "lean",

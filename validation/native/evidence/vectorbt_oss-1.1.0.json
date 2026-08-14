@@ -155,6 +155,13 @@
       "source": "from_orders"
     },
     {
+      "actual": 1035668.0954273955,
+      "expected": 1035668.0954273955,
+      "id": "lock_notional_update_arithmetic",
+      "passed": true,
+      "source": "from_orders"
+    },
+    {
       "actual": {
         "default_orders": 1,
         "enabled_orders": 2
@@ -340,7 +347,7 @@
     }
   ],
   "framework": "vectorbt_oss",
-  "oracle_sha256": "47a21499702d7e47761b76c7f7104da8db1e124b27b43957716d175f7b32fd80",
+  "oracle_sha256": "e3a002a1924a371cdf5b9f61eae13942ac371ad13d6f55125dd545c243a88bc8",
   "package": "vectorbt",
   "passed": true,
   "schema_version": 1,

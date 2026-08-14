@@ -153,6 +153,20 @@ class ShortCashPolicy(str, Enum):
     LOCK_NOTIONAL = "lock_notional"
 
 
+class LockNotionalUpdateMode(str, Enum):
+    """Floating-point operation order for locked-notional cash updates.
+
+    POSITION_LEGS:
+        Settle closing and opening position legs separately.
+
+    COMBINED_ORDER:
+        Settle the gross cash and short-debt effects as one order.
+    """
+
+    POSITION_LEGS = "position_legs"
+    COMBINED_ORDER = "combined_order"
+
+
 class RebalanceMode(str, Enum):
     """How portfolio value is computed during multi-asset rebalancing.
 
@@ -504,6 +518,7 @@ class BacktestConfig:
     fixed_margin_schedule: dict[str, tuple[float, float]] | None = None  # For futures
     margin_pct_schedule: dict[str, tuple[float, float]] | None = None  # Price-aware futures margin
     short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT
+    lock_notional_update_mode: LockNotionalUpdateMode = LockNotionalUpdateMode.POSITION_LEGS
 
     # === Execution Timing ===
     execution_price: ExecutionPrice = ExecutionPrice.OPEN
@@ -879,6 +894,7 @@ class BacktestConfig:
                 "fixed_margin_schedule": _margin_schedule_to_dict(self.fixed_margin_schedule),
                 "margin_pct_schedule": _margin_schedule_to_dict(self.margin_pct_schedule),
                 "short_cash_policy": self.short_cash_policy.value,
+                "lock_notional_update_mode": self.lock_notional_update_mode.value,
             },
             "execution": {
                 "execution_price": self.execution_price.value,
@@ -995,6 +1011,7 @@ class BacktestConfig:
                     "fixed_margin_schedule",
                     "margin_pct_schedule",
                     "short_cash_policy",
+                    "lock_notional_update_mode",
                 },
                 "execution": {"execution_price", "mark_price", "execution_mode"},
                 "stops": {
@@ -1119,6 +1136,9 @@ class BacktestConfig:
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
             margin_pct_schedule=acct_cfg.get("margin_pct_schedule"),
             short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
+            lock_notional_update_mode=LockNotionalUpdateMode(
+                acct_cfg.get("lock_notional_update_mode", "position_legs")
+            ),
             # Execution
             execution_price=ExecutionPrice(
                 exec_cfg.get("execution_price", ExecutionPrice.OPEN.value)

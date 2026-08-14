@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from ..config import ExecutionPrice, ShareType
+from ..config import ExecutionPrice, LockNotionalUpdateMode, ShareType
 from ..models import calculate_commission
 from ..types import OrderSide, OrderType
 from .shared import CASH_TOLERANCE, add_with_zero_cancellation
@@ -123,6 +123,39 @@ class FillEngine:
         current_quantity = broker.account.get_position_quantity(order.asset)
         multiplier = broker.get_multiplier(order.asset)
         unit_cost = fill_price * multiplier
+
+        if broker.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER:
+            if order.side is OrderSide.BUY and current_quantity < 0.0:
+                short_quantity = abs(current_quantity)
+                short_basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
+                cover_required = short_quantity * unit_cost
+                cover_free_cash = add_with_zero_cancellation(
+                    free_cash + 2 * short_basis,
+                    -cover_required,
+                )
+                if cover_free_cash > 0.0:
+                    cash_limit = free_cash + 2 * short_basis
+                elif cover_free_cash < 0.0:
+                    average_entry = short_basis / short_quantity
+                    denominator = unit_cost - 2 * average_entry
+                    if denominator == 0.0:
+                        return 0.0
+                    max_short_size = free_cash / denominator
+                    cash_limit = max_short_size * unit_cost
+                else:
+                    cash_limit = broker.cash
+                return max(0.0, min(cash_limit, broker.cash) / unit_cost)
+
+            if order.side is OrderSide.SELL:
+                long_quantity = max(current_quantity, 0.0)
+                long_cash = long_quantity * unit_cost
+                total_free_cash = add_with_zero_cancellation(free_cash, long_cash)
+                if total_free_cash <= 0.0:
+                    return long_quantity if current_quantity > 0.0 else 0.0
+                max_short_size = total_free_cash / unit_cost
+                return add_with_zero_cancellation(long_quantity, max_short_size)
+
+            return max(0.0, free_cash / unit_cost)
 
         if order.side is OrderSide.BUY and current_quantity < 0.0:
             short_quantity = abs(current_quantity)

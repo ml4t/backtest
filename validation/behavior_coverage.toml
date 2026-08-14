@@ -9,8 +9,8 @@ published = true
 
 [[framework.vectorbt]]
 name = "direction"
-fields = ["account.allow_short_selling", "account.short_cash_policy"]
-native_checks = ["short_cash"]
+fields = ["account.allow_short_selling", "account.short_cash_policy", "account.lock_notional_update_mode"]
+native_checks = ["short_cash", "lock_notional_update_arithmetic"]
 scenarios = ["02", "11", "12"]
 published = true
 

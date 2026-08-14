@@ -196,6 +196,16 @@ def _behavior_checks(framework: str, vbt: Any) -> list[tuple[str, Any, Any]]:
         cash_sharing=True,
         **collateral_kwargs,
     )
+    arithmetic_pf = vbt.Portfolio.from_orders(
+        np.asarray([445.1764349947099, 98.35685542114634]),
+        size=np.asarray([-935.6511349828165, 822.3137995772428]),
+        size_type="amount",
+        init_cash=800_928.6801081297,
+        log=True,
+        **collateral_kwargs,
+    )
+    arithmetic_logs = arithmetic_pf.logs.records_readable.to_dict("records")
+    new_free_cash_key = "[ST1] Free Cash" if framework == "vectorbt_pro" else "New Free Cash"
     accumulate_default = vbt.Portfolio.from_signals(
         close, entries=_bool([1, 1, 0]), exits=False, size=1, init_cash=1_000
     )
@@ -336,6 +346,11 @@ def _behavior_checks(framework: str, vbt: Any) -> list[tuple[str, Any, Any]]:
             },
         ),
         (
+            "lock_notional_update_arithmetic",
+            arithmetic_logs[-1][new_free_cash_key],
+            1_035_668.0954273958 if framework == "vectorbt_pro" else 1_035_668.0954273955,
+        ),
+        (
             "accumulation",
             {
                 "default_orders": len(_orders(accumulate_default)),
@@ -442,6 +457,7 @@ def run(framework: str) -> dict[str, Any]:
                     "target_percent_sizing",
                     "cash_sharing_and_call_sequence",
                     "cash_sharing_short_collateral",
+                    "lock_notional_update_arithmetic",
                 }
                 else "from_signals",
             }

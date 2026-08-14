@@ -26,6 +26,7 @@ from ml4t.backtest.config import (
     ExecutionPrice,
     FillOrdering,
     LateAssetPolicy,
+    LockNotionalUpdateMode,
     MissingPricePolicy,
     ShareType,
     ShortCashPolicy,
@@ -409,6 +410,41 @@ class TestShortCashPolicy:
         assert config.partial_fills_allowed is True
         assert config.entry_order_priority == EntryOrderPriority.SUBMISSION
         assert get_profile_config("vectorbt_strict") != get_profile_config("vectorbt")
+
+    def test_vectorbt_oss_strict_uses_combined_order_cash_updates(self):
+        pro = BacktestConfig.from_preset("vectorbt_strict")
+        oss = BacktestConfig.from_preset("vectorbt_oss_strict")
+
+        assert pro.lock_notional_update_mode is LockNotionalUpdateMode.POSITION_LEGS
+        assert oss.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER
+
+    def test_lock_notional_update_modes_reproduce_native_cover_arithmetic(self):
+        initial_cash = 800_928.6801081297
+        entry_price = 445.1764349947099
+        short_quantity = 935.6511349828165
+        cover_quantity = 822.3137995772428
+        cover_price = 98.35685542114634
+
+        results = {}
+        for mode in LockNotionalUpdateMode:
+            broker = _make_broker(
+                initial_cash=initial_cash,
+                short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+                lock_notional_update_mode=mode,
+                share_type=ShareType.FRACTIONAL,
+                reject_on_insufficient_cash=True,
+                partial_fills_allowed=True,
+            )
+            _set_prices(broker, {"A": entry_price})
+            broker.submit_order("A", short_quantity, OrderSide.SELL)
+            broker._process_orders()
+            _set_prices(broker, {"A": cover_price}, ts=datetime(2024, 1, 2))
+            broker.submit_order("A", cover_quantity, OrderSide.BUY)
+            broker._process_orders()
+            results[mode] = broker.account._lock_notional_free_cash
+
+        assert results[LockNotionalUpdateMode.POSITION_LEGS] == 1_035_668.0954273958
+        assert results[LockNotionalUpdateMode.COMBINED_ORDER] == 1_035_668.0954273955
 
     def test_zipline_strict_profile_uses_credit(self):
         config = BacktestConfig.from_preset("zipline_strict")

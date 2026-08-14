@@ -263,7 +263,7 @@ def _framework_run(
             signals,
             dates,
             execution_mode="same_bar",
-            profile_override="vectorbt_strict",
+            profile_override="vectorbt_oss_strict",
         )
     elif framework == "backtrader":
         external = suite.benchmark_backtrader(config, price_data, signals, dates)

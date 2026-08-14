@@ -19,6 +19,7 @@ EXPECTED_CHECKS = {
     "fees_and_slippage",
     "insufficient_cash_partial_fill",
     "integer_signal_dtype",
+    "lock_notional_update_arithmetic",
     "long_signal_conflict",
     "missing_order_price",
     "record_construction",

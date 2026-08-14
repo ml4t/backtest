@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ..config import InitialHwmSource, ShareType
+from ..config import InitialHwmSource, LockNotionalUpdateMode, ShareType
 from ..core.shared import add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
 from ..models import calculate_commission, calculate_slippage
@@ -353,6 +353,14 @@ class FillExecutor:
         if policy.allow_leverage or policy.short_cash_policy != "lock_notional":
             return
 
+        if broker.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER:
+            self._update_combined_lock_notional_cash(
+                ctx,
+                old_quantity=old_quantity,
+                commission=commission,
+            )
+            return
+
         remaining = ctx.signed_qty
         free_cash = self.account._lock_notional_free_cash
         multiplier = broker.get_multiplier(ctx.order.asset)
@@ -396,6 +404,55 @@ class FillExecutor:
                 self.account._lock_notional_short_basis[asset] = current_basis + required_cash
 
         self.account._lock_notional_free_cash = add_with_zero_cancellation(free_cash, -commission)
+
+    def _update_combined_lock_notional_cash(
+        self,
+        ctx: FillContext,
+        *,
+        old_quantity: float,
+        commission: float,
+    ) -> None:
+        """Settle locked collateral in VectorBT OSS combined-order operation order."""
+        broker = self.broker
+        asset = ctx.order.asset
+        free_cash = self.account._lock_notional_free_cash
+        short_basis = self.account._lock_notional_short_basis.get(asset, 0.0)
+        unit_cost = ctx.fill_price * broker.get_multiplier(asset)
+        fill_quantity = abs(ctx.signed_qty)
+
+        if ctx.signed_qty > 0.0:
+            required_cash = add_with_zero_cancellation(fill_quantity * unit_cost, commission)
+            if old_quantity < 0.0:
+                covered = min(fill_quantity, abs(old_quantity))
+                average_entry = short_basis / abs(old_quantity)
+                released_basis = covered * average_entry
+                free_cash = add_with_zero_cancellation(
+                    free_cash + 2 * released_basis,
+                    -required_cash,
+                )
+                new_basis = add_with_zero_cancellation(short_basis, -released_basis)
+                if old_quantity + covered < 0.0:
+                    self.account._lock_notional_short_basis[asset] = new_basis
+                else:
+                    self.account._lock_notional_short_basis.pop(asset, None)
+            else:
+                free_cash = add_with_zero_cancellation(free_cash, -required_cash)
+        else:
+            acquired_cash = add_with_zero_cancellation(fill_quantity * unit_cost, -commission)
+            new_quantity = old_quantity - fill_quantity
+            if new_quantity < 0.0:
+                short_quantity = fill_quantity if old_quantity < 0.0 else abs(new_quantity)
+                short_value = short_quantity * unit_cost
+                self.account._lock_notional_short_basis[asset] = short_basis + short_value
+                free_cash_difference = add_with_zero_cancellation(
+                    acquired_cash,
+                    -2 * short_value,
+                )
+                free_cash = add_with_zero_cancellation(free_cash, free_cash_difference)
+            else:
+                free_cash = free_cash + acquired_cash
+
+        self.account._lock_notional_free_cash = free_cash
 
     @staticmethod
     def _validate_execution_price(value: float, *, source: str) -> None:
@@ -460,6 +517,7 @@ class FillExecutor:
             or broker.account.policy.allow_leverage
             or broker.cash_buffer_pct != 0.0
             or ctx.commission != 0.0
+            or broker.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER
         ):
             return fallback
 
