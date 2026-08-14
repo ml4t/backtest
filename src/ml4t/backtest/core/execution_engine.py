@@ -683,7 +683,15 @@ class ExecutionEngine:
             broker.commission_model, order.asset, order.quantity, fill_price
         )
         projected_cash = broker.cash - signed_qty * fill_price - commission
-        return projected_cash >= 0.0
+        if projected_cash >= 0.0:
+            return True
+
+        # Backtrader executes the closing leg of a reversal after an
+        # opening-price gap, even when that close leaves cash negative.
+        if is_opposite and order.quantity > abs(current_qty):
+            order.quantity = abs(current_qty)
+            return True
+        return False
 
     def _cleanup_filled_orders(self, filled_orders: list) -> None:
         filled_ids = {o.order_id for o in filled_orders}

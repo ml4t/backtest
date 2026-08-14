@@ -219,6 +219,82 @@
       "passed": true
     },
     {
+      "actual": {
+        "cash": 200.0,
+        "events": [
+          {
+            "price": 100.0,
+            "size": -1,
+            "status": "Completed"
+          },
+          {
+            "price": 0.0,
+            "size": 0,
+            "status": "Margin"
+          }
+        ],
+        "position": -1
+      },
+      "expected": {
+        "cash": 200.0,
+        "events": [
+          {
+            "price": 100.0,
+            "size": -1,
+            "status": "Completed"
+          },
+          {
+            "price": 0.0,
+            "size": 0,
+            "status": "Margin"
+          }
+        ],
+        "position": -1
+      },
+      "id": "losing_short_cover_submission_rejection",
+      "passed": true
+    },
+    {
+      "actual": {
+        "cash": -50.0,
+        "events": [
+          {
+            "created_size": -1,
+            "executed_size": -1,
+            "price": 100.0,
+            "status": "Completed"
+          },
+          {
+            "created_size": 2,
+            "executed_size": 1,
+            "price": 250.0,
+            "status": "Margin"
+          }
+        ],
+        "position": 0
+      },
+      "expected": {
+        "cash": -50.0,
+        "events": [
+          {
+            "created_size": -1,
+            "executed_size": -1,
+            "price": 100.0,
+            "status": "Completed"
+          },
+          {
+            "created_size": 2,
+            "executed_size": 1,
+            "price": 250.0,
+            "status": "Margin"
+          }
+        ],
+        "position": 0
+      },
+      "id": "gap_reversal_executes_close_leg_despite_margin",
+      "passed": true
+    },
+    {
       "actual": [
         {
           "created_price": 100.0,
@@ -468,7 +544,7 @@
     }
   ],
   "framework": "backtrader",
-  "oracle_sha256": "02dddf9eca15abc25dcfa51a362505220de4dbc2608deb520e126904e4399f51",
+  "oracle_sha256": "f516fb0bfb3b2cbebc076b092ce86f12cca502aec81735f240063512edbbf8df",
   "package": "backtrader",
   "passed": true,
   "schema_version": 1,

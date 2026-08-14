@@ -262,6 +262,84 @@ class TestRejectOnInsufficientCash:
         assert first.status.value != "rejected"
         assert second.status.value == "rejected"
 
+    def test_backtrader_precheck_rejects_unaffordable_short_cover(self):
+        broker = _make_broker(
+            initial_cash=100.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            next_bar_simple_cash_check=True,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+        )
+        ts = datetime(2024, 1, 2)
+        _set_prices(broker, {"AAPL": 250.0}, ts=ts)
+        broker.cash = 200.0
+        broker.positions["AAPL"] = Position(
+            asset="AAPL",
+            quantity=-1.0,
+            entry_price=100.0,
+            entry_time=ts,
+            current_price=250.0,
+        )
+
+        order = broker.submit_order("AAPL", 1, OrderSide.BUY)
+
+        assert order is not None
+        assert order.status.value == "rejected"
+        assert order.rejection_code == "insufficient_cash"
+
+    def test_backtrader_gap_reversal_executes_only_the_close_leg(self):
+        broker = _make_broker(
+            initial_cash=100.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            next_bar_simple_cash_check=True,
+            share_type=ShareType.INTEGER,
+            fill_ordering=FillOrdering.FIFO,
+            reject_on_insufficient_cash=True,
+        )
+        broker._update_time(
+            timestamp=datetime(2024, 1, 1),
+            prices={"AAPL": 100.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000.0},
+            highs={"AAPL": 100.0},
+            lows={"AAPL": 100.0},
+            signals={},
+        )
+        short_order = broker.submit_order("AAPL", 1, OrderSide.SELL)
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 2),
+            prices={"AAPL": 90.0},
+            opens={"AAPL": 100.0},
+            volumes={"AAPL": 1_000.0},
+            highs={"AAPL": 100.0},
+            lows={"AAPL": 90.0},
+            signals={},
+        )
+        broker._process_orders(use_open=True)
+        reversal = broker.submit_order("AAPL", 2, OrderSide.BUY)
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3),
+            prices={"AAPL": 250.0},
+            opens={"AAPL": 250.0},
+            volumes={"AAPL": 1_000.0},
+            highs={"AAPL": 250.0},
+            lows={"AAPL": 250.0},
+            signals={},
+        )
+        broker._process_orders(use_open=True)
+
+        assert short_order is not None
+        assert reversal is not None
+        assert [fill.quantity for fill in broker.fills] == [1.0, 1.0]
+        assert broker.get_position("AAPL") is None
+        assert broker.cash == -50.0
+        assert reversal.requested_quantity == 2.0
+        assert reversal.filled_quantity == 1.0
+
     def test_margin_submission_precheck_allows_reversal_after_close_proceeds(self):
         broker = _make_broker(
             initial_cash=1_000_000.0,

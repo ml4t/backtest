@@ -215,6 +215,73 @@ def _submission_sequence(reverse: bool) -> list[dict[str, Any]]:
     ]
 
 
+def _losing_short_cover() -> dict[str, Any]:
+    class Strategy(bt.Strategy):
+        def __init__(self) -> None:
+            self.events: list[dict[str, Any]] = []
+
+        def next(self) -> None:
+            if len(self) == 1:
+                self.sell(size=1)
+            elif len(self) == 2:
+                self.buy(size=1)
+
+        def notify_order(self, order: Any) -> None:
+            if _terminal(order):
+                self.events.append(
+                    {
+                        "status": order.getstatusname(),
+                        "size": order.executed.size,
+                        "price": order.executed.price,
+                    }
+                )
+
+    cerebro, strategy = _run(
+        Strategy,
+        ("asset", _frame([100.0, 100.0, 250.0], closes=[100.0, 250.0, 250.0])),
+        cash=100.0,
+    )
+    return {
+        "events": strategy.events,
+        "cash": cerebro.broker.getcash(),
+        "position": strategy.getposition().size,
+    }
+
+
+def _gap_reversal() -> dict[str, Any]:
+    class Strategy(bt.Strategy):
+        def __init__(self) -> None:
+            self.events: list[dict[str, Any]] = []
+
+        def next(self) -> None:
+            if len(self) == 1:
+                self.sell(size=1)
+            elif len(self) == 2:
+                self.buy(size=2)
+
+        def notify_order(self, order: Any) -> None:
+            if _terminal(order):
+                self.events.append(
+                    {
+                        "status": order.getstatusname(),
+                        "created_size": order.created.size,
+                        "executed_size": order.executed.size,
+                        "price": order.executed.price,
+                    }
+                )
+
+    cerebro, strategy = _run(
+        Strategy,
+        ("asset", _frame([100.0, 100.0, 250.0], closes=[100.0, 90.0, 250.0])),
+        cash=100.0,
+    )
+    return {
+        "events": strategy.events,
+        "cash": cerebro.broker.getcash(),
+        "position": strategy.getposition().size,
+    }
+
+
 def _signal_price_stop() -> list[dict[str, Any]]:
     class Strategy(bt.Strategy):
         def __init__(self) -> None:
@@ -558,6 +625,40 @@ def run() -> dict[str, Any]:
                     {"asset": "b", "created_size": 6, "status": "Completed"},
                     {"asset": "a", "created_size": 6, "status": "Margin"},
                 ],
+            },
+        ),
+        (
+            "losing_short_cover_submission_rejection",
+            _losing_short_cover(),
+            {
+                "events": [
+                    {"status": "Completed", "size": -1, "price": 100.0},
+                    {"status": "Margin", "size": 0, "price": 0.0},
+                ],
+                "cash": 200.0,
+                "position": -1,
+            },
+        ),
+        (
+            "gap_reversal_executes_close_leg_despite_margin",
+            _gap_reversal(),
+            {
+                "events": [
+                    {
+                        "status": "Completed",
+                        "created_size": -1,
+                        "executed_size": -1,
+                        "price": 100.0,
+                    },
+                    {
+                        "status": "Margin",
+                        "created_size": 2,
+                        "executed_size": 1,
+                        "price": 250.0,
+                    },
+                ],
+                "cash": -50.0,
+                "position": 0,
             },
         ),
         (

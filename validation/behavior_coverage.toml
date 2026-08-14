@@ -107,10 +107,10 @@ reason = "The scenario matrix submits fixed integer quantities and does not test
 [[framework.backtrader]]
 name = "buying_power"
 fields = ["account.allow_leverage", "orders.reject_on_insufficient_cash", "orders.partial_fills_allowed"]
-native_checks = ["cash_rejection_and_configured_leverage"]
+native_checks = ["cash_rejection_and_configured_leverage", "losing_short_cover_submission_rejection", "gap_reversal_executes_close_leg_despite_margin"]
 scenarios = []
 published = false
-reason = "No cross-engine scenario currently reaches an insufficient-cash boundary."
+reason = "Native checks cover submission and gap boundaries, but the scenario matrix does not reach an insufficient-cash boundary."
 
 [[framework.backtrader]]
 name = "order_processing"
