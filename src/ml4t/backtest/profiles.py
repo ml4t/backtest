@@ -53,10 +53,7 @@ DEFAULT_PROFILE = {
 BACKTRADER_PROFILE = {
     "account": {
         "allow_short_selling": True,
-        "allow_leverage": True,
-        "initial_margin": 0.5,
-        "long_maintenance_margin": 0.25,
-        "short_maintenance_margin": 0.30,
+        "allow_leverage": False,
         "short_cash_policy": "credit",
     },
     "execution": {
@@ -67,18 +64,19 @@ BACKTRADER_PROFILE = {
         "stop_fill_mode": "stop_price",
         "stop_level_basis": "signal_price",
         "trail_hwm_source": "close",
+        "initial_hwm_source": "signal_price",
         "trail_stop_timing": "lagged",
     },
     "position_sizing": {
         "share_type": "integer",
     },
     "commission": {
-        "model": "percentage",
-        "rate": 0.001,
+        "model": "none",
+        "rate": 0.0,
     },
     "slippage": {
-        "model": "percentage",
-        "rate": 0.001,
+        "model": "none",
+        "rate": 0.0,
     },
     "cash": {
         "initial": 100000.0,
@@ -90,10 +88,10 @@ BACKTRADER_PROFILE = {
         "fill_ordering": "fifo",
         "entry_order_priority": "submission",
         "rebalance_mode": "snapshot",
-        "rebalance_headroom_pct": 0.998,
+        "rebalance_headroom_pct": 1.0,
         "missing_price_policy": "use_last",
-        "late_asset_policy": "require_history",
-        "late_asset_min_bars": 2,
+        "late_asset_policy": "allow",
+        "late_asset_min_bars": 1,
     },
 }
 

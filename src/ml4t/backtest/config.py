@@ -262,6 +262,7 @@ class InitialHwmSource(str, Enum):
 
     Controls what price is used for HWM when a new position is created:
     - FILL_PRICE: Use the actual fill price including slippage (default)
+    - SIGNAL_PRICE: Use the price observed when the entry order was submitted
     - BAR_CLOSE: Use the bar's close price
     - BAR_HIGH: Use the bar's high price (VBT Pro with OHLC data)
 
@@ -271,6 +272,7 @@ class InitialHwmSource(str, Enum):
     """
 
     FILL_PRICE = "fill_price"  # Use fill price (default, most frameworks)
+    SIGNAL_PRICE = "signal_price"  # Use the entry order's signal price (Backtrader)
     BAR_CLOSE = "bar_close"  # Use bar's close
     BAR_HIGH = "bar_high"  # Use bar's high (VBT Pro with OHLC)
 

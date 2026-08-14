@@ -1,0 +1,514 @@
+{
+  "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+  "artifact_sha256": "9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+  "checks": [
+    {
+      "actual": {
+        "cash": 10000.0,
+        "cheat_on_close": false,
+        "cheat_on_open": false,
+        "checksubmit": true,
+        "commission": 0.0,
+        "leverage": 1.0,
+        "short_cash": true,
+        "slippage_fixed": 0.0,
+        "slippage_percent": 0.0
+      },
+      "expected": {
+        "cash": 10000.0,
+        "cheat_on_close": false,
+        "cheat_on_open": false,
+        "checksubmit": true,
+        "commission": 0.0,
+        "leverage": 1.0,
+        "short_cash": true,
+        "slippage_fixed": 0.0,
+        "slippage_percent": 0.0
+      },
+      "id": "defaults",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "date": "2024-01-02",
+          "price": 110.0,
+          "size": 1
+        }
+      ],
+      "expected": [
+        {
+          "date": "2024-01-02",
+          "price": 110.0,
+          "size": 1
+        }
+      ],
+      "id": "next_bar_open_and_gap",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "date": "2024-01-01",
+          "price": 100.0,
+          "size": 1
+        }
+      ],
+      "expected": [
+        {
+          "date": "2024-01-01",
+          "price": 100.0,
+          "size": 1
+        }
+      ],
+      "id": "cheat_on_close",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "commission": 0.0,
+          "created_size": 5,
+          "executed_size": 5,
+          "price": 100.0,
+          "status": "Completed"
+        }
+      ],
+      "expected": [
+        {
+          "commission": 0.0,
+          "created_size": 5,
+          "executed_size": 5,
+          "price": 100.0,
+          "status": "Completed"
+        }
+      ],
+      "id": "integer_target_percent",
+      "passed": true
+    },
+    {
+      "actual": {
+        "full": [
+          {
+            "commission": 0.0,
+            "created_size": 10,
+            "executed_size": 0,
+            "price": 0.0,
+            "status": "Margin"
+          }
+        ],
+        "headroom": [
+          {
+            "commission": 0.9000000000000001,
+            "created_size": 9,
+            "executed_size": 9,
+            "price": 100.0,
+            "status": "Completed"
+          }
+        ]
+      },
+      "expected": {
+        "full": [
+          {
+            "commission": 0.0,
+            "created_size": 10,
+            "executed_size": 0,
+            "price": 0.0,
+            "status": "Margin"
+          }
+        ],
+        "headroom": [
+          {
+            "commission": 0.9000000000000001,
+            "created_size": 9,
+            "executed_size": 9,
+            "price": 100.0,
+            "status": "Completed"
+          }
+        ]
+      },
+      "id": "commission_headroom",
+      "passed": true
+    },
+    {
+      "actual": {
+        "default": [
+          {
+            "size": 0,
+            "status": "Margin"
+          }
+        ],
+        "leverage_2": [
+          {
+            "size": 20,
+            "status": "Completed"
+          }
+        ]
+      },
+      "expected": {
+        "default": [
+          {
+            "size": 0,
+            "status": "Margin"
+          }
+        ],
+        "leverage_2": [
+          {
+            "size": 20,
+            "status": "Completed"
+          }
+        ]
+      },
+      "id": "cash_rejection_and_configured_leverage",
+      "passed": true
+    },
+    {
+      "actual": {
+        "forward": [
+          {
+            "asset": "a",
+            "created_size": 6,
+            "status": "Completed"
+          },
+          {
+            "asset": "b",
+            "created_size": 6,
+            "status": "Margin"
+          }
+        ],
+        "reverse": [
+          {
+            "asset": "b",
+            "created_size": 6,
+            "status": "Completed"
+          },
+          {
+            "asset": "a",
+            "created_size": 6,
+            "status": "Margin"
+          }
+        ]
+      },
+      "expected": {
+        "forward": [
+          {
+            "asset": "a",
+            "created_size": 6,
+            "status": "Completed"
+          },
+          {
+            "asset": "b",
+            "created_size": 6,
+            "status": "Margin"
+          }
+        ],
+        "reverse": [
+          {
+            "asset": "b",
+            "created_size": 6,
+            "status": "Completed"
+          },
+          {
+            "asset": "a",
+            "created_size": 6,
+            "status": "Margin"
+          }
+        ]
+      },
+      "id": "submission_sequence",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "created_price": 100.0,
+          "executed_price": 110.0,
+          "size": 1
+        },
+        {
+          "created_price": 90.0,
+          "executed_price": 90.0,
+          "size": -1
+        }
+      ],
+      "expected": [
+        {
+          "created_price": 100.0,
+          "executed_price": 110.0,
+          "size": 1
+        },
+        {
+          "created_price": 90.0,
+          "executed_price": 90.0,
+          "size": -1
+        }
+      ],
+      "id": "signal_price_stop_basis",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "date": "2024-01-02",
+          "executed_price": 110.0,
+          "size": 1
+        },
+        {
+          "date": "2024-01-03",
+          "executed_price": 90.0,
+          "size": -1
+        }
+      ],
+      "expected": [
+        {
+          "date": "2024-01-02",
+          "executed_price": 110.0,
+          "size": 1
+        },
+        {
+          "date": "2024-01-03",
+          "executed_price": 90.0,
+          "size": -1
+        }
+      ],
+      "id": "trailing_stop_signal_close_and_lagged",
+      "passed": true
+    },
+    {
+      "actual": {
+        "credit": {
+          "cash": 1100.0,
+          "position": -1,
+          "price": 100.0
+        },
+        "debit": {
+          "cash": 900.0,
+          "position": -1,
+          "price": 100.0
+        }
+      },
+      "expected": {
+        "credit": {
+          "cash": 1100.0,
+          "position": -1,
+          "price": 100.0
+        },
+        "debit": {
+          "cash": 900.0,
+          "position": -1,
+          "price": 100.0
+        }
+      },
+      "id": "short_cash",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "callback": "nextstart",
+          "date": "2024-01-01",
+          "lengths": [
+            1,
+            1
+          ],
+          "values": [
+            100.0,
+            200.0
+          ]
+        },
+        {
+          "callback": "nextstart",
+          "date": "2024-01-02",
+          "lengths": [
+            1,
+            2
+          ],
+          "values": [
+            100.0,
+            210.0
+          ]
+        },
+        {
+          "callback": "next",
+          "date": "2024-01-03",
+          "lengths": [
+            2,
+            3
+          ],
+          "values": [
+            120.0,
+            220.0
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "callback": "nextstart",
+          "date": "2024-01-01",
+          "lengths": [
+            1,
+            1
+          ],
+          "values": [
+            100.0,
+            200.0
+          ]
+        },
+        {
+          "callback": "nextstart",
+          "date": "2024-01-02",
+          "lengths": [
+            1,
+            2
+          ],
+          "values": [
+            100.0,
+            210.0
+          ]
+        },
+        {
+          "callback": "next",
+          "date": "2024-01-03",
+          "lengths": [
+            2,
+            3
+          ],
+          "values": [
+            120.0,
+            220.0
+          ]
+        }
+      ],
+      "id": "missing_bar_uses_last_value",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "callback": "prenext",
+          "date": "2024-01-01",
+          "lengths": [
+            1,
+            0
+          ]
+        },
+        {
+          "callback": "nextstart",
+          "date": "2024-01-02",
+          "lengths": [
+            2,
+            1
+          ]
+        },
+        {
+          "callback": "next",
+          "date": "2024-01-03",
+          "lengths": [
+            3,
+            2
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "callback": "prenext",
+          "date": "2024-01-01",
+          "lengths": [
+            1,
+            0
+          ]
+        },
+        {
+          "callback": "nextstart",
+          "date": "2024-01-02",
+          "lengths": [
+            2,
+            1
+          ]
+        },
+        {
+          "callback": "next",
+          "date": "2024-01-03",
+          "lengths": [
+            3,
+            2
+          ]
+        }
+      ],
+      "id": "late_feed_start",
+      "passed": true
+    },
+    {
+      "actual": [],
+      "expected": [],
+      "id": "final_bar_market_order",
+      "passed": true
+    },
+    {
+      "actual": [
+        {
+          "commission": 4.6,
+          "entry_price": 110.0,
+          "is_long": true,
+          "pnl": 20.0,
+          "pnl_after_commission": 15.4
+        }
+      ],
+      "expected": [
+        {
+          "commission": 4.6,
+          "entry_price": 110.0,
+          "is_long": true,
+          "pnl": 20.0,
+          "pnl_after_commission": 15.4
+        }
+      ],
+      "id": "trade_record",
+      "passed": true
+    }
+  ],
+  "framework": "backtrader",
+  "oracle_sha256": "02dddf9eca15abc25dcfa51a362505220de4dbc2608deb520e126904e4399f51",
+  "package": "backtrader",
+  "passed": true,
+  "schema_version": 1,
+  "source_locations": {
+    "broker_next": {
+      "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+      "artifact_sha256": "9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+      "line": 1176,
+      "module": "backtrader.brokers.bbroker",
+      "path": "backtrader/brokers/bbroker.py",
+      "qualname": "BackBroker.next",
+      "source": "https://pypi.org/project/backtrader/1.9.78.123/"
+    },
+    "order_execute": {
+      "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+      "artifact_sha256": "9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+      "line": 566,
+      "module": "backtrader.order",
+      "path": "backtrader/order.py",
+      "qualname": "Order.execute",
+      "source": "https://pypi.org/project/backtrader/1.9.78.123/"
+    },
+    "target_percent": {
+      "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+      "artifact_sha256": "9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+      "line": 1330,
+      "module": "backtrader.strategy",
+      "path": "backtrader/strategy.py",
+      "qualname": "Strategy.order_target_percent",
+      "source": "https://pypi.org/project/backtrader/1.9.78.123/"
+    },
+    "target_size": {
+      "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+      "artifact_sha256": "9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+      "line": 192,
+      "module": "backtrader.comminfo",
+      "path": "backtrader/comminfo.py",
+      "qualname": "CommInfoBase.getsize",
+      "source": "https://pypi.org/project/backtrader/1.9.78.123/"
+    }
+  },
+  "version": "1.9.78.123"
+}

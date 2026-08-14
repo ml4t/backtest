@@ -435,7 +435,9 @@ class FillExecutor:
                 self._scale_position(ctx, pos, old_qty, new_qty)
                 return ctx.commission
 
-    def _get_initial_hwm(self, asset: str, fill_price: float) -> float:
+    def _get_initial_hwm(
+        self, asset: str, fill_price: float, signal_price: float | None = None
+    ) -> float:
         """Get initial high water mark based on configuration.
 
         This is the single source of truth for HWM initialization,
@@ -449,6 +451,8 @@ class FillExecutor:
             Initial HWM value based on configuration
         """
         broker = self.broker
+        if broker.initial_hwm_source == InitialHwmSource.SIGNAL_PRICE:
+            return signal_price if signal_price is not None else fill_price
         if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
             return self.market.highs.get(asset, fill_price)
         elif broker.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
@@ -456,7 +460,9 @@ class FillExecutor:
         else:
             return fill_price
 
-    def _get_initial_lwm(self, asset: str, fill_price: float) -> float:
+    def _get_initial_lwm(
+        self, asset: str, fill_price: float, signal_price: float | None = None
+    ) -> float:
         """Get initial low water mark based on configuration.
 
         For VBT Pro compatibility with OHLC data, LWM should be initialized
@@ -471,6 +477,8 @@ class FillExecutor:
             Initial LWM value based on configuration
         """
         broker = self.broker
+        if broker.initial_hwm_source == InitialHwmSource.SIGNAL_PRICE:
+            return signal_price if signal_price is not None else fill_price
         # When using BAR_HIGH for HWM, use BAR_LOW for LWM
         if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
             return self.market.lows.get(asset, fill_price)
@@ -513,8 +521,9 @@ class FillExecutor:
         broker = self.broker
         order = ctx.order
 
-        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
-        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
+        signal_price = getattr(order, "_signal_price", None)
+        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price, signal_price)
+        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price, signal_price)
         context = self._build_position_context(order)
 
         pos = Position(
@@ -658,8 +667,9 @@ class FillExecutor:
         self.record_pnl(order.asset, pnl)
 
         # Create new position in opposite direction
-        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
-        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
+        signal_price = getattr(order, "_signal_price", None)
+        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price, signal_price)
+        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price, signal_price)
         context = self._build_position_context(order)
 
         self.account.positions[order.asset] = Position(

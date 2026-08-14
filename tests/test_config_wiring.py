@@ -25,6 +25,7 @@ from ml4t.backtest.config import (
     EntryOrderPriority,
     ExecutionPrice,
     FillOrdering,
+    LateAssetPolicy,
     MissingPricePolicy,
     ShareType,
     ShortCashPolicy,
@@ -870,6 +871,12 @@ class TestPresetRoundTrip:
         assert config.share_type == ShareType.INTEGER
         assert config.fill_ordering == FillOrdering.FIFO
         assert config.reject_on_insufficient_cash is True
+        assert config.allow_leverage is False
+        assert config.commission_type == CommissionType.NONE
+        assert config.slippage_type == SlippageType.NONE
+        assert config.missing_price_policy == MissingPricePolicy.USE_LAST
+        assert config.late_asset_policy == LateAssetPolicy.ALLOW
+        assert config.late_asset_min_bars == 1
 
     def test_vectorbt_preset_values(self):
         config = BacktestConfig.from_preset("vectorbt")

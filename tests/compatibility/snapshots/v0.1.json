@@ -755,6 +755,10 @@
         "value": "fill_price"
       },
       {
+        "name": "SIGNAL_PRICE",
+        "value": "signal_price"
+      },
+      {
         "name": "BAR_CLOSE",
         "value": "bar_close"
       },
@@ -1200,20 +1204,17 @@
     "canonical": {
       "backtrader": {
         "account": {
-          "allow_leverage": true,
+          "allow_leverage": false,
           "allow_short_selling": true,
-          "initial_margin": 0.5,
-          "long_maintenance_margin": 0.25,
-          "short_cash_policy": "credit",
-          "short_maintenance_margin": 0.3
+          "short_cash_policy": "credit"
         },
         "cash": {
           "buffer_pct": 0.0,
           "initial": 100000.0
         },
         "commission": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "execution": {
           "execution_mode": "next_bar",
@@ -1222,11 +1223,11 @@
         "orders": {
           "entry_order_priority": "submission",
           "fill_ordering": "fifo",
-          "late_asset_min_bars": 2,
-          "late_asset_policy": "require_history",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "partial_fills_allowed": false,
-          "rebalance_headroom_pct": 0.998,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
@@ -1234,10 +1235,11 @@
           "share_type": "integer"
         },
         "slippage": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
+          "initial_hwm_source": "signal_price",
           "stop_fill_mode": "stop_price",
           "stop_level_basis": "signal_price",
           "trail_hwm_source": "close",
@@ -1246,20 +1248,17 @@
       },
       "backtrader_strict": {
         "account": {
-          "allow_leverage": true,
+          "allow_leverage": false,
           "allow_short_selling": true,
-          "initial_margin": 0.5,
-          "long_maintenance_margin": 0.25,
-          "short_cash_policy": "credit",
-          "short_maintenance_margin": 0.3
+          "short_cash_policy": "credit"
         },
         "cash": {
           "buffer_pct": 0.0,
           "initial": 100000.0
         },
         "commission": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "execution": {
           "execution_mode": "next_bar",
@@ -1268,13 +1267,13 @@
         "orders": {
           "entry_order_priority": "submission",
           "fill_ordering": "fifo",
-          "late_asset_min_bars": 2,
-          "late_asset_policy": "require_history",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "next_bar_simple_cash_check": true,
           "next_bar_submission_precheck": true,
           "partial_fills_allowed": false,
-          "rebalance_headroom_pct": 0.998,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
@@ -1282,10 +1281,11 @@
           "share_type": "integer"
         },
         "slippage": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
+          "initial_hwm_source": "signal_price",
           "stop_fill_mode": "stop_price",
           "stop_level_basis": "signal_price",
           "trail_hwm_source": "close",

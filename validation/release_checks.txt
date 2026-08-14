@@ -17,4 +17,5 @@ validation/common/ml4t_runner.py
 validation/common/provenance.py
 validation/common/types.py
 validation/native/vectorbt_behavior.py
+validation/native/backtrader_behavior.py
 validation/scenarios/definitions.py
