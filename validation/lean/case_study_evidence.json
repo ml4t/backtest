@@ -55,8 +55,8 @@
         "validation/lean/workspace/chapter16_etfs/ml4t_daily_equity.csv": "20bc4a28ad04fdc458bd8f5031fbf976623caddd819da70f2e51ddb45dea6609",
         "validation/lean/workspace/chapter16_etfs/ml4t_order_events.csv.xz": "63535bec501d36e4f1eae501917e0000e636c03a19d637b05cdda1428bc80421"
       },
-      "runtime_seconds": 13.234417018014938,
-      "summary_sha256": "cd22ab3fa5622aca202ea043b9093d77de5767b83642a6f5ed7308b22f02f25e"
+      "runtime_seconds": 13.199229444842786,
+      "summary_sha256": "8ffb89c694e19e3663c4630d84085d8e875ec697fff2a029d045d87ff327198f"
     },
     {
       "case": "chapter16_sp500_equity_option_analytics",
@@ -114,8 +114,8 @@
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_daily_equity.csv": "83a98f50053b12dd4baa37484b0b268cb8ec83ebdf633ee2e6ee790db0bb73ad",
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_order_events.csv": "334cd463affb3d23f074882fe1d8131861ec67ca5203fbdfb86cae4d8da64917"
       },
-      "runtime_seconds": 8.005312403896824,
-      "summary_sha256": "1feecc15e43549a949584b266bd55c7413ccea8fc812267c2ab09bf355d98f6f"
+      "runtime_seconds": 8.84644644591026,
+      "summary_sha256": "753913c5d6a45a9d52445b73d8bcaa93ba286220e86b2ae7149161ffd507cc84"
     },
     {
       "case": "chapter16_us_equities_panel",
@@ -203,8 +203,8 @@
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part01.xz": "9aea6ff30791dc06cd9b917e6f0c639d1b6f17883012b9c5190d7be6a899d980",
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part02.xz": "915bef2036b7d49535eb81a458a1af891f8f15c249bb413831771ea52e982a26"
       },
-      "runtime_seconds": 22.688339818036184,
-      "summary_sha256": "1ed0ef6c680a8069789ccbf9e7862c8dee8baffe860512989dca5a7f63e98575"
+      "runtime_seconds": 26.489432996837422,
+      "summary_sha256": "f5ad97c7128057b6180979c87bc1fd9e783cd6068fa7588aedad14fe2907aa2e"
     }
   ],
   "cli_observed": "lean 1.0.228",
@@ -234,7 +234,7 @@
   "producer_files": {
     "src/ml4t/backtest/_validation/case_study_lean.py": "62247f66db5ae118e7089ab4dfeca5a7251b1f3f4238b9aceeb55384df447cfd",
     "src/ml4t/backtest/_validation/lean_runner.py": "30efdb8018cc949c991dee856a7007d0dfdc635397a208f98a6dd094af20fce1",
-    "src/ml4t/backtest/profiles.py": "5a8cd8b2568e7e9f524e96fef6bb00ade3310a6f4a71c0c4f7de2f95bbfdb505",
+    "src/ml4t/backtest/profiles.py": "f3fa7c9043d476b60659d936062b41e93da0b4d6be4fb79c557f76b7fe5b109d",
     "validation/run_lean_case_studies.py": "5bf91f8d98f8bfd9a88eb72071c392ff23ad4583184b28165e7511d9e0d1901e"
   },
   "promoted": true,
