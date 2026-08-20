@@ -63,7 +63,12 @@
       "version": "3.1.1"
     }
   },
-  "generated_at": "2026-08-14T22:14:45.237244+00:00",
+  "generated_at": "2026-08-20T08:28:16.827366+00:00",
+  "input_policy": {
+    "float_quantum": "0.00000001",
+    "rounding": "ROUND_HALF_EVEN",
+    "timestamps_and_signals": "exact"
+  },
   "records": [
     {
       "comparison": {
@@ -698,7 +703,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 2.780987094156444,
+      "duration_seconds": 2.2609115350060165,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -1366,9 +1371,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -2028,7 +2033,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 2.4269682178273797,
+      "duration_seconds": 2.3084051439072937,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -2696,9 +2701,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -2855,7 +2860,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 2.4813500768505037,
+      "duration_seconds": 2.2221311288885772,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3014,9 +3019,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "c450f8db901151f953d81b05845db8cad686ca7c619cfe7e881485a2228972a7",
+        "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -3173,7 +3178,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 2.4340908580925316,
+      "duration_seconds": 2.289850472006947,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3332,9 +3337,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "d62c3c2d015f1ead6bff9d1d3ed7e92b396ddf9e4f7c808cf3ebe3eb7ae7491b",
+        "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -4004,7 +4009,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 2.453203781042248,
+      "duration_seconds": 2.289624586002901,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -4676,9 +4681,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -5348,7 +5353,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 2.503732097800821,
+      "duration_seconds": 2.471149366116151,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -6020,9 +6025,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -6682,7 +6687,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 2.753742444096133,
+      "duration_seconds": 2.4684892029035836,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -7350,9 +7355,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -8012,7 +8017,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 3.007966407109052,
+      "duration_seconds": 2.493387326132506,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -8680,9 +8685,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -8886,7 +8891,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 2.866076186997816,
+      "duration_seconds": 2.3803974490147084,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9098,9 +9103,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "0ab00a6cfc6f76a1d74f0617186a4d5c95d27cb4fd62bd5c535b3b191965369d",
+        "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -9361,7 +9366,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 2.9044520049355924,
+      "duration_seconds": 2.6301764079835266,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9630,9 +9635,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "c46f13757f77a357bcf860856d78551fd3d0b5a707fc379bb9be724a04e1d219",
+        "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -10292,7 +10297,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 2.4784763490315527,
+      "duration_seconds": 2.5081594979856163,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -10960,9 +10965,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "e0efe74473f286a7ddeb3a4e39d9eb7a2443b69474480e9e4fcf97459672b93b",
+        "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -11166,7 +11171,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 2.452456576982513,
+      "duration_seconds": 2.6897673229686916,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11378,9 +11383,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "3057fb1181d8b6bde3b0f0c71860dca5701293bcd956920c618e911bce7d0c67",
+        "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -11527,7 +11532,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 2.4465995070058852,
+      "duration_seconds": 2.294918213970959,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11682,9 +11687,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "6868775136fad190c5e2fffe0cb05f259b244161572731b86777972b78ea5fb5",
+        "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -11831,7 +11836,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 2.528575350996107,
+      "duration_seconds": 2.2934350131545216,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11986,9 +11991,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "515cb2ead81157a5d033173889d2a47af873b49bb750c0fedf91036506520aa2",
+        "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -12135,7 +12140,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 2.4606666348408908,
+      "duration_seconds": 2.2474994282238185,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -12290,9 +12295,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "0e9ac5d663e87ef8d9d42db148ea6b689902b2533884263ccde90d5ba20fc135",
+        "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -12895,7 +12900,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 2.4688280809205025,
+      "duration_seconds": 2.3491565990261734,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -13506,9 +13511,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "8b4829a04d740fe6087782188f15eb27044961db12acbcb5f5fdd227e83fde41",
+        "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -47798,7 +47803,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 2.9090713979676366,
+      "duration_seconds": 2.385895021026954,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -82096,9 +82101,9 @@
           "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
           "version": "2026.6.27"
         },
-        "input_digest": "dd491bc06ca31652f04962d8927c33330abf1b3bedaf108f9d9b222834fb9c4b",
+        "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -82758,7 +82763,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 5.115794679848477,
+      "duration_seconds": 3.1953585089650005,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -83426,9 +83431,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -84088,7 +84093,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 4.130886801052839,
+      "duration_seconds": 3.3676697849296033,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -84756,9 +84761,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -84915,7 +84920,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 4.224293657112867,
+      "duration_seconds": 3.2612994329538196,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85074,9 +85079,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "c450f8db901151f953d81b05845db8cad686ca7c619cfe7e881485a2228972a7",
+        "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -85233,7 +85238,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 4.419076754013076,
+      "duration_seconds": 3.2345631481148303,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85392,9 +85397,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "d62c3c2d015f1ead6bff9d1d3ed7e92b396ddf9e4f7c808cf3ebe3eb7ae7491b",
+        "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -86064,7 +86069,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 4.138405908131972,
+      "duration_seconds": 3.2016946440562606,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -86736,9 +86741,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -86768,7 +86773,7 @@
     {
       "comparison": null,
       "detail": "Scenario explicitly excludes this framework",
-      "duration_seconds": 1.6238074749708176e-05,
+      "duration_seconds": 3.427034243941307e-06,
       "framework": "vectorbt_oss",
       "framework_result": null,
       "ml4t_result": null,
@@ -87412,7 +87417,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 3.560044137062505,
+      "duration_seconds": 3.239916965132579,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -88080,9 +88085,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -88742,7 +88747,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 3.701031951000914,
+      "duration_seconds": 3.1671281300950795,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89410,9 +89415,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -89616,7 +89621,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 3.6116885289084166,
+      "duration_seconds": 3.1773546680342406,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89828,9 +89833,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "0ab00a6cfc6f76a1d74f0617186a4d5c95d27cb4fd62bd5c535b3b191965369d",
+        "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -90091,7 +90096,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 4.574919304810464,
+      "duration_seconds": 3.182403523940593,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -90360,9 +90365,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "c46f13757f77a357bcf860856d78551fd3d0b5a707fc379bb9be724a04e1d219",
+        "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -91022,7 +91027,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 3.5603172508999705,
+      "duration_seconds": 3.209523695986718,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -91690,9 +91695,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "e0efe74473f286a7ddeb3a4e39d9eb7a2443b69474480e9e4fcf97459672b93b",
+        "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -91896,7 +91901,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 3.6809339760802686,
+      "duration_seconds": 3.2139244319405407,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92108,9 +92113,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "3057fb1181d8b6bde3b0f0c71860dca5701293bcd956920c618e911bce7d0c67",
+        "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -92257,7 +92262,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 3.535580121912062,
+      "duration_seconds": 3.1693996109534055,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92412,9 +92417,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "6868775136fad190c5e2fffe0cb05f259b244161572731b86777972b78ea5fb5",
+        "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -92561,7 +92566,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 3.7868297048844397,
+      "duration_seconds": 3.1842959399800748,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92716,9 +92721,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "515cb2ead81157a5d033173889d2a47af873b49bb750c0fedf91036506520aa2",
+        "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -92865,7 +92870,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 4.294476073933765,
+      "duration_seconds": 3.184310143114999,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -93020,9 +93025,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "0e9ac5d663e87ef8d9d42db148ea6b689902b2533884263ccde90d5ba20fc135",
+        "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -93625,7 +93630,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 4.076314310077578,
+      "duration_seconds": 3.247879622038454,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -94236,9 +94241,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "8b4829a04d740fe6087782188f15eb27044961db12acbcb5f5fdd227e83fde41",
+        "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -128528,7 +128533,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 3.75737686897628,
+      "duration_seconds": 3.331884342012927,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -162826,9 +162831,9 @@
           "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
           "version": "1.1.0"
         },
-        "input_digest": "dd491bc06ca31652f04962d8927c33330abf1b3bedaf108f9d9b222834fb9c4b",
+        "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -163508,7 +163513,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 0.27268632990308106,
+      "duration_seconds": 0.18923035683110356,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -164198,9 +164203,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -164880,7 +164885,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 0.20307674608193338,
+      "duration_seconds": 0.18972584302537143,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165570,9 +165575,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -165730,7 +165735,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 0.19511235388927162,
+      "duration_seconds": 0.17678311211057007,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165890,9 +165895,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "c450f8db901151f953d81b05845db8cad686ca7c619cfe7e881485a2228972a7",
+        "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -166050,7 +166055,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 0.1910882059019059,
+      "duration_seconds": 0.18670942191965878,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -166210,9 +166215,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "d62c3c2d015f1ead6bff9d1d3ed7e92b396ddf9e4f7c808cf3ebe3eb7ae7491b",
+        "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -166902,7 +166907,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 0.24964794190600514,
+      "duration_seconds": 0.19355252292007208,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -167594,9 +167599,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -168286,7 +168291,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 0.39627812895923853,
+      "duration_seconds": 0.19510291516780853,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -168978,9 +168983,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -169660,7 +169665,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 0.19646230293437839,
+      "duration_seconds": 0.18725082906894386,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -170350,9 +170355,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -171032,7 +171037,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 0.19661713507957757,
+      "duration_seconds": 0.19565513683483005,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -171722,9 +171727,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "fa1946cbf9ef0bb21ff45ffeb8a251d50b24f15e8240155e87d22ad9a84cccbd",
+        "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -171930,7 +171935,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 0.1918033028487116,
+      "duration_seconds": 0.18807467096485198,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172144,9 +172149,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "0ab00a6cfc6f76a1d74f0617186a4d5c95d27cb4fd62bd5c535b3b191965369d",
+        "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -172410,7 +172415,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 0.19199497299268842,
+      "duration_seconds": 0.19294833997264504,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172682,9 +172687,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "c46f13757f77a357bcf860856d78551fd3d0b5a707fc379bb9be724a04e1d219",
+        "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -173354,7 +173359,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 0.19771738187409937,
+      "duration_seconds": 0.19549206015653908,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174032,9 +174037,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "e0efe74473f286a7ddeb3a4e39d9eb7a2443b69474480e9e4fcf97459672b93b",
+        "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -174240,7 +174245,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 0.19324366096407175,
+      "duration_seconds": 0.1989078859332949,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174454,9 +174459,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "3057fb1181d8b6bde3b0f0c71860dca5701293bcd956920c618e911bce7d0c67",
+        "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -174604,7 +174609,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 0.18433876801282167,
+      "duration_seconds": 0.18897407385520637,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174760,9 +174765,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "6868775136fad190c5e2fffe0cb05f259b244161572731b86777972b78ea5fb5",
+        "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -174910,7 +174915,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 0.184526348952204,
+      "duration_seconds": 0.1978520608972758,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175066,9 +175071,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "515cb2ead81157a5d033173889d2a47af873b49bb750c0fedf91036506520aa2",
+        "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -175216,7 +175221,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 0.19198577594943345,
+      "duration_seconds": 0.19443690194748342,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175372,9 +175377,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "0e9ac5d663e87ef8d9d42db148ea6b689902b2533884263ccde90d5ba20fc135",
+        "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -175986,7 +175991,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 0.3063395058270544,
+      "duration_seconds": 0.3146963310427964,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -176606,9 +176611,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "8b4829a04d740fe6087782188f15eb27044961db12acbcb5f5fdd227e83fde41",
+        "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -212098,7 +212103,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 0.5229020819533616,
+      "duration_seconds": 0.5276404700707644,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -247598,9 +247603,9 @@
           "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
           "version": "1.9.78.123"
         },
-        "input_digest": "dd491bc06ca31652f04962d8927c33330abf1b3bedaf108f9d9b222834fb9c4b",
+        "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -247975,7 +247980,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 2.2895453269593418,
+      "duration_seconds": 2.0911655789241195,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -248362,9 +248367,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
+        "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -248739,7 +248744,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 2.0686412670183927,
+      "duration_seconds": 2.155714539112523,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249126,9 +249131,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
+        "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -249285,7 +249290,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 2.06911085289903,
+      "duration_seconds": 2.463374220067635,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249448,9 +249453,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "c35f1e258ae4d0cd8eed9125a530bea473632a5bb3f4558583c0818700906e96",
+        "input_digest": "2ade3aa0a65bc5315f2297bc8bbc19b45dfdb8db50e52d56fc85ecb4a82facdd",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -249607,7 +249612,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 2.0326267280615866,
+      "duration_seconds": 2.105593838961795,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249770,9 +249775,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "9f43427f7ad70fc963aeec58cf8867b5646e88bd608ec489964f802a2c98a57d",
+        "input_digest": "f576ca0b7380cdcf6eb6c99d5b8467e796d9811d6fb1cd66191df1688a948b62",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -250157,7 +250162,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 2.095579191111028,
+      "duration_seconds": 2.2770463419146836,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -250548,9 +250553,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
+        "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -250935,7 +250940,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 2.148374092997983,
+      "duration_seconds": 2.119064085185528,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -251326,9 +251331,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
+        "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -251703,7 +251708,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 2.422204480972141,
+      "duration_seconds": 2.8392768420744687,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252090,9 +252095,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
+        "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -252467,7 +252472,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 2.094875831855461,
+      "duration_seconds": 2.119841074803844,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252854,9 +252859,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d4db92ee3483537d94893b614a21dcffdd4896daceb1d31cddd8e6343384e690",
+        "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -253060,7 +253065,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 2.0644762062001973,
+      "duration_seconds": 2.1438771788962185,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -253276,9 +253281,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "de6e2060eccdf8f068669911169eb7a3d28af0622a7a840f637acb82db930a7e",
+        "input_digest": "52803556b6f294e3ad1223585e297f6dab81add8ca8cf22db7ed227dc14fe627",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -253308,7 +253313,7 @@
     {
       "comparison": null,
       "detail": "Scenario explicitly excludes this framework",
-      "duration_seconds": 4.184897989034653e-06,
+      "duration_seconds": 3.144843503832817e-06,
       "framework": "zipline",
       "framework_result": null,
       "ml4t_result": null,
@@ -253667,7 +253672,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 2.4206941640004516,
+      "duration_seconds": 2.1213912351522595,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254054,9 +254059,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "517a65764277b104abf7848a9875d5f09febfddffb82d8fd9318f724ff1aaa86",
+        "input_digest": "8a8791a9d96df21d21b4fa14ebf111ea1417ec8424fd87ac9b4b79515ca6c952",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -254260,7 +254265,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 2.2559492678847164,
+      "duration_seconds": 2.10170311992988,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254476,9 +254481,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "b211286d7dde78c905f246c3d56fb3c84b7f7de3c5f4a124c6b33680c37aa37d",
+        "input_digest": "ad5a0b9abf3e7e3ae35e06811443d816a29ac95b66e0bc7ce6b49a175f1e5fce",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -254625,7 +254630,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 2.157377724070102,
+      "duration_seconds": 2.0778956077992916,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254784,9 +254789,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "79590cf03ef0f3e90985c032e8f555ecdf9add3fc21908924a49e7d706b5f041",
+        "input_digest": "bc94952cbe0b0c493e4a5599ddcd00a92412a9c8c838ea8e5c02d84d217baf0c",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -254933,7 +254938,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 2.033552559092641,
+      "duration_seconds": 2.0833060580771416,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255092,9 +255097,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "939287c002cf7b640b21c5859335249e1db1400c7d94dd37f62a7f078ba31fad",
+        "input_digest": "a0bd681ff924f45192415219403b02e639df271a2aa5987bb9b1e263b2d8c88a",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -255241,7 +255246,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 2.0341736001428217,
+      "duration_seconds": 2.148981502978131,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255400,9 +255405,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "935e7e58b70b2ff5c2181016ceae955c9aa4986a9e1d7653b63043d3be82a524",
+        "input_digest": "ce9cac417809758597595322703b30800145707fa0db44bd7f2cd0775790c114",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -255777,7 +255782,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 2.498406280996278,
+      "duration_seconds": 2.546204162063077,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -256164,9 +256169,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "fc4132bd3907c4367265ff478960830680f88ab7df440ad0ec317ff5136c039c",
+        "input_digest": "88cfc732983d3fa783e181fd4c97f8d95f7833e20dd03de0c201aaa85e83ca8b",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -275465,7 +275470,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 2.887692387914285,
+      "duration_seconds": 2.863688207929954,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -294776,9 +294781,9 @@
           "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
           "version": "3.1.1"
         },
-        "input_digest": "d8119bff0157cd31258a444fec247040af62a78f46aff8b484ad1b9ef8915516",
+        "input_digest": "6fdd33a401576a2adde590f2f8d5986f5893e4663336033ba6c0f8f221d5d526",
         "ml4t": {
-          "commit": "f903c479f803aac072dbb4539252c862ff3fbcdf",
+          "commit": "f65757ff2c0cbff950232b8cf12da92c6821e63f",
           "dirty": false
         },
         "python": {
@@ -294807,7 +294812,7 @@
     }
   ],
   "release_gate_passed": true,
-  "schema_version": 3,
+  "schema_version": 4,
   "summary": {
     "adapter_failure": 0,
     "adapter_import_failure": 0,
