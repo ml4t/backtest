@@ -164,6 +164,21 @@ def test_input_digest_uses_values_not_pandas_index_metadata() -> None:
     assert input_digest(changed_values, entries, exits) != expected
 
 
+def test_input_digest_uses_the_parity_quantum_for_floating_values() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    prices.iloc[0, 0] = 100.0
+    expected = input_digest(prices, entries, exits)
+
+    platform_noise = prices.copy()
+    platform_noise.iloc[0, 0] += 0.0000000001
+    assert input_digest(platform_noise, entries, exits) == expected
+
+    material_change = prices.copy()
+    material_change.iloc[0, 0] += 0.00000001
+    assert input_digest(material_change, entries, exits) != expected
+
+
 def test_complete_current_matrix_is_acceptable() -> None:
     assert correctness_report_failures(_full_report()) == []
 

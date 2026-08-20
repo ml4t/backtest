@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,7 @@ def test_bootstrap_interval_is_reproducible_and_requires_ten_samples() -> None:
         performance.bootstrap_median_interval(values[:9], seed=7)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="publication RSS calibration uses resource")
 def test_instrumentation_calibration_measures_child_wall_time_and_rss() -> None:
     result = performance.run_calibration_process()
 

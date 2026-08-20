@@ -18,7 +18,12 @@ from common.framework_registry import FrameworkManifest, load_framework_manifest
 from common.provenance import generate_inputs, input_digest, static_digests
 from common.types import ValidationRecord, ValidationStatus
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+INPUT_POLICY = {
+    "float_quantum": CANONICAL_QUANTUM_TEXT,
+    "rounding": "ROUND_HALF_EVEN",
+    "timestamps_and_signals": "exact",
+}
 
 
 def _framework_metadata(manifest: FrameworkManifest) -> dict[str, dict[str, object]]:
@@ -49,6 +54,7 @@ def build_report(
             "timestamp_domain": "daily session date",
             "surfaces": ["terminal", "closed_trades", "fills"],
         },
+        "input_policy": INPUT_POLICY,
         "frameworks": _framework_metadata(target_manifest),
         "release_gate_passed": release_passed,
         "summary": {status.value: counts[status.value] for status in ValidationStatus},
@@ -207,6 +213,8 @@ def correctness_report_failures(
     }
     if report.get("comparison_policy") != expected_policy:
         failures.append("Correctness comparison policy differs")
+    if report.get("input_policy") != INPUT_POLICY:
+        failures.append("Correctness input policy differs")
     if report.get("frameworks") != _framework_metadata(target_manifest):
         failures.append("Correctness framework targets differ from the frozen manifest")
     if report.get("release_gate_passed") is not True:

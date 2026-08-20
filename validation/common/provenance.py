@@ -8,6 +8,7 @@ import json
 import subprocess
 import sys
 from dataclasses import asdict
+from decimal import ROUND_HALF_EVEN, Decimal
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from common import data_generators
+from common.comparator import CANONICAL_QUANTUM
 from common.framework_registry import DEFAULT_MANIFEST_PATH, FrameworkTarget
 from common.types import FrameworkResult, ScenarioConfig
 
@@ -109,7 +111,7 @@ def input_digest(
     entries: np.ndarray,
     exits: np.ndarray | None,
 ) -> str:
-    """Hash generated prices and signals independently of pandas hashing internals."""
+    """Hash generated inputs in the same fixed-point domain used for parity claims."""
     if not isinstance(prices.index, pd.DatetimeIndex):
         raise TypeError("validation prices must use a DatetimeIndex")
 
@@ -139,7 +141,20 @@ def input_digest(
         digest.update(str(column).encode("utf-8"))
         digest.update(values.dtype.str.encode("utf-8"))
         digest.update(str(values.shape).encode("utf-8"))
-        digest.update(values.tobytes())
+        if np.issubdtype(values.dtype, np.floating):
+            if not np.isfinite(values).all():
+                raise ValueError(f"validation price column {column!r} must contain finite values")
+            for value in values.flat:
+                canonical = Decimal(str(value)).quantize(
+                    CANONICAL_QUANTUM,
+                    rounding=ROUND_HALF_EVEN,
+                )
+                if canonical == 0:
+                    canonical = abs(canonical)
+                digest.update(format(canonical, "f").encode("ascii"))
+                digest.update(b"\0")
+        else:
+            digest.update(values.tobytes())
     for name, values in (("entries", entries), ("exits", exits)):
         digest.update(name.encode("utf-8"))
         if values is None:
