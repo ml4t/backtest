@@ -46,13 +46,9 @@ CASE_STUDIES = (
 )
 PROJECT_INPUTS = {
     "asset_symbols.csv",
-    "config.json",
     "main.py",
     "ml4t_symbol_map.json",
     "rebalance_dates.csv",
-    "weights.csv",
-    "weights.csv.xz",
-    "weights.csv.gz",
 }
 
 
@@ -79,12 +75,27 @@ def _atomic_write(path: Path, payload: bytes) -> None:
         raise
 
 
+def _source_project_inputs(project: Path) -> list[Path]:
+    inputs = [project / name for name in sorted(PROJECT_INPUTS)]
+    missing = [path for path in inputs if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(missing[0])
+
+    compressed_weights = project / "weights.csv.xz"
+    weights = compressed_weights if compressed_weights.is_file() else project / "weights.csv"
+    if not weights.is_file():
+        raise FileNotFoundError(weights)
+    return [*inputs, weights]
+
+
 def _copy_project(source: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    for name in sorted(PROJECT_INPUTS):
-        path = source / name
-        if path.is_file():
-            shutil.copy2(path, destination / name)
+    for path in _source_project_inputs(source):
+        if path.name == "weights.csv.xz":
+            _atomic_write(destination / "weights.csv", lzma.decompress(path.read_bytes()))
+        else:
+            shutil.copy2(path, destination / path.name)
+    shutil.copy2(SUPPORT / "project-config.json", destination / "config.json")
 
 
 def _prepare_lean_root(root: Path, project: Path) -> Path:
@@ -125,11 +136,7 @@ def _surface_checksum(surface: Any) -> str:
 
 
 def _input_manifest(project: Path) -> dict[str, str]:
-    inputs = {
-        path.name: _digest(path)
-        for path in sorted(project.iterdir())
-        if path.is_file() and path.name in PROJECT_INPUTS
-    }
+    inputs = {path.name: _digest(path) for path in _source_project_inputs(project)}
     symbol_map = json.loads((project / "ml4t_symbol_map.json").read_text(encoding="utf-8"))
     for ticker in sorted(symbol_map):
         data_path = DATA_DAILY / f"{ticker.lower()}.zip"

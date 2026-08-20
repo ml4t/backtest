@@ -18,7 +18,6 @@
       },
       "inputs": {
         "asset_symbols.csv": "68abb75433e647269313fa6d33e55a3a74abac11c70494f00c2910d3c8958ee4",
-        "config.json": "b382e874bcd5525f9344894b27ecb7c1c8db958692f4e195dab0f05a3ecabb6b",
         "data/ceortq.zip": "28a81c7020b95b04c8f84a4802be5641c03d78d490d196bd86aa8851cf09fccc",
         "data/ckrwrx.zip": "a51b845f86b5cab73db807d2123f2507c46b4ac98e41b6f0b810c8375d924e6c",
         "data/cppque.zip": "8c26c54869b7fd0e5ffe963cc740b7949cbd909f6940d7d9552cd09b2f2fa1d3",
@@ -55,8 +54,8 @@
         "validation/lean/workspace/chapter16_etfs/ml4t_daily_equity.csv": "20bc4a28ad04fdc458bd8f5031fbf976623caddd819da70f2e51ddb45dea6609",
         "validation/lean/workspace/chapter16_etfs/ml4t_order_events.csv.xz": "63535bec501d36e4f1eae501917e0000e636c03a19d637b05cdda1428bc80421"
       },
-      "runtime_seconds": 13.199229444842786,
-      "summary_sha256": "8ffb89c694e19e3663c4630d84085d8e875ec697fff2a029d045d87ff327198f"
+      "runtime_seconds": 12.116000979207456,
+      "summary_sha256": "72b130a8db563a993fc47a8f72a4579f55a76b72996e9d54380ee68bb200ac1c"
     },
     {
       "case": "chapter16_sp500_equity_option_analytics",
@@ -76,7 +75,6 @@
       },
       "inputs": {
         "asset_symbols.csv": "0b20eef4524f62569d2453d4769fa3ce475814e3616363e8d8b17e2a70ff9776",
-        "config.json": "5c63ae1d9a84d532c989611cdf062c54cb4e2c75ed83c8d84a8b17f3ba384672",
         "data/baqkfr.zip": "d1c19ce72744fb14e8aa38ec01952467a714d82ca33130190de2c4f0d92d2af7",
         "data/bgdrai.zip": "349b87e67ceafa0fe450101504a156afe5485de057aea7c594aae4069f5951e1",
         "data/bpfuqm.zip": "959a863ece15e6bfc4725daca1a0940959af415c2e64106ff2e672b7be5383fd",
@@ -114,8 +112,8 @@
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_daily_equity.csv": "83a98f50053b12dd4baa37484b0b268cb8ec83ebdf633ee2e6ee790db0bb73ad",
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_order_events.csv": "334cd463affb3d23f074882fe1d8131861ec67ca5203fbdfb86cae4d8da64917"
       },
-      "runtime_seconds": 8.84644644591026,
-      "summary_sha256": "753913c5d6a45a9d52445b73d8bcaa93ba286220e86b2ae7149161ffd507cc84"
+      "runtime_seconds": 8.11047725006938,
+      "summary_sha256": "7f1a95bf4004209875bbba95d017643f6f20b467c1fbbbc7b33c879811982c97"
     },
     {
       "case": "chapter16_us_equities_panel",
@@ -135,7 +133,6 @@
       },
       "inputs": {
         "asset_symbols.csv": "c5051af42cea5c1172862df293024dfda0da65d01de079e840cef0ad9c4f06b4",
-        "config.json": "79a5de1c10975416e133ddf3ebc2cc5c2f762aa145e22b2271afd05df7e18720",
         "data/ajwqri.zip": "a287bb14bf6ca783e0fbe092eb2360ea112b11ef18f6f581ffeb35f2a06e1f08",
         "data/avyokw.zip": "1c9c0e922d538e59e4acebd81b5ac0c8c52590af06f0184922d8f6b19b288b9c",
         "data/bvzyrj.zip": "847ee9566458164638c25c8eaf5c16379746f6f9420127668c27a6c19595d0d9",
@@ -189,8 +186,6 @@
         "main.py": "7575b8022386e9e8afba003dc904e930cd15073f4afaa8182398289f01e9f606",
         "ml4t_symbol_map.json": "a3978887ed599be48a338c1a10abfad1963e9a81d83d6df8ca8a09e5264accd5",
         "rebalance_dates.csv": "78703d3259509b48f14963347c89d5d60f188541fbe65484239abaac684145e1",
-        "weights.csv": "ce371041742da6bbaf9ec3f8eb25e7e701b84b0ef78752d051a7da797453b561",
-        "weights.csv.gz": "9d227ef2f19f43a3548eebb3ec72abf47d6ce434b28b1aba9fe5a332195b25d1",
         "weights.csv.xz": "9f0f81378af72d4c00b4eac63bdc9a6a7b35ec1ebc8f60190355ce5d1177428c"
       },
       "lean_fill_surface_sha256": "8b0f47c093382c1f45fb49c11234cbf972b2ee680aa9ebca70e5c73bad67ad73",
@@ -203,8 +198,8 @@
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part01.xz": "9aea6ff30791dc06cd9b917e6f0c639d1b6f17883012b9c5190d7be6a899d980",
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part02.xz": "915bef2036b7d49535eb81a458a1af891f8f15c249bb413831771ea52e982a26"
       },
-      "runtime_seconds": 26.489432996837422,
-      "summary_sha256": "f5ad97c7128057b6180979c87bc1fd9e783cd6068fa7588aedad14fe2907aa2e"
+      "runtime_seconds": 19.66033091209829,
+      "summary_sha256": "8842a8679525683047aae4752c33d3076a74365e21d3c3f2ae349c3c9d9bbed6"
     }
   ],
   "cli_observed": "lean 1.0.228",
@@ -235,13 +230,14 @@
     "src/ml4t/backtest/_validation/case_study_lean.py": "62247f66db5ae118e7089ab4dfeca5a7251b1f3f4238b9aceeb55384df447cfd",
     "src/ml4t/backtest/_validation/lean_runner.py": "30efdb8018cc949c991dee856a7007d0dfdc635397a208f98a6dd094af20fce1",
     "src/ml4t/backtest/profiles.py": "f3fa7c9043d476b60659d936062b41e93da0b4d6be4fb79c557f76b7fe5b109d",
-    "validation/run_lean_case_studies.py": "5bf91f8d98f8bfd9a88eb72071c392ff23ad4583184b28165e7511d9e0d1901e"
+    "validation/run_lean_case_studies.py": "d8fe9a8519f32b5e3c29512d6eecc2bc0d7cfc87761f77962d659d84e88a681f"
   },
   "promoted": true,
   "schema_version": 1,
   "support_files": {
     "data/market-hours/market-hours-database.json": "935079bc33409373f37163eddb539f09e81a1efbd0e617cbc8fdb487c76dab2b",
     "data/symbol-properties/symbol-properties-database.csv": "56b6dc80202bca88f212c78c4d4670c2e070e6f1e7386f7436232aafe5000e93",
-    "lean.json": "fa15d6d81f560fd1665b004c338b026458fa834a7645e015d16d861dd73540f4"
+    "lean.json": "fa15d6d81f560fd1665b004c338b026458fa834a7645e015d16d861dd73540f4",
+    "project-config.json": "6f53654afabb96e23944db61235b83848ab24fcac2ecaf9597382e0671fef01f"
   }
 }

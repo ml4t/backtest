@@ -66,6 +66,9 @@ def test_retained_lean_case_study_evidence_is_fresh_and_complete() -> None:
         assert case["comparison"]["canonical_final_value_match"] is True
         assert case["comparison"]["canonical_final_value_gap_usd"] == 0.0
         assert case["lean_fill_surface_sha256"] == case["ml4t_fill_surface_sha256"]
+        assert "config.json" not in case["inputs"]
+        assert "weights.csv.gz" not in case["inputs"]
+        assert len({"weights.csv", "weights.csv.xz"} & case["inputs"].keys()) == 1
 
         project = _WORKSPACE / case["case"]
         for relative, digest in case["inputs"].items():

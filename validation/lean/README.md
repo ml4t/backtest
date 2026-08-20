@@ -82,12 +82,14 @@ It supports daily scenarios only.
 The native and Chapter 16 runners construct temporary LEAN roots from tracked inputs:
 
 - `validation/lean/support/lean.json`
+- `validation/lean/support/project-config.json`
 - `validation/lean/support/data/market-hours/market-hours-database.json`
 - `validation/lean/support/data/symbol-properties/symbol-properties-database.csv`
 - the tracked project files and daily equity archives under `validation/lean/workspace/`
 
-Map and factor files are generated from the first date in each tracked daily archive. No ignored
-machine-local `lean.json`, map file, factor file, or data directory is required.
+The runner materializes a plain `weights.csv` from the tracked `weights.csv.xz` where needed. Map
+and factor files are generated from the first date in each tracked daily archive. No ignored
+machine-local project config, `lean.json`, map file, factor file, or data directory is required.
 
 The old `scenario_01_long_only/` project and `validation/run_all_correctness.py` LEAN path are
 legacy scaffolding. They are not evidence for the current claim.
