@@ -18,11 +18,10 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = PROJECT_ROOT / "validation"
-BUNDLES = {
-    "etfs": "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db",
-    "cme_futures": "c7191027f550ef1be0c9528dac08e7c2bf6a76c86d935f593efeb1ad8b628c39",
-    "crypto_perps_funding": "2acee3c8542043266e6f9c0dfc9434c95b4469ef6fcaf0556efc569fc9721cdd",
-}
+APPLICABILITY = tomllib.loads(
+    (VALIDATION_DIR / "real_strategy_applicability.toml").read_text(encoding="utf-8")
+)
+BUNDLES = APPLICABILITY["bundle"]
 PYTHONS = {
     "ml4t": ".venv/bin/python",
     "vectorbt_pro": ".venv-vectorbt-pro/bin/python",

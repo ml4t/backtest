@@ -22,6 +22,8 @@ import polars as pl
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = PROJECT_ROOT / "validation"
 CANONICAL_QUANTUM = Decimal("0.00000001")
+APPLICABILITY_PATH = VALIDATION_DIR / "real_strategy_applicability.toml"
+FRAMEWORK_TARGETS_PATH = VALIDATION_DIR / "framework_targets.toml"
 PAIR_PROFILES = {
     ("etfs", "vectorbt_pro"): "vectorbt_strict",
     ("etfs", "vectorbt_oss"): "vectorbt_oss_strict",
@@ -31,6 +33,17 @@ PAIR_PROFILES = {
     ("cme_futures", "vectorbt_pro"): "vectorbt_strict",
     ("cme_futures", "backtrader"): "backtrader_strict",
     ("crypto_perps_funding", "lean"): "lean_crypto_future",
+}
+ADAPTER_PATHS = {
+    "vectorbt_pro": VALIDATION_DIR / "real_strategy_vectorbt.py",
+    "vectorbt_oss": VALIDATION_DIR / "real_strategy_vectorbt.py",
+    "backtrader": VALIDATION_DIR / "real_strategy_backtrader.py",
+    "zipline": VALIDATION_DIR / "real_strategy_zipline.py",
+    "lean_equity": VALIDATION_DIR / "real_strategy_lean.py",
+    "lean_crypto": VALIDATION_DIR / "real_strategy_lean_crypto.py",
+    "ml4t": VALIDATION_DIR / "real_strategy_runner.py",
+    "comparison_input": VALIDATION_DIR / "real_strategy_input.py",
+    "evidence_builder": VALIDATION_DIR / "real_strategy_evidence.py",
 }
 
 
@@ -364,19 +377,8 @@ def _comparison_record(
 
 def build_report(evidence_root: Path) -> dict[str, Any]:
     """Build the complete required and unsupported real-strategy matrix."""
-    applicability_path = VALIDATION_DIR / "real_strategy_applicability.toml"
-    applicability = tomllib.loads(applicability_path.read_text(encoding="utf-8"))
-    targets = tomllib.loads((VALIDATION_DIR / "framework_targets.toml").read_text())
-    adapter_paths = {
-        "vectorbt_pro": VALIDATION_DIR / "real_strategy_vectorbt.py",
-        "vectorbt_oss": VALIDATION_DIR / "real_strategy_vectorbt.py",
-        "backtrader": VALIDATION_DIR / "real_strategy_backtrader.py",
-        "zipline": VALIDATION_DIR / "real_strategy_zipline.py",
-        "lean_equity": VALIDATION_DIR / "real_strategy_lean.py",
-        "lean_crypto": VALIDATION_DIR / "real_strategy_lean_crypto.py",
-        "ml4t": VALIDATION_DIR / "real_strategy_runner.py",
-        "comparison_input": VALIDATION_DIR / "real_strategy_input.py",
-    }
+    applicability = tomllib.loads(APPLICABILITY_PATH.read_text(encoding="utf-8"))
+    targets = tomllib.loads(FRAMEWORK_TARGETS_PATH.read_text(encoding="utf-8"))
     records: list[dict[str, object]] = []
     for pair in applicability["pair"]:
         if pair["status"] == "required":
@@ -430,8 +432,8 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
             "platform": platform.platform(),
             "machine": platform.machine(),
             "cpu_count": os.cpu_count(),
-            "applicability_sha256": _sha256(applicability_path),
-            "adapters": {framework: _sha256(path) for framework, path in adapter_paths.items()},
+            "applicability_sha256": _sha256(APPLICABILITY_PATH),
+            "adapters": {framework: _sha256(path) for framework, path in ADAPTER_PATHS.items()},
             "frameworks": {
                 framework: targets["framework"][framework]
                 for framework in applicability["metadata"]["frameworks"]
@@ -439,6 +441,216 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
         },
         "records": records,
     }
+
+
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _is_git_sha(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 40
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def report_failures(report: dict[str, Any]) -> list[str]:
+    """Return every reason retained real-strategy evidence is not publication-safe."""
+    failures: list[str] = []
+    if report.get("schema_version") != 1:
+        return [f"Unsupported real-strategy schema: {report.get('schema_version')!r}"]
+    if not isinstance(report.get("generated_at"), str):
+        failures.append("Real-strategy report lacks a generation timestamp")
+
+    applicability = tomllib.loads(APPLICABILITY_PATH.read_text(encoding="utf-8"))
+    targets = tomllib.loads(FRAMEWORK_TARGETS_PATH.read_text(encoding="utf-8"))
+    metadata = applicability["metadata"]
+    expected_pairs = {
+        (pair["case_study"], pair["framework"]): pair for pair in applicability["pair"]
+    }
+    required_pairs = {
+        identity for identity, pair in expected_pairs.items() if pair["status"] == "required"
+    }
+    unsupported_pairs = set(expected_pairs) - required_pairs
+
+    expected_policy = {
+        "canonical_quantum": format(CANONICAL_QUANTUM, "f"),
+        "rounding": "ROUND_HALF_EVEN",
+        "meaning": "zero numeric gap after canonical quantization, not bit identity",
+        "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
+        "timestamp_domain": {
+            "etfs": "session date",
+            "cme_futures": "session date",
+            "crypto_perps_funding": "exact UTC event timestamp",
+        },
+    }
+    if report.get("comparison_policy") != expected_policy:
+        failures.append("Real-strategy comparison policy differs")
+
+    provenance = report.get("provenance")
+    if not isinstance(provenance, dict):
+        failures.append("Real-strategy provenance must be an object")
+    else:
+        ml4t = provenance.get("ml4t")
+        if not isinstance(ml4t, dict):
+            failures.append("Real-strategy ML4T provenance must be an object")
+        else:
+            if ml4t.get("dirty") is not False:
+                failures.append("Real-strategy evidence was produced from a dirty ML4T tree")
+            if not _is_git_sha(ml4t.get("commit")):
+                failures.append("Real-strategy evidence lacks a full ML4T commit")
+            if ml4t.get("engine_source_sha256") != _tree_digest(PROJECT_ROOT / "src/ml4t/backtest"):
+                failures.append("Real-strategy engine source digest is stale")
+        if provenance.get("applicability_sha256") != _sha256(APPLICABILITY_PATH):
+            failures.append("Real-strategy applicability digest is stale")
+        expected_adapters = {name: _sha256(path) for name, path in ADAPTER_PATHS.items()}
+        if provenance.get("adapters") != expected_adapters:
+            failures.append("Real-strategy adapter or comparator digests are stale")
+        expected_frameworks = {
+            framework: targets["framework"][framework] for framework in metadata["frameworks"]
+        }
+        if provenance.get("frameworks") != expected_frameworks:
+            failures.append("Real-strategy framework targets differ from the frozen manifest")
+        for field in ("python", "platform", "machine"):
+            if not isinstance(provenance.get(field), str):
+                failures.append(f"Real-strategy provenance lacks {field}")
+        cpu_count = provenance.get("cpu_count")
+        if not isinstance(cpu_count, int) or cpu_count < 1:
+            failures.append("Real-strategy provenance lacks a valid CPU count")
+
+    records = report.get("records")
+    if not isinstance(records, list):
+        failures.append("Real-strategy records must be a list")
+        records = []
+    records_by_pair: dict[tuple[str, str], dict[str, Any]] = {}
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            failures.append(f"Real-strategy record {index} must be an object")
+            continue
+        identity = (record.get("case_study"), record.get("framework"))
+        if not all(isinstance(value, str) for value in identity):
+            failures.append(f"Real-strategy record {index} lacks a pair identity")
+            continue
+        pair = (str(identity[0]), str(identity[1]))
+        if pair in records_by_pair:
+            failures.append(f"Real-strategy evidence duplicates {pair[0]}/{pair[1]}")
+        records_by_pair[pair] = record
+
+    actual_pairs = set(records_by_pair)
+    for case_study, framework in sorted(set(expected_pairs) - actual_pairs):
+        failures.append(f"Real-strategy evidence lacks {case_study}/{framework}")
+    for case_study, framework in sorted(actual_pairs - set(expected_pairs)):
+        failures.append(f"Real-strategy evidence has undeclared pair {case_study}/{framework}")
+
+    for pair in sorted(actual_pairs & set(expected_pairs)):
+        case_study, framework = pair
+        record = records_by_pair[pair]
+        contract = expected_pairs[pair]
+        identity = f"{case_study}/{framework}"
+        if pair in unsupported_pairs:
+            if record.get("status") != "unsupported":
+                failures.append(f"{identity} must be retained as unsupported")
+            if record.get("reason") != contract["native_contract"]:
+                failures.append(f"{identity} unsupported reason differs from applicability")
+            if record.get("source") != contract["source"]:
+                failures.append(f"{identity} unsupported source differs from applicability")
+            continue
+
+        if record.get("profile") != PAIR_PROFILES[pair]:
+            failures.append(f"{identity} comparison profile differs")
+        if record.get("input_bundle_sha256") != applicability["bundle"][case_study]:
+            failures.append(f"{identity} frozen input bundle differs")
+        engine_seconds = record.get("engine_seconds")
+        if not isinstance(engine_seconds, dict):
+            failures.append(f"{identity} lacks engine-only runtime diagnostics")
+        else:
+            if engine_seconds.get("single_run_diagnostic_only") is not True:
+                failures.append(f"{identity} runtime is not marked diagnostic-only")
+            for side in ("framework", "ml4t"):
+                value = engine_seconds.get(side)
+                if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+                    failures.append(f"{identity} lacks a valid {side} engine runtime")
+
+        surfaces = record.get("surfaces")
+        if not isinstance(surfaces, dict) or not all(
+            isinstance(surfaces.get(name), dict) for name in ("fills", "equity", "terminal")
+        ):
+            failures.append(f"{identity} lacks required comparison surfaces")
+            continue
+        for surface_name, surface in surfaces.items():
+            if not isinstance(surface, dict):
+                failures.append(f"{identity}/{surface_name} must be an object")
+                continue
+            if not isinstance(surface.get("passed"), bool):
+                failures.append(f"{identity}/{surface_name} lacks a comparison verdict")
+            for count_name in ("framework_records", "ml4t_records"):
+                count = surface.get(count_name)
+                if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                    failures.append(f"{identity}/{surface_name} lacks a valid {count_name}")
+            for digest_name in ("framework_sha256", "ml4t_sha256"):
+                if not _is_sha256(surface.get(digest_name)):
+                    failures.append(f"{identity}/{surface_name} lacks a valid {digest_name}")
+
+        equity = surfaces["equity"]
+        coverage = equity.get("coverage")
+        if not isinstance(coverage, dict):
+            failures.append(f"{identity} lacks valuation timestamp coverage")
+        else:
+            framework_only = coverage.get("framework_only_timestamps")
+            ml4t_only = coverage.get("ml4t_only_timestamps")
+            shared = coverage.get("shared_timestamps")
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in (framework_only, ml4t_only, shared)
+            ):
+                failures.append(f"{identity} has invalid valuation timestamp counts")
+            else:
+                coverage_passed = not (framework_only or ml4t_only)
+                if equity.get("coverage_passed") is not coverage_passed:
+                    failures.append(f"{identity} valuation coverage verdict is inconsistent")
+
+        expected_status = (
+            "pass"
+            if all(surface.get("passed") is True for surface in surfaces.values())
+            else "fail"
+        )
+        if record.get("status") != expected_status:
+            failures.append(f"{identity} verdict is inconsistent with its surfaces")
+        negative_control = record.get("negative_control")
+        if not isinstance(negative_control, dict) or negative_control.get("detected") is not True:
+            failures.append(f"{identity} lacks a passing negative control")
+        evidence = record.get("evidence")
+        if not isinstance(evidence, dict) or not all(
+            _is_sha256(evidence.get(name))
+            for name in ("framework_manifest_sha256", "ml4t_manifest_sha256")
+        ):
+            failures.append(f"{identity} lacks valid retained manifest identities")
+        if not isinstance(record.get("excluded_surfaces"), dict):
+            failures.append(f"{identity} lacks excluded-surface declarations")
+
+    scope = report.get("scope")
+    if not isinstance(scope, dict):
+        failures.append("Real-strategy scope must be an object")
+    else:
+        if scope.get("case_studies") != metadata["case_studies"]:
+            failures.append("Real-strategy case-study scope differs from applicability")
+        if scope.get("frameworks") != metadata["frameworks"]:
+            failures.append("Real-strategy framework scope differs from applicability")
+        if scope.get("required_pairs") != len(required_pairs):
+            failures.append("Real-strategy required-pair count differs from applicability")
+        if scope.get("unsupported_pairs") != len(unsupported_pairs):
+            failures.append("Real-strategy unsupported-pair count differs from applicability")
+        gate_passed = all(
+            records_by_pair.get(pair, {}).get("status") == "pass" for pair in required_pairs
+        )
+        if scope.get("real_strategy_equivalence_gate_passed") is not gate_passed:
+            failures.append("Real-strategy scope verdict is inconsistent with pair results")
+    return failures
 
 
 def write_report(report: dict[str, Any], output: Path) -> None:

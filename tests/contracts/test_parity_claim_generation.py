@@ -44,6 +44,18 @@ def test_claim_generation_rejects_hidden_valuation_dates() -> None:
         generate_parity_claims._validate_evidence(correctness, large_scale, real_strategy)
 
 
+def test_claim_generation_rejects_stale_real_strategy_engine_source() -> None:
+    correctness = generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
+    large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    real_strategy = copy.deepcopy(
+        generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_EVIDENCE)
+    )
+    real_strategy["provenance"]["ml4t"]["engine_source_sha256"] = "0" * 64
+
+    with pytest.raises(ValueError, match="engine source digest is stale"):
+        generate_parity_claims._validate_evidence(correctness, large_scale, real_strategy)
+
+
 def test_every_claim_target_uses_the_same_generated_block() -> None:
     blocks = []
     for path in generate_parity_claims.TARGETS:

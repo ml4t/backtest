@@ -3,6 +3,11 @@ schema_version = 1
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 case_studies = ["etfs", "cme_futures", "crypto_perps_funding"]
 
+[bundle]
+etfs = "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db"
+cme_futures = "c7191027f550ef1be0c9528dac08e7c2bf6a76c86d935f593efeb1ad8b628c39"
+crypto_perps_funding = "2acee3c8542043266e6f9c0dfc9434c95b4469ef6fcaf0556efc569fc9721cdd"
+
 [[pair]]
 case_study = "etfs"
 framework = "vectorbt_pro"

@@ -11,6 +11,7 @@ from typing import Any
 from common.correctness_evidence import correctness_report_failures
 from common.framework_registry import load_framework_manifest
 from large_scale_evidence import report_failures as large_scale_report_failures
+from real_strategy_evidence import report_failures as real_strategy_report_failures
 from scenarios.definitions import SCENARIOS
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -59,43 +60,9 @@ def _validate_evidence(
     scale_failures = large_scale_report_failures(large_scale)
     if scale_failures:
         raise ValueError("Accepted large-scale evidence is invalid: " + "; ".join(scale_failures))
-    scope = real_strategy.get("scope")
-    real_records = real_strategy.get("records")
-    if (
-        real_strategy.get("schema_version") != 1
-        or not isinstance(scope, dict)
-        or not isinstance(real_records, list)
-    ):
-        raise ValueError("Real-strategy evidence is malformed")
-    if scope.get("required_pairs") != 8 or scope.get("unsupported_pairs") != 7:
-        raise ValueError("Real-strategy evidence does not cover the declared applicability matrix")
-    required = [record for record in real_records if record.get("status") != "unsupported"]
-    if len(required) != 8:
-        raise ValueError("Real-strategy evidence lacks required pair records")
-    if not all(record.get("negative_control", {}).get("detected") is True for record in required):
-        raise ValueError("Real-strategy evidence lacks a passing negative control")
-    for record in required:
-        surfaces = record.get("surfaces")
-        if not isinstance(surfaces, dict) or not all(
-            isinstance(surfaces.get(name), dict) for name in ("fills", "equity", "terminal")
-        ):
-            raise ValueError("Real-strategy evidence lacks required comparison surfaces")
-        equity = surfaces["equity"]
-        coverage = equity.get("coverage")
-        if not isinstance(coverage, dict):
-            raise ValueError("Real-strategy evidence lacks valuation timestamp coverage")
-        coverage_passed = not (
-            coverage.get("framework_only_timestamps") or coverage.get("ml4t_only_timestamps")
-        )
-        if equity.get("coverage_passed") is not coverage_passed:
-            raise ValueError("Real-strategy valuation coverage verdict is inconsistent")
-        expected_status = (
-            "pass"
-            if all(surface.get("passed") is True for surface in surfaces.values())
-            else "fail"
-        )
-        if record.get("status") != expected_status:
-            raise ValueError("Real-strategy pair verdict is inconsistent with its surfaces")
+    real_failures = real_strategy_report_failures(real_strategy)
+    if real_failures:
+        raise ValueError("Accepted real-strategy evidence is invalid: " + "; ".join(real_failures))
 
 
 def _comparison_checks(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
