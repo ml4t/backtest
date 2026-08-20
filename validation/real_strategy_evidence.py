@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from common.provenance import _tree_digest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = PROJECT_ROOT / "validation"
@@ -58,16 +59,6 @@ def _sha256(path: Path) -> str:
 def _json_digest(value: object) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode()).hexdigest()
-
-
-def _tree_digest(root: Path) -> str:
-    digest = hashlib.sha256()
-    for path in sorted(root.rglob("*.py")):
-        digest.update(path.relative_to(root).as_posix().encode())
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return digest.hexdigest()
 
 
 def _git_identity(root: Path) -> dict[str, object]:

@@ -17,11 +17,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from real_strategy_evidence import (
-    ADAPTER_PATHS,
-    _sha256,
-    _tree_digest,
-)
+from common.provenance import _tree_digest
+from real_strategy_evidence import ADAPTER_PATHS, _sha256
 from real_strategy_evidence import (
     report_failures as real_strategy_report_failures,
 )
