@@ -26,6 +26,7 @@ from ml4t.backtest._validation.lean_runner import (
     resolve_lean_command,
     run_lean_backtest,
 )
+from ml4t.backtest._validation.real_strategy import filter_comparison_market
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,7 +44,7 @@ def _prepare_project(bundle: Path) -> tuple[Path, dict[str, Any]]:
     if manifest["case_study"] != "etfs":
         raise ValueError("The LEAN adapter currently accepts the ETF comparison workload")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
-    market = pl.read_parquet(bundle / "market.parquet")
+    market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
     targets = pl.read_parquet(bundle / "targets.parquet")
     symbols = market["symbol"].unique().sort().to_list()
     asset_to_ticker = build_hashed_ticker_map("real_etfs", symbols)
@@ -177,6 +178,10 @@ class RealStrategyEtfs(QCAlgorithm):
         "manifest": manifest,
         "spec": spec,
         "ticker_to_asset": ticker_to_asset,
+        "valuation_dates": {
+            pd.Timestamp(timestamp).strftime("%Y-%m-%d")
+            for timestamp in market["timestamp"].unique().to_list()
+        },
     }
 
 
@@ -204,6 +209,11 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame, pl.Da
     _, final_value, fills_pd, equity_pd, events_pd = load_lean_artifacts(output_dir)
     if fills_pd is None or equity_pd is None or events_pd is None:
         raise RuntimeError("LEAN did not produce the required comparison surfaces")
+    equity_pd = equity_pd[
+        pd.to_datetime(equity_pd["timestamp"])
+        .dt.strftime("%Y-%m-%d")
+        .isin(inputs["valuation_dates"])
+    ].copy()
     fills_pd = fills_pd.rename(columns={"fill_price": "price", "fee": "commission"})
     fills = pl.from_pandas(
         fills_pd[["timestamp", "asset", "side", "quantity", "price", "commission"]]

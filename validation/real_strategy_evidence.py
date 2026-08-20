@@ -200,19 +200,49 @@ def _max_difference(
 
 def _align_shared_values(
     framework_records: list[dict[str, str]], ml4t_records: list[dict[str, str]]
-) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, int]]:
+) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, int | str | None]]:
     framework_by_time = {record["timestamp"]: record for record in framework_records}
     ml4t_by_time = {record["timestamp"]: record for record in ml4t_records}
     shared = sorted(framework_by_time.keys() & ml4t_by_time.keys())
+    framework_only = sorted(framework_by_time.keys() - ml4t_by_time.keys())
+    ml4t_only = sorted(ml4t_by_time.keys() - framework_by_time.keys())
     return (
         [framework_by_time[timestamp] for timestamp in shared],
         [ml4t_by_time[timestamp] for timestamp in shared],
         {
             "shared_timestamps": len(shared),
-            "framework_only_timestamps": len(framework_by_time.keys() - ml4t_by_time.keys()),
-            "ml4t_only_timestamps": len(ml4t_by_time.keys() - framework_by_time.keys()),
+            "framework_only_timestamps": len(framework_only),
+            "ml4t_only_timestamps": len(ml4t_only),
+            "first_framework_only_timestamp": framework_only[0] if framework_only else None,
+            "first_ml4t_only_timestamp": ml4t_only[0] if ml4t_only else None,
         },
     )
+
+
+def _value_surface(
+    framework_records: list[dict[str, str]],
+    ml4t_records: list[dict[str, str]],
+    *,
+    field: str,
+) -> tuple[dict[str, object], list[dict[str, str]], list[dict[str, str]]]:
+    framework_shared, ml4t_shared, coverage = _align_shared_values(framework_records, ml4t_records)
+    if not framework_shared:
+        raise ValueError("No shared valuation timestamps")
+    surface = _surface(framework_shared, ml4t_shared, numeric_fields=(field,))
+    coverage_passed = not (
+        coverage["framework_only_timestamps"] or coverage["ml4t_only_timestamps"]
+    )
+    surface["coverage"] = coverage
+    surface["coverage_passed"] = coverage_passed
+    if not coverage_passed:
+        surface["passed"] = False
+        if surface["first_divergence"] is None:
+            surface["first_divergence"] = {
+                "kind": "timestamp_coverage",
+                "framework_only": coverage["first_framework_only_timestamp"],
+                "ml4t_only": coverage["first_ml4t_only_timestamp"],
+            }
+    return surface, framework_shared, ml4t_shared
 
 
 def _load_evidence(path: Path) -> tuple[dict[str, Any], dict[str, pl.DataFrame]]:
@@ -260,11 +290,9 @@ def _comparison_record(
     ml4t_fills = _fill_records(ml4t_frames["fills"], intraday=intraday)
     external_equity = _value_records(external_frames["equity"], field="equity", intraday=intraday)
     ml4t_equity = _value_records(ml4t_frames["equity"], field="equity", intraday=intraday)
-    external_equity, ml4t_equity, equity_coverage = _align_shared_values(
-        external_equity, ml4t_equity
+    equity_surface, external_equity, ml4t_equity = _value_surface(
+        external_equity, ml4t_equity, field="equity"
     )
-    if not external_equity:
-        raise ValueError(f"No shared equity timestamps for {case_study}/{framework}")
     terminal_external = [{"final_value": external_equity[-1]["equity"]}]
     terminal_ml4t = [{"final_value": ml4t_equity[-1]["equity"]}]
     surfaces: dict[str, dict[str, object]] = {
@@ -273,10 +301,9 @@ def _comparison_record(
             ml4t_fills,
             numeric_fields=("quantity", "price", "commission"),
         ),
-        "equity": _surface(external_equity, ml4t_equity, numeric_fields=("equity",)),
+        "equity": equity_surface,
         "terminal": _surface(terminal_external, terminal_ml4t, numeric_fields=("final_value",)),
     }
-    surfaces["equity"]["coverage"] = equity_coverage
     if "num_rejections" in external and "num_rejections" in ml4t:
         rejection_external = [{"count": str(external["num_rejections"])}]
         rejection_ml4t = [{"count": str(ml4t["num_rejections"])}]
@@ -286,9 +313,8 @@ def _comparison_record(
     if case_study == "etfs" and framework == "lean":
         external_cash = _value_records(external_frames["equity"], field="cash", intraday=intraday)
         ml4t_cash = _value_records(ml4t_frames["portfolio_state"], field="cash", intraday=intraday)
-        external_cash, ml4t_cash, cash_coverage = _align_shared_values(external_cash, ml4t_cash)
-        surfaces["cash"] = _surface(external_cash, ml4t_cash, numeric_fields=("cash",))
-        surfaces["cash"]["coverage"] = cash_coverage
+        cash_surface, _, _ = _value_surface(external_cash, ml4t_cash, field="cash")
+        surfaces["cash"] = cash_surface
 
     surface_values = list(surfaces.values())
     passed = all(bool(value["passed"]) for value in surface_values)
@@ -341,6 +367,16 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
     applicability_path = VALIDATION_DIR / "real_strategy_applicability.toml"
     applicability = tomllib.loads(applicability_path.read_text(encoding="utf-8"))
     targets = tomllib.loads((VALIDATION_DIR / "framework_targets.toml").read_text())
+    adapter_paths = {
+        "vectorbt_pro": VALIDATION_DIR / "real_strategy_vectorbt.py",
+        "vectorbt_oss": VALIDATION_DIR / "real_strategy_vectorbt.py",
+        "backtrader": VALIDATION_DIR / "real_strategy_backtrader.py",
+        "zipline": VALIDATION_DIR / "real_strategy_zipline.py",
+        "lean_equity": VALIDATION_DIR / "real_strategy_lean.py",
+        "lean_crypto": VALIDATION_DIR / "real_strategy_lean_crypto.py",
+        "ml4t": VALIDATION_DIR / "real_strategy_runner.py",
+        "comparison_input": (PROJECT_ROOT / "src/ml4t/backtest/_validation/real_strategy.py"),
+    }
     records: list[dict[str, object]] = []
     for pair in applicability["pair"]:
         if pair["status"] == "required":
@@ -395,18 +431,7 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
             "machine": platform.machine(),
             "cpu_count": os.cpu_count(),
             "applicability_sha256": _sha256(applicability_path),
-            "adapters": {
-                framework: _sha256(VALIDATION_DIR / f"real_strategy_{adapter}.py")
-                for framework, adapter in {
-                    "vectorbt_pro": "vectorbt",
-                    "vectorbt_oss": "vectorbt",
-                    "backtrader": "backtrader",
-                    "zipline": "zipline",
-                    "lean_equity": "lean",
-                    "lean_crypto": "lean_crypto",
-                    "ml4t": "runner",
-                }.items()
-            },
+            "adapters": {framework: _sha256(path) for framework, path in adapter_paths.items()},
             "frameworks": {
                 framework: targets["framework"][framework]
                 for framework in applicability["metadata"]["frameworks"]

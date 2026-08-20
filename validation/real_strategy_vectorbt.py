@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from ml4t.backtest._validation.real_strategy import filter_comparison_market
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -45,7 +47,8 @@ def run(bundle: Path, framework: str) -> tuple[dict[str, Any], pl.DataFrame, pl.
     if case_study not in {"etfs", "cme_futures"}:
         raise ValueError("This adapter accepts the ETF and CME futures workloads")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
-    close = _wide(pl.read_parquet(bundle / "market.parquet"), "close")
+    market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
+    close = _wide(market, "close")
     weights = _wide(pl.read_parquet(bundle / "targets.parquet"), "weight").reindex(
         index=close.index, columns=close.columns
     )

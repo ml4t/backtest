@@ -16,6 +16,8 @@ import backtrader as bt
 import pandas as pd
 import polars as pl
 
+from ml4t.backtest._validation.real_strategy import filter_comparison_market
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -129,7 +131,7 @@ class FrozenTargetStrategy(bt.Strategy):
 def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
-    market = pl.read_parquet(bundle / "market.parquet")
+    market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
     targets = _target_map(pl.read_parquet(bundle / "targets.parquet"))
     contracts = (
         json.loads((bundle / "contracts.json").read_text(encoding="utf-8"))

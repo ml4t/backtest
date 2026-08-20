@@ -9,6 +9,8 @@ from types import SimpleNamespace
 
 import polars as pl
 
+from ml4t.backtest._validation.real_strategy import filter_comparison_market
+
 
 def _load_runner():
     path = Path(__file__).parents[2] / "validation" / "real_strategy_runner.py"
@@ -137,6 +139,49 @@ def test_real_strategy_comparator_detects_one_quantum_mutation() -> None:
         "ml4t": mutated[0],
         "canonical_gap": "0.00000001",
     }
+
+
+def test_real_strategy_comparator_rejects_missing_valuation_timestamp() -> None:
+    evidence = _load_evidence()
+    framework = [
+        {"timestamp": "2024-01-01", "equity": "1000.0"},
+        {"timestamp": "2024-01-02", "equity": "1000.0"},
+    ]
+    ml4t = [{"timestamp": "2024-01-01", "equity": "1000.0"}]
+
+    surface, _, _ = evidence._value_surface(framework, ml4t, field="equity")
+
+    assert surface["passed"] is False
+    assert surface["coverage_passed"] is False
+    assert surface["first_divergence"] == {
+        "kind": "timestamp_coverage",
+        "framework_only": "2024-01-02",
+        "ml4t_only": None,
+    }
+
+
+def test_comparison_market_applies_production_daily_calendar() -> None:
+    market = pl.DataFrame(
+        {
+            "timestamp": [datetime(2018, 12, 4), datetime(2018, 12, 5)],
+            "symbol": ["ES", "ES"],
+            "close": [100.0, 101.0],
+        }
+    )
+    spec = {
+        "backtest_config": {
+            "calendar": {
+                "calendar": "CME",
+                "data_frequency": "daily",
+                "enforce_sessions": True,
+                "timezone": "UTC",
+            }
+        }
+    }
+
+    filtered = filter_comparison_market(market, spec)
+
+    assert filtered["timestamp"].to_list() == [datetime(2018, 12, 4)]
 
 
 def test_real_strategy_benchmark_interval_is_deterministic() -> None:

@@ -29,6 +29,8 @@ from zipline.finance.commission import NoCommission
 from zipline.finance.slippage import SlippageModel
 from zipline.utils.calendar_utils import get_calendar
 
+from ml4t.backtest._validation.real_strategy import filter_comparison_market
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -65,9 +67,9 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame]:
     if manifest["case_study"] != "etfs":
         raise ValueError("This adapter accepts the ETF equity workload")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
-    market = pl.read_parquet(bundle / "market.parquet").with_columns(
-        pl.col(column).round(3) for column in ("open", "high", "low", "close")
-    )
+    market = filter_comparison_market(
+        pl.read_parquet(bundle / "market.parquet"), spec
+    ).with_columns(pl.col(column).round(3) for column in ("open", "high", "low", "close"))
     target_lookup = _targets(pl.read_parquet(bundle / "targets.parquet"))
     symbols = market["symbol"].unique().sort().to_list()
     calendar_name = "XNYS"

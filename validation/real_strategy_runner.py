@@ -29,6 +29,7 @@ from ml4t.backtest import (
     Strategy,
     TargetWeightExecutor,
 )
+from ml4t.backtest._validation.real_strategy import filter_comparison_market
 from ml4t.backtest.profiles import get_profile_config
 from ml4t.backtest.risk import RuleChain, StopLoss, TimeExit, TrailingStop
 
@@ -355,7 +356,7 @@ def execute_bundle(
                             if abs(quantity) >= lot:
                                 broker.submit_order(symbol, quantity)
 
-    market = inputs["market"]
+    market = filter_comparison_market(inputs["market"], inputs["spec"])
     if price_decimals is not None:
         market = market.with_columns(
             pl.col(column).round(price_decimals)
