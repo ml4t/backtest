@@ -1,4 +1,7 @@
 {
+  "case_study_support_files": {
+    "project-config.json": "6f53654afabb96e23944db61235b83848ab24fcac2ecaf9597382e0671fef01f"
+  },
   "cases": [
     {
       "case": "chapter16_etfs",
@@ -54,8 +57,8 @@
         "validation/lean/workspace/chapter16_etfs/ml4t_daily_equity.csv": "20bc4a28ad04fdc458bd8f5031fbf976623caddd819da70f2e51ddb45dea6609",
         "validation/lean/workspace/chapter16_etfs/ml4t_order_events.csv.xz": "63535bec501d36e4f1eae501917e0000e636c03a19d637b05cdda1428bc80421"
       },
-      "runtime_seconds": 12.116000979207456,
-      "summary_sha256": "72b130a8db563a993fc47a8f72a4579f55a76b72996e9d54380ee68bb200ac1c"
+      "runtime_seconds": 12.15115352300927,
+      "summary_sha256": "1c489cd43537a108d1ee298eeb022c9c4b4d363fc1d61cc4c1c7f9078cf7d72d"
     },
     {
       "case": "chapter16_sp500_equity_option_analytics",
@@ -112,8 +115,8 @@
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_daily_equity.csv": "83a98f50053b12dd4baa37484b0b268cb8ec83ebdf633ee2e6ee790db0bb73ad",
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_order_events.csv": "334cd463affb3d23f074882fe1d8131861ec67ca5203fbdfb86cae4d8da64917"
       },
-      "runtime_seconds": 8.11047725006938,
-      "summary_sha256": "7f1a95bf4004209875bbba95d017643f6f20b467c1fbbbc7b33c879811982c97"
+      "runtime_seconds": 7.60393893904984,
+      "summary_sha256": "cfb8428fead772059aeeba183af4889c994079f49bd2d45fd24e2856a951b460"
     },
     {
       "case": "chapter16_us_equities_panel",
@@ -198,8 +201,8 @@
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part01.xz": "9aea6ff30791dc06cd9b917e6f0c639d1b6f17883012b9c5190d7be6a899d980",
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part02.xz": "915bef2036b7d49535eb81a458a1af891f8f15c249bb413831771ea52e982a26"
       },
-      "runtime_seconds": 19.66033091209829,
-      "summary_sha256": "8842a8679525683047aae4752c33d3076a74365e21d3c3f2ae349c3c9d9bbed6"
+      "runtime_seconds": 20.79639105987735,
+      "summary_sha256": "1f39398e71e4cf0fb7e8e9c95aeec89e4836b8e6cf7e9f8593eb8e81194e4757"
     }
   ],
   "cli_observed": "lean 1.0.228",
@@ -230,14 +233,13 @@
     "src/ml4t/backtest/_validation/case_study_lean.py": "62247f66db5ae118e7089ab4dfeca5a7251b1f3f4238b9aceeb55384df447cfd",
     "src/ml4t/backtest/_validation/lean_runner.py": "30efdb8018cc949c991dee856a7007d0dfdc635397a208f98a6dd094af20fce1",
     "src/ml4t/backtest/profiles.py": "f3fa7c9043d476b60659d936062b41e93da0b4d6be4fb79c557f76b7fe5b109d",
-    "validation/run_lean_case_studies.py": "d8fe9a8519f32b5e3c29512d6eecc2bc0d7cfc87761f77962d659d84e88a681f"
+    "validation/run_lean_case_studies.py": "c6286112b56c8c1ccda3ffc58c75b417a63b055a7b30ebffb3dac0988e03a71f"
   },
   "promoted": true,
   "schema_version": 1,
   "support_files": {
     "data/market-hours/market-hours-database.json": "935079bc33409373f37163eddb539f09e81a1efbd0e617cbc8fdb487c76dab2b",
     "data/symbol-properties/symbol-properties-database.csv": "56b6dc80202bca88f212c78c4d4670c2e070e6f1e7386f7436232aafe5000e93",
-    "lean.json": "fa15d6d81f560fd1665b004c338b026458fa834a7645e015d16d861dd73540f4",
-    "project-config.json": "6f53654afabb96e23944db61235b83848ab24fcac2ecaf9597382e0671fef01f"
+    "lean.json": "fa15d6d81f560fd1665b004c338b026458fa834a7645e015d16d861dd73540f4"
   }
 }

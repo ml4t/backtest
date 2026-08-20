@@ -12,6 +12,7 @@ _ROOT = Path(__file__).parents[2]
 _WORKSPACE = _ROOT / "validation/lean/workspace"
 _DATA = _WORKSPACE / "data/equity/usa/daily"
 _SUPPORT = _ROOT / "validation/lean/support"
+_CASE_STUDY_SUPPORT = _ROOT / "validation/lean/case_study_support"
 _EVIDENCE = _ROOT / "validation/lean/case_study_evidence.json"
 _CASES = {
     "chapter16_etfs",
@@ -58,6 +59,8 @@ def test_retained_lean_case_study_evidence_is_fresh_and_complete() -> None:
         assert _digest(_ROOT / relative) == digest
     for relative, digest in payload["support_files"].items():
         assert _digest(_SUPPORT / relative) == digest
+    for relative, digest in payload["case_study_support_files"].items():
+        assert _digest(_CASE_STUDY_SUPPORT / relative) == digest
 
     for case in payload["cases"]:
         assert case["passed"] is True

@@ -39,6 +39,7 @@ from ml4t.backtest._validation.lean_runner import (  # noqa: E402
 WORKSPACE = VALIDATION_ROOT / "lean" / "workspace"
 DATA_DAILY = WORKSPACE / "data" / "equity" / "usa" / "daily"
 SUPPORT = VALIDATION_ROOT / "lean" / "support"
+CASE_STUDY_SUPPORT = VALIDATION_ROOT / "lean" / "case_study_support"
 CASE_STUDIES = (
     "chapter16_etfs",
     "chapter16_sp500_equity_option_analytics",
@@ -95,7 +96,7 @@ def _copy_project(source: Path, destination: Path) -> None:
             _atomic_write(destination / "weights.csv", lzma.decompress(path.read_bytes()))
         else:
             shutil.copy2(path, destination / path.name)
-    shutil.copy2(SUPPORT / "project-config.json", destination / "config.json")
+    shutil.copy2(CASE_STUDY_SUPPORT / "project-config.json", destination / "config.json")
 
 
 def _prepare_lean_root(root: Path, project: Path) -> Path:
@@ -281,6 +282,11 @@ def run(lean_command: Path, *, promote: bool) -> dict[str, Any]:
         "support_files": {
             path.relative_to(SUPPORT).as_posix(): _digest(path)
             for path in sorted(SUPPORT.rglob("*"))
+            if path.is_file()
+        },
+        "case_study_support_files": {
+            path.relative_to(CASE_STUDY_SUPPORT).as_posix(): _digest(path)
+            for path in sorted(CASE_STUDY_SUPPORT.rglob("*"))
             if path.is_file()
         },
         "promoted": bool(promote and passed),

@@ -82,7 +82,7 @@ It supports daily scenarios only.
 The native and Chapter 16 runners construct temporary LEAN roots from tracked inputs:
 
 - `validation/lean/support/lean.json`
-- `validation/lean/support/project-config.json`
+- `validation/lean/case_study_support/project-config.json`
 - `validation/lean/support/data/market-hours/market-hours-database.json`
 - `validation/lean/support/data/symbol-properties/symbol-properties-database.csv`
 - the tracked project files and daily equity archives under `validation/lean/workspace/`
