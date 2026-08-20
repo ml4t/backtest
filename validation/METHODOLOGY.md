@@ -344,7 +344,7 @@ The scenario suite separately compares each framework's native trade records.
 
 ### Real-strategy audit
 
-6/8 supported pairs pass. The audit uses three production-selected strategies with frozen historical market data and model-derived targets. A pass requires zero numeric gap after 1e-8 quantization across every shared valuation timestamp, the complete canonical fill stream, and terminal value. The two CME rows retain exact fills but fail the equity and terminal checks.
+6/8 supported pairs pass. The audit uses three production-selected strategies with frozen historical market data and model-derived targets. A pass requires identical valuation timestamp coverage, zero numeric gap after 1e-8 quantization at every valuation, the complete canonical fill stream, and terminal value. The two CME rows retain exact fills but fail the equity and terminal checks.
 
 | Real strategy | Pinned framework | Current result | Evidence |
 |---|---|---|---|

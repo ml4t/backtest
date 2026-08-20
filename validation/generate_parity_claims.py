@@ -74,6 +74,28 @@ def _validate_evidence(
         raise ValueError("Real-strategy evidence lacks required pair records")
     if not all(record.get("negative_control", {}).get("detected") is True for record in required):
         raise ValueError("Real-strategy evidence lacks a passing negative control")
+    for record in required:
+        surfaces = record.get("surfaces")
+        if not isinstance(surfaces, dict) or not all(
+            isinstance(surfaces.get(name), dict) for name in ("fills", "equity", "terminal")
+        ):
+            raise ValueError("Real-strategy evidence lacks required comparison surfaces")
+        equity = surfaces["equity"]
+        coverage = equity.get("coverage")
+        if not isinstance(coverage, dict):
+            raise ValueError("Real-strategy evidence lacks valuation timestamp coverage")
+        coverage_passed = not (
+            coverage.get("framework_only_timestamps") or coverage.get("ml4t_only_timestamps")
+        )
+        if equity.get("coverage_passed") is not coverage_passed:
+            raise ValueError("Real-strategy valuation coverage verdict is inconsistent")
+        expected_status = (
+            "pass"
+            if all(surface.get("passed") is True for surface in surfaces.values())
+            else "fail"
+        )
+        if record.get("status") != expected_status:
+            raise ValueError("Real-strategy pair verdict is inconsistent with its surfaces")
 
 
 def _comparison_checks(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -159,10 +181,19 @@ def render_claims(
                 f"{equity['coverage']['shared_timestamps']:,} valuations, terminal"
             )
         else:
-            result = (
-                f"fills exact; equity gap {equity['max_canonical_difference']}; "
-                f"terminal gap {terminal['max_canonical_difference']}"
-            )
+            details = ["fills exact" if fills["passed"] else "fills differ"]
+            coverage = equity["coverage"]
+            if not equity["coverage_passed"]:
+                details.append(
+                    "valuation timestamps differ "
+                    f"({coverage['framework_only_timestamps']} framework-only, "
+                    f"{coverage['ml4t_only_timestamps']} ML4T-only)"
+                )
+            if equity["max_canonical_difference"] != "0.00000000":
+                details.append(f"equity gap {equity['max_canonical_difference']}")
+            if terminal["max_canonical_difference"] != "0.00000000":
+                details.append(f"terminal gap {terminal['max_canonical_difference']}")
+            result = "; ".join(details)
         real_rows.append(
             f"| {case_labels[record['case_study']]} | {pinned_framework} | {result} | "
             f"[real-strategy evidence]({real_strategy_url}) |"
@@ -177,8 +208,9 @@ def render_claims(
             "",
             f"{passed_real}/{len(required_real)} supported pairs pass. The audit uses three "
             "production-selected strategies with frozen historical market data and model-derived "
-            "targets. A pass requires zero numeric gap after 1e-8 quantization across every "
-            "shared valuation timestamp, the complete canonical fill stream, and terminal value. "
+            "targets. A pass requires identical valuation timestamp coverage, zero numeric gap "
+            "after 1e-8 quantization at every valuation, the complete canonical fill stream, and "
+            "terminal value. "
             "The two CME rows retain exact fills but fail the equity and terminal checks.",
             "",
             "| Real strategy | Pinned framework | Current result | Evidence |",

@@ -31,6 +31,19 @@ def test_generated_claims_are_current() -> None:
     assert generate_parity_claims.synchronize(check=True) == []
 
 
+def test_claim_generation_rejects_hidden_valuation_dates() -> None:
+    correctness = generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
+    large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    real_strategy = copy.deepcopy(
+        generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_EVIDENCE)
+    )
+    passing = next(record for record in real_strategy["records"] if record["status"] == "pass")
+    passing["surfaces"]["equity"]["coverage"]["framework_only_timestamps"] = 1
+
+    with pytest.raises(ValueError, match="valuation coverage verdict is inconsistent"):
+        generate_parity_claims._validate_evidence(correctness, large_scale, real_strategy)
+
+
 def test_every_claim_target_uses_the_same_generated_block() -> None:
     blocks = []
     for path in generate_parity_claims.TARGETS:
@@ -74,6 +87,7 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
     assert "16/16 exact" in claims
     assert "synthetic stress workload contains 250 assets" in claims
     assert "6/8 supported pairs pass" in claims
+    assert "identical valuation timestamp coverage" in claims
     for record in large_scale["frameworks"]:
         target = record["target"]
         checks = generate_parity_claims._comparison_checks(record)
