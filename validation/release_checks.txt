@@ -21,6 +21,7 @@ validation/common/ml4t_runner.py
 validation/common/provenance.py
 validation/large_scale_evidence.py
 validation/real_strategy_corpus.py
+validation/real_strategy_input.py
 validation/real_strategy_benchmark.py
 validation/real_strategy_evidence.py
 validation/real_strategy_runner.py
