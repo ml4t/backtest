@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import importlib.util
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -206,3 +208,17 @@ def test_real_strategy_benchmark_interval_is_deterministic() -> None:
 
     assert first == second
     assert first[0] <= 5.5 <= first[1]
+
+
+def test_real_strategy_performance_evidence_fails_stale_source() -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    changed = copy.deepcopy(report)
+    changed.setdefault("provenance", {})["ml4t_engine_source_sha256"] = "0" * 64
+
+    assert benchmark.report_failures(report, correctness) == []
+    failures = benchmark.report_failures(changed, correctness)
+
+    assert "Real-strategy performance engine source digest is stale" in failures

@@ -11,6 +11,7 @@ from typing import Any
 from common.correctness_evidence import correctness_report_failures
 from common.framework_registry import load_framework_manifest
 from large_scale_evidence import report_failures as large_scale_report_failures
+from real_strategy_benchmark import report_failures as real_strategy_performance_failures
 from real_strategy_evidence import report_failures as real_strategy_report_failures
 from scenarios.definitions import SCENARIOS
 
@@ -18,6 +19,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 CORRECTNESS_EVIDENCE = PROJECT_ROOT / "validation" / "CORRECTNESS_RESULTS.json"
 LARGE_SCALE_EVIDENCE = PROJECT_ROOT / "validation" / "LARGE_SCALE_RESULTS.json"
 REAL_STRATEGY_EVIDENCE = PROJECT_ROOT / "validation" / "REAL_STRATEGY_RESULTS.json"
+REAL_STRATEGY_PERFORMANCE = PROJECT_ROOT / "validation" / "REAL_STRATEGY_PERFORMANCE.json"
 TARGETS = (
     PROJECT_ROOT / "README.md",
     PROJECT_ROOT / "docs" / "index.md",
@@ -42,6 +44,7 @@ def _validate_evidence(
     correctness: dict[str, Any],
     large_scale: dict[str, Any],
     real_strategy: dict[str, Any],
+    real_performance: dict[str, Any] | None = None,
 ) -> None:
     failures = correctness_report_failures(correctness)
     if failures:
@@ -63,6 +66,15 @@ def _validate_evidence(
     real_failures = real_strategy_report_failures(real_strategy)
     if real_failures:
         raise ValueError("Accepted real-strategy evidence is invalid: " + "; ".join(real_failures))
+    performance = (
+        _load_json(REAL_STRATEGY_PERFORMANCE) if real_performance is None else real_performance
+    )
+    performance_failures = real_strategy_performance_failures(performance, real_strategy)
+    if performance_failures:
+        raise ValueError(
+            "Accepted real-strategy performance evidence is invalid: "
+            + "; ".join(performance_failures)
+        )
 
 
 def _comparison_checks(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -80,9 +92,10 @@ def render_claims(
     correctness: dict[str, Any],
     large_scale: dict[str, Any],
     real_strategy: dict[str, Any],
+    real_performance: dict[str, Any] | None = None,
 ) -> str:
     """Render the canonical documentation block."""
-    _validate_evidence(correctness, large_scale, real_strategy)
+    _validate_evidence(correctness, large_scale, real_strategy, real_performance)
     frameworks = correctness["frameworks"]
     records = correctness["records"]
     correctness_url = f"{GITHUB_EVIDENCE_ROOT}/CORRECTNESS_RESULTS.json"
@@ -229,6 +242,7 @@ def synchronize(*, check: bool) -> list[Path]:
         _load_json(CORRECTNESS_EVIDENCE),
         _load_json(LARGE_SCALE_EVIDENCE),
         _load_json(REAL_STRATEGY_EVIDENCE),
+        _load_json(REAL_STRATEGY_PERFORMANCE),
     )
     changed: list[Path] = []
     for path in TARGETS:

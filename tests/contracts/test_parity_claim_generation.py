@@ -56,6 +56,21 @@ def test_claim_generation_rejects_stale_real_strategy_engine_source() -> None:
         generate_parity_claims._validate_evidence(correctness, large_scale, real_strategy)
 
 
+def test_claim_generation_rejects_stale_real_strategy_performance() -> None:
+    correctness = generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
+    large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    real_strategy = generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_EVIDENCE)
+    performance = copy.deepcopy(
+        generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_PERFORMANCE)
+    )
+    performance["correctness_evidence_generated_at"] = "stale"
+
+    with pytest.raises(ValueError, match="references stale correctness evidence"):
+        generate_parity_claims._validate_evidence(
+            correctness, large_scale, real_strategy, performance
+        )
+
+
 def test_every_claim_target_uses_the_same_generated_block() -> None:
     blocks = []
     for path in generate_parity_claims.TARGETS:
