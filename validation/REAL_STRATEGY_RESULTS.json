@@ -10,12 +10,12 @@
       "etfs": "session date"
     }
   },
-  "generated_at": "2026-08-20T08:54:00.590776+00:00",
+  "generated_at": "2026-08-20T09:16:30.969468+00:00",
   "provenance": {
     "adapters": {
       "backtrader": "4eab4c5b39f05409bec23a298fc1bb45be1d86ef9beead2faba29231614fc5ec",
       "comparison_input": "fa6f6b87ffe4d1b9c5b5ea108280f8abe6aec829814caee5f5eef07615ee7aee",
-      "evidence_builder": "9fdb93e75be46d2fa8ddb7ec4c9dbd56929d8125b0c6a3e14a4922cdb08bc63e",
+      "evidence_builder": "492213fbdbe4bad1a00d21f451e549eefc853a93655aa45cbe35c7bbe0f7b078",
       "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
       "lean_equity": "5b47b337f6876d195b6c82e0d86261cac594f82b258e54305920d49ed2dec78e",
       "ml4t": "34c31241b03cffc66a97ff4af93528b248a61d30a2062123bd9f142b226bff59",
@@ -120,9 +120,9 @@
     },
     "machine": "x86_64",
     "ml4t": {
-      "commit": "be03e5002f16e724497d2728f7560407d0592508",
+      "commit": "9438fe6c6338c4f7efca899a0fe619d7422e0b99",
       "dirty": false,
-      "engine_source_sha256": "c8c35476f42fe94f30ef69b1a3355026515fb683febf3ee8bcd4b2279f0c0560"
+      "engine_source_sha256": "20a282b1c25c436a69658939fcb9f6261fe054243b446f9d4525172dfade5d9d"
     },
     "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
     "python": "3.12.11"
