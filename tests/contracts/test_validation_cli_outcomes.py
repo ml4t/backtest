@@ -240,7 +240,7 @@ def test_report_retains_framework_pins(tmp_path: Path) -> None:
     run_all_correctness.write_report(report_path, records)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["schema_version"] == 3
+    assert report["schema_version"] == 4
     assert report["frameworks"] == run_all_correctness.FRAMEWORK_PINS
 
 
