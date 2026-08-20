@@ -15,8 +15,7 @@ from typing import Any
 import backtrader as bt
 import pandas as pd
 import polars as pl
-
-from ml4t.backtest._validation.real_strategy import filter_comparison_market
+from real_strategy_input import filter_comparison_market
 
 
 def _sha256(path: Path) -> str:

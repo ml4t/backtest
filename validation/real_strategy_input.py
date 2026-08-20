@@ -7,7 +7,7 @@ from typing import Any
 
 import polars as pl
 
-from ..calendar import filter_to_trading_days, filter_to_trading_sessions
+from ml4t.backtest.calendar import filter_to_trading_days, filter_to_trading_sessions
 
 
 def filter_comparison_market(

@@ -15,6 +15,7 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
+from real_strategy_input import filter_comparison_market
 from zipline import run_algorithm
 from zipline.api import (
     get_datetime,
@@ -28,8 +29,6 @@ from zipline.data.bundles import ingest, register
 from zipline.finance.commission import NoCommission
 from zipline.finance.slippage import SlippageModel
 from zipline.utils.calendar_utils import get_calendar
-
-from ml4t.backtest._validation.real_strategy import filter_comparison_market
 
 
 def _sha256(path: Path) -> str:

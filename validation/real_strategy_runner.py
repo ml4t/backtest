@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from real_strategy_input import filter_comparison_market
 
 from ml4t.backtest import (
     AssetClass,
@@ -29,7 +30,6 @@ from ml4t.backtest import (
     Strategy,
     TargetWeightExecutor,
 )
-from ml4t.backtest._validation.real_strategy import filter_comparison_market
 from ml4t.backtest.profiles import get_profile_config
 from ml4t.backtest.risk import RuleChain, StopLoss, TimeExit, TrailingStop
 

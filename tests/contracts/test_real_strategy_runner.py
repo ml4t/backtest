@@ -3,18 +3,30 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import polars as pl
 
-from ml4t.backtest._validation.real_strategy import filter_comparison_market
-
 
 def _load_runner():
     path = Path(__file__).parents[2] / "validation" / "real_strategy_runner.py"
     spec = importlib.util.spec_from_file_location("ml4t_real_strategy_runner", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+    return module
+
+
+def _load_input():
+    path = Path(__file__).parents[2] / "validation" / "real_strategy_input.py"
+    spec = importlib.util.spec_from_file_location("ml4t_real_strategy_input", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -161,6 +173,7 @@ def test_real_strategy_comparator_rejects_missing_valuation_timestamp() -> None:
 
 
 def test_comparison_market_applies_production_daily_calendar() -> None:
+    comparison_input = _load_input()
     market = pl.DataFrame(
         {
             "timestamp": [datetime(2018, 12, 4), datetime(2018, 12, 5)],
@@ -179,7 +192,7 @@ def test_comparison_market_applies_production_daily_calendar() -> None:
         }
     }
 
-    filtered = filter_comparison_market(market, spec)
+    filtered = comparison_input.filter_comparison_market(market, spec)
 
     assert filtered["timestamp"].to_list() == [datetime(2018, 12, 4)]
 

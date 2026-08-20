@@ -375,7 +375,7 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
         "lean_equity": VALIDATION_DIR / "real_strategy_lean.py",
         "lean_crypto": VALIDATION_DIR / "real_strategy_lean_crypto.py",
         "ml4t": VALIDATION_DIR / "real_strategy_runner.py",
-        "comparison_input": (PROJECT_ROOT / "src/ml4t/backtest/_validation/real_strategy.py"),
+        "comparison_input": VALIDATION_DIR / "real_strategy_input.py",
     }
     records: list[dict[str, object]] = []
     for pair in applicability["pair"]:

@@ -16,6 +16,7 @@ from typing import Any, cast
 
 import pandas as pd
 import polars as pl
+from real_strategy_input import filter_comparison_market
 
 from ml4t.backtest._validation.lean_runner import (
     build_hashed_ticker_map,
@@ -26,7 +27,6 @@ from ml4t.backtest._validation.lean_runner import (
     resolve_lean_command,
     run_lean_backtest,
 )
-from ml4t.backtest._validation.real_strategy import filter_comparison_market
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
