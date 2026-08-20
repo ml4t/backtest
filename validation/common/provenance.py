@@ -8,7 +8,7 @@ import json
 import subprocess
 import sys
 from dataclasses import asdict
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -136,6 +136,10 @@ def input_digest(
         normalized_index.to_numpy(dtype="datetime64[ns]").view("<i8")
     )
     digest.update(index_values.tobytes())
+    quantum_exponent = CANONICAL_QUANTUM.as_tuple().exponent
+    if not isinstance(quantum_exponent, int):
+        raise RuntimeError("canonical input quantum must be finite")
+    decimal_places = max(-quantum_exponent, 0)
     for column in prices.columns:
         values = np.ascontiguousarray(prices[column].to_numpy())
         digest.update(str(column).encode("utf-8"))
@@ -145,10 +149,14 @@ def input_digest(
             if not np.isfinite(values).all():
                 raise ValueError(f"validation price column {column!r} must contain finite values")
             for value in values.flat:
-                canonical = Decimal(str(value)).quantize(
-                    CANONICAL_QUANTUM,
-                    rounding=ROUND_HALF_EVEN,
-                )
+                decimal_value = Decimal(str(value))
+                integer_digits = max(decimal_value.adjusted() + 1, 1)
+                with localcontext() as context:
+                    context.prec = max(context.prec, integer_digits + decimal_places + 1)
+                    canonical = decimal_value.quantize(
+                        CANONICAL_QUANTUM,
+                        rounding=ROUND_HALF_EVEN,
+                    )
                 if canonical == 0:
                     canonical = abs(canonical)
                 digest.update(format(canonical, "f").encode("ascii"))

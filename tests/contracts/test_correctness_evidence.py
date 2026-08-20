@@ -179,8 +179,33 @@ def test_input_digest_uses_the_parity_quantum_for_floating_values() -> None:
     assert input_digest(material_change, entries, exits) != expected
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_input_digest_rejects_nonfinite_prices(value: float) -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    prices.iloc[0, 0] = value
+
+    with pytest.raises(ValueError, match="must contain finite values"):
+        input_digest(prices, entries, exits)
+
+
+def test_input_digest_supports_large_finite_prices() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    prices.iloc[0, 0] = 1e25
+
+    assert len(input_digest(prices, entries, exits)) == 64
+
+
 def test_complete_current_matrix_is_acceptable() -> None:
     assert correctness_report_failures(_full_report()) == []
+
+
+def test_input_policy_mutation_fails_closed() -> None:
+    report = _full_report()
+    report["input_policy"] = {"float_quantum": "0.01"}
+
+    assert "Correctness input policy differs" in correctness_report_failures(report)
 
 
 @pytest.mark.parametrize(

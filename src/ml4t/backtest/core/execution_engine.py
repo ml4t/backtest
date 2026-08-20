@@ -137,7 +137,7 @@ class ExecutionEngine:
             if not _price_available(price):
                 continue
             fill_price = fill.check_fill(order, price)
-            if fill_price is not None:
+            if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
@@ -259,6 +259,8 @@ class ExecutionEngine:
             )
 
         for order, fill_price in accepted_orders:
+            if not fill.constrain_locked_short_cover(order, fill_price):
+                continue
             fully_filled = fill.execute_fill(order, fill_price)
             if fully_filled:
                 filled_orders.append(order)
@@ -468,7 +470,7 @@ class ExecutionEngine:
                 # Exits always fill (they free capital).
                 # Entries fill directly when shadow-validated at submission.
                 fill_price = fill.check_fill(order, price)
-                if fill_price is not None:
+                if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
                     fully_filled = fill.execute_fill(order, fill_price)
                     if fully_filled:
                         filled_orders.append(order)
@@ -525,25 +527,8 @@ class ExecutionEngine:
                     order.reject("Insufficient cash (open cash check)", "insufficient_cash")
                     return
 
-                # Under locked-short-cash semantics, short covers/reversals can be
-                # cash-constrained and may require partial fills.
-                if (
-                    order.side is OrderSide.BUY
-                    and broker.short_cash_policy.value == "lock_notional"
-                    and self.account.get_position_quantity(order.asset) < 0
-                ):
-                    max_qty = fill.get_max_affordable_quantity(order, fill_price)
-                    if broker.share_type.value == "integer":
-                        max_qty = float(int(max_qty))
-                    if max_qty <= 0:
-                        order.reject("Insufficient cash to cover short", "insufficient_cash")
-                        return
-                    if max_qty < order.quantity:
-                        if broker.partial_fills_allowed:
-                            order.quantity = max_qty
-                        else:
-                            order.reject("Insufficient cash to cover short", "insufficient_cash")
-                            return
+                if not fill.constrain_locked_short_cover(order, fill_price):
+                    return
 
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:

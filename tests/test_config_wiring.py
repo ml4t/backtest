@@ -33,6 +33,7 @@ from ml4t.backtest.config import (
     SlippageType,
     SpreadConvention,
 )
+from ml4t.backtest.core.shared import CASH_TOLERANCE
 from ml4t.backtest.execution.limits import VolumeParticipationLimit
 from ml4t.backtest.models import (
     CombinedCommission,
@@ -799,6 +800,7 @@ class TestShortCashPolicy:
             _set_prices(broker, {"A": entry_price})
             broker.submit_order("A", entry_quantity, entry_side)
             broker._process_orders()
+            assert broker.fills[-1].quantity == pytest.approx(entry_quantity)
 
         _set_prices(broker, {"A": fill_price}, ts=datetime(2024, 1, 2))
         order = broker.submit_order("A", quantity, side)
@@ -807,8 +809,10 @@ class TestShortCashPolicy:
             expected_quantity
         )
 
+        fill_count = len(broker.fills)
         broker._process_orders()
 
+        assert len(broker.fills) == fill_count + 1
         assert broker.fills[-1].quantity == pytest.approx(expected_quantity)
 
     def test_combined_order_rejects_new_short_when_all_cash_is_locked(self):
@@ -853,7 +857,62 @@ class TestShortCashPolicy:
         assert position.quantity == 5.0
         assert broker.account._lock_notional_free_cash == 500.0
 
-    def test_position_legs_caps_underfunded_short_cover(self):
+    @pytest.mark.parametrize(
+        "fill_ordering",
+        [FillOrdering.EXIT_FIRST, FillOrdering.FIFO, FillOrdering.SEQUENTIAL],
+    )
+    def test_position_legs_caps_underfunded_short_cover(self, fill_ordering):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            lock_notional_update_mode=LockNotionalUpdateMode.POSITION_LEGS,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+            fill_ordering=fill_ordering,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 5.0, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 400.0}, ts=datetime(2024, 1, 2))
+        order = broker.submit_order("A", 5.0, OrderSide.BUY)
+        assert order is not None
+        assert broker._fill_engine.get_max_affordable_quantity(order, 400.0) == pytest.approx(2.5)
+
+        fill_count = len(broker.fills)
+        broker._process_orders()
+
+        assert len(broker.fills) == fill_count + 1
+        assert broker.fills[-1].quantity == pytest.approx(2.5)
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(-2.5)
+        assert broker.account._lock_notional_free_cash == pytest.approx(0.0)
+
+    def test_immediate_fill_caps_underfunded_short_cover(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            lock_notional_update_mode=LockNotionalUpdateMode.POSITION_LEGS,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+            immediate_fill=True,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 5.0, OrderSide.SELL)
+
+        _set_prices(broker, {"A": 400.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 5.0, OrderSide.BUY)
+
+        assert broker.fills[-1].quantity == pytest.approx(2.5)
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(-2.5)
+        assert broker.account._lock_notional_free_cash == pytest.approx(0.0)
+
+    def test_position_legs_rejects_cover_when_no_collateral_is_available(self):
         broker = _make_broker(
             initial_cash=1_000.0,
             short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
@@ -868,12 +927,109 @@ class TestShortCashPolicy:
 
         _set_prices(broker, {"A": 300.0}, ts=datetime(2024, 1, 2))
         order = broker.submit_order("A", 10.0, OrderSide.BUY)
-        assert order is not None
-        assert broker._fill_engine.get_max_affordable_quantity(order, 300.0) == pytest.approx(
-            20.0 / 3.0
-        )
+        broker._process_orders()
 
-    def test_fill_engine_cash_and_generic_affordability_paths(self):
+        assert order is not None
+        assert order.rejection_code == "insufficient_cash"
+        assert len(broker.fills) == 1
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(-10.0)
+        assert broker.account._lock_notional_free_cash == pytest.approx(0.0)
+
+    def test_position_legs_rejects_partial_cover_when_disabled(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            lock_notional_update_mode=LockNotionalUpdateMode.POSITION_LEGS,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 5.0, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 400.0}, ts=datetime(2024, 1, 2))
+        order = broker.submit_order("A", 5.0, OrderSide.BUY)
+        broker._process_orders()
+
+        assert order is not None
+        assert order.rejection_code == "insufficient_cash"
+        assert len(broker.fills) == 1
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(-5.0)
+
+    def test_position_legs_rounds_partial_short_cover_to_integer_shares(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            lock_notional_update_mode=LockNotionalUpdateMode.POSITION_LEGS,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 5.0, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 400.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 5.0, OrderSide.BUY)
+        broker._process_orders()
+
+        assert broker.fills[-1].quantity == pytest.approx(2.0)
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(-3.0)
+        assert broker.account._lock_notional_free_cash == pytest.approx(100.0)
+
+    def test_position_legs_fully_funded_cover_can_reverse_long(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            lock_notional_update_mode=LockNotionalUpdateMode.POSITION_LEGS,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 5.0, OrderSide.SELL)
+        broker._process_orders()
+
+        _set_prices(broker, {"A": 50.0}, ts=datetime(2024, 1, 2))
+        broker.submit_order("A", 30.0, OrderSide.BUY)
+        broker._process_orders()
+
+        assert broker.fills[-1].quantity == pytest.approx(30.0)
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(25.0)
+        assert broker.account._lock_notional_free_cash == pytest.approx(0.0)
+
+    def test_position_legs_long_sale_can_reverse_short(self):
+        broker = _make_broker(
+            initial_cash=1_000.0,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            lock_notional_update_mode=LockNotionalUpdateMode.POSITION_LEGS,
+            share_type=ShareType.FRACTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"A": 100.0})
+        broker.submit_order("A", 5.0, OrderSide.BUY)
+        broker._process_orders()
+
+        broker.submit_order("A", 20.0, OrderSide.SELL)
+        broker._process_orders()
+
+        assert broker.fills[-1].quantity == pytest.approx(15.0)
+        position = broker.get_position("A")
+        assert position is not None
+        assert position.quantity == pytest.approx(-10.0)
+        assert broker.account._lock_notional_free_cash == pytest.approx(0.0)
+
+    def test_integer_affordability_rounds_to_whole_shares(self):
         integer_broker = _make_broker(
             initial_cash=1_000.0,
             share_type=ShareType.INTEGER,
@@ -887,6 +1043,7 @@ class TestShortCashPolicy:
         assert integer_broker._fill_engine.get_max_affordable_quantity(integer_order, 0.0) == 0.0
         assert integer_broker._fill_engine.get_max_affordable_quantity(integer_order, 100.0) == 10.0
 
+    def test_fractional_affordability_includes_commission_and_cash_tolerance(self):
         fractional_broker = _make_broker(
             initial_cash=1_000.0,
             commission_model=PercentageCommission(rate=0.01),
@@ -900,8 +1057,10 @@ class TestShortCashPolicy:
         affordable = fractional_broker._fill_engine.get_max_affordable_quantity(
             fractional_order, 100.0
         )
-        assert affordable == pytest.approx(1_000.0 / 101.0)
+        expected = (1_000.0 + CASH_TOLERANCE) / 101.0 - CASH_TOLERANCE / 100.0
+        assert affordable == pytest.approx(expected, rel=0.0, abs=1e-12)
 
+    def test_lock_notional_available_cash_respects_cash_buffer(self):
         locked_broker = _make_broker(
             initial_cash=1_000.0,
             short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,

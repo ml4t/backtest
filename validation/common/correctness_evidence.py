@@ -22,6 +22,7 @@ SCHEMA_VERSION = 4
 INPUT_POLICY = {
     "float_quantum": CANONICAL_QUANTUM_TEXT,
     "rounding": "ROUND_HALF_EVEN",
+    "scope": "synthetic correctness scenario prices",
     "timestamps_and_signals": "exact",
 }
 

@@ -105,8 +105,7 @@ class FillEngine:
     def _get_lock_notional_zero_cost_limit(self, order, fill_price: float) -> float | None:
         broker = self.broker
         if (
-            broker.share_type != ShareType.FRACTIONAL
-            or broker.short_cash_policy.value != "lock_notional"
+            broker.short_cash_policy.value != "lock_notional"
             or broker.account.policy.allow_leverage
             or broker.cash_buffer_pct != 0.0
             or calculate_commission(
@@ -160,10 +159,12 @@ class FillEngine:
         if order.side is OrderSide.BUY and current_quantity < 0.0:
             short_quantity = abs(current_quantity)
             short_basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
-            cover_budget = free_cash + short_basis + short_basis
-            max_cover = cover_budget / unit_cost
-            if max_cover < short_quantity:
-                return max_cover
+            average_entry = short_basis / short_quantity
+            cover_cash_delta = 2 * average_entry - unit_cost
+            if cover_cash_delta < 0.0:
+                max_cover = free_cash / -cover_cash_delta
+                if max_cover < short_quantity:
+                    return max_cover
             released = short_basis + short_basis - short_quantity * unit_cost
             free_after_cover = add_with_zero_cancellation(free_cash, released)
             return short_quantity + max(0.0, free_after_cover / unit_cost)
@@ -186,6 +187,35 @@ class FillEngine:
 
         order.quantity = max_shares
         return bool(self.execute_fill(order, fill_price))
+
+    def constrain_locked_short_cover(self, order, fill_price: float) -> bool:
+        """Apply locked-cash affordability before any short-cover fill path."""
+        broker = self.broker
+        current_quantity = broker.account.get_position_quantity(order.asset)
+        if not (
+            order.side is OrderSide.BUY
+            and current_quantity < 0.0
+            and broker.short_cash_policy.value == "lock_notional"
+            and not broker.account.policy.allow_leverage
+        ):
+            return True
+
+        effective_quantity = self.get_effective_quantity(order)
+        max_quantity = self.get_max_affordable_quantity(order, fill_price)
+        if broker.share_type is ShareType.INTEGER:
+            max_quantity = float(int(max_quantity))
+        if max_quantity <= 0.0:
+            order.reject("Insufficient cash to cover short", "insufficient_cash")
+            return False
+        if max_quantity >= effective_quantity:
+            return True
+        if not broker.partial_fills_allowed:
+            order.reject("Insufficient cash to cover short", "insufficient_cash")
+            return False
+
+        order.quantity = max_quantity
+        self.orders.partial_quantities.pop(order.order_id, None)
+        return True
 
     def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
         broker = self.broker

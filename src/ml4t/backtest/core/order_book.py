@@ -184,6 +184,8 @@ class OrderBook:
         if fill_price is None:
             order.reject("Fill check failed", "fill_check_failed")
             return order
+        if not fill.constrain_locked_short_cover(order, fill_price):
+            return order
 
         # Determine if this is an exit (reduces existing position)
         is_exit = self._is_exit_order(order)
