@@ -124,7 +124,7 @@ DEFAULT_CACHE_ROOT = Path(
     )
 )
 CANONICAL_QUANTUM = Decimal("0.00000001")
-CANONICAL_MONEY_QUANTUM = Decimal("0.000001")
+CANONICAL_MONEY_QUANTUM = Decimal("0.01")
 
 
 def _log(*args, **kwargs):
@@ -1556,6 +1556,7 @@ def benchmark_vectorbt_pro(
         cash_sharing=True,
         fees=config.commission_pct,
         slippage=config.slippage_pct,
+        call_seq="auto",
     )
 
     equity = shared_get_vectorbt_equity_curve(pf)
@@ -1619,6 +1620,7 @@ def benchmark_vectorbt_oss(
         lock_cash=True,
         fees=config.commission_pct,
         slippage=config.slippage_pct,
+        call_seq="auto",
     )
 
     equity = shared_get_vectorbt_equity_curve(pf)

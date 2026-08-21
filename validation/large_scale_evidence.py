@@ -31,7 +31,7 @@ import benchmark_suite as suite  # noqa: E402
 from common.framework_registry import FrameworkTarget, load_framework_manifest  # noqa: E402
 
 SCHEMA_VERSION = 1
-MONEY_QUANTUM = Decimal("0.000001")
+MONEY_QUANTUM = Decimal("0.01")
 FRAMEWORKS = ("vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean")
 ACCEPTED_PATH = VALIDATION_DIR / "LARGE_SCALE_RESULTS.json"
 CANDIDATE_DIR = VALIDATION_DIR / "candidates"

@@ -148,6 +148,55 @@ def test_vectorbt_scale_pairs_use_version_specific_collateral_profiles(
     assert captured["profile_override"] == expected_profile
 
 
+@pytest.mark.parametrize("framework", ["vectorbt_pro", "vectorbt_oss"])
+def test_vectorbt_scale_adapter_uses_automatic_call_sequence(
+    framework: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    workload = _small_workload(module)
+    config = workload.benchmark_config()
+    prices, signals, dates = module.suite.generate_benchmark_data(config, seed=workload.seed)
+    captured: dict[str, object] = {}
+
+    class FakePortfolio:
+        @staticmethod
+        def from_orders(**kwargs):
+            captured.update(kwargs)
+            return object()
+
+    fake_vbt = type("FakeVectorBT", (), {"Portfolio": FakePortfolio})
+    monkeypatch.setattr(module.suite, "load_vectorbt_package", lambda _package: fake_vbt)
+    monkeypatch.setattr(
+        module.suite,
+        "shared_get_vectorbt_equity_curve",
+        lambda _portfolio: pd.Series([config.initial_cash], index=dates[-1:]),
+    )
+    monkeypatch.setattr(
+        module.suite,
+        "shared_extract_vectorbt_order_log",
+        lambda _portfolio: pd.DataFrame(),
+    )
+    monkeypatch.setattr(
+        module.suite,
+        "shared_extract_vectorbt_trade_log",
+        lambda _portfolio: pd.DataFrame(),
+    )
+
+    benchmark = getattr(module.suite, f"benchmark_{framework}")
+    benchmark(config, prices, signals, dates)
+
+    assert captured["call_seq"] == "auto"
+
+
+def test_scale_account_values_compare_at_cent_precision() -> None:
+    module = _load_module()
+
+    check = module.suite._scalar_check("final_value", 100_000.004, 100_000.001)
+
+    assert check["passed"] is True
+    assert check["canonical_expected"] == check["canonical_actual"] == 100_000.0
+
+
 def test_scale_trade_surface_is_reconstructed_from_canonical_fills() -> None:
     module = _load_module()
     fills = pd.DataFrame(
