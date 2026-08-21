@@ -27,6 +27,7 @@ validation/real_strategy_evidence.py
 validation/real_strategy_runner.py
 validation/real_strategy_lean.py
 validation/real_strategy_lean_crypto.py
+validation/real_strategy_lean_fx.py
 validation/common/types.py
 validation/native/vectorbt_behavior.py
 validation/native/backtrader_behavior.py

@@ -347,19 +347,20 @@ def test_target_trace_excludes_unchanged_targets() -> None:
     ]
 
 
-def test_terminal_value_uses_exact_microdollar_representation() -> None:
+def test_terminal_value_uses_cent_representation() -> None:
     suite = _load_benchmark_suite()
     expected = _benchmark_result(suite, "Reference")
-    same_microdollar = copy.deepcopy(_benchmark_result(suite, "ml4t.backtest"))
-    same_microdollar.final_value += 4e-8
-    different_microdollar = copy.deepcopy(_benchmark_result(suite, "ml4t.backtest"))
-    different_microdollar.final_value += 1e-6
+    same_cent = copy.deepcopy(_benchmark_result(suite, "ml4t.backtest"))
+    same_cent.final_value += 0.004
+    different_cent = copy.deepcopy(_benchmark_result(suite, "ml4t.backtest"))
+    different_cent.final_value += 0.01
 
-    same = suite.compare_benchmark_results_exact(expected, same_microdollar, initial_cash=100_000.0)
+    same = suite.compare_benchmark_results_exact(expected, same_cent, initial_cash=100_000.0)
     different = suite.compare_benchmark_results_exact(
-        expected, different_microdollar, initial_cash=100_000.0
+        expected, different_cent, initial_cash=100_000.0
     )
 
+    assert same["canonical_money_quantum"] == "0.01"
     assert same["passed"] is True
     assert different["passed"] is False
 

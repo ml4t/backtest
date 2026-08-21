@@ -76,8 +76,7 @@ def _export_daily_quotes(
         ) as archive:
             archive.writestr(f"{ticker}.csv", "\n".join(lines))
     manifest_path.write_text(
-        json.dumps({"signature": signature, "bundle_sha256": bundle_sha256}, indent=2)
-        + "\n",
+        json.dumps({"signature": signature, "bundle_sha256": bundle_sha256}, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -133,7 +132,7 @@ def _prepare_project(bundle: Path) -> tuple[Path, dict[str, Any]]:
     first = pd.Timestamp(cast(datetime, market["timestamp"].min())).date()
     last = pd.Timestamp(cast(datetime, market["timestamp"].max())).date() + timedelta(days=7)
     initial_cash = float(spec["backtest_config"]["cash"]["initial"])
-    main_code = f'''from AlgorithmImports import *
+    main_code = f"""from AlgorithmImports import *
 
 import csv
 import json
@@ -199,7 +198,7 @@ class RealStrategyFx(QCAlgorithm):
 
     def on_end_of_algorithm(self):
         self._runtime_path.write_text(json.dumps({{"engine_seconds": time.perf_counter() - self._started}}))
-'''
+"""
     (project / "main.py").write_text(main_code, encoding="utf-8")
     return project, {
         "manifest": manifest,
@@ -308,8 +307,7 @@ def main() -> int:
     evidence, fills, equity, rejections = run(args.bundle.resolve())
     write_evidence(args.output.resolve(), evidence, fills, equity, rejections)
     print(
-        f"fx_pairs: {evidence['num_fills']:,} fills, "
-        f"{evidence['engine_seconds']:.6f}s engine time"
+        f"fx_pairs: {evidence['num_fills']:,} fills, {evidence['engine_seconds']:.6f}s engine time"
     )
     return 0
 
