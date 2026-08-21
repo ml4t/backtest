@@ -47,7 +47,7 @@ PROFILES = {
     ("etfs", "backtrader"): ("backtrader_strict", []),
     ("etfs", "zipline"): ("zipline_strict", ["--price-decimals", "3"]),
     ("etfs", "lean"): ("lean", ["--price-decimals", "4"]),
-    ("cme_futures", "vectorbt_pro"): ("vectorbt_strict", []),
+    ("cme_futures", "vectorbt_pro"): ("vectorbt_futures_strict", []),
     ("cme_futures", "backtrader"): ("backtrader_strict", []),
     ("fx_pairs", "vectorbt_pro"): ("vectorbt_strict", []),
     ("fx_pairs", "vectorbt_oss"): ("vectorbt_oss_strict", []),

@@ -108,7 +108,11 @@ def run(bundle: Path, framework: str) -> tuple[dict[str, Any], pl.DataFrame, pl.
         "case_study": manifest["case_study"],
         "framework": framework,
         "comparison_profile": (
-            "vectorbt_strict" if framework == "vectorbt_pro" else "vectorbt_oss_strict"
+            "vectorbt_futures_strict"
+            if case_study == "cme_futures"
+            else "vectorbt_strict"
+            if framework == "vectorbt_pro"
+            else "vectorbt_oss_strict"
         ),
         "comparison_scope": comparison_scope(spec),
         "comparison_costs": "disabled",

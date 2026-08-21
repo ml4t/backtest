@@ -34,7 +34,7 @@ PAIR_PROFILES = {
     ("etfs", "backtrader"): "backtrader_strict",
     ("etfs", "zipline"): "zipline_strict",
     ("etfs", "lean"): "lean",
-    ("cme_futures", "vectorbt_pro"): "vectorbt_strict",
+    ("cme_futures", "vectorbt_pro"): "vectorbt_futures_strict",
     ("cme_futures", "backtrader"): "backtrader_strict",
     ("crypto_perps_funding", "lean"): "lean_crypto_future",
     ("fx_pairs", "vectorbt_pro"): "vectorbt_strict",

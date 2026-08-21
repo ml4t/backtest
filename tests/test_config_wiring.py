@@ -550,6 +550,13 @@ class TestShortCashPolicy:
         assert oss.fill_ordering is FillOrdering.PRIORITY
         assert oss.entry_order_priority is EntryOrderPriority.ORDER_VALUE_ASC
 
+    def test_vectorbt_futures_strict_uses_immediate_multiplier_execution(self):
+        config = BacktestConfig.from_preset("vectorbt_futures_strict")
+
+        assert config.fill_ordering is FillOrdering.PRIORITY
+        assert config.entry_order_priority is EntryOrderPriority.FREE_CASH_ASC
+        assert config.immediate_fill is True
+
     def test_lock_notional_update_modes_reproduce_native_cover_arithmetic(self):
         initial_cash = 800_928.6801081297
         entry_price = 445.1764349947099

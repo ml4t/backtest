@@ -295,6 +295,9 @@ VECTORBT_OSS_STRICT_PROFILE = deepcopy(VECTORBT_STRICT_PROFILE)
 VECTORBT_OSS_STRICT_PROFILE["account"]["lock_notional_update_mode"] = "combined_order"
 VECTORBT_OSS_STRICT_PROFILE["orders"]["entry_order_priority"] = "order_value_asc"
 
+VECTORBT_FUTURES_STRICT_PROFILE = deepcopy(VECTORBT_STRICT_PROFILE)
+VECTORBT_FUTURES_STRICT_PROFILE["orders"]["immediate_fill"] = True
+
 BACKTRADER_STRICT_PROFILE = deepcopy(BACKTRADER_PROFILE)
 BACKTRADER_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 BACKTRADER_STRICT_PROFILE["orders"]["next_bar_submission_precheck"] = True
@@ -409,6 +412,7 @@ _PROFILES = {
     "ibkr_us_stocks_fixed": IBKR_US_STOCKS_FIXED_PROFILE,
     "vectorbt_strict": VECTORBT_STRICT_PROFILE,
     "vectorbt_oss_strict": VECTORBT_OSS_STRICT_PROFILE,
+    "vectorbt_futures_strict": VECTORBT_FUTURES_STRICT_PROFILE,
     "backtrader_strict": BACKTRADER_STRICT_PROFILE,
     "zipline_strict": ZIPLINE_STRICT_PROFILE,
 }
