@@ -1,29 +1,38 @@
 {
   "comparison_policy": {
-    "canonical_quantum": "0.00000001",
+    "account_money_fields": [
+      "cash",
+      "commission",
+      "equity",
+      "final_value"
+    ],
+    "account_money_quantum": "0.01",
     "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
-    "meaning": "zero numeric gap after canonical quantization, not bit identity",
+    "meaning": "account-money gaps round to zero cents; all other numeric gaps round to zero at 1e-8",
+    "record_numeric_quantum": "0.00000001",
     "rounding": "ROUND_HALF_EVEN",
     "timestamp_domain": {
       "cme_futures": "session date",
       "crypto_perps_funding": "exact UTC event timestamp",
-      "etfs": "session date"
+      "etfs": "session date",
+      "fx_pairs": "session date"
     }
   },
-  "generated_at": "2026-08-20T09:16:30.969468+00:00",
+  "generated_at": "2026-08-21T18:59:21.083785+00:00",
   "provenance": {
     "adapters": {
-      "backtrader": "4eab4c5b39f05409bec23a298fc1bb45be1d86ef9beead2faba29231614fc5ec",
-      "comparison_input": "fa6f6b87ffe4d1b9c5b5ea108280f8abe6aec829814caee5f5eef07615ee7aee",
-      "evidence_builder": "492213fbdbe4bad1a00d21f451e549eefc853a93655aa45cbe35c7bbe0f7b078",
+      "backtrader": "12b32f6a25cde4664c1884b2745449bf42d51ec51df96d423b373835b2d445f4",
+      "comparison_input": "33540c2626377b140d80f416c7121472aa1314dc876734340bf96c16ba366ed1",
+      "evidence_builder": "0335a68f725351c603a2792032b123a957fac88481e50b7ab0ebca9f841e499f",
       "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
-      "lean_equity": "5b47b337f6876d195b6c82e0d86261cac594f82b258e54305920d49ed2dec78e",
-      "ml4t": "34c31241b03cffc66a97ff4af93528b248a61d30a2062123bd9f142b226bff59",
-      "vectorbt_oss": "f81eebf8199f032ddb5d59e7e3b234f596293189a8983ad64e1db4f24a3adf23",
-      "vectorbt_pro": "f81eebf8199f032ddb5d59e7e3b234f596293189a8983ad64e1db4f24a3adf23",
-      "zipline": "34e112b56db9e8cb7cc6d0efee607ae8f781c802d05528d313d4ff9582434994"
+      "lean_equity": "fcc4888fa43f7f1e10c3f27f028aa522e36ae4112c2418641b270dc0a2ceb6f1",
+      "lean_fx": "5dae59ecac5e3768e95e2b62bb815ba725bdfea6db5761d65eb0bff26507e191",
+      "ml4t": "a59e683479c82db2542d25cab8aba3666f6947ce584b2622873a17598d8004cc",
+      "vectorbt_oss": "c9fe6353d107d928fda95a6f050d632c1703a2c25f2e49c5f88ef87ef892d0db",
+      "vectorbt_pro": "c9fe6353d107d928fda95a6f050d632c1703a2c25f2e49c5f88ef87ef892d0db",
+      "zipline": "917a4495e5e4c1b2f36c4cebe8c0c5d6ae513b46bcd495d3230d86b449fa4c68"
     },
-    "applicability_sha256": "404611561d271935c3670cdb9ff7bb86b847ee85238fe5613ab8daf4c90f69ef",
+    "applicability_sha256": "4cadce3585d02cf5f2193b8061205ce031be6c87d50e3c852ef2e29c9fcb5ca7",
     "cpu_count": 24,
     "frameworks": {
       "backtrader": {
@@ -120,9 +129,9 @@
     },
     "machine": "x86_64",
     "ml4t": {
-      "commit": "9438fe6c6338c4f7efca899a0fe619d7422e0b99",
+      "commit": "ff53e0934a7b12d6e634e15c756e1e41f6e36898",
       "dirty": false,
-      "engine_source_sha256": "20a282b1c25c436a69658939fcb9f6261fe054243b446f9d4525172dfade5d9d"
+      "engine_source_sha256": "9adef15e484c234c672114e9f0fcf3b5017e6b9399b2977df64a6691123ba420"
     },
     "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
     "python": "3.12.11"
@@ -131,13 +140,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 0.27958540502004325,
-        "ml4t": 0.4785348370205611,
+        "framework": 0.35220068879425526,
+        "ml4t": 0.44818943087011576,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "d135bb55be83965d0650a6ae7040583ed13f918d8c3209c8d2dcd7a57bdf42d7",
-        "ml4t_manifest_sha256": "5a3310758c49a2eeb9a4aee79db4d14bf5d7e7e572e949bb87ae593529596a47"
+        "framework_manifest_sha256": "5d3c8a55d7c59fea32fe34bc558d68c9a8859da66a6fcbe750f229c4356cb120",
+        "ml4t_manifest_sha256": "4269610f8120110470e4862e95b00ef3818f34471b77995e6b47d5093e53bc4d"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -167,9 +176,10 @@
           "first_divergence": null,
           "framework_records": 1995,
           "framework_sha256": "2a90d6fb0aba61ab170d077e3c648f46bd719a3fd286625e393827b9bd40aef5",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1995,
-          "ml4t_sha256": "35b169e25c0face2b5e714bcef7f8a871eb1202ef26dca0a8e363dde0b9c35f4",
+          "ml4t_sha256": "ee65eacc4a4a1222e005512020bb871488b7a53bb18210702025052337afa6d9",
           "passed": true
         },
         "fills": {
@@ -177,17 +187,19 @@
           "framework_records": 2466,
           "framework_sha256": "4fd8e258ca5d6c1b682bbdfc5c36676ab0ba7a50c4b825be460ce628852e5639",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 2466,
-          "ml4t_sha256": "8e7fa6334fe7e70a236ecf5b326cca611cca899a2e578157b4616782b9766a9e",
+          "ml4t_sha256": "a5436a800e80b57fe95d35f100862ec81e8b28a5e8ee751ba113a0043c089fd9",
           "passed": true
         },
         "terminal": {
           "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "11db1c456d36b30c4d6fe19414e21296ed1ea78289f54c50e82b6034b7f8c883",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
-          "ml4t_sha256": "57b2a04fa64b67afab474dfd60eb02467ce8f45f4b1a6334192432ff1620eba7",
+          "ml4t_sha256": "14bd8bb591826220dccc384e542a5a40af798f04b90d5406f1822537a5caa368",
           "passed": true
         }
       }
@@ -195,13 +207,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 0.1841805730946362,
-        "ml4t": 0.48532013804651797,
+        "framework": 0.2262860331684351,
+        "ml4t": 0.44313507294282317,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "2f7ee8f7fe71b85cc04af93e1d49830a01b0b7371602913b4173be2ece2a1630",
-        "ml4t_manifest_sha256": "3d0b205eebc6d5e2239390e73d884d233d3a1ba00048cc3b4071b21c2e37a2c5"
+        "framework_manifest_sha256": "b7cf19937712c780be2f05ee223aa923ddcd3ff2d9a164a7f021f39296e0b1be",
+        "ml4t_manifest_sha256": "18680f5811c16770a7b3cc080b8075bd15154e95349c5bf6110cfa2462cbd3f8"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -231,9 +243,10 @@
           "first_divergence": null,
           "framework_records": 1995,
           "framework_sha256": "2a90d6fb0aba61ab170d077e3c648f46bd719a3fd286625e393827b9bd40aef5",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1995,
-          "ml4t_sha256": "35b169e25c0face2b5e714bcef7f8a871eb1202ef26dca0a8e363dde0b9c35f4",
+          "ml4t_sha256": "ee65eacc4a4a1222e005512020bb871488b7a53bb18210702025052337afa6d9",
           "passed": true
         },
         "fills": {
@@ -241,17 +254,19 @@
           "framework_records": 2466,
           "framework_sha256": "4fd8e258ca5d6c1b682bbdfc5c36676ab0ba7a50c4b825be460ce628852e5639",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 2466,
-          "ml4t_sha256": "8e7fa6334fe7e70a236ecf5b326cca611cca899a2e578157b4616782b9766a9e",
+          "ml4t_sha256": "a5436a800e80b57fe95d35f100862ec81e8b28a5e8ee751ba113a0043c089fd9",
           "passed": true
         },
         "terminal": {
           "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "11db1c456d36b30c4d6fe19414e21296ed1ea78289f54c50e82b6034b7f8c883",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
-          "ml4t_sha256": "57b2a04fa64b67afab474dfd60eb02467ce8f45f4b1a6334192432ff1620eba7",
+          "ml4t_sha256": "14bd8bb591826220dccc384e542a5a40af798f04b90d5406f1822537a5caa368",
           "passed": true
         }
       }
@@ -259,13 +274,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 9.543913961853832,
-        "ml4t": 0.42560168588534,
+        "framework": 10.069945948198438,
+        "ml4t": 0.43428823817521334,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "9c62b1f9a9ae707dfe4e273a0c359ef4866c5ef7e9bd7209c8943ac7a9fb8725",
-        "ml4t_manifest_sha256": "b858fd06cbf6eba57d462a1bcd301a8ea13b6643dbdd334148bbf9e74e057404"
+        "framework_manifest_sha256": "a1d510ae17c9ea1cb413443541a44cfd69465ffb39f9065de539a7dbdada1b16",
+        "ml4t_manifest_sha256": "e44ff4923a37e958ec8d244ad380e521fab6a8faea0b6cc6999d409cdf0b2263"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -295,7 +310,8 @@
           "first_divergence": null,
           "framework_records": 1995,
           "framework_sha256": "e24fb0355c02e8e6fd24c3a050d058244d48d900682f1242e41938482a45affb",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1995,
           "ml4t_sha256": "2f657ea8deecd915e43d5f207661f1907358bc3172eca4e7f56cfc4b105fbd8f",
           "passed": true
@@ -305,6 +321,7 @@
           "framework_records": 2433,
           "framework_sha256": "0efdc5bd3df5c4ee32d9e7601a0a0f205ca338c61217271432830cc5728767ea",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 2433,
           "ml4t_sha256": "3535fd059ff949dafefd38383f3883a273073b0d982f8d19ba682137e5c3e629",
           "passed": true
@@ -314,6 +331,7 @@
           "framework_records": 1,
           "framework_sha256": "cc5553d35594bb9f739671460ea2ddfbc7151b631d07ad81792942dd32c22cf9",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "cc5553d35594bb9f739671460ea2ddfbc7151b631d07ad81792942dd32c22cf9",
           "passed": true
@@ -322,7 +340,8 @@
           "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "bab10acfe67a203e84aa8ee135c37a84462af6281afc20dc288ccc96a6af1f1a",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "e00b039f6819ab12344af27396c8915f76913726e723c079d6f2c80edb0df0f6",
           "passed": true
@@ -332,13 +351,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 3.9974202138837427,
-        "ml4t": 0.4310232000425458,
+        "framework": 4.680360711179674,
+        "ml4t": 0.4132228987291455,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "00acb9dac7fc350fb50b21e0fe5e954c276768dab19d911235be58d190a4a2c2",
-        "ml4t_manifest_sha256": "749621b72e2daf5f8cd0ea76e55073c235f3fa2884a74e7d266d3163426d8da7"
+        "framework_manifest_sha256": "35e57e7382addeac02b6f298281d30db117a670f07a20e883bb88e76b1a4f554",
+        "ml4t_manifest_sha256": "21618f05a748441574715fa64ca5dc3569b90d34676264ce00e9a8b184c3a079"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -368,7 +387,8 @@
           "first_divergence": null,
           "framework_records": 1995,
           "framework_sha256": "a5face19b441f6cf41b92e81c4458eff3428a7835cd4465c468c4e3d75ff311d",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1995,
           "ml4t_sha256": "8bafee4ab985e6e89429cdaa327caabe06d92af700c03587e5d9e6459e499e25",
           "passed": true
@@ -378,6 +398,7 @@
           "framework_records": 2458,
           "framework_sha256": "e7845f778289a093b7b13703938ac1aff36060e55841c658fa3c4cfaf7d66e80",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 2458,
           "ml4t_sha256": "c78d44621cdcd2f4b2e1797ba6b0a50a76555f210597189a73ab57ec5f8ea672",
           "passed": true
@@ -386,7 +407,8 @@
           "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "def79e34efb8b45e3f792ede075b8cdc2bb7e409b26d6e2584f5c5d7f9486726",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "4e87bd8a979d23c1189bde4d37dcbf51f9a32462a653e436223e7cf29dc494b8",
           "passed": true
@@ -396,13 +418,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 2.829744319198653,
-        "ml4t": 0.5412690830416977,
+        "framework": 2.9128032363951206,
+        "ml4t": 0.5367709458805621,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "c1bad80481cd388f8dd90f7d65df42b99c7791a296beaf48a694deb32d1cbd26",
-        "ml4t_manifest_sha256": "e4fd380ebf07636fe540774d08d7004391cfa1adfe8a9cebdab286be41041dfd"
+        "framework_manifest_sha256": "882552dcc873d0bae6d6dac25df57af91e9818a37c956f212ddf8373d9997e6f",
+        "ml4t_manifest_sha256": "68c79478f6dbfdb59fe4ec8a5e03f07d6ddfe4bbfc47b010b7ceeac2518dedf7"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -432,7 +454,8 @@
           "first_divergence": null,
           "framework_records": 1995,
           "framework_sha256": "16f270b64f43ed22739d234d1b7abe1611c253828a5964411aae8fa3955b9730",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1995,
           "ml4t_sha256": "30beda4a3a1167d861ee2c16622ef00c00ded113c1acf6dea0b8eaf0b78fd76e",
           "passed": true
@@ -449,7 +472,8 @@
           "first_divergence": null,
           "framework_records": 1995,
           "framework_sha256": "7959271a1f6e2dc65ee85a40114db98334a8852941a2fea28948bdf9eaeff5d1",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1995,
           "ml4t_sha256": "90912934200276e9da497a2ac61e5b459b660815f3b63f43c971e4c4f553b092",
           "passed": true
@@ -459,6 +483,7 @@
           "framework_records": 2457,
           "framework_sha256": "bb7685c44f3439854f69c28ed45f00cf6590c41fb4186e008bfc5ec8854c8f34",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 2457,
           "ml4t_sha256": "bb7685c44f3439854f69c28ed45f00cf6590c41fb4186e008bfc5ec8854c8f34",
           "passed": true
@@ -468,6 +493,7 @@
           "framework_records": 1,
           "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
           "passed": true
@@ -476,7 +502,8 @@
           "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "dcdf690e7ea4a122b3ca6a083112a518058dc72bdba2bb120334d4b9636f47fc",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "4e9b140ade6e038a406e3a9332649f239d317a7666468785ce8a1c7f89318bff",
           "passed": true
@@ -486,13 +513,13 @@
     {
       "case_study": "cme_futures",
       "engine_seconds": {
-        "framework": 0.30091611691750586,
-        "ml4t": 0.4438712957780808,
+        "framework": 0.38148511992767453,
+        "ml4t": 0.4344728090800345,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "63dccf50e00d16ccda27ffb676d8aa4ac3baec59fa033d041d1be2eeac200f66",
-        "ml4t_manifest_sha256": "b302f0c5f8a46639739c82f6c98102c10d66ae4616ae396a026517bd3a7fd3af"
+        "framework_manifest_sha256": "1c122d753ebba99fe99c7395a21b71b08368a0819acd142b59f91ce459a277fd",
+        "ml4t_manifest_sha256": "1d534fcc9bc24eaf384e626691db1390df175fe5b91d2b101996750f16e893fb"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -507,8 +534,8 @@
         "detected": true,
         "mutation": "first fill price + 0.00000001"
       },
-      "profile": "vectorbt_strict",
-      "status": "fail",
+      "profile": "vectorbt_futures_strict",
+      "status": "pass",
       "surfaces": {
         "equity": {
           "coverage": {
@@ -519,55 +546,34 @@
             "shared_timestamps": 1595
           },
           "coverage_passed": true,
-          "first_divergence": {
-            "canonical_gap": "0.00000001",
-            "field": "equity",
-            "framework": {
-              "equity": "10000000.0",
-              "timestamp": "2019-01-04"
-            },
-            "index": 310,
-            "kind": "record",
-            "ml4t": {
-              "equity": "9999999.999999993",
-              "timestamp": "2019-01-04"
-            }
-          },
+          "first_divergence": null,
           "framework_records": 1595,
           "framework_sha256": "b1b40cf1cbcbc671db8670a19066dfaa77b497e6d03b06d83f087ad0a8aefc2c",
-          "max_canonical_difference": "0.00000010",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000010",
           "ml4t_records": 1595,
           "ml4t_sha256": "b3d629a19f386d6688964e89188f3ba27c95d34be5e96e22a1c9c8b83427a98b",
-          "passed": false
+          "passed": true
         },
         "fills": {
           "first_divergence": null,
           "framework_records": 3545,
           "framework_sha256": "33a8c1d5aac88de6255f5a23742619e68dcf77804f5158f02a910df265d5c154",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 3545,
           "ml4t_sha256": "7588d63e48658ce630d22b814df79345ae7a8fdf53be1f133858f44b9f375971",
           "passed": true
         },
         "terminal": {
-          "first_divergence": {
-            "canonical_gap": "0.00000007",
-            "field": "final_value",
-            "framework": {
-              "final_value": "21780101.163148317"
-            },
-            "index": 0,
-            "kind": "record",
-            "ml4t": {
-              "final_value": "21780101.16314839"
-            }
-          },
+          "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "f0c1745e2a779c7b4127d81f854e355c791224c93f190167be7207250d8fe271",
-          "max_canonical_difference": "0.00000007",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000007",
           "ml4t_records": 1,
           "ml4t_sha256": "9f2c5af308ff360b1b6987eb84facaeeb98a44d08471480f4eeccb85ef11fc46",
-          "passed": false
+          "passed": true
         }
       }
     },
@@ -581,13 +587,13 @@
     {
       "case_study": "cme_futures",
       "engine_seconds": {
-        "framework": 2.7796935220248997,
-        "ml4t": 0.41417676699347794,
+        "framework": 3.393498844001442,
+        "ml4t": 0.4194304537959397,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "2c850d6afc2bc827c69ed01f96d590b2d981c2fcb376c333aa71b370f6b7b245",
-        "ml4t_manifest_sha256": "345c0767665f38fde7458f02c2b4348aeaa31efbaf18a8cd3b79738cda9cdf95"
+        "framework_manifest_sha256": "94c30997c481864505f953e03ab3932406738151c0361c4240139806049b8180",
+        "ml4t_manifest_sha256": "14844a0306cd06366bdc143e11a09b906a4a40fc7dd0f32e6e276699dc6c1811"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -603,7 +609,7 @@
         "mutation": "first fill price + 0.00000001"
       },
       "profile": "backtrader_strict",
-      "status": "fail",
+      "status": "pass",
       "surfaces": {
         "equity": {
           "coverage": {
@@ -614,32 +620,21 @@
             "shared_timestamps": 1595
           },
           "coverage_passed": true,
-          "first_divergence": {
-            "canonical_gap": "0.00000001",
-            "field": "equity",
-            "framework": {
-              "equity": "8260040.797423724",
-              "timestamp": "2019-02-01"
-            },
-            "index": 330,
-            "kind": "record",
-            "ml4t": {
-              "equity": "8260040.7974237185",
-              "timestamp": "2019-02-01"
-            }
-          },
+          "first_divergence": null,
           "framework_records": 1595,
           "framework_sha256": "420284821eb233db8012d42b32f4df081744545df7c98df38e974ef87b8d8d1c",
-          "max_canonical_difference": "0.00000015",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000015",
           "ml4t_records": 1595,
           "ml4t_sha256": "89ba33c5e41e25db2aec0cb23ce625fbe8b2ff7ff1109f4d461dc9956105b7f1",
-          "passed": false
+          "passed": true
         },
         "fills": {
           "first_divergence": null,
           "framework_records": 3376,
           "framework_sha256": "079faf95a56575dca51207bf0587d0d792fe66dff32021f19d85114d8b3dfcb0",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 3376,
           "ml4t_sha256": "4e8fc7f1acdbf85567d0c8148f2b1532dee362b1f4913058851d29a5e20896ee",
           "passed": true
@@ -649,29 +644,20 @@
           "framework_records": 1,
           "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
           "passed": true
         },
         "terminal": {
-          "first_divergence": {
-            "canonical_gap": "0.00000015",
-            "field": "final_value",
-            "framework": {
-              "final_value": "37957959.26743194"
-            },
-            "index": 0,
-            "kind": "record",
-            "ml4t": {
-              "final_value": "37957959.26743179"
-            }
-          },
+          "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "6ba61c2f2bdff3890ecbfac82425f15f4c2efaec002753bc6c31b52636106e10",
-          "max_canonical_difference": "0.00000015",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000015",
           "ml4t_records": 1,
           "ml4t_sha256": "66cdabf91ff8007a7010c0f36cf05e84eb4d4944a3bb85d8b296463ebdfe908a",
-          "passed": false
+          "passed": true
         }
       }
     },
@@ -720,13 +706,13 @@
     {
       "case_study": "crypto_perps_funding",
       "engine_seconds": {
-        "framework": 2.9820058289915323,
-        "ml4t": 0.6733848329167813,
+        "framework": 3.066414559725672,
+        "ml4t": 0.6641436917707324,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "bb339775492ee0429d0834c1335d376237fc28800612148e32789f2784f26343",
-        "ml4t_manifest_sha256": "587f576dfb52461f7acab5203d4424a480f56804896129d6772bd98fa4376ae6"
+        "framework_manifest_sha256": "3332095cd5eb1b1f98c0b49230bd33837a94572bebf67ce932b49fde32a4f115",
+        "ml4t_manifest_sha256": "706c8626c9897935cab2aec882a85dc6e251dc19c390f849c96eebcf79208619"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -756,7 +742,8 @@
           "first_divergence": null,
           "framework_records": 2426,
           "framework_sha256": "e6dd17ae20dd049dc63534d4f83ddd2f663d036811e3aa588644a8a753dc6f22",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 2426,
           "ml4t_sha256": "6bcc1f4bec12a1bf8cdc8ea800aae99f742295686e2529c5572c7590d863baf7",
           "passed": true
@@ -766,6 +753,7 @@
           "framework_records": 8408,
           "framework_sha256": "724263fa265d59ef7d650a7f168a35aa056af6db81b7934519a87bbebf281cf0",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 8408,
           "ml4t_sha256": "b3e3877d7eded50fa0f5d168086fcfb9f1e18856a3506479f2312e48186d234f",
           "passed": true
@@ -775,6 +763,7 @@
           "framework_records": 1,
           "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
           "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
           "passed": true
@@ -783,9 +772,305 @@
           "first_divergence": null,
           "framework_records": 1,
           "framework_sha256": "59a1167e8efd652cf03b0ce0b34c9612fdd03c2e653c0e282a007ca950140635",
-          "max_canonical_difference": "0.00000000",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
           "ml4t_records": 1,
           "ml4t_sha256": "66c05a1c0dbc0b8b194846e4f2709cb7c887955f3d86049f6336a992c3967e6b",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "engine_seconds": {
+        "framework": 0.38346476294100285,
+        "ml4t": 0.28412084514275193,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "778382328959779e1cf63d3171fde717d73446027840fd494722212644094c31",
+        "ml4t_manifest_sha256": "a7a4d0806c46614cf5b96f1484340e99443b63ac7e425ea605d053607a36b1bf"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "vectorbt_pro",
+      "input_bundle_sha256": "48922296cea03bfc9867a9c4e1a1d352a0bd54c0b48671e3ca8d1fdddb95d762",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "vectorbt_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "first_framework_only_timestamp": null,
+            "first_ml4t_only_timestamp": null,
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 2108
+          },
+          "coverage_passed": true,
+          "first_divergence": null,
+          "framework_records": 2108,
+          "framework_sha256": "ca8d2de29633e2319a06c13dd050ebc70e0ee5f47d7455e008fda94cc07a20ae",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 2108,
+          "ml4t_sha256": "4bbabb3199191cba4dbc13ffad57faed4b7a9fc6f20b3c99d40ee3d5c40b4ea7",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 279,
+          "framework_sha256": "6fe4af83451ecff46820abe706e8b01887361b0d43fc646b6b3d5ad2594f51d7",
+          "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 279,
+          "ml4t_sha256": "643eed191d0be8b0d879d6f8da0ed9bd3d37e6e73554d3a422b7855f2ae3a305",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "0daf07a440fc00d56c7401b48468515ae75e508f54cdd4a98ac62782c5ff18de",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "c26278d4e85d29d95ff5ea0be96a226fb4e9c0e4acd90a13afc3dfaccfbf30ab",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "engine_seconds": {
+        "framework": 0.2007552543655038,
+        "ml4t": 0.16021538618952036,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "ebab0b2d18bdf7a9cbe196e18df9c218c262614fca83a90074bc89dc8ba125d9",
+        "ml4t_manifest_sha256": "a08f407262558849043aa1faaf5d76685ba09d7beb7fe85957e71a04f258a2df"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "vectorbt_oss",
+      "input_bundle_sha256": "48922296cea03bfc9867a9c4e1a1d352a0bd54c0b48671e3ca8d1fdddb95d762",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "vectorbt_oss_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "first_framework_only_timestamp": null,
+            "first_ml4t_only_timestamp": null,
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 2108
+          },
+          "coverage_passed": true,
+          "first_divergence": null,
+          "framework_records": 2108,
+          "framework_sha256": "076a8090afe64fa21b6aa967168d69602a30fb1e22038dc3de2437eb1e707849",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 2108,
+          "ml4t_sha256": "71311bd0df6bf912c51b251fff942161842fba067c3ae3d7a21d118492d60cae",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 279,
+          "framework_sha256": "bbc82764aec30524c8ebf5b3d9457de9c84fd4f67c135e4efa3115cc35006066",
+          "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 279,
+          "ml4t_sha256": "d5d8f6ac4292f066e1aba93ae8f37a10ea54b2db14b340c4f7b52fea52de4b27",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "1f6f28b2bd5a8d99986433e7b3d11ad6e3da8006e82d2053d781b75dffbcccef",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "c26278d4e85d29d95ff5ea0be96a226fb4e9c0e4acd90a13afc3dfaccfbf30ab",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "engine_seconds": {
+        "framework": 0.4888714486733079,
+        "ml4t": 0.2513722819276154,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "ff979adcfb1f3adb59bc5525c021411a5de6582a185b2c221765299e81663dff",
+        "ml4t_manifest_sha256": "09a88328b8229064cd34342368d383a590af811570dc0f106d3a909ea9276b5a"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "backtrader",
+      "input_bundle_sha256": "48922296cea03bfc9867a9c4e1a1d352a0bd54c0b48671e3ca8d1fdddb95d762",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "backtrader_strict",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "first_framework_only_timestamp": null,
+            "first_ml4t_only_timestamp": null,
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 2108
+          },
+          "coverage_passed": true,
+          "first_divergence": null,
+          "framework_records": 2108,
+          "framework_sha256": "713d5b42eee659f6fbc86f1f9464fb739e88858c7c3bc5abd3872587a81f0de0",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 2108,
+          "ml4t_sha256": "01932c0460149b2de5c69f4f29e042b097eae51f27aec0c0b5f3541f94153a6f",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 279,
+          "framework_sha256": "b9a95f0c849e6dab1d234b1c0434cc34eab1aae6e7f3fc662d003664aa0777d6",
+          "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 279,
+          "ml4t_sha256": "ca25c7e054636e277a9c81867cb2d0e99c62d37b5f06d5f476ecd2518a6f0c33",
+          "passed": true
+        },
+        "rejection_count": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "06dd3860a50aca03568369ac5b6bbdff55a9e7885967791a7eaefd522dd948b2",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "9a02b7a9b549411a78483d0602f840d407e6079d0b8bf239adf9020a17890a36",
+          "passed": true
+        }
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "framework": "zipline",
+      "reason": "no native spot-forex asset, currency cashbook, or conversion model",
+      "source": "https://zipline.ml4trading.io/api-reference.html",
+      "status": "unsupported"
+    },
+    {
+      "case_study": "fx_pairs",
+      "engine_seconds": {
+        "framework": 0.8786622299812734,
+        "ml4t": 0.15515215368941426,
+        "single_run_diagnostic_only": true
+      },
+      "evidence": {
+        "framework_manifest_sha256": "007c9c32e853ecad3869ef8716b2afa637262214f20fe22e8043f11bd83b6d07",
+        "ml4t_manifest_sha256": "7fa7ac332e0e5463f0b533a189c182ad8f20775546c89eb98852c92b21cd0ae2"
+      },
+      "excluded_surfaces": {
+        "accepted_unfilled_orders": "not exposed by every native runner",
+        "cash": "not exposed with common accounting semantics",
+        "closed_trades": "not a common native framework concept",
+        "intents": "shared frozen target input is identified, but engines do not expose a common native intent log",
+        "positions": "not exposed in a common native record schema by every runner"
+      },
+      "framework": "lean",
+      "input_bundle_sha256": "48922296cea03bfc9867a9c4e1a1d352a0bd54c0b48671e3ca8d1fdddb95d762",
+      "negative_control": {
+        "detected": true,
+        "mutation": "first fill price + 0.00000001"
+      },
+      "profile": "lean",
+      "status": "pass",
+      "surfaces": {
+        "equity": {
+          "coverage": {
+            "first_framework_only_timestamp": null,
+            "first_ml4t_only_timestamp": null,
+            "framework_only_timestamps": 0,
+            "ml4t_only_timestamps": 0,
+            "shared_timestamps": 2108
+          },
+          "coverage_passed": true,
+          "first_divergence": null,
+          "framework_records": 2108,
+          "framework_sha256": "c420ed9244bd6631ff9167b5b1ab2690d799f6a77d9f9b8e7eb5a9bffdf93b9a",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 2108,
+          "ml4t_sha256": "1cafa4bea5e48dc0d796161adb1a9dfbd325e501518ac8017d20beb9e1350b5e",
+          "passed": true
+        },
+        "fills": {
+          "first_divergence": null,
+          "framework_records": 279,
+          "framework_sha256": "d0adf0da2c5a8b942ca50bde6263c585d1d017c6fc181c7820d1449d50388de3",
+          "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 279,
+          "ml4t_sha256": "d0adf0da2c5a8b942ca50bde6263c585d1d017c6fc181c7820d1449d50388de3",
+          "passed": true
+        },
+        "rejection_count": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "max_canonical_difference": "0.00000000",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "59fbab4bac7cb12eee5b33c7df3f95e89686eb8f430c84695e63c7557c702414",
+          "passed": true
+        },
+        "terminal": {
+          "first_divergence": null,
+          "framework_records": 1,
+          "framework_sha256": "75d913ee6498cd1e0ed418e556b8df9d356c92c4b04d2c4a5f87a943cc6d7967",
+          "max_canonical_difference": "0.00",
+          "max_raw_difference": "0.00000000",
+          "ml4t_records": 1,
+          "ml4t_sha256": "5f4c425a705e6dfe1eed240307d4dd0ea9065ed16f4db3a05d0e9b831013082d",
           "passed": true
         }
       }
@@ -793,10 +1078,14 @@
   ],
   "schema_version": 1,
   "scope": {
+    "case_protocols": {
+      "fx_pairs": "USD-quoted pairs from the frozen target stream, preserving native USD valuation in every required engine"
+    },
     "case_studies": [
       "etfs",
       "cme_futures",
-      "crypto_perps_funding"
+      "crypto_perps_funding",
+      "fx_pairs"
     ],
     "frameworks": [
       "vectorbt_pro",
@@ -805,8 +1094,8 @@
       "zipline",
       "lean"
     ],
-    "real_strategy_equivalence_gate_passed": false,
-    "required_pairs": 8,
-    "unsupported_pairs": 7
+    "real_strategy_equivalence_gate_passed": true,
+    "required_pairs": 12,
+    "unsupported_pairs": 8
   }
 }

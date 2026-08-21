@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -95,6 +96,8 @@ def render_claims(
     real_performance: dict[str, Any] | None = None,
 ) -> str:
     """Render the canonical documentation block."""
+    if real_performance is None:
+        real_performance = _load_json(REAL_STRATEGY_PERFORMANCE)
     _validate_evidence(correctness, large_scale, real_strategy, real_performance)
     frameworks = correctness["frameworks"]
     records = correctness["records"]
@@ -148,6 +151,7 @@ def render_claims(
         "etfs": "ETF allocation",
         "cme_futures": "CME futures",
         "crypto_perps_funding": "Crypto perpetual funding",
+        "fx_pairs": "FX allocation (USD-quoted pairs)",
     }
     for record in required_real:
         target = real_targets[record["framework"]]
@@ -156,10 +160,21 @@ def render_claims(
         equity = record["surfaces"]["equity"]
         terminal = record["surfaces"]["terminal"]
         if record["status"] == "pass":
-            result = (
-                f"exact: {fills['framework_records']:,} fills, "
-                f"{equity['coverage']['shared_timestamps']:,} valuations, terminal"
-            )
+            equity_raw = Decimal(equity["max_raw_difference"])
+            terminal_raw = Decimal(terminal["max_raw_difference"])
+            if equity_raw == 0 and terminal_raw == 0:
+                result = (
+                    f"fills exact at 1e-8; "
+                    f"{equity['coverage']['shared_timestamps']:,} valuations and terminal "
+                    "exact at 1e-8"
+                )
+            else:
+                result = (
+                    f"fills exact at 1e-8; "
+                    f"{equity['coverage']['shared_timestamps']:,} valuations within $0.01 "
+                    f"(max raw gap ${equity['max_raw_difference']}); terminal within $0.01 "
+                    f"(raw gap ${terminal['max_raw_difference']})"
+                )
         else:
             details = ["fills exact" if fills["passed"] else "fills differ"]
             coverage = equity["coverage"]
@@ -186,18 +201,24 @@ def render_claims(
             "",
             "### Real-strategy audit",
             "",
-            f"{passed_real}/{len(required_real)} supported pairs pass. The audit uses three "
-            "production-selected strategies with frozen historical market data and model-derived "
-            "targets. A pass requires identical valuation timestamp coverage, zero numeric gap "
-            "after 1e-8 quantization at every valuation, the complete canonical fill stream, and "
-            "terminal value. "
-            "The two CME rows retain exact fills but fail the equity and terminal checks.",
+            f"{passed_real}/{len(required_real)} required pairs pass. The audit uses four "
+            "real-data strategy workloads with frozen historical market data and model-derived "
+            "targets. A pass requires identical valuation timestamp coverage, complete fill "
+            "streams equal at 1e-8, and account monetary values that round to the same cent. "
+            "The FX workload uses the USD-quoted pairs in its frozen target stream so every "
+            "required engine uses native USD valuation.",
+            "",
+            "The parity protocol disables transaction costs and position rules on both sides. It "
+            "tests target sizing, order sequencing, fills, cash and margin behavior, funding where "
+            "applicable, and valuation. It does not claim to reproduce each selected case-study "
+            "production result with its original costs and risk overlays.",
             "",
             "| Real strategy | Pinned framework | Current result | Evidence |",
             "|---|---|---|---|",
             *real_rows,
             "",
-            f"Engine-only timing samples for the six passing pairs are retained in "
+            f"Engine-only timing samples for all {len(real_performance['records'])} passing pairs "
+            "are retained in "
             f"[real-strategy performance evidence]({real_performance_url}). These measurements "
             "support only the named strategy, framework version, input bundle, and machine.",
             "",

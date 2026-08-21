@@ -113,8 +113,10 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
         assert f"`{pin['profile']}`" in claims
     assert "16/16 exact" in claims
     assert "synthetic stress workload contains 250 assets" in claims
-    assert "6/8 supported pairs pass" in claims
+    assert "12/12 required pairs pass" in claims
     assert "identical valuation timestamp coverage" in claims
+    assert "account monetary values that round to the same cent" in claims
+    assert "FX allocation (USD-quoted pairs)" in claims
     for record in large_scale["frameworks"]:
         target = record["target"]
         checks = generate_parity_claims._comparison_checks(record)
