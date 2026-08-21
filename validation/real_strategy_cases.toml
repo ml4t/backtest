@@ -32,3 +32,14 @@ timestamp_shift_hours = 0
 contract_specs = false
 funding = false
 required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]
+
+[[case]]
+id = "fx_pairs"
+asset_class = "foreign_exchange"
+production_path = "event_driven"
+comparison_universe = "USD-quoted pairs from the frozen target stream, preserving native USD valuation in every required engine"
+warmup = true
+timestamp_shift_hours = 0
+contract_specs = false
+funding = false
+required_backtest_artifacts = ["daily_returns.parquet", "equity.parquet", "fills.parquet", "portfolio_state.parquet", "spec.json", "trades.parquet", "weights.parquet"]

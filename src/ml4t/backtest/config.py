@@ -102,7 +102,7 @@ class FillOrdering(str, Enum):
     EXIT_FIRST (default):
         All exits → mark-to-market → all entries (with gatekeeper validation).
         Capital-efficient: exits free cash before entries need it.
-        Matches VectorBT ``call_seq='auto'`` behavior.
+        Matches engines that explicitly process reductions before additions.
 
     FIFO:
         Orders process in submission order with sequential cash updates.
@@ -114,17 +114,24 @@ class FillOrdering(str, Enum):
         without exit/entry separation. Cash updates after each individual fill.
         Unlike EXIT_FIRST, exits do not pre-free cash for later entries.
         Matches LEAN's per-order sequential buying-power model.
+
+    PRIORITY:
+        Sort all orders as one sequence using ``entry_order_priority``. This preserves
+        combined reversal orders and matches portfolio simulators whose automatic call
+        sequence does not separate exits from entries.
     """
 
     EXIT_FIRST = "exit_first"
     FIFO = "fifo"
     SEQUENTIAL = "sequential"
+    PRIORITY = "priority"
 
 
 class EntryOrderPriority(str, Enum):
     """Priority for sequencing entry orders under cash constraints.
 
-    Applied when ``fill_ordering=EXIT_FIRST`` after exits are processed.
+    Applied to entries under ``fill_ordering=EXIT_FIRST`` and to the complete order
+    sequence under ``fill_ordering=PRIORITY``.
 
     SUBMISSION:
         Keep strategy submission order.
@@ -134,11 +141,20 @@ class EntryOrderPriority(str, Enum):
 
     NOTIONAL_ASC:
         Process smaller notional entries first.
+
+    FREE_CASH_ASC:
+        Process orders by their estimated free-cash use, including collateral released by
+        reversals.
+
+    ORDER_VALUE_ASC:
+        Process entries by signed target-order value, with sell orders before buy orders.
     """
 
     SUBMISSION = "submission"
     NOTIONAL_DESC = "notional_desc"
     NOTIONAL_ASC = "notional_asc"
+    FREE_CASH_ASC = "free_cash_asc"
+    ORDER_VALUE_ASC = "order_value_asc"
 
 
 class ShortCashPolicy(str, Enum):

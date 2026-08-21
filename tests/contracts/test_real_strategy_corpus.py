@@ -71,11 +71,12 @@ def test_case_contract_contains_selected_real_case_studies() -> None:
 
     cases = module.load_case_contract()
 
-    assert len(cases) == 3
+    assert len(cases) == 4
     assert {case["id"] for case in cases} == {
         "cme_futures",
         "crypto_perps_funding",
         "etfs",
+        "fx_pairs",
     }
     assert all(case["production_path"] == "event_driven" for case in cases)
 

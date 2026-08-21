@@ -286,11 +286,14 @@ VECTORBT_STRICT_PROFILE = deepcopy(VECTORBT_PROFILE)
 VECTORBT_STRICT_PROFILE["account"]["short_cash_policy"] = "lock_notional"
 VECTORBT_STRICT_PROFILE["orders"]["reject_on_insufficient_cash"] = True
 VECTORBT_STRICT_PROFILE["orders"]["partial_fills_allowed"] = True
-VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "fifo"
-VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
+VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "priority"
+VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "free_cash_asc"
+VECTORBT_STRICT_PROFILE["orders"]["immediate_fill"] = False
+VECTORBT_STRICT_PROFILE["orders"]["rebalance_mode"] = "snapshot"
 
 VECTORBT_OSS_STRICT_PROFILE = deepcopy(VECTORBT_STRICT_PROFILE)
 VECTORBT_OSS_STRICT_PROFILE["account"]["lock_notional_update_mode"] = "combined_order"
+VECTORBT_OSS_STRICT_PROFILE["orders"]["entry_order_priority"] = "order_value_asc"
 
 BACKTRADER_STRICT_PROFILE = deepcopy(BACKTRADER_PROFILE)
 BACKTRADER_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"

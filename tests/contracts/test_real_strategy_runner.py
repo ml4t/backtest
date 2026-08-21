@@ -40,7 +40,11 @@ def _load_evidence():
     spec = importlib.util.spec_from_file_location("ml4t_real_strategy_evidence", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
     return module
 
 
@@ -49,7 +53,11 @@ def _load_benchmark():
     spec = importlib.util.spec_from_file_location("ml4t_real_strategy_benchmark", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
     return module
 
 
@@ -155,6 +163,38 @@ def test_real_strategy_comparator_detects_one_quantum_mutation() -> None:
     }
 
 
+def test_real_strategy_comparator_rounds_account_money_to_cents() -> None:
+    evidence = _load_evidence()
+    framework = [{"timestamp": "2024-01-01", "equity": "1000.00000000"}]
+    residual = [{"timestamp": "2024-01-01", "equity": "1000.00000015"}]
+
+    result = evidence.compare_records(framework, residual, numeric_fields=("equity",))
+
+    assert result["passed"] is True
+
+
+def test_real_strategy_comparator_rejects_one_cent_account_money_difference() -> None:
+    evidence = _load_evidence()
+    framework = [{"final_value": "1000.00"}]
+    changed = [{"final_value": "1000.01"}]
+
+    result = evidence.compare_records(framework, changed, numeric_fields=("final_value",))
+
+    assert result["passed"] is False
+    assert result["first_divergence"]["canonical_gap"] == "0.01"
+
+
+def test_real_strategy_comparator_rejects_money_gap_that_rounds_to_one_cent() -> None:
+    evidence = _load_evidence()
+    framework = [{"final_value": "1000.000"}]
+    changed = [{"final_value": "1000.006"}]
+
+    result = evidence.compare_records(framework, changed, numeric_fields=("final_value",))
+
+    assert result["passed"] is False
+    assert result["first_divergence"]["canonical_gap"] == "0.01"
+
+
 def test_real_strategy_comparator_rejects_missing_valuation_timestamp() -> None:
     evidence = _load_evidence()
     framework = [
@@ -197,6 +237,35 @@ def test_comparison_market_applies_production_daily_calendar() -> None:
     filtered = comparison_input.filter_comparison_market(market, spec)
 
     assert filtered["timestamp"].to_list() == [datetime(2018, 12, 4)]
+
+
+def test_fx_comparison_uses_native_usd_quoted_pairs() -> None:
+    comparison_input = _load_input()
+    market = pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, 1)] * 3,
+            "symbol": ["EUR_USD", "USD_JPY", "EUR_GBP"],
+            "close": [1.1, 145.0, 0.85],
+        }
+    )
+    targets = market.select("timestamp", "symbol").with_columns(pl.lit(0.1).alias("weight"))
+    spec = {
+        "backtest_config": {
+            "calendar": {
+                "calendar": "FX",
+                "data_frequency": "daily",
+                "enforce_sessions": False,
+                "timezone": "UTC",
+            },
+            "metadata": {"case_study": "fx_pairs"},
+        }
+    }
+
+    filtered_market = comparison_input.filter_comparison_market(market, spec)
+    filtered_targets = comparison_input.filter_comparison_targets(targets, spec)
+
+    assert filtered_market["symbol"].to_list() == ["EUR_USD"]
+    assert filtered_targets["symbol"].to_list() == ["EUR_USD"]
 
 
 def test_real_strategy_benchmark_interval_is_deterministic() -> None:

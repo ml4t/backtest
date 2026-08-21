@@ -15,7 +15,7 @@ from typing import Any
 import backtrader as bt
 import pandas as pd
 import polars as pl
-from real_strategy_input import filter_comparison_market
+from real_strategy_input import comparison_scope, filter_comparison_market, filter_comparison_targets
 
 
 def _sha256(path: Path) -> str:
@@ -131,7 +131,9 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame, pl.Da
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
     market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
-    targets = _target_map(pl.read_parquet(bundle / "targets.parquet"))
+    targets = _target_map(
+        filter_comparison_targets(pl.read_parquet(bundle / "targets.parquet"), spec)
+    )
     contracts = (
         json.loads((bundle / "contracts.json").read_text(encoding="utf-8"))
         if (bundle / "contracts.json").is_file()
@@ -177,6 +179,7 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame, pl.Da
         "case_study": manifest["case_study"],
         "framework": "backtrader",
         "comparison_profile": "backtrader_strict",
+        "comparison_scope": comparison_scope(spec),
         "comparison_costs": "disabled",
         "comparison_position_rules": "disabled",
         "input_bundle_sha256": manifest["bundle_sha256"],

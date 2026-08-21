@@ -28,6 +28,7 @@ from ml4t.backtest.config import (
     LateAssetPolicy,
     LockNotionalUpdateMode,
     MissingPricePolicy,
+    RebalanceMode,
     ShareType,
     ShortCashPolicy,
     SlippageType,
@@ -532,10 +533,12 @@ class TestShortCashPolicy:
     def test_vectorbt_strict_profile_preserves_native_cash_semantics(self):
         config = BacktestConfig.from_preset("vectorbt_strict")
         assert config.short_cash_policy == ShortCashPolicy.LOCK_NOTIONAL
-        assert config.fill_ordering == FillOrdering.FIFO
+        assert config.fill_ordering == FillOrdering.PRIORITY
         assert config.reject_on_insufficient_cash is True
         assert config.partial_fills_allowed is True
-        assert config.entry_order_priority == EntryOrderPriority.SUBMISSION
+        assert config.entry_order_priority == EntryOrderPriority.FREE_CASH_ASC
+        assert config.rebalance_mode == RebalanceMode.SNAPSHOT
+        assert config.immediate_fill is False
         assert get_profile_config("vectorbt_strict") != get_profile_config("vectorbt")
 
     def test_vectorbt_oss_strict_uses_combined_order_cash_updates(self):
@@ -544,6 +547,8 @@ class TestShortCashPolicy:
 
         assert pro.lock_notional_update_mode is LockNotionalUpdateMode.POSITION_LEGS
         assert oss.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER
+        assert oss.fill_ordering is FillOrdering.PRIORITY
+        assert oss.entry_order_priority is EntryOrderPriority.ORDER_VALUE_ASC
 
     def test_lock_notional_update_modes_reproduce_native_cover_arithmetic(self):
         initial_cash = 800_928.6801081297
@@ -859,7 +864,12 @@ class TestShortCashPolicy:
 
     @pytest.mark.parametrize(
         "fill_ordering",
-        [FillOrdering.EXIT_FIRST, FillOrdering.FIFO, FillOrdering.SEQUENTIAL],
+        [
+            FillOrdering.EXIT_FIRST,
+            FillOrdering.FIFO,
+            FillOrdering.SEQUENTIAL,
+            FillOrdering.PRIORITY,
+        ],
     )
     def test_position_legs_caps_underfunded_short_cover(self, fill_ordering):
         broker = _make_broker(
@@ -1264,6 +1274,63 @@ class TestEntryOrderPriority:
 
         assert broker.get_position("SMALL") is not None
         assert broker.get_position("BIG") is None
+
+    def test_free_cash_asc_accounts_for_collateral_released_by_reversal(self):
+        broker = _make_broker(
+            initial_cash=100.0,
+            fill_ordering=FillOrdering.EXIT_FIRST,
+            entry_order_priority=EntryOrderPriority.FREE_CASH_ASC,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+        )
+        _set_prices(broker, {"REVERSAL": 10.0, "NEW": 10.0})
+        broker.submit_order("REVERSAL", 5, OrderSide.SELL)
+        broker._process_orders()
+
+        broker.submit_order("NEW", 10, OrderSide.BUY)
+        broker.submit_order("REVERSAL", 10, OrderSide.BUY)
+        broker._process_orders()
+
+        assert [fill.asset for fill in broker.fills[-2:]] == ["REVERSAL", "NEW"]
+        assert broker.get_position("REVERSAL").quantity == 5.0
+        assert broker.get_position("NEW").quantity == 5.0
+
+    def test_order_value_asc_processes_short_entry_before_long_entry(self):
+        broker = _make_broker(
+            initial_cash=100.0,
+            fill_ordering=FillOrdering.EXIT_FIRST,
+            entry_order_priority=EntryOrderPriority.ORDER_VALUE_ASC,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"LONG": 10.0, "SHORT": 10.0})
+        broker.submit_order("LONG", 5, OrderSide.BUY)
+        broker.submit_order("SHORT", 5, OrderSide.SELL)
+
+        broker._process_orders()
+
+        assert [fill.asset for fill in broker.fills] == ["SHORT", "LONG"]
+
+    def test_priority_fill_ordering_sorts_exits_and_entries_together(self):
+        broker = _make_broker(
+            initial_cash=100.0,
+            fill_ordering=FillOrdering.PRIORITY,
+            entry_order_priority=EntryOrderPriority.ORDER_VALUE_ASC,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=False,
+        )
+        _set_prices(broker, {"COVER": 10.0, "SHORT": 10.0})
+        broker.submit_order("COVER", 2, OrderSide.SELL)
+        broker._process_orders()
+
+        broker.submit_order("COVER", 2, OrderSide.BUY)
+        broker.submit_order("SHORT", 1, OrderSide.SELL)
+        broker._process_orders()
+
+        assert [fill.asset for fill in broker.fills[-2:]] == ["SHORT", "COVER"]
 
     def test_fifo_processes_in_submission_order(self):
         """FIFO processes orders in submission order."""

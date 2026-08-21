@@ -76,6 +76,13 @@ class ExecutionEngine:
                 order_ids=order_ids,
                 include_orders_this_bar=include_orders_this_bar,
             )
+        elif ordering == "priority":
+            self._process_orders_priority(
+                use_open,
+                order_types=order_types,
+                order_ids=order_ids,
+                include_orders_this_bar=include_orders_this_bar,
+            )
         else:
             self._process_orders_fifo(
                 use_open,
@@ -150,7 +157,7 @@ class ExecutionEngine:
             entry_order_ids = {order.order_id for order in entry_orders}
             entry_order_ids.update(order.order_id for order in deferred_entries)
             entry_orders = [order for order in eligible_orders if order.order_id in entry_order_ids]
-        entry_orders = self._sort_entry_orders(entry_orders, use_open=use_open)
+        entry_orders = self._sort_orders_by_priority(entry_orders, use_open=use_open)
 
         for order in entry_orders:
             self._process_single_order(
@@ -411,6 +418,29 @@ class ExecutionEngine:
             if filled_orders and filled_orders[-1] is order:
                 broker.mark_account_positions(use_open=use_open)
 
+        self._cleanup_filled_orders(filled_orders)
+
+    def _process_orders_priority(
+        self,
+        use_open: bool = False,
+        *,
+        order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
+        include_orders_this_bar: bool = False,
+    ) -> None:
+        """Process complete orders in configured priority order."""
+        eligible_orders = self._eligible_orders(
+            use_open,
+            order_types=order_types,
+            order_ids=order_ids,
+            include_orders_this_bar=include_orders_this_bar,
+        )
+        ordered = self._sort_orders_by_priority(eligible_orders, use_open=use_open)
+        filled_orders: list[Order] = []
+        for order in ordered:
+            self._process_single_order(order, use_open, filled_orders)
+            if filled_orders and filled_orders[-1] is order:
+                self.broker.mark_account_positions(use_open=use_open)
         self._cleanup_filled_orders(filled_orders)
 
     def _process_orders_sequential(
@@ -694,8 +724,8 @@ class ExecutionEngine:
                 o for o in self.orders.current_bar if o.order_id in self.orders.current_bar_ids
             ]
 
-    def _sort_entry_orders(self, orders: list, use_open: bool) -> list:
-        """Sort entry orders under EXIT_FIRST based on configured priority."""
+    def _sort_orders_by_priority(self, orders: list, use_open: bool) -> list:
+        """Sort orders using the configured cash-constrained priority."""
         broker = self.broker
         fill = self.fill_engine
         priority = broker.entry_order_priority.value
@@ -710,5 +740,48 @@ class ExecutionEngine:
                 return 0.0
             return abs(order.quantity * px)
 
+        if priority == "free_cash_asc":
+            return sorted(
+                orders,
+                key=lambda order: self._estimated_free_cash_use(order, use_open),
+            )
+        if priority == "order_value_asc":
+            return sorted(
+                orders,
+                key=lambda order: (-1.0 if order.side is OrderSide.SELL else 1.0) * notional(order),
+            )
         reverse = priority == "notional_desc"
         return sorted(orders, key=notional, reverse=reverse)
+
+    def _estimated_free_cash_use(self, order, use_open: bool) -> float:
+        """Estimate an order's cash use for automatic portfolio call sequencing."""
+        broker = self.broker
+        price = self.fill_engine.get_fill_price_for_order(order, use_open)
+        if not _price_available(price):
+            price = self.market.prices.get(order.asset, self.market.opens.get(order.asset, 0.0))
+        if not _price_available(price):
+            return 0.0
+        position = broker.account.positions.get(order.asset)
+        current = 0.0 if position is None else float(position.quantity)
+        signed = order.quantity if order.side is OrderSide.BUY else -order.quantity
+        quantity = abs(float(order.quantity))
+        unit_cost = float(price) * broker.get_multiplier(order.asset)
+        notional = quantity * unit_cost
+        commission = calculate_commission(
+            broker.commission_model,
+            order.asset,
+            quantity,
+            float(price),
+        )
+
+        if current < 0 and signed > 0:
+            covered = min(quantity, abs(current))
+            basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
+            released_basis = 0.0 if current == 0 else covered / abs(current) * basis
+            remaining = max(0.0, quantity - covered)
+            return covered * unit_cost - 2.0 * released_basis + remaining * unit_cost + commission
+        if current > 0 and signed < 0:
+            closed = min(quantity, current)
+            remaining = max(0.0, quantity - closed)
+            return -closed * unit_cost + remaining * unit_cost + commission
+        return notional + commission

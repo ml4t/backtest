@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
-from real_strategy_input import filter_comparison_market
+from real_strategy_input import comparison_scope, filter_comparison_market, filter_comparison_targets
 
 
 def _sha256(path: Path) -> str:
@@ -43,12 +43,14 @@ def run(bundle: Path, framework: str) -> tuple[dict[str, Any], pl.DataFrame, pl.
     case_study = manifest["case_study"]
     if case_study == "cme_futures" and framework != "vectorbt_pro":
         raise ValueError("VectorBT OSS lacks the contract multiplier used by this workload")
-    if case_study not in {"etfs", "cme_futures"}:
-        raise ValueError("This adapter accepts the ETF and CME futures workloads")
+    if case_study not in {"etfs", "cme_futures", "fx_pairs"}:
+        raise ValueError("This adapter accepts the ETF, FX, and CME futures workloads")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
     market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
     close = _wide(market, "close")
-    weights = _wide(pl.read_parquet(bundle / "targets.parquet"), "weight").reindex(
+    weights = _wide(
+        filter_comparison_targets(pl.read_parquet(bundle / "targets.parquet"), spec), "weight"
+    ).reindex(
         index=close.index, columns=close.columns
     )
     rebalance_rows = weights.notna().any(axis=1)
@@ -108,6 +110,7 @@ def run(bundle: Path, framework: str) -> tuple[dict[str, Any], pl.DataFrame, pl.
         "comparison_profile": (
             "vectorbt_strict" if framework == "vectorbt_pro" else "vectorbt_oss_strict"
         ),
+        "comparison_scope": comparison_scope(spec),
         "comparison_costs": "disabled",
         "comparison_position_rules": "disabled",
         "input_bundle_sha256": manifest["bundle_sha256"],

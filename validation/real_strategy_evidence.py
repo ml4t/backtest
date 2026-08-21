@@ -19,10 +19,13 @@ from typing import Any
 
 import polars as pl
 from common.provenance import _tree_digest
+from real_strategy_input import FX_COMPARISON_SCOPE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = PROJECT_ROOT / "validation"
-CANONICAL_QUANTUM = Decimal("0.00000001")
+RECORD_QUANTUM = Decimal("0.00000001")
+ACCOUNT_MONEY_QUANTUM = Decimal("0.01")
+ACCOUNT_MONEY_FIELDS = frozenset({"cash", "commission", "equity", "final_value"})
 APPLICABILITY_PATH = VALIDATION_DIR / "real_strategy_applicability.toml"
 FRAMEWORK_TARGETS_PATH = VALIDATION_DIR / "framework_targets.toml"
 PAIR_PROFILES = {
@@ -34,6 +37,10 @@ PAIR_PROFILES = {
     ("cme_futures", "vectorbt_pro"): "vectorbt_strict",
     ("cme_futures", "backtrader"): "backtrader_strict",
     ("crypto_perps_funding", "lean"): "lean_crypto_future",
+    ("fx_pairs", "vectorbt_pro"): "vectorbt_strict",
+    ("fx_pairs", "vectorbt_oss"): "vectorbt_oss_strict",
+    ("fx_pairs", "backtrader"): "backtrader_strict",
+    ("fx_pairs", "lean"): "lean",
 }
 ADAPTER_PATHS = {
     "vectorbt_pro": VALIDATION_DIR / "real_strategy_vectorbt.py",
@@ -42,6 +49,7 @@ ADAPTER_PATHS = {
     "zipline": VALIDATION_DIR / "real_strategy_zipline.py",
     "lean_equity": VALIDATION_DIR / "real_strategy_lean.py",
     "lean_crypto": VALIDATION_DIR / "real_strategy_lean_crypto.py",
+    "lean_fx": VALIDATION_DIR / "real_strategy_lean_fx.py",
     "ml4t": VALIDATION_DIR / "real_strategy_runner.py",
     "comparison_input": VALIDATION_DIR / "real_strategy_input.py",
     "evidence_builder": VALIDATION_DIR / "real_strategy_evidence.py",
@@ -79,8 +87,13 @@ def _number_text(value: object) -> str:
     return format(Decimal(str(value)), "f")
 
 
-def _canonical_gap(framework: str, ml4t: str) -> Decimal:
-    return abs(Decimal(framework) - Decimal(ml4t)).quantize(CANONICAL_QUANTUM, ROUND_HALF_EVEN)
+def _field_quantum(field: str) -> Decimal:
+    return ACCOUNT_MONEY_QUANTUM if field in ACCOUNT_MONEY_FIELDS else RECORD_QUANTUM
+
+
+def _canonical_gap(framework: str, ml4t: str, *, field: str) -> Decimal:
+    quantum = _field_quantum(field)
+    return abs(Decimal(framework) - Decimal(ml4t)).quantize(quantum, ROUND_HALF_EVEN)
 
 
 def _canonical_timestamp(value: object, *, intraday: bool) -> str:
@@ -146,7 +159,7 @@ def _first_divergence(
             framework_value = framework.get(field)
             ml4t_value = ml4t.get(field)
             if field in numeric_fields and framework_value is not None and ml4t_value is not None:
-                differs = _canonical_gap(framework_value, ml4t_value) != 0
+                differs = _canonical_gap(framework_value, ml4t_value, field=field) != 0
             else:
                 differs = framework_value != ml4t_value
             if differs:
@@ -157,7 +170,7 @@ def _first_divergence(
                     "framework": framework,
                     "ml4t": ml4t,
                     "canonical_gap": (
-                        format(_canonical_gap(framework_value, ml4t_value), "f")
+                        format(_canonical_gap(framework_value, ml4t_value, field=field), "f")
                         if field in numeric_fields
                         and framework_value is not None
                         and ml4t_value is not None
@@ -190,6 +203,7 @@ def _max_difference(
     ml4t_records: list[dict[str, str]],
     *,
     fields: tuple[str, ...],
+    canonical: bool,
 ) -> str | None:
     if len(framework_records) != len(ml4t_records):
         return None
@@ -197,9 +211,17 @@ def _max_difference(
     for framework, ml4t in zip(framework_records, ml4t_records, strict=True):
         for field in fields:
             if field in framework and field in ml4t:
-                differences.append(abs(Decimal(framework[field]) - Decimal(ml4t[field])))
+                if canonical:
+                    differences.append(_canonical_gap(framework[field], ml4t[field], field=field))
+                else:
+                    differences.append(abs(Decimal(framework[field]) - Decimal(ml4t[field])))
     maximum = max(differences, default=Decimal(0))
-    return format(maximum.quantize(CANONICAL_QUANTUM, ROUND_HALF_EVEN), "f")
+    if canonical:
+        quantum = min((_field_quantum(field) for field in fields), default=RECORD_QUANTUM)
+        maximum = maximum.quantize(quantum, ROUND_HALF_EVEN)
+    else:
+        maximum = maximum.quantize(RECORD_QUANTUM, ROUND_HALF_EVEN)
+    return format(maximum, "f")
 
 
 def _align_shared_values(
@@ -269,7 +291,10 @@ def _surface(
 ) -> dict[str, object]:
     result = compare_records(framework_records, ml4t_records, numeric_fields=numeric_fields)
     result["max_canonical_difference"] = _max_difference(
-        framework_records, ml4t_records, fields=numeric_fields
+        framework_records, ml4t_records, fields=numeric_fields, canonical=True
+    )
+    result["max_raw_difference"] = _max_difference(
+        framework_records, ml4t_records, fields=numeric_fields, canonical=False
     )
     return result
 
@@ -288,6 +313,11 @@ def _comparison_record(
         raise ValueError(f"External profile differs for {case_study}/{framework}")
     if ml4t["comparison_profile"] != expected_profile:
         raise ValueError(f"ML4T profile differs for {case_study}/{framework}")
+    if case_study == "fx_pairs":
+        if external.get("comparison_scope") != FX_COMPARISON_SCOPE:
+            raise ValueError(f"External FX comparison scope differs for {framework}")
+        if ml4t.get("comparison_scope") != FX_COMPARISON_SCOPE:
+            raise ValueError(f"ML4T FX comparison scope differs for {framework}")
 
     intraday = case_study == "crypto_perps_funding"
     external_fills = _fill_records(external_frames["fills"], intraday=intraday)
@@ -326,7 +356,7 @@ def _comparison_record(
     if not negative_control:
         raise ValueError(f"Negative control requires fills for {case_study}/{framework}")
     negative_control[0]["price"] = format(
-        Decimal(negative_control[0]["price"]) + CANONICAL_QUANTUM, "f"
+        Decimal(negative_control[0]["price"]) + RECORD_QUANTUM, "f"
     )
     detected = not compare_records(
         external_fills,
@@ -402,16 +432,23 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
             "real_strategy_equivalence_gate_passed": all(
                 record["status"] == "pass" for record in required
             ),
+            "case_protocols": {"fx_pairs": FX_COMPARISON_SCOPE},
         },
         "comparison_policy": {
-            "canonical_quantum": format(CANONICAL_QUANTUM, "f"),
+            "record_numeric_quantum": format(RECORD_QUANTUM, "f"),
+            "account_money_quantum": format(ACCOUNT_MONEY_QUANTUM, "f"),
+            "account_money_fields": sorted(ACCOUNT_MONEY_FIELDS),
             "rounding": "ROUND_HALF_EVEN",
-            "meaning": "zero numeric gap after canonical quantization, not bit identity",
+            "meaning": (
+                "account-money gaps round to zero cents; all other numeric gaps round to zero "
+                "at 1e-8"
+            ),
             "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
             "timestamp_domain": {
                 "etfs": "session date",
                 "cme_futures": "session date",
                 "crypto_perps_funding": "exact UTC event timestamp",
+                "fx_pairs": "session date",
             },
         },
         "provenance": {
@@ -470,14 +507,19 @@ def report_failures(report: dict[str, Any]) -> list[str]:
     unsupported_pairs = set(expected_pairs) - required_pairs
 
     expected_policy = {
-        "canonical_quantum": format(CANONICAL_QUANTUM, "f"),
+        "record_numeric_quantum": format(RECORD_QUANTUM, "f"),
+        "account_money_quantum": format(ACCOUNT_MONEY_QUANTUM, "f"),
+        "account_money_fields": sorted(ACCOUNT_MONEY_FIELDS),
         "rounding": "ROUND_HALF_EVEN",
-        "meaning": "zero numeric gap after canonical quantization, not bit identity",
+        "meaning": (
+            "account-money gaps round to zero cents; all other numeric gaps round to zero at 1e-8"
+        ),
         "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
         "timestamp_domain": {
             "etfs": "session date",
             "cme_futures": "session date",
             "crypto_perps_funding": "exact UTC event timestamp",
+            "fx_pairs": "session date",
         },
     }
     if report.get("comparison_policy") != expected_policy:
@@ -632,6 +674,8 @@ def report_failures(report: dict[str, Any]) -> list[str]:
             failures.append("Real-strategy case-study scope differs from applicability")
         if scope.get("frameworks") != metadata["frameworks"]:
             failures.append("Real-strategy framework scope differs from applicability")
+        if scope.get("case_protocols") != {"fx_pairs": FX_COMPARISON_SCOPE}:
+            failures.append("Real-strategy case protocols differ")
         if scope.get("required_pairs") != len(required_pairs):
             failures.append("Real-strategy required-pair count differs from applicability")
         if scope.get("unsupported_pairs") != len(unsupported_pairs):

@@ -49,6 +49,10 @@ PROFILES = {
     ("etfs", "lean"): ("lean", ["--price-decimals", "4"]),
     ("cme_futures", "vectorbt_pro"): ("vectorbt_strict", []),
     ("cme_futures", "backtrader"): ("backtrader_strict", []),
+    ("fx_pairs", "vectorbt_pro"): ("vectorbt_strict", []),
+    ("fx_pairs", "vectorbt_oss"): ("vectorbt_oss_strict", []),
+    ("fx_pairs", "backtrader"): ("backtrader_strict", []),
+    ("fx_pairs", "lean"): ("lean", ["--price-decimals", "5"]),
     (
         "crypto_perps_funding",
         "lean",
@@ -90,6 +94,8 @@ def _command(
         script, extra = ADAPTERS[framework]
         if case_study == "crypto_perps_funding":
             script = "real_strategy_lean_crypto.py"
+        elif case_study == "fx_pairs" and framework == "lean":
+            script = "real_strategy_lean_fx.py"
         return [
             str(python),
             str(VALIDATION_DIR / script),

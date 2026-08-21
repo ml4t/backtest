@@ -15,7 +15,7 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
-from real_strategy_input import filter_comparison_market
+from real_strategy_input import filter_comparison_market, filter_comparison_targets
 from zipline import run_algorithm
 from zipline.api import (
     get_datetime,
@@ -63,20 +63,23 @@ def _flatten(results: pd.DataFrame, column: str) -> pd.DataFrame:
 
 def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame]:
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
-    if manifest["case_study"] != "etfs":
+    case_study = manifest["case_study"]
+    if case_study != "etfs":
         raise ValueError("This adapter accepts the ETF equity workload")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
     market = filter_comparison_market(
         pl.read_parquet(bundle / "market.parquet"), spec
     ).with_columns(pl.col(column).round(3) for column in ("open", "high", "low", "close"))
-    target_lookup = _targets(pl.read_parquet(bundle / "targets.parquet"))
+    target_lookup = _targets(
+        filter_comparison_targets(pl.read_parquet(bundle / "targets.parquet"), spec)
+    )
     symbols = market["symbol"].unique().sort().to_list()
     calendar_name = "XNYS"
     calendar = get_calendar(calendar_name)
     first_date = pd.Timestamp(market["timestamp"].min()).normalize()
     last_date = pd.Timestamp(market["timestamp"].max()).normalize()
     sessions = pd.DatetimeIndex(calendar.sessions_in_range(first_date, last_date)).tz_localize(None)
-    bundle_name = f"real_etfs_v2_{manifest['bundle_sha256'][:16]}"
+    bundle_name = f"real_{case_study}_v2_{manifest['bundle_sha256'][:16]}"
 
     def ingest_bundle(
         _environ,

@@ -9,6 +9,26 @@ import polars as pl
 
 from ml4t.backtest.calendar import filter_to_trading_days, filter_to_trading_sessions
 
+FX_COMPARISON_SCOPE = (
+    "USD-quoted pairs from the frozen target stream, preserving native USD valuation in every "
+    "required engine"
+)
+
+
+def comparison_scope(spec: Mapping[str, Any]) -> str:
+    """Describe the engine input projection applied to a frozen bundle."""
+    case_study = spec["backtest_config"].get("metadata", {}).get("case_study")
+    return FX_COMPARISON_SCOPE if case_study == "fx_pairs" else "complete frozen bundle"
+
+
+def _filter_comparison_universe(
+    frame: pl.DataFrame,
+    spec: Mapping[str, Any],
+) -> pl.DataFrame:
+    if comparison_scope(spec) == FX_COMPARISON_SCOPE:
+        return frame.filter(pl.col("symbol").str.ends_with("_USD"))
+    return frame
+
 
 def filter_comparison_market(
     market: pl.DataFrame,
@@ -16,6 +36,7 @@ def filter_comparison_market(
 ) -> pl.DataFrame:
     """Apply the production session contract before any compared engine runs."""
     calendar = spec["backtest_config"]["calendar"]
+    market = _filter_comparison_universe(market, spec)
     if not bool(calendar.get("enforce_sessions", False)):
         return market
     calendar_id = str(calendar["calendar"])
@@ -26,3 +47,11 @@ def filter_comparison_market(
         calendar_id,
         naive_tz=str(calendar.get("timezone", "UTC")),
     )
+
+
+def filter_comparison_targets(
+    targets: pl.DataFrame,
+    spec: Mapping[str, Any],
+) -> pl.DataFrame:
+    """Apply the same native-asset comparison universe to frozen targets."""
+    return _filter_comparison_universe(targets, spec)

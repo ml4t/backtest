@@ -715,6 +715,14 @@
       {
         "name": "NOTIONAL_ASC",
         "value": "notional_asc"
+      },
+      {
+        "name": "FREE_CASH_ASC",
+        "value": "free_cash_asc"
+      },
+      {
+        "name": "ORDER_VALUE_ASC",
+        "value": "order_value_asc"
       }
     ],
     "ml4t.backtest.config.ExecutionPrice": [
@@ -767,6 +775,10 @@
       {
         "name": "SEQUENTIAL",
         "value": "sequential"
+      },
+      {
+        "name": "PRIORITY",
+        "value": "priority"
       }
     ],
     "ml4t.backtest.config.InitialHwmSource": [
@@ -1629,15 +1641,15 @@
           "execution_price": "close"
         },
         "orders": {
-          "entry_order_priority": "submission",
-          "fill_ordering": "fifo",
-          "immediate_fill": true,
+          "entry_order_priority": "order_value_asc",
+          "fill_ordering": "priority",
+          "immediate_fill": false,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "skip",
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
-          "rebalance_mode": "hybrid",
+          "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
         "position_sizing": {
@@ -1675,15 +1687,15 @@
           "execution_price": "close"
         },
         "orders": {
-          "entry_order_priority": "submission",
-          "fill_ordering": "fifo",
-          "immediate_fill": true,
+          "entry_order_priority": "free_cash_asc",
+          "fill_ordering": "priority",
+          "immediate_fill": false,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "skip",
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
-          "rebalance_mode": "hybrid",
+          "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
         "position_sizing": {

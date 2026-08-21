@@ -18,7 +18,11 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from real_strategy_input import filter_comparison_market
+from real_strategy_input import (
+    comparison_scope,
+    filter_comparison_market,
+    filter_comparison_targets,
+)
 
 from ml4t.backtest import (
     AssetClass,
@@ -210,7 +214,7 @@ def load_bundle(bundle: Path) -> dict[str, Any]:
         "manifest": manifest,
         "spec": spec,
         "market": pl.read_parquet(bundle / "market.parquet"),
-        "targets": pl.read_parquet(bundle / "targets.parquet"),
+        "targets": filter_comparison_targets(pl.read_parquet(bundle / "targets.parquet"), spec),
         "funding": (
             pl.read_parquet(bundle / "funding.parquet")
             if (bundle / "funding.parquet").is_file()
@@ -405,6 +409,7 @@ def _write_evidence(
             "case_study": inputs["manifest"]["case_study"],
             "framework": "ml4t_backtest",
             "comparison_profile": comparison_profile,
+            "comparison_scope": comparison_scope(inputs["spec"]),
             "price_decimals": price_decimals,
             "execution_specs_sha256": execution_specs_sha256,
             "input_bundle_sha256": inputs["manifest"]["bundle_sha256"],
