@@ -18,7 +18,7 @@
       "fx_pairs": "session date"
     }
   },
-  "generated_at": "2026-08-21T20:20:08.905193+00:00",
+  "generated_at": "2026-08-21T20:57:31.045037+00:00",
   "provenance": {
     "adapters": {
       "backtrader": "12b32f6a25cde4664c1884b2745449bf42d51ec51df96d423b373835b2d445f4",
@@ -26,7 +26,7 @@
       "evidence_builder": "0335a68f725351c603a2792032b123a957fac88481e50b7ab0ebca9f841e499f",
       "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
       "lean_equity": "fcc4888fa43f7f1e10c3f27f028aa522e36ae4112c2418641b270dc0a2ceb6f1",
-      "lean_fx": "5dae59ecac5e3768e95e2b62bb815ba725bdfea6db5761d65eb0bff26507e191",
+      "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
       "ml4t": "a59e683479c82db2542d25cab8aba3666f6947ce584b2622873a17598d8004cc",
       "vectorbt_oss": "c9fe6353d107d928fda95a6f050d632c1703a2c25f2e49c5f88ef87ef892d0db",
       "vectorbt_pro": "c9fe6353d107d928fda95a6f050d632c1703a2c25f2e49c5f88ef87ef892d0db",
@@ -129,7 +129,7 @@
     },
     "machine": "x86_64",
     "ml4t": {
-      "commit": "2491bb6479a358e25ac67306c8c6b5e0b79f699c",
+      "commit": "c4b1a6b3fc4422d50840cde41ffd5d5990f2f17a",
       "dirty": false,
       "engine_source_sha256": "f41accebe035368b398ca801a1affdf3d8093abe0fb0ad553bb5292c48ac728c"
     },
@@ -140,13 +140,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 0.2981360340490937,
-        "ml4t": 0.4247004371136427,
+        "framework": 0.34479647781699896,
+        "ml4t": 0.4093920080922544,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "0e1df7d978941907c9f97be8586639f2d704c9b59f470b16cd60c00ac0b9a249",
-        "ml4t_manifest_sha256": "5785934fa96cb3e6f571fec114e8b1be2909a33b040eb46f5a6866b2847d78f8"
+        "framework_manifest_sha256": "b2b6d67341000ec87c196f328a64306c12cbb17f19fd5b8895707f8732c32b9d",
+        "ml4t_manifest_sha256": "94827a8bbf03991d660effae1d9d388c1ba8860a3c4b8da907cacdbb6b3c279d"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -207,13 +207,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 0.18558452930301428,
-        "ml4t": 0.41536747803911567,
+        "framework": 0.17606149334460497,
+        "ml4t": 0.41038438118994236,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "62f20b1df77693db0b8708e350c57a6bcff276ab9b4ecb078787bc9c3e63bd7c",
-        "ml4t_manifest_sha256": "560fc9af419555fd7573f0f815d86935bede3a04cd631d05b5d1f9022125e7f5"
+        "framework_manifest_sha256": "aea8d42f75a8013365d6d097bf8f1769179186e6fb65f179102065f430ed0b14",
+        "ml4t_manifest_sha256": "dafeadbbe4e774d3e9582eecfa7e5894b58d7f19acd9eb697afb672ca2424126"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -274,13 +274,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 9.868325090967119,
-        "ml4t": 0.4247948476113379,
+        "framework": 9.505853635724634,
+        "ml4t": 0.4233846003189683,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "b78a196b219a079ad60b4b118b10882e6875a458cbf52f350cb71b4c74947e89",
-        "ml4t_manifest_sha256": "50f6350f6ae45b54df4862dc1faf72bdefc47266c960a1666f4db228bd1b76a5"
+        "framework_manifest_sha256": "72cb6ece8442e65c0e2286626a3f5a2c66b9f1b0f408ced5e10ee06404758dce",
+        "ml4t_manifest_sha256": "62191f47fb41df532dced324e1edf339ff399baada8657b3fcd154fd8d30ec61"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -351,13 +351,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 4.0790477162227035,
-        "ml4t": 0.41935536870732903,
+        "framework": 4.032953016925603,
+        "ml4t": 0.4113213927485049,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "d321b67efb110683221cff4ee46adafe8aced7c2f7926f86700876d943eae902",
-        "ml4t_manifest_sha256": "b5289ac4d4cbe9f81445b4a8b0314c0a9b6de79bff83e33ca76c24a2ede8e734"
+        "framework_manifest_sha256": "e3009a4ba83dac73a527286653bb60d19c884694df1b5be4644ccfd8534c4d75",
+        "ml4t_manifest_sha256": "b1fa66daaefc6fc89af988764bd119f42efa50b1a49debf0509a43579207aa45"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -418,13 +418,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 2.725012818351388,
-        "ml4t": 0.5600132551044226,
+        "framework": 2.742175185121596,
+        "ml4t": 0.5282445806078613,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "786e882458c43bd857a92a60ae61d18eb0c314c861bc226cdd84c95d1184bac2",
-        "ml4t_manifest_sha256": "c3950a2f92e49159e5d9d5d5fd72d43182e57c937bdf2a59c1fad0035194fa84"
+        "framework_manifest_sha256": "efeb0cebea83daa58c7805fcbee3063966ccb58a6cfc62e3d160e6f2cfefd37c",
+        "ml4t_manifest_sha256": "b095c117bbee89516ddc627b5013a764ca47506d34cdc45a322a80d05ea69077"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -513,13 +513,13 @@
     {
       "case_study": "cme_futures",
       "engine_seconds": {
-        "framework": 0.28801544615998864,
-        "ml4t": 0.4127033050172031,
+        "framework": 0.3676414778456092,
+        "ml4t": 0.41173200495541096,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "2486df2cdbe35bb52b025b253f78c4930a8b16598bf1c4451594a14778dfa95e",
-        "ml4t_manifest_sha256": "62cc289b540d5c0076c98e2bbc6db099f49e9bea85ab4c6a7afbf46e3940873a"
+        "framework_manifest_sha256": "de53f7b1fb869ebd16d6d433bf4a56fb6a9457f56ad109e4d3a0500812b3a3b0",
+        "ml4t_manifest_sha256": "ef11c8229867d3d7d3148455a8edcce4c11292a23d4b398c67500cdf6b27b2ef"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -587,13 +587,13 @@
     {
       "case_study": "cme_futures",
       "engine_seconds": {
-        "framework": 2.529816078953445,
-        "ml4t": 0.4125353670679033,
+        "framework": 2.502905290108174,
+        "ml4t": 0.4042441691271961,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "e27cf2678ed7e2da140f55b97cbaea716db2732476806ed61cdde092222495ac",
-        "ml4t_manifest_sha256": "0e16d96893f184e90e391b372e96816dab816d07a55829c0ed611d2e43adb132"
+        "framework_manifest_sha256": "8edc967f5d6c4b9e701287bcbebd52c4e434249a1c482563de3b6a398fc57b1d",
+        "ml4t_manifest_sha256": "9edeb61e2bc36d92f01df6679e4bb81f62d70f396b7b9d460d45ed974950b3e2"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -706,13 +706,13 @@
     {
       "case_study": "crypto_perps_funding",
       "engine_seconds": {
-        "framework": 2.91425321996212,
-        "ml4t": 0.6537064872682095,
+        "framework": 2.7409975579939783,
+        "ml4t": 0.6547868917696178,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "1bca791cbbd0dd535de3f8457aa62f361c47a696716f624fc7bad79620646c3d",
-        "ml4t_manifest_sha256": "73cb3fa40dd3d9e7f06fac45077404c4bd4a2e03f6751de17888ba9ed59944d7"
+        "framework_manifest_sha256": "6f06382de7e59c2d81b6e01c64290cff5f6d4ee0f84307e25a97a3c153786c13",
+        "ml4t_manifest_sha256": "7526bea34ea3d456f08bc49fa940a4f05abf72b79816a9e2d8d20d20e0538593"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -783,13 +783,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.2814778736792505,
-        "ml4t": 0.14685100503265858,
+        "framework": 0.29499146714806557,
+        "ml4t": 0.15095701022073627,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "7ed5ecbef452bf87d1988f0e168896dbb6430a03b4ebf7f8e8a33c2a0447b24b",
-        "ml4t_manifest_sha256": "e4b9867adc6eb180c343bedfcca86ed816e7742c16431520f6e83b0ddc909423"
+        "framework_manifest_sha256": "89164e8a471233dd65c95e544937cac879ac00849b6efe9d09b51613bcd83341",
+        "ml4t_manifest_sha256": "8f8bda7a6b6ddf636196399e6c230dbcf0fb65fce49b6caab9798555cc02a795"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -850,13 +850,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.13737707771360874,
-        "ml4t": 0.1521761561743915,
+        "framework": 0.15080247586593032,
+        "ml4t": 0.14295640820637345,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "74d357482b2e9d476bd5639653c027e8d2b6d0bd4fec55bbfa272a8025b3efd4",
-        "ml4t_manifest_sha256": "65949dcf1861ae26f55048158dc1d0b117c583b8935cca78bd351aedb38e65ce"
+        "framework_manifest_sha256": "dae97c12c3e4d302cea70fc0312a2137bc7d8b33ba64a4a6b707854990371a9c",
+        "ml4t_manifest_sha256": "650f5511bf0937b74188d4aa4649c541e7fbec8eefa24af8ca559a483778e8e6"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -917,13 +917,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.434517630841583,
-        "ml4t": 0.14672272419556975,
+        "framework": 0.42735385382547975,
+        "ml4t": 0.14680401887744665,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "945b28daadcb3a3cf9dcbbf2bbcf220abb230371651cc5f67edb92cb1f04cda4",
-        "ml4t_manifest_sha256": "028f86eb682746a44d5ba4c05b383ce2e7889a159d633945c076e18736f7ab96"
+        "framework_manifest_sha256": "5cf6e0acd397189db1206db27c8c4c7a2ee96de608c8c1ac0cbf8dcac1742d7f",
+        "ml4t_manifest_sha256": "099bca55baa6cd18a6b3ca2c08563d3f49c9ee7fb5bd785aaf021331cb015519"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1001,13 +1001,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.8798232949338853,
-        "ml4t": 0.1526852250099182,
+        "framework": 0.8472033310681581,
+        "ml4t": 0.157903584651649,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "739073a724bdd7478bb56fc064fe146890be9ff2988eceeacb8383d2162ac1ae",
-        "ml4t_manifest_sha256": "7f59dbafb83d1ff9f716ced54f4f01e9fcdd3f8a4229482cf446d27d57e48d5c"
+        "framework_manifest_sha256": "5b4b62fdcb681cd6058c6e2eb15d9bc4ed6101eb0ac8e2e8723b4ed66152730b",
+        "ml4t_manifest_sha256": "39db79d570983997abefc6c3be8d23b7843b115fc7e2225e1e144bd242846436"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
