@@ -145,6 +145,9 @@ def render_claims(
     required_real = [
         record for record in real_strategy["records"] if record["status"] != "unsupported"
     ]
+    unsupported_real = [
+        record for record in real_strategy["records"] if record["status"] == "unsupported"
+    ]
     passed_real = sum(record["status"] == "pass" for record in required_real)
     real_targets = real_strategy["provenance"]["frameworks"]
     case_labels = {
@@ -201,7 +204,8 @@ def render_claims(
             "",
             "### Real-strategy audit",
             "",
-            f"{passed_real}/{len(required_real)} required pairs pass. The audit uses four "
+            f"{passed_real}/{len(required_real)} required pairs pass; "
+            f"{len(unsupported_real)} pairs are declared unsupported. The audit uses four "
             "real-data strategy workloads with frozen historical market data and model-derived "
             "targets. A pass requires identical valuation timestamp coverage, complete fill "
             "streams equal at 1e-8, and account monetary values that round to the same cent. "
@@ -238,7 +242,7 @@ def render_claims(
             f"{recipe['bars']:,} daily sessions ({workload['data_points']:,} bars). Every row "
             "has zero canonical gap for target intents, native fills, closed trades reconstructed "
             "from those fills, and terminal state reconstructed from the fill ledger and final "
-            "marks.",
+            "marks. Fill records use 1e-8 precision; monetary totals use cent precision.",
             "",
             "| Profile | Current framework | Target intents | Native fills | Fill-derived closed trades | Terminal value | Evidence |",
             "|---|---|---:|---:|---:|---:|---|",
