@@ -155,6 +155,7 @@ def render_claims(
         "cme_futures": "CME futures",
         "crypto_perps_funding": "Crypto perpetual funding",
         "fx_pairs": "FX allocation (USD-quoted pairs)",
+        "us_equities_panel": "US equity panel",
     }
     for record in required_real:
         target = real_targets[record["framework"]]
@@ -167,13 +168,13 @@ def render_claims(
             terminal_raw = Decimal(terminal["max_raw_difference"])
             if equity_raw == 0 and terminal_raw == 0:
                 result = (
-                    f"fills exact at 1e-8; "
+                    f"fills equal at declared field precision; "
                     f"{equity['coverage']['shared_timestamps']:,} valuations and terminal "
                     "exact at 1e-8"
                 )
             else:
                 result = (
-                    f"fills exact at 1e-8; "
+                    f"fills equal at declared field precision; "
                     f"{equity['coverage']['shared_timestamps']:,} valuations within $0.01 "
                     f"(max raw gap ${equity['max_raw_difference']}); terminal within $0.01 "
                     f"(raw gap ${terminal['max_raw_difference']})"
@@ -205,10 +206,11 @@ def render_claims(
             "### Real-strategy audit",
             "",
             f"{passed_real}/{len(required_real)} required pairs pass; "
-            f"{len(unsupported_real)} pairs are declared unsupported. The audit uses four "
+            f"{len(unsupported_real)} pairs are declared unsupported. The audit uses five "
             "real-data strategy workloads with frozen historical market data and model-derived "
             "targets. A pass requires identical valuation timestamp coverage, complete fill "
-            "streams equal at 1e-8, and account monetary values that round to the same cent. "
+            "streams with quantities equal at 1e-5 and prices equal at 1e-8, and account "
+            "monetary values that round to the same cent. "
             "The FX workload uses the USD-quoted pairs in its frozen target stream so every "
             "required engine uses native USD valuation.",
             "",

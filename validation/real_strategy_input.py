@@ -37,6 +37,14 @@ def filter_comparison_market(
     """Apply the production session contract before any compared engine runs."""
     calendar = spec["backtest_config"]["calendar"]
     market = _filter_comparison_universe(market, spec)
+    if "close" in market.columns:
+        market = market.drop_nulls("close").with_columns(
+            pl.coalesce(pl.col(column), pl.col("close")).alias(column)
+            for column in ("open", "high", "low")
+            if column in market.columns
+        )
+    if "volume" in market.columns:
+        market = market.with_columns(pl.col("volume").fill_null(0.0))
     if not bool(calendar.get("enforce_sessions", False)):
         return market
     calendar_id = str(calendar["calendar"])

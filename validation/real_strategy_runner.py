@@ -34,6 +34,7 @@ from ml4t.backtest import (
     Strategy,
     TargetWeightExecutor,
 )
+from ml4t.backtest.execution import PositiveVolumeLimit
 from ml4t.backtest.profiles import get_profile_config
 from ml4t.backtest.risk import RuleChain, StopLoss, TimeExit, TrailingStop
 
@@ -239,8 +240,12 @@ def _comparison_config(spec: Mapping[str, Any], profile: str) -> BacktestConfig:
         profile_data["account"]["long_maintenance_margin"] = 0.02
         profile_data["account"]["short_maintenance_margin"] = 0.02
     profile_data["cash"]["initial"] = source["cash"]["initial"]
-    profile_data["calendar"] = source["calendar"]
-    profile_data["feed"] = source["feed"]
+    profile_data["calendar"] = copy.deepcopy(source["calendar"])
+    profile_data["feed"] = copy.deepcopy(source["feed"])
+    if profile == "zipline_strict" or (
+        profile == "lean" and profile_data["calendar"]["calendar"] == "NYSE"
+    ):
+        profile_data["calendar"]["enforce_sessions"] = True
     profile_data["commission"] = {
         "model": "none",
         "rate": 0.0,
@@ -373,6 +378,9 @@ def execute_bundle(
         FrozenTargetStrategy(),
         config,
         contract_specs=inputs["contracts"],
+        execution_limits=(
+            PositiveVolumeLimit() if comparison_profile == "zipline_strict" else None
+        ),
     )
     started = time.perf_counter()
     result = engine.run()

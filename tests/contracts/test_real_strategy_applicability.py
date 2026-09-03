@@ -19,7 +19,7 @@ def test_every_selected_case_framework_pair_has_one_disposition() -> None:
     assert len(pairs) == len(actual)
     assert actual == expected
     assert {pair["status"] for pair in pairs} == {"required", "unsupported"}
-    assert sum(pair["status"] == "required" for pair in pairs) == 12
+    assert sum(pair["status"] == "required" for pair in pairs) == 17
     assert sum(pair["status"] == "unsupported" for pair in pairs) == 8
     assert all(pair["native_contract"] for pair in pairs)
     assert all(pair["source"].startswith("https://") for pair in pairs)

@@ -53,6 +53,11 @@ PROFILES = {
     ("fx_pairs", "vectorbt_oss"): ("vectorbt_oss_strict", []),
     ("fx_pairs", "backtrader"): ("backtrader_strict", []),
     ("fx_pairs", "lean"): ("lean", ["--price-decimals", "5"]),
+    ("us_equities_panel", "vectorbt_pro"): ("vectorbt_strict", []),
+    ("us_equities_panel", "vectorbt_oss"): ("vectorbt_oss_strict", []),
+    ("us_equities_panel", "backtrader"): ("backtrader_strict", []),
+    ("us_equities_panel", "zipline"): ("zipline_strict", ["--price-decimals", "3"]),
+    ("us_equities_panel", "lean"): ("lean", ["--price-decimals", "4"]),
     (
         "crypto_perps_funding",
         "lean",

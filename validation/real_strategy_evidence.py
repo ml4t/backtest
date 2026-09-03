@@ -24,6 +24,7 @@ from real_strategy_input import FX_COMPARISON_SCOPE
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_DIR = PROJECT_ROOT / "validation"
 RECORD_QUANTUM = Decimal("0.00000001")
+QUANTITY_QUANTUM = Decimal("0.00001")
 ACCOUNT_MONEY_QUANTUM = Decimal("0.01")
 ACCOUNT_MONEY_FIELDS = frozenset({"cash", "commission", "equity", "final_value"})
 APPLICABILITY_PATH = VALIDATION_DIR / "real_strategy_applicability.toml"
@@ -41,6 +42,11 @@ PAIR_PROFILES = {
     ("fx_pairs", "vectorbt_oss"): "vectorbt_oss_strict",
     ("fx_pairs", "backtrader"): "backtrader_strict",
     ("fx_pairs", "lean"): "lean",
+    ("us_equities_panel", "vectorbt_pro"): "vectorbt_strict",
+    ("us_equities_panel", "vectorbt_oss"): "vectorbt_oss_strict",
+    ("us_equities_panel", "backtrader"): "backtrader_strict",
+    ("us_equities_panel", "zipline"): "zipline_strict",
+    ("us_equities_panel", "lean"): "lean",
 }
 ADAPTER_PATHS = {
     "vectorbt_pro": VALIDATION_DIR / "real_strategy_vectorbt.py",
@@ -88,7 +94,11 @@ def _number_text(value: object) -> str:
 
 
 def _field_quantum(field: str) -> Decimal:
-    return ACCOUNT_MONEY_QUANTUM if field in ACCOUNT_MONEY_FIELDS else RECORD_QUANTUM
+    if field in ACCOUNT_MONEY_FIELDS:
+        return ACCOUNT_MONEY_QUANTUM
+    if field == "quantity":
+        return QUANTITY_QUANTUM
+    return RECORD_QUANTUM
 
 
 def _canonical_gap(framework: str, ml4t: str, *, field: str) -> Decimal:
@@ -344,7 +354,7 @@ def _comparison_record(
         surfaces["rejection_count"] = _surface(
             rejection_external, rejection_ml4t, numeric_fields=("count",)
         )
-    if case_study == "etfs" and framework == "lean":
+    if case_study in {"etfs", "us_equities_panel"} and framework == "lean":
         external_cash = _value_records(external_frames["equity"], field="cash", intraday=intraday)
         ml4t_cash = _value_records(ml4t_frames["portfolio_state"], field="cash", intraday=intraday)
         cash_surface, _, _ = _value_surface(external_cash, ml4t_cash, field="cash")
@@ -385,7 +395,7 @@ def _comparison_record(
             "closed_trades": "not a common native framework concept",
             "cash": (
                 "compared separately for LEAN equities"
-                if case_study == "etfs" and framework == "lean"
+                if case_study in {"etfs", "us_equities_panel"} and framework == "lean"
                 else "not exposed with common accounting semantics"
             ),
         },
@@ -436,12 +446,13 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
         },
         "comparison_policy": {
             "record_numeric_quantum": format(RECORD_QUANTUM, "f"),
+            "quantity_quantum": format(QUANTITY_QUANTUM, "f"),
             "account_money_quantum": format(ACCOUNT_MONEY_QUANTUM, "f"),
             "account_money_fields": sorted(ACCOUNT_MONEY_FIELDS),
             "rounding": "ROUND_HALF_EVEN",
             "meaning": (
-                "account-money gaps round to zero cents; all other numeric gaps round to zero "
-                "at 1e-8"
+                "account-money gaps round to zero cents; quantity gaps round to zero at "
+                "1e-5 shares or contracts; all other numeric gaps round to zero at 1e-8"
             ),
             "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
             "timestamp_domain": {
@@ -449,6 +460,7 @@ def build_report(evidence_root: Path) -> dict[str, Any]:
                 "cme_futures": "session date",
                 "crypto_perps_funding": "exact UTC event timestamp",
                 "fx_pairs": "session date",
+                "us_equities_panel": "session date",
             },
         },
         "provenance": {
@@ -508,11 +520,13 @@ def report_failures(report: dict[str, Any]) -> list[str]:
 
     expected_policy = {
         "record_numeric_quantum": format(RECORD_QUANTUM, "f"),
+        "quantity_quantum": format(QUANTITY_QUANTUM, "f"),
         "account_money_quantum": format(ACCOUNT_MONEY_QUANTUM, "f"),
         "account_money_fields": sorted(ACCOUNT_MONEY_FIELDS),
         "rounding": "ROUND_HALF_EVEN",
         "meaning": (
-            "account-money gaps round to zero cents; all other numeric gaps round to zero at 1e-8"
+            "account-money gaps round to zero cents; quantity gaps round to zero at 1e-5 shares "
+            "or contracts; all other numeric gaps round to zero at 1e-8"
         ),
         "fill_order": "canonical timestamp, asset, side, quantity, price, commission",
         "timestamp_domain": {
@@ -520,6 +534,7 @@ def report_failures(report: dict[str, Any]) -> list[str]:
             "cme_futures": "session date",
             "crypto_perps_funding": "exact UTC event timestamp",
             "fx_pairs": "session date",
+            "us_equities_panel": "session date",
         },
     }
     if report.get("comparison_policy") != expected_policy:

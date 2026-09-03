@@ -243,10 +243,9 @@ class ExecutionEngine:
             if fill_price is None:
                 continue
 
-            validation_price = self.market.prices.get(order.asset, fill_price)
             valid, rejection_reason, rejection_code = self._validate_shadow_queue_order(
                 order=order,
-                validation_price=validation_price,
+                validation_price=fill_price,
                 shadow_cash=shadow_cash,
                 shadow_positions=shadow_positions,
             )

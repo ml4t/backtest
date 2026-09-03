@@ -15,7 +15,11 @@ from typing import Any
 import backtrader as bt
 import pandas as pd
 import polars as pl
-from real_strategy_input import comparison_scope, filter_comparison_market, filter_comparison_targets
+from real_strategy_input import (
+    comparison_scope,
+    filter_comparison_market,
+    filter_comparison_targets,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -143,10 +147,12 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame, pl.Da
     initial_cash = float(spec["backtest_config"]["cash"]["initial"])
     cerebro.broker.setcash(initial_cash)
     cerebro.broker.setcommission(commission=0.0)
-    for symbol in market["symbol"].unique().sort().to_list():
-        selected = market.filter(pl.col("symbol") == symbol).select(
-            "timestamp", "open", "high", "low", "close", "volume"
-        )
+    symbols = market["symbol"].unique().sort().to_list()
+    market_by_symbol = market.select(
+        "symbol", "timestamp", "open", "high", "low", "close", "volume"
+    ).partition_by("symbol", as_dict=True, include_key=False)
+    for symbol in symbols:
+        selected = market_by_symbol[(symbol,)]
         frame = pd.DataFrame(selected.to_dict(as_series=False)).set_index("timestamp")
         cerebro.adddata(bt.feeds.PandasData(dataname=frame), name=symbol)
         contract = contracts.get(symbol)

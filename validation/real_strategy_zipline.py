@@ -18,7 +18,9 @@ import polars as pl
 from real_strategy_input import filter_comparison_market, filter_comparison_targets
 from zipline import run_algorithm
 from zipline.api import (
+    cancel_order,
     get_datetime,
+    get_open_orders,
     order,
     order_target,
     set_commission,
@@ -64,8 +66,8 @@ def _flatten(results: pd.DataFrame, column: str) -> pd.DataFrame:
 def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame]:
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     case_study = manifest["case_study"]
-    if case_study != "etfs":
-        raise ValueError("This adapter accepts the ETF equity workload")
+    if case_study not in {"etfs", "us_equities_panel"}:
+        raise ValueError("This adapter accepts the ETF and US-equity workloads")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
     market = filter_comparison_market(
         pl.read_parquet(bundle / "market.parquet"), spec
@@ -141,8 +143,7 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame]:
         setup_seconds = time.perf_counter() - started
 
     class OpenPriceSlippage(SlippageModel):
-        @staticmethod
-        def process_order(data, pending_order):
+        def process_order(self, data, pending_order):
             return float(data.current(pending_order.asset, "open")), pending_order.amount
 
     state = {"targets": target_lookup, "symbols": symbols}
@@ -162,6 +163,9 @@ def run(bundle: Path) -> tuple[dict[str, Any], pl.DataFrame, pl.DataFrame]:
         requested = context.state["targets"].get(timestamp)
         if requested is None:
             return
+        for pending_orders in get_open_orders().values():
+            for pending_order in pending_orders:
+                cancel_order(pending_order)
         available = {
             symbol: weight
             for symbol, weight in requested.items()

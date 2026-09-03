@@ -42,8 +42,8 @@ def _sha256(path: Path) -> str:
 def _prepare_project(bundle: Path) -> tuple[Path, dict[str, Any]]:
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     case_study = manifest["case_study"]
-    if case_study != "etfs":
-        raise ValueError("The LEAN adapter accepts the ETF comparison workload")
+    if case_study not in {"etfs", "us_equities_panel"}:
+        raise ValueError("The LEAN adapter accepts the ETF and US-equity comparison workloads")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
     market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
     targets = filter_comparison_targets(pl.read_parquet(bundle / "targets.parquet"), spec)
@@ -84,11 +84,12 @@ def _prepare_project(bundle: Path) -> tuple[Path, dict[str, Any]]:
     ).select("timestamp", "ticker", "weight")
     target_rows.write_csv(project / "targets.csv")
 
+    market_by_symbol = market.select(
+        "symbol", "timestamp", "open", "high", "low", "close", "volume"
+    ).partition_by("symbol", as_dict=True, include_key=False)
     prices_by_asset: dict[str, pd.DataFrame] = {}
     for symbol in symbols:
-        selected = market.filter(pl.col("symbol") == symbol).select(
-            "timestamp", "open", "high", "low", "close", "volume"
-        )
+        selected = market_by_symbol[(symbol,)]
         prices_by_asset[symbol] = pd.DataFrame(selected.to_dict(as_series=False)).set_index(
             "timestamp"
         )
@@ -99,7 +100,7 @@ def _prepare_project(bundle: Path) -> tuple[Path, dict[str, Any]]:
         asset_to_ticker=asset_to_ticker,
         manifest_path=data_root / f"real_strategy_{case_study}_manifest.json",
         signature_payload={
-            "bundle_sha256": manifest["bundle_sha256"],
+            "market_sha256": manifest["files"]["market.parquet"]["sha256"],
             "price_decimals": 4,
         },
     )
@@ -122,11 +123,14 @@ class RealStrategyEquities(QCAlgorithm):
         self.set_end_date({last.year}, {last.month}, {last.day})
         self.set_cash({initial_cash})
         self.set_brokerage_model(BrokerageName.DEFAULT, AccountType.MARGIN)
+        self.portfolio.margin_call_model = MarginCallModel.NULL
         base = Path(__file__).resolve().parent
         self._equity_path = base / "ml4t_daily_equity.csv"
         self._events_path = base / "ml4t_order_events.csv"
         self._runtime_path = base / "ml4t_runtime.json"
         self._targets = {{}}
+        self._processed_target_dates = set()
+        self._asset_names = json.loads((base / "ml4t_symbol_map.json").read_text())
         with (base / "targets.csv").open(newline="") as stream:
             for row in csv.DictReader(stream):
                 self._targets.setdefault(row["timestamp"], {{}})[row["ticker"]] = float(row["weight"])
@@ -147,14 +151,15 @@ class RealStrategyEquities(QCAlgorithm):
     def on_data(self, data: Slice):
         key = self.time.strftime("%Y-%m-%d")
         requested = self._targets.get(key)
-        if requested is not None:
-            active = set(requested)
-            active.update(ticker for ticker, symbol in self._symbols.items() if self.portfolio[symbol].quantity != 0)
+        if requested is not None and key not in self._processed_target_dates:
+            self._processed_target_dates.add(key)
+            self.transactions.cancel_open_orders()
             value = float(self.portfolio.total_portfolio_value)
             current = {{ticker: float(self.portfolio[symbol].quantity) * float(self.securities[symbol].price) / value for ticker, symbol in self._symbols.items() if self.portfolio[symbol].quantity != 0}}
-            reductions = sorted(ticker for ticker in active if requested.get(ticker, 0.0) < current.get(ticker, 0.0))
-            increases = sorted(active - set(reductions))
-            for ticker in reductions + increases:
+            reductions = sorted((ticker for ticker, weight in requested.items() if weight < current.get(ticker, 0.0)), key=self._asset_names.__getitem__)
+            omitted = sorted((ticker for ticker in current if ticker not in requested), key=self._asset_names.__getitem__)
+            increases = sorted((ticker for ticker in requested if ticker not in reductions), key=self._asset_names.__getitem__)
+            for ticker in reductions + omitted + increases:
                 symbol = self._symbols[ticker]
                 if symbol not in data.bars:
                     continue

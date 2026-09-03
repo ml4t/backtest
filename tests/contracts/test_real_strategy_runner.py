@@ -143,6 +143,7 @@ def test_lean_comparison_preserves_margin_account_and_disables_equity_costs() ->
     assert config.commission_rate == 0.0
     assert config.slippage_rate == 0.0
     assert config.rebalance_headroom_pct == 1.0
+    assert config.enforce_sessions is True
 
 
 def test_real_strategy_comparator_detects_one_quantum_mutation() -> None:
@@ -171,6 +172,27 @@ def test_real_strategy_comparator_rounds_account_money_to_cents() -> None:
     result = evidence.compare_records(framework, residual, numeric_fields=("equity",))
 
     assert result["passed"] is True
+
+
+def test_real_strategy_comparator_rounds_fractional_share_residuals() -> None:
+    evidence = _load_evidence()
+    framework = [{"timestamp": "2024-01-01", "quantity": "10.00000000"}]
+    residual = [{"timestamp": "2024-01-01", "quantity": "10.00000036"}]
+
+    result = evidence.compare_records(framework, residual, numeric_fields=("quantity",))
+
+    assert result["passed"] is True
+
+
+def test_real_strategy_comparator_rejects_one_quantity_quantum() -> None:
+    evidence = _load_evidence()
+    framework = [{"timestamp": "2024-01-01", "quantity": "10.00000"}]
+    changed = [{"timestamp": "2024-01-01", "quantity": "10.00001"}]
+
+    result = evidence.compare_records(framework, changed, numeric_fields=("quantity",))
+
+    assert result["passed"] is False
+    assert result["first_divergence"]["canonical_gap"] == "0.00001"
 
 
 def test_real_strategy_comparator_rejects_one_cent_account_money_difference() -> None:
@@ -237,6 +259,66 @@ def test_comparison_market_applies_production_daily_calendar() -> None:
     filtered = comparison_input.filter_comparison_market(market, spec)
 
     assert filtered["timestamp"].to_list() == [datetime(2018, 12, 4)]
+
+
+def test_comparison_market_normalizes_missing_ohlcv_consistently() -> None:
+    comparison_input = _load_input()
+    market = pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, 2), datetime(2024, 1, 3)],
+            "symbol": ["A", "A"],
+            "open": [None, 11.0],
+            "high": [None, 12.0],
+            "low": [None, 10.0],
+            "close": [10.0, None],
+            "volume": [None, 100.0],
+        }
+    )
+    spec = {
+        "backtest_config": {
+            "calendar": {
+                "calendar": "NYSE",
+                "data_frequency": "daily",
+                "enforce_sessions": False,
+                "timezone": "UTC",
+            }
+        }
+    }
+
+    filtered = comparison_input.filter_comparison_market(market, spec)
+
+    assert filtered.to_dicts() == [
+        {
+            "timestamp": datetime(2024, 1, 2),
+            "symbol": "A",
+            "open": 10.0,
+            "high": 10.0,
+            "low": 10.0,
+            "close": 10.0,
+            "volume": 0.0,
+        }
+    ]
+
+
+def test_zipline_comparison_enforces_exchange_sessions() -> None:
+    runner = _load_runner()
+    source = {
+        "account": {"allow_short_selling": True, "allow_leverage": False},
+        "cash": {"initial": 100_000.0},
+        "calendar": {
+            "calendar": "NYSE",
+            "data_frequency": "daily",
+            "enforce_sessions": False,
+            "timezone": "UTC",
+        },
+        "feed": {"calendar": "NYSE", "data_frequency": "daily"},
+    }
+
+    config = runner._comparison_config({"backtest_config": source}, "zipline_strict")
+
+    assert config.calendar == "NYSE"
+    assert config.enforce_sessions is True
+    assert source["calendar"]["enforce_sessions"] is False
 
 
 def test_fx_comparison_uses_native_usd_quoted_pairs() -> None:

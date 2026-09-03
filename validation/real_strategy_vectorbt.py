@@ -16,7 +16,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
-from real_strategy_input import comparison_scope, filter_comparison_market, filter_comparison_targets
+from real_strategy_input import (
+    comparison_scope,
+    filter_comparison_market,
+    filter_comparison_targets,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -43,16 +47,14 @@ def run(bundle: Path, framework: str) -> tuple[dict[str, Any], pl.DataFrame, pl.
     case_study = manifest["case_study"]
     if case_study == "cme_futures" and framework != "vectorbt_pro":
         raise ValueError("VectorBT OSS lacks the contract multiplier used by this workload")
-    if case_study not in {"etfs", "cme_futures", "fx_pairs"}:
-        raise ValueError("This adapter accepts the ETF, FX, and CME futures workloads")
+    if case_study not in {"etfs", "cme_futures", "fx_pairs", "us_equities_panel"}:
+        raise ValueError("This adapter accepts the ETF, US equity, FX, and CME futures workloads")
     spec = json.loads((bundle / "spec.json").read_text(encoding="utf-8"))
     market = filter_comparison_market(pl.read_parquet(bundle / "market.parquet"), spec)
     close = _wide(market, "close")
     weights = _wide(
         filter_comparison_targets(pl.read_parquet(bundle / "targets.parquet"), spec), "weight"
-    ).reindex(
-        index=close.index, columns=close.columns
-    )
+    ).reindex(index=close.index, columns=close.columns)
     rebalance_rows = weights.notna().any(axis=1)
     weights.loc[rebalance_rows] = weights.loc[rebalance_rows].fillna(0.0)
     kwargs: dict[str, Any] = {

@@ -313,6 +313,40 @@ class TestRejectOnInsufficientCash:
         assert broker.get_position("AAPL").quantity == 150.0
         assert broker.cash == -6_500.0
 
+    def test_lean_shadow_validation_uses_fill_price(self):
+        broker = _make_broker(
+            initial_cash=10_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_submission_precheck=True,
+            next_bar_queue_shadow_validation=True,
+            allow_short_selling=True,
+            allow_leverage=True,
+            initial_margin=0.5,
+            long_maintenance_margin=0.5,
+            short_maintenance_margin=0.5,
+            fill_ordering=FillOrdering.SEQUENTIAL,
+            share_type=ShareType.INTEGER,
+            reject_on_insufficient_cash=True,
+        )
+        _set_prices(broker, {"AAPL": 50.0, "MSFT": 50.0})
+        first = broker.submit_order("AAPL", 150, OrderSide.BUY)
+        second = broker.submit_order("MSFT", 150, OrderSide.BUY)
+
+        broker._update_time(
+            timestamp=datetime(2024, 1, 3),
+            prices={"AAPL": 100.0, "MSFT": 100.0},
+            opens={"AAPL": 50.0, "MSFT": 50.0},
+            volumes={"AAPL": 1_000.0, "MSFT": 1_000.0},
+            highs={"AAPL": 100.0, "MSFT": 100.0},
+            lows={"AAPL": 50.0, "MSFT": 50.0},
+            signals={},
+        )
+        broker._process_orders(use_open=True)
+
+        assert first is not None and first.status.value == "filled"
+        assert second is not None and second.status.value == "filled"
+        assert [fill.price for fill in broker.fills] == [50.0, 50.0]
+
     def test_backtrader_precheck_rejects_unaffordable_short_cover(self):
         broker = _make_broker(
             initial_cash=100.0,

@@ -70,6 +70,7 @@ def load_case_contract(path: Path = DEFAULT_CASES_PATH) -> list[dict[str, Any]]:
         "required_backtest_artifacts",
         "warmup",
         "timestamp_shift_hours",
+        "target_scale",
         "contract_specs",
         "funding",
     }
@@ -81,6 +82,9 @@ def load_case_contract(path: Path = DEFAULT_CASES_PATH) -> list[dict[str, Any]]:
             raise ValueError(f"Invalid production path for {case['id']}")
         if not isinstance(case["required_backtest_artifacts"], list):
             raise ValueError(f"Invalid artifact list for {case['id']}")
+        target_scale = float(case["target_scale"])
+        if not 0.0 < target_scale <= 1.0:
+            raise ValueError(f"Invalid target scale for {case['id']}: {target_scale}")
         case_ids.append(str(case["id"]))
     if not 3 <= len(case_ids) <= 5 or len(set(case_ids)) != len(case_ids):
         raise ValueError("Real-strategy corpus must contain three to five unique case studies")
@@ -181,6 +185,7 @@ def build_case_record(
         "case_study": case_id,
         "asset_class": case["asset_class"],
         "production_path": case["production_path"],
+        "comparison_target_scale": float(case["target_scale"]),
         "selection": dict(lineage),
         "strategy": _strategy_summary(spec),
         "inputs": {
@@ -289,6 +294,21 @@ def align_targets_to_engine_schedule(targets: pl.DataFrame, schedule: pl.Series)
             pl.col("timestamp").cast(targets.schema["timestamp"])
         )
     return targets.join(schedule_frame, on="timestamp", how="semi").sort("timestamp", "symbol")
+
+
+def apply_comparison_target_scale(
+    targets: pl.DataFrame,
+    spec: Mapping[str, Any],
+    target_scale: float,
+) -> tuple[pl.DataFrame, dict[str, Any]]:
+    """Apply declared execution headroom without changing relative model allocations."""
+    scaled_spec = json.loads(json.dumps(spec, default=str))
+    if target_scale == 1.0:
+        return targets, scaled_spec
+    scaled_spec["backtest_config"].setdefault("metadata", {})["comparison_target_scale"] = (
+        target_scale
+    )
+    return targets.with_columns((pl.col("weight") * target_scale).alias("weight")), scaled_spec
 
 
 def _bundle_digest(
@@ -446,6 +466,11 @@ def materialize_bundles(
             case_study=case_id,
             prediction_hash=prediction_hash,
         ).sort("timestamp", "symbol")
+        targets, spec = apply_comparison_target_scale(
+            targets,
+            spec,
+            float(contract["target_scale"]),
+        )
         cadence = spec["strategy"]["rebalance"]["cadence"]
         calendar = spec["backtest_config"]["calendar"]["calendar"]
         schedule = loaders.resolve_rebalance_timestamps(

@@ -71,14 +71,18 @@ def test_case_contract_contains_selected_real_case_studies() -> None:
 
     cases = module.load_case_contract()
 
-    assert len(cases) == 4
+    assert len(cases) == 5
     assert {case["id"] for case in cases} == {
         "cme_futures",
         "crypto_perps_funding",
         "etfs",
         "fx_pairs",
+        "us_equities_panel",
     }
     assert all(case["production_path"] == "event_driven" for case in cases)
+    assert next(case for case in cases if case["id"] == "us_equities_panel")[
+        "target_scale"
+    ] == pytest.approx(0.5)
 
 
 def test_case_record_retains_predictions_spec_and_outputs(tmp_path: Path) -> None:
@@ -206,3 +210,17 @@ def test_targets_are_limited_to_production_engine_schedule() -> None:
     aligned = module.align_targets_to_engine_schedule(targets, schedule)
 
     assert aligned["symbol"].to_list() == ["SPY", "QQQ"]
+
+
+def test_comparison_target_scale_is_recorded_in_frozen_input() -> None:
+    module = _load_module()
+    targets = pl.DataFrame(
+        {"timestamp": ["2024-01-01", "2024-01-01"], "symbol": ["A", "B"], "weight": [1.0, -1.0]}
+    )
+    spec = {"backtest_config": {"metadata": {"case_study": "us_equities_panel"}}}
+
+    scaled, scaled_spec = module.apply_comparison_target_scale(targets, spec, 0.5)
+
+    assert scaled["weight"].to_list() == pytest.approx([0.5, -0.5])
+    assert scaled_spec["backtest_config"]["metadata"]["comparison_target_scale"] == 0.5
+    assert "comparison_target_scale" not in spec["backtest_config"]["metadata"]
