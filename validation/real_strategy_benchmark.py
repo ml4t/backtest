@@ -33,6 +33,7 @@ TIMING_SOURCE_PATHS = {
     **{name: path for name, path in ADAPTER_PATHS.items() if name != "evidence_builder"},
     "benchmark": Path(__file__).resolve(),
 }
+SUBPROCESS_TIMEOUT_SECONDS = 900
 PYTHONS = {
     "ml4t": ".venv/bin/python",
     "vectorbt_pro": ".venv-vectorbt-pro/bin/python",
@@ -138,7 +139,7 @@ def _run_once(command: list[str], output: Path) -> tuple[float, dict[str, str]]:
         check=False,
         capture_output=True,
         text=True,
-        timeout=600,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip()
