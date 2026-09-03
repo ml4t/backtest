@@ -569,6 +569,14 @@ class Broker:
         self._market_state.volumes = value
 
     @property
+    def _current_vwaps(self) -> dict[str, float]:
+        return self._market_state.vwaps
+
+    @_current_vwaps.setter
+    def _current_vwaps(self, value: dict[str, float]) -> None:
+        self._market_state.vwaps = value
+
+    @property
     def _current_bids(self) -> dict[str, float]:
         return self._market_state.bids
 
@@ -968,6 +976,11 @@ class Broker:
                 ExecutionPrice.ASK,
                 ExecutionPrice.QUOTE_MID,
                 ExecutionPrice.QUOTE_SIDE,
+                # VWAP is already a whole-bar price, so the open short-circuit must not
+                # override it. While VWAP was absent from this set the branch below was
+                # unreachable under NEXT_BAR, and every VWAP fill silently returned the
+                # open - the assumption a caller chooses VWAP specifically to avoid.
+                ExecutionPrice.VWAP,
             }
         ):
             return self._current_opens.get(asset, self._current_prices.get(asset))
@@ -985,7 +998,15 @@ class Broker:
                 return (high + low) / 2.0
             return self._current_prices.get(asset, self._current_closes.get(asset))
         if source == ExecutionPrice.VWAP:
-            return self._current_prices.get(asset, self._current_closes.get(asset))
+            # None, not a fallback and not a raise. A bar in which nothing traded has no
+            # volume-weighted price, and that is an ordinary market state rather than an
+            # error: callers already treat None as "this asset cannot be priced on this
+            # bar" and skip it, which leaves the order unfilled and the prior position
+            # standing - what happens to a real order resting in a bar with no prints.
+            # Substituting the close would invent a price from a stale carried print.
+            # A feed that declares no VWAP column at all is a different thing entirely,
+            # and Engine rejects that configuration before the first bar.
+            return self._current_vwaps.get(asset)
         if source == ExecutionPrice.BID:
             return self._current_bids.get(asset, self._current_prices.get(asset))
         if source == ExecutionPrice.ASK:
@@ -2285,6 +2306,7 @@ class Broker:
             lows = lows if lows is not None else kwargs.pop("lows", None)
             closes = kwargs.pop("closes", prices)
             volumes = kwargs.pop("volumes")
+            vwaps = kwargs.pop("vwaps", {})
             bids = kwargs.pop("bids", {})
             asks = kwargs.pop("asks", {})
             mids = kwargs.pop("mids", {})
@@ -2296,18 +2318,24 @@ class Broker:
         elif len(rest) == 2:
             volumes, signals = rest
             closes = prices
+            vwaps = {}
             bids = {}
             asks = {}
             mids = {}
             bid_sizes = {}
             ask_sizes = {}
         elif len(rest) == 8:
+            # Pre-VWAP positional form, kept working: a caller that does not pass VWAPs
+            # gets an empty cache, and get_price_for_source raises if it then asks for one.
             closes, volumes, bids, asks, mids, bid_sizes, ask_sizes, signals = rest
+            vwaps = {}
+        elif len(rest) == 9:
+            closes, volumes, vwaps, bids, asks, mids, bid_sizes, ask_sizes, signals = rest
         else:
             raise TypeError(
                 "_update_time expects either legacy arguments "
                 "(timestamp, prices, opens, highs, lows, volumes, signals) "
-                "or quote-aware arguments with closes/bid/ask caches."
+                "or quote-aware arguments with closes/vwap/bid/ask caches."
             )
         if highs is None or lows is None:
             raise TypeError("_update_time requires highs and lows")
@@ -2320,6 +2348,7 @@ class Broker:
         self._current_lows = lows
         self._current_closes = closes
         self._current_volumes = volumes
+        self._current_vwaps = vwaps
         self._current_bids = bids
         self._current_asks = asks
         self._current_mids = mids
