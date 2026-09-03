@@ -113,7 +113,10 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
         assert f"`{pin['profile']}`" in claims
     assert "16/16 exact" in claims
     assert "synthetic stress workload contains 250 assets" in claims
-    assert "12/12 required pairs pass" in claims
+    required_real = [
+        record for record in real_strategy["records"] if record["status"] != "unsupported"
+    ]
+    assert f"{len(required_real)}/{len(required_real)} required pairs pass" in claims
     assert "8 pairs are declared unsupported" in claims
     assert "identical valuation timestamp coverage" in claims
     assert "account monetary values that round to the same cent" in claims
