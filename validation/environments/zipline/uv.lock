@@ -459,7 +459,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
-    { name = "ml4t-specs", specifier = ">=0.1.2,<0.2" },
+    { name = "ml4t-specs", specifier = ">=0.1.4,<0.2" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.3.2" },
@@ -534,14 +534,14 @@ requires-dist = [
 
 [[package]]
 name = "ml4t-specs"
-version = "0.1.3"
+version = "0.1.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/ca/aba7ea1f4e9a1da0b4f465dea03d3e4320d63db348245a2a9976096407ac/ml4t_specs-0.1.3.tar.gz", hash = "sha256:9578038af96d59cd50317e78f8781772833b308076da13ad24c0b304bb20961d", size = 50758, upload-time = "2026-08-12T02:27:14.366Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/52/ba5c172ef1eddd3727832123dd6abf380ff39d36083ec37864bc488c2bd7/ml4t_specs-0.1.4.tar.gz", hash = "sha256:bc8e417e8049a05847ca30de52a59e28a18539c5e8aef8711dc5d57d7752e0a4", size = 51355, upload-time = "2026-09-03T02:06:36.74Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/6c/0a35ee16313441a68a14d811ffa8b79eb63a013d548b6bbb50dfd208c6b1/ml4t_specs-0.1.3-py3-none-any.whl", hash = "sha256:2b9302d27746f5859b62c6748bf217ca4eae76d4842c783575c58f4880d1568f", size = 33860, upload-time = "2026-08-12T02:27:12.929Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/1f/d03958fb90ac08adc78465e915501b1043ff7d12b68485592dac6139e59a/ml4t_specs-0.1.4-py3-none-any.whl", hash = "sha256:459928f55edb0c62dde535fc391f38446774bca821c5774617d40b50a0289725", size = 34033, upload-time = "2026-09-03T02:06:35.49Z" },
 ]
 
 [[package]]
