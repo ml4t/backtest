@@ -252,3 +252,11 @@ exclude_lines = [
     "except ImportError:",
     "@abstractmethod",
 ]
+
+# TEMPORARY - REMOVE BEFORE MERGE.
+# FeedSpec.vwap_col lands in ml4t-specs#13 and is not released yet. Without this the
+# `ty` hook resolves FeedSpec against the published 0.1.x and rejects datafeed.py:182.
+# Once ml4t-specs is released, delete this block and raise the version floor in
+# [project.dependencies] instead. Tracked by ml4t/agent-workspace#1017.
+[tool.uv.sources]
+ml4t-specs = { git = "https://github.com/ml4t/specs.git", branch = "feat/feedspec-vwap-col" }

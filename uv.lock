@@ -1902,7 +1902,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
-    { name = "ml4t-specs", specifier = ">=0.1.2,<0.2" },
+    { name = "ml4t-specs", git = "https://github.com/ml4t/specs.git?branch=feat%2Ffeedspec-vwap-col" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.3.2" },
@@ -2083,14 +2083,10 @@ wheels = [
 
 [[package]]
 name = "ml4t-specs"
-version = "0.1.2"
-source = { registry = "https://pypi.org/simple" }
+version = "0.1.3"
+source = { git = "https://github.com/ml4t/specs.git?branch=feat%2Ffeedspec-vwap-col#1b1f432eece5c3e85b978caf4f4657cadaaa3059" }
 dependencies = [
     { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/6b/58aacbc7ccf9239edb5f3b350b418aff543f87698852e1507892c2ce8c26/ml4t_specs-0.1.2.tar.gz", hash = "sha256:72131624220bdded7d01d9c09e4c9e6637e8e977a37be283bc7f38d4fe0b1e1a", size = 50590, upload-time = "2026-08-10T00:53:01.695Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/97/1508cd131272885391fe17eb54865d8c2ee0a853d15bdd5cfd838b20ce44/ml4t_specs-0.1.2-py3-none-any.whl", hash = "sha256:c9e6749bc28c087f1a97494690edae94460aeffe2c223494a19c41c4915b9532", size = 33763, upload-time = "2026-08-10T00:53:00.474Z" },
 ]
 
 [[package]]
