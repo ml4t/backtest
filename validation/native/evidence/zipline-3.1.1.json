@@ -552,7 +552,7 @@
     "slippage": "no volume cap unless a scenario explicitly configures slippage"
   },
   "framework": "zipline",
-  "oracle_sha256": "1804d3fae3a56ec930aba31fc832214d6be6f8a3f6d2e8043b4bd1f0a1040346",
+  "oracle_sha256": "ad4b6fadd71eca8bf88866829a746a875ff0778fd0ceb584180440fde16dac8f",
   "package": "zipline-reloaded",
   "passed": true,
   "schema_version": 1,
