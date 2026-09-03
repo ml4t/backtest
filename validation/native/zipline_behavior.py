@@ -140,8 +140,7 @@ def _run(
 class OpenPriceSlippage(slippage.SlippageModel):
     """Explicit comparison protocol: next-session open with no volume cap."""
 
-    @staticmethod
-    def process_order(data: Any, order: Any) -> tuple[float, int]:
+    def process_order(self, data: Any, order: Any) -> tuple[float, int]:
         return data.current(order.asset, "open"), order.open_amount
 
 

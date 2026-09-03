@@ -172,6 +172,7 @@ class Order:
     # Internal risk management fields (set by broker)
     _created_bar_index: int = 0
     _signal_price: float | None = None  # Close price at order creation time
+    _priority_notional: float | None = None
     _risk_exit_reason: str | None = None  # Human-readable reason (legacy, for logging)
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits

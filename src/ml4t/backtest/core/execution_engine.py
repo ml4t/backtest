@@ -733,6 +733,8 @@ class ExecutionEngine:
             return orders
 
         def notional(order) -> float:
+            if order._priority_notional is not None:
+                return order._priority_notional
             px = fill.get_fill_price_for_order(order, use_open)
             if not _price_available(px):
                 px = self.market.prices.get(order.asset, self.market.opens.get(order.asset, 0.0))

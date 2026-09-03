@@ -85,6 +85,7 @@ class OrderBook:
             order_id=f"ORD-{self.orders.counter}",
             created_at=self.market.time,
             _created_bar_index=self.market.bar_index,
+            _priority_notional=options.priority_notional if options is not None else None,
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,

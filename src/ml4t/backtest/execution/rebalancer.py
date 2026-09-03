@@ -426,7 +426,10 @@ class TargetWeightExecutor:
 
         # Submit order
         side = OrderSide.BUY if shares > 0 else OrderSide.SELL
-        options = SubmitOrderOptions(rebalance_id=rebalance_id)
+        options = SubmitOrderOptions(
+            rebalance_id=rebalance_id,
+            priority_notional=abs(delta_value),
+        )
         return broker.submit_order(asset, abs(shares), side, _options=options)
 
     def _get_rebalance_price(self, asset: str, data: dict[str, dict]) -> float | None:

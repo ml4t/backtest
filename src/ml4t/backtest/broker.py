@@ -2121,6 +2121,9 @@ class Broker:
         if abs(delta_value) < 0.01:  # Less than 1 cent, no trade needed
             return None
 
+        if _options is not None and _options.priority_notional is None:
+            _options.priority_notional = abs(delta_value)
+
         # Convert to quantity (accounting for multiplier)
         delta_qty = delta_value / unit_notional
 

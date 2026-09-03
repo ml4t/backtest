@@ -36,6 +36,7 @@ from ml4t.backtest.config import (
 )
 from ml4t.backtest.core.shared import CASH_TOLERANCE
 from ml4t.backtest.execution.limits import VolumeParticipationLimit
+from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.models import (
     CombinedCommission,
     NoCommission,
@@ -1319,6 +1320,35 @@ class TestEntryOrderPriority:
         broker._process_orders()
 
         assert [fill.asset for fill in broker.fills] == ["SHORT", "LONG"]
+
+    def test_order_value_priority_preserves_equal_target_submission_order(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            fill_ordering=FillOrdering.PRIORITY,
+            entry_order_priority=EntryOrderPriority.ORDER_VALUE_ASC,
+            short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+            reject_on_insufficient_cash=True,
+            partial_fills_allowed=True,
+            share_type=ShareType.FRACTIONAL,
+        )
+        prices = {"ROVI": 70.69, "TIVO": 67.895320594601}
+        _set_prices(broker, prices)
+        equity = 1_305_526.2630508184
+        monkeypatch.setattr(broker, "get_account_value", lambda: equity)
+        weight = -0.059433628848188376
+        executor = TargetWeightExecutor(RebalanceConfig(allow_fractional=True, allow_short=True))
+
+        executor.execute(
+            {"ROVI": weight, "TIVO": weight},
+            {asset: {"close": price} for asset, price in prices.items()},
+            broker,
+        )
+        broker._process_orders()
+
+        assert [fill.asset for fill in broker.fills] == ["ROVI", "TIVO"]
+        assert broker.fills[0].quantity == pytest.approx(abs(equity * weight) / prices["ROVI"])
 
     def test_priority_fill_ordering_sorts_exits_and_entries_together(self):
         broker = _make_broker(

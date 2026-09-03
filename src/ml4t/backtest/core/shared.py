@@ -46,6 +46,7 @@ class SubmitOrderOptions:
 
     eligible_in_next_bar_mode: bool = False
     rebalance_id: str | None = None
+    priority_notional: float | None = None
     risk_exit_reason: str | None = None
     exit_reason: ExitReason | None = None
     risk_fill_price: float | None = None
