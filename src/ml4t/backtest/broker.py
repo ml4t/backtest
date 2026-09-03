@@ -998,16 +998,15 @@ class Broker:
                 return (high + low) / 2.0
             return self._current_prices.get(asset, self._current_closes.get(asset))
         if source == ExecutionPrice.VWAP:
-            vwap = self._current_vwaps.get(asset)
-            if vwap is None:
-                raise ValueError(
-                    f"execution_price is VWAP but the feed carries no VWAP for {asset!r} at "
-                    f"{self._current_time}. Declare the column as FeedSpec.vwap_col. This "
-                    f"refuses rather than falling back to the close: a VWAP fill and a close "
-                    f"fill are different assumptions, and a substitution here would be "
-                    f"indistinguishable from a correct run."
-                )
-            return vwap
+            # None, not a fallback and not a raise. A bar in which nothing traded has no
+            # volume-weighted price, and that is an ordinary market state rather than an
+            # error: callers already treat None as "this asset cannot be priced on this
+            # bar" and skip it, which leaves the order unfilled and the prior position
+            # standing - what happens to a real order resting in a bar with no prints.
+            # Substituting the close would invent a price from a stale carried print.
+            # A feed that declares no VWAP column at all is a different thing entirely,
+            # and Engine rejects that configuration before the first bar.
+            return self._current_vwaps.get(asset)
         if source == ExecutionPrice.BID:
             return self._current_bids.get(asset, self._current_prices.get(asset))
         if source == ExecutionPrice.ASK:

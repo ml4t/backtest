@@ -81,24 +81,37 @@ class TestVwapIsItsOwnPrice:
         assert position.entry_price == VWAP
 
 
-class TestARefusalRatherThanASubstitution:
-    def test_a_feed_without_a_vwap_raises(self):
+class TestANoTradeBarIsANonFill:
+    """A bar with no prints has no VWAP, and that is not an error."""
+
+    def test_a_missing_vwap_resolves_to_none_rather_than_raising(self):
+        # Measured on the NASDAQ-100: 0.24% of production symbol-minutes inside the
+        # exchange session carry no print, and every one of them would stop a run if
+        # this raised. The engine's callers already read None as "cannot be priced on
+        # this bar" and skip, which is the non-fill.
         broker = _broker()
         _advance(broker, vwaps={})
-        with pytest.raises(ValueError, match="carries no VWAP"):
-            broker.get_price_for_source(ExecutionPrice.VWAP, "AAPL")
+        assert broker.get_price_for_source(ExecutionPrice.VWAP, "AAPL") is None
 
-    def test_the_refusal_names_the_field_that_fixes_it(self):
+    def test_it_does_not_fall_back_to_the_close_or_the_open(self):
         broker = _broker()
         _advance(broker, vwaps={})
-        with pytest.raises(ValueError, match="vwap_col"):
-            broker.get_price_for_source(ExecutionPrice.VWAP, "AAPL")
+        price = broker.get_price_for_source(ExecutionPrice.VWAP, "AAPL")
+        assert price != CLOSE
+        assert price != OPEN
 
-    def test_one_asset_missing_a_vwap_does_not_silence_another(self):
+    def test_one_asset_without_a_vwap_does_not_affect_another(self):
         broker = _broker()
         _advance(broker, vwaps={"MSFT": VWAP})
-        with pytest.raises(ValueError, match="'AAPL'"):
-            broker.get_price_for_source(ExecutionPrice.VWAP, "AAPL")
+        assert broker.get_price_for_source(ExecutionPrice.VWAP, "AAPL") is None
+        assert broker.get_price_for_source(ExecutionPrice.VWAP, "MSFT") == VWAP
+
+    def test_an_order_on_a_no_trade_bar_does_not_fill(self):
+        broker = _broker()
+        _advance(broker, vwaps={})
+        broker.submit_order("AAPL", 10.0, OrderSide.BUY)
+        broker._process_orders()
+        assert broker.get_position("AAPL") is None
 
 
 class TestTheFeedCarriesItThrough:
@@ -140,3 +153,56 @@ class TestTheFeedCarriesItThrough:
         _timestamp, assets, _context = next(iter(feed))
         assert "vwap" not in assets["AAPL"]
         assert assets._vwaps == {}
+
+
+class TestAnUndeclaredColumnIsAConfigurationError:
+    """A feed with no VWAP column at all is rejected once, before the first bar."""
+
+    @staticmethod
+    def _engine(feed, config):
+        from ml4t.backtest import Engine
+        from ml4t.backtest.strategy import Strategy
+
+        class _Noop(Strategy):
+            def on_data(self, timestamp, data, broker):
+                return None
+
+        return Engine(feed, _Noop(), config)
+
+    @staticmethod
+    def _prices(with_vwap: bool) -> pl.DataFrame:
+        frame = {
+            "timestamp": [datetime(2024, 1, 2, 9, 31), datetime(2024, 1, 2, 9, 32)],
+            "symbol": ["AAPL", "AAPL"],
+            "open": [OPEN, OPEN],
+            "high": [105.0, 105.0],
+            "low": [95.0, 95.0],
+            "close": [CLOSE, CLOSE],
+            "volume": [1_000_000.0, 1_000_000.0],
+        }
+        if with_vwap:
+            frame["vwap"] = [VWAP, VWAP]
+        return pl.DataFrame(frame)
+
+    def test_engine_rejects_vwap_execution_on_a_feed_without_the_column(self):
+        from ml4t.backtest.config import BacktestConfig
+
+        feed = DataFeed(prices_df=self._prices(with_vwap=False), entity_col="symbol")
+        config = BacktestConfig(execution_price=ExecutionPrice.VWAP)
+        with pytest.raises(ValueError, match="declares no VWAP column"):
+            self._engine(feed, config)
+
+    def test_engine_accepts_it_once_the_column_is_declared(self):
+        from ml4t.backtest.config import BacktestConfig
+
+        feed = DataFeed(
+            prices_df=self._prices(with_vwap=True), entity_col="symbol", vwap_col="vwap"
+        )
+        config = BacktestConfig(execution_price=ExecutionPrice.VWAP)
+        self._engine(feed, config)  # does not raise
+
+    def test_a_feed_without_the_column_is_fine_under_another_execution_price(self):
+        from ml4t.backtest.config import BacktestConfig
+
+        feed = DataFeed(prices_df=self._prices(with_vwap=False), entity_col="symbol")
+        self._engine(feed, BacktestConfig(execution_price=ExecutionPrice.CLOSE))

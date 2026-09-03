@@ -21,7 +21,7 @@ from ml4t.specs import (
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
 from .broker import Broker
-from .config import DataFrequency
+from .config import DataFrequency, ExecutionPrice
 from .datafeed import DataFeed
 from .lifecycle import LifecycleDispatcher
 from .preopen import default_execution_policy
@@ -112,6 +112,16 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
+            self.feed.feed_spec, "vwap_col", None
+        ):
+            raise ValueError(
+                "execution_price is VWAP but the feed declares no VWAP column. Set "
+                "FeedSpec.vwap_col to the column holding the volume-weighted average "
+                "price. This is checked here, once, rather than at fill time: a missing "
+                "column is a configuration error, while an individual bar with no VWAP is "
+                "an ordinary no-trade bar that leaves its order unfilled."
+            )
         self.equity_curve: list[tuple[datetime, float]] = []
         self.portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
         self.lifecycle_dispatcher = LifecycleDispatcher(
