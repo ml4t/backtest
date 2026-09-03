@@ -21,7 +21,7 @@ from ml4t.specs import (
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
 from .broker import Broker
-from .config import DataFrequency
+from .config import DataFrequency, ExecutionPrice
 from .datafeed import DataFeed
 from .lifecycle import LifecycleDispatcher
 from .preopen import default_execution_policy
@@ -112,6 +112,16 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
+            self.feed.feed_spec, "vwap_col", None
+        ):
+            raise ValueError(
+                "execution_price is VWAP but the feed declares no VWAP column. Set "
+                "FeedSpec.vwap_col to the column holding the volume-weighted average "
+                "price. This is checked here, once, rather than at fill time: a missing "
+                "column is a configuration error, while an individual bar with no VWAP is "
+                "an ordinary no-trade bar that leaves its order unfilled."
+            )
         self.equity_curve: list[tuple[datetime, float]] = []
         self.portfolio_state: list[tuple[datetime, float, float, float, float, int]] = []
         self.lifecycle_dispatcher = LifecycleDispatcher(
@@ -331,6 +341,11 @@ class Engine:
             lows = getattr(assets_data, "_lows", None)
             closes = getattr(assets_data, "_closes", None)
             volumes = getattr(assets_data, "_volumes", None)
+            # Not in the None-check below: a feed with no vwap_col legitimately has no
+            # VWAP cache, and that is not a reason to take the slow rebuild path. An
+            # empty cache is the correct value; the broker refuses at fill time if a
+            # VWAP execution price is then asked for.
+            vwaps = getattr(assets_data, "_vwaps", None) or {}
             bids = getattr(assets_data, "_bids", None)
             asks = getattr(assets_data, "_asks", None)
             mids = getattr(assets_data, "_mids", None)
@@ -373,6 +388,7 @@ class Engine:
                     highs[asset] = data.get("high") if data.get("high") is not None else base_price
                     lows[asset] = data.get("low") if data.get("low") is not None else base_price
                 volumes = {a: d.get("volume", 0) for a, d in assets_data.items()}
+                vwaps = {a: d["vwap"] for a, d in assets_data.items() if d.get("vwap") is not None}
                 bids = {a: d["bid"] for a, d in assets_data.items() if d.get("bid") is not None}
                 asks = {a: d["ask"] for a, d in assets_data.items() if d.get("ask") is not None}
                 mids = {a: d["mid"] for a, d in assets_data.items() if d.get("mid") is not None}
@@ -396,6 +412,7 @@ class Engine:
                 lows,
                 closes,
                 volumes,
+                vwaps,
                 bids,
                 asks,
                 mids,
