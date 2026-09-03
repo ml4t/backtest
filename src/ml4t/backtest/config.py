@@ -1091,6 +1091,7 @@ class BacktestConfig:
                     "low_col",
                     "close_col",
                     "volume_col",
+                    "vwap_col",
                     "bid_col",
                     "ask_col",
                     "mid_col",

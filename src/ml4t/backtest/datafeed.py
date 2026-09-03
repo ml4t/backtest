@@ -29,6 +29,7 @@ class _AssetsData(dict[str, dict[str, Any]]):
         "_lows",
         "_closes",
         "_volumes",
+        "_vwaps",
         "_bids",
         "_asks",
         "_mids",
@@ -45,6 +46,7 @@ class _AssetsData(dict[str, dict[str, Any]]):
         self._lows: dict[str, Any] = {}
         self._closes: dict[str, Any] = {}
         self._volumes: dict[str, Any] = {}
+        self._vwaps: dict[str, Any] = {}
         self._bids: dict[str, Any] = {}
         self._asks: dict[str, Any] = {}
         self._mids: dict[str, Any] = {}
@@ -96,6 +98,7 @@ class DataFeed:
         low_col: str | None = None,
         close_col: str | None = None,
         volume_col: str | None = None,
+        vwap_col: str | None = None,
         bid_col: str | None = None,
         ask_col: str | None = None,
         mid_col: str | None = None,
@@ -143,6 +146,7 @@ class DataFeed:
             low_col=low_col,
             close_col=close_col,
             volume_col=volume_col,
+            vwap_col=vwap_col,
             bid_col=bid_col,
             ask_col=ask_col,
             mid_col=mid_col,
@@ -175,6 +179,7 @@ class DataFeed:
         self._low_col = self.feed_spec.low_col
         self._close_col = self.feed_spec.close_col
         self._volume_col = self.feed_spec.volume_col
+        self._vwap_col = self.feed_spec.vwap_col
         self._bid_col = self.feed_spec.bid_col
         self._ask_col = self.feed_spec.ask_col
         self._mid_col = self.feed_spec.mid_col
@@ -228,6 +233,9 @@ class DataFeed:
         )
         self._price_volume_idx = (
             price_cols.index(self._volume_col) if self._volume_col in price_cols else -1
+        )
+        self._price_vwap_idx = (
+            price_cols.index(self._vwap_col) if self._vwap_col in price_cols else -1
         )
         self._price_bid_idx = price_cols.index(self._bid_col) if self._bid_col in price_cols else -1
         self._price_ask_idx = price_cols.index(self._ask_col) if self._ask_col in price_cols else -1
@@ -363,6 +371,7 @@ class DataFeed:
         price_close_idx = self._price_close_idx
         price_price_idx = self._price_price_idx
         price_volume_idx = self._price_volume_idx
+        price_vwap_idx = self._price_vwap_idx
         price_bid_idx = self._price_bid_idx
         price_ask_idx = self._price_ask_idx
         price_mid_idx = self._price_mid_idx
@@ -380,6 +389,10 @@ class DataFeed:
                 high = row[price_high_idx] if price_high_idx >= 0 else close
                 low = row[price_low_idx] if price_low_idx >= 0 else close
                 volume = row[price_volume_idx] if price_volume_idx >= 0 else 0.0
+                # No fallback to the close. A missing VWAP stays missing so the broker can
+                # refuse a VWAP fill it cannot price, rather than substitute a different
+                # quantity that would be indistinguishable from a correct one.
+                vwap = row[price_vwap_idx] if price_vwap_idx >= 0 else None
                 bid = row[price_bid_idx] if price_bid_idx >= 0 else None
                 ask = row[price_ask_idx] if price_ask_idx >= 0 else None
                 mid = row[price_mid_idx] if price_mid_idx >= 0 else None
@@ -408,6 +421,8 @@ class DataFeed:
                     "volume": volume,
                     "signals": {},
                 }
+                if vwap is not None:
+                    assets_data[asset]["vwap"] = vwap
                 if bid is not None:
                     assets_data[asset]["bid"] = bid
                 if ask is not None:
@@ -425,6 +440,8 @@ class DataFeed:
                 assets_data._lows[asset] = low
                 assets_data._closes[asset] = close
                 assets_data._volumes[asset] = volume
+                if vwap is not None:
+                    assets_data._vwaps[asset] = vwap
                 if bid is not None:
                     assets_data._bids[asset] = bid
                 if ask is not None:

@@ -20,6 +20,7 @@ class MarketState:
     lows: dict[str, float] = field(default_factory=dict)
     closes: dict[str, float] = field(default_factory=dict)
     volumes: dict[str, float] = field(default_factory=dict)
+    vwaps: dict[str, float] = field(default_factory=dict)
     bids: dict[str, float] = field(default_factory=dict)
     asks: dict[str, float] = field(default_factory=dict)
     mids: dict[str, float] = field(default_factory=dict)
