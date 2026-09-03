@@ -242,7 +242,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "9518c9c39e8031d01d2458d1155261e03dbc2562",
+        "commit": "da6a17f81729c7f3c38483b7e9aeaf8e7f4e10ad",
         "dirty": false
       },
       "python": {
@@ -250,8 +250,8 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 68.58227533800527,
-        "ml4t": 88.56605237099575,
+        "framework": 69.38130597799318,
+        "ml4t": 87.44761717598885,
         "not_a_performance_claim": true
       },
       "source_digests": {
@@ -624,7 +624,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "9518c9c39e8031d01d2458d1155261e03dbc2562",
+        "commit": "da6a17f81729c7f3c38483b7e9aeaf8e7f4e10ad",
         "dirty": false
       },
       "python": {
@@ -632,8 +632,8 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 74.775051685996,
-        "ml4t": 94.44550085598894,
+        "framework": 44.437109105987474,
+        "ml4t": 86.54987668301328,
         "not_a_performance_claim": true
       },
       "source_digests": {
@@ -847,7 +847,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "9518c9c39e8031d01d2458d1155261e03dbc2562",
+        "commit": "da6a17f81729c7f3c38483b7e9aeaf8e7f4e10ad",
         "dirty": false
       },
       "python": {
@@ -855,8 +855,8 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 347.0853633999941,
-        "ml4t": 99.95880926100654,
+        "framework": 337.5184677949874,
+        "ml4t": 98.3814432809886,
         "not_a_performance_claim": true
       },
       "source_digests": {
@@ -1087,7 +1087,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "9518c9c39e8031d01d2458d1155261e03dbc2562",
+        "commit": "da6a17f81729c7f3c38483b7e9aeaf8e7f4e10ad",
         "dirty": false
       },
       "python": {
@@ -1095,8 +1095,8 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 268.50117623098777,
-        "ml4t": 97.92835832400306,
+        "framework": 267.13043479202315,
+        "ml4t": 97.087909904978,
         "not_a_performance_claim": true
       },
       "source_digests": {
@@ -1292,7 +1292,7 @@
         "raw_sha256": "1d1ef383884bb9db1aad484f2dc9b6b4fb72ade02c41c8d9c8f44055e9580d09"
       },
       "ml4t": {
-        "commit": "9518c9c39e8031d01d2458d1155261e03dbc2562",
+        "commit": "da6a17f81729c7f3c38483b7e9aeaf8e7f4e10ad",
         "dirty": false
       },
       "python": {
@@ -1300,8 +1300,8 @@
         "version": "3.12.11"
       },
       "runtime_seconds": {
-        "framework": 150.59406381699955,
-        "ml4t": 203.87612130100024,
+        "framework": 145.3438583050156,
+        "ml4t": 208.80691466797725,
         "not_a_performance_claim": true
       },
       "source_digests": {
@@ -1329,7 +1329,7 @@
       }
     }
   ],
-  "generated_at": "2026-09-03T03:56:38.706881+00:00",
+  "generated_at": "2026-09-03T08:44:03.035191+00:00",
   "release_gate_passed": true,
   "schema_version": 1,
   "workload": {
