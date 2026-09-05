@@ -1,6 +1,6 @@
 {
   "case_study_support_files": {
-    "project-config.json": "6f53654afabb96e23944db61235b83848ab24fcac2ecaf9597382e0671fef01f"
+    "project-config.json": "2c71309922dc0305269869776ba945432379a2c45d5327550708953e6901b0c6"
   },
   "cases": [
     {
@@ -57,8 +57,8 @@
         "validation/lean/workspace/chapter16_etfs/ml4t_daily_equity.csv": "20bc4a28ad04fdc458bd8f5031fbf976623caddd819da70f2e51ddb45dea6609",
         "validation/lean/workspace/chapter16_etfs/ml4t_order_events.csv.xz": "63535bec501d36e4f1eae501917e0000e636c03a19d637b05cdda1428bc80421"
       },
-      "runtime_seconds": 12.663519160356373,
-      "summary_sha256": "8a50b99a15d26baa87845c8ed2a517f40747b5e352cc6e739d208cba4323b777"
+      "runtime_seconds": 21.884960932000013,
+      "summary_sha256": "677166e5de08ea5de1795d1b4d4ac440b5e2cf1e5c4f26f5139bbd0ee2682240"
     },
     {
       "case": "chapter16_sp500_equity_option_analytics",
@@ -115,8 +115,8 @@
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_daily_equity.csv": "83a98f50053b12dd4baa37484b0b268cb8ec83ebdf633ee2e6ee790db0bb73ad",
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/ml4t_order_events.csv": "334cd463affb3d23f074882fe1d8131861ec67ca5203fbdfb86cae4d8da64917"
       },
-      "runtime_seconds": 8.238332036882639,
-      "summary_sha256": "df58a18960ff30d5cc5cf51ee7072dd2b557f46ad7e0ced3d74aaab061eb3e13"
+      "runtime_seconds": 14.92322724799999,
+      "summary_sha256": "035984926246be0c41275ba43df96e2e04d06ef105bfb6055d35909f525e43dd"
     },
     {
       "case": "chapter16_us_equities_panel",
@@ -201,8 +201,8 @@
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part01.xz": "9aea6ff30791dc06cd9b917e6f0c639d1b6f17883012b9c5190d7be6a899d980",
         "validation/lean/workspace/chapter16_us_equities_panel/ml4t_order_events.csv.part02.xz": "915bef2036b7d49535eb81a458a1af891f8f15c249bb413831771ea52e982a26"
       },
-      "runtime_seconds": 23.13902745116502,
-      "summary_sha256": "4d10636f183790250e6feb7018554c09140c1603dd8c09c7e93029679543397b"
+      "runtime_seconds": 42.17692052699999,
+      "summary_sha256": "bd8582a9316684d73a0ed55d4ed16ed2e7a05be5b94881607f022a5867f3ecbd"
     }
   ],
   "cli_observed": "lean 1.0.228",

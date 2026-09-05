@@ -2254,7 +2254,7 @@
     "security": "Equity USA, daily, adjusted normalization, leverage 2"
   },
   "oracle_files": {
-    "config.json": "5b7ec7bf073127d026e6086ec18771dcb700375570ba51def97739d85009351c",
+    "config.json": "272e56b7a924ac9fd1dfe01e70be10e2a7c58b1b9328576e7a9c0b6e3144dbb3",
     "main.py": "04aab940df029bf37e7aa1a9d3d8ab0996fce0bb3a10fa4dd4e15ca685e83e19"
   },
   "oracle_sha256": "1675f062ce54f29727d2bf7d17afc5c9db4e439e9f921e270feec49cde065d66",
