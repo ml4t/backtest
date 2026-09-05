@@ -1,6 +1,6 @@
 """Zipline framework driver for validation scenarios.
 
-Consolidates 15 run_zipline() functions into a single parameterized driver.
+Provides one parameterized driver for the scenario matrix.
 
 Zipline uses next-bar execution with open fills. Requires:
 - exchange_calendars for NYSE trading calendar dates
@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from common.canonical_records import zipline_fills
+from common.capabilities import FRAMEWORK_CAPABILITIES
 from common.types import FrameworkResult, ScenarioConfig
 
 from ml4t.backtest._validation.zipline_runner import (
@@ -221,8 +223,10 @@ def run(
     for trade in trade_list:
         trade["entry_time"] = trade.pop("entry_date")
         trade["exit_time"] = trade.pop("exit_date")
+        trade["asset"] = "TEST"
         trade["size"] = trade.pop("quantity")
         trade["direction"] = str(trade.pop("side")).title()
+        trade_commission = 0.0
         if "commission_rate" in constants:
             trade_commission = (
                 constants["commission_rate"]
@@ -235,7 +239,14 @@ def run(
             trade_commission = constants["per_share_rate"] * float(trade["size"]) * 2
             total_commission += trade_commission
             trade["pnl"] = float(trade["pnl"]) - trade_commission
+        trade["commission"] = trade_commission
     num_trades = len(trade_list)
+    fill_list = zipline_fills(
+        transactions,
+        asset="TEST",
+        commission_rate=float(constants.get("commission_rate", 0.0)),
+        per_share_rate=float(constants.get("per_share_rate", 0.0)),
+    )
 
     extra = {}
     if "commission" in scenario.extra_checks:
@@ -249,6 +260,8 @@ def run(
         total_pnl=final_value - scenario.initial_cash,
         num_trades=num_trades,
         trades=trade_list,
+        fills=fill_list,
+        capabilities=FRAMEWORK_CAPABILITIES["zipline"],
         extra=extra,
     )
 

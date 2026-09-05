@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ..config import InitialHwmSource, ShareType
-from ..core.shared import quantity_zero_tolerance
+from ..config import InitialHwmSource, LockNotionalUpdateMode, ShareType
+from ..core.shared import add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
 from ..models import calculate_commission, calculate_slippage
 from ..types import (
@@ -60,15 +60,6 @@ def _calculate_position_pnl(
 ) -> float:
     """Calculate PnL from entry and exit notionals in ledger operation order."""
     return (exit_price * signed_quantity - entry_price * signed_quantity) * multiplier
-
-
-def _add_with_zero_cancellation(left: float, right: float) -> float:
-    """Add values while collapsing tolerance-equivalent opposite amounts to zero."""
-    if math.copysign(1.0, left) != math.copysign(1.0, right) and math.isclose(
-        abs(left), abs(right), rel_tol=1e-9, abs_tol=1e-12
-    ):
-        return 0.0
-    return left + right
 
 
 @dataclass
@@ -314,7 +305,6 @@ class FillExecutor:
 
         old_position = self.account.positions.get(order.asset)
         old_quantity = old_position.quantity if old_position is not None else 0.0
-        old_entry_price = old_position.entry_price if old_position is not None else 0.0
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
@@ -323,7 +313,6 @@ class FillExecutor:
         self._update_lock_notional_free_cash(
             ctx,
             old_quantity=old_quantity,
-            old_entry_price=old_entry_price,
             commission=actual_commission,
         )
 
@@ -357,7 +346,6 @@ class FillExecutor:
         ctx: FillContext,
         *,
         old_quantity: float,
-        old_entry_price: float,
         commission: float,
     ) -> None:
         broker = self.broker
@@ -365,26 +353,106 @@ class FillExecutor:
         if policy.allow_leverage or policy.short_cash_policy != "lock_notional":
             return
 
+        if broker.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER:
+            self._update_combined_lock_notional_cash(
+                ctx,
+                old_quantity=old_quantity,
+                commission=commission,
+            )
+            return
+
         remaining = ctx.signed_qty
         free_cash = self.account._lock_notional_free_cash
         multiplier = broker.get_multiplier(ctx.order.asset)
+        asset = ctx.order.asset
+        short_basis = self.account._lock_notional_short_basis.get(asset, 0.0)
 
         if old_quantity < 0.0 and remaining > 0.0:
             covered = min(remaining, abs(old_quantity))
-            released_basis = covered * old_entry_price * multiplier
+            size_fraction = covered / abs(old_quantity)
+            released_basis = size_fraction * short_basis
             required_cash = covered * ctx.fill_price * multiplier
-            free_cash = _add_with_zero_cancellation(free_cash, 2.0 * released_basis - required_cash)
+            free_cash = add_with_zero_cancellation(
+                free_cash,
+                released_basis + released_basis - required_cash,
+            )
+            new_quantity = old_quantity + covered
+            if new_quantity < 0.0:
+                new_fraction = abs(new_quantity) / abs(old_quantity)
+                self.account._lock_notional_short_basis[asset] = new_fraction * short_basis
+            else:
+                self.account._lock_notional_short_basis.pop(asset, None)
             remaining -= covered
         elif old_quantity > 0.0 and remaining < 0.0:
             closed = min(abs(remaining), old_quantity)
-            free_cash = _add_with_zero_cancellation(free_cash, closed * ctx.fill_price * multiplier)
+            free_cash = add_with_zero_cancellation(free_cash, closed * ctx.fill_price * multiplier)
             remaining += closed
+
+        new_position = self.account.positions.get(asset)
+        if (
+            new_position is not None
+            and old_quantity * new_position.quantity < 0.0
+            and remaining != 0.0
+        ):
+            remaining = new_position.quantity
 
         if remaining != 0.0:
             required_cash = abs(remaining) * ctx.fill_price * multiplier
-            free_cash = _add_with_zero_cancellation(free_cash, -required_cash)
+            free_cash = add_with_zero_cancellation(free_cash, -required_cash)
+            if remaining < 0.0:
+                current_basis = self.account._lock_notional_short_basis.get(asset, 0.0)
+                self.account._lock_notional_short_basis[asset] = current_basis + required_cash
 
-        self.account._lock_notional_free_cash = _add_with_zero_cancellation(free_cash, -commission)
+        self.account._lock_notional_free_cash = add_with_zero_cancellation(free_cash, -commission)
+
+    def _update_combined_lock_notional_cash(
+        self,
+        ctx: FillContext,
+        *,
+        old_quantity: float,
+        commission: float,
+    ) -> None:
+        """Settle locked collateral in VectorBT OSS combined-order operation order."""
+        broker = self.broker
+        asset = ctx.order.asset
+        free_cash = self.account._lock_notional_free_cash
+        short_basis = self.account._lock_notional_short_basis.get(asset, 0.0)
+        unit_cost = ctx.fill_price * broker.get_multiplier(asset)
+        fill_quantity = abs(ctx.signed_qty)
+
+        if ctx.signed_qty > 0.0:
+            required_cash = add_with_zero_cancellation(fill_quantity * unit_cost, commission)
+            if old_quantity < 0.0:
+                covered = min(fill_quantity, abs(old_quantity))
+                average_entry = short_basis / abs(old_quantity)
+                released_basis = covered * average_entry
+                free_cash = add_with_zero_cancellation(
+                    free_cash + 2 * released_basis,
+                    -required_cash,
+                )
+                new_basis = add_with_zero_cancellation(short_basis, -released_basis)
+                if old_quantity + covered < 0.0:
+                    self.account._lock_notional_short_basis[asset] = new_basis
+                else:
+                    self.account._lock_notional_short_basis.pop(asset, None)
+            else:
+                free_cash = add_with_zero_cancellation(free_cash, -required_cash)
+        else:
+            acquired_cash = add_with_zero_cancellation(fill_quantity * unit_cost, -commission)
+            new_quantity = old_quantity - fill_quantity
+            if new_quantity < 0.0:
+                short_quantity = fill_quantity if old_quantity < 0.0 else abs(new_quantity)
+                short_value = short_quantity * unit_cost
+                self.account._lock_notional_short_basis[asset] = short_basis + short_value
+                free_cash_difference = add_with_zero_cancellation(
+                    acquired_cash,
+                    -2 * short_value,
+                )
+                free_cash = add_with_zero_cancellation(free_cash, free_cash_difference)
+            else:
+                free_cash = free_cash + acquired_cash
+
+        self.account._lock_notional_free_cash = free_cash
 
     @staticmethod
     def _validate_execution_price(value: float, *, source: str) -> None:
@@ -430,12 +498,51 @@ class FillExecutor:
                 self._close_position(ctx, pos, old_qty)
                 return ctx.commission
             elif _is_position_flip(old_qty, new_qty):
+                new_qty = self._get_lock_notional_flip_quantity(ctx, old_qty, new_qty)
                 return self._flip_position(ctx, pos, old_qty, new_qty)
             else:
                 self._scale_position(ctx, pos, old_qty, new_qty)
                 return ctx.commission
 
-    def _get_initial_hwm(self, asset: str, fill_price: float) -> float:
+    def _get_lock_notional_flip_quantity(
+        self,
+        ctx: FillContext,
+        old_quantity: float,
+        fallback: float,
+    ) -> float:
+        broker = self.broker
+        if (
+            broker.share_type != ShareType.FRACTIONAL
+            or broker.short_cash_policy.value != "lock_notional"
+            or broker.account.policy.allow_leverage
+            or broker.cash_buffer_pct != 0.0
+            or ctx.commission != 0.0
+            or broker.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER
+        ):
+            return fallback
+
+        unit_cost = ctx.fill_price * broker.get_multiplier(ctx.order.asset)
+        if ctx.fill_quantity == ctx.order.quantity:
+            requested_quantity = ctx.order.requested_quantity or ctx.order.quantity
+            requested_open = abs(requested_quantity) - abs(old_quantity)
+        else:
+            requested_open = abs(ctx.signed_qty) - abs(old_quantity)
+        free_cash = self.account._lock_notional_free_cash
+        if old_quantity < 0.0:
+            short_basis = self.account._lock_notional_short_basis.get(ctx.order.asset, 0.0)
+            released = short_basis + short_basis - abs(old_quantity) * unit_cost
+            free_after_close = add_with_zero_cancellation(free_cash, released)
+        else:
+            free_after_close = add_with_zero_cancellation(
+                free_cash,
+                abs(old_quantity) * unit_cost,
+            )
+        open_quantity = min(requested_open, max(0.0, free_after_close / unit_cost))
+        return math.copysign(open_quantity, ctx.signed_qty)
+
+    def _get_initial_hwm(
+        self, asset: str, fill_price: float, signal_price: float | None = None
+    ) -> float:
         """Get initial high water mark based on configuration.
 
         This is the single source of truth for HWM initialization,
@@ -449,6 +556,8 @@ class FillExecutor:
             Initial HWM value based on configuration
         """
         broker = self.broker
+        if broker.initial_hwm_source == InitialHwmSource.SIGNAL_PRICE:
+            return signal_price if signal_price is not None else fill_price
         if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
             return self.market.highs.get(asset, fill_price)
         elif broker.initial_hwm_source == InitialHwmSource.BAR_CLOSE:
@@ -456,7 +565,9 @@ class FillExecutor:
         else:
             return fill_price
 
-    def _get_initial_lwm(self, asset: str, fill_price: float) -> float:
+    def _get_initial_lwm(
+        self, asset: str, fill_price: float, signal_price: float | None = None
+    ) -> float:
         """Get initial low water mark based on configuration.
 
         For VBT Pro compatibility with OHLC data, LWM should be initialized
@@ -471,6 +582,8 @@ class FillExecutor:
             Initial LWM value based on configuration
         """
         broker = self.broker
+        if broker.initial_hwm_source == InitialHwmSource.SIGNAL_PRICE:
+            return signal_price if signal_price is not None else fill_price
         # When using BAR_HIGH for HWM, use BAR_LOW for LWM
         if broker.initial_hwm_source == InitialHwmSource.BAR_HIGH:
             return self.market.lows.get(asset, fill_price)
@@ -513,8 +626,9 @@ class FillExecutor:
         broker = self.broker
         order = ctx.order
 
-        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
-        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
+        signal_price = getattr(order, "_signal_price", None)
+        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price, signal_price)
+        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price, signal_price)
         context = self._build_position_context(order)
 
         pos = Position(
@@ -658,8 +772,9 @@ class FillExecutor:
         self.record_pnl(order.asset, pnl)
 
         # Create new position in opposite direction
-        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price)
-        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price)
+        signal_price = getattr(order, "_signal_price", None)
+        initial_hwm = self._get_initial_hwm(order.asset, ctx.fill_price, signal_price)
+        initial_lwm = self._get_initial_lwm(order.asset, ctx.fill_price, signal_price)
         context = self._build_position_context(order)
 
         self.account.positions[order.asset] = Position(

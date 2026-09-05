@@ -28,6 +28,7 @@ import json
 import math
 import re
 import zipfile
+from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 
 import pandas as pd
@@ -39,10 +40,25 @@ from ..engine import Engine
 from ..strategy import Strategy
 
 _NUMBER = r"[-+]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][-+]?\d[\d_]*)?"
+_MONEY_QUANTUM = Decimal("0.0001")
+RETAINED_ORDER_EVENT_ARTIFACTS = {
+    "chapter16_etfs": ("ml4t_order_events.csv.xz",),
+    "chapter16_sp500_equity_option_analytics": ("ml4t_order_events.csv",),
+    "chapter16_us_equities_panel": (
+        "ml4t_order_events.csv.part01.xz",
+        "ml4t_order_events.csv.part02.xz",
+    ),
+}
 
 
 def _csv_path(base_dir: Path, name: str) -> Path:
-    for suffix in ("", ".xz", ".gz"):
+    if name == "ml4t_order_events.csv":
+        retained = RETAINED_ORDER_EVENT_ARTIFACTS.get(base_dir.name)
+        if retained and len(retained) == 1:
+            candidate = base_dir / retained[0]
+            if candidate.is_file():
+                return candidate
+    for suffix in (".xz", ".gz", ""):
         path = base_dir / f"{name}{suffix}"
         if path.exists():
             return path
@@ -249,7 +265,7 @@ def lean_side(workspace_dir: Path) -> dict:
     final_value = float(equity["equity"].iloc[-1])
 
     events = _read_csv_fixture(workspace_dir, "ml4t_order_events.csv", low_memory=False)
-    filled = events[events["status"].astype(str) == "Filled"].copy()
+    filled = events[events["status"].astype(str).str.lower() == "filled"].copy()
     filled["asset"] = filled["symbol"].astype(str).map(symbol_map).fillna(filled["symbol"])
     filled = filled.rename(columns={"fill_quantity": "quantity", "fill_price": "price"})
     filled["side"] = filled["direction"].astype(str).str.lower()
@@ -267,11 +283,20 @@ def compare(lean: dict, ml4t: dict) -> dict:
         len(ls) == len(ms)
         and not (lean["fills"][cols].reset_index(drop=True) != ml4t["fills"][cols]).any().any()
     )
+    lean_value = Decimal(str(lean["final_value"])).quantize(
+        _MONEY_QUANTUM, rounding=ROUND_HALF_EVEN
+    )
+    ml4t_value = Decimal(str(ml4t["final_value"])).quantize(
+        _MONEY_QUANTUM, rounding=ROUND_HALF_EVEN
+    )
     return {
         "lean_final_value": lean["final_value"],
         "ml4t_final_value": ml4t["final_value"],
         "final_value_gap_usd": ml4t["final_value"] - lean["final_value"],
         "final_value_gap_pct": ml4t["final_value"] / lean["final_value"] - 1.0,
+        "canonical_final_value_gap_usd": float(ml4t_value - lean_value),
+        "canonical_final_value_match": ml4t_value == lean_value,
+        "final_value_quantum_usd": float(_MONEY_QUANTUM),
         "lean_fills": len(lean["fills"]),
         "ml4t_fills": len(ml4t["fills"]),
         "fill_gap": len(ml4t["fills"]) - len(lean["fills"]),

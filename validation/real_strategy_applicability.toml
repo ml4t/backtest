@@ -1,0 +1,186 @@
+[metadata]
+schema_version = 1
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+case_studies = ["etfs", "cme_futures", "crypto_perps_funding", "fx_pairs", "us_equities_panel"]
+
+[bundle]
+etfs = "01f38079ce47821a5379d3769e86f4a2170b88033108153bfc0f928698e946db"
+cme_futures = "c7191027f550ef1be0c9528dac08e7c2bf6a76c86d935f593efeb1ad8b628c39"
+crypto_perps_funding = "2acee3c8542043266e6f9c0dfc9434c95b4469ef6fcaf0556efc569fc9721cdd"
+fx_pairs = "48922296cea03bfc9867a9c4e1a1d352a0bd54c0b48671e3ca8d1fdddb95d762"
+us_equities_panel = "02926d8a7f1c1f5b4855b2393d1763885288ef64950d5cf521ca96c61f454d88"
+
+[[pair]]
+case_study = "etfs"
+framework = "vectorbt_pro"
+status = "required"
+native_contract = "multi-asset target allocation and cash sharing"
+source = "https://vectorbt.pro/features/portfolio/"
+
+[[pair]]
+case_study = "etfs"
+framework = "vectorbt_oss"
+status = "required"
+native_contract = "multi-asset target allocation and cash sharing"
+source = "https://vectorbt.dev/api/portfolio/base/"
+
+[[pair]]
+case_study = "etfs"
+framework = "backtrader"
+status = "required"
+native_contract = "multi-data target-percent orders"
+source = "https://www.backtrader.com/docu/order_target/order_target/"
+
+[[pair]]
+case_study = "etfs"
+framework = "zipline"
+status = "required"
+native_contract = "equity assets and target-percent orders"
+source = "https://zipline.ml4trading.io/api-reference.html"
+
+[[pair]]
+case_study = "etfs"
+framework = "lean"
+status = "required"
+native_contract = "equity margin accounts and market-on-open orders"
+source = "https://www.quantconnect.com/docs/v2/writing-algorithms/trading-and-orders/position-sizing"
+
+[[pair]]
+case_study = "cme_futures"
+framework = "vectorbt_pro"
+status = "required"
+native_contract = "contract multipliers and eager leverage on target-percent orders"
+source = "https://vectorbt.pro/features/portfolio/"
+
+[[pair]]
+case_study = "cme_futures"
+framework = "vectorbt_oss"
+status = "unsupported"
+native_contract = "no native futures contract multiplier and margin-account model"
+source = "https://vectorbt.dev/api/portfolio/base/"
+
+[[pair]]
+case_study = "cme_futures"
+framework = "backtrader"
+status = "required"
+native_contract = "futures-like commission scheme with margin and contract multiplier"
+source = "https://www.backtrader.com/docu/commission-schemes/commission-schemes/"
+
+[[pair]]
+case_study = "cme_futures"
+framework = "zipline"
+status = "unsupported"
+native_contract = "the frozen workload has continuous root series but no dated contract chain or roll map"
+source = "https://zipline.ml4trading.io/api-reference.html"
+
+[[pair]]
+case_study = "cme_futures"
+framework = "lean"
+status = "unsupported"
+native_contract = "the frozen workload has continuous root series but no dated contract chain or roll map"
+source = "https://www.quantconnect.com/docs/v2/writing-algorithms/securities/asset-classes/futures"
+
+[[pair]]
+case_study = "crypto_perps_funding"
+framework = "vectorbt_pro"
+status = "unsupported"
+native_contract = "no native perpetual-futures funding and margin-account model"
+source = "https://vectorbt.pro/features/portfolio/"
+
+[[pair]]
+case_study = "crypto_perps_funding"
+framework = "vectorbt_oss"
+status = "unsupported"
+native_contract = "no native perpetual-futures funding and margin-account model"
+source = "https://vectorbt.dev/api/portfolio/base/"
+
+[[pair]]
+case_study = "crypto_perps_funding"
+framework = "backtrader"
+status = "unsupported"
+native_contract = "no native perpetual-futures funding model"
+source = "https://www.backtrader.com/docu/commission-schemes/commission-schemes/"
+
+[[pair]]
+case_study = "crypto_perps_funding"
+framework = "zipline"
+status = "unsupported"
+native_contract = "no crypto perpetual-futures asset and funding model"
+source = "https://zipline.ml4trading.io/api-reference.html"
+
+[[pair]]
+case_study = "crypto_perps_funding"
+framework = "lean"
+status = "required"
+native_contract = "CryptoFuture securities with scheduled funding debits and credits"
+source = "https://www.quantconnect.com/docs/v2/writing-algorithms/reality-modeling/margin-interest-rate/supported-models"
+
+[[pair]]
+case_study = "fx_pairs"
+framework = "vectorbt_pro"
+status = "required"
+native_contract = "long-short target allocation for the frozen strategy's USD-quoted FX pairs"
+source = "https://vectorbt.pro/features/portfolio/"
+
+[[pair]]
+case_study = "fx_pairs"
+framework = "vectorbt_oss"
+status = "required"
+native_contract = "long-short target allocation for the frozen strategy's USD-quoted FX pairs"
+source = "https://vectorbt.dev/api/portfolio/base/"
+
+[[pair]]
+case_study = "fx_pairs"
+framework = "backtrader"
+status = "required"
+native_contract = "multi-data target-percent orders on the frozen strategy's USD-quoted FX pairs"
+source = "https://www.backtrader.com/docu/commission-schemes/commission-schemes/"
+
+[[pair]]
+case_study = "fx_pairs"
+framework = "zipline"
+status = "unsupported"
+native_contract = "no native spot-forex asset, currency cashbook, or conversion model"
+source = "https://zipline.ml4trading.io/api-reference.html"
+
+[[pair]]
+case_study = "fx_pairs"
+framework = "lean"
+status = "required"
+native_contract = "native USD-quoted Forex securities, cashbook valuation, margin, and target sizing"
+source = "https://www.quantconnect.com/docs/v2/writing-algorithms/securities/asset-classes/forex"
+
+[[pair]]
+case_study = "us_equities_panel"
+framework = "vectorbt_pro"
+status = "required"
+native_contract = "large multi-asset equity target allocation with cash sharing"
+source = "https://vectorbt.pro/features/portfolio/"
+
+[[pair]]
+case_study = "us_equities_panel"
+framework = "vectorbt_oss"
+status = "required"
+native_contract = "large multi-asset equity target allocation with cash sharing"
+source = "https://vectorbt.dev/api/portfolio/base/"
+
+[[pair]]
+case_study = "us_equities_panel"
+framework = "backtrader"
+status = "required"
+native_contract = "large multi-data equity portfolio with target-percent orders"
+source = "https://www.backtrader.com/docu/order_target/order_target/"
+
+[[pair]]
+case_study = "us_equities_panel"
+framework = "zipline"
+status = "required"
+native_contract = "large US-equity universe with native orders and exchange sessions"
+source = "https://zipline.ml4trading.io/api-reference.html"
+
+[[pair]]
+case_study = "us_equities_panel"
+framework = "lean"
+status = "required"
+native_contract = "large US-equity universe with margin accounts and market-on-open orders"
+source = "https://www.quantconnect.com/docs/v2/writing-algorithms/securities/asset-classes/equity"

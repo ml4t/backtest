@@ -34,8 +34,8 @@ def _load_adapter():
 def test_supported_vectorbt_pro_version_is_explicit() -> None:
     adapter = _load_adapter()
 
-    assert adapter.SUPPORTED_VECTORBT_PRO_VERSION == "2025.12.31"
-    adapter._require_supported_version("2025.12.31")
+    assert adapter.SUPPORTED_VECTORBT_PRO_VERSION == "2026.6.27"
+    adapter._require_supported_version("2026.6.27")
 
 
 def test_unsupported_vectorbt_pro_version_fails_precisely() -> None:
@@ -43,7 +43,7 @@ def test_unsupported_vectorbt_pro_version_fails_precisely() -> None:
 
     with pytest.raises(
         RuntimeError,
-        match=r"requires version 2025\.12\.31, found 2026\.1\.1",
+        match=r"requires version 2026\.6\.27, found 2026\.1\.1",
     ):
         adapter._require_supported_version("2026.1.1")
 

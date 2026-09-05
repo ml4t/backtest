@@ -1,6 +1,6 @@
 """Backtrader framework driver for validation scenarios.
 
-Consolidates 16 run_backtrader() functions into a single parameterized driver.
+Provides one parameterized driver for the scenario matrix.
 
 Backtrader always uses next-bar execution (orders placed on bar N fill at bar N+1's open).
 """
@@ -16,7 +16,19 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from common.capabilities import FRAMEWORK_CAPABILITIES
 from common.types import FrameworkResult, ScenarioConfig
+
+
+def _completed_fill(order: Any, bt: Any) -> dict[str, object]:
+    return {
+        "timestamp": bt.num2date(order.executed.dt),
+        "asset": "TEST",
+        "side": "buy" if order.isbuy() else "sell",
+        "quantity": abs(float(order.executed.size)),
+        "price": float(order.executed.price),
+        "commission": abs(float(order.executed.comm)),
+    }
 
 
 def run(
@@ -102,6 +114,7 @@ def run(
     trade_list = []
     if hasattr(strategy, "trade_log"):
         trade_list = sorted(strategy.trade_log, key=lambda t: t.get("entry_time", 0))
+    fill_list = getattr(strategy, "fill_log", [])
 
     extra = {}
     if hasattr(strategy, "total_commission"):
@@ -125,6 +138,8 @@ def run(
         total_pnl=final_value - scenario.initial_cash,
         num_trades=len(trade_list),
         trades=trade_list,
+        fills=fill_list,
+        capabilities=FRAMEWORK_CAPABILITIES["backtrader"],
         extra=extra,
     )
 
@@ -152,6 +167,7 @@ def _signal_strategy(scenario: ScenarioConfig, bt: Any) -> type:
         def __init__(self):
             self.bar_count = 0
             self.trade_log = []
+            self.fill_log = []
             self.total_commission = 0.0
             self.pending_trade = None
 
@@ -186,6 +202,7 @@ def _signal_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                     {
                         "entry_time": self.pending_trade["entry_time"],
                         "exit_time": bt.num2date(trade.dtclose),
+                        "asset": "TEST",
                         "entry_price": self.pending_trade["entry_price"],
                         "exit_price": exit_price,
                         "gross_pnl": trade.pnl,
@@ -200,6 +217,7 @@ def _signal_strategy(scenario: ScenarioConfig, bt: Any) -> type:
 
         def notify_order(self, order):
             if order.status == order.Completed:
+                self.fill_log.append(_completed_fill(order, bt))
                 self.total_commission += order.executed.comm
 
     return SignalStrategy
@@ -215,6 +233,7 @@ def _short_strategy(scenario: ScenarioConfig, bt: Any) -> type:
         def __init__(self):
             self.bar_count = 0
             self.trade_log = []
+            self.fill_log = []
             self.pending_trade = None
 
         def next(self):
@@ -255,15 +274,21 @@ def _short_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                     {
                         "entry_time": self.pending_trade["entry_time"],
                         "exit_time": bt.num2date(trade.dtclose),
+                        "asset": "TEST",
                         "entry_price": self.pending_trade["entry_price"],
                         "exit_price": exit_price,
                         "size": abs(entry_size),
                         "gross_pnl": trade.pnl,
                         "pnl": trade.pnlcomm,
                         "direction": "Short" if entry_size < 0 else "Long",
+                        "commission": trade.commission,
                     }
                 )
                 self.pending_trade = None
+
+        def notify_order(self, order):
+            if order.status == order.Completed:
+                self.fill_log.append(_completed_fill(order, bt))
 
     return ShortStrategy
 
@@ -297,6 +322,7 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
         def __init__(self):
             self.bar_count = 0
             self.trade_log = []
+            self.fill_log = []
             self.entered_once = False
             self.entry_order = None
             self.exit_orders = []
@@ -423,18 +449,22 @@ def _risk_entry_strategy(scenario: ScenarioConfig, bt: Any) -> type:
                     {
                         "entry_time": self.pending_trade["entry_time"],
                         "exit_time": bt.num2date(trade.dtclose),
+                        "asset": "TEST",
                         "entry_price": self.pending_trade["entry_price"],
                         "exit_price": exit_price,
                         "size": abs(entry_size),
                         "gross_pnl": trade.pnl,
                         "pnl": trade.pnlcomm,
                         "direction": "Short" if entry_size < 0 else "Long",
+                        "commission": trade.commission,
                     }
                 )
                 self.pending_trade = None
                 self.exit_orders = []
 
         def notify_order(self, order):
+            if order.status == order.Completed:
+                self.fill_log.append(_completed_fill(order, bt))
             if order.status == order.Completed and order == self.entry_order:
                 # Entry filled — now submit deferred trailing stop
                 self.entry_order = None

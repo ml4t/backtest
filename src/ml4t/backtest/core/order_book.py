@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from ..config import MissingPricePolicy
 from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
@@ -83,6 +85,7 @@ class OrderBook:
             order_id=f"ORD-{self.orders.counter}",
             created_at=self.market.time,
             _created_bar_index=self.market.bar_index,
+            _priority_notional=options.priority_notional if options is not None else None,
             _risk_exit_reason=options.risk_exit_reason if options is not None else None,
             _exit_reason=options.exit_reason if options is not None else None,
             _risk_fill_price=options.risk_fill_price if options is not None else None,
@@ -171,13 +174,18 @@ class OrderBook:
 
         # Get fill price (close price for same-bar)
         price = fill.get_fill_price_for_order(order, use_open=False)
-        if price is None:
+        missing_price = price is None or not math.isfinite(price)
+        if missing_price and broker.missing_price_policy is MissingPricePolicy.USE_LAST:
+            price = broker.get_last_price(order.asset)
+        if price is None or not math.isfinite(price):
             order.reject("No price available", "price_unavailable")
             return order
 
         fill_price = fill.check_fill(order, price)
         if fill_price is None:
             order.reject("Fill check failed", "fill_check_failed")
+            return order
+        if not fill.constrain_locked_short_cover(order, fill_price):
             return order
 
         # Determine if this is an exit (reduces existing position)
@@ -365,7 +373,11 @@ class OrderBook:
         self._reset_submission_shadow_if_needed()
 
         if broker.allow_leverage and not broker.next_bar_simple_cash_check:
-            return self._passes_margin_submission_precheck(order, signal_price)
+            return self._passes_margin_submission_precheck(
+                order,
+                signal_price,
+                commit=not broker.next_bar_queue_shadow_validation,
+            )
 
         size = order.quantity if order.side is OrderSide.BUY else -order.quantity
         old_qty, old_price = self._submission_shadow_positions.get(order.asset, (0.0, signal_price))
@@ -488,11 +500,17 @@ class OrderBook:
             self._submission_shadow_positions[order.asset] = (new_qty, new_price)
         return True
 
-    def _passes_margin_submission_precheck(self, order: Order, signal_price: float) -> bool:
+    def _passes_margin_submission_precheck(
+        self,
+        order: Order,
+        signal_price: float,
+        *,
+        commit: bool = True,
+    ) -> bool:
         """Margin-aware submission precheck for NEXT_BAR market orders.
 
-        Simulates sequential submission-time acceptance using policy validation at
-        signal-bar prices and commits only accepted orders into shadow state.
+        Validate at the signal-bar price. ``commit=False`` keeps each check
+        independent, while ``commit=True`` reserves accepted orders in shadow state.
         """
         broker = self.broker
 
@@ -570,6 +588,9 @@ class OrderBook:
             order.rejection_reason = reason or fallback_reason
             order._rejection_code = rejection_code
             return False
+
+        if not commit:
+            return True
 
         multiplier = broker.get_multiplier(order.asset)
         self._submission_shadow_cash += -size * signal_price * multiplier - commission

@@ -53,6 +53,7 @@ def run_vectorbt_orders(
     cash_sharing: bool = True,
     group_by: bool | None = None,
     lock_cash: bool | None = None,
+    call_seq: str | None = None,
 ):
     """Run `Portfolio.from_orders` with consistent defaults across harnesses."""
     kwargs: dict[str, object] = {
@@ -68,6 +69,8 @@ def run_vectorbt_orders(
         kwargs["group_by"] = group_by
     if lock_cash is not None:
         kwargs["lock_cash"] = lock_cash
+    if call_seq is not None:
+        kwargs["call_seq"] = call_seq
     return vbt.Portfolio.from_orders(**kwargs)
 
 

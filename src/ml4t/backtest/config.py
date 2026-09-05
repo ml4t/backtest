@@ -87,6 +87,13 @@ class ShareType(str, Enum):
     INTEGER = "integer"  # Round down to whole shares (like most real brokers)
 
 
+class ShareRounding(str, Enum):
+    """Integer-share rounding used during target-weight sizing."""
+
+    NEAREST = "nearest"
+    TRUNCATE = "truncate"
+
+
 class FillOrdering(str, Enum):
     """Order processing sequence within a single bar.
 
@@ -95,7 +102,7 @@ class FillOrdering(str, Enum):
     EXIT_FIRST (default):
         All exits → mark-to-market → all entries (with gatekeeper validation).
         Capital-efficient: exits free cash before entries need it.
-        Matches VectorBT ``call_seq='auto'`` behavior.
+        Matches engines that explicitly process reductions before additions.
 
     FIFO:
         Orders process in submission order with sequential cash updates.
@@ -107,17 +114,24 @@ class FillOrdering(str, Enum):
         without exit/entry separation. Cash updates after each individual fill.
         Unlike EXIT_FIRST, exits do not pre-free cash for later entries.
         Matches LEAN's per-order sequential buying-power model.
+
+    PRIORITY:
+        Sort all orders as one sequence using ``entry_order_priority``. This preserves
+        combined reversal orders and matches portfolio simulators whose automatic call
+        sequence does not separate exits from entries.
     """
 
     EXIT_FIRST = "exit_first"
     FIFO = "fifo"
     SEQUENTIAL = "sequential"
+    PRIORITY = "priority"
 
 
 class EntryOrderPriority(str, Enum):
     """Priority for sequencing entry orders under cash constraints.
 
-    Applied when ``fill_ordering=EXIT_FIRST`` after exits are processed.
+    Applied to entries under ``fill_ordering=EXIT_FIRST`` and to the complete order
+    sequence under ``fill_ordering=PRIORITY``.
 
     SUBMISSION:
         Keep strategy submission order.
@@ -127,11 +141,20 @@ class EntryOrderPriority(str, Enum):
 
     NOTIONAL_ASC:
         Process smaller notional entries first.
+
+    FREE_CASH_ASC:
+        Process orders by their estimated free-cash use, including collateral released by
+        reversals.
+
+    ORDER_VALUE_ASC:
+        Process entries by signed target-order value, with sell orders before buy orders.
     """
 
     SUBMISSION = "submission"
     NOTIONAL_DESC = "notional_desc"
     NOTIONAL_ASC = "notional_asc"
+    FREE_CASH_ASC = "free_cash_asc"
+    ORDER_VALUE_ASC = "order_value_asc"
 
 
 class ShortCashPolicy(str, Enum):
@@ -151,6 +174,20 @@ class ShortCashPolicy(str, Enum):
     CREDIT = "credit"
     CREDIT_PROCEEDS = "credit_proceeds"
     LOCK_NOTIONAL = "lock_notional"
+
+
+class LockNotionalUpdateMode(str, Enum):
+    """Floating-point operation order for locked-notional cash updates.
+
+    POSITION_LEGS:
+        Settle closing and opening position legs separately.
+
+    COMBINED_ORDER:
+        Settle the gross cash and short-debt effects as one order.
+    """
+
+    POSITION_LEGS = "position_legs"
+    COMBINED_ORDER = "combined_order"
 
 
 class RebalanceMode(str, Enum):
@@ -262,6 +299,7 @@ class InitialHwmSource(str, Enum):
 
     Controls what price is used for HWM when a new position is created:
     - FILL_PRICE: Use the actual fill price including slippage (default)
+    - SIGNAL_PRICE: Use the price observed when the entry order was submitted
     - BAR_CLOSE: Use the bar's close price
     - BAR_HIGH: Use the bar's high price (VBT Pro with OHLC data)
 
@@ -271,6 +309,7 @@ class InitialHwmSource(str, Enum):
     """
 
     FILL_PRICE = "fill_price"  # Use fill price (default, most frameworks)
+    SIGNAL_PRICE = "signal_price"  # Use the entry order's signal price (Backtrader)
     BAR_CLOSE = "bar_close"  # Use bar's close
     BAR_HIGH = "bar_high"  # Use bar's high (VBT Pro with OHLC)
 
@@ -502,6 +541,7 @@ class BacktestConfig:
     fixed_margin_schedule: dict[str, tuple[float, float]] | None = None  # For futures
     margin_pct_schedule: dict[str, tuple[float, float]] | None = None  # Price-aware futures margin
     short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT
+    lock_notional_update_mode: LockNotionalUpdateMode = LockNotionalUpdateMode.POSITION_LEGS
 
     # === Execution Timing ===
     execution_price: ExecutionPrice = ExecutionPrice.OPEN
@@ -695,6 +735,7 @@ class BacktestConfig:
 
     # === Position Sizing ===
     share_type: ShareType = ShareType.INTEGER
+    share_rounding: ShareRounding = ShareRounding.NEAREST
 
     # === Commission ===
     commission_type: CommissionType = CommissionType.NONE
@@ -731,10 +772,9 @@ class BacktestConfig:
     next_bar_submission_precheck: bool = False
     next_bar_simple_cash_check: bool = False
     buying_power_reservation: bool = False  # Reserve cash at submission (LEAN-style)
-    # TODO(parity): consider an explicit profile/knob for "commit basket at close,
-    # fill reserved orders at next open" semantics. Keep it separate from the
-    # default next-bar/open path, which currently revalidates affordability at
-    # the actual open.
+    # Validate a next-open batch against a shadow account in submission order.
+    # When combined with next_bar_submission_precheck, each order first gets an
+    # independent close-price check before the batch is rechecked next session.
     next_bar_queue_shadow_validation: bool = False
     immediate_fill: bool = False  # Fill same-bar market orders at submit time (LEAN-style)
     rebalance_mode: RebalanceMode = RebalanceMode.INCREMENTAL
@@ -877,6 +917,7 @@ class BacktestConfig:
                 "fixed_margin_schedule": _margin_schedule_to_dict(self.fixed_margin_schedule),
                 "margin_pct_schedule": _margin_schedule_to_dict(self.margin_pct_schedule),
                 "short_cash_policy": self.short_cash_policy.value,
+                "lock_notional_update_mode": self.lock_notional_update_mode.value,
             },
             "execution": {
                 "execution_price": self.execution_price.value,
@@ -893,6 +934,7 @@ class BacktestConfig:
             },
             "position_sizing": {
                 "share_type": self.share_type.value,
+                "share_rounding": self.share_rounding.value,
             },
             "commission": {
                 "model": self.commission_type.value,
@@ -993,6 +1035,7 @@ class BacktestConfig:
                     "fixed_margin_schedule",
                     "margin_pct_schedule",
                     "short_cash_policy",
+                    "lock_notional_update_mode",
                 },
                 "execution": {"execution_price", "mark_price", "execution_mode"},
                 "stops": {
@@ -1003,7 +1046,7 @@ class BacktestConfig:
                     "initial_hwm_source",
                     "trail_stop_timing",
                 },
-                "position_sizing": {"share_type"},
+                "position_sizing": {"share_type", "share_rounding"},
                 "commission": {"model", "rate", "per_share", "per_trade", "minimum"},
                 "slippage": {
                     "model",
@@ -1118,6 +1161,9 @@ class BacktestConfig:
             fixed_margin_schedule=acct_cfg.get("fixed_margin_schedule"),
             margin_pct_schedule=acct_cfg.get("margin_pct_schedule"),
             short_cash_policy=ShortCashPolicy(acct_cfg.get("short_cash_policy", "credit")),
+            lock_notional_update_mode=LockNotionalUpdateMode(
+                acct_cfg.get("lock_notional_update_mode", "position_legs")
+            ),
             # Execution
             execution_price=ExecutionPrice(
                 exec_cfg.get("execution_price", ExecutionPrice.OPEN.value)
@@ -1137,6 +1183,7 @@ class BacktestConfig:
             trail_stop_timing=TrailStopTiming(stops_cfg.get("trail_stop_timing", "lagged")),
             # Sizing
             share_type=ShareType(sizing_cfg.get("share_type", "integer")),
+            share_rounding=ShareRounding(sizing_cfg.get("share_rounding", "nearest")),
             # Commission
             commission_type=CommissionType(comm_cfg.get("model", "none")),
             commission_rate=comm_cfg.get("rate", 0.0),
@@ -1220,7 +1267,7 @@ class BacktestConfig:
         - "backtrader": Match Backtrader's default behavior
         - "vectorbt": Match VectorBT's default behavior
         - "zipline": Match Zipline's default behavior
-        - "lean": Match QuantConnect LEAN's default behavior
+        - "lean": Match the frozen LEAN daily US-equity comparison protocol
         - "realistic": Conservative settings for realistic simulation
         - "ibkr_us_stocks_fixed": Interactive Brokers US stocks fixed pricing
         """

@@ -3,6 +3,7 @@
 from ml4t.backtest.execution.limits import (
     AdaptiveParticipationLimit,
     NoLimits,
+    PositiveVolumeLimit,
     VolumeParticipationLimit,
 )
 
@@ -42,6 +43,22 @@ class TestNoLimits:
 
         assert result.participation_rate == 0.0
         assert result.fillable_quantity == 500.0
+
+
+class TestPositiveVolumeLimit:
+    def test_positive_volume_fills_complete_order(self):
+        result = PositiveVolumeLimit().calculate(order_quantity=500.0, bar_volume=1.0, price=75.0)
+
+        assert result.fillable_quantity == 500.0
+        assert result.remaining_quantity == 0.0
+
+    def test_zero_or_missing_volume_defers_complete_order(self):
+        limit = PositiveVolumeLimit()
+
+        for volume in (0.0, None):
+            result = limit.calculate(order_quantity=500.0, bar_volume=volume, price=75.0)
+            assert result.fillable_quantity == 0.0
+            assert result.remaining_quantity == 500.0
 
 
 class TestVolumeParticipationLimit:

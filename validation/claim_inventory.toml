@@ -1,0 +1,178 @@
+[metadata]
+schema_version = 1
+audit_date = "2026-08-13"
+
+[[claim]]
+id = "library-synthetic-scenario-conformance"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/CORRECTNESS_RESULTS.json"]
+type = "correctness"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline"]
+required_evidence = ["executed_matrix", "canonical_trade_log", "canonical_fill_log", "equity_curve", "environment_identity"]
+status = "verified"
+issue = "ml4t/backtest-dev#3"
+
+[[claim]]
+id = "library-real-strategy-equivalence"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/REAL_STRATEGY_RESULTS.json", "validation/real_strategy_applicability.toml"]
+type = "correctness"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["frozen_real_strategy_inputs", "complete_canonical_fill_log", "equity_curve", "terminal_value", "negative_control", "environment_identity"]
+status = "failed"
+issue = "ml4t/backtest-dev#3"
+
+[[claim]]
+id = "library-vectorbt-behavior"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/concepts/how-it-works.md", "docs/getting-started/quickstart.md", "docs/user-guide/accounts.md", "docs/user-guide/configuration.md", "docs/user-guide/execution-semantics.md", "docs/user-guide/profiles.md", "docs/user-guide/rebalancing.md", "validation/METHODOLOGY.md", "validation/frameworks/vectorbt_oss.py", "validation/frameworks/vectorbt_pro.py"]
+type = "behavioral"
+frameworks = ["vectorbt_pro", "vectorbt_oss"]
+required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
+status = "verified"
+issue = "ml4t/backtest-dev#5"
+
+[[claim]]
+id = "library-backtrader-behavior"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/concepts/how-it-works.md", "docs/getting-started/quickstart.md", "docs/user-guide/accounts.md", "docs/user-guide/configuration.md", "docs/user-guide/execution-semantics.md", "docs/user-guide/profiles.md", "docs/user-guide/rebalancing.md", "validation/METHODOLOGY.md", "validation/frameworks/backtrader.py"]
+type = "behavioral"
+frameworks = ["backtrader"]
+required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
+status = "verified"
+issue = "ml4t/backtest-dev#6"
+
+[[claim]]
+id = "library-zipline-behavior"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/concepts/how-it-works.md", "docs/getting-started/quickstart.md", "docs/user-guide/accounts.md", "docs/user-guide/configuration.md", "docs/user-guide/execution-semantics.md", "docs/user-guide/profiles.md", "validation/METHODOLOGY.md", "validation/frameworks/zipline.py"]
+type = "behavioral"
+frameworks = ["zipline"]
+required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
+status = "verified"
+issue = "ml4t/backtest-dev#7"
+
+[[claim]]
+id = "library-lean-behavior"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/concepts/how-it-works.md", "docs/user-guide/accounts.md", "docs/user-guide/configuration.md", "docs/user-guide/execution-semantics.md", "docs/user-guide/profiles.md", "validation/lean/README.md", "validation/benchmark_suite.py"]
+type = "behavioral"
+frameworks = ["lean"]
+required_evidence = ["native_microtests", "upstream_source_reference", "adapter_contract"]
+status = "verified"
+issue = "ml4t/backtest-dev#8"
+
+[[claim]]
+id = "library-synthetic-scale-conformance"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/LARGE_SCALE_RESULTS.json"]
+type = "correctness"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["public_workload", "canonical_trade_log", "canonical_fill_log", "equity_curve", "environment_identity"]
+status = "verified"
+issue = "ml4t/backtest-dev#10"
+
+[[claim]]
+id = "library-controlled-performance"
+repository = "ml4t/backtest"
+paths = ["validation/cross_framework_performance.py", "validation/PERFORMANCE_RESULTS.json", "validation/run_all_benchmarks.py"]
+type = "performance"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["controlled_workload", "warmup_policy", "repetitions", "machine_identity", "raw_timings"]
+status = "verified"
+issue = "ml4t/backtest-dev#11"
+
+[[claim]]
+id = "library-real-strategy-performance"
+repository = "ml4t/backtest"
+paths = ["validation/real_strategy_benchmark.py", "validation/REAL_STRATEGY_PERFORMANCE.json", "validation/REAL_STRATEGY_RESULTS.json"]
+type = "performance"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["correctness_passing_workload", "engine_only_timer", "warmup_policy", "repetitions", "machine_identity", "raw_timings", "output_identity"]
+status = "verified"
+issue = "ml4t/backtest-dev#11"
+
+[[claim]]
+id = "library-idiomatic-performance"
+repository = "ml4t/backtest"
+paths = ["validation/cross_framework_performance.py", "validation/PERFORMANCE_RESULTS.json", "validation/vectorbt_pro/benchmark_performance.py", "validation/backtrader/benchmark_performance.py", "validation/zipline/benchmark_performance.py"]
+type = "performance"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["idiomatic_workload", "declared_scope", "warmup_policy", "repetitions", "machine_identity", "raw_timings"]
+status = "verified"
+issue = "ml4t/backtest-dev#12"
+
+[[claim]]
+id = "library-qualitative-comparison"
+repository = "ml4t/backtest"
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md"]
+type = "qualitative"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["upstream_source_reference", "scope_qualification"]
+status = "verified"
+issue = "ml4t/backtest-dev#13"
+
+[[claim]]
+id = "book-framework-equivalence"
+repository = "ml4t/public"
+paths = ["16_strategy_simulation/06_framework_parity.py", "16_strategy_simulation/15_lean_engine_parity.py", "16_strategy_simulation/16_case_study_lean_parity.py", "16_strategy_simulation/17_backtrader_zipline_engine_parity.py", "16_strategy_simulation/18_vectorbt_engine_parity.py", "16_strategy_simulation/validation/_library_validation.py", "16_strategy_simulation/validation/adapters/lean_adapter.py", "16_strategy_simulation/validation/adapters/ml4t_adapter.py", "16_strategy_simulation/validation/adapters/vectorbt_adapter.py"]
+type = "correctness"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["executed_notebook", "canonical_trade_log", "canonical_fill_log", "equity_curve", "environment_identity"]
+status = "unresolved"
+issue = "ml4t/backtest-dev#14"
+
+[[claim]]
+id = "book-performance-comparison"
+repository = "ml4t/public"
+paths = ["16_strategy_simulation/03_single_asset_vectorbt.py", "16_strategy_simulation/04_single_asset_ml4t_backtest.py", "16_strategy_simulation/README.md"]
+type = "performance"
+frameworks = ["vectorbt_oss"]
+required_evidence = ["executed_notebook", "retained_benchmark", "workload_definition", "raw_timings"]
+status = "unresolved"
+issue = "ml4t/backtest-dev#14"
+
+[[claim]]
+id = "book-framework-tradeoffs"
+repository = "ml4t/public"
+paths = ["16_strategy_simulation/06_framework_parity.py", "16_strategy_simulation/07_engine_divergence_anatomy.py", "16_strategy_simulation/README.md"]
+type = "qualitative"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["executed_notebook", "upstream_source_reference", "scope_qualification"]
+status = "unresolved"
+issue = "ml4t/backtest-dev#14"
+
+[[claim]]
+id = "content-marketing-correctness"
+repository = "ml4t/content-marketing"
+paths = ["insights/issues/issue_022/derivatives/hacker-news.md", "insights/issues/issue_022/derivatives/reddit-post.md", "insights/issues/issue_022/reviews/parity-claims-audit.md"]
+type = "correctness"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["published_library_evidence", "canonical_comparison", "environment_identity"]
+status = "unresolved"
+issue = "ml4t/backtest-dev#15"
+
+[[claim]]
+id = "content-marketing-performance"
+repository = "ml4t/content-marketing"
+paths = ["insights/issues/issue_022/derivatives/hacker-news.md", "insights/issues/issue_022/derivatives/reddit-post.md"]
+type = "performance"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["published_library_evidence", "workload_definition", "raw_timings", "scope_qualification"]
+status = "unresolved"
+issue = "ml4t/backtest-dev#15"
+
+[[claim]]
+id = "content-marketing-qualitative"
+repository = "ml4t/content-marketing"
+paths = ["insights/issues/issue_022/derivatives/hacker-news.md", "insights/issues/issue_022/derivatives/reddit-post.md", "insights/issues/issue_022/reviews/parity-claims-audit.md"]
+type = "qualitative"
+frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
+required_evidence = ["published_library_evidence", "upstream_source_reference", "scope_qualification"]
+status = "unresolved"
+issue = "ml4t/backtest-dev#15"
+
+[[unresolved]]
+id = "performance-publication-decision"
+finding = "Whether to publish dated cross-framework runtime or memory ratios is deferred until the audit results are reviewed."
+issue = "ml4t/backtest-dev#15"

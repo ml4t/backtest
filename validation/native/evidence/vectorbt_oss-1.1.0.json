@@ -1,0 +1,372 @@
+{
+  "checks": [
+    {
+      "actual": {
+        "accumulate": false,
+        "allow_partial": true,
+        "call_seq": "default",
+        "cash_sharing": false,
+        "fees": 0.0,
+        "ffill_val_price": true,
+        "fillna_close": true,
+        "fixed_fees": 0.0,
+        "raise_reject": false,
+        "slippage": 0.0,
+        "update_value": false,
+        "upon_dir_conflict": "ignore",
+        "upon_long_conflict": "ignore",
+        "upon_opposite_entry": "reversereduce",
+        "upon_short_conflict": "ignore"
+      },
+      "expected": {
+        "accumulate": false,
+        "allow_partial": true,
+        "call_seq": "default",
+        "cash_sharing": false,
+        "fees": 0.0,
+        "ffill_val_price": true,
+        "fillna_close": true,
+        "fixed_fees": 0.0,
+        "raise_reject": false,
+        "slippage": 0.0,
+        "update_value": false,
+        "upon_dir_conflict": "ignore",
+        "upon_long_conflict": "ignore",
+        "upon_opposite_entry": "reversereduce",
+        "upon_short_conflict": "ignore"
+      },
+      "id": "defaults",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": {
+        "prices": [
+          100.0,
+          110.0
+        ],
+        "timestamps": [
+          "2024-01-01 00:00:00",
+          "2024-01-02 00:00:00"
+        ]
+      },
+      "expected": {
+        "prices": [
+          100.0,
+          110.0
+        ],
+        "timestamps": [
+          "2024-01-01 00:00:00",
+          "2024-01-02 00:00:00"
+        ]
+      },
+      "id": "signal_timing_and_default_fill",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": [
+        99.0,
+        109.0
+      ],
+      "expected": [
+        99.0,
+        109.0
+      ],
+      "id": "explicit_fill_price",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": [
+        5.0,
+        5.0
+      ],
+      "expected": [
+        5.0,
+        5.0
+      ],
+      "id": "target_percent_sizing",
+      "passed": true,
+      "source": "from_orders"
+    },
+    {
+      "actual": {
+        "default": [
+          "a"
+        ],
+        "reversed": [
+          "b"
+        ]
+      },
+      "expected": {
+        "default": [
+          "a"
+        ],
+        "reversed": [
+          "b"
+        ]
+      },
+      "id": "cash_sharing_and_call_sequence",
+      "passed": true,
+      "source": "from_orders"
+    },
+    {
+      "actual": {
+        "cash": [
+          1500.0,
+          1000.0,
+          1000.0
+        ],
+        "orders": [
+          {
+            "column": "b",
+            "side": "Sell",
+            "size": 5.0
+          },
+          {
+            "column": "a",
+            "side": "Buy",
+            "size": 5.0
+          }
+        ]
+      },
+      "expected": {
+        "cash": [
+          1500.0,
+          1000.0,
+          1000.0
+        ],
+        "orders": [
+          {
+            "column": "b",
+            "side": "Sell",
+            "size": 5.0
+          },
+          {
+            "column": "a",
+            "side": "Buy",
+            "size": 5.0
+          }
+        ]
+      },
+      "id": "cash_sharing_short_collateral",
+      "passed": true,
+      "source": "from_orders"
+    },
+    {
+      "actual": 1035668.0954273955,
+      "expected": 1035668.0954273955,
+      "id": "lock_notional_update_arithmetic",
+      "passed": true,
+      "source": "from_orders"
+    },
+    {
+      "actual": {
+        "default_orders": 1,
+        "enabled_orders": 2
+      },
+      "expected": {
+        "default_orders": 1,
+        "enabled_orders": 2
+      },
+      "id": "accumulation",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": {
+        "default": [
+          "Buy"
+        ],
+        "entry": [
+          "Buy",
+          "Buy"
+        ],
+        "exit": [
+          "Buy",
+          "Sell"
+        ]
+      },
+      "expected": {
+        "default": [
+          "Buy"
+        ],
+        "entry": [
+          "Buy",
+          "Buy"
+        ],
+        "exit": [
+          "Buy",
+          "Sell"
+        ]
+      },
+      "id": "long_signal_conflict",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": {
+        "cash": [
+          1100.0,
+          990.0
+        ],
+        "sides": [
+          "Sell",
+          "Buy"
+        ]
+      },
+      "expected": {
+        "cash": [
+          1100.0,
+          990.0
+        ],
+        "sides": [
+          "Sell",
+          "Buy"
+        ]
+      },
+      "id": "short_cash",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": [
+        100.0,
+        90.0
+      ],
+      "expected": [
+        100.0,
+        90.0
+      ],
+      "id": "stop_fill",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": [
+        100.0,
+        108.0
+      ],
+      "expected": [
+        100.0,
+        108.0
+      ],
+      "id": "trailing_stop_extreme_and_intrabar_fill",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": {
+        "fees": [
+          3.01,
+          2.99
+        ],
+        "prices": [
+          101.0,
+          99.0
+        ]
+      },
+      "expected": {
+        "fees": [
+          3.01,
+          2.99
+        ],
+        "prices": [
+          101.0,
+          99.0
+        ]
+      },
+      "id": "fees_and_slippage",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": {
+        "cash": [
+          900.0,
+          900.0,
+          900.0
+        ],
+        "order_count": 1
+      },
+      "expected": {
+        "cash": [
+          900.0,
+          900.0,
+          900.0
+        ],
+        "order_count": 1
+      },
+      "id": "missing_order_price",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": [
+        1.0
+      ],
+      "expected": [
+        1.0
+      ],
+      "id": "insufficient_cash_partial_fill",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": {
+        "direction": "Long",
+        "order_ids": [
+          0,
+          1
+        ],
+        "pnl": 10.0,
+        "status": "Closed",
+        "trade_count": 1
+      },
+      "expected": {
+        "direction": "Long",
+        "order_ids": [
+          0,
+          1
+        ],
+        "pnl": 10.0,
+        "status": "Closed",
+        "trade_count": 1
+      },
+      "id": "record_construction",
+      "passed": true,
+      "source": "from_signals"
+    },
+    {
+      "actual": "accepted",
+      "expected": "accepted",
+      "id": "integer_signal_dtype",
+      "passed": true,
+      "source": "from_signals"
+    }
+  ],
+  "framework": "vectorbt_oss",
+  "oracle_sha256": "e3a002a1924a371cdf5b9f61eae13942ac371ad13d6f55125dd545c243a88bc8",
+  "package": "vectorbt",
+  "passed": true,
+  "schema_version": 1,
+  "source_commit": "259d2d89fe2e7638baf3ca76c394937cd32b656d",
+  "source_locations": {
+    "from_orders": {
+      "line": 1616,
+      "module": "vectorbt.portfolio.base",
+      "path": "vectorbt/portfolio/base.py",
+      "qualname": "Portfolio.from_orders",
+      "source_url": "https://github.com/polakowo/vectorbt/blob/259d2d89fe2e7638baf3ca76c394937cd32b656d/vectorbt/portfolio/base.py#L1616"
+    },
+    "from_signals": {
+      "line": 2047,
+      "module": "vectorbt.portfolio.base",
+      "path": "vectorbt/portfolio/base.py",
+      "qualname": "Portfolio.from_signals",
+      "source_url": "https://github.com/polakowo/vectorbt/blob/259d2d89fe2e7638baf3ca76c394937cd32b656d/vectorbt/portfolio/base.py#L2047"
+    }
+  },
+  "version": "1.1.0"
+}

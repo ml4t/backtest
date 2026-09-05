@@ -15,6 +15,7 @@ from .config import (
     FillOrdering,
     InitialHwmSource,
     LateAssetPolicy,
+    LockNotionalUpdateMode,
     MissingPricePolicy,
     ShareType,
     ShortCashPolicy,
@@ -103,6 +104,7 @@ class Broker:
         fixed_margin_schedule: dict[str, tuple[float, float]] | None = None,
         margin_pct_schedule: dict[str, tuple[float, float]] | None = None,
         short_cash_policy: ShortCashPolicy = ShortCashPolicy.CREDIT,
+        lock_notional_update_mode: LockNotionalUpdateMode = LockNotionalUpdateMode.POSITION_LEGS,
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
@@ -214,6 +216,7 @@ class Broker:
         self.fixed_margin_schedule = effective_margin_schedule
         self.margin_pct_schedule = effective_margin_pct_schedule
         self.short_cash_policy = short_cash_policy
+        self.lock_notional_update_mode = lock_notional_update_mode
 
         # Create Gatekeeper for order validation
         self.gatekeeper = Gatekeeper(
@@ -409,6 +412,7 @@ class Broker:
             fixed_margin_schedule=config.fixed_margin_schedule,
             margin_pct_schedule=config.margin_pct_schedule,
             short_cash_policy=config.short_cash_policy,
+            lock_notional_update_mode=config.lock_notional_update_mode,
             execution_limits=execution_limits,
             market_impact_model=market_impact_model,
             contract_specs=contract_specs,
@@ -2116,6 +2120,9 @@ class Broker:
         delta_value = target_value - current_value
         if abs(delta_value) < 0.01:  # Less than 1 cent, no trade needed
             return None
+
+        if _options is not None and _options.priority_notional is None:
+            _options.priority_notional = abs(delta_value)
 
         # Convert to quantity (accounting for multiplier)
         delta_qty = delta_value / unit_notional

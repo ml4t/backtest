@@ -30,7 +30,13 @@ if TYPE_CHECKING:
 
 from ml4t.specs.market_data import TimestampSemantics
 
-from ..config import DataFrequency, ExecutionPrice, RebalanceMode, ShareType
+from ..config import (
+    DataFrequency,
+    ExecutionPrice,
+    RebalanceMode,
+    ShareRounding,
+    ShareType,
+)
 from ..core.shared import SubmitOrderOptions
 from ..types import OrderSide
 from .schedule import RebalanceSchedule, _OnlineRebalanceEvaluator
@@ -105,6 +111,7 @@ class RebalanceConfig:
     cancel_before_rebalance: bool = True
     account_for_pending: bool = True
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
+    share_rounding: ShareRounding | str = ShareRounding.NEAREST
     schedule: RebalanceSchedule | None = None
     calendar: str | None = None
     timezone: str | None = None
@@ -113,6 +120,7 @@ class RebalanceConfig:
     timestamp_semantics: TimestampSemantics | str | None = None
 
     def __post_init__(self) -> None:
+        self.share_rounding = ShareRounding(self.share_rounding)
         if self.session_start_time is None:
             return
         from ..sessions import _validate_session_start_time
@@ -411,16 +419,17 @@ class TargetWeightExecutor:
 
         # Compute shares (account for contract multiplier for futures)
         multiplier = broker.get_multiplier(asset)
-        shares = delta_value / (price * multiplier)
-
-        shares = self._quantize_shares(shares, broker)
+        shares = self._quantize_shares(delta_value / (price * multiplier), broker)
 
         if shares == 0:
             return None
 
         # Submit order
         side = OrderSide.BUY if shares > 0 else OrderSide.SELL
-        options = SubmitOrderOptions(rebalance_id=rebalance_id)
+        options = SubmitOrderOptions(
+            rebalance_id=rebalance_id,
+            priority_notional=abs(delta_value),
+        )
         return broker.submit_order(asset, abs(shares), side, _options=options)
 
     def _get_rebalance_price(self, asset: str, data: dict[str, dict]) -> float | None:
@@ -449,6 +458,8 @@ class TargetWeightExecutor:
             return int(rounded_lots)
         if use_fractional:
             return shares
+        if self.config.share_rounding is ShareRounding.TRUNCATE:
+            return int(shares)
         rounded = math.copysign(math.floor(abs(shares) + 0.5), shares)
         return int(rounded)
 

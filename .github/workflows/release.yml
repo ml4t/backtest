@@ -24,10 +24,15 @@ jobs:
     name: Qualify Release Candidate
     uses: ./.github/workflows/ci.yml
 
+  private-comparisons:
+    name: Qualify Licensed and Container Comparisons
+    uses: ./.github/workflows/private-comparisons.yml
+    secrets: inherit
+
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: [ecosystem-qualification, qualification]
+    needs: [ecosystem-qualification, private-comparisons, qualification]
     environment: pypi
     permissions:
       contents: read

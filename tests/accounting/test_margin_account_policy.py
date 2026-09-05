@@ -66,8 +66,8 @@ class TestMarginAccountPolicyInitialization:
             )
 
     def test_invalid_maintenance_greater_than_initial(self):
-        """Test that long_maintenance_margin must be < initial_margin."""
-        with pytest.raises(ValueError, match="maintenance margin.*must be <"):
+        """Test that long_maintenance_margin must be <= initial_margin."""
+        with pytest.raises(ValueError, match="maintenance margin.*must be <="):
             UnifiedAccountPolicy(
                 allow_short_selling=True,
                 allow_leverage=True,
@@ -75,15 +75,17 @@ class TestMarginAccountPolicyInitialization:
                 long_maintenance_margin=0.5,
             )
 
-    def test_invalid_maintenance_equal_to_initial(self):
-        """Test that long_maintenance_margin cannot equal initial_margin."""
-        with pytest.raises(ValueError, match="maintenance margin.*must be <"):
-            UnifiedAccountPolicy(
-                allow_short_selling=True,
-                allow_leverage=True,
-                initial_margin=0.5,
-                long_maintenance_margin=0.5,
-            )
+    def test_maintenance_can_equal_initial(self):
+        """Support models that use the same initial and maintenance requirement."""
+        policy = UnifiedAccountPolicy(
+            allow_short_selling=True,
+            allow_leverage=True,
+            initial_margin=0.5,
+            long_maintenance_margin=0.5,
+            short_maintenance_margin=0.5,
+        )
+        assert policy.long_maintenance_margin == 0.5
+        assert policy.short_maintenance_margin == 0.5
 
 
 class TestMarginAccountPolicyBuyingPower:

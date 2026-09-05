@@ -335,14 +335,14 @@ class UnifiedAccountPolicy(AccountPolicy):
                 raise ValueError(
                     f"Short maintenance margin must be in (0.0, 1.0], got {short_maintenance_margin}"
                 )
-            if long_maintenance_margin >= initial_margin:
+            if long_maintenance_margin > initial_margin:
                 raise ValueError(
-                    f"Long maintenance margin ({long_maintenance_margin}) must be < "
+                    f"Long maintenance margin ({long_maintenance_margin}) must be <= "
                     f"initial margin ({initial_margin})"
                 )
-            if short_maintenance_margin >= initial_margin:
+            if short_maintenance_margin > initial_margin:
                 raise ValueError(
-                    f"Short maintenance margin ({short_maintenance_margin}) must be < "
+                    f"Short maintenance margin ({short_maintenance_margin}) must be <= "
                     f"initial margin ({initial_margin})"
                 )
 

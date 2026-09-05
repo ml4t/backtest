@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING
+import math
+from typing import TYPE_CHECKING, TypeGuard
 
 from ..models import calculate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
@@ -14,6 +15,10 @@ if TYPE_CHECKING:
     from ..accounting import AccountState
     from ..broker import Broker
     from .fill_engine import FillEngine
+
+
+def _price_available(price: object) -> TypeGuard[int | float]:
+    return isinstance(price, (int, float)) and math.isfinite(price)
 
 
 class ExecutionEngine:
@@ -66,6 +71,13 @@ class ExecutionEngine:
             )
         elif ordering == "sequential":
             self._process_orders_sequential(
+                use_open,
+                order_types=order_types,
+                order_ids=order_ids,
+                include_orders_this_bar=include_orders_this_bar,
+            )
+        elif ordering == "priority":
+            self._process_orders_priority(
                 use_open,
                 order_types=order_types,
                 order_ids=order_ids,
@@ -129,10 +141,10 @@ class ExecutionEngine:
                 deferred_entries.append(order)
                 continue
             price = fill.get_fill_price_for_order(order, use_open)
-            if price is None:
+            if not _price_available(price):
                 continue
             fill_price = fill.check_fill(order, price)
-            if fill_price is not None:
+            if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
                     filled_orders.append(order)
@@ -145,7 +157,7 @@ class ExecutionEngine:
             entry_order_ids = {order.order_id for order in entry_orders}
             entry_order_ids.update(order.order_id for order in deferred_entries)
             entry_orders = [order for order in eligible_orders if order.order_id in entry_order_ids]
-        entry_orders = self._sort_entry_orders(entry_orders, use_open=use_open)
+        entry_orders = self._sort_orders_by_priority(entry_orders, use_open=use_open)
 
         for order in entry_orders:
             self._process_single_order(
@@ -174,18 +186,13 @@ class ExecutionEngine:
         if order_types is not None or order_ids is not None or include_orders_this_bar:
             return False
 
-        current_bar_index = self.market.bar_index
         eligible_orders = self._eligible_orders(
             use_open,
             order_types=order_types,
             order_ids=order_ids,
             include_orders_this_bar=include_orders_this_bar,
         )
-        for order in eligible_orders:
-            if getattr(order, "_created_bar_index", current_bar_index) < current_bar_index - 1:
-                return True
-
-        return False
+        return bool(eligible_orders)
 
     def _process_orders_next_bar_queue_shadow(
         self,
@@ -221,7 +228,7 @@ class ExecutionEngine:
 
         for order in eligible_orders:
             price = fill.get_fill_price_for_order(order, use_open)
-            if price is None:
+            if not _price_available(price):
                 continue
 
             fill.apply_share_rounding(order)
@@ -259,6 +266,8 @@ class ExecutionEngine:
             )
 
         for order, fill_price in accepted_orders:
+            if not fill.constrain_locked_short_cover(order, fill_price):
+                continue
             fully_filled = fill.execute_fill(order, fill_price)
             if fully_filled:
                 filled_orders.append(order)
@@ -411,6 +420,29 @@ class ExecutionEngine:
 
         self._cleanup_filled_orders(filled_orders)
 
+    def _process_orders_priority(
+        self,
+        use_open: bool = False,
+        *,
+        order_types: set[OrderType] | None = None,
+        order_ids: set[str] | None = None,
+        include_orders_this_bar: bool = False,
+    ) -> None:
+        """Process complete orders in configured priority order."""
+        eligible_orders = self._eligible_orders(
+            use_open,
+            order_types=order_types,
+            order_ids=order_ids,
+            include_orders_this_bar=include_orders_this_bar,
+        )
+        ordered = self._sort_orders_by_priority(eligible_orders, use_open=use_open)
+        filled_orders: list[Order] = []
+        for order in ordered:
+            self._process_single_order(order, use_open, filled_orders)
+            if filled_orders and filled_orders[-1] is order:
+                self.broker.mark_account_positions(use_open=use_open)
+        self._cleanup_filled_orders(filled_orders)
+
     def _process_orders_sequential(
         self,
         use_open: bool = False,
@@ -451,7 +483,7 @@ class ExecutionEngine:
                 continue
 
             price = fill.get_fill_price_for_order(order, use_open)
-            if price is None:
+            if not _price_available(price):
                 continue
 
             fill.apply_share_rounding(order)
@@ -468,7 +500,7 @@ class ExecutionEngine:
                 # Exits always fill (they free capital).
                 # Entries fill directly when shadow-validated at submission.
                 fill_price = fill.check_fill(order, price)
-                if fill_price is not None:
+                if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
                     fully_filled = fill.execute_fill(order, fill_price)
                     if fully_filled:
                         filled_orders.append(order)
@@ -500,7 +532,7 @@ class ExecutionEngine:
         if order.status is not OrderStatus.PENDING:
             return
         price = fill.get_fill_price_for_order(order, use_open)
-        if price is None:
+        if not _price_available(price):
             return
 
         skip_cash = broker.skip_cash_validation
@@ -525,25 +557,8 @@ class ExecutionEngine:
                     order.reject("Insufficient cash (open cash check)", "insufficient_cash")
                     return
 
-                # Under locked-short-cash semantics, short covers/reversals can be
-                # cash-constrained and may require partial fills.
-                if (
-                    order.side is OrderSide.BUY
-                    and broker.short_cash_policy.value == "lock_notional"
-                    and self.account.get_position_quantity(order.asset) < 0
-                ):
-                    max_qty = fill.get_max_affordable_quantity(order, fill_price)
-                    if broker.share_type.value == "integer":
-                        max_qty = float(int(max_qty))
-                    if max_qty <= 0:
-                        order.reject("Insufficient cash to cover short", "insufficient_cash")
-                        return
-                    if max_qty < order.quantity:
-                        if broker.partial_fills_allowed:
-                            order.quantity = max_qty
-                        else:
-                            order.reject("Insufficient cash to cover short", "insufficient_cash")
-                            return
+                if not fill.constrain_locked_short_cover(order, fill_price):
+                    return
 
                 fully_filled = fill.execute_fill(order, fill_price)
                 if fully_filled:
@@ -678,7 +693,15 @@ class ExecutionEngine:
             broker.commission_model, order.asset, order.quantity, fill_price
         )
         projected_cash = broker.cash - signed_qty * fill_price - commission
-        return projected_cash >= 0.0
+        if projected_cash >= 0.0:
+            return True
+
+        # Backtrader executes the closing leg of a reversal after an
+        # opening-price gap, even when that close leaves cash negative.
+        if is_opposite and order.quantity > abs(current_qty):
+            order.quantity = abs(current_qty)
+            return True
+        return False
 
     def _cleanup_filled_orders(self, filled_orders: list) -> None:
         filled_ids = {o.order_id for o in filled_orders}
@@ -701,8 +724,8 @@ class ExecutionEngine:
                 o for o in self.orders.current_bar if o.order_id in self.orders.current_bar_ids
             ]
 
-    def _sort_entry_orders(self, orders: list, use_open: bool) -> list:
-        """Sort entry orders under EXIT_FIRST based on configured priority."""
+    def _sort_orders_by_priority(self, orders: list, use_open: bool) -> list:
+        """Sort orders using the configured cash-constrained priority."""
         broker = self.broker
         fill = self.fill_engine
         priority = broker.entry_order_priority.value
@@ -710,10 +733,57 @@ class ExecutionEngine:
             return orders
 
         def notional(order) -> float:
+            if order._priority_notional is not None:
+                return order._priority_notional
             px = fill.get_fill_price_for_order(order, use_open)
-            if px is None:
+            if not _price_available(px):
                 px = self.market.prices.get(order.asset, self.market.opens.get(order.asset, 0.0))
+            if not _price_available(px):
+                return 0.0
             return abs(order.quantity * px)
 
+        if priority == "free_cash_asc":
+            return sorted(
+                orders,
+                key=lambda order: self._estimated_free_cash_use(order, use_open),
+            )
+        if priority == "order_value_asc":
+            return sorted(
+                orders,
+                key=lambda order: (-1.0 if order.side is OrderSide.SELL else 1.0) * notional(order),
+            )
         reverse = priority == "notional_desc"
         return sorted(orders, key=notional, reverse=reverse)
+
+    def _estimated_free_cash_use(self, order, use_open: bool) -> float:
+        """Estimate an order's cash use for automatic portfolio call sequencing."""
+        broker = self.broker
+        price = self.fill_engine.get_fill_price_for_order(order, use_open)
+        if not _price_available(price):
+            price = self.market.prices.get(order.asset, self.market.opens.get(order.asset, 0.0))
+        if not _price_available(price):
+            return 0.0
+        position = broker.account.positions.get(order.asset)
+        current = 0.0 if position is None else float(position.quantity)
+        signed = order.quantity if order.side is OrderSide.BUY else -order.quantity
+        quantity = abs(float(order.quantity))
+        unit_cost = float(price) * broker.get_multiplier(order.asset)
+        notional = quantity * unit_cost
+        commission = calculate_commission(
+            broker.commission_model,
+            order.asset,
+            quantity,
+            float(price),
+        )
+
+        if current < 0 and signed > 0:
+            covered = min(quantity, abs(current))
+            basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
+            released_basis = 0.0 if current == 0 else covered / abs(current) * basis
+            remaining = max(0.0, quantity - covered)
+            return covered * unit_cost - 2.0 * released_basis + remaining * unit_cost + commission
+        if current > 0 and signed < 0:
+            closed = min(quantity, current)
+            remaining = max(0.0, quantity - closed)
+            return -closed * unit_cost + remaining * unit_cost + commission
+        return notional + commission

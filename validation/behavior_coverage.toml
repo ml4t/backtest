@@ -1,0 +1,266 @@
+schema_version = 1
+
+[[framework.vectorbt]]
+name = "execution"
+fields = ["execution.execution_price", "execution.execution_mode"]
+native_checks = ["signal_timing_and_default_fill", "explicit_fill_price"]
+scenarios = ["01", "17"]
+published = true
+
+[[framework.vectorbt]]
+name = "direction"
+fields = ["account.allow_short_selling", "account.short_cash_policy", "account.lock_notional_update_mode"]
+native_checks = ["short_cash", "lock_notional_update_arithmetic"]
+scenarios = ["02", "11", "12"]
+published = true
+
+[[framework.vectorbt]]
+name = "stops"
+fields = ["stops.stop_fill_mode", "stops.stop_level_basis", "stops.trail_hwm_source", "stops.initial_hwm_source", "stops.trail_stop_timing"]
+native_checks = ["stop_fill", "trailing_stop_extreme_and_intrabar_fill"]
+scenarios = ["03", "04", "09", "10", "12", "13", "14", "15"]
+published = true
+
+[[framework.vectorbt]]
+name = "costs"
+fields = ["commission.model", "commission.rate", "slippage.model", "slippage.rate"]
+native_checks = ["fees_and_slippage"]
+scenarios = ["05", "07", "08"]
+published = true
+
+[[framework.vectorbt]]
+name = "sizing"
+fields = ["position_sizing.share_type"]
+native_checks = ["target_percent_sizing"]
+scenarios = []
+published = false
+reason = "The scenario matrix submits fixed integer quantities and does not test fractional target sizing."
+
+[[framework.vectorbt]]
+name = "buying_power"
+fields = ["account.allow_leverage", "orders.reject_on_insufficient_cash", "orders.partial_fills_allowed"]
+native_checks = ["cash_sharing_short_collateral", "insufficient_cash_partial_fill"]
+scenarios = []
+published = false
+reason = "No cross-engine scenario currently reaches an insufficient-cash boundary."
+
+[[framework.vectorbt]]
+name = "order_processing"
+fields = ["orders.fill_ordering", "orders.entry_order_priority", "orders.immediate_fill", "orders.rebalance_mode"]
+native_checks = ["cash_sharing_and_call_sequence", "accumulation", "long_signal_conflict"]
+scenarios = []
+published = false
+reason = "The single-asset scenario strategy does not submit competing same-session orders or targets."
+
+[[framework.vectorbt]]
+name = "cash_and_target_headroom"
+fields = ["cash.initial", "cash.buffer_pct", "orders.rebalance_headroom_pct"]
+native_checks = ["target_percent_sizing"]
+scenarios = []
+published = false
+reason = "Initial cash is an explicit scenario input and target headroom is not exercised."
+
+[[framework.vectorbt]]
+name = "data_continuity"
+fields = ["orders.missing_price_policy", "orders.late_asset_policy", "orders.late_asset_min_bars"]
+native_checks = ["missing_order_price"]
+scenarios = []
+published = false
+reason = "The scenario matrix has one complete asset history and cannot test late assets."
+
+[[framework.backtrader]]
+name = "execution"
+fields = ["execution.execution_price", "execution.execution_mode"]
+native_checks = ["next_bar_open_and_gap", "final_bar_market_order"]
+scenarios = ["01", "17"]
+published = true
+
+[[framework.backtrader]]
+name = "direction"
+fields = ["account.allow_short_selling", "account.short_cash_policy"]
+native_checks = ["short_cash"]
+scenarios = ["02", "11", "12"]
+published = true
+
+[[framework.backtrader]]
+name = "stops"
+fields = ["stops.stop_fill_mode", "stops.stop_level_basis", "stops.trail_hwm_source", "stops.initial_hwm_source", "stops.trail_stop_timing"]
+native_checks = ["signal_price_stop_basis", "trailing_stop_signal_close_and_lagged"]
+scenarios = ["03", "04", "09", "10", "12", "13", "14", "15"]
+published = true
+
+[[framework.backtrader]]
+name = "costs"
+fields = ["commission.model", "commission.rate", "slippage.model", "slippage.rate"]
+native_checks = ["defaults", "commission_headroom"]
+scenarios = ["05", "06", "07", "08"]
+published = true
+
+[[framework.backtrader]]
+name = "sizing"
+fields = ["position_sizing.share_type", "position_sizing.share_rounding"]
+native_checks = ["integer_target_percent"]
+scenarios = []
+published = false
+reason = "The scenario matrix submits fixed integer quantities and does not test target-percent sizing."
+
+[[framework.backtrader]]
+name = "buying_power"
+fields = ["account.allow_leverage", "orders.reject_on_insufficient_cash", "orders.partial_fills_allowed"]
+native_checks = ["cash_rejection_and_configured_leverage", "losing_short_cover_submission_rejection", "gap_reversal_executes_close_leg_despite_margin"]
+scenarios = []
+published = false
+reason = "Native checks cover submission and gap boundaries, but the scenario matrix does not reach an insufficient-cash boundary."
+
+[[framework.backtrader]]
+name = "order_processing"
+fields = ["orders.fill_ordering", "orders.entry_order_priority", "orders.rebalance_mode"]
+native_checks = ["submission_sequence"]
+scenarios = []
+published = false
+reason = "The single-asset scenario strategy does not submit competing same-session orders or targets."
+
+[[framework.backtrader]]
+name = "cash_and_target_headroom"
+fields = ["cash.initial", "cash.buffer_pct", "orders.rebalance_headroom_pct"]
+native_checks = ["commission_headroom"]
+scenarios = []
+published = false
+reason = "Initial cash is an explicit scenario input and target headroom is not exercised."
+
+[[framework.backtrader]]
+name = "data_continuity"
+fields = ["orders.missing_price_policy", "orders.late_asset_policy", "orders.late_asset_min_bars"]
+native_checks = ["missing_bar_uses_last_value", "late_feed_start"]
+scenarios = []
+published = false
+reason = "The scenario matrix has one complete asset history and cannot test late assets."
+
+[[framework.zipline]]
+name = "execution"
+fields = ["execution.execution_price", "execution.execution_mode"]
+native_checks = ["configured_next_bar_open_fill", "final_bar_market_order"]
+scenarios = ["01", "17"]
+published = true
+
+[[framework.zipline]]
+name = "direction"
+fields = ["account.allow_short_selling", "account.short_cash_policy"]
+native_checks = ["cash_and_short_proceeds"]
+scenarios = ["02", "11", "12"]
+published = true
+
+[[framework.zipline]]
+name = "risk_adapter"
+fields = ["stops.stop_fill_mode", "stops.stop_level_basis", "stops.trail_hwm_source", "stops.trail_stop_timing"]
+native_checks = ["configured_next_bar_open_fill"]
+scenarios = ["03", "04", "09", "12", "13", "14", "15"]
+published = true
+
+[[framework.zipline]]
+name = "costs"
+fields = ["commission.model", "commission.rate", "commission.per_share", "commission.minimum", "slippage.model", "slippage.rate"]
+native_checks = ["defaults", "explicit_minimum_commission"]
+scenarios = ["05", "06", "07", "08"]
+published = true
+
+[[framework.zipline]]
+name = "sizing"
+fields = ["position_sizing.share_type", "orders.rebalance_mode"]
+native_checks = ["integer_target_percent", "target_percent_snapshot"]
+scenarios = []
+published = false
+reason = "The scenario matrix submits fixed quantities and does not call target-percent APIs."
+
+[[framework.zipline]]
+name = "buying_power"
+fields = ["account.allow_leverage", "orders.reject_on_insufficient_cash", "orders.skip_cash_validation", "orders.partial_fills_allowed"]
+native_checks = ["cash_and_short_proceeds", "volume_share_partial_fills"]
+scenarios = []
+published = false
+reason = "The comparison protocol overrides cash validation and fill volume, but no boundary scenario tests either behavior."
+
+[[framework.zipline]]
+name = "order_processing"
+fields = ["orders.fill_ordering", "orders.entry_order_priority", "orders.next_bar_queue_shadow_validation"]
+native_checks = ["submission_sequence"]
+scenarios = []
+published = false
+reason = "The single-asset scenario strategy does not submit competing same-session orders."
+
+[[framework.zipline]]
+name = "cash_and_target_headroom"
+fields = ["cash.initial", "cash.buffer_pct", "orders.rebalance_headroom_pct"]
+native_checks = ["integer_target_percent"]
+scenarios = []
+published = false
+reason = "Initial cash is explicit and target headroom is not exercised."
+
+[[framework.zipline]]
+name = "data_continuity"
+fields = ["orders.missing_price_policy", "orders.late_asset_policy", "orders.late_asset_min_bars"]
+native_checks = ["session_calendar", "missing_bar"]
+scenarios = []
+published = false
+reason = "The scenario matrix has one complete asset history and cannot test late assets."
+
+[[framework.lean]]
+name = "execution"
+fields = ["execution.execution_price", "execution.execution_mode"]
+native_checks = ["timing", "final_bar_order"]
+scenarios = ["lean-case:chapter16_etfs", "lean-case:chapter16_sp500_equity_option_analytics", "lean-case:chapter16_us_equities_panel"]
+published = true
+
+[[framework.lean]]
+name = "account"
+fields = ["account.allow_short_selling", "account.allow_leverage", "account.initial_margin", "account.long_maintenance_margin", "account.short_maintenance_margin", "account.short_cash_policy"]
+native_checks = ["default_models", "buying_power_allowed", "buying_power_rejected"]
+scenarios = ["lean-case:chapter16_etfs", "lean-case:chapter16_sp500_equity_option_analytics", "lean-case:chapter16_us_equities_panel"]
+published = true
+
+[[framework.lean]]
+name = "target_sizing"
+fields = ["position_sizing.share_type", "orders.rebalance_mode", "orders.rebalance_headroom_pct"]
+native_checks = ["target_sizing"]
+scenarios = ["lean-case:chapter16_etfs", "lean-case:chapter16_sp500_equity_option_analytics", "lean-case:chapter16_us_equities_panel"]
+published = true
+
+[[framework.lean]]
+name = "costs"
+fields = ["commission.model", "commission.rate", "commission.per_share", "commission.minimum", "slippage.model", "slippage.rate"]
+native_checks = ["default_models", "explicit_costs"]
+scenarios = []
+published = false
+reason = "Chapter 16 uses a custom percentage fee model, not the profile's default brokerage fee model."
+
+[[framework.lean]]
+name = "stops"
+fields = ["stops.stop_fill_mode", "stops.stop_level_basis", "stops.trail_hwm_source", "stops.trail_stop_timing"]
+native_checks = []
+scenarios = []
+published = false
+reason = "The current LEAN oracle and case studies do not test stop-order semantics."
+
+[[framework.lean]]
+name = "buying_power_and_ordering"
+fields = ["orders.reject_on_insufficient_cash", "orders.partial_fills_allowed", "orders.fill_ordering", "orders.entry_order_priority", "orders.buying_power_reservation", "orders.next_bar_submission_precheck", "orders.next_bar_queue_shadow_validation"]
+native_checks = ["submission_sequence", "buying_power_sequence", "default_full_fill"]
+scenarios = []
+published = false
+reason = "The Chapter 16 projects do not isolate rejection, competing-order, or partial-fill boundaries."
+
+[[framework.lean]]
+name = "cash"
+fields = ["cash.initial", "cash.buffer_pct"]
+native_checks = ["target_sizing"]
+scenarios = []
+published = false
+reason = "Initial cash is an explicit project input, not an engine-default equivalence claim."
+
+[[framework.lean]]
+name = "data_continuity"
+fields = ["orders.missing_price_policy", "orders.late_asset_policy", "orders.late_asset_min_bars"]
+native_checks = ["fill_forward"]
+scenarios = []
+published = false
+reason = "The Chapter 16 projects do not contain a controlled missing-bar or late-asset case."

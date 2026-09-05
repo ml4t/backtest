@@ -23,9 +23,10 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-import math
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 # Ensure project root is on path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -33,10 +34,12 @@ VALIDATION_DIR = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(VALIDATION_DIR))
 
-from common import data_generators  # noqa: E402
 from common.comparator import compare_results, print_comparison  # noqa: E402
+from common.framework_registry import load_framework_manifest  # noqa: E402
 from common.ml4t_runner import run_ml4t  # noqa: E402
+from common.provenance import build_record_provenance, generate_inputs  # noqa: E402
 from common.types import (  # noqa: E402
+    ComparisonResult,
     FrameworkResult,
     ValidationRecord,
     ValidationSkipped,
@@ -51,6 +54,7 @@ FRAMEWORK_MODULES = {
     "backtrader": "frameworks.backtrader",
     "zipline": "frameworks.zipline",
 }
+FRAMEWORK_MANIFEST = load_framework_manifest()
 
 
 def _record(
@@ -60,6 +64,11 @@ def _record(
     *,
     required: bool = True,
     detail: str | None = None,
+    started_at: float | None = None,
+    provenance: dict[str, Any] | None = None,
+    framework_result: FrameworkResult | None = None,
+    ml4t_result: FrameworkResult | None = None,
+    comparison: ComparisonResult | None = None,
 ) -> ValidationRecord:
     scenario = SCENARIOS.get(scenario_id)
     return ValidationRecord(
@@ -69,25 +78,26 @@ def _record(
         status=status,
         required=required,
         detail=detail,
+        duration_seconds=time.perf_counter() - started_at if started_at is not None else None,
+        provenance=provenance,
+        framework_result=framework_result,
+        ml4t_result=ml4t_result,
+        comparison=comparison,
     )
 
 
 def _malformed_result_detail(result: object) -> str | None:
     if not isinstance(result, FrameworkResult):
         return f"Adapter returned {type(result).__name__}, expected FrameworkResult"
-    if not isinstance(result.framework, str) or not result.framework:
-        return "FrameworkResult.framework must be a nonempty string"
-    if not isinstance(result.num_trades, int) or isinstance(result.num_trades, bool):
-        return "FrameworkResult.num_trades must be an integer"
-    if result.num_trades < 0:
-        return "FrameworkResult.num_trades cannot be negative"
-    for name, value in (("final_value", result.final_value), ("total_pnl", result.total_pnl)):
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            return f"FrameworkResult.{name} must be numeric"
-        if not math.isfinite(float(value)):
-            return f"FrameworkResult.{name} must be finite"
-    if not isinstance(result.trades, list):
-        return "FrameworkResult.trades must be a list"
+    try:
+        FrameworkResult.from_dict(result.to_dict())
+    except (TypeError, ValueError) as error:
+        return str(error)
+    if result.num_trades != len(result.trades):
+        return (
+            "FrameworkResult.num_trades must equal the retained closed-trade count: "
+            f"{result.num_trades} != {len(result.trades)}"
+        )
     return None
 
 
@@ -101,6 +111,7 @@ def run_single(
     Returns:
         A terminal, machine-readable validation record.
     """
+    started_at = time.perf_counter()
     scenario = SCENARIOS.get(scenario_id)
     if not scenario:
         print(f"Unknown scenario: {scenario_id}")
@@ -109,6 +120,7 @@ def run_single(
             framework,
             ValidationStatus.MISSING_SCENARIO,
             detail=f"Scenario {scenario_id} is not defined",
+            started_at=started_at,
         )
 
     if framework not in scenario.supported_frameworks:
@@ -119,6 +131,7 @@ def run_single(
             ValidationStatus.UNSUPPORTED,
             required=False,
             detail="Scenario explicitly excludes this framework",
+            started_at=started_at,
         )
 
     print(f"\n{'=' * 70}")
@@ -128,8 +141,7 @@ def run_single(
     # Generate data
     print("\nGenerating test data...")
     try:
-        gen_func = getattr(data_generators, scenario.data_generator)
-        data_result = gen_func(**scenario.data_kwargs)
+        prices_df, entries, exits = generate_inputs(scenario, framework)
     except Exception as error:
         print(f"   ERROR: data generation failed: {error}")
         return _record(
@@ -137,31 +149,8 @@ def run_single(
             framework,
             ValidationStatus.ADAPTER_FAILURE,
             detail=f"Data generation failed: {error}",
+            started_at=started_at,
         )
-
-    if len(data_result) == 3:
-        prices_df, entries, exits = data_result
-    else:
-        prices_df, entries = data_result
-        exits = None
-
-    # Align to NYSE calendar for Zipline (which only operates on NYSE sessions)
-    if framework == "zipline":
-        import exchange_calendars as xcals
-
-        nyse = xcals.get_calendar("XNYS")
-        start_ts = prices_df.index[0]
-        end_ts = prices_df.index[-1]
-        if start_ts.tz is not None:
-            start_ts = start_ts.tz_convert(None)
-            end_ts = end_ts.tz_convert(None)
-        sessions = nyse.sessions_in_range(start_ts, end_ts)
-        naive_idx = prices_df.index.tz_localize(None) if prices_df.index.tz else prices_df.index
-        valid_mask = naive_idx.isin(sessions)
-        prices_df = prices_df[valid_mask].copy()
-        entries = entries[valid_mask]
-        if exits is not None:
-            exits = exits[valid_mask]
 
     print(f"   Bars: {len(prices_df)}")
     print(f"   Entry signals: {entries.sum()}")
@@ -179,6 +168,7 @@ def run_single(
             framework,
             ValidationStatus.ADAPTER_IMPORT_FAILURE,
             detail=str(error),
+            started_at=started_at,
         )
 
     try:
@@ -190,6 +180,7 @@ def run_single(
             framework,
             ValidationStatus.SKIPPED,
             detail=str(error),
+            started_at=started_at,
         )
     except ImportError as error:
         print(f"   UNAVAILABLE: {error}")
@@ -198,6 +189,7 @@ def run_single(
             framework,
             ValidationStatus.UNAVAILABLE,
             detail=str(error),
+            started_at=started_at,
         )
     except Exception as error:
         print(f"   ERROR: {error}")
@@ -206,6 +198,7 @@ def run_single(
             framework,
             ValidationStatus.ADAPTER_FAILURE,
             detail=str(error),
+            started_at=started_at,
         )
 
     malformed_detail = _malformed_result_detail(fw_result)
@@ -216,6 +209,7 @@ def run_single(
             framework,
             ValidationStatus.MALFORMED_OUTPUT,
             detail=malformed_detail,
+            started_at=started_at,
         )
 
     try:
@@ -227,6 +221,7 @@ def run_single(
             framework,
             ValidationStatus.MALFORMED_OUTPUT,
             detail=f"Could not render adapter result: {error}",
+            started_at=started_at,
         )
 
     # Run ml4t
@@ -242,6 +237,7 @@ def run_single(
             framework,
             ValidationStatus.ML4T_FAILURE,
             detail=str(error),
+            started_at=started_at,
         )
 
     # Compare
@@ -255,6 +251,27 @@ def run_single(
             framework,
             ValidationStatus.MALFORMED_OUTPUT,
             detail=f"Could not compare validation results: {error}",
+            started_at=started_at,
+        )
+
+    try:
+        provenance = build_record_provenance(
+            scenario=scenario,
+            framework=framework,
+            target=FRAMEWORK_MANIFEST.targets[framework],
+            prices=prices_df,
+            entries=entries,
+            exits=exits,
+            framework_result=fw_result,
+            ml4t_result=ml4t_result,
+        )
+    except Exception as error:
+        return _record(
+            scenario_id,
+            framework,
+            ValidationStatus.MALFORMED_OUTPUT,
+            detail=f"Could not retain validation provenance: {error}",
+            started_at=started_at,
         )
 
     status = ValidationStatus.PASS if result.passed else ValidationStatus.COMPARISON_FAILURE
@@ -263,6 +280,11 @@ def run_single(
         framework,
         status,
         detail=None if result.passed else result.summary,
+        started_at=started_at,
+        provenance=provenance,
+        framework_result=fw_result,
+        ml4t_result=ml4t_result,
+        comparison=result,
     )
 
 

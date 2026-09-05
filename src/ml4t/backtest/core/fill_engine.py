@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from ..config import ExecutionPrice, ShareType
+from ..config import ExecutionPrice, LockNotionalUpdateMode, ShareType
+from ..models import calculate_commission
 from ..types import OrderSide, OrderType
-from .shared import CASH_TOLERANCE
+from .shared import CASH_TOLERANCE, add_with_zero_cancellation
 from .state import MarketState, OrderState
 
 if TYPE_CHECKING:
@@ -62,6 +63,10 @@ class FillEngine:
         if fill_price <= 0 or order.quantity <= 0:
             return 0.0
 
+        direct_limit = self._get_lock_notional_zero_cost_limit(order, fill_price)
+        if direct_limit is not None:
+            return min(order.quantity, direct_limit)
+
         if self.broker.share_type == ShareType.INTEGER:
             high_int = int(order.quantity)
             if high_int <= 0:
@@ -97,6 +102,80 @@ class FillEngine:
             cash_tolerance = 0.0
         return max(0.0, low - cash_tolerance / fill_price)
 
+    def _get_lock_notional_zero_cost_limit(self, order, fill_price: float) -> float | None:
+        broker = self.broker
+        if (
+            broker.short_cash_policy.value != "lock_notional"
+            or broker.account.policy.allow_leverage
+            or broker.cash_buffer_pct != 0.0
+            or calculate_commission(
+                broker.commission_model,
+                order.asset,
+                order.quantity,
+                fill_price,
+            )
+            != 0.0
+        ):
+            return None
+
+        free_cash = broker.account._lock_notional_free_cash
+        current_quantity = broker.account.get_position_quantity(order.asset)
+        multiplier = broker.get_multiplier(order.asset)
+        unit_cost = fill_price * multiplier
+
+        if broker.lock_notional_update_mode is LockNotionalUpdateMode.COMBINED_ORDER:
+            if order.side is OrderSide.BUY and current_quantity < 0.0:
+                short_quantity = abs(current_quantity)
+                short_basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
+                cover_required = short_quantity * unit_cost
+                cover_free_cash = add_with_zero_cancellation(
+                    free_cash + 2 * short_basis,
+                    -cover_required,
+                )
+                if cover_free_cash > 0.0:
+                    cash_limit = free_cash + 2 * short_basis
+                elif cover_free_cash < 0.0:
+                    average_entry = short_basis / short_quantity
+                    denominator = unit_cost - 2 * average_entry
+                    if denominator == 0.0:
+                        return 0.0
+                    max_short_size = free_cash / denominator
+                    cash_limit = max_short_size * unit_cost
+                else:
+                    cash_limit = broker.cash
+                return max(0.0, min(cash_limit, broker.cash) / unit_cost)
+
+            if order.side is OrderSide.SELL:
+                long_quantity = max(current_quantity, 0.0)
+                long_cash = long_quantity * unit_cost
+                total_free_cash = add_with_zero_cancellation(free_cash, long_cash)
+                if total_free_cash <= 0.0:
+                    return long_quantity if current_quantity > 0.0 else 0.0
+                max_short_size = total_free_cash / unit_cost
+                return add_with_zero_cancellation(long_quantity, max_short_size)
+
+            return max(0.0, free_cash / unit_cost)
+
+        if order.side is OrderSide.BUY and current_quantity < 0.0:
+            short_quantity = abs(current_quantity)
+            short_basis = broker.account._lock_notional_short_basis.get(order.asset, 0.0)
+            average_entry = short_basis / short_quantity
+            cover_cash_delta = 2 * average_entry - unit_cost
+            if cover_cash_delta < 0.0:
+                max_cover = free_cash / -cover_cash_delta
+                if max_cover < short_quantity:
+                    return max_cover
+            released = short_basis + short_basis - short_quantity * unit_cost
+            free_after_cover = add_with_zero_cancellation(free_cash, released)
+            return short_quantity + max(0.0, free_after_cover / unit_cost)
+
+        if order.side is OrderSide.SELL and current_quantity > 0.0:
+            sale_proceeds = current_quantity * unit_cost
+            free_after_close = add_with_zero_cancellation(free_cash, sale_proceeds)
+            return current_quantity + max(0.0, free_after_close / unit_cost)
+
+        return max(0.0, free_cash / unit_cost)
+
     def try_partial_fill(self, order, fill_price: float) -> bool:
         max_shares = self.get_max_affordable_quantity(order, fill_price)
 
@@ -108,6 +187,35 @@ class FillEngine:
 
         order.quantity = max_shares
         return bool(self.execute_fill(order, fill_price))
+
+    def constrain_locked_short_cover(self, order, fill_price: float) -> bool:
+        """Apply locked-cash affordability before any short-cover fill path."""
+        broker = self.broker
+        current_quantity = broker.account.get_position_quantity(order.asset)
+        if not (
+            order.side is OrderSide.BUY
+            and current_quantity < 0.0
+            and broker.short_cash_policy.value == "lock_notional"
+            and not broker.account.policy.allow_leverage
+        ):
+            return True
+
+        effective_quantity = self.get_effective_quantity(order)
+        max_quantity = self.get_max_affordable_quantity(order, fill_price)
+        if broker.share_type is ShareType.INTEGER:
+            max_quantity = float(int(max_quantity))
+        if max_quantity <= 0.0:
+            order.reject("Insufficient cash to cover short", "insufficient_cash")
+            return False
+        if max_quantity >= effective_quantity:
+            return True
+        if not broker.partial_fills_allowed:
+            order.reject("Insufficient cash to cover short", "insufficient_cash")
+            return False
+
+        order.quantity = max_quantity
+        self.orders.partial_quantities.pop(order.order_id, None)
+        return True
 
     def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
         broker = self.broker

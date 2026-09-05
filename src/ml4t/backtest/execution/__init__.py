@@ -17,6 +17,7 @@ from .impact import (
 from .limits import (
     ExecutionLimits,
     NoLimits,
+    PositiveVolumeLimit,
     VolumeParticipationLimit,
 )
 from .rebalancer import (
@@ -39,6 +40,7 @@ __all__ = [
     # Limits
     "ExecutionLimits",
     "NoLimits",
+    "PositiveVolumeLimit",
     "VolumeParticipationLimit",
     # Impact
     "MarketImpactModel",

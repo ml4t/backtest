@@ -146,9 +146,22 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
         "security",
         "coverage",
         "runtime",
-        "contracts",
+        "public-parity",
         "documentation",
     }
+    parity = jobs["public-parity"]
+    assert {entry["framework"] for entry in parity["strategy"]["matrix"]["include"]} == {
+        "vectorbt_oss",
+        "backtrader",
+        "zipline",
+    }
+    parity_commands = "\n".join(step.get("run", "") for step in parity["steps"])
+    assert "validation/build_framework_env.py" in parity_commands
+    assert "validation/native/vectorbt_behavior.py" in parity_commands
+    assert "validation/native/backtrader_behavior.py" in parity_commands
+    assert "validation/native/zipline_behavior.py" in parity_commands
+    assert "validation/run_all_correctness.py" in parity_commands
+    assert "--extra comparison" not in parity_commands
     build_commands = "\n".join(step.get("run", "") for step in jobs["build"]["steps"])
     assert "git rev-parse HEAD" in build_commands
     assert "validation/release_candidate.py create" in build_commands
@@ -157,7 +170,14 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
         assert f"--gate {gate}=" in build_commands
 
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
-    assert release_jobs["publish"]["needs"] == ["ecosystem-qualification", "qualification"]
+    assert release_jobs["private-comparisons"]["uses"] == (
+        "./.github/workflows/private-comparisons.yml"
+    )
+    assert release_jobs["publish"]["needs"] == [
+        "ecosystem-qualification",
+        "private-comparisons",
+        "qualification",
+    ]
     assert release_jobs["publish"]["permissions"] == {
         "contents": "read",
         "id-token": "write",
@@ -172,3 +192,22 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
     assert release_jobs["verify-pypi"]["needs"] == "publish"
     assert release_jobs["github-release"]["needs"] == "verify-pypi"
     assert "if" not in release_jobs["github-release"]
+
+
+def test_private_comparison_workflow_pins_and_retains_evidence() -> None:
+    workflow = _workflow("private-comparisons.yml")
+    jobs = workflow["jobs"]
+
+    assert workflow["on"]["workflow_call"]["secrets"]["VECTORBT_PRO_DEPLOY_KEY"]["required"]
+    pro_commands = "\n".join(step.get("run", "") for step in jobs["vectorbt-pro"]["steps"])
+    assert "validation/build_framework_env.py" in pro_commands
+    assert "validation/native/vectorbt_behavior.py" in pro_commands
+    assert "validation/run_all_correctness.py" in pro_commands
+    assert "--framework vectorbt_pro" in pro_commands
+    lean_commands = "\n".join(step.get("run", "") for step in jobs["lean"]["steps"])
+    assert "--framework lean" in lean_commands
+    assert "validation/native/lean_behavior.py" in lean_commands
+    assert "validation/run_lean_case_studies.py" in lean_commands
+    assert "lean-native.json" in str(jobs["lean"])
+    assert "lean-case-studies.json" in str(jobs["lean"])
+    assert "run_all_correctness.py" not in lean_commands

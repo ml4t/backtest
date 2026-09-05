@@ -103,7 +103,7 @@ def test_minimum_dependency_matrix_proves_declared_lower_bounds() -> None:
         "pandas>=2.3.3; python_version < '3.15'",
         "numpy>=2.3.2",
         "PyYAML>=6.0.3",
-        "pandas-market-calendars>=5.2.4",
+        "pandas-market-calendars>=5.4.0",
     }
     specs_dependencies = [
         requirement
@@ -122,4 +122,7 @@ def test_merge_and_release_builds_depend_on_compatibility_gate() -> None:
     assert ci_jobs["compatibility"]["uses"] == "./.github/workflows/compatibility.yml"
     assert "compatibility" in ci_jobs["build"]["needs"]
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
-    assert release_jobs["publish"]["needs"] == ["ecosystem-qualification", "qualification"]
+    assert set(release_jobs["publish"]["needs"]) >= {
+        "ecosystem-qualification",
+        "qualification",
+    }

@@ -53,10 +53,7 @@ DEFAULT_PROFILE = {
 BACKTRADER_PROFILE = {
     "account": {
         "allow_short_selling": True,
-        "allow_leverage": True,
-        "initial_margin": 0.5,
-        "long_maintenance_margin": 0.25,
-        "short_maintenance_margin": 0.30,
+        "allow_leverage": False,
         "short_cash_policy": "credit",
     },
     "execution": {
@@ -67,18 +64,20 @@ BACKTRADER_PROFILE = {
         "stop_fill_mode": "stop_price",
         "stop_level_basis": "signal_price",
         "trail_hwm_source": "close",
+        "initial_hwm_source": "signal_price",
         "trail_stop_timing": "lagged",
     },
     "position_sizing": {
         "share_type": "integer",
+        "share_rounding": "truncate",
     },
     "commission": {
-        "model": "percentage",
-        "rate": 0.001,
+        "model": "none",
+        "rate": 0.0,
     },
     "slippage": {
-        "model": "percentage",
-        "rate": 0.001,
+        "model": "none",
+        "rate": 0.0,
     },
     "cash": {
         "initial": 100000.0,
@@ -90,10 +89,10 @@ BACKTRADER_PROFILE = {
         "fill_ordering": "fifo",
         "entry_order_priority": "submission",
         "rebalance_mode": "snapshot",
-        "rebalance_headroom_pct": 0.998,
+        "rebalance_headroom_pct": 1.0,
         "missing_price_policy": "use_last",
-        "late_asset_policy": "require_history",
-        "late_asset_min_bars": 2,
+        "late_asset_policy": "allow",
+        "late_asset_min_bars": 1,
     },
 }
 
@@ -102,6 +101,7 @@ VECTORBT_PROFILE = {
         "allow_short_selling": True,
         "allow_leverage": False,
         "short_cash_policy": "credit",
+        "lock_notional_update_mode": "position_legs",
     },
     "execution": {
         "execution_price": "close",
@@ -134,9 +134,10 @@ VECTORBT_PROFILE = {
         "partial_fills_allowed": True,
         "fill_ordering": "exit_first",
         "entry_order_priority": "submission",
+        "immediate_fill": True,
         "rebalance_mode": "hybrid",
         "rebalance_headroom_pct": 1.0,
-        "missing_price_policy": "use_last",
+        "missing_price_policy": "skip",
         "late_asset_policy": "allow",
         "late_asset_min_bars": 1,
     },
@@ -144,7 +145,7 @@ VECTORBT_PROFILE = {
 
 ZIPLINE_PROFILE = {
     "account": {
-        "allow_short_selling": False,
+        "allow_short_selling": True,
         "allow_leverage": False,
         "short_cash_policy": "credit",
     },
@@ -153,36 +154,37 @@ ZIPLINE_PROFILE = {
         "execution_mode": "next_bar",
     },
     "stops": {
-        "stop_fill_mode": "stop_price",
+        "stop_fill_mode": "next_bar_open",
         "stop_level_basis": "fill_price",
-        "trail_hwm_source": "close",
-        "trail_stop_timing": "lagged",
+        "trail_hwm_source": "bar_extreme",
+        "trail_stop_timing": "intrabar",
     },
     "position_sizing": {
         "share_type": "integer",
     },
     "commission": {
-        "model": "per_share",
+        "model": "none",
         "rate": 0.0,
-        "per_share": 0.005,
-        "minimum": 1.0,
+        "per_share": 0.0,
+        "minimum": 0.0,
     },
     "slippage": {
-        "model": "volume_based",
-        "rate": 0.1,
+        "model": "none",
+        "rate": 0.0,
     },
     "cash": {
         "initial": 100000.0,
         "buffer_pct": 0.0,
     },
     "orders": {
-        "reject_on_insufficient_cash": True,
-        "partial_fills_allowed": True,
-        "fill_ordering": "exit_first",
+        "reject_on_insufficient_cash": False,
+        "skip_cash_validation": True,
+        "partial_fills_allowed": False,
+        "fill_ordering": "fifo",
         "entry_order_priority": "submission",
-        "next_bar_queue_shadow_validation": True,
+        "next_bar_queue_shadow_validation": False,
         "rebalance_mode": "snapshot",
-        "rebalance_headroom_pct": 0.998,
+        "rebalance_headroom_pct": 1.0,
         "missing_price_policy": "use_last",
         "late_asset_policy": "allow",
         "late_asset_min_bars": 1,
@@ -284,8 +286,17 @@ VECTORBT_STRICT_PROFILE = deepcopy(VECTORBT_PROFILE)
 VECTORBT_STRICT_PROFILE["account"]["short_cash_policy"] = "lock_notional"
 VECTORBT_STRICT_PROFILE["orders"]["reject_on_insufficient_cash"] = True
 VECTORBT_STRICT_PROFILE["orders"]["partial_fills_allowed"] = True
-VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "fifo"
-VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
+VECTORBT_STRICT_PROFILE["orders"]["fill_ordering"] = "priority"
+VECTORBT_STRICT_PROFILE["orders"]["entry_order_priority"] = "free_cash_asc"
+VECTORBT_STRICT_PROFILE["orders"]["immediate_fill"] = False
+VECTORBT_STRICT_PROFILE["orders"]["rebalance_mode"] = "snapshot"
+
+VECTORBT_OSS_STRICT_PROFILE = deepcopy(VECTORBT_STRICT_PROFILE)
+VECTORBT_OSS_STRICT_PROFILE["account"]["lock_notional_update_mode"] = "combined_order"
+VECTORBT_OSS_STRICT_PROFILE["orders"]["entry_order_priority"] = "order_value_asc"
+
+VECTORBT_FUTURES_STRICT_PROFILE = deepcopy(VECTORBT_STRICT_PROFILE)
+VECTORBT_FUTURES_STRICT_PROFILE["orders"]["immediate_fill"] = True
 
 BACKTRADER_STRICT_PROFILE = deepcopy(BACKTRADER_PROFILE)
 BACKTRADER_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
@@ -293,18 +304,14 @@ BACKTRADER_STRICT_PROFILE["orders"]["next_bar_submission_precheck"] = True
 BACKTRADER_STRICT_PROFILE["orders"]["next_bar_simple_cash_check"] = True
 
 ZIPLINE_STRICT_PROFILE = deepcopy(ZIPLINE_PROFILE)
-ZIPLINE_STRICT_PROFILE["account"]["allow_short_selling"] = True
-ZIPLINE_STRICT_PROFILE["account"]["short_cash_policy"] = "credit"
-ZIPLINE_STRICT_PROFILE["orders"]["skip_cash_validation"] = True
-ZIPLINE_STRICT_PROFILE["orders"]["entry_order_priority"] = "submission"
 
 LEAN_PROFILE = {
     "account": {
         "allow_short_selling": True,
         "allow_leverage": True,
         "initial_margin": 0.5,
-        "long_maintenance_margin": 0.25,
-        "short_maintenance_margin": 0.30,
+        "long_maintenance_margin": 0.5,
+        "short_maintenance_margin": 0.5,
         "short_cash_policy": "credit",
     },
     "execution": {
@@ -327,8 +334,8 @@ LEAN_PROFILE = {
         "minimum": 1.0,
     },
     "slippage": {
-        "model": "percentage",
-        "rate": 0.001,
+        "model": "none",
+        "rate": 0.0,
     },
     "cash": {
         "initial": 100000.0,
@@ -337,11 +344,13 @@ LEAN_PROFILE = {
     "orders": {
         "reject_on_insufficient_cash": True,
         "partial_fills_allowed": False,
-        "fill_ordering": "exit_first",
+        "fill_ordering": "sequential",
         "entry_order_priority": "submission",
+        "buying_power_reservation": False,
+        "next_bar_submission_precheck": True,
         "next_bar_queue_shadow_validation": True,
         "rebalance_mode": "snapshot",
-        "rebalance_headroom_pct": 1.0,
+        "rebalance_headroom_pct": 0.9975,
         "missing_price_policy": "use_last",
         "late_asset_policy": "allow",
         "late_asset_min_bars": 1,
@@ -402,6 +411,8 @@ _PROFILES = {
     "realistic": REALISTIC_PROFILE,
     "ibkr_us_stocks_fixed": IBKR_US_STOCKS_FIXED_PROFILE,
     "vectorbt_strict": VECTORBT_STRICT_PROFILE,
+    "vectorbt_oss_strict": VECTORBT_OSS_STRICT_PROFILE,
+    "vectorbt_futures_strict": VECTORBT_FUTURES_STRICT_PROFILE,
     "backtrader_strict": BACKTRADER_STRICT_PROFILE,
     "zipline_strict": ZIPLINE_STRICT_PROFILE,
 }
@@ -412,6 +423,7 @@ _ALIASES = {
     "quantconnect": "lean",
     "ibkr:us:stocks:fixed": "ibkr_us_stocks_fixed",
     "vectorbt_compare": "vectorbt_strict",
+    "vectorbt_oss_compare": "vectorbt_oss_strict",
     "backtrader_compare": "backtrader_strict",
     "zipline_compare": "zipline_strict",
     "lean_compare": "lean",

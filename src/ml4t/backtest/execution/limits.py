@@ -60,6 +60,26 @@ class NoLimits(ExecutionLimits):
 
 
 @dataclass
+class PositiveVolumeLimit(ExecutionLimits):
+    """Require positive reported bar volume without limiting order size."""
+
+    def calculate(
+        self,
+        order_quantity: float,
+        bar_volume: float | None,
+        price: float,
+    ) -> ExecutionResult:
+        """Fill the complete order only when the bar reports positive volume."""
+        fillable = order_quantity if bar_volume is not None and bar_volume > 0 else 0.0
+        return ExecutionResult(
+            fillable_quantity=fillable,
+            remaining_quantity=order_quantity - fillable,
+            adjusted_price=price,
+            participation_rate=fillable / bar_volume if bar_volume and fillable else 0.0,
+        )
+
+
+@dataclass
 class VolumeParticipationLimit(ExecutionLimits):
     """Limit order fill to a percentage of bar volume.
 

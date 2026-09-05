@@ -1,0 +1,301 @@
+"""Contracts for complete, current, atomically accepted correctness evidence."""
+
+from __future__ import annotations
+
+import copy
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, cast
+
+import pandas as pd
+import pytest
+
+_VALIDATION_DIR = Path(__file__).parents[2] / "validation"
+if str(_VALIDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(_VALIDATION_DIR))
+
+from common.capabilities import FRAMEWORK_CAPABILITIES, ML4T_CAPABILITIES  # noqa: E402
+from common.comparator import compare_results  # noqa: E402
+from common.correctness_evidence import (  # noqa: E402
+    build_report,
+    correctness_report_failures,
+    promote_candidate,
+)
+from common.framework_registry import load_framework_manifest  # noqa: E402
+from common.provenance import (  # noqa: E402
+    _tree_digest,
+    generate_inputs,
+    input_digest,
+    static_digests,
+)
+from common.types import FrameworkResult, ValidationRecord, ValidationStatus  # noqa: E402
+from scenarios.definitions import SCENARIOS  # noqa: E402
+
+
+def _complete_record(framework: str, scenario_id: str) -> ValidationRecord:
+    manifest = load_framework_manifest()
+    target = manifest.targets[framework]
+    scenario = SCENARIOS[scenario_id]
+    prices, entries, exits = generate_inputs(scenario, framework)
+    extra = {"total_commission": 0.0, "exit_price": 0.0}
+    expected = FrameworkResult(
+        target.display_name,
+        100_000.0,
+        0.0,
+        0,
+        capabilities=FRAMEWORK_CAPABILITIES[framework],
+        extra=extra,
+    )
+    actual = FrameworkResult(
+        "ml4t.backtest",
+        100_000.0,
+        0.0,
+        0,
+        capabilities=ML4T_CAPABILITIES,
+        extra=extra,
+    )
+    comparison = compare_results(scenario, expected, actual)
+    provenance = {
+        "framework_target": {
+            "version": target.version,
+            "actual_version": target.version,
+            "immutable_id": target.immutable_id,
+        },
+        "ml4t": {"commit": "a" * 40, "dirty": False},
+        "python": {"version": "3.12.11", "implementation": "cpython"},
+        "adapter": {
+            "module": f"frameworks.{framework}",
+            "path": f"validation/frameworks/{framework}.py",
+        },
+        "digests": static_digests(scenario, framework),
+        "input_digest": input_digest(prices, entries, exits),
+        "capabilities": {
+            "framework": FRAMEWORK_CAPABILITIES[framework],
+            "ml4t": ML4T_CAPABILITIES,
+        },
+        "record_counts": {
+            "bars": len(prices),
+            "entry_signals": int(entries.sum()),
+            "exit_signals": int(exits.sum()) if exits is not None else 0,
+            "framework_intents": int(entries.sum())
+            + (int(exits.sum()) if exits is not None else 0),
+            "ml4t_intents": int(entries.sum()) + (int(exits.sum()) if exits is not None else 0),
+            "framework_orders": None,
+            "ml4t_orders": None,
+            "framework_fills": 0,
+            "ml4t_fills": 0,
+            "framework_closed_trades": 0,
+            "ml4t_closed_trades": 0,
+        },
+    }
+    return ValidationRecord(
+        framework=framework,
+        scenario_id=scenario_id,
+        scenario_name=scenario.name,
+        status=ValidationStatus.PASS,
+        required=True,
+        duration_seconds=0.01,
+        provenance=provenance,
+        framework_result=expected,
+        ml4t_result=actual,
+        comparison=comparison,
+    )
+
+
+def _full_report() -> dict[str, object]:
+    manifest = load_framework_manifest()
+    records: list[ValidationRecord] = []
+    for framework in manifest.scenario_framework_ids:
+        for scenario_id, scenario in SCENARIOS.items():
+            if framework in scenario.supported_frameworks:
+                records.append(_complete_record(framework, scenario_id))
+            else:
+                records.append(
+                    ValidationRecord(
+                        framework=framework,
+                        scenario_id=scenario_id,
+                        scenario_name=scenario.name,
+                        status=ValidationStatus.UNSUPPORTED,
+                        required=False,
+                        detail="Scenario explicitly excludes this framework",
+                        duration_seconds=0.001,
+                    )
+                )
+    return build_report(records)
+
+
+def _first_required_record(report: dict[str, object]) -> dict[str, Any]:
+    records = cast(list[dict[str, Any]], report["records"])
+    return next(record for record in records if record["required"])
+
+
+def test_complete_record_retains_outputs_checks_runtime_and_provenance() -> None:
+    payload = _complete_record("backtrader", "01").to_dict()
+
+    assert payload["duration_seconds"] > 0
+    assert payload["framework_result"]["final_value"] == 100_000.0
+    assert payload["ml4t_result"]["final_value"] == 100_000.0
+    assert payload["provenance"]["input_digest"]
+    assert payload["provenance"]["digests"]["adapter"]
+    checks = payload["comparison"]["checks"]
+    assert checks
+    assert {check["canonical_quantum"] for check in checks} == {"1", "0.00000001"}
+    assert all(
+        {"name", "canonical_quantum", "expected", "actual", "difference", "message"} <= check.keys()
+        for check in checks
+    )
+
+
+def test_input_digest_uses_values_not_pandas_index_metadata() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    assert exits is not None
+    expected = input_digest(prices, entries, exits)
+
+    same_values = prices.copy()
+    same_values.index = pd.DatetimeIndex(same_values.index.to_numpy())
+    assert same_values.index.freq is None
+    assert input_digest(same_values, entries.copy(), exits.copy()) == expected
+
+    changed_values = prices.copy()
+    changed_values.iloc[0, 0] += 0.01
+    assert input_digest(changed_values, entries, exits) != expected
+
+
+def test_input_digest_uses_the_parity_quantum_for_floating_values() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    prices.iloc[0, 0] = 100.0
+    expected = input_digest(prices, entries, exits)
+
+    platform_noise = prices.copy()
+    platform_noise.iloc[0, 0] += 0.0000000001
+    assert input_digest(platform_noise, entries, exits) == expected
+
+    material_change = prices.copy()
+    material_change.iloc[0, 0] += 0.00000001
+    assert input_digest(material_change, entries, exits) != expected
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_input_digest_rejects_nonfinite_prices(value: float) -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    prices.iloc[0, 0] = value
+
+    with pytest.raises(ValueError, match="must contain finite values"):
+        input_digest(prices, entries, exits)
+
+
+def test_input_digest_supports_large_finite_prices() -> None:
+    scenario = SCENARIOS["01"]
+    prices, entries, exits = generate_inputs(scenario, "backtrader")
+    prices.iloc[0, 0] = 1e25
+
+    assert len(input_digest(prices, entries, exits)) == 64
+
+
+def test_complete_current_matrix_is_acceptable() -> None:
+    assert correctness_report_failures(_full_report()) == []
+
+
+def test_input_policy_mutation_fails_closed() -> None:
+    report = _full_report()
+    report["input_policy"] = {"float_quantum": "0.01"}
+
+    assert "Correctness input policy differs" in correctness_report_failures(report)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_failure"),
+    [
+        ("version", "framework target identity"),
+        ("input", "generated-input digest"),
+        ("adapter", "adapter digest"),
+        ("profile", "profile digest"),
+        ("comparator", "comparator digest"),
+        ("capability", "capability declaration differs"),
+        ("expected", "comparison checks differ"),
+        ("actual", "comparison checks differ"),
+        ("missing", "comparison evidence must be complete"),
+    ],
+)
+def test_evidence_mutations_fail_closed(mutation: str, expected_failure: str) -> None:
+    report = copy.deepcopy(_full_report())
+    record = _first_required_record(report)
+    if mutation == "version":
+        record["provenance"]["framework_target"]["actual_version"] = "0.0.0"
+    elif mutation == "input":
+        record["provenance"]["input_digest"] = "0" * 64
+    elif mutation in {"adapter", "profile", "comparator"}:
+        record["provenance"]["digests"][mutation] = "0" * 64
+    elif mutation == "capability":
+        record["provenance"]["capabilities"]["framework"]["fills"] = "unavailable"
+    elif mutation in {"expected", "actual"}:
+        record["comparison"]["checks"][0][mutation] = 12345
+    else:
+        record.pop("comparison")
+
+    failures = correctness_report_failures(report)
+
+    assert any(expected_failure in failure for failure in failures)
+
+
+def test_source_commit_change_without_behavior_change_is_not_stale() -> None:
+    report = _full_report()
+    for record in cast(list[dict[str, Any]], report["records"]):
+        if record["provenance"] is not None:
+            record["provenance"]["ml4t"]["commit"] = "b" * 40
+
+    assert correctness_report_failures(report) == []
+
+
+def test_tree_digest_excludes_untracked_generated_python(tmp_path: Path) -> None:
+    source = tmp_path / "src" / "package"
+    source.mkdir(parents=True)
+    (source / "engine.py").write_text("VALUE = 1\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "src/package/engine.py"], cwd=tmp_path, check=True)
+
+    _tree_digest.cache_clear()
+    expected = _tree_digest(source)
+    (source / "_version.py").write_text("VERSION = 'generated'\n", encoding="utf-8")
+    _tree_digest.cache_clear()
+
+    assert _tree_digest(source) == expected
+
+
+def test_dirty_source_is_not_acceptable() -> None:
+    report = _full_report()
+    _first_required_record(report)["provenance"]["ml4t"]["dirty"] = True
+
+    assert any("dirty ML4T tree" in failure for failure in correctness_report_failures(report))
+
+
+def test_failed_candidate_does_not_replace_accepted_evidence(tmp_path: Path) -> None:
+    report = _full_report()
+    report["release_gate_passed"] = False
+    candidate = tmp_path / "candidate.json"
+    accepted = tmp_path / "accepted.json"
+    candidate.write_text(json.dumps(report), encoding="utf-8")
+    accepted.write_bytes(b"accepted-before\n")
+
+    failures = promote_candidate(candidate, accepted)
+
+    assert failures
+    assert accepted.read_bytes() == b"accepted-before\n"
+    assert candidate.is_file()
+
+
+def test_valid_candidate_atomically_replaces_accepted_evidence(tmp_path: Path) -> None:
+    report = _full_report()
+    candidate = tmp_path / "candidate.json"
+    accepted = tmp_path / "accepted.json"
+    candidate.write_text(json.dumps(report, sort_keys=True), encoding="utf-8")
+    accepted.write_bytes(b"accepted-before\n")
+
+    assert promote_candidate(candidate, accepted) == []
+    assert accepted.read_bytes() == candidate.read_bytes()
+    assert candidate.is_file()

@@ -9,7 +9,11 @@ from ml4t.backtest import (
     Broker,
     OrderSide,
 )
-from ml4t.backtest.config import ExecutionPrice, RebalanceMode
+from ml4t.backtest.config import (
+    ExecutionPrice,
+    RebalanceMode,
+    ShareRounding,
+)
 from ml4t.backtest.execution.rebalancer import RebalanceConfig, TargetWeightExecutor
 from ml4t.backtest.execution.schedule import RebalanceSchedule, resolve_rebalance_timestamps
 from ml4t.backtest.models import NoCommission, NoSlippage
@@ -265,6 +269,19 @@ class TestTargetWeightExecutorShareHandling:
         assert len(orders) == 1
         # Should be approximately 66.67
         assert 66.6 < orders[0].quantity < 66.7
+
+    def test_truncation_matches_target_percent_brokers(self, broker, sample_data):
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(
+                allow_fractional=False,
+                share_rounding=ShareRounding.TRUNCATE,
+            )
+        )
+
+        orders = executor.execute({"AAPL": 0.1}, sample_data, broker)
+
+        assert len(orders) == 1
+        assert orders[0].quantity == 66
 
     def test_lot_rounding(self, broker, sample_data):
         """Test rounding to lot sizes."""

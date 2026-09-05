@@ -184,15 +184,25 @@ def load_lean_artifacts(
 
 
 def resolve_lean_command() -> list[str]:
-    """Resolve the local LEAN CLI command."""
+    """Resolve a preinstalled LEAN CLI command without installing an unpinned version."""
+    configured = os.getenv("ML4T_LEAN_COMMAND")
+    if configured:
+        return [configured]
+
+    locked_binary = (
+        Path.cwd() / ".venv-lean" / ("Scripts/lean.exe" if os.name == "nt" else "bin/lean")
+    )
+    if locked_binary.is_file():
+        return [str(locked_binary)]
+
     lean_binary = shutil.which("lean")
     if lean_binary is not None:
         return [lean_binary]
 
-    uvx_binary = shutil.which("uvx")
-    if uvx_binary is None:
-        raise FileNotFoundError("Neither 'lean' nor 'uvx' executable found.")
-    return [uvx_binary, "--python", "3.12", "--with", "setuptools<81", "lean"]
+    raise FileNotFoundError(
+        "LEAN CLI not found; build the frozen environment with "
+        "validation/build_framework_env.py --framework lean"
+    )
 
 
 def make_lean_env() -> dict[str, str]:
@@ -308,10 +318,13 @@ def run_lean_backtest(
     project_dir: Path,
     lean_config: Path,
     output_dir: Path,
+    image: str,
     timeout: int = 1800,
     env: dict[str, str] | None = None,
 ) -> float:
-    """Run a LEAN backtest and return the runtime in seconds."""
+    """Run a LEAN backtest with an immutable engine image and return its runtime."""
+    if "@sha256:" not in image:
+        raise ValueError(f"LEAN image must use an immutable digest: {image}")
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
@@ -320,6 +333,8 @@ def run_lean_backtest(
         str(project_dir),
         "--lean-config",
         str(lean_config),
+        "--image",
+        image,
         "--no-update",
         "--output",
         str(output_dir),

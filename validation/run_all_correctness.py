@@ -14,61 +14,37 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 
 VALIDATION_DIR = Path(__file__).parent
 PROJECT_ROOT = VALIDATION_DIR.parent
 sys.path.insert(0, str(VALIDATION_DIR))
 
+from common.correctness_evidence import (  # noqa: E402, I001
+    build_report,
+    promote_candidate,
+    write_candidate,
+)
+from common.framework_registry import load_framework_manifest  # noqa: E402
 from common.types import ValidationRecord, ValidationStatus  # noqa: E402, I001
 from scenarios.definitions import SCENARIOS  # noqa: E402
 
+FRAMEWORK_MANIFEST = load_framework_manifest()
 FRAMEWORK_ENVIRONMENTS = {
-    "vectorbt_pro": ".venv-vectorbt-pro",
-    "vectorbt_oss": ".venv",
-    "backtrader": ".venv-backtrader",
-    "zipline": ".venv-zipline",
+    framework_id: target.environment
+    for framework_id, target in FRAMEWORK_MANIFEST.targets.items()
+    if target.scenario_matrix and target.environment is not None
 }
-
 FRAMEWORK_PYTHON_ENV_VARS = {
-    "vectorbt_pro": "ML4T_VECTORBT_PRO_PYTHON",
-    "vectorbt_oss": "ML4T_VECTORBT_OSS_PYTHON",
-    "backtrader": "ML4T_BACKTRADER_PYTHON",
-    "zipline": "ML4T_ZIPLINE_PYTHON",
+    framework_id: target.python_env_var
+    for framework_id, target in FRAMEWORK_MANIFEST.targets.items()
+    if target.scenario_matrix and target.python_env_var is not None
 }
-
 FRAMEWORK_PINS = {
-    "vectorbt_pro": {
-        "display_name": "VectorBT Pro",
-        "profile": "vectorbt_strict",
-        "package": "vectorbtpro",
-        "version": "2025.12.31",
-        "source": "https://github.com/polakowo/vectorbt.pro",
-        "commit": "1305a1e1974325db9382eaeacc6452e9b075ca71",
-    },
-    "vectorbt_oss": {
-        "display_name": "VectorBT OSS",
-        "profile": "vectorbt",
-        "package": "vectorbt",
-        "version": "0.28.2",
-        "source": "https://pypi.org/project/vectorbt/0.28.2/",
-    },
-    "backtrader": {
-        "display_name": "Backtrader",
-        "profile": "backtrader_strict",
-        "package": "backtrader",
-        "version": "1.9.78.123",
-        "source": "https://pypi.org/project/backtrader/1.9.78.123/",
-    },
-    "zipline": {
-        "display_name": "Zipline Reloaded",
-        "profile": "zipline_strict",
-        "package": "zipline-reloaded",
-        "version": "3.1.1",
-        "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
-    },
+    framework_id: FRAMEWORK_MANIFEST.targets[framework_id].evidence_metadata()
+    for framework_id in FRAMEWORK_MANIFEST.scenario_framework_ids
 }
 
 
@@ -79,6 +55,7 @@ def _record(
     *,
     required: bool = True,
     detail: str | None = None,
+    started_at: float | None = None,
 ) -> ValidationRecord:
     scenario = SCENARIOS.get(scenario_id)
     return ValidationRecord(
@@ -88,6 +65,7 @@ def _record(
         status=status,
         required=required,
         detail=detail,
+        duration_seconds=time.perf_counter() - started_at if started_at is not None else None,
     )
 
 
@@ -117,6 +95,7 @@ def run_isolated(
     timeout: int = 180,
 ) -> ValidationRecord:
     """Run one pair in its framework environment and retain its exact terminal status."""
+    started_at = time.perf_counter()
     scenario = SCENARIOS.get(scenario_id)
     if scenario is None:
         return _record(
@@ -124,6 +103,7 @@ def run_isolated(
             scenario_id,
             ValidationStatus.MISSING_SCENARIO,
             detail=f"Scenario {scenario_id} is not defined",
+            started_at=started_at,
         )
     if framework not in scenario.supported_frameworks:
         return _record(
@@ -132,6 +112,7 @@ def run_isolated(
             ValidationStatus.UNSUPPORTED,
             required=False,
             detail="Scenario explicitly excludes this framework",
+            started_at=started_at,
         )
 
     interpreter = python_path or resolve_python(framework)
@@ -141,6 +122,7 @@ def run_isolated(
             scenario_id,
             ValidationStatus.UNAVAILABLE,
             detail=f"Framework interpreter not found: {interpreter}",
+            started_at=started_at,
         )
 
     with tempfile.TemporaryDirectory(prefix="ml4t-validation-") as temporary_directory:
@@ -170,6 +152,7 @@ def run_isolated(
                 scenario_id,
                 ValidationStatus.TIMEOUT,
                 detail=f"Validation subprocess timed out after {timeout} seconds",
+                started_at=started_at,
             )
         except OSError as error:
             return _record(
@@ -177,6 +160,7 @@ def run_isolated(
                 scenario_id,
                 ValidationStatus.SUBPROCESS_FAILURE,
                 detail=f"Could not execute validation subprocess: {error}",
+                started_at=started_at,
             )
 
         if not result_path.is_file():
@@ -185,6 +169,7 @@ def run_isolated(
                 scenario_id,
                 ValidationStatus.SUBPROCESS_FAILURE,
                 detail=_process_detail(result),
+                started_at=started_at,
             )
 
         try:
@@ -198,6 +183,7 @@ def run_isolated(
                 scenario_id,
                 ValidationStatus.MALFORMED_OUTPUT,
                 detail=f"Invalid validation record: {error}",
+                started_at=started_at,
             )
 
         if record.framework != framework or record.scenario_id != scenario_id:
@@ -209,6 +195,7 @@ def run_isolated(
                     "Validation record identity mismatch: "
                     f"received {record.framework}/{record.scenario_id}"
                 ),
+                started_at=started_at,
             )
         expected_returncode = 1 if record.release_blocking else 0
         if result.returncode != expected_returncode:
@@ -220,6 +207,7 @@ def run_isolated(
                     f"Record status {record.status.value} conflicts with subprocess "
                     f"exit code {result.returncode}"
                 ),
+                started_at=started_at,
             )
         return record
 
@@ -255,16 +243,49 @@ def release_gate_passed(records: list[ValidationRecord]) -> bool:
     return bool(required_records) and all(record.passed for record in required_records)
 
 
+def matrix_coverage_failures(
+    records: list[ValidationRecord],
+    frameworks: list[str],
+    scenarios: list[str],
+) -> list[str]:
+    """Reject omitted, duplicate, or misclassified framework/scenario pairs."""
+    failures: list[str] = []
+    expected_pairs = {(framework, scenario) for framework in frameworks for scenario in scenarios}
+    actual_pairs = [(record.framework, record.scenario_id) for record in records]
+    duplicate_pairs = sorted(pair for pair, count in Counter(actual_pairs).items() if count > 1)
+    missing_pairs = sorted(expected_pairs - set(actual_pairs))
+    unexpected_pairs = sorted(set(actual_pairs) - expected_pairs)
+    if duplicate_pairs:
+        failures.append(f"Duplicate matrix pairs: {duplicate_pairs}")
+    if missing_pairs:
+        failures.append(f"Missing matrix pairs: {missing_pairs}")
+    if unexpected_pairs:
+        failures.append(f"Unexpected matrix pairs: {unexpected_pairs}")
+
+    if scenarios == list(SCENARIOS):
+        for framework in frameworks:
+            target = FRAMEWORK_MANIFEST.targets[framework]
+            framework_records = [record for record in records if record.framework == framework]
+            required_count = sum(record.required for record in framework_records)
+            unsupported_count = sum(
+                record.status is ValidationStatus.UNSUPPORTED for record in framework_records
+            )
+            if required_count != target.required_scenarios:
+                failures.append(
+                    f"{framework} required count differs: "
+                    f"{required_count} != {target.required_scenarios}"
+                )
+            if unsupported_count != target.unsupported_scenarios:
+                failures.append(
+                    f"{framework} unsupported count differs: "
+                    f"{unsupported_count} != {target.unsupported_scenarios}"
+                )
+    return failures
+
+
 def write_report(path: Path, records: list[ValidationRecord]) -> None:
     """Retain the complete machine-readable release-gate result."""
-    payload = {
-        "schema_version": 1,
-        "generated_at": datetime.now(UTC).isoformat(),
-        "frameworks": FRAMEWORK_PINS,
-        "release_gate_passed": release_gate_passed(records),
-        "summary": summarize(records),
-        "records": [record.to_dict() for record in records],
-    }
+    payload = build_report(records, manifest=FRAMEWORK_MANIFEST)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -283,8 +304,14 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
+        default=VALIDATION_DIR / "candidates" / "CORRECTNESS_RESULTS.candidate.json",
+        help="Diagnostic candidate path",
+    )
+    parser.add_argument(
+        "--accepted-output",
+        type=Path,
         default=VALIDATION_DIR / "CORRECTNESS_RESULTS.json",
-        help="Machine-readable result path",
+        help="Accepted evidence path, replaced only by a complete passing matrix",
     )
     parser.add_argument("--timeout", type=int, default=180, help="Per-scenario timeout in seconds")
     args = parser.parse_args()
@@ -292,11 +319,32 @@ def main() -> int:
     frameworks = [args.framework] if args.framework else None
     scenarios = args.scenarios.split(",") if args.scenarios else None
     records = run_all_validations(frameworks, scenarios, timeout=args.timeout)
-    write_report(args.output, records)
+    write_candidate(args.output, records)
 
     nonzero = [f"{status}={count}" for status, count in summarize(records).items() if count]
     print(f"Results: {', '.join(nonzero)}")
-    print(f"Report: {args.output}")
+    print(f"Candidate: {args.output}")
+    selected_frameworks = frameworks or list(FRAMEWORK_MANIFEST.scenario_framework_ids)
+    selected_scenarios = scenarios or list(SCENARIOS)
+    coverage_failures = matrix_coverage_failures(
+        records,
+        selected_frameworks,
+        selected_scenarios,
+    )
+    if coverage_failures:
+        print("Matrix coverage failed:")
+        for failure in coverage_failures:
+            print(f"- {failure}")
+        return 1
+    full_matrix = frameworks is None and scenarios is None
+    if full_matrix:
+        promotion_failures = promote_candidate(args.output, args.accepted_output)
+        if promotion_failures:
+            print("Accepted evidence unchanged:")
+            for failure in promotion_failures:
+                print(f"- {failure}")
+            return 1
+        print(f"Accepted evidence: {args.accepted_output}")
     return 0 if release_gate_passed(records) else 1
 
 

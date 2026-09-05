@@ -171,13 +171,13 @@ result = run_backtest(prices, strategy, config=config)
 Match the exact behavior of another backtesting framework:
 
 ```python
-# Backtrader-compatible: next-bar execution, integer shares, margin account
+# Backtrader-compatible: next-bar execution, integer shares, default cash checks
 result = run_backtest(prices, strategy, config="backtrader")
 
 # VectorBT-compatible: same-bar execution, fractional shares, no costs
 result = run_backtest(prices, strategy, config="vectorbt")
 
-# Zipline-compatible: next-bar execution, per-share commission
+# Zipline comparison protocol: next-bar open execution, no default costs
 result = run_backtest(prices, strategy, config="zipline")
 
 # Conservative production settings

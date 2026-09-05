@@ -112,6 +112,7 @@ def test_isolated_timeout_is_retained(
 
     assert record.status is ValidationStatus.TIMEOUT
     assert "7" in (record.detail or "")
+    assert record.duration_seconds is not None
 
 
 def test_isolated_subprocess_failure_without_record_is_retained(
@@ -194,7 +195,7 @@ def test_release_gate_fails_for_every_non_optional_nonpass_status() -> None:
     assert run_all_correctness.release_gate_passed(records[:1]) is False
 
 
-def test_unavailable_vectorbt_pro_matrix_cannot_report_sixteen_passes(
+def test_unavailable_vectorbt_pro_matrix_cannot_report_all_passes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def unavailable(framework: str, scenario_id: str, **_kwargs) -> ValidationRecord:
@@ -211,9 +212,9 @@ def test_unavailable_vectorbt_pro_matrix_cannot_report_sixteen_passes(
     records = run_all_correctness.run_all_validations(frameworks=["vectorbt_pro"])
     summary = run_all_correctness.summarize(records)
 
-    assert len(records) == 16
+    assert len(records) == 17
     assert summary["pass"] == 0
-    assert summary["unavailable"] == 16
+    assert summary["unavailable"] == 17
     assert run_all_correctness.release_gate_passed(records) is False
 
 
@@ -239,4 +240,69 @@ def test_report_retains_framework_pins(tmp_path: Path) -> None:
     run_all_correctness.write_report(report_path, records)
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["schema_version"] == 4
     assert report["frameworks"] == run_all_correctness.FRAMEWORK_PINS
+
+
+def _matrix_records(framework: str) -> list[ValidationRecord]:
+    return [
+        ValidationRecord(
+            framework,
+            scenario_id,
+            scenario.name,
+            (
+                ValidationStatus.PASS
+                if framework in scenario.supported_frameworks
+                else ValidationStatus.UNSUPPORTED
+            ),
+            framework in scenario.supported_frameworks,
+        )
+        for scenario_id, scenario in run_all_correctness.SCENARIOS.items()
+    ]
+
+
+def test_complete_public_matrices_match_declared_counts() -> None:
+    frameworks = ["vectorbt_oss", "backtrader", "zipline"]
+    records = [record for framework in frameworks for record in _matrix_records(framework)]
+
+    failures = run_all_correctness.matrix_coverage_failures(
+        records,
+        frameworks,
+        list(run_all_correctness.SCENARIOS),
+    )
+
+    assert failures == []
+
+
+def test_matrix_coverage_rejects_an_omitted_pair() -> None:
+    records = _matrix_records("backtrader")[:-1]
+
+    failures = run_all_correctness.matrix_coverage_failures(
+        records,
+        ["backtrader"],
+        list(run_all_correctness.SCENARIOS),
+    )
+
+    assert any("Missing matrix pairs" in failure for failure in failures)
+    assert any("required count differs" in failure for failure in failures)
+
+
+def test_matrix_coverage_rejects_a_misclassified_pair() -> None:
+    records = _matrix_records("vectorbt_oss")
+    unsupported = next(record for record in records if not record.required)
+    records[records.index(unsupported)] = ValidationRecord(
+        unsupported.framework,
+        unsupported.scenario_id,
+        unsupported.scenario_name,
+        ValidationStatus.PASS,
+        True,
+    )
+
+    failures = run_all_correctness.matrix_coverage_failures(
+        records,
+        ["vectorbt_oss"],
+        list(run_all_correctness.SCENARIOS),
+    )
+
+    assert any("required count differs" in failure for failure in failures)
+    assert any("unsupported count differs" in failure for failure in failures)

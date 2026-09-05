@@ -83,7 +83,7 @@ def test_ci_checks_every_release_validation_script() -> None:
         )
     }
     excluded_validation_scripts = {
-        # Legacy benchmark entry points run only in their named framework environments.
+        # Compatibility benchmark entry points route to the checked retained harness.
         "validation/backtrader/benchmark_performance.py",
         "validation/backtrader/scale_validation.py",
         "validation/vectorbt_pro/benchmark_performance.py",
@@ -93,7 +93,8 @@ def test_ci_checks_every_release_validation_script() -> None:
         "validation/lean/workspace/chapter16_etfs/main.py",
         "validation/lean/workspace/chapter16_sp500_equity_option_analytics/main.py",
         "validation/lean/workspace/chapter16_us_equities_panel/main.py",
-        # Legacy manual orchestrators require optional framework environments.
+        "validation/native/lean_project/main.py",
+        # Manual orchestrators require optional framework environments.
         "validation/benchmark_suite.py",
         "validation/run_all_benchmarks.py",
         "validation/run_full_validation.py",
@@ -103,6 +104,9 @@ def test_ci_checks_every_release_validation_script() -> None:
         "validation/frameworks/vectorbt_oss.py",
         "validation/frameworks/vectorbt_pro.py",
         "validation/frameworks/zipline.py",
+        "validation/real_strategy_backtrader.py",
+        "validation/real_strategy_vectorbt.py",
+        "validation/real_strategy_zipline.py",
     }
     candidate_files = subprocess.run(
         [

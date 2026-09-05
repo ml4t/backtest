@@ -72,6 +72,15 @@
         "name": "short_cash_policy"
       },
       {
+        "annotation": "LockNotionalUpdateMode",
+        "default": {
+          "enum": "ml4t.backtest.config.LockNotionalUpdateMode.POSITION_LEGS",
+          "value": "position_legs"
+        },
+        "keyword_only": false,
+        "name": "lock_notional_update_mode"
+      },
+      {
         "annotation": "ExecutionPrice",
         "default": {
           "enum": "ml4t.backtest.config.ExecutionPrice.OPEN",
@@ -157,6 +166,15 @@
         },
         "keyword_only": false,
         "name": "share_type"
+      },
+      {
+        "annotation": "ShareRounding",
+        "default": {
+          "enum": "ml4t.backtest.config.ShareRounding.NEAREST",
+          "value": "nearest"
+        },
+        "keyword_only": false,
+        "name": "share_rounding"
       },
       {
         "annotation": "CommissionType",
@@ -458,6 +476,7 @@
         "allow_short_selling": false,
         "fixed_margin_schedule": null,
         "initial_margin": 0.5,
+        "lock_notional_update_mode": "position_legs",
         "long_maintenance_margin": 0.25,
         "margin_pct_schedule": null,
         "short_cash_policy": "credit",
@@ -526,6 +545,7 @@
         "skip_cash_validation": false
       },
       "position_sizing": {
+        "share_rounding": "nearest",
         "share_type": "integer"
       },
       "result": {
@@ -696,6 +716,14 @@
       {
         "name": "NOTIONAL_ASC",
         "value": "notional_asc"
+      },
+      {
+        "name": "FREE_CASH_ASC",
+        "value": "free_cash_asc"
+      },
+      {
+        "name": "ORDER_VALUE_ASC",
+        "value": "order_value_asc"
       }
     ],
     "ml4t.backtest.config.ExecutionPrice": [
@@ -748,12 +776,20 @@
       {
         "name": "SEQUENTIAL",
         "value": "sequential"
+      },
+      {
+        "name": "PRIORITY",
+        "value": "priority"
       }
     ],
     "ml4t.backtest.config.InitialHwmSource": [
       {
         "name": "FILL_PRICE",
         "value": "fill_price"
+      },
+      {
+        "name": "SIGNAL_PRICE",
+        "value": "signal_price"
       },
       {
         "name": "BAR_CLOSE",
@@ -772,6 +808,16 @@
       {
         "name": "REQUIRE_HISTORY",
         "value": "require_history"
+      }
+    ],
+    "ml4t.backtest.config.LockNotionalUpdateMode": [
+      {
+        "name": "POSITION_LEGS",
+        "value": "position_legs"
+      },
+      {
+        "name": "COMBINED_ORDER",
+        "value": "combined_order"
       }
     ],
     "ml4t.backtest.config.MissingPricePolicy": [
@@ -796,6 +842,16 @@
       {
         "name": "HYBRID",
         "value": "hybrid"
+      }
+    ],
+    "ml4t.backtest.config.ShareRounding": [
+      {
+        "name": "NEAREST",
+        "value": "nearest"
+      },
+      {
+        "name": "TRUNCATE",
+        "value": "truncate"
       }
     ],
     "ml4t.backtest.config.ShareType": [
@@ -1195,26 +1251,24 @@
       "quantconnect": "lean",
       "vectorbt_compare": "vectorbt_strict",
       "vectorbt_oss": "vectorbt",
+      "vectorbt_oss_compare": "vectorbt_oss_strict",
       "vectorbt_pro": "vectorbt",
       "zipline_compare": "zipline_strict"
     },
     "canonical": {
       "backtrader": {
         "account": {
-          "allow_leverage": true,
+          "allow_leverage": false,
           "allow_short_selling": true,
-          "initial_margin": 0.5,
-          "long_maintenance_margin": 0.25,
-          "short_cash_policy": "credit",
-          "short_maintenance_margin": 0.3
+          "short_cash_policy": "credit"
         },
         "cash": {
           "buffer_pct": 0.0,
           "initial": 100000.0
         },
         "commission": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "execution": {
           "execution_mode": "next_bar",
@@ -1223,22 +1277,24 @@
         "orders": {
           "entry_order_priority": "submission",
           "fill_ordering": "fifo",
-          "late_asset_min_bars": 2,
-          "late_asset_policy": "require_history",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "partial_fills_allowed": false,
-          "rebalance_headroom_pct": 0.998,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
         "position_sizing": {
+          "share_rounding": "truncate",
           "share_type": "integer"
         },
         "slippage": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
+          "initial_hwm_source": "signal_price",
           "stop_fill_mode": "stop_price",
           "stop_level_basis": "signal_price",
           "trail_hwm_source": "close",
@@ -1247,20 +1303,17 @@
       },
       "backtrader_strict": {
         "account": {
-          "allow_leverage": true,
+          "allow_leverage": false,
           "allow_short_selling": true,
-          "initial_margin": 0.5,
-          "long_maintenance_margin": 0.25,
-          "short_cash_policy": "credit",
-          "short_maintenance_margin": 0.3
+          "short_cash_policy": "credit"
         },
         "cash": {
           "buffer_pct": 0.0,
           "initial": 100000.0
         },
         "commission": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "execution": {
           "execution_mode": "next_bar",
@@ -1269,24 +1322,26 @@
         "orders": {
           "entry_order_priority": "submission",
           "fill_ordering": "fifo",
-          "late_asset_min_bars": 2,
-          "late_asset_policy": "require_history",
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "next_bar_simple_cash_check": true,
           "next_bar_submission_precheck": true,
           "partial_fills_allowed": false,
-          "rebalance_headroom_pct": 0.998,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
         "position_sizing": {
+          "share_rounding": "truncate",
           "share_type": "integer"
         },
         "slippage": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
+          "initial_hwm_source": "signal_price",
           "stop_fill_mode": "stop_price",
           "stop_level_basis": "signal_price",
           "trail_hwm_source": "close",
@@ -1431,9 +1486,9 @@
           "allow_leverage": true,
           "allow_short_selling": true,
           "initial_margin": 0.5,
-          "long_maintenance_margin": 0.25,
+          "long_maintenance_margin": 0.5,
           "short_cash_policy": "credit",
-          "short_maintenance_margin": 0.3
+          "short_maintenance_margin": 0.5
         },
         "cash": {
           "buffer_pct": 0.0,
@@ -1450,14 +1505,16 @@
           "execution_price": "open"
         },
         "orders": {
+          "buying_power_reservation": false,
           "entry_order_priority": "submission",
-          "fill_ordering": "exit_first",
+          "fill_ordering": "sequential",
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
           "next_bar_queue_shadow_validation": true,
+          "next_bar_submission_precheck": true,
           "partial_fills_allowed": false,
-          "rebalance_headroom_pct": 1.0,
+          "rebalance_headroom_pct": 0.9975,
           "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
@@ -1465,8 +1522,8 @@
           "share_type": "integer"
         },
         "slippage": {
-          "model": "percentage",
-          "rate": 0.001
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
           "stop_fill_mode": "stop_price",
@@ -1523,6 +1580,7 @@
         "account": {
           "allow_leverage": false,
           "allow_short_selling": true,
+          "lock_notional_update_mode": "position_legs",
           "short_cash_policy": "credit"
         },
         "cash": {
@@ -1540,9 +1598,10 @@
         "orders": {
           "entry_order_priority": "submission",
           "fill_ordering": "exit_first",
+          "immediate_fill": true,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
-          "missing_price_policy": "use_last",
+          "missing_price_policy": "skip",
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "hybrid",
@@ -1563,10 +1622,11 @@
           "trail_stop_timing": "intrabar"
         }
       },
-      "vectorbt_strict": {
+      "vectorbt_futures_strict": {
         "account": {
           "allow_leverage": false,
           "allow_short_selling": true,
+          "lock_notional_update_mode": "position_legs",
           "short_cash_policy": "lock_notional"
         },
         "cash": {
@@ -1582,14 +1642,107 @@
           "execution_price": "close"
         },
         "orders": {
-          "entry_order_priority": "submission",
-          "fill_ordering": "fifo",
+          "entry_order_priority": "free_cash_asc",
+          "fill_ordering": "priority",
+          "immediate_fill": true,
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
-          "missing_price_policy": "use_last",
+          "missing_price_policy": "skip",
           "partial_fills_allowed": true,
           "rebalance_headroom_pct": 1.0,
-          "rebalance_mode": "hybrid",
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "fractional"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "initial_hwm_source": "bar_high",
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
+        }
+      },
+      "vectorbt_oss_strict": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "lock_notional_update_mode": "combined_order",
+          "short_cash_policy": "lock_notional"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "same_bar",
+          "execution_price": "close"
+        },
+        "orders": {
+          "entry_order_priority": "order_value_asc",
+          "fill_ordering": "priority",
+          "immediate_fill": false,
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "snapshot",
+          "reject_on_insufficient_cash": true
+        },
+        "position_sizing": {
+          "share_type": "fractional"
+        },
+        "slippage": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "stops": {
+          "initial_hwm_source": "bar_high",
+          "stop_fill_mode": "stop_price",
+          "stop_level_basis": "fill_price",
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
+        }
+      },
+      "vectorbt_strict": {
+        "account": {
+          "allow_leverage": false,
+          "allow_short_selling": true,
+          "lock_notional_update_mode": "position_legs",
+          "short_cash_policy": "lock_notional"
+        },
+        "cash": {
+          "buffer_pct": 0.0,
+          "initial": 100000.0
+        },
+        "commission": {
+          "model": "none",
+          "rate": 0.0
+        },
+        "execution": {
+          "execution_mode": "same_bar",
+          "execution_price": "close"
+        },
+        "orders": {
+          "entry_order_priority": "free_cash_asc",
+          "fill_ordering": "priority",
+          "immediate_fill": false,
+          "late_asset_min_bars": 1,
+          "late_asset_policy": "allow",
+          "missing_price_policy": "skip",
+          "partial_fills_allowed": true,
+          "rebalance_headroom_pct": 1.0,
+          "rebalance_mode": "snapshot",
           "reject_on_insufficient_cash": true
         },
         "position_sizing": {
@@ -1610,7 +1763,7 @@
       "zipline": {
         "account": {
           "allow_leverage": false,
-          "allow_short_selling": false,
+          "allow_short_selling": true,
           "short_cash_policy": "credit"
         },
         "cash": {
@@ -1618,9 +1771,9 @@
           "initial": 100000.0
         },
         "commission": {
-          "minimum": 1.0,
-          "model": "per_share",
-          "per_share": 0.005,
+          "minimum": 0.0,
+          "model": "none",
+          "per_share": 0.0,
           "rate": 0.0
         },
         "execution": {
@@ -1629,28 +1782,29 @@
         },
         "orders": {
           "entry_order_priority": "submission",
-          "fill_ordering": "exit_first",
+          "fill_ordering": "fifo",
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
-          "next_bar_queue_shadow_validation": true,
-          "partial_fills_allowed": true,
-          "rebalance_headroom_pct": 0.998,
+          "next_bar_queue_shadow_validation": false,
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
-          "reject_on_insufficient_cash": true
+          "reject_on_insufficient_cash": false,
+          "skip_cash_validation": true
         },
         "position_sizing": {
           "share_type": "integer"
         },
         "slippage": {
-          "model": "volume_based",
-          "rate": 0.1
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
-          "stop_fill_mode": "stop_price",
+          "stop_fill_mode": "next_bar_open",
           "stop_level_basis": "fill_price",
-          "trail_hwm_source": "close",
-          "trail_stop_timing": "lagged"
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
         }
       },
       "zipline_strict": {
@@ -1664,9 +1818,9 @@
           "initial": 100000.0
         },
         "commission": {
-          "minimum": 1.0,
-          "model": "per_share",
-          "per_share": 0.005,
+          "minimum": 0.0,
+          "model": "none",
+          "per_share": 0.0,
           "rate": 0.0
         },
         "execution": {
@@ -1675,29 +1829,29 @@
         },
         "orders": {
           "entry_order_priority": "submission",
-          "fill_ordering": "exit_first",
+          "fill_ordering": "fifo",
           "late_asset_min_bars": 1,
           "late_asset_policy": "allow",
           "missing_price_policy": "use_last",
-          "next_bar_queue_shadow_validation": true,
-          "partial_fills_allowed": true,
-          "rebalance_headroom_pct": 0.998,
+          "next_bar_queue_shadow_validation": false,
+          "partial_fills_allowed": false,
+          "rebalance_headroom_pct": 1.0,
           "rebalance_mode": "snapshot",
-          "reject_on_insufficient_cash": true,
+          "reject_on_insufficient_cash": false,
           "skip_cash_validation": true
         },
         "position_sizing": {
           "share_type": "integer"
         },
         "slippage": {
-          "model": "volume_based",
-          "rate": 0.1
+          "model": "none",
+          "rate": 0.0
         },
         "stops": {
-          "stop_fill_mode": "stop_price",
+          "stop_fill_mode": "next_bar_open",
           "stop_level_basis": "fill_price",
-          "trail_hwm_source": "close",
-          "trail_stop_timing": "lagged"
+          "trail_hwm_source": "bar_extreme",
+          "trail_stop_timing": "intrabar"
         }
       }
     }
@@ -2498,7 +2652,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, share_rounding: 'ShareRounding | str' = <ShareRounding.NEAREST: 'nearest'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest.execution.rebalancer:TargetWeightExecutor": {
       "kind": "class",
@@ -2570,7 +2724,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, share_rounding: 'ShareRounding | str' = <ShareRounding.NEAREST: 'nearest'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest.execution:SquareRootImpact": {
       "kind": "class",
@@ -3619,7 +3773,7 @@
       },
       "module": "ml4t.backtest.broker",
       "qualname": "Broker",
-      "signature": "(initial_cash: 'float' = 100000.0, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, stop_slippage_rate: 'float' = 0.0, execution_mode: 'ExecutionMode' = <ExecutionMode.SAME_BAR: 'same_bar'>, execution_price: 'ExecutionPrice' = <ExecutionPrice.CLOSE: 'close'>, mark_price: 'ExecutionPrice' = <ExecutionPrice.PRICE: 'price'>, stop_fill_mode: 'StopFillMode' = <StopFillMode.STOP_PRICE: 'stop_price'>, stop_level_basis: 'StopLevelBasis' = <StopLevelBasis.FILL_PRICE: 'fill_price'>, trail_hwm_source: 'WaterMarkSource' = <WaterMarkSource.CLOSE: 'close'>, trail_include_entry_bar_extremes: 'bool' = False, initial_hwm_source: 'InitialHwmSource' = <InitialHwmSource.FILL_PRICE: 'fill_price'>, trail_stop_timing: 'TrailStopTiming' = <TrailStopTiming.LAGGED: 'lagged'>, allow_short_selling: 'bool' = False, allow_leverage: 'bool' = False, initial_margin: 'float' = 0.5, long_maintenance_margin: 'float' = 0.25, short_maintenance_margin: 'float' = 0.3, fixed_margin_schedule: 'dict[str, tuple[float, float]] | None' = None, margin_pct_schedule: 'dict[str, tuple[float, float]] | None' = None, short_cash_policy: 'ShortCashPolicy' = <ShortCashPolicy.CREDIT: 'credit'>, execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, share_type: 'ShareType' = <ShareType.INTEGER: 'integer'>, fill_ordering: 'FillOrdering' = <FillOrdering.EXIT_FIRST: 'exit_first'>, entry_order_priority: 'EntryOrderPriority' = <EntryOrderPriority.SUBMISSION: 'submission'>, next_bar_submission_precheck: 'bool' = False, next_bar_simple_cash_check: 'bool' = False, buying_power_reservation: 'bool' = False, next_bar_queue_shadow_validation: 'bool' = False, immediate_fill: 'bool' = False, reject_on_insufficient_cash: 'bool' = True, skip_cash_validation: 'bool' = False, cash_buffer_pct: 'float' = 0.0, partial_fills_allowed: 'bool' = False, rebalance_headroom_pct: 'float' = 1.0, missing_price_policy: 'MissingPricePolicy' = <MissingPricePolicy.SKIP: 'skip'>, late_asset_policy: 'LateAssetPolicy' = <LateAssetPolicy.ALLOW: 'allow'>, late_asset_min_bars: 'int' = 1, settlement_delay: 'int' = 0, settlement_reduces_buying_power: 'bool' = True)"
+      "signature": "(initial_cash: 'float' = 100000.0, commission_model: 'CommissionModel | None' = None, slippage_model: 'SlippageModel | None' = None, stop_slippage_rate: 'float' = 0.0, execution_mode: 'ExecutionMode' = <ExecutionMode.SAME_BAR: 'same_bar'>, execution_price: 'ExecutionPrice' = <ExecutionPrice.CLOSE: 'close'>, mark_price: 'ExecutionPrice' = <ExecutionPrice.PRICE: 'price'>, stop_fill_mode: 'StopFillMode' = <StopFillMode.STOP_PRICE: 'stop_price'>, stop_level_basis: 'StopLevelBasis' = <StopLevelBasis.FILL_PRICE: 'fill_price'>, trail_hwm_source: 'WaterMarkSource' = <WaterMarkSource.CLOSE: 'close'>, trail_include_entry_bar_extremes: 'bool' = False, initial_hwm_source: 'InitialHwmSource' = <InitialHwmSource.FILL_PRICE: 'fill_price'>, trail_stop_timing: 'TrailStopTiming' = <TrailStopTiming.LAGGED: 'lagged'>, allow_short_selling: 'bool' = False, allow_leverage: 'bool' = False, initial_margin: 'float' = 0.5, long_maintenance_margin: 'float' = 0.25, short_maintenance_margin: 'float' = 0.3, fixed_margin_schedule: 'dict[str, tuple[float, float]] | None' = None, margin_pct_schedule: 'dict[str, tuple[float, float]] | None' = None, short_cash_policy: 'ShortCashPolicy' = <ShortCashPolicy.CREDIT: 'credit'>, lock_notional_update_mode: 'LockNotionalUpdateMode' = <LockNotionalUpdateMode.POSITION_LEGS: 'position_legs'>, execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, share_type: 'ShareType' = <ShareType.INTEGER: 'integer'>, fill_ordering: 'FillOrdering' = <FillOrdering.EXIT_FIRST: 'exit_first'>, entry_order_priority: 'EntryOrderPriority' = <EntryOrderPriority.SUBMISSION: 'submission'>, next_bar_submission_precheck: 'bool' = False, next_bar_simple_cash_check: 'bool' = False, buying_power_reservation: 'bool' = False, next_bar_queue_shadow_validation: 'bool' = False, immediate_fill: 'bool' = False, reject_on_insufficient_cash: 'bool' = True, skip_cash_validation: 'bool' = False, cash_buffer_pct: 'float' = 0.0, partial_fills_allowed: 'bool' = False, rebalance_headroom_pct: 'float' = 1.0, missing_price_policy: 'MissingPricePolicy' = <MissingPricePolicy.SKIP: 'skip'>, late_asset_policy: 'LateAssetPolicy' = <LateAssetPolicy.ALLOW: 'allow'>, late_asset_min_bars: 'int' = 1, settlement_delay: 'int' = 0, settlement_reduces_buying_power: 'bool' = True)"
     },
     "ml4t.backtest:CommissionType": {
       "kind": "class",
@@ -3813,7 +3967,7 @@
       },
       "module": "ml4t.backtest.types",
       "qualname": "Order",
-      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None) -> None"
+      "signature": "(asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, order_type: ml4t.backtest.types.OrderType = <OrderType.MARKET: 'market'>, limit_price: float | None = None, stop_price: float | None = None, trail_amount: float | None = None, parent_id: str | None = None, rebalance_id: str | None = None, order_id: str = '', status: ml4t.backtest.types.OrderStatus = <OrderStatus.PENDING: 'pending'>, created_at: datetime.datetime | None = None, filled_at: datetime.datetime | None = None, filled_price: float | None = None, filled_quantity: float = 0.0, rejection_reason: str | None = None, requested_quantity: float | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None, _rejection_code: str | None = None, _created_bar_index: int = 0, _signal_price: float | None = None, _priority_notional: float | None = None, _risk_exit_reason: str | None = None, _exit_reason: ml4t.backtest.types.ExitReason | None = None, _risk_fill_price: float | None = None) -> None"
     },
     "ml4t.backtest:OrderSide": {
       "kind": "class",
@@ -3901,7 +4055,7 @@
       },
       "module": "ml4t.backtest.execution.rebalancer",
       "qualname": "RebalanceConfig",
-      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
+      "signature": "(min_trade_value: 'float' = 0.0, min_weight_change: 'float' = 0.0, allow_fractional: 'bool | None' = None, round_lots: 'bool' = False, lot_size: 'int' = 100, allow_short: 'bool' = False, max_single_weight: 'float' = 1.0, max_gross_leverage: 'float | None' = None, cancel_before_rebalance: 'bool' = True, account_for_pending: 'bool' = True, rebalance_mode: 'RebalanceMode' = <RebalanceMode.SNAPSHOT: 'snapshot'>, share_rounding: 'ShareRounding | str' = <ShareRounding.NEAREST: 'nearest'>, schedule: 'RebalanceSchedule | None' = None, calendar: 'str | None' = None, timezone: 'str | None' = None, session_start_time: 'str | None' = None, data_frequency: 'DataFrequency | str | None' = None, timestamp_semantics: 'TimestampSemantics | str | None' = None) -> None"
     },
     "ml4t.backtest:RebalanceSchedule": {
       "kind": "class",
