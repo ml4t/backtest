@@ -1,6 +1,11 @@
 {
   "algorithm-language": "Python",
-  "parameters": {},
   "description": "ml4t case-study lean parity",
-  "local-id": 0
+  "docker": {
+    "environment": {
+      "PYTHONPYCACHEPREFIX": "/tmp/lean-pycache"
+    }
+  },
+  "local-id": 0,
+  "parameters": {}
 }

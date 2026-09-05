@@ -187,7 +187,7 @@ not used for the published real-strategy ratios above.
 # Build and verify all public targets from their committed uv locks
 python validation/build_framework_env.py --all-public
 
-# Licensed VectorBT Pro requires authorized SSH access to the frozen source commit
+# Licensed VectorBT Pro requires GitHub CLI access to the frozen source commit
 python validation/build_framework_env.py --framework vectorbt_pro
 
 # Verify the locked LEAN CLI and immutable engine image

@@ -86,7 +86,7 @@ def test_definition_rejects_wrong_private_commit(
     project.mkdir()
     (project / "uv.lock").write_text("wrong-commit", encoding="utf-8")
     (project / "pyproject.toml").write_text(
-        '[project]\ndependencies = ["vectorbtpro @ git+ssh://example.invalid/repo@wrong"]\n',
+        '[project]\ndependencies = ["vectorbtpro @ git+https://example.invalid/repo@wrong"]\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(build_framework_env, "ENVIRONMENTS_DIR", tmp_path)
@@ -95,6 +95,28 @@ def test_definition_rejects_wrong_private_commit(
 
     assert "VectorBT Pro environment does not pin the manifest commit" in failures
     assert any("artifact identity" in failure for failure in failures)
+
+
+def test_definition_rejects_private_ssh_source(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    targets: dict[str, FrameworkTarget],
+) -> None:
+    target = targets["vectorbt_pro"]
+    project = tmp_path / "vectorbt_pro"
+    project.mkdir()
+    (project / "uv.lock").write_text(target.immutable_id.removeprefix("git:"), encoding="utf-8")
+    (project / "pyproject.toml").write_text(
+        "[project]\ndependencies = ["
+        f'"vectorbtpro @ git+ssh://git@github.com/polakowo/vectorbt.pro.git@'
+        f'{target.source_commit}"\n]\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(build_framework_env, "ENVIRONMENTS_DIR", tmp_path)
+
+    failures = build_framework_env.definition_failures("vectorbt_pro", target)
+
+    assert "VectorBT Pro environment must use GitHub CLI authenticated HTTPS" in failures
 
 
 def test_private_build_reports_missing_licensed_access(
@@ -109,7 +131,7 @@ def test_private_build_reports_missing_licensed_access(
         lambda *args, **_kwargs: (_ for _ in ()).throw(subprocess.CalledProcessError(1, args[0])),
     )
 
-    with pytest.raises(RuntimeError, match="Authorized SSH access"):
+    with pytest.raises(RuntimeError, match="GitHub CLI access"):
         build_framework_env.build_environment(
             "vectorbt_pro", targets["vectorbt_pro"], root=tmp_path
         )
@@ -147,6 +169,32 @@ def test_lean_verification_separates_cli_and_engine_provenance(
     assert evidence["data_preparation"]["cli_version"] == target.cli_version
     assert evidence["engine_execution"]["image_digest"] == target.immutable_id
     assert commands == [["docker", "buildx", "imagetools", "inspect", target.artifact]]
+
+
+def test_lean_build_pulls_the_verified_engine_image(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    targets: dict[str, FrameworkTarget],
+) -> None:
+    target = targets["lean"]
+    commands: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(build_framework_env.subprocess, "run", run)
+    monkeypatch.setattr(build_framework_env, "definition_failures", lambda *_: [])
+    monkeypatch.setattr(
+        build_framework_env,
+        "verify_environment",
+        lambda *_args, **_kwargs: {"framework": "lean"},
+    )
+
+    evidence = build_framework_env.build_environment("lean", target, root=tmp_path)
+
+    assert evidence == {"framework": "lean"}
+    assert commands[-1] == ["docker", "pull", target.artifact]
 
 
 def test_private_environment_rejects_wrong_installed_commit(

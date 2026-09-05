@@ -3,7 +3,7 @@ name: Private Comparison Evidence
 on:
   workflow_call:
     secrets:
-      VECTORBT_PRO_DEPLOY_KEY:
+      VECTORBT_PRO_GH_TOKEN:
         required: true
   workflow_dispatch:
 
@@ -30,14 +30,12 @@ jobs:
 
       - name: Configure licensed source access
         env:
-          VECTORBT_PRO_DEPLOY_KEY: ${{ secrets.VECTORBT_PRO_DEPLOY_KEY }}
-        run: |
-          install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$VECTORBT_PRO_DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
-          chmod 600 "$HOME/.ssh/id_ed25519"
-          ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
+          GH_TOKEN: ${{ secrets.VECTORBT_PRO_GH_TOKEN }}
+        run: gh auth setup-git --hostname github.com
 
       - name: Build the locked VectorBT Pro environment
+        env:
+          GH_TOKEN: ${{ secrets.VECTORBT_PRO_GH_TOKEN }}
         run: >-
           python validation/build_framework_env.py
           --framework vectorbt_pro
@@ -102,6 +100,7 @@ jobs:
           validation/run_lean_case_studies.py
           --lean-command .venv-lean/bin/lean
           --output lean-case-studies.json
+          --promote
 
       - name: Retain LEAN provenance
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -4,7 +4,7 @@ version = "0.0.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "ml4t-backtest",
-    "vectorbtpro @ git+ssh://git@github.com/polakowo/vectorbt.pro.git@6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+    "vectorbtpro @ git+https://github.com/polakowo/vectorbt.pro.git@6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
 ]
 
 [tool.uv]
