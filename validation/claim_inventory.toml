@@ -1,3 +1,5 @@
+unresolved = []
+
 [metadata]
 schema_version = 1
 audit_date = "2026-08-13"
@@ -19,7 +21,7 @@ paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validatio
 type = "correctness"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["frozen_real_strategy_inputs", "complete_canonical_fill_log", "equity_curve", "terminal_value", "negative_control", "environment_identity"]
-status = "failed"
+status = "verified"
 issue = "ml4t/backtest-dev#3"
 
 [[claim]]
@@ -85,7 +87,7 @@ issue = "ml4t/backtest-dev#11"
 [[claim]]
 id = "library-real-strategy-performance"
 repository = "ml4t/backtest"
-paths = ["validation/real_strategy_benchmark.py", "validation/REAL_STRATEGY_PERFORMANCE.json", "validation/REAL_STRATEGY_RESULTS.json"]
+paths = ["README.md", "docs/index.md", "docs/user-guide/profiles.md", "validation/README.md", "validation/METHODOLOGY.md", "validation/real_strategy_benchmark.py", "validation/REAL_STRATEGY_PERFORMANCE.json", "validation/REAL_STRATEGY_RESULTS.json"]
 type = "performance"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["correctness_passing_workload", "engine_only_timer", "warmup_policy", "repetitions", "machine_identity", "raw_timings", "output_identity"]
@@ -170,9 +172,4 @@ type = "qualitative"
 frameworks = ["vectorbt_pro", "vectorbt_oss", "backtrader", "zipline", "lean"]
 required_evidence = ["published_library_evidence", "upstream_source_reference", "scope_qualification"]
 status = "unresolved"
-issue = "ml4t/backtest-dev#15"
-
-[[unresolved]]
-id = "performance-publication-decision"
-finding = "Whether to publish dated cross-framework runtime or memory ratios is deferred until the audit results are reviewed."
 issue = "ml4t/backtest-dev#15"

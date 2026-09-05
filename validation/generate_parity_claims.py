@@ -198,6 +198,27 @@ def render_claims(
             f"[real-strategy evidence]({real_strategy_url}) |"
         )
 
+    performance_rows = []
+    for record in real_performance["records"]:
+        target = real_targets[record["framework"]]
+        pinned_framework = f"[{target['display_name']} {target['version']}]({target['source']})"
+        framework_result = record["framework_engine"]
+        ml4t_result = record["ml4t_engine"]
+        framework_ci = framework_result["ci_95_seconds"]
+        ml4t_ci = ml4t_result["ci_95_seconds"]
+        performance_rows.append(
+            f"| {case_labels[record['case_study']]} | {pinned_framework} | "
+            f"{framework_result['median_seconds']:.3f} "
+            f"({framework_ci[0]:.3f}-{framework_ci[1]:.3f}) | "
+            f"{ml4t_result['median_seconds']:.3f} "
+            f"({ml4t_ci[0]:.3f}-{ml4t_ci[1]:.3f}) | "
+            f"{record['framework_to_ml4t_median_ratio']:.3f}x |"
+        )
+
+    timing_policy = real_performance["timing_policy"]
+    environment = real_performance["environment"]
+    excluded = ", ".join(timing_policy["excluded"])
+
     return "\n".join(
         [
             START_MARKER,
@@ -223,10 +244,24 @@ def render_claims(
             "|---|---|---|---|",
             *real_rows,
             "",
-            f"Engine-only timing samples for all {len(real_performance['records'])} passing pairs "
-            "are retained in "
-            f"[real-strategy performance evidence]({real_performance_url}). These measurements "
-            "support only the named strategy, framework version, input bundle, and machine.",
+            "### Real-strategy engine performance",
+            "",
+            f"The table reports engine-call wall time for all {len(performance_rows)} "
+            "correctness-passing pairs. The ratio is framework median / ML4T median; values "
+            "above 1 mean ML4T completed the engine call faster.",
+            "",
+            "| Real strategy | Pinned framework | Framework median (95% CI), s | "
+            "ML4T median (95% CI), s | Framework / ML4T median |",
+            "|---|---|---:|---:|---:|",
+            *performance_rows,
+            "",
+            f"Measured {real_performance['generated_at'][:10]} on "
+            f"`{environment['platform']}` with {environment['cpu_count']} logical CPUs. Each "
+            "side used one isolated warm-up process and ten isolated measured processes. The "
+            f"timer includes only the engine call; it excludes {excluded}. These measurements "
+            "apply only to the named strategy, framework version, frozen input bundle, and "
+            f"machine. Raw samples and bootstrap intervals are retained in "
+            f"[real-strategy performance evidence]({real_performance_url}).",
             "",
             "### Synthetic diagnostic scenarios",
             "",

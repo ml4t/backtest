@@ -313,7 +313,31 @@ The parity protocol disables transaction costs and position rules on both sides.
 | US equity panel | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | fills equal at declared field precision; 4,027 valuations within $0.01 (max raw gap $0.00000190); terminal within $0.01 (raw gap $0.00000030) | [real-strategy evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_RESULTS.json) |
 | US equity panel | [LEAN 18001](https://github.com/QuantConnect/Lean) | fills equal at declared field precision; 4,027 valuations within $0.01 (max raw gap $0.00000460); terminal within $0.01 (raw gap $0.00000420) | [real-strategy evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_RESULTS.json) |
 
-Engine-only timing samples for all 17 passing pairs are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json). These measurements support only the named strategy, framework version, input bundle, and machine.
+### Real-strategy engine performance
+
+The table reports engine-call wall time for all 17 correctness-passing pairs. The ratio is framework median / ML4T median; values above 1 mean ML4T completed the engine call faster.
+
+| Real strategy | Pinned framework | Framework median (95% CI), s | ML4T median (95% CI), s | Framework / ML4T median |
+|---|---|---:|---:|---:|
+| ETF allocation | [VectorBT Pro 2026.6.27](https://github.com/polakowo/vectorbt.pro) | 0.287 (0.286-0.289) | 0.415 (0.414-0.419) | 0.692x |
+| ETF allocation | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 0.171 (0.171-0.174) | 0.415 (0.413-0.417) | 0.412x |
+| ETF allocation | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 9.355 (9.303-9.424) | 0.430 (0.426-0.432) | 21.762x |
+| ETF allocation | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 3.872 (3.867-3.910) | 0.632 (0.628-0.638) | 6.127x |
+| ETF allocation | [LEAN 18001](https://github.com/QuantConnect/Lean) | 2.564 (2.487-2.599) | 0.750 (0.749-0.757) | 3.418x |
+| CME futures | [VectorBT Pro 2026.6.27](https://github.com/polakowo/vectorbt.pro) | 0.286 (0.284-0.289) | 0.432 (0.429-0.435) | 0.663x |
+| CME futures | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 2.495 (2.488-2.526) | 0.429 (0.427-0.433) | 5.812x |
+| Crypto perpetual funding | [LEAN 18001](https://github.com/QuantConnect/Lean) | 2.801 (2.709-2.891) | 0.657 (0.655-0.661) | 4.266x |
+| FX allocation (USD-quoted pairs) | [VectorBT Pro 2026.6.27](https://github.com/polakowo/vectorbt.pro) | 0.283 (0.281-0.286) | 0.146 (0.145-0.147) | 1.939x |
+| FX allocation (USD-quoted pairs) | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 0.139 (0.138-0.141) | 0.146 (0.145-0.147) | 0.952x |
+| FX allocation (USD-quoted pairs) | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 0.425 (0.420-0.432) | 0.146 (0.145-0.147) | 2.920x |
+| FX allocation (USD-quoted pairs) | [LEAN 18001](https://github.com/QuantConnect/Lean) | 0.913 (0.877-0.953) | 0.153 (0.152-0.157) | 5.952x |
+| US equity panel | [VectorBT Pro 2026.6.27](https://github.com/polakowo/vectorbt.pro) | 0.795 (0.787-0.838) | 20.555 (20.486-20.600) | 0.039x |
+| US equity panel | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 16.995 (16.960-17.024) | 20.495 (20.453-20.534) | 0.829x |
+| US equity panel | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 495.553 (494.227-510.273) | 21.470 (21.386-21.543) | 23.082x |
+| US equity panel | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 107.609 (106.834-109.150) | 22.132 (22.082-22.234) | 4.862x |
+| US equity panel | [LEAN 18001](https://github.com/QuantConnect/Lean) | 47.683 (47.333-48.015) | 26.368 (26.222-26.473) | 1.808x |
+
+Measured 2026-09-03 on `Linux-6.8.0-138-generic-x86_64-with-glibc2.39` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
 ### Synthetic diagnostic scenarios
 
@@ -368,19 +392,21 @@ uv run pytest tests/benchmark/test_hotpath_benchmarks.py::test_optimized_feed_ru
 ```
 
 Workload definitions and expected checksums are retained in
-`validation/performance_baselines.json`. The project does not publish hardware-dependent runtime,
-throughput, memory, or cross-framework ratios as stable claims.
+`validation/performance_baselines.json`. These ML4T-only measurements are regression baselines,
+not cross-machine performance claims.
 
 Cross-framework performance evidence uses a common 50-asset, 252-session controlled workload.
 Each runner receives one isolated warm-up followed by ten isolated measurements. The retained
 artifact contains raw samples, whole-process wall time, process-tree peak RSS, deterministic 95%
 bootstrap intervals, output checksums, framework identities, and semantic disclosures for the
-idiomatic view. The results remain audit evidence pending a separate publication decision.
+idiomatic view. This controlled synthetic workload remains supporting audit evidence rather than
+the basis for the published real-strategy comparison above.
 
 The real-strategy performance artifact times only engine execution for correctness-passing pairs.
 Inputs, model inference, target construction, adapter preparation, extraction, and reporting are
-excluded. See `validation/REAL_STRATEGY_PERFORMANCE.json`; its ratios are dated audit measurements,
-not stable framework claims.
+excluded. The table above publishes the measured ratios with their date, versions, workload, host,
+and uncertainty. They describe those executions and do not establish a hardware-independent speed
+ranking.
 
 ## Documentation
 
