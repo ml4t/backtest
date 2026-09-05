@@ -171,6 +171,32 @@ def test_lean_verification_separates_cli_and_engine_provenance(
     assert commands == [["docker", "buildx", "imagetools", "inspect", target.artifact]]
 
 
+def test_lean_build_pulls_the_verified_engine_image(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    targets: dict[str, FrameworkTarget],
+) -> None:
+    target = targets["lean"]
+    commands: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(build_framework_env.subprocess, "run", run)
+    monkeypatch.setattr(build_framework_env, "definition_failures", lambda *_: [])
+    monkeypatch.setattr(
+        build_framework_env,
+        "verify_environment",
+        lambda *_args, **_kwargs: {"framework": "lean"},
+    )
+
+    evidence = build_framework_env.build_environment("lean", target, root=tmp_path)
+
+    assert evidence == {"framework": "lean"}
+    assert commands[-1] == ["docker", "pull", target.artifact]
+
+
 def test_private_environment_rejects_wrong_installed_commit(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

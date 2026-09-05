@@ -206,7 +206,12 @@ def build_environment(
                 "source is required; no credentials are stored in this repository."
             ) from error
         raise
-    return verify_environment(framework, target, root=root)
+    evidence = verify_environment(framework, target, root=root)
+    if framework == "lean":
+        if target.artifact is None:
+            raise ValueError("LEAN target lacks an immutable engine image")
+        subprocess.run(["docker", "pull", target.artifact], check=True)
+    return evidence
 
 
 def main() -> int:
