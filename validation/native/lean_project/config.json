@@ -1,6 +1,11 @@
 {
   "algorithm-language": "Python",
   "description": "ML4T native LEAN behavior oracle",
+  "docker": {
+    "environment": {
+      "PYTHONPYCACHEPREFIX": "/tmp/lean-pycache"
+    }
+  },
   "local-id": 771804201,
   "parameters": {}
 }
