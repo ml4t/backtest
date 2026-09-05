@@ -65,6 +65,10 @@ def definition_failures(framework: str, target: FrameworkTarget) -> list[str]:
     if len(matching) != 1:
         failures.append(f"Environment must define one {target.package} dependency: {framework}")
     elif framework == "vectorbt_pro":
+        if not matching[0].startswith(
+            "vectorbtpro @ git+https://github.com/polakowo/vectorbt.pro.git@"
+        ):
+            failures.append("VectorBT Pro environment must use GitHub CLI authenticated HTTPS")
         if target.source_commit is None or f"@{target.source_commit}" not in matching[0]:
             failures.append("VectorBT Pro environment does not pin the manifest commit")
     else:
@@ -198,8 +202,8 @@ def build_environment(
     except subprocess.CalledProcessError as error:
         if framework == "vectorbt_pro":
             raise RuntimeError(
-                "VectorBT Pro is unavailable. Authorized SSH access to the licensed source is "
-                "required; no credentials are stored in this repository."
+                "VectorBT Pro is unavailable. Authorized GitHub CLI access to the licensed "
+                "source is required; no credentials are stored in this repository."
             ) from error
         raise
     return verify_environment(framework, target, root=root)

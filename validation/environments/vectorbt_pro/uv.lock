@@ -299,7 +299,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "ml4t-backtest", editable = "../../../" },
-    { name = "vectorbtpro", git = "ssh://git@github.com/polakowo/vectorbt.pro.git?rev=6e18cf0aa37849cfc20848f40f1d26ecfdc771b4" },
+    { name = "vectorbtpro", git = "https://github.com/polakowo/vectorbt.pro.git?rev=6e18cf0aa37849cfc20848f40f1d26ecfdc771b4" },
 ]
 
 [[package]]
@@ -712,7 +712,7 @@ wheels = [
 [[package]]
 name = "vectorbtpro"
 version = "2026.6.27"
-source = { git = "ssh://git@github.com/polakowo/vectorbt.pro.git?rev=6e18cf0aa37849cfc20848f40f1d26ecfdc771b4#6e18cf0aa37849cfc20848f40f1d26ecfdc771b4" }
+source = { git = "https://github.com/polakowo/vectorbt.pro.git?rev=6e18cf0aa37849cfc20848f40f1d26ecfdc771b4#6e18cf0aa37849cfc20848f40f1d26ecfdc771b4" }
 dependencies = [
     { name = "attrs" },
     { name = "dateparser" },

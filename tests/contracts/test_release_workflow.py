@@ -198,8 +198,16 @@ def test_private_comparison_workflow_pins_and_retains_evidence() -> None:
     workflow = _workflow("private-comparisons.yml")
     jobs = workflow["jobs"]
 
-    assert workflow["on"]["workflow_call"]["secrets"]["VECTORBT_PRO_DEPLOY_KEY"]["required"]
+    assert workflow["on"]["workflow_call"]["secrets"]["VECTORBT_PRO_GH_TOKEN"]["required"]
     pro_commands = "\n".join(step.get("run", "") for step in jobs["vectorbt-pro"]["steps"])
+    assert "gh auth setup-git" in pro_commands
+    assert "id_ed25519" not in pro_commands
+    authenticated_steps = [
+        step
+        for step in jobs["vectorbt-pro"]["steps"]
+        if step.get("env", {}).get("GH_TOKEN") == "${{ secrets.VECTORBT_PRO_GH_TOKEN }}"
+    ]
+    assert len(authenticated_steps) == 2
     assert "validation/build_framework_env.py" in pro_commands
     assert "validation/native/vectorbt_behavior.py" in pro_commands
     assert "validation/run_all_correctness.py" in pro_commands
