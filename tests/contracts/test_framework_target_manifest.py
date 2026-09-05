@@ -162,8 +162,10 @@ def test_claim_inventory_accounts_for_all_repositories_and_known_targets() -> No
         "performance",
         "qualitative",
     }
-    assert inventory.unresolved
-    assert all(item.issue.startswith("ml4t/backtest-dev#") for item in inventory.unresolved)
+    assert inventory.unresolved == ()
+    statuses = {claim.claim_id: claim.status for claim in inventory.claims}
+    assert statuses["library-real-strategy-equivalence"] == "verified"
+    assert statuses["library-real-strategy-performance"] == "verified"
     local_paths = {
         path
         for claim in inventory.claims

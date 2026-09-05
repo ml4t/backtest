@@ -84,6 +84,43 @@ def test_every_claim_target_uses_the_same_generated_block() -> None:
     assert len(set(blocks)) == 1
 
 
+def test_claims_publish_real_strategy_engine_timings_with_provenance() -> None:
+    correctness = generate_parity_claims._load_json(generate_parity_claims.CORRECTNESS_EVIDENCE)
+    large_scale = generate_parity_claims._load_json(generate_parity_claims.LARGE_SCALE_EVIDENCE)
+    real_strategy = generate_parity_claims._load_json(generate_parity_claims.REAL_STRATEGY_EVIDENCE)
+    performance = generate_parity_claims._load_json(
+        generate_parity_claims.REAL_STRATEGY_PERFORMANCE
+    )
+
+    claims = generate_parity_claims.render_claims(
+        correctness, large_scale, real_strategy, performance
+    )
+
+    assert "### Real-strategy engine performance" in claims
+    assert "Framework / ML4T median" in claims
+    for record in performance["records"]:
+        framework_result = record["framework_engine"]
+        ml4t_result = record["ml4t_engine"]
+        framework_ci = framework_result["ci_95_seconds"]
+        ml4t_ci = ml4t_result["ci_95_seconds"]
+        expected_measurements = (
+            f"{framework_result['median_seconds']:.3f} "
+            f"({framework_ci[0]:.3f}-{framework_ci[1]:.3f}) | "
+            f"{ml4t_result['median_seconds']:.3f} "
+            f"({ml4t_ci[0]:.3f}-{ml4t_ci[1]:.3f}) | "
+            f"{record['framework_to_ml4t_median_ratio']:.3f}x"
+        )
+        assert expected_measurements in claims
+
+    assert performance["generated_at"][:10] in claims
+    assert performance["environment"]["platform"] in claims
+    assert f"{performance['environment']['cpu_count']} logical CPUs" in claims
+    assert "one isolated warm-up process and ten isolated measured processes" in claims
+    assert "values above 1 mean ML4T completed the engine call faster" in claims
+    for excluded in performance["timing_policy"]["excluded"]:
+        assert excluded in claims
+
+
 def test_claims_pin_every_advertised_framework_and_expose_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
