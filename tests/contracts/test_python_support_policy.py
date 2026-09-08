@@ -122,7 +122,11 @@ def test_merge_and_release_builds_depend_on_compatibility_gate() -> None:
     assert ci_jobs["compatibility"]["uses"] == "./.github/workflows/compatibility.yml"
     assert "compatibility" in ci_jobs["build"]["needs"]
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
-    assert set(release_jobs["publish"]["needs"]) >= {
+    assert set(release_jobs["deploy-documentation"]["needs"]) >= {
         "ecosystem-qualification",
         "qualification",
+    }
+    assert set(release_jobs["publish"]["needs"]) >= {
+        "deploy-documentation",
+        "preflight",
     }
