@@ -1,47 +1,56 @@
 # ml4t-backtest
 
-@.workspace/shared-context.md
+Event-driven backtesting for quantitative strategies with explicit execution, accounting, and risk
+semantics. The package uses runtime-neutral lifecycle and order contracts from `ml4t.specs` so a
+strategy can be compared with other frameworks and moved toward live execution without changing its
+decision logic.
 
-Event-driven backtesting engine with cross-framework parity validation.
-
-## Structure
-
-| Directory | Purpose |
-|-----------|---------|
-| src/ml4t/backtest/ | Package root (~17.0k lines, 40+ modules) |
-| tests/ | 1,443 passing tests, 13 skipped |
-| validation/ | Cross-framework parity (VectorBT, Backtrader, Zipline, LEAN) |
-
-## Key Modules
-
-| Module | Lines | Purpose |
-|--------|-------|---------|
-| broker.py | 1,678 | Order execution, positions |
-| result.py | 1,057 | BacktestResult container |
-| config.py | 1,044 | BacktestConfig (40+ knobs) |
-| calendar.py | 794 | Trading calendar, sessions |
-| types.py | 647 | Order, Position, Fill, Trade, cost decomposition |
-| engine.py | 578 | Event loop orchestration |
-| profiles.py | 384 | 6 core + 4 strict profiles |
-| export.py | 320 | Result export (Parquet, YAML, JSON) |
-| sessions.py | 279 | Session handling |
-| models.py | 248 | Commission/slippage models |
-| datafeed.py | 394 | Price/signal iteration |
-| strategy.py | 38 | Strategy base class |
-
-## Subpackages
-
-| Directory | Lines | Purpose |
-|-----------|-------|---------|
-| execution/ | 1,894 | Fill executor, rebalancer, impact, schedule |
-| core/ | 1,538 | Order book, execution engine, fill engine, risk engine |
-| accounting/ | 1,123 | Cash/margin policies, gatekeeper |
-| analytics/ | 1,220 | Metrics, equity, trades, diagnostic bridge |
-| risk/ | 1,790 | Position rules, portfolio limits |
-| strategies/ | 492 | Strategy templates |
-
-## Entry Point
+## Public entry points
 
 ```python
-from ml4t.backtest import Engine, Strategy, BacktestConfig, run_backtest
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy, run_backtest
+```
+
+Prefer exports from `ml4t.backtest` for user-facing code. `Engine` coordinates the event loop,
+`DataFeed` supplies time-ordered market data, `Strategy` defines decisions, and `BacktestConfig`
+controls execution assumptions. `BacktestResult` contains portfolio, order, trade, and diagnostic
+outputs.
+
+## Source map
+
+| Path | Responsibility |
+|---|---|
+| `src/ml4t/backtest/engine.py` | Event-loop orchestration and top-level execution |
+| `src/ml4t/backtest/broker.py` | Orders, fills, positions, and broker state |
+| `src/ml4t/backtest/datafeed.py` | Price and signal iteration |
+| `src/ml4t/backtest/config.py` | Backtest and execution configuration |
+| `src/ml4t/backtest/execution/` | Rebalancing, fill execution, impact, and schedules |
+| `src/ml4t/backtest/accounting/` | Cash, margin, and accounting policies |
+| `src/ml4t/backtest/risk/` | Position and portfolio risk rules |
+| `src/ml4t/backtest/analytics/` | Metrics, equity, trades, and diagnostic integration |
+| `validation/` | Cross-framework parity and retained performance evidence |
+| `tests/` | Unit, integration, contract, and regression coverage |
+
+Read the nearest nested `AGENTS.md` before changing a subsystem. Those guides identify the local
+contracts and entry points without repeating this repository overview.
+
+## Behavioral constraints
+
+- Preserve causal information boundaries: a decision cannot use a completed price and fill at that
+  same price unless the configured lifecycle contract explicitly permits it.
+- Keep runtime-neutral lifecycle, intent, execution-policy, and position-rule contracts in
+  `ml4t-specs`; this repository owns their backtest implementation.
+- Treat parity claims as claims about explicit configurations, not framework defaults. Update the
+  retained validation evidence when behavior or a comparison configuration changes.
+- Keep public result artifacts versioned and readable across compatible releases.
+
+## Quality commands
+
+```bash
+uv sync
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run ty check
+uv run pytest
+pre-commit run --all-files
 ```

@@ -39,7 +39,10 @@ htmlcov/
 src/ml4t/backtest/_version.py
 
 # Agent-local state
+CLAUDE.md
 .claude/
+.codex/
+.workspace/
 
 # Validation-generated local artifacts
 validation/.zipline/
