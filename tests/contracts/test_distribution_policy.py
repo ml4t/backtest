@@ -58,3 +58,35 @@ def test_ci_checks_both_distribution_formats_and_reproducibility() -> None:
     assert "uv build --out-dir dist-rebuild" in commands
     assert "validation/check_artifacts.py dist --compare dist-rebuild" in commands
     assert "uvx twine check dist/*" in commands
+
+
+def test_distribution_metadata_matches_the_public_identity_contract() -> None:
+    config = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project = config["project"]
+
+    description = (
+        "Event-driven backtesting for quantitative strategies with configurable execution, "
+        "accounting, risk, and framework-parity validation."
+    )
+    assert project["description"] == description
+    assert project["authors"] == [{"name": "Stefan Jansen", "email": "stefan@applied-ai.com"}]
+    assert project["maintainers"] == [{"name": "Stefan Jansen", "email": "pm@ml4trading.io"}]
+    assert {
+        "finance",
+        "quantitative-finance",
+        "algorithmic-trading",
+        "backtesting",
+        "execution",
+    } <= set(project["keywords"])
+    assert {
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: MacOS",
+        "Operating System :: POSIX :: Linux",
+    } <= set(project["classifiers"])
+    assert project["urls"] == {
+        "Homepage": "https://www.ml4trading.io/",
+        "Documentation": "https://www.ml4trading.io/docs/backtest/",
+        "Repository": "https://github.com/ml4t/backtest",
+        "Issues": "https://github.com/ml4t/backtest/issues",
+        "Changelog": "https://github.com/ml4t/backtest/blob/main/CHANGELOG.md",
+    }

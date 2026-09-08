@@ -51,3 +51,36 @@ def test_reviewed_config_fields_are_in_configuration_guide() -> None:
     configuration = (_ROOT / "docs" / "user-guide" / "configuration.md").read_text(encoding="utf-8")
     missing = sorted(name for name in fields if f"`{name}`" not in configuration)
     assert not missing, f"Configuration guide omits reviewed fields: {missing}"
+
+
+def test_readme_satisfies_the_public_entry_point_contract() -> None:
+    readme = (_ROOT / "README.md").read_text(encoding="utf-8")
+    description = (
+        "Event-driven backtesting for quantitative strategies with configurable execution, "
+        "accounting, risk, and framework-parity validation."
+    )
+
+    assert description in readme
+    assert all(version in readme for version in ("3.12", "3.13", "3.14"))
+    assert "uv add ml4t-backtest" in readme
+    assert "from ml4t.backtest import" in readme
+    assert "no external service or special hardware" in readme
+    assert "licensed VectorBT Pro" in readme
+    assert "containerized LEAN engine" in readme
+    for link in (
+        "https://www.ml4trading.io/docs/backtest/",
+        "https://github.com/ml4t/backtest/issues",
+        "https://github.com/ml4t/backtest/releases",
+        "[MIT License](LICENSE)",
+    ):
+        assert link in readme
+    assert all(
+        command in readme
+        for command in (
+            "uv run ruff check",
+            "uv run ruff format --check",
+            "uv run ty check",
+            "uv run pytest",
+            "uv run mkdocs build --strict",
+        )
+    )
