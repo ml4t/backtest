@@ -30,21 +30,28 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --dev --extra docs
+        run: uv sync --dev --extra docs --locked
+
+      - name: Record documentation identity
+        run: |
+          echo "ML4T_DOCS_VERSION=$(uv run python -c 'import ml4t.backtest as package; print(package.__version__)')" >> "$GITHUB_ENV"
+          echo "ML4T_DOCS_COMMIT=$GITHUB_SHA" >> "$GITHUB_ENV"
 
       - name: Build docs
         run: uv run mkdocs build --strict
 
-      - name: Deploy to website repo
-        uses: cpina/github-action-push-to-another-repository@55306faa4ed53b815ae49e564af8cfb359d32ae2 # v1.7.3
-        env:
-          SSH_DEPLOY_KEY: ${{ secrets.DOCS_DEPLOY_KEY }}
+      - name: Verify rendered documentation identity
+        run: >-
+          uv run python validation/check_documentation_identity.py
+          --site site
+          --expected-library backtest
+          --expected-version "$ML4T_DOCS_VERSION"
+          --expected-commit "$ML4T_DOCS_COMMIT"
+
+      - name: Retain immutable documentation artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          source-directory: site/
-          destination-github-username: ml4t
-          destination-repository-name: website
-          target-directory: static/docs/backtest/
-          target-branch: main
-          commit-message: "docs(backtest): update from ml4t/backtest@${{ github.sha }}"
-          user-name: ml4t-bot
-          user-email: bot@ml4trading.io
+          name: docs-${{ github.sha }}
+          path: site/
+          if-no-files-found: error
+          retention-days: 90

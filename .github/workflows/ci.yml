@@ -265,8 +265,21 @@ jobs:
       - name: Install documentation dependencies
         run: uv sync --dev --extra docs --locked
 
+      - name: Record documentation identity
+        run: |
+          echo "ML4T_DOCS_VERSION=$(uv run python -c 'import ml4t.backtest as package; print(package.__version__)')" >> "$GITHUB_ENV"
+          echo "ML4T_DOCS_COMMIT=$GITHUB_SHA" >> "$GITHUB_ENV"
+
       - name: Build documentation with strict validation
         run: uv run mkdocs build --strict
+
+      - name: Verify rendered documentation identity
+        run: >-
+          uv run python validation/check_documentation_identity.py
+          --site site
+          --expected-library backtest
+          --expected-version "$ML4T_DOCS_VERSION"
+          --expected-commit "$ML4T_DOCS_COMMIT"
 
       - name: Build candidate wheel for documentation examples
         run: uv build --wheel --out-dir "$RUNNER_TEMP/docs-wheel"

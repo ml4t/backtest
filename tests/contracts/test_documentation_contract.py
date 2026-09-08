@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -84,3 +85,29 @@ def test_readme_satisfies_the_public_entry_point_contract() -> None:
             "uv run mkdocs build --strict",
         )
     )
+
+
+def test_documentation_identity_check_rejects_stale_rendered_metadata() -> None:
+    path = _ROOT / "validation" / "check_documentation_identity.py"
+    spec = importlib.util.spec_from_file_location("ml4t_documentation_identity", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    html = (
+        '<meta name="ml4t-library" content="backtest">'
+        '<meta name="ml4t-version" content="0.1.6">'
+        f'<meta name="ml4t-commit" content="{"1" * 40}">'
+    )
+    expected = {
+        "expected_library": "backtest",
+        "expected_version": "0.1.6",
+        "expected_commit": "1" * 40,
+        "source": "site/index.html",
+    }
+    assert module.identity_failures(html, **expected) == []
+
+    stale = html.replace('content="0.1.6"', 'content="0.1.5"')
+    assert module.identity_failures(stale, **expected) == [
+        "site/index.html: ml4t-version is '0.1.5', expected '0.1.6'"
+    ]
