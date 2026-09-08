@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 
-import pytest
-
-if importlib.util.find_spec("ml4t.diagnostic") is None:
-    pytest.skip("ml4t-diagnostic is an optional integration", allow_module_level=True)
-
-from ml4t.diagnostic.artifacts import dump_spec, load_market_data_spec, load_spec
-from ml4t.engineer.artifacts import FeatureSpec, LabelSpec, PredictionSpec
-from ml4t.specs import ArtifactKind, FeedSpec, MarketDataSpec, TimestampSemantics
+from ml4t.specs import (
+    ArtifactKind,
+    FeedSpec,
+    MarketDataSpec,
+    TimestampSemantics,
+    read_spec_payload,
+    write_spec_payload,
+)
 
 from ml4t.backtest.spec_bridge import (
     market_data_spec_to_feed_spec,
@@ -152,8 +151,8 @@ def test_spec_io_yaml_round_trip(tmp_path: Path) -> None:
         }
     )
 
-    path = dump_spec(spec, tmp_path / "market_data.yaml")
-    loaded = load_market_data_spec(path)
+    path = write_spec_payload(spec, tmp_path / "market_data.yaml")
+    loaded = MarketDataSpec.from_mapping(read_spec_payload(path))
 
     assert loaded == spec
 
@@ -169,72 +168,7 @@ def test_spec_io_json_round_trip(tmp_path: Path) -> None:
         }
     )
 
-    path = dump_spec(spec, tmp_path / "market_data.json")
-    loaded = load_market_data_spec(path)
+    path = write_spec_payload(spec, tmp_path / "market_data.json")
+    loaded = MarketDataSpec.from_mapping(read_spec_payload(path))
 
     assert loaded == spec
-
-
-def test_load_spec_dispatches_label_spec() -> None:
-    spec = load_spec(
-        {
-            "artifact_id": "us_equities_fwd_ret_1d_v1",
-            "kind": "labels",
-            "definition": {
-                "family": "forward_return",
-                "task_type": "regression",
-                "horizon": "1D",
-                "buffer": "1D",
-                "source_artifact": "us_equities_daily_bars_v1",
-            },
-        }
-    )
-
-    assert isinstance(spec, LabelSpec)
-    assert spec.definition.buffer == "1D"
-    assert spec.schema.entity_col == "asset"
-    assert spec.schema.label_col == "label_value"
-
-
-def test_load_spec_dispatches_feature_spec() -> None:
-    spec = load_spec(
-        {
-            "artifact_id": "us_equities_financial_features_v1",
-            "kind": "features",
-            "schema": {
-                "timestamp_col": "timestamp",
-                "feature_columns": ["mom_21", "vol_21"],
-            },
-            "definition": {
-                "family": "financial",
-                "join_keys": ["timestamp", "asset"],
-                "source_artifacts": ["us_equities_daily_bars_v1"],
-            },
-        }
-    )
-
-    assert isinstance(spec, FeatureSpec)
-    assert spec.schema.entity_col == "asset"
-    assert spec.schema.feature_columns == ("mom_21", "vol_21")
-    assert spec.definition.source_artifacts == ("us_equities_daily_bars_v1",)
-
-
-def test_load_spec_dispatches_prediction_spec() -> None:
-    spec = load_spec(
-        {
-            "artifact_id": "us_equities_preds_v1",
-            "kind": "predictions",
-            "definition": {
-                "split_protocol": "walk_forward_oos",
-                "label_artifact": "us_equities_fwd_ret_1d_v1",
-                "feature_artifacts": ["us_equities_financial_features_v1"],
-                "training_hash": "abc123",
-            },
-        }
-    )
-
-    assert isinstance(spec, PredictionSpec)
-    assert spec.schema.entity_col == "asset"
-    assert spec.schema.prediction_col == "prediction_value"
-    assert spec.definition.feature_artifacts == ("us_equities_financial_features_v1",)
-    assert spec.definition.training_hash == "abc123"
