@@ -7,6 +7,9 @@ on:
 env:
   UV_NO_SOURCES: "1"
 
+permissions:
+  contents: read
+
 jobs:
   stable:
     name: Stable (${{ matrix.os }}, Python ${{ matrix.python-version }})

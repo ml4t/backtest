@@ -131,7 +131,6 @@ extra:
   ml4t_library: backtest
   ml4t_version: !ENV [ML4T_DOCS_VERSION, development]
   ml4t_commit: !ENV [ML4T_DOCS_COMMIT, 0000000000000000000000000000000000000000]
-  ml4t_docs_hub_url: https://ml4trading.io/docs/
   ml4t_libraries_url: https://ml4trading.io/libraries/
   ml4t_chapters_url: https://ml4trading.io/chapters/
   social:
