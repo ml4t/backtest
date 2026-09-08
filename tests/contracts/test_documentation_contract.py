@@ -111,3 +111,44 @@ def test_documentation_identity_check_rejects_stale_rendered_metadata() -> None:
     assert module.identity_failures(stale, **expected) == [
         "site/index.html: ml4t-version is '0.1.5', expected '0.1.6'"
     ]
+
+
+def test_deployed_identity_check_retries_stale_content(monkeypatch) -> None:
+    path = _ROOT / "validation" / "check_documentation_identity.py"
+    spec = importlib.util.spec_from_file_location("ml4t_documentation_identity_retry", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    stale = (
+        '<meta name="ml4t-library" content="backtest">'
+        '<meta name="ml4t-version" content="0.1.5">'
+        f'<meta name="ml4t-commit" content="{"1" * 40}">'
+    )
+    current = stale.replace('content="0.1.5"', 'content="0.1.6"')
+    responses = iter((stale, current))
+    calls: list[str] = []
+    delays: list[float] = []
+
+    def read_url(url: str) -> str:
+        calls.append(url)
+        return next(responses)
+
+    monkeypatch.setattr(module, "_read_url", read_url)
+    monkeypatch.setattr(module.time, "sleep", delays.append)
+
+    failures = module.deployed_identity_failures(
+        ["https://www.ml4trading.io/docs/backtest/"],
+        expected_library="backtest",
+        expected_version="0.1.6",
+        expected_commit="1" * 40,
+        attempts=2,
+        delay=0.25,
+    )
+
+    assert failures == []
+    assert calls == [
+        "https://www.ml4trading.io/docs/backtest/",
+        "https://www.ml4trading.io/docs/backtest/",
+    ]
+    assert delays == [0.25]

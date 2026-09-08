@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 import urllib.error
 import urllib.request
 from html.parser import HTMLParser
@@ -64,6 +65,39 @@ def _read_url(url: str) -> str:
         return response.read().decode("utf-8")
 
 
+def deployed_identity_failures(
+    urls: list[str],
+    *,
+    expected_library: str,
+    expected_version: str,
+    expected_commit: str,
+    attempts: int,
+    delay: float,
+) -> list[str]:
+    """Retry deployed pages until every URL reports one release identity."""
+    failures: list[str] = []
+    for attempt in range(1, attempts + 1):
+        failures = []
+        try:
+            for url in urls:
+                failures.extend(
+                    identity_failures(
+                        _read_url(url),
+                        expected_library=expected_library,
+                        expected_version=expected_version,
+                        expected_commit=expected_commit,
+                        source=url,
+                    )
+                )
+        except (OSError, UnicodeDecodeError, urllib.error.URLError, ValueError) as error:
+            failures = [str(error)]
+        if not failures:
+            break
+        if attempt < attempts:
+            time.sleep(delay)
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     source = parser.add_mutually_exclusive_group(required=True)
@@ -72,7 +106,12 @@ def main() -> int:
     parser.add_argument("--expected-library", required=True)
     parser.add_argument("--expected-version", required=True)
     parser.add_argument("--expected-commit", required=True)
+    parser.add_argument("--attempts", type=int, default=1)
+    parser.add_argument("--delay", type=float, default=0.0)
     args = parser.parse_args()
+
+    if args.attempts < 1 or args.delay < 0:
+        parser.error("--attempts must be positive and --delay must be non-negative")
 
     if len(args.expected_commit) != 40 or any(
         character not in "0123456789abcdef" for character in args.expected_commit
@@ -95,19 +134,19 @@ def main() -> int:
                         source=str(page),
                     )
                 )
-        else:
-            for url in args.url:
-                failures.extend(
-                    identity_failures(
-                        _read_url(url),
-                        expected_library=args.expected_library,
-                        expected_version=args.expected_version,
-                        expected_commit=args.expected_commit,
-                        source=url,
-                    )
-                )
     except (OSError, UnicodeDecodeError, urllib.error.URLError, ValueError) as error:
         failures.append(str(error))
+    if args.url is not None:
+        failures.extend(
+            deployed_identity_failures(
+                args.url,
+                expected_library=args.expected_library,
+                expected_version=args.expected_version,
+                expected_commit=args.expected_commit,
+                attempts=args.attempts,
+                delay=args.delay,
+            )
+        )
 
     for failure in failures:
         print(failure)

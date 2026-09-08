@@ -11,6 +11,7 @@ validation/generate_parity_claims.py
 validation/performance_baseline.py
 validation/release_candidate.py
 validation/run_all_correctness.py
+validation/release_preflight.py
 validation/run_lean_case_studies.py
 validation/common/canonical_records.py
 validation/common/capabilities.py
