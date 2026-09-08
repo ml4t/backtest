@@ -64,11 +64,16 @@ class LinearImpact(MarketImpactModel):
     Simple model where impact scales linearly with participation rate.
     Appropriate for liquid markets with moderate order sizes.
 
+    Like every model here it is a single-order concession model: `calculate` sees one
+    order, and the impact it returns is charged to that order's fill price only. Nothing
+    is carried into the price for later orders, so a parent order worked in slices is
+    charged the same concession on every slice. A caller who needs permanent impact -
+    the part of the move that does not revert and is paid again by every later slice -
+    accumulates it outside the model.
+
     Args:
         coefficient: Impact scaling factor (default 0.1)
                     Higher values = more impact per unit participation
-        permanent_fraction: Fraction of impact that is permanent (0-1)
-                           Remainder is temporary and reverts
 
     Example:
         model = LinearImpact(coefficient=0.1)
@@ -76,7 +81,6 @@ class LinearImpact(MarketImpactModel):
     """
 
     coefficient: float = 0.1
-    permanent_fraction: float = 0.5
 
     def calculate(
         self,

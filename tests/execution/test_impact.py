@@ -2,6 +2,8 @@
 
 import math
 
+import pytest
+
 from ml4t.backtest.execution.impact import (
     LinearImpact,
     NoImpact,
@@ -39,7 +41,6 @@ class TestLinearImpact:
         """Test default configuration."""
         model = LinearImpact()
         assert model.coefficient == 0.1
-        assert model.permanent_fraction == 0.5
 
     def test_buy_positive_impact(self):
         """Test that buy orders have positive impact (price goes up)."""
@@ -245,3 +246,32 @@ class TestPowerLawImpact:
 
         # With exponent=0.25, 16x quantity = 2x impact (16^0.25 = 2)
         assert abs(impact_16000 / impact_1000 - 2.0) < 0.1
+
+
+class TestImpactModelsAreSingleOrderConcessions:
+    """No model here carries impact into the price for the orders that follow it."""
+
+    MODELS = (
+        NoImpact(),
+        LinearImpact(coefficient=0.1),
+        SquareRootImpact(coefficient=0.5, volatility=0.02),
+        PowerLawImpact(coefficient=0.1, exponent=0.5),
+    )
+
+    def test_repeated_slices_are_charged_the_same_concession(self):
+        """A parent order worked in ten equal slices pays the first slice's price ten times.
+
+        This is the property that a permanent-impact parameter would have to break. It
+        holds for every model, which is why `LinearImpact` no longer advertises one.
+        """
+        for model in self.MODELS:
+            charges = [
+                model.calculate(quantity=1000.0, price=100.0, volume=100_000.0, is_buy=True)
+                for _ in range(10)
+            ]
+            assert len(set(charges)) == 1, f"{type(model).__name__} is not stateless"
+
+    def test_linear_impact_rejects_a_persistence_parameter(self):
+        """The parameter was settable and never read; setting it must now fail loudly."""
+        with pytest.raises(TypeError):
+            LinearImpact(coefficient=0.1, permanent_fraction=0.8)  # type: ignore[call-arg]
