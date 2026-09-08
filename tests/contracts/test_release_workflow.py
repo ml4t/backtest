@@ -236,6 +236,19 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
         step.get("run", "") for step in release_jobs["preflight"]["steps"]
     )
     assert "validation/release_preflight.py" in preflight_commands
+    for job_name in (
+        "preflight",
+        "deploy-documentation",
+        "publish",
+        "tag-and-release",
+        "post-release",
+    ):
+        checkout = next(
+            step
+            for step in release_jobs[job_name]["steps"]
+            if step.get("uses", "").startswith("actions/checkout@")
+        )
+        assert checkout["with"]["ref"] == "${{ github.sha }}"
 
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
     assert release_jobs["qualification"]["needs"] == "preflight"
