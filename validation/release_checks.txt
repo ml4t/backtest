@@ -1,6 +1,7 @@
 validation/check_artifacts.py
 validation/check_coverage.py
 validation/check_documentation_examples.py
+validation/check_documentation_identity.py
 validation/check_security.py
 validation/build_framework_env.py
 validation/cross_framework_performance.py
@@ -10,6 +11,7 @@ validation/generate_parity_claims.py
 validation/performance_baseline.py
 validation/release_candidate.py
 validation/run_all_correctness.py
+validation/release_preflight.py
 validation/run_lean_case_studies.py
 validation/common/canonical_records.py
 validation/common/capabilities.py

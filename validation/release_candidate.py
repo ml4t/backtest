@@ -109,6 +109,7 @@ def create_manifest(
     commit: str,
     repository: str,
     gates: dict[str, str],
+    expected_version: str | None = None,
 ) -> dict[str, object]:
     if _COMMIT.fullmatch(commit) is None:
         raise ValueError("Release candidate commit must be a full lowercase SHA")
@@ -121,6 +122,8 @@ def create_manifest(
     if len(paths) != 2 or sum(path.suffix == ".whl" for path in paths) != 1:
         raise ValueError("Release candidate requires exactly one wheel and one source distribution")
     package_name, package_version = _package_identity(paths)
+    if expected_version is not None and package_version != expected_version:
+        raise ValueError(f"Candidate version differs: {package_version!r} != {expected_version!r}")
     return {
         "schema_version": _SCHEMA_VERSION,
         "source": {"repository": repository, "commit": commit},
@@ -139,6 +142,7 @@ def candidate_failures(
     expected_commit: str,
     expected_repository: str,
     expected_tag: str | None = None,
+    expected_version: str | None = None,
 ) -> list[str]:
     failures: list[str] = []
     if manifest.get("schema_version") != _SCHEMA_VERSION:
@@ -169,7 +173,15 @@ def candidate_failures(
     package = _object_mapping(manifest.get("package"))
     if package is None:
         failures.append("Candidate package must be an object")
-    elif expected_tag is not None and expected_tag != f"v{package.get('version')}":
+    elif expected_version is not None and package.get("version") != expected_version:
+        failures.append(
+            f"Candidate version differs: {package.get('version')!r} != {expected_version!r}"
+        )
+    if (
+        package is not None
+        and expected_tag is not None
+        and expected_tag != f"v{package.get('version')}"
+    ):
         failures.append(
             f"Release tag does not match candidate version: {expected_tag!r} != "
             f"'v{package.get('version')}'"
@@ -280,6 +292,7 @@ def main() -> int:
     create.add_argument("--repository", required=True)
     create.add_argument("--gate", action="append", default=[])
     create.add_argument("--output", type=Path, required=True)
+    create.add_argument("--expected-version")
 
     verify = subparsers.add_parser("verify")
     verify.add_argument("--dist", type=Path, required=True)
@@ -287,6 +300,7 @@ def main() -> int:
     verify.add_argument("--expected-commit", required=True)
     verify.add_argument("--expected-repository", required=True)
     verify.add_argument("--expected-tag")
+    verify.add_argument("--expected-version")
 
     verify_index = subparsers.add_parser("verify-index")
     verify_index.add_argument("--manifest", type=Path, required=True)
@@ -302,6 +316,7 @@ def main() -> int:
                 commit=args.commit,
                 repository=args.repository,
                 gates=_parse_gates(args.gate),
+                expected_version=args.expected_version,
             )
             args.output.write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -315,6 +330,7 @@ def main() -> int:
                 expected_commit=args.expected_commit,
                 expected_repository=args.expected_repository,
                 expected_tag=args.expected_tag,
+                expected_version=args.expected_version,
             )
         else:
             package = _object_mapping(manifest.get("package"))

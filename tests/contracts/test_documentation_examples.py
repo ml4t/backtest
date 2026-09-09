@@ -43,9 +43,9 @@ def test_documentation_ci_installs_wheel_before_running_examples() -> None:
         (_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"),
         Loader=yaml.BaseLoader,
     )
-    commands = "\n".join(step.get("run", "") for step in workflow["jobs"]["documentation"]["steps"])
+    commands = "\n".join(step.get("run", "") for step in workflow["jobs"]["build"]["steps"])
 
-    build = commands.index("uv build --wheel")
+    build = commands.index("uv build")
     install = commands.index("uv pip install")
     execute = commands.index("validation/check_documentation_examples.py")
     assert build < install < execute

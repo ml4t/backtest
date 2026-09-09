@@ -1,10 +1,10 @@
 # ml4t-backtest
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12-3.14](https://img.shields.io/badge/python-3.12--3.14-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/ml4t-backtest)](https://pypi.org/project/ml4t-backtest/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Event-driven backtesting engine for quantitative trading strategies with realistic execution modeling.
+Event-driven backtesting for quantitative strategies with configurable execution, accounting, risk, and framework-parity validation.
 
 ## Part of the ML4T Library Ecosystem
 
@@ -34,9 +34,26 @@ The same Strategy class used in backtesting works unchanged in ml4t-live for pro
 
 ## Installation
 
+`ml4t-backtest` supports CPython 3.12, 3.13, and 3.14 on Linux, macOS, and Windows.
+
 ```bash
-pip install ml4t-backtest
+uv add ml4t-backtest
 ```
+
+The core package and quick start require no external service or special hardware. Optional extras
+are isolated by capability:
+
+```bash
+uv add 'ml4t-backtest[viz]'         # Plotly, Matplotlib, and Dash reporting
+uv add 'ml4t-backtest[advanced]'    # Graph routing and portfolio optimization
+uv add 'ml4t-backtest[comparison]'  # Public framework-comparison dependencies
+```
+
+The comparison extra does not include licensed VectorBT Pro or the containerized LEAN engine.
+Those validation environments require their own repository access or container runtime and are
+not part of normal library use. See the
+[installation guide](https://www.ml4trading.io/docs/backtest/getting-started/installation/)
+for supported setup paths.
 
 ## Quick Start
 
@@ -410,17 +427,17 @@ ranking.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started/quickstart.md) — your first backtest
-- [Data Feed](docs/user-guide/data-feed.md) — `price_col`, quote columns, and feed wiring
-- [Strategies](docs/user-guide/strategies.md) — strategy interface and templates
-- [Stateful Strategies](docs/user-guide/stateful-strategies.md) — advanced event-driven patterns (Kelly sizing, pairs trading, circuit breakers)
-- [Execution Semantics](docs/user-guide/execution-semantics.md) — fill timing, ordering, stops
-- [Configuration](docs/user-guide/configuration.md) — 40+ behavioral knobs
-- [Risk Management](docs/user-guide/risk-management.md) — stops, trails, portfolio limits
-- [Rebalancing](docs/user-guide/rebalancing.md) — weight-based portfolio management
-- [Results & Analysis](docs/user-guide/results.md) — trades, fills, equity, and Parquet export
-- [Market Impact](docs/user-guide/market-impact.md) — commission, slippage, and impact models
-- [Profiles](docs/user-guide/profiles.md) — framework parity presets
+- [Getting Started](docs/getting-started/quickstart.md) - your first backtest
+- [Data Feed](docs/user-guide/data-feed.md) - `price_col`, quote columns, and feed wiring
+- [Strategies](docs/user-guide/strategies.md) - strategy interface and templates
+- [Stateful Strategies](docs/user-guide/stateful-strategies.md) - advanced event-driven patterns (Kelly sizing, pairs trading, circuit breakers)
+- [Execution Semantics](docs/user-guide/execution-semantics.md) - fill timing, ordering, stops
+- [Configuration](docs/user-guide/configuration.md) - 40+ behavioral knobs
+- [Risk Management](docs/user-guide/risk-management.md) - stops, trails, portfolio limits
+- [Rebalancing](docs/user-guide/rebalancing.md) - weight-based portfolio management
+- [Results & Analysis](docs/user-guide/results.md) - trades, fills, equity, and Parquet export
+- [Market Impact](docs/user-guide/market-impact.md) - commission, slippage, and impact models
+- [Profiles](docs/user-guide/profiles.md) - framework parity presets
 
 ## Technical Characteristics
 
@@ -443,10 +460,17 @@ ranking.
 ```bash
 git clone https://github.com/ml4t/backtest.git
 cd backtest
-uv sync
-uv run pytest tests/ -q
+uv sync --dev --extra docs --locked
+uv run ruff check src/ tests/ validation/
+uv run ruff format --check src/ tests/ validation/
 uv run ty check
+uv run pytest tests/ -q
+uv run mkdocs build --strict
 ```
+
+Release-critical validation files are listed in
+[`validation/release_checks.txt`](validation/release_checks.txt). CI runs the supported gate set,
+including compatibility, security, parity, and artifact qualification.
 
 ## Known Limitations
 
@@ -458,4 +482,11 @@ See [LIMITATIONS.md](LIMITATIONS.md) for documented assumptions:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+ML4T Backtest uses the [MIT License](LICENSE).
+
+## Project Links
+
+- [Documentation](https://www.ml4trading.io/docs/backtest/)
+- [Issue tracker](https://github.com/ml4t/backtest/issues)
+- [Release notes](https://github.com/ml4t/backtest/releases)
+- [Source repository](https://github.com/ml4t/backtest)

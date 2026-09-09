@@ -2,9 +2,15 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      release-version:
+        description: Exact package version for a release-candidate build
+        required: false
+        type: string
   push:
     branches: [main, develop]
   pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -18,6 +24,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -251,6 +267,8 @@ jobs:
   documentation:
     name: Documentation
     runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ inputs.release-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -265,29 +283,41 @@ jobs:
       - name: Install documentation dependencies
         run: uv sync --dev --extra docs --locked
 
+      - name: Record documentation identity
+        run: |
+          version="$RELEASE_VERSION"
+          if test -z "$version"; then
+            version="$(uv run python -c 'import ml4t.backtest as package; print(package.__version__)')"
+          fi
+          echo "ML4T_DOCS_VERSION=$version" >> "$GITHUB_ENV"
+          echo "ML4T_DOCS_COMMIT=$GITHUB_SHA" >> "$GITHUB_ENV"
+
       - name: Build documentation with strict validation
         run: uv run mkdocs build --strict
 
-      - name: Build candidate wheel for documentation examples
-        run: uv build --wheel --out-dir "$RUNNER_TEMP/docs-wheel"
-
-      - name: Install candidate wheel in an isolated environment
-        run: |
-          uv venv "$RUNNER_TEMP/docs-venv"
-          uv pip install \
-            --python "$RUNNER_TEMP/docs-venv/bin/python" \
-            "$RUNNER_TEMP"/docs-wheel/*.whl
-
-      - name: Execute selected documentation examples against the wheel
+      - name: Verify rendered documentation identity
         run: >-
-          "$RUNNER_TEMP/docs-venv/bin/python"
-          validation/check_documentation_examples.py
+          uv run python validation/check_documentation_identity.py
+          --site site
+          --expected-library backtest
+          --expected-version "$ML4T_DOCS_VERSION"
+          --expected-commit "$ML4T_DOCS_COMMIT"
+
+      - name: Retain immutable documentation artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-${{ github.sha }}
+          path: site/
+          if-no-files-found: error
+          retention-days: 90
 
   build:
     name: Build Package
     runs-on: ubuntu-latest
     needs:
       [lint, typecheck, compatibility, security, coverage, runtime, public-parity, documentation]
+    env:
+      RELEASE_VERSION: ${{ inputs.release-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -302,16 +332,36 @@ jobs:
         run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Build package
-        run: uv build
+        run: |
+          if test -n "$RELEASE_VERSION"; then
+            export SETUPTOOLS_SCM_PRETEND_VERSION="$RELEASE_VERSION"
+          fi
+          uv build
 
       - name: Rebuild package for reproducibility
-        run: uv build --out-dir dist-rebuild
+        run: |
+          if test -n "$RELEASE_VERSION"; then
+            export SETUPTOOLS_SCM_PRETEND_VERSION="$RELEASE_VERSION"
+          fi
+          uv build --out-dir dist-rebuild
 
       - name: Validate distribution contents and reproducibility
         run: uv run python validation/check_artifacts.py dist --compare dist-rebuild
 
       - name: Validate package metadata and long description
         run: uvx twine check dist/*
+
+      - name: Install the candidate wheel in a clean environment
+        run: |
+          uv venv --clear --python "${{ env.PYTHON_VERSION }}" "$RUNNER_TEMP/candidate-venv"
+          uv pip install \
+            --python "$RUNNER_TEMP/candidate-venv/bin/python" \
+            dist/*.whl
+
+      - name: Execute the documented quick starts against the wheel
+        run: >-
+          "$RUNNER_TEMP/candidate-venv/bin/python"
+          validation/check_documentation_examples.py
 
       - name: Verify source provenance
         run: |
@@ -322,10 +372,15 @@ jobs:
         run: |
           mkdir -p release-candidate/dist
           cp dist/* release-candidate/dist/
+          version_args=()
+          if test -n "$RELEASE_VERSION"; then
+            version_args=(--expected-version "$RELEASE_VERSION")
+          fi
           uv run python validation/release_candidate.py create \
             --dist release-candidate/dist \
             --commit "$GITHUB_SHA" \
             --repository "$GITHUB_REPOSITORY" \
+            "${version_args[@]}" \
             --gate compatibility=${{ needs.compatibility.result }} \
             --gate correctness=${{ needs.public-parity.result }} \
             --gate coverage=${{ needs.coverage.result }} \
@@ -341,7 +396,8 @@ jobs:
             --dist release-candidate/dist \
             --manifest release-candidate/release-candidate.json \
             --expected-commit "$GITHUB_SHA" \
-            --expected-repository "$GITHUB_REPOSITORY"
+            --expected-repository "$GITHUB_REPOSITORY" \
+            "${version_args[@]}"
 
       - name: Upload exact release candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -160,11 +160,18 @@ def test_ci_and_release_both_require_the_evidence_retaining_security_workflow() 
 
     assert ci_jobs["security"]["uses"] == "./.github/workflows/security.yml"
     assert "security" in ci_jobs["build"]["needs"]
+    dependency_review = ci_jobs["dependency-review"]
+    assert dependency_review["if"] == "github.event_name == 'pull_request'"
+    assert any(
+        "actions/dependency-review-action" in step.get("uses", "")
+        for step in dependency_review["steps"]
+    )
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
-    assert set(release_jobs["publish"]["needs"]) >= {
+    assert set(release_jobs["deploy-documentation"]["needs"]) >= {
         "ecosystem-qualification",
         "qualification",
     }
+    assert "deploy-documentation" in release_jobs["publish"]["needs"]
 
     scan = security["jobs"]["scan"]
     commands = "\n".join(step.get("run", "") for step in scan["steps"])

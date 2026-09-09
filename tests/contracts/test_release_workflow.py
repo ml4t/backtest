@@ -25,6 +25,15 @@ def _load_release_candidate() -> ModuleType:
     return module
 
 
+def _load_release_preflight() -> ModuleType:
+    path = _ROOT / "validation" / "release_preflight.py"
+    spec = importlib.util.spec_from_file_location("ml4t_release_preflight", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _workflow(name: str) -> dict:
     payload = yaml.load(
         (_ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8"),
@@ -57,6 +66,31 @@ def _manifest(tmp_path: Path) -> tuple[ModuleType, dict[str, object]]:
         gates=gates,
     )
     return candidate, manifest
+
+
+def test_preflight_rejects_non_main_reused_and_unstable_candidates() -> None:
+    preflight = _load_release_preflight()
+
+    failures = preflight.preflight_failures(
+        version="0.2.0rc1",
+        candidate_commit=_COMMIT,
+        workflow_commit="2" * 40,
+        checkout_commit="3" * 40,
+        main_commit="4" * 40,
+        tag_exists=True,
+        release_exists=True,
+        pypi_exists=True,
+    )
+
+    assert failures == [
+        "Release version must be a stable X.Y.Z value: '0.2.0rc1'",
+        f"Candidate commit differs from workflow: {_COMMIT!r} != {'2' * 40!r}",
+        f"Candidate commit differs from checkout: {_COMMIT!r} != {'3' * 40!r}",
+        f"Candidate commit differs from origin/main: {_COMMIT!r} != {'4' * 40!r}",
+        "Git tag already exists: v0.2.0rc1",
+        "GitHub release already exists: v0.2.0rc1",
+        "PyPI version already exists: 0.2.0rc1",
+    ]
 
 
 def test_candidate_rejects_missing_and_failed_release_gates(tmp_path: Path) -> None:
@@ -93,6 +127,32 @@ def test_candidate_rejects_stale_commit_tag_and_changed_artifact(tmp_path: Path)
     assert any("commit is stale" in failure for failure in failures)
     assert any("tag does not match" in failure for failure in failures)
     assert f"Candidate digest mismatch: {wheel.name}" in failures
+
+
+def test_candidate_rejects_a_version_other_than_the_requested_release(tmp_path: Path) -> None:
+    candidate, manifest = _manifest(tmp_path)
+
+    failures = candidate.candidate_failures(
+        manifest,
+        tmp_path,
+        expected_commit=_COMMIT,
+        expected_repository=_REPOSITORY,
+        expected_version="0.1.1",
+    )
+
+    assert failures == ["Candidate version differs: '0.1.0' != '0.1.1'"]
+    try:
+        candidate.create_manifest(
+            tmp_path,
+            commit=_COMMIT,
+            repository=_REPOSITORY,
+            gates=dict.fromkeys(candidate.REQUIRED_GATES, "success"),
+            expected_version="0.1.1",
+        )
+    except ValueError as error:
+        assert str(error) == "Candidate version differs: '0.1.0' != '0.1.1'"
+    else:
+        raise AssertionError("A mismatched release version must be rejected")
 
 
 def test_candidate_rejects_missing_and_undeclared_distributions(tmp_path: Path) -> None:
@@ -169,15 +229,43 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
     for gate in _load_release_candidate().REQUIRED_GATES:
         assert f"--gate {gate}=" in build_commands
 
+    assert set(release["on"]) == {"workflow_dispatch"}
+    inputs = release["on"]["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {"version", "candidate-commit"}
+    preflight_commands = "\n".join(
+        step.get("run", "") for step in release_jobs["preflight"]["steps"]
+    )
+    assert "validation/release_preflight.py" in preflight_commands
+    for job_name in (
+        "preflight",
+        "deploy-documentation",
+        "publish",
+        "tag-and-release",
+        "post-release",
+    ):
+        checkout = next(
+            step
+            for step in release_jobs[job_name]["steps"]
+            if step.get("uses", "").startswith("actions/checkout@")
+        )
+        assert checkout["with"]["ref"] == "${{ github.sha }}"
+
     assert release_jobs["qualification"]["uses"] == "./.github/workflows/ci.yml"
+    assert release_jobs["qualification"]["needs"] == "preflight"
+    assert release_jobs["qualification"]["with"]["release-version"] == (
+        "${{ needs.preflight.outputs.version }}"
+    )
     assert release_jobs["private-comparisons"]["uses"] == (
         "./.github/workflows/private-comparisons.yml"
     )
-    assert release_jobs["publish"]["needs"] == [
+    assert set(release_jobs["deploy-documentation"]["needs"]) == {
+        "preflight",
         "ecosystem-qualification",
         "private-comparisons",
         "qualification",
-    ]
+    }
+    assert release_jobs["deploy-documentation"]["environment"] == "documentation"
+    assert release_jobs["publish"]["needs"] == ["preflight", "deploy-documentation"]
     assert release_jobs["publish"]["permissions"] == {
         "contents": "read",
         "id-token": "write",
@@ -188,10 +276,20 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
     )
     assert publish["with"]["packages-dir"] == "candidate/dist/"
     assert not ({"user", "password"} & set(publish["with"]))
-    assert "release_candidate.py verify" in "\n".join(step.get("run", "") for step in publish_steps)
-    assert release_jobs["verify-pypi"]["needs"] == "publish"
-    assert release_jobs["github-release"]["needs"] == "verify-pypi"
-    assert "if" not in release_jobs["github-release"]
+    publish_commands = "\n".join(step.get("run", "") for step in publish_steps)
+    assert "release_candidate.py verify" in publish_commands
+    assert "--expected-version" in publish_commands
+    assert release_jobs["tag-and-release"]["needs"] == ["preflight", "publish"]
+    assert release_jobs["post-release"]["needs"] == ["preflight", "tag-and-release"]
+    post_commands = "\n".join(step.get("run", "") for step in release_jobs["post-release"]["steps"])
+    assert "release_candidate.py verify-index" in post_commands
+    assert "gh release download" in post_commands
+    assert "ml4t-backtest==${{ needs.preflight.outputs.version }}" in post_commands
+    recovery = release_jobs["record-recovery"]
+    assert "needs.publish.result == 'success'" in recovery["if"]
+    recovery_commands = "\n".join(step.get("run", "") for step in recovery["steps"])
+    assert "Rerun only the failed jobs" in recovery_commands
+    assert "Do not rebuild or reuse this version" in recovery_commands
 
 
 def test_private_comparison_workflow_pins_and_retains_evidence() -> None:
