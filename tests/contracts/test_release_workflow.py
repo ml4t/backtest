@@ -285,6 +285,7 @@ def test_release_reuses_all_ci_gates_and_publishes_the_exact_candidate() -> None
     assert "release_candidate.py verify-index" in post_commands
     assert "gh release download" in post_commands
     assert "ml4t-backtest==${{ needs.preflight.outputs.version }}" in post_commands
+    assert "--refresh-package ml4t-backtest" in post_commands
     recovery = release_jobs["record-recovery"]
     assert "needs.publish.result == 'success'" in recovery["if"]
     recovery_commands = "\n".join(step.get("run", "") for step in recovery["steps"])
