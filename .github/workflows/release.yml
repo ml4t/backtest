@@ -250,7 +250,7 @@ jobs:
       - name: Install and exercise the published wheel
         run: |
           uv venv --clear --python 3.12 "$RUNNER_TEMP/published-venv"
-          uv pip install --python "$RUNNER_TEMP/published-venv/bin/python" --index-url https://pypi.org/simple "ml4t-backtest==${{ needs.preflight.outputs.version }}"
+          uv pip install --python "$RUNNER_TEMP/published-venv/bin/python" --index-url https://pypi.org/simple --refresh-package ml4t-backtest "ml4t-backtest==${{ needs.preflight.outputs.version }}"
           "$RUNNER_TEMP/published-venv/bin/python" -I -c "import ml4t.backtest as package; assert package.__version__ == '${{ needs.preflight.outputs.version }}'"
           "$RUNNER_TEMP/published-venv/bin/python" validation/check_documentation_examples.py
 
