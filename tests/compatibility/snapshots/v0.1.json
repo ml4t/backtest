@@ -2696,7 +2696,7 @@
       },
       "module": "ml4t.backtest.execution.impact",
       "qualname": "LinearImpact",
-      "signature": "(coefficient: float = 0.1, permanent_fraction: float = 0.5) -> None"
+      "signature": "(coefficient: float = 0.1) -> None"
     },
     "ml4t.backtest.execution:NoImpact": {
       "kind": "class",
