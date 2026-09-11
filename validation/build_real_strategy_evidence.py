@@ -28,15 +28,18 @@ VALIDATION_DIR = Path(__file__).resolve().parent
 if str(VALIDATION_DIR) not in sys.path:
     sys.path.insert(0, str(VALIDATION_DIR))
 
-from real_strategy_benchmark import (  # noqa: E402
+from real_strategy_benchmark import (  # noqa: E402, I001
     BUNDLES,
-    PROJECT_ROOT,
     VALIDATION_DIR as _BENCHMARK_VALIDATION_DIR,
     _command,
     _run_once,
 )
 
 APPLICABILITY_PATH = VALIDATION_DIR / "real_strategy_applicability.toml"
+# The benchmark resolves its own VALIDATION_DIR independently. If the two ever
+# disagree this script would enumerate one applicability file and shell out with
+# paths derived from another, so tie them together here rather than trusting that
+# two `Path(__file__)` expressions in the same directory stay in agreement.
 assert _BENCHMARK_VALIDATION_DIR == VALIDATION_DIR
 
 

@@ -1,5 +1,5 @@
 {
-  "correctness_evidence_generated_at": "2026-09-03T08:49:07.253544+00:00",
+  "correctness_evidence_generated_at": "2026-09-11T22:46:21.943835+00:00",
   "environment": {
     "cpu_count": 24,
     "frameworks": {
@@ -101,6 +101,29 @@
   },
   "generated_at": "2026-09-03T11:44:14.344493+00:00",
   "provenance": {
+    "certified_equivalent_sources": [
+      {
+        "certified_at": "2026-09-11T23:03:52.881741+00:00",
+        "correctness_evidence_generated_at": "2026-09-11T22:46:21.943835+00:00",
+        "correctness_evidence_sha256": "a18591c6d0e3ccf686dc6591f855a81b3052f0a50106d6b4e6fa1062f7d60819",
+        "correctness_pairs_passed": 17,
+        "engine_source_sha256": "d625ed4aec3e4cd745f2ebd5138d9f6177c187f53cf6fe613d258a952d99a744",
+        "ml4t_commit": "5441ca6290710d5f4f6f39d29fbac41ae6f58e8f",
+        "reason": "Removed the LinearImpact.permanent_fraction constructor parameter, which calculate() never read. No code path consumed it, so no arithmetic, allocation or branch changed, and the 17 required pairs re-derive byte-identical metrics under the new source. _tree_digest hashes every tracked .py under the engine, so this docstring-scale edit moves the digest as far as a rewritten fill model would.",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "0ccc3c90786dc6bc7b8d5992097cd977e2568c39c20f1490d83531b20e6a5188",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      }
+    ],
     "ml4t_engine_source_sha256": "8011ecdaf90807b4fe4fb5ada518a237311774b32891179bf1fad0a0baad8a58",
     "sources": {
       "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
