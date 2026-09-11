@@ -1,8 +1,12 @@
 """Market impact models for realistic execution costs."""
 
 import math
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
+
+PERMANENT_FRACTION_DEFAULT = 0.5
 
 
 class MarketImpactModel(ABC):
@@ -74,6 +78,9 @@ class LinearImpact(MarketImpactModel):
     Args:
         coefficient: Impact scaling factor (default 0.1)
                     Higher values = more impact per unit participation
+        permanent_fraction: Deprecated and inert; scheduled for removal in 0.2.0.
+                    `calculate` has never read it, so every value charges the same
+                    price. Setting it to anything but its default warns.
 
     Example:
         model = LinearImpact(coefficient=0.1)
@@ -81,6 +88,34 @@ class LinearImpact(MarketImpactModel):
     """
 
     coefficient: float = 0.1
+    permanent_fraction: float = PERMANENT_FRACTION_DEFAULT
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Warn once per assignment that sets the inert persistence parameter.
+
+        The warning goes here rather than in `__post_init__` because the field is
+        settable after construction as well as through it, and a model assembled and
+        then adjusted is the case that most looks like it is configuring something.
+        A non-frozen dataclass routes `__init__` through `__setattr__` too, so one
+        guard covers both and fires once each time a value is actually set.
+
+        The default is the one value that does not warn, because a dataclass cannot
+        tell a caller who passed 0.5 from one who passed nothing. Leaving it alone is
+        also the case that loses nothing when the field goes: the model charges the
+        same price either way.
+        """
+        if name == "permanent_fraction" and value != PERMANENT_FRACTION_DEFAULT:
+            warnings.warn(
+                "LinearImpact.permanent_fraction is inert and will be removed in "
+                "ml4t-backtest 0.2.0. calculate() has never read it, so this model "
+                "charges the same impact at every value; the engine applies an impact "
+                "model to one order at a time and has no state in which a permanent "
+                "component could persist into later fills. Accumulate permanent impact "
+                "in the caller instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        super().__setattr__(name, value)
 
     def calculate(
         self,

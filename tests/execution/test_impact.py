@@ -1,6 +1,7 @@
 """Tests for market impact models."""
 
 import math
+import warnings
 
 import pytest
 
@@ -41,6 +42,7 @@ class TestLinearImpact:
         """Test default configuration."""
         model = LinearImpact()
         assert model.coefficient == 0.1
+        assert model.permanent_fraction == 0.5
 
     def test_buy_positive_impact(self):
         """Test that buy orders have positive impact (price goes up)."""
@@ -262,7 +264,8 @@ class TestImpactModelsAreSingleOrderConcessions:
         """A parent order worked in ten equal slices pays the first slice's price ten times.
 
         This is the property that a permanent-impact parameter would have to break. It
-        holds for every model, which is why `LinearImpact` no longer advertises one.
+        holds for every model, which is why `LinearImpact.permanent_fraction` is
+        deprecated rather than implemented.
         """
         for model in self.MODELS:
             charges = [
@@ -271,7 +274,34 @@ class TestImpactModelsAreSingleOrderConcessions:
             ]
             assert len(set(charges)) == 1, f"{type(model).__name__} is not stateless"
 
-    def test_linear_impact_rejects_a_persistence_parameter(self):
-        """The parameter was settable and never read; setting it must now fail loudly."""
-        with pytest.raises(TypeError):
-            LinearImpact(coefficient=0.1, permanent_fraction=0.8)  # type: ignore[call-arg]
+    def test_setting_permanent_fraction_warns_and_changes_nothing(self):
+        """The parameter was settable, silent and never read; it must now say so.
+
+        Both halves are asserted because either alone would pass a broken
+        implementation: a warning that also changed the charge would be a behaviour
+        change nobody asked for, and an unchanged charge with no warning is the defect.
+        """
+        with pytest.warns(DeprecationWarning, match="removed in ml4t-backtest 0.2.0"):
+            loud = LinearImpact(coefficient=0.1, permanent_fraction=0.8)
+        quiet = LinearImpact(coefficient=0.1)
+        args = {"quantity": 100_000.0, "price": 100.0, "volume": 1_000_000.0, "is_buy": True}
+        assert loud.calculate(**args) == quiet.calculate(**args)
+
+    def test_assigning_permanent_fraction_after_construction_warns(self):
+        """A dataclass field is settable after `__init__`, and that path warned too."""
+        model = LinearImpact(coefficient=0.1)
+        with pytest.warns(DeprecationWarning, match="removed in ml4t-backtest 0.2.0"):
+            model.permanent_fraction = 0.8
+
+    def test_leaving_permanent_fraction_at_its_default_is_silent(self):
+        """A caller who never touches the field is not warned about it.
+
+        `LinearImpact()` and an explicit `permanent_fraction=0.5` are indistinguishable
+        to a dataclass, so the default is the one value that cannot warn. Pinned as the
+        negative case: without it the warning could fire on every construction and the
+        two tests above would still pass.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            LinearImpact()
+            LinearImpact(coefficient=0.2, permanent_fraction=0.5)
