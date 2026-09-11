@@ -20,7 +20,7 @@
       "us_equities_panel": "session date"
     }
   },
-  "generated_at": "2026-09-08T20:39:08.460346+00:00",
+  "generated_at": "2026-09-03T08:49:07.253544+00:00",
   "provenance": {
     "adapters": {
       "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
@@ -131,12 +131,12 @@
     },
     "machine": "x86_64",
     "ml4t": {
-      "commit": "85c0291447214730bd3328b14b73eb2f64cf9f2c",
+      "commit": "7034236519cc0a99df6ef34a21d07ec2a81fc87c",
       "dirty": false,
-      "engine_source_sha256": "8078ba760b8076c9f3ba3b087bf50aaf4311e5205ee50e13fdedeea639c75836"
+      "engine_source_sha256": "8011ecdaf90807b4fe4fb5ada518a237311774b32891179bf1fad0a0baad8a58"
     },
     "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
-    "python": "3.14.3"
+    "python": "3.12.11"
   },
   "records": [
     {
