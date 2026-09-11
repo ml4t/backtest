@@ -2,6 +2,8 @@
 
 import math
 
+import pytest
+
 from ml4t.backtest.execution.impact import (
     LinearImpact,
     NoImpact,
@@ -39,7 +41,17 @@ class TestLinearImpact:
         """Test default configuration."""
         model = LinearImpact()
         assert model.coefficient == 0.1
-        assert model.permanent_fraction == 0.5
+
+    def test_rejects_permanent_fraction(self):
+        """A permanent component cannot be honoured, so asking for one raises.
+
+        ``calculate`` sees a single order with no reference to earlier slices of
+        the same parent, so impact it returns is entirely temporary. The field
+        was accepted and never read through 0.1.6: a caller asking for a mostly
+        permanent model got a fully temporary one and no warning.
+        """
+        with pytest.raises(TypeError):
+            LinearImpact(coefficient=0.1, permanent_fraction=0.8)
 
     def test_buy_positive_impact(self):
         """Test that buy orders have positive impact (price goes up)."""

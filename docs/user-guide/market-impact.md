@@ -157,11 +157,18 @@ from ml4t.backtest.execution import LinearImpact
 
 engine = Engine(
     feed, strategy, config,
-    market_impact_model=LinearImpact(eta=0.1),
+    market_impact_model=LinearImpact(coefficient=0.1),
 )
 ```
 
-An order that is 10% of bar volume with `eta=0.1` moves the fill price by 1%.
+An order that is 10% of bar volume with `coefficient=0.1` moves the fill price by 1%.
+
+Impact from every model here is entirely temporary: `calculate` is handed one order and holds no
+reference to earlier slices of the same parent, so there is nothing for a permanent component to
+persist into. `LinearImpact` accepted a `permanent_fraction` argument through 0.1.6 and never read
+it, so a caller asking for a mostly permanent model got a fully temporary one and no warning. The
+argument is removed rather than defaulted, so the request now raises `TypeError` instead of being
+answered wrongly. Model persistence outside the engine if you need it.
 
 ### Square-Root Impact
 
@@ -176,7 +183,7 @@ from ml4t.backtest.execution import SquareRootImpact
 
 engine = Engine(
     feed, strategy, config,
-    market_impact_model=SquareRootImpact(eta=0.5),
+    market_impact_model=SquareRootImpact(coefficient=0.5),
 )
 ```
 

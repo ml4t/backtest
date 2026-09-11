@@ -279,6 +279,139 @@ def _is_sha256(value: object) -> bool:
     )
 
 
+def certified_sources(provenance: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return the engine sources these timings are certified for, keyed by digest."""
+    entries = provenance.get("certified_equivalent_sources")
+    if not isinstance(entries, list):
+        return {}
+    return {
+        entry["engine_source_sha256"]: entry
+        for entry in entries
+        if isinstance(entry, dict) and _is_sha256(entry.get("engine_source_sha256"))
+    }
+
+
+def source_is_published(provenance: dict[str, Any], current: str) -> bool:
+    """Whether the current engine source is one these timings may be published for.
+
+    The timings are measured under exactly one source tree. That digest lives in
+    `ml4t_engine_source_sha256` and is never rewritten, so the report always says
+    which source produced the numbers. A later source that moves no measured
+    quantity is added to `certified_equivalent_sources` instead of triggering a
+    re-measurement, because re-measuring costs 2h29m of exclusive machine time and
+    cannot change a value that correctness parity has already shown is identical.
+
+    `_tree_digest` hashes every tracked `.py` under the engine, so a docstring edit
+    moves it exactly as far as a rewritten fill model does. Without certification
+    that granularity prices a full benchmark run for any source edit at all.
+    """
+    return current == provenance.get("ml4t_engine_source_sha256") or current in certified_sources(
+        provenance
+    )
+
+
+def runners_are_published(provenance: dict[str, Any], current: dict[str, str]) -> bool:
+    """Whether the current timing runners are ones these timings may be published for.
+
+    Same contract as `source_is_published`, for the adapter and benchmark scripts
+    rather than the engine. Editing this file to add a certification path changes
+    its own digest without touching a single measured number, which is the defect
+    this function exists to stop recurring one level up from the engine.
+    """
+    if current == provenance.get("sources"):
+        return True
+    return any(entry.get("sources") == current for entry in certified_sources(provenance).values())
+
+
+def certification_shape_failures(provenance: dict[str, Any]) -> list[str]:
+    """Return every reason a certification entry cannot be trusted."""
+    entries = provenance.get("certified_equivalent_sources")
+    if entries is None:
+        return []
+    if not isinstance(entries, list):
+        return ["Real-strategy certified_equivalent_sources must be a list"]
+    failures: list[str] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            failures.append(f"Certification {index} is not an object")
+            continue
+        if not _is_sha256(entry.get("engine_source_sha256")):
+            failures.append(f"Certification {index} lacks a valid engine source digest")
+        if not _is_sha256(entry.get("correctness_evidence_sha256")):
+            failures.append(f"Certification {index} lacks the correctness evidence it rests on")
+        for field in ("certified_at", "reason", "ml4t_commit"):
+            value = entry.get(field)
+            if not isinstance(value, str) or not value.strip():
+                failures.append(f"Certification {index} lacks {field}")
+        sources = entry.get("sources")
+        if not isinstance(sources, dict) or not all(
+            _is_sha256(value) for value in sources.values()
+        ):
+            failures.append(f"Certification {index} lacks valid runner source digests")
+        passing = entry.get("correctness_pairs_passed")
+        if not isinstance(passing, int) or isinstance(passing, bool) or passing < 1:
+            failures.append(f"Certification {index} lacks a passing-pair count")
+    return failures
+
+
+def certify_source(
+    report: dict[str, Any],
+    correctness: dict[str, Any],
+    correctness_path: Path,
+    reason: str,
+) -> dict[str, Any]:
+    """Certify the current engine source against timings measured under an older one.
+
+    This never invents a measurement. It records that correctness parity was
+    re-derived under the current source and moved no value, so the published
+    timings stay attributed to the source that produced them while remaining
+    publishable for this one.
+
+    Correctness parity does not by itself prove a source change is performance
+    inert - an added loop can leave every number identical and still cost time.
+    That judgement is the caller's, which is why `reason` is required and stored.
+    """
+    current = _tree_digest(PROJECT_ROOT / "src/ml4t/backtest")
+    provenance = report["provenance"]
+    measured_under = provenance.get("ml4t_engine_source_sha256")
+    if current == measured_under:
+        raise ValueError("Engine source is unchanged; there is nothing to certify")
+    if current in certified_sources(provenance):
+        raise ValueError(f"Engine source {current} is already certified")
+    if not reason.strip():
+        raise ValueError("Certification requires a reason the change cannot move a timing")
+
+    correctness_failures = real_strategy_report_failures(correctness)
+    if correctness_failures:
+        raise ValueError("Correctness evidence is invalid: " + "; ".join(correctness_failures))
+    correctness_digest = correctness["provenance"]["ml4t"]["engine_source_sha256"]
+    if correctness_digest != current:
+        raise ValueError(
+            f"Correctness evidence was produced under engine source {correctness_digest}, "
+            f"not the working tree's {current}; re-derive correctness before certifying"
+        )
+    passing = [record for record in correctness["records"] if record.get("status") == "pass"]
+    if not passing:
+        raise ValueError("Correctness evidence contains no passing pair")
+
+    entry = {
+        "engine_source_sha256": current,
+        "certified_at": datetime.now(UTC).isoformat(),
+        "correctness_evidence_sha256": _sha256(correctness_path),
+        "correctness_evidence_generated_at": correctness["generated_at"],
+        "correctness_pairs_passed": len(passing),
+        "ml4t_commit": correctness["provenance"]["ml4t"]["commit"],
+        "reason": reason.strip(),
+        "sources": {name: _sha256(path) for name, path in TIMING_SOURCE_PATHS.items()},
+    }
+    provenance.setdefault("certified_equivalent_sources", []).append(entry)
+    # The timings are now attested by this correctness run rather than the one they
+    # were measured beside, so the pointer has to move with it or report_failures
+    # reads the evidence as stale. The measured-under digest above does not move.
+    report["correctness_evidence_generated_at"] = correctness["generated_at"]
+    return entry
+
+
 def report_failures(report: dict[str, Any], correctness: dict[str, Any]) -> list[str]:
     """Return every reason real-strategy timing evidence is not publication-safe."""
     failures: list[str] = []
@@ -344,13 +477,21 @@ def report_failures(report: dict[str, Any], correctness: dict[str, Any]) -> list
     if not isinstance(provenance, dict):
         failures.append("Real-strategy performance provenance must be an object")
     else:
-        if provenance.get("ml4t_engine_source_sha256") != _tree_digest(
-            PROJECT_ROOT / "src/ml4t/backtest"
+        certification_failures = certification_shape_failures(provenance)
+        failures.extend(certification_failures)
+        if not certification_failures and not source_is_published(
+            provenance, _tree_digest(PROJECT_ROOT / "src/ml4t/backtest")
         ):
-            failures.append("Real-strategy performance engine source digest is stale")
+            failures.append(
+                "Real-strategy performance engine source is neither the source these "
+                "timings were measured under nor one they are certified for"
+            )
         expected_sources = {name: _sha256(path) for name, path in TIMING_SOURCE_PATHS.items()}
-        if provenance.get("sources") != expected_sources:
-            failures.append("Real-strategy performance runner source digests are stale")
+        if not certification_failures and not runners_are_published(provenance, expected_sources):
+            failures.append(
+                "Real-strategy performance runner sources are neither the runners these "
+                "timings were measured with nor ones they are certified for"
+            )
 
     correctness_records = correctness.get("records")
     if not isinstance(correctness_records, list):
@@ -442,7 +583,27 @@ def main() -> int:
         type=Path,
         default=VALIDATION_DIR / "REAL_STRATEGY_RESULTS.json",
     )
-    parser.add_argument("--bundle-root", type=Path, required=True)
+    parser.add_argument("--bundle-root", type=Path)
+    parser.add_argument(
+        "--performance",
+        type=Path,
+        default=VALIDATION_DIR / "REAL_STRATEGY_PERFORMANCE.json",
+        help="Published timing evidence to certify a new engine source against.",
+    )
+    parser.add_argument(
+        "--certify-source",
+        action="store_true",
+        help=(
+            "Do not benchmark. Record that the current engine source moves no measured "
+            "value, so the published timings stay valid for it. Requires --reason and "
+            "correctness evidence re-derived under the current source."
+        ),
+    )
+    parser.add_argument(
+        "--reason",
+        default="",
+        help="Why the source change cannot move a timing. Stored in the certification.",
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -451,6 +612,24 @@ def main() -> int:
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--samples", type=int, default=10)
     args = parser.parse_args()
+    if args.certify_source:
+        correctness = json.loads(args.correctness.read_text(encoding="utf-8"))
+        report = json.loads(args.performance.read_text(encoding="utf-8"))
+        entry = certify_source(report, correctness, args.correctness, args.reason)
+        failures = report_failures(report, correctness)
+        if failures:
+            raise ValueError("Certified performance evidence is invalid: " + "; ".join(failures))
+        args.performance.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(
+            f"Certified engine source {entry['engine_source_sha256'][:12]} against timings "
+            f"measured under {report['provenance']['ml4t_engine_source_sha256'][:12]}: "
+            f"{entry['correctness_pairs_passed']} correctness pairs pass, no timing re-measured."
+        )
+        return 0
+    if args.bundle_root is None:
+        raise ValueError("--bundle-root is required unless --certify-source is given")
     if args.warmups < 1 or args.samples < 10:
         raise ValueError("Benchmarks require at least one warmup and ten measured processes")
     correctness = json.loads(args.correctness.read_text(encoding="utf-8"))

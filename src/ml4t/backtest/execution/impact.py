@@ -67,8 +67,13 @@ class LinearImpact(MarketImpactModel):
     Args:
         coefficient: Impact scaling factor (default 0.1)
                     Higher values = more impact per unit participation
-        permanent_fraction: Fraction of impact that is permanent (0-1)
-                           Remainder is temporary and reverts
+
+    The impact this returns is entirely temporary: ``calculate`` sees one order
+    and holds no reference to earlier slices of the same parent, so there is
+    nothing for a permanent component to persist into. A ``permanent_fraction``
+    field was accepted and documented here until 0.1.7 and was never read; it is
+    removed rather than defaulted so that asking for a permanent component
+    raises instead of silently returning a fully temporary one.
 
     Example:
         model = LinearImpact(coefficient=0.1)
@@ -76,7 +81,6 @@ class LinearImpact(MarketImpactModel):
     """
 
     coefficient: float = 0.1
-    permanent_fraction: float = 0.5
 
     def calculate(
         self,
