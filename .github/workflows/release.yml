@@ -250,7 +250,20 @@ jobs:
       - name: Install and exercise the published wheel
         run: |
           uv venv --clear --python 3.12 "$RUNNER_TEMP/published-venv"
-          uv pip install --python "$RUNNER_TEMP/published-venv/bin/python" --index-url https://pypi.org/simple --refresh-package ml4t-backtest "ml4t-backtest==${{ needs.preflight.outputs.version }}"
+          # The step above reads https://pypi.org/pypi/<name>/<version>/json; this one reads
+          # https://pypi.org/simple/. The two endpoints propagate independently, so the JSON
+          # API can already serve a version the simple index has not listed yet. On 0.1.7 the
+          # gap was under four minutes and turned a correct publication into a red release run.
+          attempt=1
+          until uv pip install --python "$RUNNER_TEMP/published-venv/bin/python" --index-url https://pypi.org/simple --refresh-package ml4t-backtest "ml4t-backtest==${{ needs.preflight.outputs.version }}"; do
+            if [ "$attempt" -ge 12 ]; then
+              echo "::error::ml4t-backtest==${{ needs.preflight.outputs.version }} is still absent from the simple index after $attempt attempts over 120s."
+              exit 1
+            fi
+            echo "Simple index has not listed ${{ needs.preflight.outputs.version }} yet (attempt $attempt); retrying in 10s."
+            attempt=$((attempt + 1))
+            sleep 10
+          done
           "$RUNNER_TEMP/published-venv/bin/python" -I -c "import ml4t.backtest as package; assert package.__version__ == '${{ needs.preflight.outputs.version }}'"
           "$RUNNER_TEMP/published-venv/bin/python" validation/check_documentation_examples.py
 
