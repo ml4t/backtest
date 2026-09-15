@@ -1395,3 +1395,134 @@ class TestBacktestResultSchemas:
         assert schema["equity"] == pl.Float64()
         assert schema["return"] == pl.Float64()
         assert schema["drawdown"] == pl.Float64()
+
+
+class TestEnrichTradesTimeZoneReconciliation:
+    """The two sides of the as-of join need not agree on a time zone, and one caller hides it.
+
+    `BacktestProfile.prediction_enriched_trades_df` wraps this call in a `try` and degrades to
+    an empty frame with a `UserWarning`, so a raised join is not a traceback a reader sees: it
+    is a tear sheet quietly missing its ML trade-alignment charts. Found 2026-09-15 in
+    `case_studies/nasdaq100_microstructure/20_strategy_analysis.ipynb`, whose committed output
+    carries "Prediction enrichment failed: datatypes of join keys don't match - `entry_time`:
+    datetime[us] on left does not match `timestamp`: datetime[us, UTC] on right".
+    """
+
+    @staticmethod
+    def _trades(tz: str | None) -> pl.DataFrame:
+        frame = pl.DataFrame(
+            {
+                "symbol": ["AAPL", "AAPL"],
+                "entry_time": [datetime(2024, 1, 1, 10, 0), datetime(2024, 1, 1, 14, 0)],
+                "exit_time": [datetime(2024, 1, 1, 14, 0), datetime(2024, 1, 1, 16, 0)],
+                "pnl": [100.0, -50.0],
+            }
+        )
+        if tz is None:
+            return frame
+        return frame.with_columns(
+            pl.col("entry_time").dt.replace_time_zone(tz),
+            pl.col("exit_time").dt.replace_time_zone(tz),
+        )
+
+    @staticmethod
+    def _signals(tz: str | None) -> pl.DataFrame:
+        frame = pl.DataFrame(
+            {
+                "timestamp": [
+                    datetime(2024, 1, 1, 10, 0),
+                    datetime(2024, 1, 1, 14, 0),
+                    datetime(2024, 1, 1, 16, 0),
+                ],
+                "momentum": [0.5, 0.7, 0.2],
+            }
+        )
+        if tz is None:
+            return frame
+        return frame.with_columns(pl.col("timestamp").dt.replace_time_zone(tz))
+
+    def test_naive_trades_against_aware_signals_join_instead_of_raising(self):
+        """The measured nasdaq shape: engine trades naive, prediction panel UTC."""
+        enriched = enrich_trades_with_signals(
+            self._trades(None), self._signals("UTC"), signal_columns=["momentum"]
+        )
+        assert enriched.height == 2
+        assert enriched["entry_momentum"].to_list() == [0.5, 0.7]
+
+    def test_aware_trades_against_naive_signals_join_instead_of_raising(self):
+        """The same mismatch with the sides swapped, which reaches the same join."""
+        enriched = enrich_trades_with_signals(
+            self._trades("UTC"), self._signals(None), signal_columns=["momentum"]
+        )
+        assert enriched.height == 2
+        assert enriched["entry_momentum"].to_list() == [0.5, 0.7]
+
+    def test_a_naive_side_is_localized_and_never_shifted(self):
+        """The whole correctness of the fix.
+
+        A naive column is the same wall clock with the zone dropped, so 10:00 must pick the
+        10:00 signal. Shifting it by an offset would still return rows, and the join would be
+        wrong in silence rather than loud - which is worse than the bug being fixed.
+        """
+        enriched = enrich_trades_with_signals(
+            self._trades(None),
+            self._signals("America/New_York"),
+            signal_columns=["momentum"],
+        )
+        assert enriched["entry_momentum"].to_list() == [0.5, 0.7]
+        assert enriched["exit_momentum"].to_list() == [0.7, 0.2]
+
+    def test_two_aware_zones_are_converted_so_the_instants_survive(self):
+        """Two aware columns already name instants, so converting is right and localizing is not.
+
+        15:00 in Europe/Berlin is 14:00 UTC, so the trade entering then takes the 14:00 signal.
+        Localizing would read it as 15:00 UTC and take the 14:00 signal for the wrong reason,
+        then take 14:00 again at exit instead of 16:00.
+        """
+        trades = pl.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "entry_time": [datetime(2024, 1, 1, 15, 0)],
+                "exit_time": [datetime(2024, 1, 1, 17, 0)],
+                "pnl": [10.0],
+            }
+        ).with_columns(
+            pl.col("entry_time").dt.replace_time_zone("Europe/Berlin"),
+            pl.col("exit_time").dt.replace_time_zone("Europe/Berlin"),
+        )
+        enriched = enrich_trades_with_signals(
+            trades, self._signals("UTC"), signal_columns=["momentum"]
+        )
+        assert enriched["entry_momentum"].to_list() == [0.7]
+        assert enriched["exit_momentum"].to_list() == [0.2]
+
+    def test_two_naive_sides_are_left_alone(self):
+        """The negative control: nothing is localized where nothing disagrees."""
+        enriched = enrich_trades_with_signals(
+            self._trades(None), self._signals(None), signal_columns=["momentum"]
+        )
+        assert enriched.schema["entry_time"].time_zone is None
+        assert enriched["entry_momentum"].to_list() == [0.5, 0.7]
+
+    def test_one_shared_zone_is_left_alone(self):
+        """The other negative control: an agreed zone is not converted to anything."""
+        enriched = enrich_trades_with_signals(
+            self._trades("UTC"), self._signals("UTC"), signal_columns=["momentum"]
+        )
+        assert enriched.schema["entry_time"].time_zone == "UTC"
+        assert enriched["entry_momentum"].to_list() == [0.5, 0.7]
+
+    def test_without_the_reconciliation_the_join_still_raises(self, monkeypatch):
+        """The negative control, and the reason it is a monkeypatch rather than a comment.
+
+        Every assertion above passes whether or not `_align_join_time_zones` does anything,
+        once polars one day decides to coerce these keys itself. Neutralizing the helper is
+        what makes the other tests evidence that this code path is load-bearing today.
+        """
+        from ml4t.backtest import result as result_module
+
+        monkeypatch.setattr(result_module, "_align_join_time_zones", lambda t, s, *_a, **_k: (t, s))
+        with pytest.raises(Exception, match="join keys"):
+            enrich_trades_with_signals(
+                self._trades(None), self._signals("UTC"), signal_columns=["momentum"]
+            )
