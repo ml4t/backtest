@@ -1466,6 +1466,54 @@ class BacktestResult:
         )
 
 
+def _align_join_time_zones(
+    trades_df: pl.DataFrame,
+    signals_df: pl.DataFrame,
+    timestamp_col: str,
+    trade_time_cols: tuple[str, ...] = ("entry_time", "exit_time"),
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Put the trade times and the signal timestamps on one time zone before an as-of join.
+
+    ``join_asof`` refuses a naive left key against a time-zone-aware right key, and the two
+    sides of this join reach it from different places: trade times come out of the engine,
+    which carries the bar clock without its zone, while a signal or prediction panel is read
+    from parquet with its zone intact. The join then raises ``datatypes of join keys don't
+    match`` and every caller that wraps this in a ``try`` loses its ML columns silently.
+
+    **A naive column here is the same wall clock with the zone dropped, so it is localized
+    and never shifted.** Measured 2026-09-15 on ``nasdaq100_microstructure``, whose trades
+    carry ``Datetime(us)`` and whose predictions carry ``Datetime(us, UTC)``: reading the
+    naive times as UTC matches 703 of 905 trades to an exact ``(symbol, instant)`` row in the
+    prediction panel, and reading them as ``America/New_York`` matches 199. The residual 202
+    are trades entered between two prediction instants, which is what a backward as-of join
+    is for. Shifting instead of localizing would move every trade by the offset and the join
+    would still return rows, so this failure would be silent rather than loud.
+
+    Where both sides are aware but disagree, the signals are *converted* to the trades' zone:
+    two aware columns already name instants, so converting preserves them and localizing
+    would not.
+    """
+    left_dtype = trades_df.schema.get(trade_time_cols[0])
+    right_dtype = signals_df.schema.get(timestamp_col)
+    if not isinstance(left_dtype, pl.Datetime) or not isinstance(right_dtype, pl.Datetime):
+        return trades_df, signals_df
+
+    left_tz, right_tz = left_dtype.time_zone, right_dtype.time_zone
+    if left_tz == right_tz:
+        return trades_df, signals_df
+
+    if left_tz is None:
+        present = [c for c in trade_time_cols if c in trades_df.columns]
+        trades_df = trades_df.with_columns(
+            [pl.col(c).dt.replace_time_zone(right_tz) for c in present]
+        )
+    elif right_tz is None:
+        signals_df = signals_df.with_columns(pl.col(timestamp_col).dt.replace_time_zone(left_tz))
+    else:
+        signals_df = signals_df.with_columns(pl.col(timestamp_col).dt.convert_time_zone(left_tz))
+    return trades_df, signals_df
+
+
 def enrich_trades_with_signals(
     trades_df: pl.DataFrame,
     signals_df: pl.DataFrame,
@@ -1533,6 +1581,9 @@ def enrich_trades_with_signals(
 
     if not signal_columns:
         return trades_df
+
+    # The two sides reach this join from different places and need not agree on a time zone.
+    trades_df, signals_df = _align_join_time_zones(trades_df, signals_df, timestamp_col)
 
     # Preserve original trade order (join_asof requires sorting which disrupts order)
     trades_df = trades_df.with_row_index("_original_order")
