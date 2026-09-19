@@ -193,12 +193,6 @@ class StopLossStrategy(Strategy):
 # These values were captured from known-good runs.
 # If tests fail after a code change, verify the change is correct before updating.
 
-EXPECTED_BUY_HOLD_TRENDING = {
-    "num_trades": 1,
-    "final_value_hash": "trending_100d",  # Placeholder - will calculate on first run
-    "trade_pnl_hash": "hash_placeholder",
-}
-
 EXPECTED_SMA_CROSSOVER_TRENDING = {
     "num_trades_min": 2,  # At least some crossovers
     "num_trades_max": 20,  # Not too many (trend is strong)
