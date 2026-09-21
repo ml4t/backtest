@@ -1,14 +1,12 @@
-# risk/portfolio/ - 816 Lines
+# Portfolio-risk guide
 
-Portfolio-level risk limits.
+## Ownership
 
-## Modules
+`limits.py` implements aggregate exposure, drawdown, and position-count constraints. `manager.py`
+evaluates configured rules and returns the resulting action to the broker.
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| limits.py | 601 | Exposure, drawdown, position count limits |
-| manager.py | 215 | Risk rule orchestration |
+## Constraints
 
-## Key
-
-`PortfolioLimits`, `MaxDrawdownLimit`, `PositionCountLimit`, `ExposureLimit`
+Keep limit evaluation side-effect free. State changes belong to the broker after it accepts an
+explicit risk action. Define whether a breach rejects a new order, halts new risk, or liquidates
+positions, and preserve that reason in results. Cover boundary values and recovery behavior.

@@ -1,33 +1,14 @@
-# analytics/ - ~970 Lines
+# Analytics guide
 
-Performance metrics, trade analysis, cost decomposition, and ml4t-diagnostic integration.
+## Ownership
 
-## Modules
+This package derives metrics, equity curves, trade records, and diagnostic inputs from completed
+backtest results. `metrics.py` owns performance statistics, `trades.py` owns round-trip analysis,
+`equity.py` owns equity-series construction, and `bridge.py` is the optional `ml4t.diagnostic`
+adapter.
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| trades.py | ~510 | Trade statistics (win rate, PnL, MFE/MAE, cost decomposition) |
-| metrics.py | 180 | Performance metrics (Sharpe, CAGR, drawdown) |
-| bridge.py | ~155 | ml4t-diagnostic integration bridge |
-| equity.py | 119 | Equity curve calculation |
+## Constraints
 
-## Key Functions
-
-`calculate_metrics()`, `to_trade_records()`, `to_returns_series()`
-
-## TradeAnalyzer Cost Decomposition (v0.1.0b2)
-
-`TradeAnalyzer` exposes aggregate cost decomposition metrics:
-- `total_gross_pnl` - Price-move P&L before all costs
-- `total_costs` - Total fees + slippage
-- `avg_cost_drag` - Average cost as fraction of notional
-- `gross_profit_factor` - Profit factor from raw price moves (isolates edge from costs)
-
-## ml4t-diagnostic Bridge
-
-`bridge.py` converts backtest Trade objects to diagnostic TradeRecord format:
-- `to_trade_record(trade)` / `to_trade_records(trades)` - Trade conversion
-- `to_returns_series(equity)` - Equity to returns for Sharpe analysis
-- `to_equity_dataframe(equity, timestamps)` - Equity with timestamps
-
-Bridge exports cost decomposition fields: `gross_pnl`, `net_return`, `total_slippage_cost`, `cost_drag`
+Keep gross PnL, fees, slippage, and net PnL separately traceable. Partial closes must reconcile to
+the underlying fills without duplicating entry costs. The diagnostic bridge must depend only on the
+public Diagnostic API and must fail with an actionable optional-dependency error when it is absent.

@@ -1,20 +1,13 @@
-# risk/ - 1,906 Lines
+# Risk guide
 
-Position-level and portfolio-level risk management.
+## Ownership
 
-## Subpackages
+Position rules decide when an individual holding should exit. Portfolio rules constrain aggregate
+exposure, drawdown, and position counts. Shared result and configuration types belong in
+`types.py`; implementations belong in the nearest subpackage.
 
-| Directory | Lines | Purpose |
-|-----------|-------|---------|
-| position/ | 940 | Stop-loss, trailing stop, take-profit, rule chains |
-| portfolio/ | 816 | Exposure limits, drawdown limits, position counts |
+## Constraints
 
-## Modules
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| types.py | 150 | Risk configuration types |
-
-## Key
-
-`StopLoss`, `TrailingStop`, `TakeProfit`, `RuleChain`, `PortfolioLimits`
+Risk evaluation may inspect only state available at its lifecycle phase. Forced exits must retain
+their cause through order creation and fill reporting. A portfolio halt must have explicit resume or
+liquidation semantics rather than silently leaving positions unmanaged.
