@@ -1,17 +1,13 @@
-# risk/position/ - 940 Lines
+# Position-risk guide
 
-Position-level risk rules (stop-loss, trailing stop, take-profit).
+## Ownership
 
-## Modules
+`static.py` contains fixed stop-loss and take-profit rules. `dynamic.py` contains rules whose state
+changes with market data, `signal.py` handles signal exits, and `composite.py` combines rules behind
+the protocol in `protocol.py`.
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| dynamic.py | 505 | Trailing stop, dynamic stop-loss |
-| static.py | 246 | Take-profit, fixed stop-loss |
-| composite.py | 103 | Rule composition (RuleChain) |
-| signal.py | 48 | Signal-based exit rules |
-| protocol.py | 38 | Rule interface protocol |
+## Constraints
 
-## Key
-
-`TrailingStop`, `StopLoss`, `TakeProfit`, `RuleChain`
+Evaluate rules against lifecycle-appropriate prices and preserve deterministic precedence when more
+than one rule fires. Dynamic rule state is per position and must be cleared when that position
+closes. Rule composition must retain the triggering rule and forced-exit cause for result reporting.
