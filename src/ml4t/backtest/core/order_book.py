@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import MissingPricePolicy
-from ..models import calculate_commission
+from ..models import estimate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
 from .state import MarketState, OrderState, RiskState
@@ -389,20 +389,12 @@ class OrderBook:
         shadow_cash = self._submission_shadow_cash
 
         if closed != 0.0:
-            close_cash = (-closed) * signal_price
-            shadow_cash += close_cash
-            closed_commission = calculate_commission(
-                broker.commission_model, order.asset, abs(closed), signal_price
-            )
-            shadow_cash -= closed_commission
-
+            shadow_cash += (-closed) * signal_price
         if opened != 0.0:
-            open_cash = opened * signal_price
-            shadow_cash -= open_cash
-            opened_commission = calculate_commission(
-                broker.commission_model, order.asset, abs(opened), signal_price
-            )
-            shadow_cash -= opened_commission
+            shadow_cash -= opened * signal_price
+        shadow_cash -= estimate_commission(
+            broker.commission_model, order.asset, order.quantity, signal_price
+        )
 
         # Keep shadow effects even for rejected orders to mirror Backtrader's
         # sequential submitted-queue pseudo-execution behavior.
@@ -470,23 +462,13 @@ class OrderBook:
         shadow_cash = self._submission_shadow_cash
 
         if closed != 0.0:
-            closed_value = (-closed) * signal_price
-            shadow_cash += closed_value
-            closed_commission = calculate_commission(
-                broker.commission_model, order.asset, abs(closed), signal_price
-            )
-            shadow_cash -= closed_commission
-
+            shadow_cash += (-closed) * signal_price
         if opened != 0.0:
-            # LEAN semantics: both longs and shorts consume buying power.
-            # Longs cost notional; shorts also require notional (not credit).
-            # This prevents credit-model inflation where short proceeds
-            # artificially inflate shadow cash.
+            # LEAN semantics: shorts consume buying power rather than crediting cash.
             shadow_cash -= abs(opened) * signal_price
-            opened_commission = calculate_commission(
-                broker.commission_model, order.asset, abs(opened), signal_price
-            )
-            shadow_cash -= opened_commission
+        shadow_cash -= estimate_commission(
+            broker.commission_model, order.asset, order.quantity, signal_price
+        )
 
         if shadow_cash < 0.0:
             # Rejected — do NOT update shadow state (LEAN semantics)
@@ -520,7 +502,7 @@ class OrderBook:
             old_qty, old_price, size, signal_price
         )
 
-        commission = calculate_commission(
+        commission = estimate_commission(
             broker.commission_model, order.asset, order.quantity, signal_price
         )
         shadow_positions = self._build_shadow_policy_positions()

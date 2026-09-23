@@ -71,10 +71,12 @@ combined = CombinedCommission(
 A custom commission model implements `calculate(asset, quantity, price)` and
 returns the fee for that quantity. The engine may call it before execution to
 estimate cash or margin requirements, then call it at the actual fill price.
-Only the fill-time value is charged. Keep `calculate` free of state changes:
-counting calls or advancing a volume tier inside it will count estimates as
-trades. A single fill that closes a position and opens the opposite side is
-charged once for its full quantity; the fee is allocated between the closing
+Only the fill-time value is charged. Estimates use a deep copy of the model,
+so a model that advances an internal volume tier on an executed fill does not
+advance it for a rejected or unfilled estimate. Custom models must support
+`deepcopy`, and `calculate` must not have external effects such as writing to a
+database or shared counter. A single fill that closes a position and opens
+its opposite is charged once for its full quantity. The fee is allocated between the closing
 and opening trade records in proportion to their quantities. Partial fills are
 charged separately when they execute.
 

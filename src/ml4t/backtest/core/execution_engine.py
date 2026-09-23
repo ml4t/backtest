@@ -6,7 +6,7 @@ import copy
 import math
 from typing import TYPE_CHECKING, TypeGuard
 
-from ..models import calculate_commission
+from ..models import estimate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import is_exit_order, quantity_zero_tolerance
 from .state import MarketState, OrderState
@@ -298,7 +298,7 @@ class ExecutionEngine:
             and abs(new_qty) > quantity_zero_tolerance(current_qty, qty_delta)
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
-        commission = calculate_commission(
+        commission = estimate_commission(
             broker.commission_model, order.asset, order.quantity, validation_price
         )
         multiplier = broker.get_multiplier(order.asset)
@@ -355,7 +355,7 @@ class ExecutionEngine:
             shadow_positions[order.asset].quantity if order.asset in shadow_positions else 0.0
         )
         new_qty = current_qty + qty_delta
-        commission = calculate_commission(
+        commission = estimate_commission(
             broker.commission_model, order.asset, order.quantity, fill_price
         )
         shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
@@ -689,7 +689,7 @@ class ExecutionEngine:
             return True
 
         signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
-        commission = calculate_commission(
+        commission = estimate_commission(
             broker.commission_model, order.asset, order.quantity, fill_price
         )
         projected_cash = broker.cash - signed_qty * fill_price - commission
@@ -769,7 +769,7 @@ class ExecutionEngine:
         quantity = abs(float(order.quantity))
         unit_cost = float(price) * broker.get_multiplier(order.asset)
         notional = quantity * unit_cost
-        commission = calculate_commission(
+        commission = estimate_commission(
             broker.commission_model,
             order.asset,
             quantity,

@@ -1,6 +1,7 @@
 """Pluggable commission and slippage models."""
 
 import math
+from copy import deepcopy
 from typing import Protocol, runtime_checkable
 
 # === Protocols ===
@@ -10,9 +11,10 @@ from typing import Protocol, runtime_checkable
 class CommissionModel(Protocol):
     """Return a non-negative fee for a proposed or executed fill.
 
-    The engine may call ``calculate`` for cash and margin estimates before a
-    fill. Only the fill-time result is charged. Implementations must be pure:
-    do not advance volume tiers or count an order when this method is called.
+    Pre-trade estimates call ``calculate`` on a deep copy. Only the fill-time
+    result on the original model is charged. Stateful models can advance tiers
+    on filled executions, but must support deepcopy and avoid external effects
+    from ``calculate`` because those cannot be isolated by copying.
     """
 
     def calculate(self, asset: str, quantity: float, price: float) -> float: ...
@@ -35,6 +37,22 @@ def calculate_commission(
 ) -> float:
     value = model.calculate(asset, quantity, price)
     return _validate_nonnegative_model_output("commission", model, value)
+
+
+def estimate_commission(
+    model: CommissionModel,
+    asset: str,
+    quantity: float,
+    price: float,
+) -> float:
+    """Estimate a fee without advancing a stateful model's execution state."""
+    try:
+        estimate_model = deepcopy(model)
+    except Exception as exc:
+        raise TypeError("commission model must support deepcopy for pre-trade estimates") from exc
+    if estimate_model is model:
+        raise TypeError("commission model deepcopy must return an independent instance")
+    return calculate_commission(estimate_model, asset, quantity, price)
 
 
 def calculate_slippage(

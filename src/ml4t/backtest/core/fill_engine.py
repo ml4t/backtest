@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from ..config import ExecutionPrice, LockNotionalUpdateMode, ShareType
-from ..models import calculate_commission
+from ..models import estimate_commission
 from ..types import OrderSide, OrderType
 from .shared import CASH_TOLERANCE, add_with_zero_cancellation
 from .state import MarketState, OrderState
@@ -108,7 +108,7 @@ class FillEngine:
             broker.short_cash_policy.value != "lock_notional"
             or broker.account.policy.allow_leverage
             or broker.cash_buffer_pct != 0.0
-            or calculate_commission(
+            or estimate_commission(
                 broker.commission_model,
                 order.asset,
                 order.quantity,
