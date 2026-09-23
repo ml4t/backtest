@@ -2,7 +2,7 @@
 # Independent package configuration for standalone distribution
 
 [build-system]
-requires = ["hatchling==1.32.0", "hatch-vcs==0.5.0"]
+requires = ["hatchling==1.32.3", "hatch-vcs==0.5.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
