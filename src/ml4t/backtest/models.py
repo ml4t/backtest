@@ -8,7 +8,12 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class CommissionModel(Protocol):
-    """Protocol for commission calculation."""
+    """Return a non-negative fee for a proposed or executed fill.
+
+    The engine may call ``calculate`` for cash and margin estimates before a
+    fill. Only the fill-time result is charged. Implementations must be pure:
+    do not advance volume tiers or count an order when this method is called.
+    """
 
     def calculate(self, asset: str, quantity: float, price: float) -> float: ...
 
