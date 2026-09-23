@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 from .limits import LimitResult, PortfolioLimit, PortfolioState
@@ -57,6 +58,7 @@ class RiskManager:
     _halt_reason: str = ""
     _warnings: list[str] = field(default_factory=list)
     _liquidation_applied: bool = False
+    _reduction_applied: set[int] = field(default_factory=set)
 
     def initialize(self, initial_equity: float, timestamp: datetime | None = None) -> None:
         """Initialize the risk manager with starting equity.
@@ -74,6 +76,7 @@ class RiskManager:
         self._halt_reason = ""
         self._warnings = []
         self._liquidation_applied = False
+        self._reduction_applied.clear()
 
     def update(
         self,
@@ -83,60 +86,69 @@ class RiskManager:
         context: dict[str, Any] | None = None,
         broker: Broker | None = None,
     ) -> list[LimitResult]:
-        """Update risk state and check all limits.
+        """Check limits, then apply supported actions through the broker.
 
-        Args:
-            equity: Current portfolio equity
-            positions: Dict of asset -> position market value
-            timestamp: Current timestamp
-            context: Optional context dict with historical data (e.g., returns for VaR)
-            broker: Optional broker handle. Required to auto-apply
-                ``action="liquidate"`` by calling
-                ``broker.flatten_all_positions(reason=...)``.
-
-        Returns:
-            List of LimitResult for any breached limits
+        A reduction requires a broker and runs once per continuous breach of
+        each limit. A new breach after recovery may reduce exposure again.
         """
-        # Update high water mark and track last equity
-        self._last_equity = equity
-        if equity > self._high_water_mark:
-            self._high_water_mark = equity
-
-        # Check for new trading day
-        if timestamp:
+        high_water_mark = max(self._high_water_mark, equity)
+        daily_start_equity = self._daily_start_equity
+        last_date = self._last_date
+        if timestamp is not None:
             current_date = timestamp.date()
-            if self._last_date and current_date != self._last_date:
-                # New day - reset daily P&L tracking
-                self._daily_start_equity = equity
-                self._warnings = []  # Clear daily warnings
-            self._last_date = current_date
+            if last_date is not None and current_date != last_date:
+                daily_start_equity = equity
+            last_date = current_date
 
-        # Build portfolio state
-        state = self._build_state(equity, positions, timestamp, context or {})
-
-        # Check all limits
-        results = []
-        self._warnings = []
+        state = self._build_state(
+            equity,
+            positions,
+            timestamp,
+            context or {},
+            high_water_mark=high_water_mark,
+            daily_start_equity=daily_start_equity,
+        )
+        results: list[LimitResult] = []
+        reduction_results: dict[int, LimitResult] = {}
         liquidation_reasons: list[str] = []
+        warning_reasons: list[str] = []
+        halted = self._halted
+        halt_reason = self._halt_reason
 
-        for limit in self.limits:
+        for index, limit in enumerate(self.limits):
             result = limit.check(state)
-            if result.breached:
-                results.append(result)
+            if not result.breached:
+                continue
+            results.append(result)
+            if result.action in {"halt", "liquidate"}:
+                halted = True
+                halt_reason = result.reason
+                if result.action == "liquidate":
+                    liquidation_reasons.append(result.reason)
+            elif result.action == "warn":
+                warning_reasons.append(result.reason)
+            elif result.action == "reduce":
+                pct = result.reduction_pct
+                if not isinstance(pct, (int, float)) or not isfinite(pct) or not 0 < pct <= 1:
+                    raise ValueError("reduce action requires a finite reduction_pct in (0, 1]")
+                reduction_results[index] = result
+            elif result.action != "none":
+                raise ValueError(f"unsupported portfolio-limit action: {result.action!r}")
 
-                if result.action in {"halt", "liquidate"}:
-                    self._halted = True
-                    self._halt_reason = result.reason
-                    if result.action == "liquidate":
-                        liquidation_reasons.append(result.reason)
-                elif result.action == "warn":
-                    self._warnings.append(result.reason)
+        new_reductions = set(reduction_results) - self._reduction_applied
+        has_exposure = bool(positions) or (broker is not None and bool(broker.positions))
+        apply_reduction = bool(new_reductions and has_exposure and not liquidation_reasons)
+        if apply_reduction and broker is None:
+            raise ValueError("broker is required to apply action='reduce'")
+        if apply_reduction and broker is not None and not broker.positions:
+            raise ValueError("broker has no positions to reduce")
 
-        if liquidation_reasons and not self._liquidation_applied:
-            liquidation_reason = "; ".join(dict.fromkeys(liquidation_reasons))
+        liquidation_applied = self._liquidation_applied
+        if liquidation_reasons and not liquidation_applied:
+            reason = "; ".join(dict.fromkeys(liquidation_reasons))
             if broker is not None:
-                broker.flatten_all_positions(reason=liquidation_reason)
-                self._liquidation_applied = True
+                broker.flatten_all_positions(reason=reason)
+                liquidation_applied = True
             else:
                 warnings.warn(
                     "RiskManager.update() produced action='liquidate' but no broker was "
@@ -145,7 +157,25 @@ class RiskManager:
                     UserWarning,
                     stacklevel=2,
                 )
+        elif apply_reduction:
+            assert broker is not None
+            reason = "; ".join(
+                dict.fromkeys(reduction_results[index].reason for index in sorted(new_reductions))
+            )
+            fraction = max(reduction_results[index].reduction_pct for index in new_reductions)
+            broker.reduce_all_positions(fraction=fraction, reason=reason)
 
+        self._last_equity = equity
+        self._high_water_mark = high_water_mark
+        self._daily_start_equity = daily_start_equity
+        self._last_date = last_date
+        self._warnings = warning_reasons
+        self._halted = halted
+        self._halt_reason = halt_reason
+        self._liquidation_applied = liquidation_applied
+        self._reduction_applied.intersection_update(reduction_results)
+        if apply_reduction:
+            self._reduction_applied.update(new_reductions)
         return results
 
     def _build_state(
@@ -154,16 +184,20 @@ class RiskManager:
         positions: dict[str, float],
         timestamp: date | datetime | None,
         context: dict[str, Any] | None = None,
+        *,
+        high_water_mark: float | None = None,
+        daily_start_equity: float | None = None,
     ) -> PortfolioState:
         """Build PortfolioState from current data."""
+        high_water_mark = self._high_water_mark if high_water_mark is None else high_water_mark
+        daily_start_equity = (
+            self._daily_start_equity if daily_start_equity is None else daily_start_equity
+        )
         # Calculate drawdown
-        if self._high_water_mark > 0:
-            drawdown = (self._high_water_mark - equity) / self._high_water_mark
-        else:
-            drawdown = 0.0
+        drawdown = (high_water_mark - equity) / high_water_mark if high_water_mark > 0 else 0.0
 
         # Calculate daily P&L
-        daily_pnl = equity - self._daily_start_equity
+        daily_pnl = equity - daily_start_equity
 
         # Calculate exposures
         gross_exposure = sum(abs(v) for v in positions.values())
@@ -172,7 +206,7 @@ class RiskManager:
         return PortfolioState(
             equity=equity,
             initial_equity=self._initial_equity,
-            high_water_mark=self._high_water_mark,
+            high_water_mark=high_water_mark,
             current_drawdown=max(0, drawdown),
             num_positions=len(positions),
             positions=positions,

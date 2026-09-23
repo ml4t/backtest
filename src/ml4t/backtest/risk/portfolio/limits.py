@@ -3,13 +3,29 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any
+from math import isfinite
+from typing import Any, ClassVar
 
 import numpy as np
 
 
 class PortfolioLimit(ABC):
     """Base class for portfolio-level risk limits."""
+
+    _supports_reduction: ClassVar[bool] = False
+
+    def __post_init__(self) -> None:
+        action = getattr(self, "action", None)
+        if action not in {"none", "warn", "reduce", "halt", "liquidate"}:
+            raise ValueError(f"unsupported portfolio-limit action: {action!r}")
+        pct = getattr(self, "reduction_pct", 0.0)
+        if action == "reduce":
+            if not self._supports_reduction:
+                raise ValueError(f"{type(self).__name__} does not support action='reduce'")
+            if not isinstance(pct, (int, float)) or not isfinite(pct) or not 0 < pct <= 1:
+                raise ValueError("reduction_pct must be a finite fraction in (0, 1]")
+        elif pct != 0.0:
+            raise ValueError("reduction_pct requires action='reduce'")
 
     @abstractmethod
     def check(self, state: "PortfolioState") -> "LimitResult":
@@ -102,23 +118,25 @@ class MaxDrawdownLimit(PortfolioLimit):
         action: Action when breached ("warn", "reduce", "halt", "liquidate")
                 Default "liquidate" - flatten positions and stop new trades
         warn_threshold: Optional earlier threshold for warnings
+        reduction_pct: Required fraction in (0, 1] when action is "reduce"
 
     Example:
         limit = MaxDrawdownLimit(max_drawdown=0.20, warn_threshold=0.15)
-        # Warns at 15% drawdown, halts at 20%
+        # Warns at 15% drawdown, liquidates at 20%
     """
 
     max_drawdown: float = 0.20
     action: str = "liquidate"
     warn_threshold: float | None = None
+    reduction_pct: float = 0.0
+    _supports_reduction: ClassVar[bool] = True
 
     def check(self, state: PortfolioState) -> LimitResult:
         if state.current_drawdown >= self.max_drawdown:
-            return LimitResult(
-                breached=True,
-                action=self.action,
-                reason=f"drawdown {state.current_drawdown:.1%} >= {self.max_drawdown:.1%}",
-            )
+            reason = f"drawdown {state.current_drawdown:.1%} >= {self.max_drawdown:.1%}"
+            if self.action == "reduce":
+                return LimitResult.reduce(reason, self.reduction_pct)
+            return LimitResult(breached=True, action=self.action, reason=reason)
 
         if self.warn_threshold and state.current_drawdown >= self.warn_threshold:
             return LimitResult.warn(
@@ -190,7 +208,7 @@ class DailyLossLimit(PortfolioLimit):
     Args:
         max_daily_loss_pct: Maximum daily loss as % of equity (0.0-1.0)
                            Default 0.02 = 2% max daily loss
-        action: Action when breached ("warn", "reduce", "halt", "liquidate")
+        action: Action when breached ("warn", "halt", "liquidate")
 
     Example:
         limit = DailyLossLimit(max_daily_loss_pct=0.02)
@@ -291,7 +309,7 @@ class VaRLimit(PortfolioLimit):
         threshold: Maximum acceptable VaR as decimal (0.05 = 5% max loss)
         confidence_level: Confidence level for VaR (0.95 = 95% confidence)
         lookback_days: Minimum days of history required (default: 20)
-        action: Action when breached ("warn", "reduce", "halt")
+        action: Action when breached ("warn", "halt")
         returns_key: Key in context for historical returns array
 
     Example:
@@ -357,7 +375,7 @@ class CVaRLimit(PortfolioLimit):
         threshold: Maximum acceptable CVaR as decimal (0.08 = 8% expected shortfall)
         confidence_level: Confidence level for CVaR (0.95 = 95% confidence)
         lookback_days: Minimum days of history required (default: 20)
-        action: Action when breached ("warn", "reduce", "halt")
+        action: Action when breached ("warn", "halt")
         returns_key: Key in context for historical returns array
 
     Example:
@@ -424,7 +442,7 @@ class BetaLimit(PortfolioLimit):
     Args:
         max_beta: Maximum allowed portfolio beta (default 1.5)
         min_beta: Minimum allowed portfolio beta (default -0.5)
-        action: Action when breached ("warn", "reduce", "halt")
+        action: Action when breached ("warn", "halt")
         betas_key: Key in context for asset beta dict
 
     Example:

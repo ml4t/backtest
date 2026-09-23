@@ -284,12 +284,22 @@ Each limit check returns a `LimitResult` with an action:
 |--------|---------|
 | `none` | No breach |
 | `warn` | Log warning, continue trading |
-| `reduce` | Reduce position sizes by a percentage |
+| `reduce` | Reduce open positions by the configured fraction; currently supported by `MaxDrawdownLimit` |
 | `halt` | Stop opening new positions |
 | `liquidate` | Flatten open positions and stop new trading |
 
-When using portfolio limits in a live strategy loop, pass the broker into
-`RiskManager.update(...)` so liquidation actions are applied immediately:
+For a drawdown reduction, set both `action="reduce"` and an explicit
+`reduction_pct` in (0, 1]. The manager cancels pending orders and submits one
+risk-tagged reduction order per open position. It acts once while that limit
+remains breached and can act again after the breach clears. Other built-in
+limits reject `action="reduce"` at construction until they have a defined
+reduction policy.
+
+For example, `MaxDrawdownLimit(max_drawdown=0.10, action="reduce",
+reduction_pct=0.50)` cuts each open position by half after a 10% drawdown.
+
+Pass the broker into `RiskManager.update(...)` so reduction and liquidation
+actions are applied through normal order execution:
 
 ```python
 results = risk_manager.update(

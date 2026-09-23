@@ -1,6 +1,7 @@
 """Tests for portfolio-level risk limits."""
 
 import numpy as np
+import pytest
 
 from ml4t.backtest.risk.portfolio.limits import (
     BetaLimit,
@@ -156,6 +157,36 @@ class TestMaxDrawdownLimit:
         result = limit.check(state)
         assert result.breached
         assert result.action == "warn"
+
+
+@pytest.mark.parametrize("fraction", [0.0, -0.1, 1.1, float("nan"), float("inf")])
+def test_drawdown_reduction_rejects_invalid_fraction(fraction):
+    with pytest.raises(ValueError, match="reduction_pct"):
+        MaxDrawdownLimit(action="reduce", reduction_pct=fraction)
+
+
+def test_drawdown_reduction_reports_explicit_fraction():
+    limit = MaxDrawdownLimit(max_drawdown=0.10, action="reduce", reduction_pct=0.5)
+    state = PortfolioState(
+        equity=80.0,
+        initial_equity=100.0,
+        high_water_mark=100.0,
+        current_drawdown=0.20,
+        num_positions=1,
+        positions={"A": 80.0},
+        daily_pnl=-20.0,
+        gross_exposure=80.0,
+        net_exposure=80.0,
+    )
+    result = limit.check(state)
+    assert result.action == "reduce"
+    assert result.reduction_pct == 0.5
+
+
+@pytest.mark.parametrize("limit_type", [DailyLossLimit, VaRLimit, CVaRLimit, BetaLimit])
+def test_other_limits_reject_unimplemented_reduction(limit_type):
+    with pytest.raises(ValueError, match="does not support"):
+        limit_type(action="reduce")
 
 
 class TestMaxPositionsLimit:
@@ -669,17 +700,9 @@ class TestCVaRLimit:
         # CVaR should be >= VaR
         assert cvar >= var
 
-    def test_reduce_action(self):
-        """Test reduce action."""
-        limit = CVaRLimit(threshold=0.02, confidence_level=0.95, lookback_days=20, action="reduce")
-        np.random.seed(42)
-        returns = np.random.normal(0.0, 0.05, 30)  # High vol
-        returns[0:3] = [-0.15, -0.12, -0.14]
-
-        state = self._make_state(returns)
-        result = limit.check(state)
-        assert result.breached
-        assert result.action == "reduce"
+    def test_reduce_action_is_rejected_when_no_fraction_contract_exists(self):
+        with pytest.raises(ValueError, match="does not support"):
+            CVaRLimit(action="reduce")
 
 
 class TestPortfolioStateContext:

@@ -1,10 +1,11 @@
 """Tests for RiskManager portfolio-level risk management."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
+import polars as pl
 import pytest
 
-from ml4t.backtest import BacktestResult
+from ml4t.backtest import BacktestConfig, BacktestResult, DataFeed, Engine, Strategy
 from ml4t.backtest.broker import Broker
 from ml4t.backtest.models import NoCommission, NoSlippage
 from ml4t.backtest.risk.portfolio.limits import (
@@ -401,6 +402,99 @@ class TestRiskManagerGetState:
 
 class TestRiskManagerIntegration:
     """Integration tests for RiskManager."""
+
+    def test_drawdown_reduction_fills_once_in_complete_backtest(self):
+        class ReducingStrategy(Strategy):
+            def on_start(self, broker):
+                self.manager = RiskManager(
+                    limits=[
+                        MaxDrawdownLimit(
+                            max_drawdown=0.10,
+                            action="reduce",
+                            reduction_pct=0.5,
+                        )
+                    ]
+                )
+                self.manager.initialize(initial_equity=broker.get_account_value())
+                self.breaches = []
+
+            def on_data(self, timestamp, data, context, broker):
+                position = broker.get_position("A")
+                results = self.manager.update(
+                    equity=broker.get_account_value(),
+                    positions={"A": position.market_value} if position is not None else {},
+                    timestamp=timestamp,
+                    broker=broker,
+                )
+                self.breaches.extend(result for result in results if result.action == "reduce")
+                if timestamp == datetime(2024, 1, 1):
+                    broker.submit_order("A", 10)
+
+        dates = [datetime(2024, 1, 1) + timedelta(days=i) for i in range(5)]
+        prices = pl.DataFrame(
+            {
+                "timestamp": dates,
+                "asset": ["A"] * 5,
+                "open": [100.0, 100.0, 80.0, 80.0, 80.0],
+                "high": [100.0, 100.0, 80.0, 80.0, 80.0],
+                "low": [100.0, 100.0, 80.0, 80.0, 80.0],
+                "close": [100.0, 100.0, 80.0, 80.0, 80.0],
+                "volume": [1000] * 5,
+            }
+        )
+        strategy = ReducingStrategy()
+        result = Engine(
+            feed=DataFeed(prices_df=prices),
+            strategy=strategy,
+            config=BacktestConfig(initial_cash=1000),
+        ).run()
+
+        fills = result.to_fills_dataframe()
+        assert fills.height == 2
+        assert fills["quantity"].to_list() == [10.0, 5.0]
+        assert fills["exit_reason_detail"].to_list()[1] == (
+            "risk reduction: drawdown 20.0% >= 10.0%"
+        )
+        assert all(breach.reduction_pct == 0.5 for breach in strategy.breaches)
+        final = result.to_portfolio_state_dataframe().tail(1).row(0, named=True)
+        assert final["gross_exposure"] == 400.0
+        assert final["cash"] == 400.0
+
+    def test_new_breach_after_recovery_reduces_again(self):
+        manager = RiskManager(
+            limits=[MaxDrawdownLimit(max_drawdown=0.10, action="reduce", reduction_pct=0.5)]
+        )
+        manager.initialize(initial_equity=100000.0)
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+        )
+        open_long_position(broker, "AAPL", 100.0, 150.0)
+        mark_prices(broker, {"AAPL": 150.0})
+
+        manager.update(equity=80000.0, positions={"AAPL": 15000.0}, broker=broker)
+        manager.update(equity=79000.0, positions={"AAPL": 15000.0}, broker=broker)
+        assert len(broker.get_pending_orders()) == 1
+        broker._process_orders()
+        assert broker.positions["AAPL"].quantity == 50.0
+
+        manager.update(equity=100000.0, positions={"AAPL": 7500.0}, broker=broker)
+        manager.update(equity=80000.0, positions={"AAPL": 7500.0}, broker=broker)
+        assert len(broker.get_pending_orders()) == 1
+        assert broker.get_pending_orders()[0].quantity == 25.0
+
+    def test_reduction_without_broker_does_not_change_manager_state(self):
+        manager = RiskManager(
+            limits=[MaxDrawdownLimit(max_drawdown=0.10, action="reduce", reduction_pct=0.5)]
+        )
+        manager.initialize(initial_equity=100.0)
+
+        with pytest.raises(ValueError, match="broker"):
+            manager.update(equity=80.0, positions={"A": 80.0})
+
+        assert manager.current_drawdown == 0.0
+        assert not manager.is_halted
 
     def test_full_workflow(self):
         """Test complete RiskManager workflow."""

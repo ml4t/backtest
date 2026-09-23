@@ -2966,7 +2966,7 @@
       },
       "module": "ml4t.backtest.risk.portfolio.limits",
       "qualname": "MaxDrawdownLimit",
-      "signature": "(max_drawdown: float = 0.2, action: str = 'liquidate', warn_threshold: float | None = None) -> None"
+      "signature": "(max_drawdown: float = 0.2, action: str = 'liquidate', warn_threshold: float | None = None, reduction_pct: float = 0.0) -> None"
     },
     "ml4t.backtest.risk.portfolio.limits:MaxExposureLimit": {
       "kind": "class",
@@ -3721,6 +3721,10 @@
         "rebalance_to_weights": {
           "kind": "method",
           "signature": "(self, target_weights: 'dict[str, float]', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
+        },
+        "reduce_all_positions": {
+          "kind": "method",
+          "signature": "(self, fraction: 'float', reason: 'str', order_type: 'OrderType' = <OrderType.MARKET: 'market'>) -> 'list[Order]'"
         },
         "reduce_position": {
           "kind": "method",

@@ -6,6 +6,7 @@ import copy
 from collections import deque
 from collections.abc import Callable, Mapping
 from datetime import datetime
+from math import isfinite
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 from zoneinfo import ZoneInfo
 
@@ -45,6 +46,7 @@ from .types import (
     Fill,
     Order,
     OrderSide,
+    OrderStatus,
     OrderType,
     Position,
     StopFillMode,
@@ -1712,6 +1714,54 @@ class Broker:
             liquidations.append(order)
 
         return liquidations
+
+    def reduce_all_positions(
+        self,
+        fraction: float,
+        reason: str,
+        order_type: OrderType = OrderType.MARKET,
+    ) -> list[Order]:
+        """Cancel pending orders and reduce each open position atomically."""
+        if not isfinite(fraction) or not 0 < fraction <= 1:
+            raise ValueError(f"fraction must be a finite value in (0, 1], got {fraction!r}")
+
+        active = [(asset, pos.quantity) for asset, pos in self.positions.items() if pos.quantity]
+        if not active:
+            return []
+        for asset, quantity in active:
+            exit_qty = abs(quantity) * fraction
+            if not isfinite(exit_qty) or exit_qty <= self._order_book._MIN_ORDER_SIZE:
+                raise ValueError(f"reduction quantity for {asset} is not executable")
+            if self.share_type == ShareType.INTEGER and int(exit_qty) == 0:
+                raise ValueError(f"reduction quantity for {asset} rounds to zero")
+
+        state = self._snapshot_lifecycle_state(
+            all_positions=True, all_pending_orders=True, all_asset_stats=True
+        )
+        try:
+            for order in list(self.pending_orders):
+                self.cancel_order(order.order_id)
+
+            reductions: list[Order] = []
+            for asset, quantity in active:
+                exit_side = OrderSide.SELL if quantity > 0 else OrderSide.BUY
+                order = self.submit_order(
+                    asset,
+                    abs(quantity) * fraction,
+                    exit_side,
+                    order_type,
+                    _options=SubmitOrderOptions(
+                        risk_exit_reason=f"risk reduction: {reason}",
+                        exit_reason=ExitReason.RISK_LIQUIDATION,
+                    ),
+                )
+                if order is None or order.status is OrderStatus.REJECTED:
+                    raise RuntimeError(f"risk reduction order was not accepted for {asset}")
+                reductions.append(order)
+            return reductions
+        except Exception:
+            self._restore_lifecycle_state(state)
+            raise
 
     # === Position Modification (P1 Features) ===
 
