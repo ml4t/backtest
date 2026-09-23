@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import ItemsView, KeysView
+from collections.abc import ItemsView, Iterable, KeysView
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -223,6 +223,15 @@ class BacktestResult:
             timestamps=timestamps,
         )
 
+    def _timestamp_dtype(self, timestamps: Iterable[datetime | None]) -> pl.DataType:
+        """Use the recorded zone, or the equity timeline for an empty export."""
+        for timestamp in timestamps:
+            if timestamp is not None:
+                return pl.Series([timestamp]).dtype
+        for timestamp, _ in self.equity_curve:
+            return pl.Series([timestamp]).dtype
+        return pl.Datetime()
+
     def to_trades_dataframe(self) -> pl.DataFrame:
         """Convert trades to Polars DataFrame.
 
@@ -248,8 +257,11 @@ class BacktestResult:
         if self._trades_df is not None:
             return self._trades_df
 
+        schema = self._trades_schema()
+        schema["entry_time"] = self._timestamp_dtype(t.entry_time for t in self.trades)
+        schema["exit_time"] = self._timestamp_dtype(t.exit_time for t in self.trades)
         if not self.trades:
-            return pl.DataFrame(schema=self._trades_schema())
+            return pl.DataFrame(schema=schema)
 
         records = []
         for t in self.trades:
@@ -291,7 +303,7 @@ class BacktestResult:
                 }
             )
 
-        self._trades_df = pl.DataFrame(records, schema=self._trades_schema())
+        self._trades_df = pl.DataFrame(records, schema=schema)
         return self._trades_df
 
     def to_fills_dataframe(self) -> pl.DataFrame:
@@ -304,8 +316,10 @@ class BacktestResult:
         if self._fills_df is not None:
             return self._fills_df
 
+        schema = self._fills_schema()
+        schema["timestamp"] = self._timestamp_dtype(fill.timestamp for fill in self.fills)
         if not self.fills:
-            return pl.DataFrame(schema=self._fills_schema())
+            return pl.DataFrame(schema=schema)
 
         records = []
         for fill in self.fills:
@@ -337,15 +351,19 @@ class BacktestResult:
                 }
             )
 
-        self._fills_df = pl.DataFrame(records, schema=self._fills_schema())
+        self._fills_df = pl.DataFrame(records, schema=schema)
         return self._fills_df
 
     def to_rejected_orders_dataframe(self) -> pl.DataFrame:
         """Convert rejected orders to a stable, machine-readable DataFrame."""
         if self._rejected_orders_df is not None:
             return self._rejected_orders_df
+        schema = self._rejected_orders_schema()
+        schema["timestamp"] = self._timestamp_dtype(
+            order.created_at for order in self.rejected_orders
+        )
         if not self.rejected_orders:
-            return pl.DataFrame(schema=self._rejected_orders_schema())
+            return pl.DataFrame(schema=schema)
 
         records = [
             {
@@ -370,7 +388,7 @@ class BacktestResult:
         ]
         self._rejected_orders_df = pl.DataFrame(
             records,
-            schema=self._rejected_orders_schema(),
+            schema=schema,
         )
         return self._rejected_orders_df
 
@@ -439,12 +457,14 @@ class BacktestResult:
         if self._portfolio_state_df is not None:
             return self._portfolio_state_df
 
+        schema = self._portfolio_state_schema()
+        schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.portfolio_state)
         if not self.portfolio_state:
-            return pl.DataFrame(schema=self._portfolio_state_schema())
+            return pl.DataFrame(schema=schema)
 
         self._portfolio_state_df = pl.DataFrame(
             self.portfolio_state,
-            schema=self._portfolio_state_schema(),
+            schema=schema,
             orient="row",
         ).sort("timestamp")
         return self._portfolio_state_df

@@ -8,12 +8,14 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
 import pytest
 from ml4t.specs.market_data import FeedSpec
 
+from ml4t.backtest import DataFeed, Engine, Strategy
 from ml4t.backtest.config import BacktestConfig
 from ml4t.backtest.result import (
     ArtifactIncompleteError,
@@ -1526,3 +1528,44 @@ class TestEnrichTradesTimeZoneReconciliation:
             enrich_trades_with_signals(
                 self._trades(None), self._signals("UTC"), signal_columns=["momentum"]
             )
+
+
+@pytest.mark.parametrize("zone", ["UTC", "America/New_York", None])
+def test_result_exports_preserve_feed_timestamp_timezone(zone):
+    """Execution records join to the feed on the same timestamp and asset."""
+    tz = ZoneInfo(zone) if zone is not None else None
+    dates = [datetime(2024, 1, 1, tzinfo=tz) + timedelta(days=i) for i in range(5)]
+    prices = pl.DataFrame(
+        {
+            "timestamp": dates,
+            "asset": ["A"] * len(dates),
+            "open": [100.0] * len(dates),
+            "high": [100.0] * len(dates),
+            "low": [100.0] * len(dates),
+            "close": [100.0] * len(dates),
+            "volume": [1000] * len(dates),
+        }
+    )
+
+    class RoundTrip(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == dates[0]:
+                broker.submit_order("A", 1)
+            elif timestamp == dates[2]:
+                broker.close_position("A")
+
+    result = Engine(
+        feed=DataFeed(prices_df=prices),
+        strategy=RoundTrip(),
+        config=BacktestConfig(initial_cash=1000),
+    ).run()
+    feed_dtype = prices.schema["timestamp"]
+    fills = result.to_fills_dataframe()
+    assert fills.height == 2
+    assert fills.schema["timestamp"] == feed_dtype
+    assert fills.join(prices.select("timestamp", "asset"), on=["timestamp", "asset"]).height == 2
+    assert result.to_trades_dataframe().schema["entry_time"] == feed_dtype
+    assert result.to_trades_dataframe().schema["exit_time"] == feed_dtype
+    assert result.to_equity_dataframe().schema["timestamp"] == feed_dtype
+    assert result.to_portfolio_state_dataframe().schema["timestamp"] == feed_dtype
+    assert result.to_rejected_orders_dataframe().schema["timestamp"] == feed_dtype
