@@ -107,6 +107,7 @@ nav:
     - Installation: getting-started/installation.md
     - Quickstart: getting-started/quickstart.md
     - Example Data: tutorials/data.md
+    - Orders and Timing: tutorials/orders-and-timing.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:
