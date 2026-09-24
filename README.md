@@ -57,6 +57,10 @@ for supported setup paths.
 
 ## Quick Start
 
+The [first backtest](https://www.ml4trading.io/docs/backtest/getting-started/quickstart/)
+uses bundled synthetic data and explains every fill. The [tutorial sequence](https://www.ml4trading.io/docs/backtest/)
+then covers orders, multi-asset portfolios, costs, account rules, risk, and results.
+
 <!-- ml4t-doc-test: readme-quickstart -->
 ```python
 from datetime import datetime

@@ -16,6 +16,7 @@ from pathlib import Path
 _ROOT = Path(__file__).parents[1]
 _DEFAULT_PATHS = (
     _ROOT / "README.md",
+    _ROOT / "docs" / "index.md",
     _ROOT / "docs" / "getting-started" / "installation.md",
     _ROOT / "docs" / "getting-started" / "quickstart.md",
     _ROOT / "docs" / "tutorials" / "data.md",
@@ -33,6 +34,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "installation-import",
         "preopen-mixed-rules",
         "readme-quickstart",
+        "home-example",
         "quickstart-minimal",
         "smoke-equity",
         "smoke-etf",

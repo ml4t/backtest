@@ -46,22 +46,32 @@ deployment:
 
 ## Quick Example
 
+This run uses a bundled synthetic AAPL panel, so it needs no API key or data
+download. The [first backtest](getting-started/quickstart.md) walks through the
+orders and result records.
+
+<!-- ml4t-doc-test: home-example -->
 ```python
+from importlib.metadata import version
+
 import polars as pl
-from ml4t.backtest import Engine, DataFeed, Strategy, BacktestConfig
+from ml4t.backtest import BacktestConfig, DataFeed, Engine
+from ml4t.backtest.example_data import ExampleRoundTrip, load_example_prices
 
-class BuyAndHold(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        for asset, bar in data.items():
-            if broker.get_position(asset) is None:
-                broker.submit_order(asset, 100)
+prices = load_example_prices("equity").filter(pl.col("asset") == "AAPL")
+result = Engine(
+    DataFeed(prices_df=prices),
+    ExampleRoundTrip("AAPL", 100),
+    BacktestConfig(initial_cash=100_000),
+).run()
+print("ml4t-backtest " + version("ml4t-backtest"))
+print(f"fills={len(result.fills)} final=${result.metrics['final_value']:.2f}")
+```
 
-feed = DataFeed(prices_df=prices)
-engine = Engine(feed=feed, strategy=BuyAndHold())
-result = engine.run()
-
-print(f"Total Return: {result.metrics['total_return_pct']:.1f}%")
-print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
+<!-- ml4t-doc-output: home-example -->
+```text
+ml4t-backtest {package_version}
+fills=2 final=$100300.00
 ```
 
 Each `Engine` instance is single-use. Create a new instance for every independent run.

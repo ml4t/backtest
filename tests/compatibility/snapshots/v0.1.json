@@ -597,7 +597,6 @@
     "from ml4t.backtest import DataFeed",
     "from ml4t.backtest import Engine",
     "from ml4t.backtest import Engine, DataFeed",
-    "from ml4t.backtest import Engine, DataFeed, Strategy, BacktestConfig",
     "from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed",
     "from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest",
     "from ml4t.backtest import ExecutionMode, StopFillMode",
