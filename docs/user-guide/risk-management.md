@@ -1,5 +1,8 @@
 # Risk Management
 
+The [risk and state tutorial](../tutorials/risk-and-state.md) runs a stop, two
+portfolio reductions, and the recovery between breaches from one declared price panel.
+
 ml4t-backtest has two levels of risk management: **position rules** (per-position exits) and **portfolio limits** (portfolio-wide constraints). Position rules are the primary tool -- they automatically evaluate on every bar and generate exit orders when triggered.
 
 ## Position Rules

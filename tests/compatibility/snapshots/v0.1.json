@@ -587,6 +587,7 @@
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, OrderType, Strategy",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, OrderSide, Strategy",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, RebalanceConfig, RebalanceSchedule, Strategy, TargetWeightExecutor",
+    "from ml4t.backtest import BacktestConfig, DataFeed, Engine, StopLoss, Strategy",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy",
     "from ml4t.backtest import BacktestConfig, Engine",
     "from ml4t.backtest import BacktestConfig, ExecutionMode",
@@ -635,6 +636,7 @@
     "from ml4t.backtest.models import TieredCommission, CombinedCommission",
     "from ml4t.backtest.profiles import list_profiles",
     "from ml4t.backtest.result import BacktestResult",
+    "from ml4t.backtest.risk.portfolio import MaxDrawdownLimit, RiskManager",
     "from ml4t.backtest.risk.portfolio.limits import BetaLimit",
     "from ml4t.backtest.risk.portfolio.limits import DailyLossLimit",
     "from ml4t.backtest.risk.portfolio.limits import GrossExposureLimit, NetExposureLimit",
@@ -3084,6 +3086,74 @@
       "module": "ml4t.backtest.risk.portfolio.limits",
       "qualname": "VaRLimit",
       "signature": "(threshold: float = 0.05, confidence_level: float = 0.95, lookback_days: int = 20, action: str = 'warn', returns_key: str = 'historical_returns') -> None"
+    },
+    "ml4t.backtest.risk.portfolio:MaxDrawdownLimit": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "check": {
+          "kind": "method",
+          "signature": "(self, state: ml4t.backtest.risk.portfolio.limits.PortfolioState) -> ml4t.backtest.risk.portfolio.limits.LimitResult"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.limits",
+      "qualname": "MaxDrawdownLimit",
+      "signature": "(max_drawdown: float = 0.2, action: str = 'liquidate', warn_threshold: float | None = None, reduction_pct: float = 0.0) -> None"
+    },
+    "ml4t.backtest.risk.portfolio:RiskManager": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "can_increase_position": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', amount: 'float') -> 'tuple[bool, str]'"
+        },
+        "can_open_position": {
+          "kind": "method",
+          "signature": "(self) -> 'bool'"
+        },
+        "current_drawdown": {
+          "kind": "property",
+          "signature": "(self) -> 'float'"
+        },
+        "get_state": {
+          "kind": "method",
+          "signature": "(self, equity: 'float', positions: 'dict[str, float]', context: 'dict[str, Any] | None' = None) -> 'PortfolioState'"
+        },
+        "halt_reason": {
+          "kind": "property",
+          "signature": "(self) -> 'str'"
+        },
+        "initialize": {
+          "kind": "method",
+          "signature": "(self, initial_equity: 'float', timestamp: 'datetime | None' = None) -> 'None'"
+        },
+        "is_halted": {
+          "kind": "property",
+          "signature": "(self) -> 'bool'"
+        },
+        "reset_halt": {
+          "kind": "method",
+          "signature": "(self) -> 'None'"
+        },
+        "update": {
+          "kind": "method",
+          "signature": "(self, equity: 'float', positions: 'dict[str, float]', timestamp: 'datetime | None' = None, context: 'dict[str, Any] | None' = None, broker: 'Broker | None' = None) -> 'list[LimitResult]'"
+        },
+        "warnings": {
+          "kind": "property",
+          "signature": "(self) -> 'list[str]'"
+        }
+      },
+      "module": "ml4t.backtest.risk.portfolio.manager",
+      "qualname": "RiskManager",
+      "signature": "(limits: 'list[PortfolioLimit]' = <factory>, _initial_equity: 'float' = 0.0, _high_water_mark: 'float' = 0.0, _daily_start_equity: 'float' = 0.0, _last_equity: 'float' = 0.0, _last_date: 'date | None' = None, _halted: 'bool' = False, _halt_reason: 'str' = '', _warnings: 'list[str]' = <factory>, _liquidation_applied: 'bool' = False, _reduction_applied: 'set[int]' = <factory>) -> None"
     },
     "ml4t.backtest.risk.position:AllOf": {
       "kind": "class",

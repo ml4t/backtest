@@ -23,6 +23,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "tutorials" / "multiasset-rebalancing.md",
     _ROOT / "docs" / "tutorials" / "costs-and-funding.md",
     _ROOT / "docs" / "tutorials" / "accounts-and-constraints.md",
+    _ROOT / "docs" / "tutorials" / "risk-and-state.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
 )
 _REQUIRED_EXAMPLES = frozenset(
@@ -44,6 +45,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "tutorial-costs-funding",
         "tutorial-costs-flip",
         "tutorial-accounts-constraints",
+        "tutorial-risk-state",
     }
 )
 _EXAMPLE = re.compile(

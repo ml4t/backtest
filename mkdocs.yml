@@ -111,6 +111,7 @@ nav:
     - Multi-asset Rebalancing: tutorials/multiasset-rebalancing.md
     - Costs and Funding: tutorials/costs-and-funding.md
     - Accounts and Constraints: tutorials/accounts-and-constraints.md
+    - Risk and State: tutorials/risk-and-state.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:
