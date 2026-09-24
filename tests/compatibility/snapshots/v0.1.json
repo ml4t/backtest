@@ -596,10 +596,10 @@
     "from ml4t.backtest import Broker, BacktestConfig",
     "from ml4t.backtest import DataFeed",
     "from ml4t.backtest import Engine",
-    "from ml4t.backtest import Engine, DataFeed",
     "from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed",
     "from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest",
     "from ml4t.backtest import ExecutionMode, StopFillMode",
+    "from ml4t.backtest import Order, OrderSide",
     "from ml4t.backtest import RebalanceConfig, RebalanceSchedule, Strategy, TargetWeightExecutor",
     "from ml4t.backtest import RebalanceConfig, TargetWeightExecutor",
     "from ml4t.backtest import RebalanceSchedule",
@@ -613,7 +613,7 @@
     "from ml4t.backtest import TakeProfit",
     "from ml4t.backtest import TrailingStop",
     "from ml4t.backtest import run_backtest",
-    "from ml4t.backtest.accounting import Gatekeeper",
+    "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
@@ -634,6 +634,7 @@
     "from ml4t.backtest.execution import SquareRootImpact",
     "from ml4t.backtest.execution import VolumeParticipationLimit",
     "from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig",
+    "from ml4t.backtest.models import NoCommission",
     "from ml4t.backtest.models import TieredCommission, CombinedCommission",
     "from ml4t.backtest.profiles import list_profiles",
     "from ml4t.backtest.result import BacktestResult",
@@ -2050,6 +2051,54 @@
   ],
   "snapshot_schema_version": 1,
   "symbols": {
+    "ml4t.backtest.accounting:AccountState": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self) -> str"
+        },
+        "add_settlement_hold": {
+          "kind": "method",
+          "signature": "(self, bar_index: int, delay: int, amount: float) -> None"
+        },
+        "allows_short_selling": {
+          "kind": "method",
+          "signature": "(self) -> bool"
+        },
+        "buying_power": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "get_position": {
+          "kind": "method",
+          "signature": "(self, asset: str) -> ml4t.backtest.types.Position | None"
+        },
+        "get_position_quantity": {
+          "kind": "method",
+          "signature": "(self, asset: str) -> float"
+        },
+        "mark_to_market": {
+          "kind": "method",
+          "signature": "(self, current_prices: dict[str, float]) -> None"
+        },
+        "release_settled": {
+          "kind": "method",
+          "signature": "(self, current_bar: int) -> None"
+        },
+        "total_equity": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
+        "unsettled_cash": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        }
+      },
+      "module": "ml4t.backtest.accounting.account",
+      "qualname": "AccountState",
+      "signature": "(initial_cash: float, policy: ml4t.backtest.accounting.policy.AccountPolicy)"
+    },
     "ml4t.backtest.accounting:Gatekeeper": {
       "kind": "class",
       "members": {
@@ -2069,6 +2118,50 @@
       "module": "ml4t.backtest.accounting.gatekeeper",
       "qualname": "Gatekeeper",
       "signature": "(account: ml4t.backtest.accounting.account.AccountState, commission_model: ml4t.backtest.models.CommissionModel, cash_buffer_pct: float = 0.0, settlement_reduces_buying_power: bool = True, multiplier_resolver: collections.abc.Callable[[str], float] | None = None)"
+    },
+    "ml4t.backtest.accounting:UnifiedAccountPolicy": {
+      "kind": "class",
+      "members": {
+        "allows_short_selling": {
+          "kind": "method",
+          "signature": "(self) -> 'bool'"
+        },
+        "calculate_buying_power": {
+          "kind": "method",
+          "signature": "(self, cash: 'float', positions: 'dict[str, Position]') -> 'float'"
+        },
+        "from_config": {
+          "kind": "method",
+          "signature": "(cls, config: 'BacktestConfig') -> 'UnifiedAccountPolicy'"
+        },
+        "get_margin_requirement": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', quantity: 'float', price: 'float', for_initial: 'bool' = True, *, multiplier: 'float' = 1.0) -> 'float'"
+        },
+        "get_spendable_cash": {
+          "kind": "method",
+          "signature": "(self, cash: 'float', positions: 'dict[str, Position]') -> 'float'"
+        },
+        "handle_reversal": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', current_quantity: 'float', order_quantity_delta: 'float', price: 'float', current_positions: 'dict[str, Position]', cash: 'float', commission: 'float', *, multiplier: 'float' = 1.0) -> 'tuple[bool, str]'"
+        },
+        "is_margin_call": {
+          "kind": "method",
+          "signature": "(self, cash: 'float', positions: 'dict[str, Position]') -> 'bool'"
+        },
+        "validate_new_position": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', quantity: 'float', price: 'float', current_positions: 'dict[str, Position]', cash: 'float', *, multiplier: 'float' = 1.0) -> 'tuple[bool, str]'"
+        },
+        "validate_position_change": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', current_quantity: 'float', quantity_delta: 'float', price: 'float', current_positions: 'dict[str, Position]', cash: 'float', *, multiplier: 'float' = 1.0) -> 'tuple[bool, str]'"
+        }
+      },
+      "module": "ml4t.backtest.accounting.policy",
+      "qualname": "UnifiedAccountPolicy",
+      "signature": "(allow_short_selling: 'bool' = False, allow_leverage: 'bool' = False, initial_margin: 'float' = 0.5, long_maintenance_margin: 'float' = 0.25, short_maintenance_margin: 'float' = 0.3, fixed_margin_schedule: 'dict[str, tuple[float, float]] | None' = None, margin_pct_schedule: 'dict[str, tuple[float, float]] | None' = None, short_cash_policy: 'str' = 'credit') -> 'None'"
     },
     "ml4t.backtest.analytics.bridge:to_trade_records": {
       "kind": "function",
@@ -2805,6 +2898,18 @@
       "module": "ml4t.backtest.models",
       "qualname": "CombinedCommission",
       "signature": "(percentage: float = 0.0, fixed: float = 0.0)"
+    },
+    "ml4t.backtest.models:NoCommission": {
+      "kind": "class",
+      "members": {
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, asset: str, quantity: float, price: float) -> float"
+        }
+      },
+      "module": "ml4t.backtest.models",
+      "qualname": "NoCommission",
+      "signature": "()"
     },
     "ml4t.backtest.models:TieredCommission": {
       "kind": "class",
