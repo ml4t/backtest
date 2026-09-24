@@ -70,6 +70,8 @@ def _check_external(url: str) -> str | None:
                     return f"HTTP {response.status}"
             return None
         except (HTTPError, URLError, TimeoutError) as error:
+            if isinstance(error, HTTPError):
+                error.close()
             if attempt == 2 or (isinstance(error, HTTPError) and error.code < 500):
                 return str(error)
             time.sleep(attempt + 1)
