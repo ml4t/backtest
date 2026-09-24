@@ -144,10 +144,10 @@ def check_public_api_calls(paths: list[Path] | tuple[Path, ...]) -> int:
     checked = 0
     for path in paths:
         content = path.read_text(encoding="utf-8")
+        imports: dict[str, object] = {}
         for block in _PYTHON_BLOCK.finditer(content):
             line = content.count("\n", 0, block.start()) + 1
             tree = ast.parse(block["code"], filename=f"{path}:{line}")
-            imports: dict[str, object] = {}
             for node in tree.body:
                 if not isinstance(node, ast.ImportFrom):
                     continue
