@@ -556,13 +556,9 @@ print(result.config.describe())
 print(result.config.preset_name)
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses BacktestResult in every case study:
-
-- **Ch16 / NB05** (`performance_reporting`) — `portfolio_analysis_from_result()`, MFE/MAE analysis, gross vs net comparison, full 24-section tearsheet
-- **Ch16 case studies** — all cases save trade artifacts via `to_parquet()` and pass trades/metrics/equity to tearsheet generation
-- **Ch16 / NB06** (`sharpe_ratio_inference`) — statistical inference on backtest results
+Chapter 16, Section 16.5, [Performance reporting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/09_performance_reporting.ipynb) develops return and drawdown interpretation. This page defines the result frames and artifact format used to reproduce those reports.
 
 ## Next Steps
 

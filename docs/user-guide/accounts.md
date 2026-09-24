@@ -227,20 +227,9 @@ The reviewed 0.1 compatibility snapshot is `tests/compatibility/snapshots/v0.1.j
 `uv run python validation/generate_compatibility_snapshot.py` to check it. An intentional API or
 schema change requires `--write` and review of the resulting snapshot diff.
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading)
-materials use account policy most clearly in these workflows:
-
-- **Ch16 case studies** — reusable `BacktestConfig` objects control cash use, leverage, and
-  portfolio behavior across equities, futures, crypto, and options examples
-- **Ch17** (`portfolio_construction`) — allocator comparisons depend on explicit account and
-  turnover assumptions instead of hidden notebook defaults
-- **Ch19** (`risk_management`) — leverage, shorting, and maintenance rules interact directly
-  with position sizing and portfolio limits
-
-Use the [Book Guide](../book-guide/index.md) when you want to jump from a notebook or
-case-study path to the production account-policy workflow.
+Chapter 17, Section 17.4, [Conformal position sizing](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/07_conformal_position_sizing.ipynb) turns prediction uncertainty into position sizes. The account tutorial here shows how buying power and share precision affect those sizes.
 
 ## Next Steps
 

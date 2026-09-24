@@ -543,13 +543,9 @@ config = BacktestConfig(share_type=ShareType.FRACTIONAL)
 config = BacktestConfig(share_type=ShareType.INTEGER)
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates execution semantics across chapters:
-
-- **Ch16 / NB11** (`engine_divergence_anatomy`) - detailed analysis of how SAME_BAR vs NEXT_BAR and fill ordering affect backtest results
-- **Ch18** (`portfolio_construction`) - LinearImpact and SquareRootImpact market impact models with VolumeParticipationLimit
-- **Ch16 case studies** - each case study uses setup.yaml to configure commission_rate, slippage_rate, and execution_mode
+Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) isolates fill timing and ordering differences. This page specifies the current engine behavior behind those comparisons.
 
 ## Next Steps
 

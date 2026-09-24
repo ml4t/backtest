@@ -45,3 +45,7 @@ The example reports nine daily-return observations, not nine closed trades.
 For a larger analysis, pass a benchmark to the helper and inspect the
 [Results & Analysis](../user-guide/results.md#integration-with-ml4t-diagnostic)
 reference for trade, fill, and portfolio-state handoffs.
+
+## In the book
+
+Chapter 17, Section 17.3, [Portfolio metrics](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/01_portfolio_metrics.ipynb) applies `ml4t-diagnostic` to a larger ETF allocation. The small example above tests the bridge before adding benchmark and rolling analyses.

@@ -260,6 +260,10 @@ print(list_profiles())
 # ['backtrader', 'default', 'lean', 'realistic', 'vectorbt', 'zipline']
 ```
 
+## In the book
+
+Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) changes one setting at a time; [Case-study LEAN parity](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/16_case_study_lean_parity.ipynb) reports the bounded comparison audit. The profile tables here identify the configuration used for each retained library workload.
+
 ## Next Steps
 
 - [Configuration](configuration.md) -- understand each parameter

@@ -278,13 +278,9 @@ result = run_backtest("data/prices.parquet", strategy, signals="data/signals.par
 
 DataFeed pre-partitions data by timestamp at initialization and pre-extracts column indices for O(1) per-bar access. Quote columns are cached additively, so the OHLCV path stays unchanged unless you provide quote data. The release benchmark records setup separately from engine runtime and measures memory over the complete child process.
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book prepares DataFeed inputs in every Engine case study:
-
-- **Ch16 case studies** — each case study loads OHLCV from Parquet, constructs a signals DataFrame from ML predictions, and passes both to DataFeed
-- **Ch16 / NB13** (`futures_backtesting`) — multi-contract futures data with session boundaries and overnight gaps
-- The common pattern: `prices_df` is a stacked multi-asset OHLCV DataFrame, `signals_df` contains prediction columns aligned by (timestamp, asset)
+Chapter 16, Section 16.3, [Futures backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/02_futures_backtesting.ipynb) works through contract and session inputs. The [FX pairs backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/case_studies/fx_pairs/13_backtest.ipynb) extends feed alignment to a prediction stream.
 
 ## Next Steps
 

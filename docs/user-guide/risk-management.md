@@ -316,16 +316,9 @@ if risk_manager.is_halted:
     return
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates risk management in Ch19 case studies:
-
-- **ETFs** — RuleChain with StopLoss + TrailingStop on multi-asset ETF portfolios
-- **FX Pairs** — StopLoss + TakeProfit + TrailingStop for currency strategies
-- **CME Futures** — Risk rules with ContractSpec and per-contract commission
-- **US Equities** — MaxDrawdownLimit and DailyLossLimit portfolio protection
-
-The case studies show progressive complexity: basic stop-loss → trailing stops → rule chains → portfolio limits.
+Chapter 19, Section 19.4, [ml4t-backtest risk demo](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/19_risk_management/10_ml4t_backtest_risk_demo.ipynb) applies position rules and portfolio limits. The [exit strategies notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/19_risk_management/02_exit_strategies.ipynb) compares stop choices.
 
 ## Next Steps
 

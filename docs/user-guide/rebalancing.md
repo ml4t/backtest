@@ -175,14 +175,9 @@ silently restarting session counters.
 The engine validates `LongShortStrategy` schedule alignment after `on_end`, independently of any
 callback override.
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses TargetWeightExecutor extensively:
-
-- **Ch16 case studies** — all 6 Engine-based cases (ETFs, FX, equities, crypto, futures, options) use TargetWeightExecutor for ML prediction → portfolio weight → rebalance
-- **Ch17** (`portfolio_construction`) — portfolio optimization with weight constraints
-
-The common pattern: ML model generates predictions, predictions are converted to portfolio weights, TargetWeightExecutor handles the order generation and execution.
+Chapter 17, Section 17.7, [Library comparison](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/08_library_comparison.ipynb) compares allocation methods on matched inputs. This page covers how those target weights become timed, sized orders.
 
 ## Next Steps
 

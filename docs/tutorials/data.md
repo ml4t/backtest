@@ -170,3 +170,7 @@ show contract marks; check CME's data access terms before building a historical
 futures panel. Normalize vendor timestamps, corporate actions, currency units,
 contract multipliers, and missing sessions before substituting any of these
 sources for the synthetic panels.
+
+## In the book
+
+Chapter 16, Section 16.3, [Futures backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/02_futures_backtesting.ipynb) extends the small synthetic futures panel to a longer contract history. [FX pairs backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/case_studies/fx_pairs/13_backtest.ipynb) shows how a research prediction stream becomes aligned feed input.

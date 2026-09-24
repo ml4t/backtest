@@ -514,15 +514,9 @@ config = BacktestConfig(
 
 Use this with a `DataFeed` whose `FeedSpec` maps `price_col`, `bid_col`, `ask_col`, and optionally quote sizes.
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses BacktestConfig across all case studies:
-
-- **Ch16 case studies** — each case study loads config from `setup.yaml` via `get_backtest_config()`, setting initial_cash, commission_rate, slippage_rate, and execution_mode
-- **Ch16 / NB13** (`futures_backtesting`) — ContractSpec with CommissionType.PER_CONTRACT for CME futures
-- **Ch19 case studies** — risk management config (stop fill modes, trailing stop timing)
-
-The book pattern: `BacktestConfig()` with 4 overrides (initial_cash, commission_rate, slippage_rate, execution_mode), loaded from YAML. Costs come from `setup.yaml` via a utility function. This covers the vast majority of use cases.
+Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) changes one execution assumption at a time. Use this reference to identify and record the corresponding `BacktestConfig` fields.
 
 ## Next Steps
 

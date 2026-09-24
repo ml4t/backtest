@@ -284,13 +284,9 @@ cost_drag = result_zero.metrics['total_return_pct'] - result_real.metrics['total
 print(f"Cost drag: {cost_drag:.2f}%")
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates market impact in Ch18:
-
-- **Cost notebooks** — LinearImpact and SquareRootImpact models applied to multi-asset portfolios
-- **VolumeParticipationLimit** — preventing oversized orders in illiquid assets
-- **Cost drag analysis** — comparing gross vs net returns across case studies
+Chapter 18, Section 18.4, [Market impact calibration](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/18_transaction_costs/03_market_impact_calibration.ipynb) examines how execution size changes impact. [Gross versus net performance](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/18_transaction_costs/10_gross_vs_net_performance.ipynb) shows the portfolio effect of those costs.
 
 ## Next Steps
 

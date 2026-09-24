@@ -289,14 +289,9 @@ class AssetSpecificRules(Strategy):
 4. **Use NEXT_BAR mode** -- for production strategies, avoid SAME_BAR
 5. **Validate with profiles** -- compare results across framework profiles
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates these patterns across multiple case studies:
-
-- **Ch16 / NB03** (`single_asset_ml4t_backtest`) — RSI mean-reversion Strategy with submit_order/close_position
-- **Ch16 / NB04** (`framework_parity`) — same strategy compared across VectorBT and ml4t-backtest
-- **Ch16 / NB13** (`futures_backtesting`) — futures strategies with ContractSpec and per-contract costs
-- **Ch16 case studies** — 6 Engine-based case studies (ETFs, FX, equities, crypto, futures, options) using TargetWeightExecutor with ML predictions
+Chapter 16, Section 16.3, [Single asset ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb) implements an event-driven strategy and reconciles its trade log. This page describes the reusable `Strategy` interface.
 
 ## Next Steps
 
