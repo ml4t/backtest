@@ -4,6 +4,8 @@ The [multi-asset rebalancing tutorial](../tutorials/multiasset-rebalancing.md) r
 
 For multi-asset strategies that target portfolio weights, the broker provides `rebalance_to_weights()` and the execution module provides a `TargetWeightExecutor` for advanced control.
 
+The broker calls below belong inside a strategy callback. The linked multi-asset tutorial supplies the feed, strategy, and result checks.
+
 ## Simple Rebalancing
 
 ```python

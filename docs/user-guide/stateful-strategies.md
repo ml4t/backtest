@@ -1,19 +1,21 @@
 # Stateful Strategies
 
-Stateful strategies are the reason event-driven backtesting exists. In a vectorized framework, every signal is computed in advance from historical data alone. In an event-driven engine, each trading decision can depend on the **entire history of prior decisions** — fills, P&L, position state, equity path. This feedback loop is impossible to vectorize.
+Use a stateful strategy when a later decision depends on earlier order outcomes, cash, positions, or equity. A signal array computed from price history alone does not capture those execution outcomes. The event loop passes updated broker state into each decision.
+
+The strategy classes below illustrate individual state patterns. Run [the complete strategy examples](https://github.com/ml4t/backtest/blob/main/examples/stateful_strategies.py) or the [risk and state tutorial](../tutorials/risk-and-state.md) for a complete feed and result.
 
 ## When You Need Event-Driven
 
 Use vectorized backtesting when your signal is a pure function of price history:
 
 ```
-signal[t] = f(prices[0:t])    # No feedback — vectorizable
+signal[t] = f(prices[0:t])    # No execution feedback
 ```
 
 Use event-driven backtesting when your trading decision depends on execution state:
 
 ```
-action[t] = g(prices[0:t], fills[0:t], equity[0:t])    # Feedback — requires event loop
+action[t] = g(prices[0:t], fills[0:t], equity[0:t])    # Update execution state in order
 ```
 
 Five categories of stateful patterns:
@@ -401,7 +403,7 @@ def test_pyramiding_respects_max_levels():
     assert max(strategy.pyramid_levels.values()) <= 3
 ```
 
-See `examples/test_stateful_strategies.py` for 45+ test methods covering all five patterns.
+See `examples/stateful_strategies.py` for complete implementations and `examples/test_stateful_strategies.py` for behavioral checks.
 
 ## In the book
 

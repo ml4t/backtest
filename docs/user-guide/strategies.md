@@ -2,6 +2,8 @@
 
 Every strategy subclasses `Strategy` and implements `on_data`. The broker is your interface to the market -- use it to submit orders, query positions, and set risk rules.
 
+The `MyStrategy` class sketches the callback interface. Later `broker` calls belong inside a callback; the [quickstart](../getting-started/quickstart.md) supplies a complete, checked run.
+
 ## Strategy Interface
 
 ```python

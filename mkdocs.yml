@@ -118,6 +118,7 @@ nav:
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:
+    - Overview: user-guide/index.md
     - Strategies: user-guide/strategies.md
     - Order Types: user-guide/orders.md
     - Execution Semantics: user-guide/execution-semantics.md

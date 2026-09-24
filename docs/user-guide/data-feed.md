@@ -4,6 +4,8 @@ The [multi-asset rebalancing tutorial](../tutorials/multiasset-rebalancing.md) r
 
 `DataFeed` converts a Polars DataFrame into per-bar data for the engine. It handles partitioning by timestamp, multi-asset iteration, optional signals/context data, and additive quote caches for execution-aware workloads.
 
+Schema snippets using `[...]` stand for user-supplied columns; they are not standalone datasets. Run the [bundled data examples](../tutorials/data.md) for complete panels and checked output.
+
 ## Required Columns
 
 With the default `FeedSpec`, the prices DataFrame must include:

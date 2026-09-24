@@ -32,6 +32,13 @@ START_MARKER = "<!-- parity-claims:start -->"
 END_MARKER = "<!-- parity-claims:end -->"
 GITHUB_EVIDENCE_ROOT = "https://github.com/ml4t/backtest/blob/main/validation"
 SCENARIO_FRAMEWORKS = load_framework_manifest().scenario_framework_ids
+PRIVATE_VECTORBT_SOURCE = "https://github.com/polakowo/vectorbt.pro"
+PUBLIC_VECTORBT_SOURCE = "https://vectorbt.pro/"
+
+
+def _documentation_source(source: str) -> str:
+    """Link readers to the public product page when evidence names a private repository."""
+    return PUBLIC_VECTORBT_SOURCE if source == PRIVATE_VECTORBT_SOURCE else source
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -118,7 +125,9 @@ def render_claims(
             result = f"{len(passed)}/{len(required)} pass; blocked by scenario {failed_ids}"
         else:
             result = f"{len(passed)}/{len(required)} exact"
-        pinned_framework = f"[{pin['display_name']} {pin['version']}]({pin['source']})"
+        pinned_framework = (
+            f"[{pin['display_name']} {pin['version']}]({_documentation_source(pin['source'])})"
+        )
         rows.append(
             f"| `{pin['profile']}` | {pinned_framework} | {result} | "
             f"[scenario evidence]({correctness_url}) |"
@@ -132,7 +141,7 @@ def render_claims(
         fills = checks["fills"]["expected_count"]
         trades = checks["trades"]["expected_count"]
         terminal_value = checks["final_value"]["canonical_expected"]
-        pinned_framework = f"[{target['display_name']} {target['version']}]({target['source']})"
+        pinned_framework = f"[{target['display_name']} {target['version']}]({_documentation_source(target['source'])})"
         scale_rows.append(
             f"| `{target['profile']}` | {pinned_framework} | {intents:,} | {fills:,} | "
             f"{trades:,} | {terminal_value:,.6f} | "
@@ -159,7 +168,7 @@ def render_claims(
     }
     for record in required_real:
         target = real_targets[record["framework"]]
-        pinned_framework = f"[{target['display_name']} {target['version']}]({target['source']})"
+        pinned_framework = f"[{target['display_name']} {target['version']}]({_documentation_source(target['source'])})"
         fills = record["surfaces"]["fills"]
         equity = record["surfaces"]["equity"]
         terminal = record["surfaces"]["terminal"]
@@ -201,7 +210,7 @@ def render_claims(
     performance_rows = []
     for record in real_performance["records"]:
         target = real_targets[record["framework"]]
-        pinned_framework = f"[{target['display_name']} {target['version']}]({target['source']})"
+        pinned_framework = f"[{target['display_name']} {target['version']}]({_documentation_source(target['source'])})"
         framework_result = record["framework_engine"]
         ml4t_result = record["ml4t_engine"]
         framework_ci = framework_result["ci_95_seconds"]

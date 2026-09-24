@@ -4,6 +4,8 @@ Orders are submitted from a strategy via `broker.submit_order()`. The default or
 
 Run the [order and timing tutorial](../tutorials/orders-and-timing.md) to compare fills on one fixed price panel.
 
+The order calls below assume `broker` is the argument passed to a strategy callback. Run the linked orders tutorial for a complete strategy, feed, and fill records.
+
 ## Market Orders
 
 Execute at the configured execution price (open or close, depending on profile):

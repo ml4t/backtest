@@ -1,8 +1,10 @@
 # Execution Semantics
 
-This is the reference for how orders execute in ml4t-backtest. Every behavioral detail described here corresponds to a named config parameter, so you can tune or override it.
+This page describes when orders are eligible to fill and how the engine processes them. Configuration controls the listed execution choices; the lifecycle and causal ordering rules remain part of the engine contract.
 
 Run the [order and timing tutorial](../tutorials/orders-and-timing.md) to compare fills on one fixed price panel.
+
+The configuration fragments below change one execution choice at a time and assume their enum imports. Run the linked orders tutorial to inspect the resulting fills.
 
 ## Execution Timing
 
