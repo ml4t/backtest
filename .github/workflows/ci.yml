@@ -363,6 +363,11 @@ jobs:
           "$RUNNER_TEMP/candidate-venv/bin/python"
           validation/check_documentation_examples.py
 
+      - name: Exercise the optional diagnostic handoff against the wheel
+        run: |
+          uv pip install --python "$RUNNER_TEMP/candidate-venv/bin/python" "ml4t-diagnostic==0.1.4"
+          "$RUNNER_TEMP/candidate-venv/bin/python" validation/check_documentation_examples.py docs/tutorials/diagnostic-handoff.md
+
       - name: Verify source provenance
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"

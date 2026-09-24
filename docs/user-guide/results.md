@@ -1,5 +1,10 @@
 # Results & Analysis
 
+The [result export tutorial](../tutorials/results-and-analysis.md) joins a
+time-zone-aware feed to fills, equity, predictions, and funding, then checks a
+Parquet round trip. The [diagnostic handoff](../tutorials/diagnostic-handoff.md)
+uses the optional analysis package.
+
 `Engine.run()` returns a `BacktestResult` containing trades, equity curve, fills,
 portfolio state, and computed metrics. Everything is accessible as Python objects,
 Polars DataFrames, or Parquet files.
@@ -456,9 +461,10 @@ result = engine.run()
 # One-liner bridge to ml4t-diagnostic
 analysis = portfolio_analysis_from_result(result, calendar="NYSE")
 
-# Now use PortfolioAnalysis methods
-print(f"Sharpe: {analysis.sharpe_ratio():.2f}")
-print(f"Max DD: {analysis.max_drawdown():.2%}")
+# Compute PortfolioAnalysis summary metrics
+stats = analysis.compute_summary_stats()
+print(f"Sharpe: {stats.sharpe_ratio:.2f}")
+print(f"Max DD: {stats.max_drawdown:.2%}")
 monthly = analysis.compute_monthly_returns()
 ```
 

@@ -576,6 +576,7 @@
     }
   },
   "documented_imports": [
+    "from ml4t.backtest import AssetClass, BacktestConfig, BacktestResult, ContractSpec, DataFeed, Engine",
     "from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine",
     "from ml4t.backtest import AssetClass, ContractSpec",
     "from ml4t.backtest import BacktestConfig",

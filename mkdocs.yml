@@ -113,6 +113,8 @@ nav:
     - Accounts and Constraints: tutorials/accounts-and-constraints.md
     - Risk and State: tutorials/risk-and-state.md
     - Profiles and Parity: tutorials/profiles-and-parity.md
+    - Results and Analysis: tutorials/results-and-analysis.md
+    - Diagnostic Handoff: tutorials/diagnostic-handoff.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:
