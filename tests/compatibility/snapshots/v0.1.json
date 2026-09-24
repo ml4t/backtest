@@ -576,12 +576,14 @@
     }
   },
   "documented_imports": [
+    "from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine",
     "from ml4t.backtest import AssetClass, ContractSpec",
     "from ml4t.backtest import BacktestConfig",
     "from ml4t.backtest import BacktestConfig, CommissionType",
     "from ml4t.backtest import BacktestConfig, DataFeed",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, OrderType, Strategy",
+    "from ml4t.backtest import BacktestConfig, DataFeed, Engine, RebalanceConfig, RebalanceSchedule, Strategy, TargetWeightExecutor",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy",
     "from ml4t.backtest import BacktestConfig, Engine",
     "from ml4t.backtest import BacktestConfig, ExecutionMode",
@@ -593,6 +595,7 @@
     "from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed",
     "from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest",
     "from ml4t.backtest import ExecutionMode, StopFillMode",
+    "from ml4t.backtest import RebalanceConfig, RebalanceSchedule, Strategy, TargetWeightExecutor",
     "from ml4t.backtest import RebalanceSchedule",
     "from ml4t.backtest import RuleChain, StopLoss, TakeProfit, TrailingStop",
     "from ml4t.backtest import StopLoss",

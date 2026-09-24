@@ -1,5 +1,7 @@
 # Rebalancing
 
+The [multi-asset rebalancing tutorial](../tutorials/multiasset-rebalancing.md) runs equities, ETFs, futures, and FX from bundled inputs.
+
 For multi-asset strategies that target portfolio weights, the broker provides `rebalance_to_weights()` and the execution module provides a `TargetWeightExecutor` for advanced control.
 
 ## Simple Rebalancing

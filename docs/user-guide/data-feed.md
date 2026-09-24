@@ -1,5 +1,7 @@
 # Data Feed
 
+The [multi-asset rebalancing tutorial](../tutorials/multiasset-rebalancing.md) runs equities, ETFs, futures, and FX from bundled inputs.
+
 `DataFeed` converts a Polars DataFrame into per-bar data for the engine. It handles partitioning by timestamp, multi-asset iteration, optional signals/context data, and additive quote caches for execution-aware workloads.
 
 ## Required Columns

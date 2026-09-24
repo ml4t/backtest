@@ -20,6 +20,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "getting-started" / "quickstart.md",
     _ROOT / "docs" / "tutorials" / "data.md",
     _ROOT / "docs" / "tutorials" / "orders-and-timing.md",
+    _ROOT / "docs" / "tutorials" / "multiasset-rebalancing.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
 )
 _REQUIRED_EXAMPLES = frozenset(
@@ -34,6 +35,9 @@ _REQUIRED_EXAMPLES = frozenset(
         "smoke-fx",
         "smoke-crypto-perp",
         "tutorial-orders-timing",
+        "tutorial-multiasset-equity-etf",
+        "tutorial-multiasset-future",
+        "tutorial-multiasset-fx",
     }
 )
 _EXAMPLE = re.compile(
