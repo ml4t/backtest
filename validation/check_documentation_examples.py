@@ -27,10 +27,12 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "tutorials" / "risk-and-state.md",
     _ROOT / "docs" / "tutorials" / "profiles-and-parity.md",
     _ROOT / "docs" / "tutorials" / "results-and-analysis.md",
+    _ROOT / "docs" / "user-guide" / "accounts.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
 )
 _REQUIRED_EXAMPLES = frozenset(
     {
+        "account-engine-direct",
         "installation-import",
         "preopen-mixed-rules",
         "readme-quickstart",

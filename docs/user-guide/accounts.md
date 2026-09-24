@@ -111,19 +111,53 @@ Common margin configurations:
 
 ## Using Engine Directly
 
-You can also pass account policy directly to `Engine`:
+Pass the account policy to `Engine` through `BacktestConfig`. This complete example
+submits a short sale on the first bar and checks its next-bar fill:
 
+<!-- ml4t-doc-test: account-engine-direct -->
 ```python
-from ml4t.backtest import Engine, DataFeed
+from datetime import datetime
 
-engine = Engine(
-    feed=feed,
-    strategy=strategy,
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, OrderSide, Strategy
+
+
+class SellOnce(Strategy):
+    def __init__(self):
+        self.submitted = False
+
+    def on_data(self, timestamp, data, context, broker):
+        if not self.submitted:
+            broker.submit_order("AAPL", 10, OrderSide.SELL)
+            self.submitted = True
+
+
+prices = pl.DataFrame({
+    "timestamp": [datetime(2024, 1, 2), datetime(2024, 1, 3)],
+    "asset": ["AAPL", "AAPL"],
+    "open": [100.0, 100.0],
+    "high": [100.0, 100.0],
+    "low": [100.0, 100.0],
+    "close": [100.0, 100.0],
+    "volume": [10_000.0, 10_000.0],
+})
+
+config = BacktestConfig(
     initial_cash=100_000,
     allow_short_selling=True,
     allow_leverage=True,
     initial_margin=0.5,
 )
+engine = Engine(feed=DataFeed(prices_df=prices), strategy=SellOnce(), config=config)
+result = engine.run()
+
+assert [(fill.side.value, fill.quantity) for fill in result.fills] == [("sell", 10.0)]
+print("short sale filled: 10 AAPL")
+```
+
+<!-- ml4t-doc-output: account-engine-direct -->
+```text
+short sale filled: 10 AAPL
 ```
 
 ## Using Broker.from_config()
