@@ -110,6 +110,49 @@ prices = pl.DataFrame({
 })
 ```
 
+## Daily decisions across different close times
+
+By default, the feed emits one event per exact timestamp. If ES closes at 21:00 UTC
+and ZC closes at 21:15 UTC, the strategy sees two callbacks, each with one asset.
+The first callback has no ZC bar. A cross-sectional rebalance built from that
+partial mapping can submit an unintended close for a held asset.
+
+Add a Polars `Date` session column to each price row and pass its name to
+`DataFeed` to request one decision per completed session:
+
+```python
+from datetime import date, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine
+from ml4t.backtest.types import ExecutionMode
+
+prices = pl.DataFrame({
+    "timestamp": [datetime(2024, 1, 2, 21), datetime(2024, 1, 2, 21, 15)],
+    "session_date": [date(2024, 1, 2), date(2024, 1, 2)],
+    "asset": ["ES", "ZC"],
+    "open": [100.0, 100.0],
+    "close": [100.0, 100.0],
+})
+feed = DataFeed(prices_df=prices, session_col="session_date")
+engine = Engine(feed, strategy, BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR))
+```
+
+The engine registers and marks each real bar at its own timestamp. At the final
+bar of a session, it calls `on_data` once with both assets and the timestamp of
+that final bar. Each asset's `signals` come from its own bar. Context values from
+earlier events in the session remain available, with later values taking
+precedence for duplicate keys. Market orders from this decision can fill only
+on a later bar for that asset. Market-on-close orders also wait for a later
+matching close. Same-bar execution is rejected for session decisions.
+
+A decision session must contain exactly one price bar for every asset in the
+feed's asset set. Missing or duplicate asset bars, mixed session dates at one
+timestamp, and signal-only or context-only timestamps raise before the run.
+A holiday with no rows produces no callback; a partial holiday session raises
+rather than silently rebalancing an incomplete portfolio. Supply exchange-local
+session dates explicitly when bars cross midnight or daylight-saving boundaries.
+The timestamp remains the actual bar close in its original timezone.
+
 ## Signals
 
 Pass pre-computed signals (ML predictions, indicators, etc.) as a separate DataFrame:

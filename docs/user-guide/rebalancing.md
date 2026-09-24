@@ -67,6 +67,18 @@ config = BacktestConfig(
 )
 ```
 
+## Rebalance after all daily closes
+
+When daily bars have different close times, exact-timestamp callbacks contain
+only the assets closing at that instant. Building a target dictionary from
+`data` at each callback may leave out held assets, and `TargetWeightExecutor`
+submits closes for holdings missing from the target. Use the feed's explicit
+`session_col` option for a complete cross-sectional decision. The callback
+runs after the last close in the session and receives one bar per asset; orders
+then wait for each asset's next bar. See [Daily decisions across different close
+times](data-feed.md#daily-decisions-across-different-close-times) for the input
+contract and example. Keep `execution_mode=NEXT_BAR` for this workflow.
+
 ## Advanced: TargetWeightExecutor
 
 For more control, use the `TargetWeightExecutor` with a `RebalanceConfig`:

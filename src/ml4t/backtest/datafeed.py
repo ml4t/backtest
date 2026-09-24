@@ -5,7 +5,7 @@ timestamp-to-slice indexes, then converts only the current bar to dicts at
 iteration time.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import polars as pl
@@ -104,6 +104,7 @@ class DataFeed:
         mid_col: str | None = None,
         bid_size_col: str | None = None,
         ask_size_col: str | None = None,
+        session_col: str | None = None,
     ):
         if feed_spec is not None and contract is not None:
             raise ValueError("Pass either feed_spec or contract, not both")
@@ -202,6 +203,11 @@ class DataFeed:
             self._context_ranges_by_ts = {}
 
         self._timestamps = self._get_timestamps()
+        self.session_col = session_col
+        self._session_by_timestamp: dict[datetime, date] = {}
+        self._session_decision_timestamps: set[datetime] = set()
+        if session_col is not None:
+            self._index_decision_sessions(session_col)
         self._idx = 0
         self._signal_columns = (
             [c for c in self.signals.columns if c not in (self._timestamp_col, self._entity_col)]
@@ -337,6 +343,47 @@ class DataFeed:
         all_ts.update(self._signal_ranges_by_ts.keys())
         all_ts.update(self._context_ranges_by_ts.keys())
         return sorted(all_ts)
+
+    def _index_decision_sessions(self, session_col: str) -> None:
+        """Validate complete daily cross sections and record each final close."""
+        prices = self.prices
+        assert prices is not None
+        if session_col not in prices.columns:
+            raise ValueError(f"session_col={session_col!r} not found in price columns")
+        if prices.schema[session_col] != pl.Date:
+            raise ValueError("session_col must contain Polars Date values")
+        if set(self._timestamps) != set(self._price_ranges_by_ts):
+            raise ValueError("session decisions require a price row at every feed timestamp")
+
+        assets_by_session: dict[date, set[str]] = {}
+        last_timestamp_by_session: dict[date, datetime] = {}
+        previous_session: date | None = None
+        for timestamp, asset, session in prices.select(
+            self._timestamp_col, self._entity_col, session_col
+        ).iter_rows():
+            if session is None:
+                raise ValueError("session_col contains a null session date")
+            if previous_session is not None and session < previous_session:
+                raise ValueError("session dates must increase with bar timestamps")
+            if (
+                timestamp in self._session_by_timestamp
+                and self._session_by_timestamp[timestamp] != session
+            ):
+                raise ValueError("one timestamp cannot contain bars from different sessions")
+            self._session_by_timestamp[timestamp] = session
+            session_assets = assets_by_session.setdefault(session, set())
+            if asset in session_assets:
+                raise ValueError(f"duplicate bar for {asset!r} in session {session}")
+            session_assets.add(asset)
+            last_timestamp_by_session[session] = timestamp
+            previous_session = session
+
+        expected_assets = set().union(*assets_by_session.values()) if assets_by_session else set()
+        for session, assets in assets_by_session.items():
+            missing = expected_assets - assets
+            if missing:
+                raise ValueError(f"session {session} is missing bars for {sorted(missing)}")
+        self._session_decision_timestamps = set(last_timestamp_by_session.values())
 
     def __iter__(self):
         self._idx = 0

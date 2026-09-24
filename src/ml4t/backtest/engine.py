@@ -106,6 +106,11 @@ class Engine:
         self.strategy = strategy
         self.config = config.merge_feed_spec(getattr(feed, "feed_spec", None))
         self.execution_mode = self.config.execution_mode
+        if (
+            getattr(feed, "session_col", None) is not None
+            and self.execution_mode != ExecutionMode.NEXT_BAR
+        ):
+            raise ValueError("session decisions require NEXT_BAR execution")
         self.lifecycle_version = negotiated_version
         self.execution_policy = execution_policy or default_execution_policy(self.config)
         self.broker = Broker.from_config(
@@ -322,7 +327,13 @@ class Engine:
                 assert is_trading_day_fn is not None
                 calendar_id = self.config.resolved_calendar
                 assert calendar_id is not None
-                accepted = {ts for ts in timestamps if is_trading_day_fn(calendar_id, ts.date())}
+                accepted = {
+                    ts
+                    for ts in timestamps
+                    if is_trading_day_fn(
+                        calendar_id, self.feed._session_by_timestamp.get(ts, ts.date())
+                    )
+                }
             else:
                 accepted = {
                     ts
@@ -345,6 +356,9 @@ class Engine:
             self.config,
         )
 
+        session_mode = getattr(self.feed, "session_col", None) is not None
+        session_assets: dict[str, dict[str, Any]] = {}
+        session_context: dict[str, Any] = {}
         for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
@@ -357,7 +371,12 @@ class Engine:
             ):
                 # Daily bars use valid dates. Intraday bars use precomputed session intervals.
                 if self.config.resolved_data_frequency == DataFrequency.DAILY:
-                    if not is_trading_day_fn(calendar_id, timestamp.date()):
+                    session_date = (
+                        self.feed._session_by_timestamp[timestamp]
+                        if session_mode
+                        else timestamp.date()
+                    )
+                    if not is_trading_day_fn(calendar_id, session_date):
                         self._skipped_bars += 1
                         continue
                 elif valid_intraday_bar_mask is None or not valid_intraday_bar_mask[feed_bar_index]:
@@ -449,7 +468,9 @@ class Engine:
                 ask_sizes,
                 signals,
             )
-            self._accepted_market_event_count += 1
+            if session_mode:
+                session_assets.update(assets_data)
+                session_context.update(context)
             funding_events = self._funding_events.get(timestamp)
             if funding_events:
                 self.funding_payments.extend(self.broker._apply_funding(funding_events))
@@ -472,12 +493,19 @@ class Engine:
                 # Process same-cycle risk exits before ordinary strategy decisions.
                 self.broker._process_orders(use_open=True)
                 # Strategy generates new orders
-                self._dispatch_market_event(timestamp, assets_data, context)
+                if not session_mode or timestamp in self.feed._session_decision_timestamps:
+                    self._dispatch_market_event(
+                        timestamp,
+                        session_assets if session_mode else assets_data,
+                        session_context if session_mode else context,
+                    )
+                    session_assets = {}
+                    session_context = {}
                 # MOC orders are the one next-bar exception: they execute on the
                 # current session close after strategy logic runs.
                 self.broker._process_orders(
                     order_types={OrderType.MOC},
-                    include_orders_this_bar=True,
+                    include_orders_this_bar=not session_mode,
                 )
             else:
                 # Same-bar mode: process before and after strategy
@@ -529,6 +557,7 @@ class Engine:
         assets_data: Any,
         context: dict[str, Any],
     ) -> None:
+        self._accepted_market_event_count += 1
         self.lifecycle_dispatcher.dispatch(
             LifecyclePhase.MARKET_EVENT,
             self.broker,
