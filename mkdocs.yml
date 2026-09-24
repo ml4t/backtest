@@ -110,6 +110,7 @@ nav:
     - Orders and Timing: tutorials/orders-and-timing.md
     - Multi-asset Rebalancing: tutorials/multiasset-rebalancing.md
     - Costs and Funding: tutorials/costs-and-funding.md
+    - Accounts and Constraints: tutorials/accounts-and-constraints.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:

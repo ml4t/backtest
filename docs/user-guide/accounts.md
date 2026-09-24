@@ -1,5 +1,8 @@
 # Account Policies
 
+The [accounts and constraints tutorial](../tutorials/accounts-and-constraints.md) compares
+accepted orders, structured rejections, and resulting portfolio state under each setting.
+
 Account policy determines what the broker is allowed to do with cash, leverage, and
 short sale proceeds. Use this page when you need to decide whether your strategy
 should behave like a long-only cash account, a short-enabled crypto-style account,
