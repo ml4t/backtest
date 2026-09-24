@@ -82,3 +82,15 @@ def test_missing_tutorial_input_fails_real_example(tmp_path: Path) -> None:
     checker = _load_checker()
     with pytest.raises(RuntimeError, match="Unknown example category"):
         checker.run_examples(checker.collect_examples([page]))
+
+
+def test_invalid_user_guide_api_keyword_fails(tmp_path: Path) -> None:
+    page = tmp_path / "invalid-guide.md"
+    page.write_text(
+        "```python\nfrom ml4t.backtest import Engine\nEngine(initial_cash=100_000)\n```\n",
+        encoding="utf-8",
+    )
+    checker = _load_checker()
+
+    with pytest.raises(ValueError, match="unexpected keyword argument 'initial_cash'"):
+        checker.check_public_api_calls([page])

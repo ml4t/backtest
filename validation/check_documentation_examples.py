@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import difflib
+import importlib
+import inspect
 import os
 import re
 import subprocess
@@ -30,6 +33,10 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "user-guide" / "accounts.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
     _ROOT / "docs" / "user-guide" / "risk-management.md",
+)
+_API_AUDIT_PATHS = (
+    _ROOT / "docs" / "index.md",
+    *sorted((_ROOT / "docs" / "user-guide").glob("*.md")),
 )
 _REQUIRED_EXAMPLES = frozenset(
     {
@@ -73,6 +80,7 @@ _EXAMPLE = re.compile(
     r"```(?P<language>python|bash)\n(?P<code>.*?)\n```",
     flags=re.DOTALL,
 )
+_PYTHON_BLOCK = re.compile(r"^```python\n(?P<code>.*?)^```", flags=re.MULTILINE | re.DOTALL)
 _OUTPUT = re.compile(
     r"<!-- ml4t-doc-output: (?P<name>[a-z0-9-]+) -->\s*"
     r"```text\n(?P<output>.*?)\n```",
@@ -129,6 +137,49 @@ def collect_examples(
         if missing:
             raise ValueError(f"Required documentation examples are missing: {missing}")
     return examples
+
+
+def check_public_api_calls(paths: list[Path] | tuple[Path, ...]) -> int:
+    """Bind direct calls imported in each Python block to the installed package signatures."""
+    checked = 0
+    for path in paths:
+        content = path.read_text(encoding="utf-8")
+        for block in _PYTHON_BLOCK.finditer(content):
+            line = content.count("\n", 0, block.start()) + 1
+            tree = ast.parse(block["code"], filename=f"{path}:{line}")
+            imports: dict[str, object] = {}
+            for node in tree.body:
+                if not isinstance(node, ast.ImportFrom):
+                    continue
+                if node.module is None or not node.module.startswith("ml4t.backtest"):
+                    continue
+                module = importlib.import_module(node.module)
+                for alias in node.names:
+                    imports[alias.asname or alias.name] = getattr(module, alias.name)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                    continue
+                target = imports.get(node.func.id)
+                if not callable(target):
+                    continue
+                if any(isinstance(arg, ast.Starred) for arg in node.args):
+                    continue
+                if any(keyword.arg is None for keyword in node.keywords):
+                    continue
+                try:
+                    signature = inspect.signature(target)
+                except (TypeError, ValueError):
+                    continue
+                args = [object() for _ in node.args]
+                kwargs = {
+                    keyword.arg: object() for keyword in node.keywords if keyword.arg is not None
+                }
+                try:
+                    signature.bind_partial(*args, **kwargs)
+                except TypeError as exc:
+                    raise ValueError(f"{path}:{line + node.lineno}: {node.func.id}: {exc}") from exc
+                checked += 1
+    return checked
 
 
 def run_examples(examples: list[Example]) -> None:
@@ -193,6 +244,9 @@ def main() -> int:
     parser.add_argument("paths", nargs="*", type=Path)
     arguments = parser.parse_args()
     paths = arguments.paths or list(_DEFAULT_PATHS)
+    audit_paths = arguments.paths or list(_API_AUDIT_PATHS)
+    checked = check_public_api_calls(audit_paths)
+    print(f"Checked {checked} direct public API calls in documentation")
     run_examples(collect_examples(paths, require_all=not arguments.paths))
     return 0
 
