@@ -2681,6 +2681,44 @@ class TestConvenienceMethods:
 class TestP1PositionModification:
     """Test P1 position modification methods (reduce_position, buy, sell)."""
 
+    def test_reduce_all_positions_covers_short_with_risk_reason(self, broker):
+        broker.positions["AAPL"] = Position(
+            asset="AAPL",
+            quantity=-100.0,
+            entry_price=150.0,
+            entry_time=datetime(2024, 1, 1, 9, 30),
+        )
+        mark_prices(broker, {"AAPL": 140.0})
+
+        orders = broker.reduce_all_positions(0.25, "drawdown exceeded")
+
+        assert len(orders) == 1
+        assert orders[0].side is OrderSide.BUY
+        assert orders[0].quantity == 25.0
+        assert orders[0]._risk_exit_reason == "risk reduction: drawdown exceeded"
+        broker._process_orders()
+        assert broker.positions["AAPL"].quantity == -75.0
+
+    def test_reduce_all_positions_restores_pending_orders_on_failure(
+        self, broker_with_position, monkeypatch
+    ):
+        broker = broker_with_position
+        mark_prices(broker, {"AAPL": 150.0})
+        pending = broker.submit_order("AAPL", 10)
+        assert pending is not None
+        before_count = len(broker.orders)
+
+        def fail_reduction(*args, **kwargs):
+            raise RuntimeError("reduction failed")
+
+        monkeypatch.setattr(broker, "submit_order", fail_reduction)
+        with pytest.raises(RuntimeError, match="reduction failed"):
+            broker.reduce_all_positions(0.5, "drawdown exceeded")
+
+        assert pending.status is OrderStatus.PENDING
+        assert broker.get_pending_orders() == [pending]
+        assert len(broker.orders) == before_count
+
     def test_reduce_position_half(self, broker_with_position):
         """Test reduce_position sells half of a long position."""
         broker = broker_with_position

@@ -1,5 +1,8 @@
 # Risk Management
 
+The [risk and state tutorial](../tutorials/risk-and-state.md) runs a stop, two
+portfolio reductions, and the recovery between breaches from one declared price panel.
+
 ml4t-backtest has two levels of risk management: **position rules** (per-position exits) and **portfolio limits** (portfolio-wide constraints). Position rules are the primary tool -- they automatically evaluate on every bar and generate exit orders when triggered.
 
 ## Position Rules
@@ -284,12 +287,22 @@ Each limit check returns a `LimitResult` with an action:
 |--------|---------|
 | `none` | No breach |
 | `warn` | Log warning, continue trading |
-| `reduce` | Reduce position sizes by a percentage |
+| `reduce` | Reduce open positions by the configured fraction; currently supported by `MaxDrawdownLimit` |
 | `halt` | Stop opening new positions |
 | `liquidate` | Flatten open positions and stop new trading |
 
-When using portfolio limits in a live strategy loop, pass the broker into
-`RiskManager.update(...)` so liquidation actions are applied immediately:
+For a drawdown reduction, set both `action="reduce"` and an explicit
+`reduction_pct` in (0, 1]. The manager cancels pending orders and submits one
+risk-tagged reduction order per open position. It acts once while that limit
+remains breached and can act again after the breach clears. Other built-in
+limits reject `action="reduce"` at construction until they have a defined
+reduction policy.
+
+For example, `MaxDrawdownLimit(max_drawdown=0.10, action="reduce",
+reduction_pct=0.50)` cuts each open position by half after a 10% drawdown.
+
+Pass the broker into `RiskManager.update(...)` so reduction and liquidation
+actions are applied through normal order execution:
 
 ```python
 results = risk_manager.update(
@@ -303,16 +316,9 @@ if risk_manager.is_halted:
     return
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates risk management in Ch19 case studies:
-
-- **ETFs** — RuleChain with StopLoss + TrailingStop on multi-asset ETF portfolios
-- **FX Pairs** — StopLoss + TakeProfit + TrailingStop for currency strategies
-- **CME Futures** — Risk rules with ContractSpec and per-contract commission
-- **US Equities** — MaxDrawdownLimit and DailyLossLimit portfolio protection
-
-The case studies show progressive complexity: basic stop-loss → trailing stops → rule chains → portfolio limits.
+Chapter 19, Section 19.4, [ml4t-backtest risk demo](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/19_risk_management/10_ml4t_backtest_risk_demo.ipynb) applies position rules and portfolio limits. The [exit strategies notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/19_risk_management/02_exit_strategies.ipynb) compares stop choices.
 
 ## Next Steps
 

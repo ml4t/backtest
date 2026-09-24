@@ -2,6 +2,8 @@
 
 This is the reference for how orders execute in ml4t-backtest. Every behavioral detail described here corresponds to a named config parameter, so you can tune or override it.
 
+Run the [order and timing tutorial](../tutorials/orders-and-timing.md) to compare fills on one fixed price panel.
+
 ## Execution Timing
 
 ### NEXT_BAR (Default)
@@ -23,7 +25,7 @@ config = BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR)  # default
 ```
 
 `OrderType.MOC` is the exception. In `NEXT_BAR` mode, `MOC` orders submitted during
-`on_data()` still fill on the current bar, at the close, after strategy logic runs.
+`on_data()` still fill on the current bar, at the close, after strategy logic runs. For session-level decisions with `DataFeed(session_col=...)`, an `MOC` order instead waits for the next eligible bar close for that asset.
 
 ### Causal Strategy Lifecycle
 
@@ -226,7 +228,7 @@ target-intent payload alone. Unprocessed targets can be restored without order s
 
 ### SAME_BAR
 
-Orders fill at the **current bar's close** price, in the same bar they are submitted.
+Orders can fill in the bar where they are submitted, using the configured `execution_price`. The default source is `OPEN`; set `ExecutionPrice.CLOSE` to model a current-close fill.
 
 ```
 Bar N:  Strategy sees close=$100, submits buy order, fills at close=$100
@@ -235,7 +237,13 @@ Bar N:  Strategy sees close=$100, submits buy order, fills at close=$100
 This mode is useful for comparing against vectorized frameworks (VectorBT) where signals and fills happen simultaneously. It carries look-ahead risk for production strategies because the strategy can "see" the close before deciding to trade at the close.
 
 ```python
-config = BacktestConfig(execution_mode=ExecutionMode.SAME_BAR)
+from ml4t.backtest import BacktestConfig, ExecutionMode
+from ml4t.backtest.config import ExecutionPrice
+
+config = BacktestConfig(
+    execution_mode=ExecutionMode.SAME_BAR,
+    execution_price=ExecutionPrice.CLOSE,
+)
 ```
 
 ### Execution Price
@@ -244,8 +252,8 @@ The `execution_price` parameter controls which price source is used for market o
 
 | Value | Fill Price | Typical Use |
 |-------|-----------|-------------|
-| `OPEN` | Next bar's open | Default, realistic |
-| `CLOSE` | Current bar's close | VectorBT comparison |
+| `OPEN` | Eligible bar open | Default next-bar fill |
+| `CLOSE` | Eligible bar close | Same-bar close comparison |
 | `VWAP` | Volume-weighted average | Requires volume data |
 | `MID` | (high + low) / 2 | Simple approximation |
 | `PRICE` | `FeedSpec.price_col` / `bar["price"]` | Custom reference price, derived bars |
@@ -256,8 +264,7 @@ The `execution_price` parameter controls which price source is used for market o
 
 `PRICE` is the default mark source and follows your feed schema. If you map `price_col="mid_price"`, then both `bar["price"]` and `ExecutionPrice.PRICE` use that midpoint.
 
-`OrderType.MOC` does not use `execution_price`; it always fills at the current bar's
-close.
+`OrderType.MOC` does not use `execution_price`; it fills at the eligible bar's close. In session decision mode, that eligible bar is later than the decision.
 
 ### Mark Price
 
@@ -536,13 +543,9 @@ config = BacktestConfig(share_type=ShareType.FRACTIONAL)
 config = BacktestConfig(share_type=ShareType.INTEGER)
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates execution semantics across chapters:
-
-- **Ch16 / NB11** (`engine_divergence_anatomy`) - detailed analysis of how SAME_BAR vs NEXT_BAR and fill ordering affect backtest results
-- **Ch18** (`portfolio_construction`) - LinearImpact and SquareRootImpact market impact models with VolumeParticipationLimit
-- **Ch16 case studies** - each case study uses setup.yaml to configure commission_rate, slippage_rate, and execution_mode
+Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) isolates fill timing and ordering differences. This page specifies the current engine behavior behind those comparisons.
 
 ## Next Steps
 

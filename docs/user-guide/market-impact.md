@@ -1,5 +1,7 @@
 # Market Impact & Execution Costs
 
+The [costs and funding tutorial](../tutorials/costs-and-funding.md) reconciles executed examples across all four cash-flow sources.
+
 Realistic backtesting requires modeling the costs of executing trades. ml4t-backtest provides three layers of cost modeling: commission, slippage, and market impact.
 
 ## Cost Layers
@@ -67,6 +69,18 @@ combined = CombinedCommission(
     percentage=0.0005,  # Plus 5 bps of notional
 )
 ```
+
+A custom commission model implements `calculate(asset, quantity, price)` and
+returns the fee for that quantity. The engine may call it before execution to
+estimate cash or margin requirements, then call it at the actual fill price.
+Only the fill-time value is charged. Estimates use a deep copy of the model,
+so a model that advances an internal volume tier on an executed fill does not
+advance it for a rejected or unfilled estimate. Custom models must support
+`deepcopy`, and `calculate` must not have external effects such as writing to a
+database or shared counter. A single fill that closes a position and opens
+its opposite is charged once for its full quantity. The fee is allocated between the closing
+and opening trade records in proportion to their quantities. Partial fills are
+charged separately when they execute.
 
 ## Slippage Models
 
@@ -204,6 +218,48 @@ engine = Engine(
 
 Orders exceeding 10% of bar volume are partially filled (the remainder stays pending).
 
+## Perpetual Futures Funding
+
+Pass a Polars frame to `Engine(..., funding_df=funding)`. Each row names a feed
+timestamp and asset, with either `rate` or `amount_per_unit`:
+
+```python
+from datetime import datetime
+import polars as pl
+
+funding = pl.DataFrame({
+    "timestamp": [datetime(2024, 1, 2, 8)],
+    "asset": ["BTC-PERP"],
+    "rate": [0.0001],
+})
+result = Engine(feed=feed, strategy=strategy, config=config,
+                funding_df=funding).run()
+payments = result.to_funding_dataframe()
+print(payments.select("timestamp", "asset", "cash_delta"))
+print(result.metrics["total_funding"])
+```
+
+A positive rate debits a long and credits a short. For a held position, the
+cash transfer is `-quantity * latest_price * contract_multiplier * rate`.
+Alternatively, `amount_per_unit` gives an account-currency amount per unit of
+underlying, multiplied by position quantity and contract multiplier. Negative
+values reverse the direction. Each row must provide exactly one of the two.
+
+Funding is applied after the bar's reference price becomes available and before
+orders eligible at that timestamp or the strategy callback run. A position
+opened at that timestamp does not pay that event. If the asset has no bar at
+the event, the latest earlier positive reference price is used. Events must
+match feed timestamps and known assets; duplicate, missing, or nonfinite
+values raise before the run. A rate event for a held position without a causal
+price raises before any payment at that timestamp changes cash.
+
+Funding is a separate cash flow, not a fill or trading fee. The result includes
+`funding.parquet`, `to_funding_dataframe()`, `total_funding`, and
+`num_funding_events`. Trading P&L
+and costs retain their existing definitions; terminal equity includes funding
+in addition to trading P&L. A scheduled event for a flat asset records zero
+cash transfer.
+
 ## Cost Impact Analysis
 
 To measure cost impact, run the same strategy with and without costs:
@@ -228,13 +284,9 @@ cost_drag = result_zero.metrics['total_return_pct'] - result_real.metrics['total
 print(f"Cost drag: {cost_drag:.2f}%")
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book demonstrates market impact in Ch18:
-
-- **Cost notebooks** — LinearImpact and SquareRootImpact models applied to multi-asset portfolios
-- **VolumeParticipationLimit** — preventing oversized orders in illiquid assets
-- **Cost drag analysis** — comparing gross vs net returns across case studies
+Chapter 18, Section 18.4, [Market impact calibration](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/18_transaction_costs/03_market_impact_calibration.ipynb) examines how execution size changes impact. [Gross versus net performance](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/18_transaction_costs/10_gross_vs_net_performance.ipynb) shows the portfolio effect of those costs.
 
 ## Next Steps
 

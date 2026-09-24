@@ -106,6 +106,15 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quickstart: getting-started/quickstart.md
+    - Example Data: tutorials/data.md
+    - Orders and Timing: tutorials/orders-and-timing.md
+    - Multi-asset Rebalancing: tutorials/multiasset-rebalancing.md
+    - Costs and Funding: tutorials/costs-and-funding.md
+    - Accounts and Constraints: tutorials/accounts-and-constraints.md
+    - Risk and State: tutorials/risk-and-state.md
+    - Profiles and Parity: tutorials/profiles-and-parity.md
+    - Results and Analysis: tutorials/results-and-analysis.md
+    - Diagnostic Handoff: tutorials/diagnostic-handoff.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:

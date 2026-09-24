@@ -222,18 +222,8 @@ class FillExecutor:
         if position is not None:
             new_qty = position.quantity + signed_qty
             if _is_position_flip(position.quantity, new_qty):
-                close_commission = calculate_commission(
-                    broker.commission_model,
-                    order.asset,
-                    abs(position.quantity),
-                    fill_price,
-                )
-                open_commission = calculate_commission(
-                    broker.commission_model,
-                    order.asset,
-                    abs(new_qty),
-                    fill_price,
-                )
+                close_commission = commission * abs(position.quantity) / fill_quantity
+                open_commission = commission - close_commission
 
         if broker.execution_limits is not None:
             self.orders.filled_this_bar.add(order.order_id)

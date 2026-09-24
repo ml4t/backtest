@@ -1,0 +1,27 @@
+{
+  "commit": "366e1d51ace2d851776499a68da3d6e3c2641b02",
+  "blobs": {
+    "16_strategy_simulation/02_futures_backtesting.ipynb": "66fd0866d02a5e30e6f07d9ae5b2f39d121f1d98",
+    "16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb": "7cdb38231b8250531db3c17eebcb63959471fda0",
+    "16_strategy_simulation/05_stateful_strategies.ipynb": "c9b0e806e72cf904ccc48945f06eda96eece6e9b",
+    "16_strategy_simulation/07_engine_divergence_anatomy.ipynb": "aeb353475eb93c14ab42abbc5db60275df893242",
+    "16_strategy_simulation/09_performance_reporting.ipynb": "12dde67e2edf8df5b1f2c7aae2e2b7525c765219",
+    "16_strategy_simulation/16_case_study_lean_parity.ipynb": "de98d605792b27609ffe0d0c03dab259ec6171b9",
+    "16_strategy_simulation/README.md": "b436ed0350cbec2cb5a9fb277130204d74f133cc",
+    "17_portfolio_construction/01_portfolio_metrics.ipynb": "3af45156465b3ce47c392dc6af986a894a8170b0",
+    "17_portfolio_construction/07_conformal_position_sizing.ipynb": "7a3753f0e58937f5f1df7d6b8984e56b30edeb7d",
+    "17_portfolio_construction/08_library_comparison.ipynb": "d25ec660b899b6bde0d4641b01c180ebd96379bc",
+    "17_portfolio_construction/README.md": "174d5bcd8f168d1dc65618ed8d1c2eb66e0b7f98",
+    "18_transaction_costs/03_market_impact_calibration.ipynb": "f38fefefec5196418891e555b595831ca750b315",
+    "18_transaction_costs/10_gross_vs_net_performance.ipynb": "29cb706310c8cef06da42b6971031f0eeceb312b",
+    "18_transaction_costs/README.md": "ccaebc87036f89db7af2885b750fc7006f33c0f2",
+    "19_risk_management/02_exit_strategies.ipynb": "31c39d3f5659799e50a25202b4844ba50103db61",
+    "19_risk_management/10_ml4t_backtest_risk_demo.ipynb": "f2876ce2b5257d48d9334ed5b80c4e0d603581e7",
+    "19_risk_management/README.md": "902319e5f5b6d84c4d25a29c79283f1356b4a22b",
+    "case_studies/cme_futures/13_backtest.ipynb": "0f8889fe88b8af872ebaa97665c792d80992b6de",
+    "case_studies/crypto_perps_funding/16_costs.ipynb": "c1e414e238db695c5676c8a4ec7571ae09350ea3",
+    "case_studies/etfs/14_backtest.ipynb": "75ee6786570de1f954891094c5d2768280fee0ab",
+    "case_studies/etfs/16_risk_management.ipynb": "9cafc173af7709109a2ff2b7180fac46df79ca58",
+    "case_studies/fx_pairs/13_backtest.ipynb": "6c945090230f659cc5c6baf4940526d48ad807b5"
+  }
+}

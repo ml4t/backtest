@@ -269,6 +269,9 @@ jobs:
           "$RUNNER_TEMP/published-venv/bin/python" -I -c "import ml4t.backtest as package; assert package.__version__ == '${{ needs.preflight.outputs.version }}'"
           "$RUNNER_TEMP/published-venv/bin/python" validation/check_documentation_examples.py
 
+          uv pip install --python "$RUNNER_TEMP/published-venv/bin/python" "ml4t-diagnostic==0.1.4"
+          "$RUNNER_TEMP/published-venv/bin/python" validation/check_documentation_examples.py docs/tutorials/diagnostic-handoff.md
+
       - name: Download and verify GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}

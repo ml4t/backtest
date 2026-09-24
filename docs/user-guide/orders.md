@@ -2,6 +2,8 @@
 
 Orders are submitted from a strategy via `broker.submit_order()`. The default order type is `MARKET`.
 
+Run the [order and timing tutorial](../tutorials/orders-and-timing.md) to compare fills on one fixed price panel.
+
 ## Market Orders
 
 Execute at the configured execution price (open or close, depending on profile):
@@ -14,7 +16,7 @@ broker.submit_order("AAPL", 100)
 broker.submit_order("AAPL", -100)
 ```
 
-In NEXT_BAR mode (default), market orders fill at the next bar's open. In SAME_BAR mode, they fill at the current bar's close.
+In `NEXT_BAR` mode (default), ordinary market orders fill at the next eligible asset bar's open. In `SAME_BAR` mode, they use the current bar's configured `execution_price`; choose `ExecutionPrice.CLOSE` for a current-close comparison.
 
 ## Market-On-Close Orders
 
@@ -35,7 +37,7 @@ mode, orders submitted during `on_data()` normally fill at the next bar's open, 
 `MOC` orders fill at the current bar's close after strategy logic finishes. In
 `SAME_BAR` mode, `MOC` also fills at the current bar's close.
 
-For daily bars, this models a market-on-close fill at the session close price.
+With an exact-timestamp feed, this models a market-on-close fill at the current daily bar. With `DataFeed(session_col=...)`, a session decision occurs after every component bar has closed; a new `MOC` order waits for that asset's next bar close.
 
 ## Limit Orders
 
@@ -149,6 +151,10 @@ broker.close_position("AAPL", order_type=OrderType.MOC)
 # Cancel a pending order by ID
 broker.cancel_order(order.id)
 ```
+
+## In the book
+
+Chapter 16, Section 16.3, [Single asset ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb) reconciles submitted decisions with completed fills. The [engine divergence notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) in the companion varies execution assumptions.
 
 ## Next Steps
 

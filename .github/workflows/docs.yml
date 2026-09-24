@@ -37,6 +37,9 @@ jobs:
           echo "ML4T_DOCS_VERSION=$(uv run python -c 'import ml4t.backtest as package; print(package.__version__)')" >> "$GITHUB_ENV"
           echo "ML4T_DOCS_COMMIT=$GITHUB_SHA" >> "$GITHUB_ENV"
 
+      - name: Check pinned book companion links
+        run: uv run python validation/check_book_links.py
+
       - name: Build docs
         run: uv run mkdocs build --strict
 

@@ -1,4 +1,5 @@
 validation/check_artifacts.py
+validation/check_book_links.py
 validation/check_coverage.py
 validation/check_documentation_examples.py
 validation/check_documentation_identity.py

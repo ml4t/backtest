@@ -403,15 +403,9 @@ def test_pyramiding_respects_max_levels():
 
 See `examples/test_stateful_strategies.py` for 45+ test methods covering all five patterns.
 
-## See It in Action
+## In the book
 
-The book uses `ml4t-backtest` precisely when vectorized shortcuts stop being good enough:
-
-- **Ch16** (`framework_parity`, execution-analysis notebooks, and Engine-based case studies) shows why fill timing, broker state, and portfolio transitions require an event loop
-- **Ch17** (`portfolio_construction`) relies on sequential rebalancing, turnover, and account-state updates rather than one-shot allocation math
-- **Ch19** case studies layer stop logic, portfolio limits, and path-dependent risk controls on top of evolving strategy state
-
-Use the [Book Guide](../book-guide/index.md) to jump from those chapters and case studies to the matching reusable APIs.
+Chapter 16, Section 16.3, [Stateful strategies](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/05_stateful_strategies.ipynb) demonstrates decisions that depend on prior fills and account state. The runnable risk tutorial here traces one such path across callbacks.
 
 ## Next Steps
 

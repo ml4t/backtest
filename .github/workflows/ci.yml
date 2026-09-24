@@ -358,10 +358,18 @@ jobs:
             --python "$RUNNER_TEMP/candidate-venv/bin/python" \
             dist/*.whl
 
+      - name: Check pinned book companion links
+        run: uv run python validation/check_book_links.py
+
       - name: Execute the documented quick starts against the wheel
         run: >-
           "$RUNNER_TEMP/candidate-venv/bin/python"
           validation/check_documentation_examples.py
+
+      - name: Exercise the optional diagnostic handoff against the wheel
+        run: |
+          uv pip install --python "$RUNNER_TEMP/candidate-venv/bin/python" "ml4t-diagnostic==0.1.4"
+          "$RUNNER_TEMP/candidate-venv/bin/python" validation/check_documentation_examples.py docs/tutorials/diagnostic-handoff.md
 
       - name: Verify source provenance
         run: |

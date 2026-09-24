@@ -1,5 +1,10 @@
 # Results & Analysis
 
+The [result export tutorial](../tutorials/results-and-analysis.md) joins a
+time-zone-aware feed to fills, equity, predictions, and funding, then checks a
+Parquet round trip. The [diagnostic handoff](../tutorials/diagnostic-handoff.md)
+uses the optional analysis package.
+
 `Engine.run()` returns a `BacktestResult` containing trades, equity curve, fills,
 portfolio state, and computed metrics. Everything is accessible as Python objects,
 Polars DataFrames, or Parquet files.
@@ -456,9 +461,10 @@ result = engine.run()
 # One-liner bridge to ml4t-diagnostic
 analysis = portfolio_analysis_from_result(result, calendar="NYSE")
 
-# Now use PortfolioAnalysis methods
-print(f"Sharpe: {analysis.sharpe_ratio():.2f}")
-print(f"Max DD: {analysis.max_drawdown():.2%}")
+# Compute PortfolioAnalysis summary metrics
+stats = analysis.compute_summary_stats()
+print(f"Sharpe: {stats.sharpe_ratio:.2f}")
+print(f"Max DD: {stats.max_drawdown:.2%}")
 monthly = analysis.compute_monthly_returns()
 ```
 
@@ -550,13 +556,9 @@ print(result.config.describe())
 print(result.config.preset_name)
 ```
 
-## See It in Action
+## In the book
 
-The [Machine Learning for Trading](https://github.com/stefan-jansen/machine-learning-for-trading) book uses BacktestResult in every case study:
-
-- **Ch16 / NB05** (`performance_reporting`) — `portfolio_analysis_from_result()`, MFE/MAE analysis, gross vs net comparison, full 24-section tearsheet
-- **Ch16 case studies** — all cases save trade artifacts via `to_parquet()` and pass trades/metrics/equity to tearsheet generation
-- **Ch16 / NB06** (`sharpe_ratio_inference`) — statistical inference on backtest results
+Chapter 16, Section 16.5, [Performance reporting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/09_performance_reporting.ipynb) develops return and drawdown interpretation. This page defines the result frames and artifact format used to reproduce those reports.
 
 ## Next Steps
 
