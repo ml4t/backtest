@@ -2,7 +2,7 @@
 
 Use a stateful strategy when a later decision depends on earlier order outcomes, cash, positions, or equity. A signal array computed from price history alone does not capture those execution outcomes. The event loop passes updated broker state into each decision.
 
-The strategy classes below illustrate individual state patterns. Run [the complete strategy examples](https://github.com/ml4t/backtest/blob/main/examples/stateful_strategies.py) or the [risk and state tutorial](../tutorials/risk-and-state.md) for a complete feed and result.
+The strategy classes below illustrate individual state patterns. Run [the complete strategy examples](https://github.com/ml4t/backtest/blob/main/examples/stateful_strategies.py) or the [risk and state tutorial](../tutorials/risk-and-state.md) for a complete feed and result. The pairs example submits independent orders; it does not guarantee that both legs fill.
 
 ## When You Need Event-Driven
 
@@ -12,11 +12,13 @@ Use vectorized backtesting when your signal is a pure function of price history:
 signal[t] = f(prices[0:t])    # No execution feedback
 ```
 
-Use event-driven backtesting when your trading decision depends on execution state:
+Use a callback-based simulation when your trading decision depends on execution state:
 
 ```
 action[t] = g(prices[0:t], fills[0:t], equity[0:t])    # Update execution state in order
 ```
+
+VectorBT also supports state-dependent order generation through [`Portfolio.from_order_func`](https://vectorbt.dev/api/portfolio/base/). The distinction here is between a precomputed order array and a simulation that updates state after orders execute.
 
 Five categories of stateful patterns:
 
@@ -77,7 +79,7 @@ class AdaptiveKellySizingStrategy(Strategy):
                 broker.close_position(asset)
 ```
 
-**Why vectorized fails**: The Kelly fraction at bar N depends on the win rate from trades 0..N-1, but each trade's P&L depends on its size, which was set by the Kelly fraction at entry time. This circular dependency requires sequential execution.
+**Why precomputed sizes are insufficient:** The Kelly fraction at bar N uses realized P&L from earlier fills. Those fills depend on earlier sizes, so the simulation must update the trade history before computing the next size.
 
 ## Pattern 2: Conditional Chains (Pyramiding)
 
@@ -131,7 +133,7 @@ class PyramidingStrategy(Strategy):
                     self.pyramid_levels[asset] = level + 1
 ```
 
-**Why vectorized fails**: Whether entry 2 happens depends on the unrealized P&L of entry 1, which depends on entry 1's fill price and size. The fill price includes slippage, which may depend on volume and order size. Each link in the chain is only knowable at execution time.
+**Why precomputed entries are insufficient:** Whether entry 2 happens depends on the filled price and size of entry 1. Execution costs can change that fill, so the next decision must use the simulated position state.
 
 ## Pattern 3: Cross-Asset Coordination (Pairs Trading)
 
@@ -206,7 +208,7 @@ class PairsTradingStrategy(Strategy):
             self.pair_status = "flat"
 ```
 
-**Why vectorized fails**: Position in A affects available capital for B. If A's order gets rejected (insufficient cash, margin limits), B shouldn't be entered either — the pair is meaningless as a single leg. Capital allocation across the two legs depends on execution outcomes.
+**Why precomputed pair orders are insufficient:** The first leg's fill or rejection changes the capital available for the second. This example does not make the two orders atomic or cancel an unmatched leg. Inspect fills and rejected orders before treating the pair as established.
 
 ## Pattern 4: Path-Dependent Sizing (Drawdown Circuit Breaker)
 
@@ -261,7 +263,7 @@ class DrawdownCircuitBreakerStrategy(Strategy):
                 broker.close_position(asset)
 ```
 
-**Why vectorized fails**: The sizing multiplier at bar N depends on the drawdown from bars 0..N-1, but the equity at each prior bar depends on the sizing decisions made at those bars. The equity path and the sizing path are co-determined — you can't compute one without the other.
+**Why precomputed sizes are insufficient:** The sizing multiplier at bar N depends on the preceding equity path, which depends on earlier sizing and fills. Compute each new size after updating equity.
 
 ## Pattern 5: Reactive Order Management (Grid Trading)
 
@@ -339,7 +341,7 @@ class GridTradingStrategy(Strategy):
             self._place_grid(broker, price)
 ```
 
-**Why vectorized fails**: The entire order book is reactive — each fill changes the grid, which changes which orders exist, which changes future fills. The full state evolution requires sequential event processing.
+**Why precomputed orders are insufficient:** Each fill changes which grid orders exist. A callback must update the outstanding orders after each observed fill.
 
 ## Combining Patterns
 
