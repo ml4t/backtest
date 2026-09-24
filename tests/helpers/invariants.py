@@ -78,7 +78,7 @@ def _check_equity_terminal(
     initial_cash: float,
     realized_trades: list,
 ) -> None:
-    """Verify: initial_cash + sum(realized_pnl) + sum(open_pnl) ≈ final_value."""
+    """Verify: initial cash plus trading P&L and funding equals final equity."""
     if not result.equity_curve:
         return
 
@@ -86,12 +86,22 @@ def _check_equity_terminal(
     realized_pnl = sum(t.pnl for t in realized_trades)
     open_trades = [t for t in result.trades if t.status == "open"]
     open_pnl = sum(t.pnl for t in open_trades)
+    funding = sum(payment.cash_delta for payment in result.funding_payments)
+    if "total_funding" in result.metrics:
+        reported_funding = result.metrics["total_funding"]
+        assert math.isclose(
+            reported_funding,
+            funding,
+            abs_tol=_accounting_tolerance(reported_funding, funding),
+        ), "total_funding does not reconcile with funding payments"
+    if "num_funding_events" in result.metrics:
+        assert result.metrics["num_funding_events"] == len(result.funding_payments)
 
-    expected = initial_cash + realized_pnl + open_pnl
+    expected = initial_cash + realized_pnl + open_pnl + funding
     diff = abs(expected - final_value)
 
     reported_trades = [*realized_trades, *open_trades]
-    terms = [initial_cash, *(t.pnl for t in reported_trades)]
+    terms = [initial_cash, *(t.pnl for t in reported_trades), funding]
     notionals = [abs(t.quantity) * t.exit_price * t.multiplier for t in reported_trades]
     tol = _accounting_tolerance(
         expected,
@@ -104,7 +114,8 @@ def _check_equity_terminal(
     assert diff <= tol, (
         f"Equity terminal invariant violated: "
         f"initial_cash({initial_cash}) + realized_pnl({realized_pnl:.6f}) + "
-        f"open_pnl({open_pnl:.6f}) = {expected:.6f} != final_value({final_value:.6f}), "
+        f"open_pnl({open_pnl:.6f}) + funding({funding:.6f}) = {expected:.6f} "
+        f"!= final_value({final_value:.6f}), "
         f"diff={diff:.10f}, tol={tol:.6f}"
     )
 

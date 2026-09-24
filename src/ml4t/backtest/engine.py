@@ -23,6 +23,7 @@ from .analytics.metrics import calmar_ratio
 from .broker import Broker
 from .config import DataFrequency, ExecutionPrice
 from .datafeed import DataFeed
+from .funding import FundingPayment, index_funding_events
 from .lifecycle import LifecycleDispatcher
 from .preopen import default_execution_policy
 from .strategy import Strategy
@@ -89,6 +90,7 @@ class Engine:
         contract_specs: dict[str, Any] | None = None,
         market_impact_model: Any | None = None,
         execution_limits: Any | None = None,
+        funding_df: pl.DataFrame | None = None,
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
@@ -112,6 +114,17 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        if funding_df is None:
+            self._funding_events = {}
+        else:
+            prices_frame = feed.prices
+            assert prices_frame is not None
+            self._funding_events = index_funding_events(
+                funding_df,
+                list(feed.timestamps),
+                set(prices_frame[feed._entity_col].unique().to_list()),
+            )
+        self.funding_payments: list[FundingPayment] = []
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -304,6 +317,22 @@ class Engine:
                 for index in filtered["__feed_bar_index"]:
                     valid_intraday_bar_mask[index] = 1
 
+        if self._funding_events and self.config.enforce_sessions and self._calendar:
+            if self.config.resolved_data_frequency == DataFrequency.DAILY:
+                assert is_trading_day_fn is not None
+                calendar_id = self.config.resolved_calendar
+                assert calendar_id is not None
+                accepted = {ts for ts in timestamps if is_trading_day_fn(calendar_id, ts.date())}
+            else:
+                accepted = {
+                    ts
+                    for index, ts in enumerate(timestamps)
+                    if valid_intraday_bar_mask is not None and valid_intraday_bar_mask[index]
+                }
+            filtered_events = self._funding_events.keys() - accepted
+            if filtered_events:
+                raise ValueError("funding event timestamp is excluded by session filtering")
+
         self.lifecycle_dispatcher.dispatch(
             LifecyclePhase.RUN_START,
             self.broker,
@@ -421,6 +450,9 @@ class Engine:
                 signals,
             )
             self._accepted_market_event_count += 1
+            funding_events = self._funding_events.get(timestamp)
+            if funding_events:
+                self.funding_payments.extend(self.broker._apply_funding(funding_events))
 
             # Process pending exits from NEXT_BAR_OPEN mode (fills at open)
             # before opening targets are sized against the resulting positions.
@@ -677,12 +709,15 @@ class Engine:
                 equity_curve=[],
                 fills=[],
                 rejected_orders=self.broker.get_rejected_orders(),
+                funding_payments=list(self.funding_payments),
                 predictions=self.feed.signals,
                 portfolio_state=[],
                 metrics={
                     "skipped_bars": self._skipped_bars,
                     "num_orders": len(self.broker.orders),
                     "num_rejected_orders": len(self.broker.get_rejected_orders()),
+                    "total_funding": 0.0,
+                    "num_funding_events": 0,
                     **contract_evidence,
                 },
                 config=self.config,
@@ -772,6 +807,8 @@ class Engine:
             # Commission/slippage from fills (includes open positions)
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(t.total_slippage_cost for t in all_trades),
+            "total_funding": sum(payment.cash_delta for payment in self.funding_payments),
+            "num_funding_events": len(self.funding_payments),
             # Additional metrics
             "sharpe": equity.sharpe,
             "sortino": equity.sortino,
@@ -804,6 +841,7 @@ class Engine:
             equity_curve=list(self.equity_curve),
             fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),
+            funding_payments=list(self.funding_payments),
             predictions=self.feed.signals,
             portfolio_state=list(self.portfolio_state),
             metrics=metrics,
@@ -822,6 +860,7 @@ class Engine:
         contract_specs: dict[str, Any] | None = None,
         market_impact_model: Any | None = None,
         execution_limits: Any | None = None,
+        funding_df: pl.DataFrame | None = None,
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
@@ -838,6 +877,7 @@ class Engine:
             contract_specs: Per-asset contract specifications (futures multipliers, etc.)
             market_impact_model: Market impact model for fill simulation
             execution_limits: Execution limits (max order size, etc.)
+            funding_df: Timestamped funding rates or amounts for named assets
 
         Returns:
             Configured Engine instance
@@ -849,6 +889,7 @@ class Engine:
             contract_specs=contract_specs,
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
+            funding_df=funding_df,
             lifecycle_version=lifecycle_version,
             execution_policy=execution_policy,
             target_intent_state=target_intent_state,
@@ -870,6 +911,7 @@ def run_backtest(
     contract_specs: dict[str, Any] | None = None,
     market_impact_model: Any | None = None,
     execution_limits: Any | None = None,
+    funding_df: pl.DataFrame | None = None,
     lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
@@ -887,6 +929,7 @@ def run_backtest(
         contract_specs: Per-asset contract specifications (futures multipliers, etc.)
         market_impact_model: Market impact model for fill simulation
         execution_limits: Execution limits (max order size, etc.)
+        funding_df: Timestamped funding rates or amounts for named assets
 
     Returns:
         BacktestResult with metrics, trades, equity curve, and export methods.
@@ -929,6 +972,7 @@ def run_backtest(
         contract_specs=contract_specs,
         market_impact_model=market_impact_model,
         execution_limits=execution_limits,
+        funding_df=funding_df,
         lifecycle_version=lifecycle_version,
         execution_policy=execution_policy,
         target_intent_state=target_intent_state,

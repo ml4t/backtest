@@ -63,6 +63,7 @@ Auto-generated from source docstrings.
         - sell
         - close_position
         - reduce_position
+        - reduce_all_positions
         - flatten_all_positions
         - order_target_percent
         - order_target_value
@@ -169,6 +170,7 @@ Auto-generated from source docstrings.
         - from_parquet
         - to_trades_dataframe
         - to_fills_dataframe
+        - to_funding_dataframe
         - to_rejected_orders_dataframe
         - to_portfolio_state_dataframe
         - to_predictions_dataframe

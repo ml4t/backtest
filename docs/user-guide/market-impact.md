@@ -216,6 +216,48 @@ engine = Engine(
 
 Orders exceeding 10% of bar volume are partially filled (the remainder stays pending).
 
+## Perpetual Futures Funding
+
+Pass a Polars frame to `Engine(..., funding_df=funding)`. Each row names a feed
+timestamp and asset, with either `rate` or `amount_per_unit`:
+
+```python
+from datetime import datetime
+import polars as pl
+
+funding = pl.DataFrame({
+    "timestamp": [datetime(2024, 1, 2, 8)],
+    "asset": ["BTC-PERP"],
+    "rate": [0.0001],
+})
+result = Engine(feed=feed, strategy=strategy, config=config,
+                funding_df=funding).run()
+payments = result.to_funding_dataframe()
+print(payments.select("timestamp", "asset", "cash_delta"))
+print(result.metrics["total_funding"])
+```
+
+A positive rate debits a long and credits a short. For a held position, the
+cash transfer is `-quantity * latest_price * contract_multiplier * rate`.
+Alternatively, `amount_per_unit` gives an account-currency amount per unit of
+underlying, multiplied by position quantity and contract multiplier. Negative
+values reverse the direction. Each row must provide exactly one of the two.
+
+Funding is applied after the bar's reference price becomes available and before
+orders eligible at that timestamp or the strategy callback run. A position
+opened at that timestamp does not pay that event. If the asset has no bar at
+the event, the latest earlier positive reference price is used. Events must
+match feed timestamps and known assets; duplicate, missing, or nonfinite
+values raise before the run. A rate event for a held position without a causal
+price raises before any payment at that timestamp changes cash.
+
+Funding is a separate cash flow, not a fill or trading fee. The result includes
+`funding.parquet`, `to_funding_dataframe()`, `total_funding`, and
+`num_funding_events`. Trading P&L
+and costs retain their existing definitions; terminal equity includes funding
+in addition to trading P&L. A scheduled event for a flat asset records zero
+cash transfer.
+
 ## Cost Impact Analysis
 
 To measure cost impact, run the same strategy with and without costs:

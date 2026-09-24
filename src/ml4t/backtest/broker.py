@@ -37,6 +37,7 @@ from .core import (
     SubmitOrderOptions,
 )
 from .execution.fill_executor import FillExecutor
+from .funding import FundingEvent, FundingPayment
 from .models import CommissionModel, NoCommission, NoSlippage, SlippageModel
 from .types import (
     AssetTradingStats,
@@ -453,6 +454,49 @@ class Broker:
         """Set cash balance (delegates to AccountState)."""
         self._capture_lifecycle_mutation()
         self.account.cash = value
+
+    def _apply_funding(self, events: list[FundingEvent]) -> list[FundingPayment]:
+        """Apply one timestamp's validated funding events before any fills at that time."""
+        payments: list[FundingPayment] = []
+        for event in events:
+            position = self.positions.get(event.asset)
+            quantity = position.quantity if position is not None else 0.0
+            multiplier = (
+                position.multiplier if position is not None else self.get_multiplier(event.asset)
+            )
+            mark_price = self.get_last_price(event.asset) if position is not None else None
+            if quantity == 0.0:
+                cash_delta = 0.0
+            elif event.rate is not None:
+                if mark_price is None or not isfinite(mark_price) or mark_price <= 0:
+                    raise ValueError(f"funding mark is unavailable for {event.asset}")
+                cash_delta = -quantity * mark_price * multiplier * event.rate
+            else:
+                assert event.amount_per_unit is not None
+                cash_delta = -quantity * multiplier * event.amount_per_unit
+            if not isfinite(cash_delta):
+                raise ValueError(f"funding cash flow is nonfinite for {event.asset}")
+            payments.append(
+                FundingPayment(
+                    timestamp=event.timestamp,
+                    asset=event.asset,
+                    quantity=quantity,
+                    mark_price=mark_price,
+                    multiplier=multiplier,
+                    rate=event.rate,
+                    amount_per_unit=event.amount_per_unit,
+                    cash_delta=cash_delta,
+                )
+            )
+        total = sum(payment.cash_delta for payment in payments)
+        new_cash = self.cash + total
+        new_free_cash = self.account._lock_notional_free_cash + total
+        if not isfinite(new_cash) or not isfinite(new_free_cash):
+            raise ValueError("funding would make the cash ledger nonfinite")
+        if total:
+            self.cash = new_cash
+            self.account._lock_notional_free_cash = new_free_cash
+        return payments
 
     @property
     def positions(self) -> dict[str, Position]:

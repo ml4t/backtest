@@ -37,6 +37,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for local editable edge cases
     __version__ = "0.0.0.dev0"
 from .analytics.annualization import should_session_align
+from .funding import FundingPayment
 from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
 
 if TYPE_CHECKING:
@@ -52,6 +53,7 @@ _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
 _COMPONENT_FILES = {
     "trades": "trades.parquet",
     "fills": "fills.parquet",
+    "funding": "funding.parquet",
     "rejected_orders": "rejected_orders.parquet",
     "predictions": "predictions.parquet",
     "equity": "equity.parquet",
@@ -177,6 +179,7 @@ class BacktestResult:
         trades: List of completed Trade objects
         equity_curve: List of (timestamp, portfolio_value) tuples
         fills: List of Fill objects (all order fills)
+        funding_payments: Timestamped cash flows separate from trades and fills
         rejected_orders: Orders that reached the rejected terminal state. Orders
             cancelled under permissive insufficient-cash handling are not included.
         predictions: Raw prediction DataFrame passed into the backtest (optional)
@@ -200,6 +203,7 @@ class BacktestResult:
         default_factory=list
     )
     rejected_orders: list[Order] = field(default_factory=list)
+    funding_payments: list[FundingPayment] = field(default_factory=list)
     artifact_diagnostics: tuple[ArtifactDiagnostic, ...] = field(default_factory=tuple)
 
     # Cached DataFrames (computed on demand)
@@ -353,6 +357,35 @@ class BacktestResult:
 
         self._fills_df = pl.DataFrame(records, schema=schema)
         return self._fills_df
+
+    def to_funding_dataframe(self) -> pl.DataFrame:
+        """Return timestamped funding cash flows separately from trades and fills."""
+        schema = {
+            "timestamp": self._timestamp_dtype(p.timestamp for p in self.funding_payments),
+            "asset": pl.String(),
+            "quantity": pl.Float64(),
+            "mark_price": pl.Float64(),
+            "multiplier": pl.Float64(),
+            "rate": pl.Float64(),
+            "amount_per_unit": pl.Float64(),
+            "cash_delta": pl.Float64(),
+        }
+        return pl.DataFrame(
+            [
+                {
+                    "timestamp": payment.timestamp,
+                    "asset": payment.asset,
+                    "quantity": payment.quantity,
+                    "mark_price": payment.mark_price,
+                    "multiplier": payment.multiplier,
+                    "rate": payment.rate,
+                    "amount_per_unit": payment.amount_per_unit,
+                    "cash_delta": payment.cash_delta,
+                }
+                for payment in self.funding_payments
+            ],
+            schema=schema,
+        )
 
     def to_rejected_orders_dataframe(self) -> pl.DataFrame:
         """Convert rejected orders to a stable, machine-readable DataFrame."""
@@ -635,6 +668,7 @@ class BacktestResult:
                 "trades": self.trades,
                 "equity_curve": self.equity_curve,
                 "fills": self.fills,
+                "funding_payments": self.funding_payments,
                 "portfolio_state": self.portfolio_state,
             }
         )
@@ -710,6 +744,7 @@ class BacktestResult:
             {path}/
                 trades.parquet
                 fills.parquet
+                funding.parquet
                 rejected_orders.parquet
                 predictions.parquet
                 equity.parquet
@@ -723,7 +758,7 @@ class BacktestResult:
         Args:
             path: Directory path to write files
             include: Components to include. Default: all.
-                Options: ["trades", "fills", "rejected_orders", "predictions", "equity",
+                Options: ["trades", "fills", "funding", "rejected_orders", "predictions", "equity",
                     "portfolio_state", "daily_pnl", "metrics", "config", "spec"]
             compression: Parquet compression codec (default: "zstd")
 
@@ -845,6 +880,17 @@ class BacktestResult:
             )
             written["fills"] = fills_path
 
+        if "funding" in selected:
+            funding_path = path / "funding.parquet"
+            write_component(
+                "funding",
+                lambda: self.to_funding_dataframe().write_parquet(
+                    funding_path,
+                    compression=compression,
+                ),
+            )
+            written["funding"] = funding_path
+
         if "rejected_orders" in selected:
             rejected_orders_path = path / "rejected_orders.parquet"
             write_component(
@@ -916,7 +962,8 @@ class BacktestResult:
             "artifact_type": _ARTIFACT_TYPE,
             "schema_version": _ARTIFACT_SCHEMA_VERSION,
             "library_version": __version__,
-            "complete": written.keys() >= _REQUIRED_RESULT_COMPONENTS,
+            "complete": written.keys()
+            >= (_REQUIRED_RESULT_COMPONENTS | ({"funding"} if self.funding_payments else set())),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
             },
@@ -1101,7 +1148,7 @@ class BacktestResult:
                 f"missing components={missing_required_components}, missing files={missing_files}"
             )
         if recovery:
-            missing_components = sorted(_COMPONENT_FILES.keys() - components.keys())
+            missing_components = sorted((_COMPONENT_FILES.keys() - {"funding"}) - components.keys())
             diagnostics.extend(
                 ArtifactDiagnostic(
                     code="component_missing",
@@ -1219,6 +1266,21 @@ class BacktestResult:
                 )
             return result
 
+        def read_funding(component_path: Path) -> list[FundingPayment]:
+            return [
+                FundingPayment(
+                    timestamp=row["timestamp"],
+                    asset=row["asset"],
+                    quantity=row["quantity"],
+                    mark_price=row["mark_price"],
+                    multiplier=row["multiplier"],
+                    rate=row["rate"],
+                    amount_per_unit=row["amount_per_unit"],
+                    cash_delta=row["cash_delta"],
+                )
+                for row in pl.read_parquet(component_path).iter_rows(named=True)
+            ]
+
         def read_rejected_orders(component_path: Path) -> list[Order]:
             result: list[Order] = []
             for row in pl.read_parquet(component_path).iter_rows(named=True):
@@ -1301,10 +1363,29 @@ class BacktestResult:
 
         trades = read_component("trades", read_trades, [])
         fills = read_component("fills", read_fills, [])
+        funding_payments = read_component("funding", read_funding, [])
         rejected_orders = read_component("rejected_orders", read_rejected_orders, [])
         equity_curve = read_component("equity", read_equity, [])
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
         metrics = read_component("metrics", read_metrics, {})
+        if metrics.get("num_funding_events", 0) and not component_read_ok["funding"]:
+            message = "funding.parquet is required for an artifact with funding events"
+            if not recovery:
+                raise ArtifactReadError(message)
+            diagnostics.append(ArtifactDiagnostic("component_missing", "funding", message))
+        if component_read_ok["funding"] and "num_funding_events" in metrics:
+            reported_count = metrics["num_funding_events"]
+            reported_total = metrics.get("total_funding")
+            actual_total = sum(payment.cash_delta for payment in funding_payments)
+            if (
+                reported_count != len(funding_payments)
+                or not isinstance(reported_total, (int, float))
+                or not math.isclose(reported_total, actual_total, abs_tol=1e-9)
+            ):
+                message = "funding.parquet is inconsistent with funding metrics"
+                if not recovery:
+                    raise ArtifactReadError(message)
+                diagnostics.append(ArtifactDiagnostic("component_inconsistent", "funding", message))
         predictions = read_component("predictions", pl.read_parquet, None)
         daily_pnl = read_component("daily_pnl", pl.read_parquet, None)
         config = read_component("config", read_config, None)
@@ -1347,6 +1428,7 @@ class BacktestResult:
             predictions=predictions,
             portfolio_state=portfolio_state,
             rejected_orders=rejected_orders,
+            funding_payments=funding_payments,
             metrics=metrics,
             config=config,
             artifact_diagnostics=tuple(diagnostics),
