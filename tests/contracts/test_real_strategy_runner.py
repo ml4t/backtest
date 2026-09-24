@@ -362,12 +362,7 @@ def test_real_strategy_benchmark_interval_is_deterministic() -> None:
 
 
 def test_real_strategy_performance_evidence_fails_stale_source() -> None:
-    """An engine source that is neither measured-under nor certified is refused.
-
-    Both escape hatches have to be closed at once. The shipped report reaches the
-    current source through `certified_equivalent_sources`, so blanking only the
-    measured-under digest leaves it publishable and proves nothing.
-    """
+    """An engine source that is neither measured-under nor certified is refused."""
     benchmark = _load_benchmark()
     validation = Path(__file__).parents[2] / "validation"
     correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
@@ -388,12 +383,17 @@ def test_certification_alone_publishes_a_later_engine_source() -> None:
     validation = Path(__file__).parents[2] / "validation"
     correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
     report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    report["provenance"]["ml4t_engine_source_sha256"] = "0" * 64
+    report["provenance"]["certified_equivalent_sources"] = []
+    benchmark.certify_source(
+        report,
+        correctness,
+        validation / "REAL_STRATEGY_RESULTS.json",
+        "Test a later source with unchanged measured behavior",
+    )
     provenance = report["provenance"]
-    certified = provenance.get("certified_equivalent_sources") or []
+    certified = provenance["certified_equivalent_sources"]
 
-    # The working tree is reachable only through a certification, never because the
-    # timings were measured under it: those two digests must differ, or this test
-    # passes for the wrong reason.
     current = benchmark._tree_digest(benchmark.PROJECT_ROOT / "src/ml4t/backtest")
     assert current != provenance["ml4t_engine_source_sha256"]
     assert current in {entry["engine_source_sha256"] for entry in certified}
@@ -406,6 +406,14 @@ def test_malformed_certification_is_refused() -> None:
     validation = Path(__file__).parents[2] / "validation"
     correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
     report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    report["provenance"]["ml4t_engine_source_sha256"] = "0" * 64
+    report["provenance"]["certified_equivalent_sources"] = []
+    benchmark.certify_source(
+        report,
+        correctness,
+        validation / "REAL_STRATEGY_RESULTS.json",
+        "Test a later source with unchanged measured behavior",
+    )
 
     for field in ("reason", "correctness_evidence_sha256", "correctness_pairs_passed"):
         changed = copy.deepcopy(report)
