@@ -146,7 +146,7 @@ def test_claims_pin_every_advertised_framework_and_expose_failures(
 
     for pin in correctness["frameworks"].values():
         assert pin["version"] in claims
-        assert pin["source"] in claims
+        assert generate_parity_claims._documentation_source(pin["source"]) in claims
         assert f"`{pin['profile']}`" in claims
     assert "16/16 exact" in claims
     assert "synthetic stress workload contains 250 assets" in claims
