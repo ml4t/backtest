@@ -1,272 +1,87 @@
-# Quickstart
+# Run your first completed backtest
 
-Build and run your first backtest in 5 minutes.
-
-## Minimal Example
+Install the package as described in [Installation](installation.md), then run the
+following Python script. It loads nine synthetic daily AAPL bars from the wheel,
+submits a buy order, submits a close order four asset bars later, and inspects
+the resulting fills, trade, and equity. The bundled data is described in
+[Example Data](../tutorials/data.md).
 
 <!-- ml4t-doc-test: quickstart-minimal -->
 ```python
+from importlib.metadata import version
+
 import polars as pl
-from ml4t.backtest import Engine, DataFeed, Strategy
 
-class BuyAndHold(Strategy):
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.example_data import load_example_prices
+
+
+class FirstRoundTrip(Strategy):
+    def __init__(self):
+        self.asset_bars = 0
+
     def on_data(self, timestamp, data, context, broker):
-        for asset, bar in data.items():
-            if broker.get_position(asset) is None:
-                broker.submit_order(asset, 100)
+        if "AAPL" not in data:
+            return
+        self.asset_bars += 1
+        if self.asset_bars == 1:
+            broker.submit_order("AAPL", 10)
+        elif self.asset_bars == 5:
+            broker.close_position("AAPL")
 
-# Create sample price data
-prices = pl.DataFrame({
-    "timestamp": pl.datetime_range(
-        start=pl.datetime(2023, 1, 2),
-        end=pl.datetime(2023, 6, 30),
-        interval="1d",
-        eager=True,
-    ),
-    "asset": "AAPL",
-    "open": [150.0 + i * 0.1 for i in range(180)],
-    "high": [151.0 + i * 0.1 for i in range(180)],
-    "low": [149.0 + i * 0.1 for i in range(180)],
-    "close": [150.5 + i * 0.1 for i in range(180)],
-    "volume": [1_000_000] * 180,
-})
 
+prices = load_example_prices("equity").filter(pl.col("asset") == "AAPL")
 feed = DataFeed(prices_df=prices)
-engine = Engine(feed=feed, strategy=BuyAndHold())
+engine = Engine(feed, FirstRoundTrip(), BacktestConfig(initial_cash=100_000))
 result = engine.run()
 
-print(f"Final Value:  ${result.metrics['final_value']:,.2f}")
-print(f"Total Return: {result.metrics['total_return_pct']:.1f}%")
-print(f"Sharpe Ratio: {result.metrics['sharpe']:.2f}")
-print(f"Trades:       {result.metrics['num_trades']}")
+print("ml4t-backtest " + version("ml4t-backtest"))
+print(f"bars: {len(feed)}")
+for fill in result.fills:
+    print(f"{fill.timestamp:%Y-%m-%d} {fill.side.value} {fill.quantity:g} @ ${fill.price:.2f}")
+print(f"closed trades: {len(result.to_trades_dataframe())}")
+print(f"trade P&L: ${result.trades[0].pnl:.2f}")
+equity = result.to_equity_dataframe()
+print(f"equity points: {equity.height}")
+print(f"final equity: ${result.metrics['final_value']:.2f}")
 ```
 
-An `Engine` instance can run once. Create a new instance for another run. Result collection fields
-are snapshots, so changing their lists does not change Engine or Broker state.
-
-## Data Format
-
-With the default feed mapping, `DataFeed` requires `timestamp`, a recognized entity
-column such as `asset`, and `close`:
-
-| Column | Type | Required |
-|--------|------|----------|
-| `timestamp` | Datetime | Yes |
-| `asset` | String | Yes |
-| `open` | Float | No |
-| `high` | Float | No |
-| `low` | Float | No |
-| `close` | Float | Yes |
-| `volume` | Float | No |
-
-For multi-asset backtests, stack all assets in a single DataFrame -- the engine
-handles partitioning by timestamp automatically.
-
-Missing open, high, and low values fall back to `close`; missing volume becomes
-zero. This makes close-only examples runnable, but stop, limit, and volume-limited
-fills require the corresponding input columns for useful simulation.
-
-`bar["price"]` is always populated from the configured reference-price column. By
-default it follows `close`, but it switches to `FeedSpec.price_col` or the
-`price_col=` override when you provide one. Construction fails if that resolved
-column is absent.
-
-## Strategy Callbacks
-
-Every strategy subclasses `Strategy` and implements `on_data`:
-
-```python
-class MyStrategy(Strategy):
-    def on_start(self, broker):
-        """Called once before the backtest starts. Set up risk rules here."""
-        pass
-
-    def on_data(self, timestamp, data, context, broker):
-        """Called on every bar. Generate orders here.
-
-        Args:
-            timestamp: Current bar's datetime
-            data: Dict of {asset: {price, open, high, low, close, volume, signals, ...}}
-            context: Dict of context data (if provided)
-            broker: Broker for submitting orders and querying positions
-        """
-        pass
-
-    def on_end(self, broker):
-        """Called once after the backtest ends."""
-        pass
+<!-- ml4t-doc-output: quickstart-minimal -->
+```text
+ml4t-backtest {package_version}
+bars: 9
+2024-01-03 buy 10 @ $188.37
+2024-01-09 sell 10 @ $191.37
+closed trades: 1
+trade P&L: $30.00
+equity points: 9
+final equity: $100030.00
 ```
 
-## Signal-Based Strategy
+The feed provides `timestamp`, `asset`, and OHLCV columns. `DataFeed` delivers
+the AAPL bar to `on_data` at each timestamp. The first callback queues a buy;
+the fifth queues a close. The default `NEXT_BAR` execution mode fills both
+market orders at the next AAPL bar's open. The orders were submitted on January
+2 and January 8, and the fills occurred on January 3 and January 9. The run
+starts with $100,000, charges no commission or slippage, and ends with one
+closed trade worth $30. The nine equity points include cash and the marked
+position after each bar. These synthetic prices illustrate accounting, not a
+claim about AAPL's historical return.
 
-Pass pre-computed signals alongside prices:
+`result.to_fills_dataframe()` gives one row per execution. `result.to_trades_dataframe()`
+gives the completed position round trip, including entry, exit, and P&L.
+`result.to_equity_dataframe()` gives the dated account value. Inspect these
+three frames before interpreting a summary metric; [Results & Analysis](../user-guide/results.md)
+covers export and additional measures.
 
-```python
-from ml4t.backtest import run_backtest
+An `Engine` instance runs once. Create a new instance to test another strategy
+or setting. Continue with [Order Types](../user-guide/orders.md) and
+[Execution Semantics](../user-guide/execution-semantics.md) to see how order
+choice and timing change fills.
 
-class SignalStrategy(Strategy):
-    def on_data(self, timestamp, data, context, broker):
-        for asset, bar in data.items():
-            signal = bar.get("signals", {}).get("prediction", 0)
-            position = broker.get_position(asset)
+## In the book
 
-            if signal > 0.7 and position is None:
-                # Buy 10% of portfolio value
-                equity = broker.get_account_value()
-                shares = int(equity * 0.10 / bar["price"])
-                if shares > 0:
-                    broker.submit_order(asset, shares)
-
-            elif signal < 0.3 and position is not None:
-                broker.close_position(asset)
-
-# Signals DataFrame has same timestamp/asset columns plus your signal columns
-result = run_backtest(prices, SignalStrategy(), signals=signals_df)
-```
-
-## Quote-Aware Feeds
-
-If you have quotes, add them without changing your strategy interface:
-
-```python
-from ml4t.backtest import BacktestConfig, DataFeed
-from ml4t.backtest.config import ExecutionPrice
-
-feed = DataFeed(
-    prices_df=quotes_df,
-    price_col="mid_price",
-    bid_col="bid",
-    ask_col="ask",
-    bid_size_col="bid_size",
-    ask_size_col="ask_size",
-)
-
-config = BacktestConfig(
-    execution_price=ExecutionPrice.QUOTE_SIDE,
-    mark_price=ExecutionPrice.QUOTE_SIDE,
-)
-```
-
-Buys then fill from the ask, sells fill from the bid, and `bar["price"]` still gives your configured reference price.
-
-## Adding Transaction Costs
-
-```python
-from ml4t.backtest import BacktestConfig
-from ml4t.backtest.config import CommissionType, SlippageType
-
-config = BacktestConfig(
-    initial_cash=100_000,
-    commission_type=CommissionType.PERCENTAGE,
-    commission_rate=0.001,       # 0.1% per trade
-    slippage_type=SlippageType.PERCENTAGE,
-    slippage_rate=0.0005,        # 0.05% slippage
-)
-
-result = run_backtest(prices, strategy, config=config)
-```
-
-## Using Framework Profiles
-
-Match the exact behavior of another backtesting framework:
-
-```python
-# Backtrader-compatible: next-bar execution, integer shares, default cash checks
-result = run_backtest(prices, strategy, config="backtrader")
-
-# VectorBT-compatible: same-bar execution, fractional shares, no costs
-result = run_backtest(prices, strategy, config="vectorbt")
-
-# Zipline comparison protocol: next-bar open execution, no default costs
-result = run_backtest(prices, strategy, config="zipline")
-
-# Conservative production settings
-result = run_backtest(prices, strategy, config="realistic")
-```
-
-See [Profiles](../user-guide/profiles.md) for all available presets and their settings.
-
-## Adding Risk Management
-
-Set position rules in `on_start` to automatically manage exits:
-
-```python
-from ml4t.backtest import StopLoss, TakeProfit, TrailingStop, RuleChain
-
-class ProtectedStrategy(Strategy):
-    def on_start(self, broker):
-        # Rules evaluate in order; first trigger wins
-        broker.set_position_rules(RuleChain([
-            StopLoss(pct=0.05),        # Exit at -5% loss
-            TakeProfit(pct=0.15),      # Exit at +15% profit
-            TrailingStop(pct=0.03),    # Trail 3% from high water mark
-        ]))
-
-    def on_data(self, timestamp, data, context, broker):
-        for asset, bar in data.items():
-            if broker.get_position(asset) is None:
-                equity = broker.get_account_value()
-                shares = int(equity * 0.10 / bar["price"])
-                if shares > 0:
-                    broker.submit_order(asset, shares)
-```
-
-## Analyzing Results
-
-`engine.run()` returns a `BacktestResult` with metrics, trades, and export methods:
-
-```python
-result = engine.run()
-
-# Key metrics (dict)
-print(result.metrics["sharpe"])
-print(result.metrics["max_drawdown_pct"])
-print(result.metrics["win_rate"])
-print(result.metrics["profit_factor"])
-
-# Trades as Polars DataFrame
-trades_df = result.to_trades_dataframe()
-print(trades_df.head())
-
-# Equity curve as Polars DataFrame
-equity_df = result.to_equity_dataframe()
-print(equity_df.head())
-
-# Fills as Polars DataFrame
-fills_df = result.to_fills_dataframe()
-print(fills_df.head())
-
-# Portfolio state snapshots
-portfolio_df = result.to_portfolio_state_dataframe()
-print(portfolio_df.head())
-
-# Export to Parquet for analysis with ml4t-diagnostic
-result.to_parquet("./results/my_backtest")
-```
-
-For quote-aware backtests, `fills_df` and `trades_df` preserve the quote context
-used for execution, while `portfolio_df` shows the effect of the configured
-marking source over time.
-
-## Convenience Function
-
-For quick experiments, `run_backtest` combines DataFeed + Engine in one call:
-
-```python
-from ml4t.backtest import run_backtest
-
-# Accepts DataFrames or file paths
-result = run_backtest(
-    prices="data/prices.parquet",
-    strategy=MyStrategy(),
-    signals="data/signals.parquet",
-    config="backtrader",
-)
-```
-
-## Next Steps
-
-- [How It Works](../concepts/how-it-works.md) -- understand the execution model
-- [Execution Semantics](../user-guide/execution-semantics.md) -- fill ordering, stops, timing
-- [Configuration](../user-guide/configuration.md) -- all 40+ behavioral knobs
-- [Risk Management](../user-guide/risk-management.md) -- stops, trails, portfolio limits
+Chapter 16, Section 16.3, [Vectorized and event-driven backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/README.md),
+and [notebook 04, Single Asset Backtest with ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb)
+extend this first round trip to a stateful RSI rule, explicit costs, and a matched
+comparison with a vectorized backtest.
