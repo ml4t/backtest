@@ -13,11 +13,11 @@ how cash is reserved, and how results change when you match another framework's 
     Define a strategy, pick a config profile, get results in 10 lines.
     [:octicons-arrow-right-24: Quickstart](getting-started/quickstart.md)
 
--   :material-tune:{ .lg .middle } __40+ Configurable Knobs__
+-   :material-tune:{ .lg .middle } __User Guide__
     ---
-    Fill ordering, stop modes, cash policy, settlement, and account behavior
-    are explicit named parameters.
-    [:octicons-arrow-right-24: Configuration](user-guide/configuration.md)
+    Find the workflow for data, strategies, orders, account rules, costs,
+    risk, and result analysis.
+    [:octicons-arrow-right-24: User Guide](user-guide/index.md)
 
 -   :material-check-all:{ .lg .middle } __Validated Against 4 Frameworks__
     ---
@@ -76,12 +76,22 @@ fills=2 final=$100300.00
 
 Each `Engine` instance is single-use. Create a new instance for every independent run.
 
-Or use the convenience function:
+The convenience function accepts the same price panel and strategy directly:
 
+<!-- ml4t-doc-test: home-convenience -->
 ```python
+import polars as pl
 from ml4t.backtest import run_backtest
+from ml4t.backtest.example_data import ExampleRoundTrip, load_example_prices
 
-result = run_backtest(prices, BuyAndHold(), config="backtrader")
+prices = load_example_prices("equity").filter(pl.col("asset") == "AAPL")
+result = run_backtest(prices, ExampleRoundTrip("AAPL", 100), config="backtrader")
+print(f"fills={len(result.fills)} final=${result.metrics['final_value']:.2f}")
+```
+
+<!-- ml4t-doc-output: home-convenience -->
+```text
+fills=2 final=$100300.00
 ```
 
 ## Why ML4T Backtest?

@@ -35,6 +35,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "preopen-mixed-rules",
         "readme-quickstart",
         "home-example",
+        "home-convenience",
         "quickstart-minimal",
         "smoke-equity",
         "smoke-etf",
