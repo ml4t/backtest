@@ -33,6 +33,7 @@ _DEFAULT_PATHS = (
 _REQUIRED_EXAMPLES = frozenset(
     {
         "account-engine-direct",
+        "account-gatekeeper",
         "installation-import",
         "preopen-mixed-rules",
         "readme-quickstart",

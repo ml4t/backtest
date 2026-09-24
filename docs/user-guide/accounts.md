@@ -12,7 +12,7 @@ The configuration is intentionally simple: instead of switching between account
 "types", you set the policy flags directly and let the broker enforce the resulting
 buying-power rules.
 
-The short `Engine` and `Broker` snippets below assume a prepared feed and strategy. Run the linked accounts tutorial for complete inputs, orders, and result records.
+Run the linked accounts tutorial for complete order and portfolio-state comparisons under each policy.
 
 ## Quick Example
 
@@ -232,16 +232,27 @@ the retained comparison commands.
 
 ## Insufficient Funds
 
-Orders that exceed available buying power are rejected by the gatekeeper. Use this
-directly when you want to inspect why an order would fail:
+Use `Gatekeeper` directly when you need to validate an order before execution.
+It requires an account state, a commission model, and the expected fill price:
 
+<!-- ml4t-doc-test: account-gatekeeper -->
 ```python
-from ml4t.backtest.accounting import Gatekeeper
+from ml4t.backtest import Order, OrderSide
+from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy
+from ml4t.backtest.models import NoCommission
 
-gatekeeper = Gatekeeper(account_state, policy)
-is_valid, reason = gatekeeper.validate_order(order)
-if not is_valid:
-    print(f"Order rejected: {reason}")
+account = AccountState(initial_cash=100_000, policy=UnifiedAccountPolicy())
+gatekeeper = Gatekeeper(account, NoCommission())
+order = Order(asset="AAPL", side=OrderSide.BUY, quantity=1_500)
+is_valid, reason = gatekeeper.validate_order(order, price=100.0)
+
+assert not is_valid
+print(reason)
+```
+
+<!-- ml4t-doc-output: account-gatekeeper -->
+```text
+Insufficient cash: need $150000.00, have $100000.00
 ```
 
 ## Migration from the beta `account_type` keyword
