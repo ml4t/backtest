@@ -83,14 +83,22 @@ def artifact_failures(directory: Path) -> list[str]:
     package_files = {path.removeprefix("src/") for path in _python_files(_PACKAGE)} | {
         "ml4t/backtest/py.typed"
     }
-    expected_wheel = package_files | {
-        f"{dist_info}/METADATA",
-        f"{dist_info}/WHEEL",
-        f"{dist_info}/licenses/LICENSE",
-        f"{dist_info}/RECORD",
+    package_data = {
+        path.relative_to(_ROOT).as_posix() for path in (_PACKAGE / "example_data").glob("*.csv")
     }
+    expected_wheel = (
+        package_files
+        | {path.removeprefix("src/") for path in package_data}
+        | {
+            f"{dist_info}/METADATA",
+            f"{dist_info}/WHEEL",
+            f"{dist_info}/licenses/LICENSE",
+            f"{dist_info}/RECORD",
+        }
+    )
     expected_sdist = (
         _python_files(_PACKAGE)
+        | package_data
         | _python_files(_TESTS)
         | set().union(*(_data_files(path) for path in _APPROVED_TEST_DATA))
         | {
