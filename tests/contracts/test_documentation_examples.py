@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 import yaml
 
 _ROOT = Path(__file__).parents[2]
@@ -49,3 +50,35 @@ def test_documentation_ci_installs_wheel_before_running_examples() -> None:
     install = commands.index("uv pip install")
     execute = commands.index("validation/check_documentation_examples.py")
     assert build < install < execute
+
+
+def test_recorded_tutorial_output_mismatch_fails(tmp_path: Path) -> None:
+    page = tmp_path / "example.md"
+    page.write_text(
+        "<!-- ml4t-doc-test: smoke-mismatch -->\n"
+        "```python\nprint('actual')\n```\n\n"
+        "<!-- ml4t-doc-output: smoke-mismatch -->\n"
+        "```text\nexpected\n```\n",
+        encoding="utf-8",
+    )
+    checker = _load_checker()
+    examples = checker.collect_examples([page])
+    with pytest.raises(AssertionError, match="output differs"):
+        checker.run_examples(examples)
+
+
+def test_missing_tutorial_input_fails_real_example(tmp_path: Path) -> None:
+    page = tmp_path / "example.md"
+    page.write_text(
+        "<!-- ml4t-doc-test: smoke-missing-input -->\n"
+        "```python\n"
+        "from ml4t.backtest.example_data import load_example_prices\n"
+        "load_example_prices('not-a-bundled-category')\n"
+        "```\n\n"
+        "<!-- ml4t-doc-output: smoke-missing-input -->\n"
+        "```text\nunreachable\n```\n",
+        encoding="utf-8",
+    )
+    checker = _load_checker()
+    with pytest.raises(RuntimeError, match="Unknown example category"):
+        checker.run_examples(checker.collect_examples([page]))

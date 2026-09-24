@@ -576,6 +576,7 @@
     }
   },
   "documented_imports": [
+    "from ml4t.backtest import AssetClass, ContractSpec",
     "from ml4t.backtest import BacktestConfig",
     "from ml4t.backtest import BacktestConfig, CommissionType",
     "from ml4t.backtest import BacktestConfig, DataFeed",
@@ -615,6 +616,7 @@
     "from ml4t.backtest.config import SlippageType",
     "from ml4t.backtest.config import SlippageType, SpreadConvention",
     "from ml4t.backtest.config import TrailStopTiming, WaterMarkSource, InitialHwmSource",
+    "from ml4t.backtest.example_data import ExampleRoundTrip, load_example_prices",
     "from ml4t.backtest.execution import LinearImpact",
     "from ml4t.backtest.execution import LinearImpact, SquareRootImpact, NoImpact",
     "from ml4t.backtest.execution import RebalanceConfig",
@@ -2645,6 +2647,24 @@
       "module": "ml4t.backtest.config",
       "qualname": "WaterMarkSource",
       "signature": "(*values)"
+    },
+    "ml4t.backtest.example_data:ExampleRoundTrip": {
+      "kind": "class",
+      "members": {
+        "on_data": {
+          "kind": "method",
+          "signature": "(self, timestamp: datetime.datetime, data: dict[str, dict[str, Any]], context: dict[str, Any], broker: Any) -> None"
+        }
+      },
+      "module": "ml4t.backtest.example_data",
+      "qualname": "ExampleRoundTrip",
+      "signature": "(asset: str, quantity: float) -> None"
+    },
+    "ml4t.backtest.example_data:load_example_prices": {
+      "kind": "function",
+      "module": "ml4t.backtest.example_data",
+      "qualname": "load_example_prices",
+      "signature": "(category: str) -> polars.dataframe.frame.DataFrame"
     },
     "ml4t.backtest.execution.rebalancer:RebalanceConfig": {
       "kind": "class",
