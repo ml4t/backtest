@@ -585,6 +585,7 @@
     "from ml4t.backtest import BacktestConfig, DataFeed",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, OrderType, Strategy",
+    "from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, Strategy",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, OrderSide, Strategy",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, RebalanceConfig, RebalanceSchedule, Strategy, TargetWeightExecutor",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, StopLoss, Strategy",

@@ -1,6 +1,6 @@
 # Validation Methodology
 
-*Last updated: 2026-08-14*
+*Last updated: 2026-09-23*
 
 ## Core Principle
 
@@ -62,10 +62,10 @@ The `default` profile represents ml4t's own opinion on the most reasonable setti
 | Dimension | ml4t Default | Rationale |
 |-----------|-------------|-----------|
 | Execution | next_bar_open | No look-ahead bias |
-| Costs | 0.1% commission + 0.1% slippage | Conservative but not punishing |
+| Costs | No commission or slippage | Reproducible baseline; add explicit cost models for the venue |
 | Short selling | disabled | Require explicit opt-in |
 | Leverage | disabled | Require explicit opt-in |
-| Share type | fractional | Simpler for research |
+| Share type | integer | Default equity execution uses whole shares |
 | Fill ordering | exit_first | Capital-efficient |
 | Rebalance | incremental | Most accurate cash tracking |
 | Stop basis | fill_price | Based on actual execution |

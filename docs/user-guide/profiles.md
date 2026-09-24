@@ -1,5 +1,8 @@
 # Profiles
 
+The [profiles and parity tutorial](../tutorials/profiles-and-parity.md) runs a
+one-setting comparison and explains the supported evidence boundaries.
+
 Profiles are pre-configured `BacktestConfig` settings for framework-specific execution semantics.
 The retained evidence in this page states which pinned framework scenarios currently match
 exactly and which remain release-blocking.
