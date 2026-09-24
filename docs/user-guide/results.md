@@ -495,8 +495,10 @@ analysis_net = portfolio_analysis_from_result(results_net, calendar="crypto")
 ```
 
 !!! note "Requires ml4t-diagnostic"
-    Install with `pip install ml4t-diagnostic`. The import is deferred so ml4t-backtest
-    works standalone without ml4t-diagnostic installed.
+    Add `ml4t-diagnostic==0.1.4` for portfolio analysis. The full HTML
+    tearsheet also requires the visualization extra:
+    `uv add 'ml4t-diagnostic[viz]==0.1.4'`. Backtest imports and runs
+    without this optional package.
 
 ### Trade Records
 
@@ -515,20 +517,35 @@ The bridge exports all cost decomposition fields (`gross_pnl`, `net_return`, `to
 
 ### Full Tearsheet
 
-Pass all result data for the richest tearsheet (up to 24 sections):
+Use the diagnostic integration function to build the HTML report from a
+complete Backtest result. This example uses the bundled synthetic equity panel
+and writes `tearsheet.html` in the current directory.
 
+<!-- ml4t-doc-test: guide-tearsheet -->
 ```python
-from ml4t.diagnostic.visualization.backtest import generate_backtest_tearsheet
+from pathlib import Path
 
-html = generate_backtest_tearsheet(
-    trades=result.to_trades_dataframe(),
-    returns=analysis.returns,
-    equity_curve=result.to_equity_dataframe(),
-    metrics=result.metrics,
-    template="full",
-    title="My Strategy — Full Report",
-    output_path="tearsheet.html",
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine
+from ml4t.backtest.example_data import ExampleRoundTrip, load_example_prices
+from ml4t.diagnostic.integration import generate_tearsheet_from_result
+
+prices = load_example_prices("equity").filter(pl.col("asset") == "AAPL")
+result = Engine(
+    DataFeed(prices_df=prices),
+    ExampleRoundTrip("AAPL", 100),
+    BacktestConfig(initial_cash=100_000),
+).run()
+html = generate_tearsheet_from_result(
+    result, title="AAPL example", template="full", output_path="tearsheet.html"
 )
+assert "<html" in html.lower()
+print(f"html_saved={Path('tearsheet.html').is_file()} fills={len(result.fills)}")
+```
+
+<!-- ml4t-doc-output: guide-tearsheet -->
+```text
+html_saved=True fills=2
 ```
 
 #### Metrics Keys That Enable Tearsheet Sections

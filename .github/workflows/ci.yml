@@ -368,8 +368,9 @@ jobs:
 
       - name: Exercise the optional diagnostic handoff against the wheel
         run: |
-          uv pip install --python "$RUNNER_TEMP/candidate-venv/bin/python" "ml4t-diagnostic==0.1.4"
+          uv pip install --python "$RUNNER_TEMP/candidate-venv/bin/python" "ml4t-diagnostic[viz]==0.1.4"
           "$RUNNER_TEMP/candidate-venv/bin/python" validation/check_documentation_examples.py docs/tutorials/diagnostic-handoff.md
+          "$RUNNER_TEMP/candidate-venv/bin/python" validation/check_documentation_examples.py docs/user-guide/results.md
 
       - name: Verify source provenance
         run: |
