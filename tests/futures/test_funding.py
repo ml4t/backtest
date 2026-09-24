@@ -175,6 +175,38 @@ def test_funding_artifact_rejects_missing_cash_flow_component(tmp_path):
 
     with pytest.raises(ArtifactReadError, match="funding.parquet is required"):
         BacktestResult.from_parquet(tmp_path)
+    recovered = BacktestResult.from_parquet(tmp_path, recovery=True)
+    assert any(
+        item.code == "component_missing" and item.component == "funding"
+        for item in recovered.artifact_diagnostics
+    )
+
+
+@pytest.mark.parametrize(
+    "metric,value",
+    [("num_funding_events", 2), ("total_funding", 0.0)],
+)
+def test_funding_artifact_rejects_inconsistent_metrics(tmp_path, metric, value):
+    funding = pl.DataFrame(
+        {
+            "timestamp": [datetime(2024, 1, 2)],
+            "asset": ["BTC-PERP"],
+            "rate": [0.01],
+        }
+    )
+    _run(1, funding).to_parquet(tmp_path)
+    metrics_path = tmp_path / "metrics.json"
+    metrics = json.loads(metrics_path.read_text())
+    metrics[metric] = value
+    metrics_path.write_text(json.dumps(metrics))
+
+    with pytest.raises(ArtifactReadError, match="funding.parquet is inconsistent"):
+        BacktestResult.from_parquet(tmp_path)
+    recovered = BacktestResult.from_parquet(tmp_path, recovery=True)
+    assert any(
+        item.code == "component_inconsistent" and item.component == "funding"
+        for item in recovered.artifact_diagnostics
+    )
 
 
 def test_funding_event_on_a_filtered_session_is_rejected_before_cash_changes():
