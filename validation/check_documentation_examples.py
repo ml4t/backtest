@@ -29,6 +29,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "tutorials" / "results-and-analysis.md",
     _ROOT / "docs" / "user-guide" / "accounts.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
+    _ROOT / "docs" / "user-guide" / "risk-management.md",
 )
 _REQUIRED_EXAMPLES = frozenset(
     {
@@ -37,6 +38,14 @@ _REQUIRED_EXAMPLES = frozenset(
         "installation-import",
         "preopen-mixed-rules",
         "readme-quickstart",
+        "risk-volatility-stop",
+        "risk-tightening-trailing-stop",
+        "risk-scaled-exit",
+        "risk-max-exposure",
+        "risk-daily-loss",
+        "risk-gross-net",
+        "risk-var-cvar",
+        "risk-sector-factor",
         "home-example",
         "home-convenience",
         "quickstart-minimal",
