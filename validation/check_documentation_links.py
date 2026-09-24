@@ -1,4 +1,4 @@
-"""Check links in rendered documentation content, including section anchors."""
+"""Check all rendered internal links and external guide destinations."""
 
 from __future__ import annotations
 
@@ -90,8 +90,7 @@ def check_links(site: Path) -> tuple[int, int]:
     external: set[str] = set()
     checked = 0
     for page, content in pages.items():
-        if page.relative_to(site).parts[0] not in _GUIDE_SECTIONS:
-            continue
+        section = page.relative_to(site).parts[0]
         for link in content.links:
             checked += 1
             destination = urlsplit(urljoin(_page_url(page, site), link))
@@ -99,10 +98,12 @@ def check_links(site: Path) -> tuple[int, int]:
                 failures.append(f"{page.relative_to(site)}: unsupported link {link}")
                 continue
             if destination.netloc not in {"www.ml4trading.io", "ml4trading.io"}:
-                external.add(destination._replace(fragment="").geturl())
+                if section in _GUIDE_SECTIONS:
+                    external.add(destination._replace(fragment="").geturl())
                 continue
             if not destination.path.startswith(_SITE_PREFIX):
-                external.add(destination._replace(fragment="").geturl())
+                if section in _GUIDE_SECTIONS:
+                    external.add(destination._replace(fragment="").geturl())
                 continue
             try:
                 target = _target_path(site, destination.path)

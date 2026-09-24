@@ -409,7 +409,7 @@ See `examples/stateful_strategies.py` for complete implementations and `examples
 
 ## In the book
 
-Chapter 16, Section 16.3, [Stateful strategies](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/05_stateful_strategies.ipynb) demonstrates decisions that depend on prior fills and account state. The runnable risk tutorial here traces one such path across callbacks.
+Chapter 16, Section 16.3, [Stateful strategies](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/05_stateful_strategies.ipynb) demonstrates decisions that depend on prior fills and account state. The runnable risk tutorial here traces one such path across callbacks.
 
 ## Next Steps
 

@@ -188,8 +188,8 @@ total commission: $10.00
 
 ## In the book
 
-Chapter 18, Section 18.7, [Transaction cost analysis and model validation](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/18_transaction_costs/README.md),
-and [notebook 10, Gross versus net performance](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/18_transaction_costs/10_gross_vs_net_performance.ipynb)
+Chapter 18, Section 18.7, [Transaction cost analysis and model validation](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/18_transaction_costs/README.md),
+and [notebook 10, Gross versus net performance](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/18_transaction_costs/10_gross_vs_net_performance.ipynb)
 extend the cost decomposition to larger strategy runs. The [crypto-perpetual
-cost notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/case_studies/crypto_perps_funding/16_costs.ipynb)
+cost notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/case_studies/crypto_perps_funding/16_costs.ipynb)
 adds case-study funding and fee assumptions.

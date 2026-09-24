@@ -10,7 +10,7 @@ how cash is reserved, and how results change when you match another framework's 
 
 -   :material-play-circle:{ .lg .middle } __Run Your First Backtest__
     ---
-    Define a strategy, pick a config profile, get results in 10 lines.
+    Run a complete strategy on bundled synthetic bars and inspect its fills.
     [:octicons-arrow-right-24: Quickstart](getting-started/quickstart.md)
 
 -   :material-tune:{ .lg .middle } __User Guide__
@@ -76,6 +76,9 @@ fills=2 final=$100300.00
 
 Each `Engine` instance is single-use. Create a new instance for every independent run.
 
+Moving a Zipline strategy? Follow the [task-level migration map](user-guide/migrate-from-zipline.md)
+and run its checked target-weight example before comparing framework results.
+
 The convenience function accepts the same price panel and strategy directly:
 
 <!-- ml4t-doc-test: home-convenience -->
@@ -108,8 +111,8 @@ exercise high event counts.
 
 | Feature | Description |
 |---------|-------------|
-| Event-driven | Point-in-time correctness, no look-ahead bias |
-| 40+ behavioral knobs | Every execution detail is configurable |
+| Event-driven | Explicit decision and fill timing; same-bar settings require a causal-data check |
+| Configurable behavior | Set fill timing, cash, costs, and order processing explicitly |
 | Quote-aware execution | Side-aware fills and separate mark pricing |
 | 10 framework profiles | Configure VectorBT, Backtrader, Zipline, and LEAN semantics |
 | Risk management | Stop-loss, take-profit, trailing stops, portfolio limits |

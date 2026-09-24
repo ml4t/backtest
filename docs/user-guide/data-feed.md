@@ -282,7 +282,7 @@ DataFeed pre-partitions data by timestamp at initialization and pre-extracts col
 
 ## In the book
 
-Chapter 16, Section 16.3, [Futures backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/02_futures_backtesting.ipynb) works through contract and session inputs. The [FX pairs backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/case_studies/fx_pairs/13_backtest.ipynb) extends feed alignment to a prediction stream.
+Chapter 16, Section 16.3, [Futures backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/02_futures_backtesting.ipynb) works through contract and session inputs. The [FX pairs backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/case_studies/fx_pairs/13_backtest.ipynb) extends feed alignment to a prediction stream.
 
 ## Next Steps
 

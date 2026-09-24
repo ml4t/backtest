@@ -1,4 +1,4 @@
-"""Rendered guide links must resolve to pages, sections, and reachable URLs."""
+"""Rendered internal links and external guide URLs must resolve."""
 
 from __future__ import annotations
 
@@ -71,3 +71,17 @@ def test_external_url_rejects_http_404(tmp_path: Path) -> None:
         server.shutdown()
         thread.join()
         server.server_close()
+
+
+def test_homepage_internal_fragment_is_checked(tmp_path: Path) -> None:
+    checker = _load_checker()
+    homepage = tmp_path / "index.html"
+    guide = tmp_path / "user-guide" / "index.html"
+    guide.parent.mkdir(parents=True)
+    guide.write_text('<article><h2 id="working-section">Working</h2></article>')
+    homepage.write_text('<article><a href="user-guide/#working-section">Guide</a></article>')
+    assert checker.check_links(tmp_path) == (1, 0)
+
+    homepage.write_text('<article><a href="user-guide/#missing-section">Guide</a></article>')
+    with pytest.raises(ValueError, match="missing anchor"):
+        checker.check_links(tmp_path)

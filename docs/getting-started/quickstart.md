@@ -81,7 +81,7 @@ choice and timing change fills.
 
 ## In the book
 
-Chapter 16, Section 16.3, [Vectorized and event-driven backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/README.md),
-and [notebook 04, Single Asset Backtest with ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb)
+Chapter 16, Section 16.3, [Vectorized and event-driven backtesting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/README.md),
+and [notebook 04, Single Asset Backtest with ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb)
 extend this first round trip to a stateful RSI rule, explicit costs, and a matched
 comparison with a vectorized backtest.

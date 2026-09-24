@@ -124,6 +124,7 @@ nav:
     - Execution Semantics: user-guide/execution-semantics.md
     - Configuration: user-guide/configuration.md
     - Profiles: user-guide/profiles.md
+    - Migrate from Zipline: user-guide/migrate-from-zipline.md
     - Risk Management: user-guide/risk-management.md
     - Account Policies: user-guide/accounts.md
     - Rebalancing: user-guide/rebalancing.md

@@ -124,8 +124,8 @@ describes the comparison process and canonical precision.
 
 ## In the book
 
-Chapter 16, [Framework parity and engine divergence](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/README.md),
-includes [notebook 07, Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb),
+Chapter 16, [Framework parity and engine divergence](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/README.md),
+includes [notebook 07, Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/07_engine_divergence_anatomy.ipynb),
 which changes one configuration field at a time, and [notebook 16, Case-study
-LEAN parity](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/16_case_study_lean_parity.ipynb),
+LEAN parity](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/16_case_study_lean_parity.ipynb),
 which reports the bounded cross-framework audit.

@@ -547,7 +547,7 @@ config = BacktestConfig(share_type=ShareType.INTEGER)
 
 ## In the book
 
-Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) isolates fill timing and ordering differences. This page specifies the current engine behavior behind those comparisons.
+Chapter 16, Section 16.3, [Engine divergence anatomy](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) isolates fill timing and ordering differences. This page specifies the current engine behavior behind those comparisons.
 
 ## Next Steps
 
