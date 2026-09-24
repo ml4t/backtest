@@ -580,6 +580,8 @@
     "from ml4t.backtest import AssetClass, ContractSpec",
     "from ml4t.backtest import BacktestConfig",
     "from ml4t.backtest import BacktestConfig, CommissionType",
+    "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine",
+    "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine, OrderSide, Strategy",
     "from ml4t.backtest import BacktestConfig, DataFeed",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine",
     "from ml4t.backtest import BacktestConfig, DataFeed, Engine, ExecutionMode, OrderType, Strategy",

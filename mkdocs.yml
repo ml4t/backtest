@@ -109,6 +109,7 @@ nav:
     - Example Data: tutorials/data.md
     - Orders and Timing: tutorials/orders-and-timing.md
     - Multi-asset Rebalancing: tutorials/multiasset-rebalancing.md
+    - Costs and Funding: tutorials/costs-and-funding.md
   - Concepts:
     - How It Works: concepts/how-it-works.md
   - User Guide:

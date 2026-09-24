@@ -1,5 +1,7 @@
 # Market Impact & Execution Costs
 
+The [costs and funding tutorial](../tutorials/costs-and-funding.md) reconciles executed examples across all four cash-flow sources.
+
 Realistic backtesting requires modeling the costs of executing trades. ml4t-backtest provides three layers of cost modeling: commission, slippage, and market impact.
 
 ## Cost Layers

@@ -21,6 +21,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "tutorials" / "data.md",
     _ROOT / "docs" / "tutorials" / "orders-and-timing.md",
     _ROOT / "docs" / "tutorials" / "multiasset-rebalancing.md",
+    _ROOT / "docs" / "tutorials" / "costs-and-funding.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
 )
 _REQUIRED_EXAMPLES = frozenset(
@@ -38,6 +39,9 @@ _REQUIRED_EXAMPLES = frozenset(
         "tutorial-multiasset-equity-etf",
         "tutorial-multiasset-future",
         "tutorial-multiasset-fx",
+        "tutorial-costs-equity",
+        "tutorial-costs-funding",
+        "tutorial-costs-flip",
     }
 )
 _EXAMPLE = re.compile(
