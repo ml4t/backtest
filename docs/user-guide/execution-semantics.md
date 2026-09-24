@@ -236,7 +236,7 @@ Orders can fill in the bar where they are submitted, using the configured `execu
 Bar N:  Strategy sees close=$100, submits buy order, fills at close=$100
 ```
 
-This mode is useful for comparing against vectorized frameworks (VectorBT) where signals and fills happen simultaneously. It carries look-ahead risk for production strategies because the strategy can "see" the close before deciding to trade at the close.
+Use this mode only when the comparison explicitly permits a decision and fill at the same close. It carries lookahead risk if the strategy observes that close before choosing an order that fills there. VectorBT supports several simulation modes, including [state-dependent order functions](https://vectorbt.dev/api/portfolio/base/); its timing cannot be summarized by this one setting.
 
 ```python
 from ml4t.backtest import BacktestConfig, ExecutionMode

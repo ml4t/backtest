@@ -1,10 +1,10 @@
 """Stateful strategy examples demonstrating why event-driven backtesting matters.
 
-Each strategy here maintains state across bars — trading decisions feed back
-into future decisions. This is fundamentally impossible in vectorized frameworks
-like VectorBT, where all signals must be computed in advance.
+Each strategy here maintains state across bars. A precomputed signal or order
+array cannot respond to fills produced by the same simulation. Callback-based
+simulators, including VectorBT order functions, can model this feedback.
 
-Five reasons you need event-driven backtesting:
+Five examples of state-dependent decisions:
 
 1. **Feedback loops** — position size depends on realized P&L (AdaptiveKellySizing)
 2. **Conditional chains** — entry N depends on P&L of entries 1..N-1 (Pyramiding)
@@ -13,7 +13,7 @@ Five reasons you need event-driven backtesting:
 5. **Reactive order management** — each fill triggers new orders (GridTrading)
 
 These are NOT part of the public API. They are importable demonstrations with
-full test coverage in test_stateful_strategies.py.
+behavioral tests in test_stateful_strategies.py.
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ class AdaptiveKellySizingStrategy(Strategy):
     """Position size adapts based on realized win rate and payoff ratio.
 
     The feedback loop: position_size → P&L → Kelly_fraction → next_position_size.
-    In a vectorized framework, you cannot compute the Kelly fraction because it
-    depends on future fills that depend on the fraction itself.
+    A precomputed size array cannot use realized P&L from fills produced later
+    in the same simulation.
 
     Kelly formula: f* = W - (1 - W) / R
         where W = win rate, R = avg_win / avg_loss
@@ -229,8 +229,8 @@ class PairsTradingStrategy(Strategy):
     """Trade the spread between two correlated assets.
 
     Cross-asset coordination: the entry/exit of asset A is conditioned on the
-    price of asset B. You cannot vectorize this because position in A affects
-    available capital for B, and fills in A affect the timing of orders for B.
+    price of asset B. The first leg can affect capital available to the second.
+    Orders are submitted independently; this example does not ensure atomic fills.
     """
 
     def __init__(
@@ -341,7 +341,7 @@ class DrawdownCircuitBreakerStrategy(Strategy):
     Path-dependent feedback: equity_curve → drawdown → sizing_multiplier →
     future_equity_curve. The sizing multiplier at bar N depends on the entire
     equity path from bar 0 to bar N-1, which depends on all prior sizing
-    decisions. Impossible to vectorize.
+    decisions. Sizes must be updated after each simulated equity change.
     """
 
     def __init__(

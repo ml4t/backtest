@@ -1,7 +1,6 @@
 """Tests for stateful strategy examples.
 
-Each test group verifies the key stateful behavior that makes the strategy
-impossible to implement in a vectorized framework.
+Each test group verifies a state-dependent behavior of the example strategies.
 """
 
 from __future__ import annotations

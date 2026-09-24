@@ -21,7 +21,7 @@ rule = StopLoss(pct=0.05)  # Exit at -5% from entry
 
 - **Long positions**: triggers if `bar_low <= entry_price * (1 - pct)`
 - **Short positions**: triggers if `bar_high >= entry_price * (1 + pct)`
-- Gap handling: if bar opens beyond stop, fills at open price
+- With the default `STOP_PRICE` fill mode, a gap through the stop fills at the bar open; other modes use their configured fill rule
 
 ### TakeProfit
 
@@ -64,14 +64,16 @@ rule = TimeExit(max_bars=20)  # Exit after 20 bars
 
 ### VolatilityStop
 
-Exit when loss exceeds N standard deviations of recent volatility:
+Exit when price moves against a position by a multiple of Average True Range (ATR).
+After a position exists, supply a positive `atr` value through
+`broker.update_position_context(asset, {"atr": current_atr})`. Without it, the rule holds:
 
+<!-- ml4t-doc-test: risk-volatility-stop -->
 ```python
 from ml4t.backtest.risk.position import VolatilityStop
 
 rule = VolatilityStop(
-    n_std=2.0,       # 2 standard deviations
-    lookback=20,     # 20-bar window for volatility
+    multiplier=2.0,  # Stop distance is twice the supplied ATR
 )
 ```
 
@@ -79,11 +81,13 @@ rule = VolatilityStop(
 
 Trail that tightens as profit increases:
 
+<!-- ml4t-doc-test: risk-tightening-trailing-stop -->
 ```python
 from ml4t.backtest.risk.position import TighteningTrailingStop
 
 rule = TighteningTrailingStop(
-    thresholds=[
+    schedule=[
+        (0.00, 0.05),  # Before +5% profit, trail 5%
         (0.05, 0.03),  # At +5% profit, trail 3%
         (0.10, 0.02),  # At +10% profit, trail 2%
         (0.20, 0.01),  # At +20% profit, trail 1%
@@ -95,16 +99,20 @@ rule = TighteningTrailingStop(
 
 Take partial profits at predefined levels:
 
+<!-- ml4t-doc-test: risk-scaled-exit -->
 ```python
 from ml4t.backtest.risk.position import ScaledExit
 
 rule = ScaledExit(
-    levels=[
-        (0.10, 0.5),  # At +10%, exit 50% of position
-        (0.20, 0.5),  # At +20%, exit remaining 50%
+    targets=[
+        (0.10, 0.5),  # At +10%, exit 50% of current position
+        (0.20, 1.0),  # At +20%, exit the remaining position
     ],
 )
 ```
+
+`ScaledExit` tracks triggered targets on the rule instance. Use a separate instance for each
+position or reset it when a position closes.
 
 ### SignalExit
 
@@ -139,9 +147,9 @@ Exit only when multiple conditions are true simultaneously:
 ```python
 from ml4t.backtest.risk.position import AllOf, TakeProfit, TimeExit
 
-# Only exit if profitable AND held long enough
+# Exit at or above breakeven after at least five bars
 rule = AllOf([
-    TakeProfit(pct=0.0),    # Must be profitable
+    TakeProfit(pct=0.0),    # At or above breakeven
     TimeExit(max_bars=5),   # Must have held 5+ bars
 ])
 ```
@@ -166,7 +174,7 @@ Combine composition patterns for complex logic:
 ```python
 rules = RuleChain([
     StopLoss(pct=0.08),                    # Hard stop always applies
-    AllOf([TakeProfit(pct=0.0), TimeExit(max_bars=5)]),  # Profitable + held 5 bars
+    AllOf([TakeProfit(pct=0.0), TimeExit(max_bars=5)]),  # Breakeven + held 5 bars
     TrailingStop(pct=0.03),                # Trail from peak
     TimeExit(max_bars=60),                 # Max hold 60 bars
 ])
@@ -232,36 +240,43 @@ limit = MaxPositionsLimit(max_positions=10)
 
 ### MaxExposureLimit
 
+<!-- ml4t-doc-test: risk-max-exposure -->
 ```python
 from ml4t.backtest.risk.portfolio.limits import MaxExposureLimit
 
-limit = MaxExposureLimit(max_exposure=2.0)  # Max 200% gross exposure
+limit = MaxExposureLimit(max_exposure_pct=0.10)  # Warn above 10% in one asset
 ```
 
 ### DailyLossLimit
 
+<!-- ml4t-doc-test: risk-daily-loss -->
 ```python
 from ml4t.backtest.risk.portfolio.limits import DailyLossLimit
 
-limit = DailyLossLimit(max_daily_loss=0.03)  # Liquidate at -3% daily loss
+limit = DailyLossLimit(max_daily_loss_pct=0.03)  # Liquidate above 3% daily loss
 ```
 
 ### GrossExposureLimit / NetExposureLimit
 
+<!-- ml4t-doc-test: risk-gross-net -->
 ```python
 from ml4t.backtest.risk.portfolio.limits import GrossExposureLimit, NetExposureLimit
 
-gross = GrossExposureLimit(max_gross=1.5)  # Max 150% gross
-net = NetExposureLimit(min_net=-0.2, max_net=1.2)  # Net between -20% and 120%
+gross = GrossExposureLimit(max_gross_exposure=1.5)  # Halt above 150% gross
+net = NetExposureLimit(min_net_exposure=-0.2, max_net_exposure=1.2)  # Warn outside range
 ```
 
 ### VaRLimit / CVaRLimit
 
+These checks require at least `lookback_days` of portfolio returns in the risk manager's
+`context["historical_returns"]`. Without that input they report no breach.
+
+<!-- ml4t-doc-test: risk-var-cvar -->
 ```python
 from ml4t.backtest.risk.portfolio.limits import VaRLimit, CVaRLimit
 
-var_limit = VaRLimit(max_var=0.05, confidence=0.95)
-cvar_limit = CVaRLimit(max_cvar=0.08, confidence=0.95)
+var_limit = VaRLimit(threshold=0.05, confidence_level=0.95)
+cvar_limit = CVaRLimit(threshold=0.08, confidence_level=0.95)
 ```
 
 ### BetaLimit
@@ -274,11 +289,17 @@ beta_limit = BetaLimit(max_beta=1.5)
 
 ### SectorExposureLimit / FactorExposureLimit
 
+Sector checks require an asset-to-sector mapping in `context["asset_sectors"]`.
+Factor checks require an asset-to-loading mapping in `context["factor_loadings"]`;
+the example names that factor momentum. Pass these mappings as the `context` argument to
+`RiskManager.update(...)`. Without them the checks report no breach.
+
+<!-- ml4t-doc-test: risk-sector-factor -->
 ```python
 from ml4t.backtest.risk.portfolio.limits import SectorExposureLimit, FactorExposureLimit
 
-sector = SectorExposureLimit(max_sector_weight=0.30)
-factor = FactorExposureLimit(max_factor_exposure=0.50)
+sector = SectorExposureLimit(max_sector_exposure=0.30)
+factor = FactorExposureLimit(factor_name="momentum", max_exposure=0.50)
 ```
 
 ## Limit Actions

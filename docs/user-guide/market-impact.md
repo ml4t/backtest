@@ -49,7 +49,7 @@ config = BacktestConfig(
 )
 ```
 
-`PER_CONTRACT` is an alias for `PER_SHARE` — same math, clearer intent for futures.
+`PER_CONTRACT` is an alias for `PER_SHARE` - same math, clearer intent for futures.
 
 ### Custom Models
 
@@ -86,7 +86,7 @@ charged separately when they execute.
 
 ## Slippage Models
 
-Slippage models the bid-ask spread you cross when executing. A buy order fills slightly above the mid-price; a sell order fills slightly below.
+Slippage adjusts the configured execution price in the adverse direction. Use the spread model for a bar-only estimate of bid-ask crossing, or a percentage or fixed amount for other execution drag.
 
 ### Percentage (Default)
 
@@ -145,7 +145,7 @@ synthetic spread slippage disabled unless you explicitly want additional impact.
 
 ## Market Impact Models
 
-Market impact captures the price movement caused by your order itself — large orders move the market. This is the most important cost for institutional-size strategies.
+Market impact models add an adverse price adjustment that depends on order size relative to reported volume. Calibrate the model parameters for the market and bar frequency you simulate.
 
 Import from `ml4t.backtest.execution`:
 
@@ -164,9 +164,10 @@ engine = Engine(feed, strategy, config)
 
 Price impact proportional to order size relative to bar volume:
 
-$$\text{impact} = \eta \times \frac{Q}{V}$$
+$$\Delta P = P \times \eta \times \frac{Q}{V}$$
 
-where $Q$ = order quantity, $V$ = bar volume, $\eta$ = impact coefficient.
+Here $P$ is the reference price, $Q$ is order quantity, $V$ is the bar volume, and
+$\eta$ is the configured coefficient. $\Delta P$ is added for buys and subtracted for sells.
 
 ```python
 from ml4t.backtest.execution import LinearImpact
@@ -188,11 +189,14 @@ answered wrongly. Model persistence outside the engine if you need it.
 
 ### Square-Root Impact
 
-The standard institutional model — impact scales with the square root of participation rate:
+This model scales the price adjustment with the square root of estimated daily-volume participation:
 
-$$\text{impact} = \eta \times \sigma \times \sqrt{\frac{Q}{V}}$$
+$$\Delta P = P \times \eta \times \sigma \times \sqrt{\frac{Q}{V \times a}}$$
 
-where $\sigma$ = daily volatility, $\eta$ = impact coefficient.
+Here $\sigma$ is the model's configured daily volatility and $a$ is
+`adv_factor`, the configured multiplier that converts bar volume into an
+estimated average daily volume. The defaults are $\sigma=0.02$ and $a=1.0$.
+The model does not estimate either value from the feed.
 
 ```python
 from ml4t.backtest.execution import SquareRootImpact
@@ -203,7 +207,9 @@ engine = Engine(
 )
 ```
 
-Square-root impact is the empirical consensus for equity markets (Almgren-Chriss, Barra).
+Both impact models return zero adjustment when bar volume is missing or zero.
+Calibrate their coefficients against observed execution costs before using them
+for performance estimates.
 
 ### Volume Participation Limits
 
@@ -293,6 +299,6 @@ Chapter 18, Section 18.4, [Market impact calibration](https://github.com/stefan-
 ## Next Steps
 
 - [Book Guide](../book-guide/index.md) -- where cost realism and quote-aware execution appear in the book
-- [Execution Semantics](execution-semantics.md) — fill timing, ordering, and stop modes
-- [Configuration](configuration.md) — all commission and slippage parameters
-- [Rebalancing](rebalancing.md) — how costs interact with weight-based rebalancing
+- [Execution Semantics](execution-semantics.md) - fill timing, ordering, and stop modes
+- [Configuration](configuration.md) - all commission and slippage parameters
+- [Rebalancing](rebalancing.md) - how costs interact with weight-based rebalancing
