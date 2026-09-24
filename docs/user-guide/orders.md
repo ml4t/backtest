@@ -156,7 +156,7 @@ broker.cancel_order(order.id)
 
 ## In the book
 
-Chapter 16, Section 16.3, [Single asset ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb) reconciles submitted decisions with completed fills. The [engine divergence notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) in the companion varies execution assumptions.
+Chapter 16, Section 16.3, [Single asset ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb) reconciles submitted decisions with completed fills. The [engine divergence notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/07_engine_divergence_anatomy.ipynb) in the companion varies execution assumptions.
 
 ## Next Steps
 

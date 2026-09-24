@@ -141,9 +141,9 @@ instead of inferring acceptance from requested weights.
 
 ## In the book
 
-Chapter 17, Section 17.1, [Defining the allocation problem](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/README.md),
+Chapter 17, Section 17.1, [Defining the allocation problem](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/17_portfolio_construction/README.md),
 sets out the role of constraints and leverage. [Notebook 07, Conformal position
-sizing](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/07_conformal_position_sizing.ipynb)
+sizing](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/17_portfolio_construction/07_conformal_position_sizing.ipynb)
 uses registered ETF and futures predictions to study a larger sizing problem.
 The controlled runs here make the account and execution layer inspectable
 before applying a book allocator.

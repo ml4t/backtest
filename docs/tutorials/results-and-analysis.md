@@ -121,7 +121,7 @@ shows an optional, tested post-backtest analysis step.
 
 ## In the book
 
-Chapter 16, [Strategy simulation and reporting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/README.md),
-uses fill and trade reconciliation in [notebook 04, Single asset ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb).
-Chapter 17's [portfolio metrics notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/01_portfolio_metrics.ipynb)
+Chapter 16, [Strategy simulation and reporting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/README.md),
+uses fill and trade reconciliation in [notebook 04, Single asset ml4t-backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb).
+Chapter 17's [portfolio metrics notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/17_portfolio_construction/01_portfolio_metrics.ipynb)
 extends the reporting workflow to allocation diagnostics.

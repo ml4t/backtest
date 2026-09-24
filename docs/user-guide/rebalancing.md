@@ -179,7 +179,7 @@ callback override.
 
 ## In the book
 
-Chapter 17, Section 17.7, [Library comparison](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/08_library_comparison.ipynb) compares allocation methods on matched inputs. This page covers how those target weights become timed, sized orders.
+Chapter 17, Section 17.7, [Library comparison](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/17_portfolio_construction/08_library_comparison.ipynb) compares allocation methods on matched inputs. This page covers how those target weights become timed, sized orders.
 
 ## Next Steps
 

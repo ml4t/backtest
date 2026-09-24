@@ -577,7 +577,7 @@ print(result.config.preset_name)
 
 ## In the book
 
-Chapter 16, Section 16.5, [Performance reporting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/09_performance_reporting.ipynb) develops return and drawdown interpretation. This page defines the result frames and artifact format used to reproduce those reports.
+Chapter 16, Section 16.5, [Performance reporting](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/09_performance_reporting.ipynb) develops return and drawdown interpretation. This page defines the result frames and artifact format used to reproduce those reports.
 
 ## Next Steps
 

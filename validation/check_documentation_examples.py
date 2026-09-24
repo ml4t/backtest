@@ -33,6 +33,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "user-guide" / "accounts.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
     _ROOT / "docs" / "user-guide" / "risk-management.md",
+    _ROOT / "docs" / "user-guide" / "migrate-from-zipline.md",
 )
 _API_AUDIT_PATHS = (
     _ROOT / "docs" / "index.md",
@@ -43,6 +44,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "account-engine-direct",
         "account-gatekeeper",
         "installation-import",
+        "migration-zipline-target",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",

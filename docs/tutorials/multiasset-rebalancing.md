@@ -228,8 +228,8 @@ guide covers cash and margin settings used by these variants.
 
 ## In the book
 
-Chapter 17, Section 17.7, [Comparing allocator performance](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/README.md),
-and [notebook 08, Library comparison](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/17_portfolio_construction/08_library_comparison.ipynb)
-compare portfolio construction workflows. [Chapter 16's futures notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/16_strategy_simulation/02_futures_backtesting.ipynb)
-adds contract and overnight-session assumptions; the [FX case-study backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/case_studies/fx_pairs/13_backtest.ipynb)
+Chapter 17, Section 17.7, [Comparing allocator performance](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/17_portfolio_construction/README.md),
+and [notebook 08, Library comparison](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/17_portfolio_construction/08_library_comparison.ipynb)
+compare portfolio construction workflows. [Chapter 16's futures notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/16_strategy_simulation/02_futures_backtesting.ipynb)
+adds contract and overnight-session assumptions; the [FX case-study backtest](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/case_studies/fx_pairs/13_backtest.ipynb)
 applies targets to a larger prediction stream.

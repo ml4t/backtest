@@ -1,5 +1,5 @@
 {
-  "commit": "366e1d51ace2d851776499a68da3d6e3c2641b02",
+  "commit": "2d6e8f95eeccaee66906245606471f570b5807e5",
   "blobs": {
     "16_strategy_simulation/02_futures_backtesting.ipynb": "66fd0866d02a5e30e6f07d9ae5b2f39d121f1d98",
     "16_strategy_simulation/04_single_asset_ml4t_backtest.ipynb": "7cdb38231b8250531db3c17eebcb63959471fda0",

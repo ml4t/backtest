@@ -129,7 +129,7 @@ show other uses of callback state.
 
 ## In the book
 
-Chapter 19, Section 19.4, [Drawdowns, path risk, and time to recovery](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/19_risk_management/README.md),
+Chapter 19, Section 19.4, [Drawdowns, path risk, and time to recovery](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/19_risk_management/README.md),
 puts this event trace in a broader risk framework. [Notebook 10, ml4t-backtest
-risk demo](https://github.com/stefan-jansen/machine-learning-for-trading/blob/366e1d51ace2d851776499a68da3d6e3c2641b02/19_risk_management/10_ml4t_backtest_risk_demo.ipynb)
+risk demo](https://github.com/stefan-jansen/machine-learning-for-trading/blob/2d6e8f95eeccaee66906245606471f570b5807e5/19_risk_management/10_ml4t_backtest_risk_demo.ipynb)
 uses the library's position rules and portfolio controls on larger examples.
