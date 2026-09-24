@@ -4,8 +4,9 @@ The [profiles and parity tutorial](../tutorials/profiles-and-parity.md) runs a
 one-setting comparison and explains the supported evidence boundaries.
 
 Profiles are pre-configured `BacktestConfig` settings for framework-specific execution semantics.
-The retained evidence in this page states which pinned framework scenarios currently match
-exactly and which remain release-blocking.
+The retained evidence on this page identifies supported framework comparisons, their input settings, and their stated tolerances.
+
+Examples using `prices` and `strategy` assume those inputs already exist. The linked profiles tutorial supplies both and compares one setting at a time.
 
 ## Available Profiles
 
@@ -14,9 +15,9 @@ exactly and which remain release-blocking.
 | Profile | Description |
 |---------|-------------|
 | `default` | Sensible defaults for general use with integer-share execution |
-| `fast` | Zero-cost, integer-share execution -- fastest possible execution |
-| `backtrader` | Match Backtrader's default behavior |
-| `vectorbt` | Match VectorBT's default behavior (including fractional shares) |
+| `fast` | Zero-cost, integer-share settings for iteration; performance depends on the workload |
+| `backtrader` | Settings used for the documented Backtrader comparisons |
+| `vectorbt` | Settings used for the documented VectorBT comparisons, including fractional shares |
 | `zipline` | Match the documented Zipline comparison protocol |
 | `lean` | Match the frozen LEAN daily US-equity comparison protocol |
 | `realistic` | Conservative settings for production |

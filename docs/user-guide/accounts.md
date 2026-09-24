@@ -12,6 +12,8 @@ The configuration is intentionally simple: instead of switching between account
 "types", you set the policy flags directly and let the broker enforce the resulting
 buying-power rules.
 
+The short `Engine` and `Broker` snippets below assume a prepared feed and strategy. Run the linked accounts tutorial for complete inputs, orders, and result records.
+
 ## Quick Example
 
 ```python

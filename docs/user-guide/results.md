@@ -28,6 +28,8 @@ For reproducibility, `BacktestResult` also exposes:
 - `result.to_parquet(...)`, which writes `config.yaml`, `spec.yaml`, and `predictions.parquet`
   when available
 
+Snippets using `result` assume an existing `BacktestResult` from `Engine.run()`. The linked export tutorial supplies the complete run and checks each exported table.
+
 ## Metrics
 
 ```python

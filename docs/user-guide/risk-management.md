@@ -5,6 +5,8 @@ portfolio reductions, and the recovery between breaches from one declared price 
 
 ml4t-backtest has two levels of risk management: **position rules** (per-position exits) and **portfolio limits** (portfolio-wide constraints). Position rules are the primary tool -- they automatically evaluate on every bar and generate exit orders when triggered.
 
+Rule snippets below assume a strategy or broker with current positions and prices. The linked risk tutorial runs the full event sequence and inspects reduction fills.
+
 ## Position Rules
 
 ### StopLoss

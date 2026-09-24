@@ -4,6 +4,8 @@ The [costs and funding tutorial](../tutorials/costs-and-funding.md) reconciles e
 
 Realistic backtesting requires modeling the costs of executing trades. ml4t-backtest provides three layers of cost modeling: commission, slippage, and market impact.
 
+Individual cost-model snippets assume a configured backtest and, where shown, an existing `result`. The linked costs tutorial runs complete gross-to-net comparisons.
+
 ## Cost Layers
 
 | Layer | What It Models | Config |

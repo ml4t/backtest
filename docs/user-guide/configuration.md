@@ -1,6 +1,6 @@
 # Configuration
 
-`BacktestConfig` is the single source of truth for all backtest behavior. Every behavioral difference between frameworks is a named parameter -- no subclassing or monkey-patching required.
+`BacktestConfig` records the execution and account settings used for a run. Named profiles choose settings for the supported comparison scenarios; they do not reproduce every behavior of another framework.
 
 It is also the canonical serializable backtest preset:
 
@@ -9,6 +9,8 @@ It is also the canonical serializable backtest preset:
 - persist the fully resolved snapshot from the executed result
 
 This keeps the input simple while still giving you an exact replayable record of what ran.
+
+Configuration snippets isolate individual settings and assume the named classes and enums have been imported. The [profiles tutorial](../tutorials/profiles-and-parity.md) runs a complete comparison with declared inputs.
 
 ## Creating a Config
 
