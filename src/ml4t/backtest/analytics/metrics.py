@@ -162,7 +162,11 @@ def cagr(
     if final_value <= 0:
         return -1.0  # Total loss
 
-    return (final_value / initial_value) ** (1 / years) - 1
+    try:
+        return (final_value / initial_value) ** (1 / years) - 1
+    except OverflowError:
+        # Sub-day windows make the annualized power exceed the float range.
+        return float("inf")
 
 
 def calmar_ratio(cagr_value: float, max_dd: float) -> float:
