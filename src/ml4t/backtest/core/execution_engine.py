@@ -692,7 +692,9 @@ class ExecutionEngine:
         commission = estimate_commission(
             broker.commission_model, order.asset, order.quantity, fill_price
         )
-        projected_cash = broker.cash - signed_qty * fill_price - commission
+        # Match the fill debit, which scales notional by the contract multiplier.
+        multiplier = broker.get_multiplier(order.asset)
+        projected_cash = broker.cash - signed_qty * fill_price * multiplier - commission
         if projected_cash >= 0.0:
             return True
 
