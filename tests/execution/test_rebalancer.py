@@ -1397,6 +1397,25 @@ class TestTargetWeightExecutorEdgeCases:
         value = orders[0].quantity * 150.0
         assert value < 26000  # Less than 26% of $100k
 
+    def test_max_single_weight_caps_short_targets(self):
+        """A short target is floored at -max_single_weight, not left uncapped."""
+        broker = Broker(
+            initial_cash=100000.0,
+            commission_model=NoCommission(),
+            slippage_model=NoSlippage(),
+            allow_short_selling=True,
+        )
+        executor = TargetWeightExecutor(
+            config=RebalanceConfig(allow_short=True, max_single_weight=0.25)
+        )
+
+        orders = executor.execute({"AAPL": -0.5}, {"AAPL": {"close": 150.0}}, broker)
+
+        assert len(orders) == 1
+        assert orders[0].side == OrderSide.SELL
+        assert orders[0].quantity > 0
+        assert orders[0].quantity * 150.0 < 26000  # Less than 26% of $100k
+
     def test_short_weight_disallowed(self, broker):
         """Test negative weight is set to 0 when shorts not allowed."""
         executor = TargetWeightExecutor(
