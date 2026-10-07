@@ -512,6 +512,35 @@ class TestRejectOnInsufficientCash:
         assert filled.status.value == "filled"
         assert affordable.cash == 50_000.0
 
+    def test_buying_power_reservation_includes_contract_multiplier(self):
+        """Shadow buying power must reserve futures notional, not the raw price."""
+        spec = {
+            "ES": ContractSpec(symbol="ES", asset_class=AssetClass.FUTURE, multiplier=50.0),
+        }
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            buying_power_reservation=True,
+            fill_ordering=FillOrdering.SEQUENTIAL,
+            contract_specs=spec,
+            reject_on_insufficient_cash=True,
+        )
+        broker._update_time(
+            datetime(2024, 1, 2),
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 1_000_000.0},
+            {},
+        )
+
+        order = broker.submit_order("ES", 1, OrderSide.BUY)
+
+        assert order is not None
+        assert order.status.value == "rejected"
+        assert broker.cash == 100_000.0
+
 
 # ---------------------------------------------------------------------------
 # cash_buffer_pct
