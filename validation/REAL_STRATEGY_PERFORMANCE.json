@@ -1,5 +1,5 @@
 {
-  "correctness_evidence_generated_at": "2026-10-08T19:27:55.214328+00:00",
+  "correctness_evidence_generated_at": "2026-10-08T20:00:49.510846+00:00",
   "environment": {
     "cpu_count": 24,
     "frameworks": {
@@ -110,6 +110,27 @@
         "engine_source_sha256": "b1ebee1ef59f82269fb69cb4103927398254bfa5d8ad620a23c588260de99aca",
         "ml4t_commit": "a1649d9f4271c56dcb1de9688b97218f8c50cb13",
         "reason": "The only engine source change is the new module src/ml4t/backtest/prediction_market_fees.py. Nothing in src/ml4t/backtest or the real-strategy runners imports it (grep finds no import outside the module itself), so it is never loaded by the timed region, result = engine.run() in validation/real_strategy_runner.py, and cannot move an engine timing. Real-strategy correctness was rebuilt under this source at f349264: 17/17 pass with no compared value moved.",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "0ccc3c90786dc6bc7b8d5992097cd977e2568c39c20f1490d83531b20e6a5188",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-10-08T20:00:56.038473+00:00",
+        "correctness_evidence_generated_at": "2026-10-08T20:00:49.510846+00:00",
+        "correctness_evidence_sha256": "3f26dc66ec0874de379a4fe97fa149ccf262688901a7b6aa2c3a973e4376a861",
+        "correctness_pairs_passed": 17,
+        "engine_source_sha256": "2a0d9b9b0570f22772090e2204b97fb7aa970b99ca6814b63f443b47539bf41f",
+        "ml4t_commit": "e76e95d5b3ca5ef1daf833c82b9548e1db726fed",
+        "reason": "The engine source differs from the measured one only by the new module src/ml4t/backtest/prediction_market_fees.py. Nothing in src/ml4t/backtest or the real-strategy runners imports it, so it is never loaded in the timed region (result = engine.run() in validation/real_strategy_runner.py) and cannot move an engine timing. Real-strategy correctness was rebuilt under this source at 5b7a27e: 17/17 pass.",
         "sources": {
           "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
           "benchmark": "0ccc3c90786dc6bc7b8d5992097cd977e2568c39c20f1490d83531b20e6a5188",
