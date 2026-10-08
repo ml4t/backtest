@@ -79,7 +79,7 @@ def test_warning_policy_fails_new_warnings_and_has_no_global_suppression() -> No
     assert filters[0] == "error"
     assert "ignore::DeprecationWarning" not in filters
     assert "ignore::PendingDeprecationWarning" not in filters
-    assert len(filters) <= 5
+    assert len(filters) <= 6
 
 
 def test_accounting_tolerance_is_an_exact_ulp_bound() -> None:

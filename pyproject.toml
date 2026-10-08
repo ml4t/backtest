@@ -191,6 +191,9 @@ filterwarnings = [
     "ignore:co_lnotab is deprecated, use co_lines instead.*:DeprecationWarning:zipline.*",
     "ignore::UserWarning:vectorbt",  # VectorBT accessor registration warnings
     "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
+    # pandas 3.1 Pandas4Warning from exchange_calendars' calendar constructor; pandas attributes
+    # it to its own module, so the message is what keeps the filter narrow
+    "ignore:Series.values returning an ndarray that drops timezone:DeprecationWarning:pandas.core.series",
 ]
 
 [tool.ruff]
