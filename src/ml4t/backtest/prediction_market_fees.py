@@ -28,7 +28,6 @@ change; the module constants name the value in force on that date.
 from typing import Any, Literal
 
 import numpy as np
-from numpy.typing import NDArray
 
 __all__ = [
     "FORECASTEX_EXCHANGE_FEE",
@@ -84,28 +83,28 @@ ArrayInput = Any
 # === Shared helpers ===
 
 
-def _floats(name: str, value: ArrayInput) -> NDArray[np.float64]:
+def _floats(name: str, value: ArrayInput) -> np.ndarray:
     array = np.asarray(value, dtype=np.float64)
     if not np.all(np.isfinite(array)):
         raise ValueError(f"{name} must be finite")
     return array
 
 
-def _prices(value: ArrayInput) -> NDArray[np.float64]:
+def _prices(value: ArrayInput) -> np.ndarray:
     price = _floats("price", value)
     if np.any((price < 0.0) | (price > 1.0)):
         raise ValueError("price must be in [0, 1] dollars per contract")
     return price
 
 
-def _contracts(value: ArrayInput) -> NDArray[np.float64]:
+def _contracts(value: ArrayInput) -> np.ndarray:
     contracts = _floats("contracts", value)
     if np.any(contracts < 0.0):
         raise ValueError("contracts must be non-negative; pass the direction as side")
     return contracts
 
 
-def _labels(name: str, value: ArrayInput, allowed: tuple[str, ...]) -> NDArray[np.str_]:
+def _labels(name: str, value: ArrayInput, allowed: tuple[str, ...]) -> np.ndarray:
     labels = np.asarray(value, dtype=np.str_)
     unknown = sorted(set(np.unique(labels).tolist()) - set(allowed))
     if unknown:
@@ -113,7 +112,7 @@ def _labels(name: str, value: ArrayInput, allowed: tuple[str, ...]) -> NDArray[n
     return labels
 
 
-def _snap(units: NDArray[np.float64]) -> NDArray[np.float64]:
+def _snap(units: np.ndarray) -> np.ndarray:
     """Remove floating-point noise from values that are integers in exact arithmetic.
 
     ``0.07 * 100 * 0.25 * 1e6`` evaluates to ``1750000.0000000002``; ceiling it
@@ -140,7 +139,7 @@ def _kalshi_components(
     fee_type: ArrayInput,
     fee_multiplier: ArrayInput,
     rounding: str,
-) -> tuple[NDArray[np.float64], NDArray[np.float64], float]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Return trade fee and rounding fee per fill in micro-dollars, and the precision."""
     p = _prices(price)
     c = _contracts(contracts)
@@ -186,7 +185,7 @@ def kalshi_fee(
     fee_type: ArrayInput = "quadratic",
     fee_multiplier: ArrayInput = 1.0,
     rounding: KalshiRounding = "exact",
-) -> NDArray[np.float64]:
+) -> np.ndarray:
     """Kalshi trading fee per fill, with each fill treated as its own order.
 
     Taker fee: ``round_up(M * 0.07 * C * P * (1 - P))`` with ``C`` contracts at
@@ -246,7 +245,7 @@ def kalshi_order_fees(
     fee_type: ArrayInput = "quadratic",
     fee_multiplier: ArrayInput = 1.0,
     rounding: KalshiRounding = "cent",
-) -> NDArray[np.float64]:
+) -> np.ndarray:
     """Net Kalshi fee per fill for the fills of one order, in execution order.
 
     Each fill pays its trade fee plus a rounding fee that aligns the balance to
@@ -355,7 +354,7 @@ def forecastex_fee(
     *,
     exchange_fee: ArrayInput = FORECASTEX_EXCHANGE_FEE,
     broker_commission: ArrayInput = 0.0,
-) -> NDArray[np.float64]:
+) -> np.ndarray:
     """ForecastEx fee per fill: a flat amount per contract per side.
 
     ForecastEx charges 0.01 per contract per side at execution, "independent of
@@ -436,7 +435,7 @@ def polymarket_us_fee(
     fee_coefficient: ArrayInput = POLYMARKET_US_TAKER_COEFFICIENT,
     maker_rebate_coefficient: ArrayInput = POLYMARKET_US_MAKER_REBATE_COEFFICIENT,
     rounding: PolymarketUSRounding = "exact",
-) -> NDArray[np.float64]:
+) -> np.ndarray:
     """Polymarket US fee per fill; a maker rebate is a negative fee.
 
     Taker: ``theta * C * p * (1 - p)`` with ``theta = 0.0695`` (1,000 contracts

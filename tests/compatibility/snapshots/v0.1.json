@@ -2941,13 +2941,13 @@
       "kind": "function",
       "module": "ml4t.backtest.prediction_market_fees",
       "qualname": "kalshi_fee",
-      "signature": "(price: Any, contracts: Any, *, liquidity: Any = 'taker', side: Any = 'buy', fee_type: Any = 'quadratic', fee_multiplier: Any = 1.0, rounding: Literal['exact', 'cent', 'direct'] = 'exact') -> NDArray[numpy.float64]"
+      "signature": "(price: Any, contracts: Any, *, liquidity: Any = 'taker', side: Any = 'buy', fee_type: Any = 'quadratic', fee_multiplier: Any = 1.0, rounding: Literal['exact', 'cent', 'direct'] = 'exact') -> numpy.ndarray"
     },
     "ml4t.backtest.prediction_market_fees:polymarket_us_fee": {
       "kind": "function",
       "module": "ml4t.backtest.prediction_market_fees",
       "qualname": "polymarket_us_fee",
-      "signature": "(price: Any, contracts: Any, *, liquidity: Any = 'taker', fee_coefficient: Any = 0.0695, maker_rebate_coefficient: Any = 0.0125, rounding: Literal['exact', 'cent'] = 'exact') -> NDArray[numpy.float64]"
+      "signature": "(price: Any, contracts: Any, *, liquidity: Any = 'taker', fee_coefficient: Any = 0.0695, maker_rebate_coefficient: Any = 0.0125, rounding: Literal['exact', 'cent'] = 'exact') -> numpy.ndarray"
     },
     "ml4t.backtest.profiles:list_profiles": {
       "kind": "function",
