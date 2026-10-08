@@ -20,7 +20,7 @@
       "us_equities_panel": "session date"
     }
   },
-  "generated_at": "2026-10-08T19:27:55.214328+00:00",
+  "generated_at": "2026-10-08T20:00:49.510846+00:00",
   "provenance": {
     "adapters": {
       "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
@@ -131,9 +131,9 @@
     },
     "machine": "x86_64",
     "ml4t": {
-      "commit": "a1649d9f4271c56dcb1de9688b97218f8c50cb13",
+      "commit": "e76e95d5b3ca5ef1daf833c82b9548e1db726fed",
       "dirty": false,
-      "engine_source_sha256": "b1ebee1ef59f82269fb69cb4103927398254bfa5d8ad620a23c588260de99aca"
+      "engine_source_sha256": "2a0d9b9b0570f22772090e2204b97fb7aa970b99ca6814b63f443b47539bf41f"
     },
     "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
     "python": "3.12.11"
@@ -142,13 +142,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 0.2989169700304046,
-        "ml4t": 0.43177315598586574,
+        "framework": 0.3412680019973777,
+        "ml4t": 0.419192252040375,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "7e61f3a321cec3aaf3509f4005655266a42d9d65a55fb43f66a39bfac790d0ef",
-        "ml4t_manifest_sha256": "3ea54146cf03195defba916e3986591a2f33610a2ae8a2f507df74bbab5b8448"
+        "framework_manifest_sha256": "1b7f4eca0fd6eafcc14c5bb97a60150810c4517972671ab93d963f507bff1b3a",
+        "ml4t_manifest_sha256": "abab1d59ba06a1216da8c0be69ad19670c277eec2bc467c42aebcc790d5d6eb3"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -209,13 +209,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 0.1827339839655906,
-        "ml4t": 0.4261742489761673,
+        "framework": 0.18416030501248315,
+        "ml4t": 0.4282481879927218,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "2c73650b0985ad3cd8e133b616a42d958b74f1c556fc95e7262ed1c725a54f7d",
-        "ml4t_manifest_sha256": "a03fb25d43cdd2ac74eb2c394dbcbb125593653ebe8e033617095f187c77a6aa"
+        "framework_manifest_sha256": "48aa6691ec1a296142101db639e8ba5966ad83490de0b58e646620ff022cfd2c",
+        "ml4t_manifest_sha256": "064b493228789906039cbd462d3297059d48f56ceed0a4c1c5e691475ed7134c"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -276,13 +276,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 9.591963312006555,
-        "ml4t": 0.45318369299639016,
+        "framework": 9.737538582005072,
+        "ml4t": 0.4487659599981271,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "fd6efbd25b967c66f2ca8f941b5ea4f7748e79c3446ab2ce4e388460f6a5a649",
-        "ml4t_manifest_sha256": "ca21e8e778a6c12b1e2f4e545c34ac30855ca33ad24a0172ce8ed136150d3ba3"
+        "framework_manifest_sha256": "7f1e9cecc4feeced81af2ee7d99123196536bce1e5fb292631d7d250d19834d7",
+        "ml4t_manifest_sha256": "d83bebda06df2b217689c872082582b19a7b09d459578458a08de55273b37a7e"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -353,13 +353,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 4.0777511760243215,
-        "ml4t": 0.7744300449849106,
+        "framework": 4.807452238979749,
+        "ml4t": 0.6355875970330089,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "e556bb9c8d245a3b195f4f0e7c1a819ee1a9ec0bae1625c75e1183e221de9232",
-        "ml4t_manifest_sha256": "f210fd0250f62a943d0c80128bdd423e75f7ac302928613f2018bbe9926889cb"
+        "framework_manifest_sha256": "26775814326860feebb8fc359492b58f601240a811916b2797219907b443ae11",
+        "ml4t_manifest_sha256": "a4aaa05edad9e296818a7687a24b7f502d0eecdd796bfde3215fab866f9ecd21"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -420,13 +420,13 @@
     {
       "case_study": "etfs",
       "engine_seconds": {
-        "framework": 3.0868930720025674,
-        "ml4t": 0.8125833710073493,
+        "framework": 2.9700952940038405,
+        "ml4t": 0.7646393330069259,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "4f8cbbc894af4d048846458fd730e855be7c55ec2499182d3b10acb1c09dfa4a",
-        "ml4t_manifest_sha256": "98313ca898b9c4918c932e14b88bd1e838fcdc11897434b41d7567eb49f0ccbe"
+        "framework_manifest_sha256": "bccc2fa584afc9759bca5b77f912a2d9df9b7bb22f446d458c32978932f48064",
+        "ml4t_manifest_sha256": "89ee685f46b21e64bac1fc900cc473735ddfb9a23e02cda8714bf73358f5d657"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -515,13 +515,13 @@
     {
       "case_study": "cme_futures",
       "engine_seconds": {
-        "framework": 0.3229743330157362,
-        "ml4t": 0.5530519019812346,
+        "framework": 0.37743046099785715,
+        "ml4t": 0.4161097949836403,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "3615b800c9c08005cfa2181c9c3c5c87f7b7366c260ac5394c29878453a15d88",
-        "ml4t_manifest_sha256": "f9c42cc2628d81338b87320bd65dfcc7bddeb93297963aee84f9e5390fb94bed"
+        "framework_manifest_sha256": "95f831f02c6990a73c4e08b41587dfee3103c8587f2121d5ea2878d841d70c0a",
+        "ml4t_manifest_sha256": "82e4d2ded6a373d2b5b7cf3f0ec696c54c4405ceecd4fc49c0c067d8f4368370"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -589,13 +589,13 @@
     {
       "case_study": "cme_futures",
       "engine_seconds": {
-        "framework": 2.8983370829955675,
-        "ml4t": 0.47793340298812836,
+        "framework": 2.6640014040167443,
+        "ml4t": 0.4422138170339167,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "753ac0058c4dbfc0642a340fbae95a4bda6ce01e41d88317465e163c481a111c",
-        "ml4t_manifest_sha256": "771dd88211c4694e65527bde493d20fe50f23db8856ada589b8d90a7b011d556"
+        "framework_manifest_sha256": "4fe816c44263c0729af1af1d26ab47f6237abdab9c10f02dff3b506a3869d700",
+        "ml4t_manifest_sha256": "33cac6b620a39bf3ed2a5845ab86d7bbed89dbf8d16606812634fea1deda4716"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -708,13 +708,13 @@
     {
       "case_study": "crypto_perps_funding",
       "engine_seconds": {
-        "framework": 3.454799419036135,
-        "ml4t": 0.717405000992585,
+        "framework": 2.87804518698249,
+        "ml4t": 0.7094007299747318,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "d9002a8d3c072fa1e4601aeef42ce6c6c12ec36f05e164339cdf15047c9b037c",
-        "ml4t_manifest_sha256": "65f21e9f633bec3d6ceb230bb694103291d6e6c45afde19ca09437e2eb7396f9"
+        "framework_manifest_sha256": "5b5873188d1f8731a57f302831809599bcdf6ec72dd225ffc1e6ca0b40b72745",
+        "ml4t_manifest_sha256": "5badb0761f0665e00873f7490c775bcaf0bcdf2e0c5943c09d968da3632dcd89"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -785,13 +785,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.30079082102747634,
-        "ml4t": 0.16720655700191855,
+        "framework": 0.39610078401165083,
+        "ml4t": 0.15986847499152645,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "3194a8ec3aa3fe8234d2bcfbc87eb925fa21e1245fe595d28a87039140365672",
-        "ml4t_manifest_sha256": "9a0cb211b591d13f176ab33a4ed9ec7ac79cb37112abf84296d5ed2c7edd1f92"
+        "framework_manifest_sha256": "087843d9c025881cebdead1a7d6d8e04b10468bb25d85c4f606a18f845ef740b",
+        "ml4t_manifest_sha256": "0d6e8b530cbefe03afc171edc470f0ee8c9f13e5298284754b9baec75fecdc19"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -852,13 +852,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.3179314290173352,
-        "ml4t": 0.19281309499638155,
+        "framework": 0.2652946129674092,
+        "ml4t": 0.16622454696334898,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "4b2b4f6aaa49d6d1586134f7123d819d4dd9f867221a3f3dc9a97eab65a1970d",
-        "ml4t_manifest_sha256": "66b197b00799b7a82166a903a39e29d38c8d014c882304082d0597b9e0b36bb4"
+        "framework_manifest_sha256": "9bc9c3020fda3549d772d6de2464138cc0ff710c845c29e2ca363e1a54e13b4f",
+        "ml4t_manifest_sha256": "f357b758231290582fcd6f6321ef9e3b7122ef4b8ad23f11c4c259bc9a87895f"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -919,13 +919,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 0.5464207790209912,
-        "ml4t": 0.15464957000222057,
+        "framework": 0.4294113659998402,
+        "ml4t": 0.16142100398428738,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "02c9ee9f6cf297028d46da4ff72685f3bacb8f216c3490f33102fc3d78c976b1",
-        "ml4t_manifest_sha256": "a7b3211599c8983f2cfcf69e6f60db6022eb1e107090f53a56c98363e83219e7"
+        "framework_manifest_sha256": "79035767c67ffb9b102972fd70dcfd0562e021680186b37e4cb9db606591d019",
+        "ml4t_manifest_sha256": "a96b2a7f38e901f8fbe2c908b850196fd0c166021d38b0c50145dee15730f15a"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1003,13 +1003,13 @@
     {
       "case_study": "fx_pairs",
       "engine_seconds": {
-        "framework": 1.0048286839737557,
-        "ml4t": 0.15909764100797474,
+        "framework": 1.0083705990109593,
+        "ml4t": 0.16377678205026314,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "ee4629e0a8ee96acb1dabc05afa234cd81ff31bedfeb49d963489f3c55be2775",
-        "ml4t_manifest_sha256": "eb4d27ec612dbdd80789c882a40456f8f58e5f901b592604dea8a6ae51c16494"
+        "framework_manifest_sha256": "6c63ce8dee1eec909a0d06ae7629d93aa3a71edd04ba657edb110bb9212b32f3",
+        "ml4t_manifest_sha256": "152e463ac94d3efbb2578a37020663a84ee8172ee4e21f17960c311d3494f0fe"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1080,13 +1080,13 @@
     {
       "case_study": "us_equities_panel",
       "engine_seconds": {
-        "framework": 0.9954689900041558,
-        "ml4t": 23.282298417994753,
+        "framework": 1.1930540719768032,
+        "ml4t": 32.499565685982816,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "aac79cfa0f8a41e68279a181c5aff484d98d46af3c4f035ce205dceb7f1dc3ef",
-        "ml4t_manifest_sha256": "fda8d586bfe2f1dd87254adcfd6dc9dc9771734a369cd45cfbabd81448e822c1"
+        "framework_manifest_sha256": "f9883ea4e6e1f8662b829ddcdb1253490d75539610560497265080ffd691c7b0",
+        "ml4t_manifest_sha256": "5a8db1c911ee80b7d7cae056eb63737549775edd095b62ef13749f419c780c90"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1147,13 +1147,13 @@
     {
       "case_study": "us_equities_panel",
       "engine_seconds": {
-        "framework": 18.065409675007686,
-        "ml4t": 30.30292018596083,
+        "framework": 18.31070233299397,
+        "ml4t": 30.549421797972172,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "5eab06aa8a8a119cfa9259715ae575245cabb8c19cf3f8f11f183a3676dfaa08",
-        "ml4t_manifest_sha256": "8c23e923bb69739fe0df32f00a145b8f02036ace71b5a82d28bb44275ab699b6"
+        "framework_manifest_sha256": "19fc47421629cc12e8f3512eed860e65bd196cc5942868631a264235bc0ca43f",
+        "ml4t_manifest_sha256": "556adb7916408a4fa2eda366cf092e065141c651a32c7f8d8e126ee83a09f9b2"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1214,13 +1214,13 @@
     {
       "case_study": "us_equities_panel",
       "engine_seconds": {
-        "framework": 562.7433883760241,
-        "ml4t": 37.579135221021716,
+        "framework": 529.6449827509932,
+        "ml4t": 23.223136416985653,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "f9dcd66ad88d792a29181b6c7fc07dddc9d69e6631fe08f7929f9f6733422d2d",
-        "ml4t_manifest_sha256": "6a073a62fe93cae9c56c231538988ec267b088577ff52d0b4f211a6791154b61"
+        "framework_manifest_sha256": "a8c7c16c5db2812fc6539aa23b2c8a59301495c61b431eac49ed9cd3f9e75588",
+        "ml4t_manifest_sha256": "c64aa4bcea4da2ee90444168ad8b4b709b12f04836f3ec00c3ce1343bd363af6"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1291,13 +1291,13 @@
     {
       "case_study": "us_equities_panel",
       "engine_seconds": {
-        "framework": 119.17777742899489,
-        "ml4t": 29.322065323998686,
+        "framework": 106.2881790450192,
+        "ml4t": 23.548457249999046,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "bb20248d3f109f76d33ccbf677b6b4bc99a333ca22d5d926c4c88ab0b658d9a2",
-        "ml4t_manifest_sha256": "2ddc4a03c5e210741ad58da4e19dbabbd08dbb1becd9ab51f5c078f549c50ce7"
+        "framework_manifest_sha256": "d31da8742d55417f1464e65fc47f46fc8f3ab1bf5464e92035a0684776b6369e",
+        "ml4t_manifest_sha256": "e118a86cee6fd760435d909cbf5469b59be0d50fa2e7e1c6a18d943041ba65fd"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
@@ -1358,13 +1358,13 @@
     {
       "case_study": "us_equities_panel",
       "engine_seconds": {
-        "framework": 74.64036783005577,
-        "ml4t": 43.61855282698525,
+        "framework": 53.311729563982226,
+        "ml4t": 29.1640200560214,
         "single_run_diagnostic_only": true
       },
       "evidence": {
-        "framework_manifest_sha256": "a3a1855c3aa62b84682aee450fa913172ace30c97be6ebbd3e1f14d9009c9fa9",
-        "ml4t_manifest_sha256": "bc8463dcf4f96db58cc5f300f84c8091bff65e58d918523903dd0933439c1632"
+        "framework_manifest_sha256": "bd404a4e3ace9eac084d842c777a780702ff9d26a17113599ec0b3c3de5189dc",
+        "ml4t_manifest_sha256": "5fb49877e497b4541ed7a1d6293c65b6364a3c6637d4d7595b18032703b29acc"
       },
       "excluded_surfaces": {
         "accepted_unfilled_orders": "not exposed by every native runner",
