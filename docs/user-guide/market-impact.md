@@ -84,6 +84,66 @@ its opposite is charged once for its full quantity. The fee is allocated between
 and opening trade records in proportion to their quantities. Partial fills are
 charged separately when they execute.
 
+### Prediction-Market Venue Fees
+
+`ml4t.backtest.prediction_market_fees` implements the published fee schedules
+of Kalshi, ForecastEx (via IBKR) and Polymarket US. Prices are dollars per
+contract in `[0, 1]`; buying NO at `q` is a purchase at `q`.
+
+| Venue | Fee per fill | Model |
+|-------|--------------|-------|
+| Kalshi | taker `round_up(M * 0.07 * C * P * (1 - P))`; maker 0, 0.25x or 0.5x taker by series `fee_type` | `KalshiCommission` |
+| ForecastEx | 0.01 per contract per side; no IBKR commission | `ForecastExCommission` |
+| Polymarket US | taker `0.0695 * C * p * (1 - p)`; maker rebate `0.0125 * C * p * (1 - p)` | `PolymarketUSCommission` |
+
+Kalshi rounds the trade fee up to 0.000001. A non-direct member's balance is
+then aligned to whole cents, so one contract at 0.50 costs 0.02 instead of
+0.0175 while 100 contracts cost exactly 1.75; `rounding="cent"` reproduces
+this, and `kalshi_order_fees` adds the per-order rebate of accumulated
+overpayment. Polymarket US rounds each fill to the cent, half to even. The
+engine charges only non-negative fees, so `PolymarketUSCommission` charges a
+maker fill 0 and leaves out the rebate.
+
+Assign a model to the broker before running:
+
+```python
+from ml4t.backtest.prediction_market_fees import KalshiCommission
+
+engine.broker.commission_model = KalshiCommission(
+    liquidity="taker", fee_type="quadratic", fee_multiplier=1.0, rounding="cent"
+)
+```
+
+For research over many fills, the vectorized functions take NumPy arrays or
+Polars Series and return an array of fees in dollars:
+
+```python
+import polars as pl
+
+from ml4t.backtest.prediction_market_fees import kalshi_fee, polymarket_us_fee
+
+fills = pl.DataFrame(
+    {
+        "price": [0.50, 0.50, 0.90],
+        "contracts": [1, 100, 10],
+        "liquidity": ["taker", "taker", "maker"],
+    }
+)
+kalshi = kalshi_fee(
+    fills["price"],
+    fills["contracts"],
+    liquidity=fills["liquidity"],
+    fee_type="quadratic_with_maker_fees",
+    rounding="cent",
+)
+# array([0.02, 1.75, 0.02])
+polymarket = polymarket_us_fee(fills["price"], fills["contracts"], liquidity=fills["liquidity"])
+# array([ 0.017375,  1.7375  , -0.01125 ])
+```
+
+Each function's docstring names the venue documents it follows and the date
+they were read; schedules change, so check them before relying on a result.
+
 ## Slippage Models
 
 Slippage adjusts the configured execution price in the adverse direction. Use the spread model for a bar-only estimate of bid-ask crossing, or a percentage or fixed amount for other execution drag.

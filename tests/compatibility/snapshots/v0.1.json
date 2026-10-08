@@ -636,6 +636,8 @@
     "from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig",
     "from ml4t.backtest.models import NoCommission",
     "from ml4t.backtest.models import TieredCommission, CombinedCommission",
+    "from ml4t.backtest.prediction_market_fees import KalshiCommission",
+    "from ml4t.backtest.prediction_market_fees import kalshi_fee, polymarket_us_fee",
     "from ml4t.backtest.profiles import list_profiles",
     "from ml4t.backtest.result import BacktestResult",
     "from ml4t.backtest.risk.portfolio import MaxDrawdownLimit, RiskManager",
@@ -2922,6 +2924,30 @@
       "module": "ml4t.backtest.models",
       "qualname": "TieredCommission",
       "signature": "(tiers: list[tuple[float, float]])"
+    },
+    "ml4t.backtest.prediction_market_fees:KalshiCommission": {
+      "kind": "class",
+      "members": {
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, asset: str, quantity: float, price: float) -> float"
+        }
+      },
+      "module": "ml4t.backtest.prediction_market_fees",
+      "qualname": "KalshiCommission",
+      "signature": "(liquidity: Literal['taker', 'maker'] = 'taker', fee_type: Literal['quadratic', 'quadratic_with_maker_fees', 'quadratic_with_combo_maker_fees'] = 'quadratic', fee_multiplier: float = 1.0, rounding: Literal['exact', 'cent', 'direct'] = 'exact')"
+    },
+    "ml4t.backtest.prediction_market_fees:kalshi_fee": {
+      "kind": "function",
+      "module": "ml4t.backtest.prediction_market_fees",
+      "qualname": "kalshi_fee",
+      "signature": "(price: Any, contracts: Any, *, liquidity: Any = 'taker', side: Any = 'buy', fee_type: Any = 'quadratic', fee_multiplier: Any = 1.0, rounding: Literal['exact', 'cent', 'direct'] = 'exact') -> NDArray[numpy.float64]"
+    },
+    "ml4t.backtest.prediction_market_fees:polymarket_us_fee": {
+      "kind": "function",
+      "module": "ml4t.backtest.prediction_market_fees",
+      "qualname": "polymarket_us_fee",
+      "signature": "(price: Any, contracts: Any, *, liquidity: Any = 'taker', fee_coefficient: Any = 0.0695, maker_rebate_coefficient: Any = 0.0125, rounding: Literal['exact', 'cent'] = 'exact') -> NDArray[numpy.float64]"
     },
     "ml4t.backtest.profiles:list_profiles": {
       "kind": "function",

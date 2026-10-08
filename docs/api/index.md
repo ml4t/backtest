@@ -161,6 +161,20 @@ Auto-generated from source docstrings.
     options:
       show_root_heading: true
 
+## Prediction-Market Fees
+
+::: ml4t.backtest.prediction_market_fees
+    options:
+      show_root_heading: true
+      members:
+        - kalshi_fee
+        - kalshi_order_fees
+        - forecastex_fee
+        - polymarket_us_fee
+        - KalshiCommission
+        - ForecastExCommission
+        - PolymarketUSCommission
+
 ## Results
 
 ::: ml4t.backtest.result.BacktestResult
