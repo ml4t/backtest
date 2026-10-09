@@ -83,3 +83,14 @@ class TestEquityCurveAnnualization:
 
         assert result.equity is not None
         assert result.equity.periods_per_year == 252.0 * 390.0
+
+    def test_short_window_cagr_does_not_overflow(self):
+        """A one-minute gain must not raise while annualizing CAGR."""
+        eq = EquityCurve()
+        start = datetime(2025, 1, 2, 9, 30)
+        eq.append(start, 100_000.0)
+        eq.append(start + timedelta(minutes=1), 101_000.0)
+
+        metrics = eq.to_dict()
+
+        assert metrics["cagr"] == float("inf")
