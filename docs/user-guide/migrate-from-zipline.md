@@ -113,6 +113,11 @@ and [`to_equity_dataframe()`](../api/index.md#ml4t.backtest.result.BacktestResul
 when migrating a real strategy; a matching final value alone can hide different
 orders or interim exposure.
 
+If you need portfolio analysis after migration, evaluate the optional
+[diagnostic handoff](../tutorials/diagnostic-handoff.md). Its separate checked
+example passes a `BacktestResult` to `ml4t-diagnostic==0.1.4` and computes
+return and drawdown statistics.
+
 ## Check a migrated run
 
 1. Export Zipline's ordered transactions and portfolio values. Preserve the
