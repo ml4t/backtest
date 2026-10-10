@@ -50,7 +50,7 @@ jobs:
         run: uv build
 
   prerelease:
-    name: Prerelease (${{ matrix.os }}, Python 3.15)
+    name: Python 3.15 canary (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -89,13 +89,13 @@ jobs:
           --no-build-isolation-package pandas
           --editable . --group test
 
-      - name: Verify beta-or-later CPython 3.15 and package import
+      - name: Verify CPython 3.15 and package import
         run: >-
           uv run --no-sync python -c
           "import sys; import numpy; import pandas; import ml4t.backtest;
           from packaging.version import Version;
           assert sys.version_info[:2] == (3, 15);
-          assert sys.version_info.releaselevel in {'beta', 'candidate'};
+          assert sys.version_info.releaselevel in {'beta', 'candidate', 'final'};
           assert Version(numpy.__version__) >= Version('2.6.0.dev0')"
 
       - name: Run the non-hardware test suite
