@@ -1,5 +1,5 @@
 name: Bug report
-description: Report reproducible incorrect behavior in ecosystem policy or tooling
+description: Report one reproducible Backtest defect
 title: "[Bug]: "
 labels:
   - "type: bug"
@@ -10,7 +10,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Search existing issues first. Do not disclose suspected vulnerabilities here.
+        Search existing issues first and report one problem here.
+        Read [CONTRIBUTING.md](https://github.com/ml4t/backtest/blob/main/CONTRIBUTING.md).
+        Report suspected vulnerabilities through the private security link instead.
   - type: dropdown
     id: library
     attributes:
@@ -56,7 +58,7 @@ body:
     id: reproduction
     attributes:
       label: Minimal reproduction
-      description: Provide the smallest complete example and error output.
+      description: Provide the smallest complete public API or user workflow example and error output.
     validations:
       required: true
   - type: dropdown
@@ -76,5 +78,14 @@ body:
     attributes:
       label: Acceptance criteria
       description: State the observable conditions that demonstrate the issue is resolved.
+    validations:
+      required: true
+  - type: textarea
+    id: ai_assistance
+    attributes:
+      label: AI assistance
+      description: >-
+        State whether AI tools helped prepare this report and which parts they produced.
+        Write "None" if none.
     validations:
       required: true

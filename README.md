@@ -476,6 +476,8 @@ Release-critical validation files are listed in
 [`validation/release_checks.txt`](validation/release_checks.txt). CI runs the supported gate set,
 including compatibility, security, parity, and artifact qualification.
 
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before filing an issue or pull request.
+
 ## Known Limitations
 
 See [LIMITATIONS.md](LIMITATIONS.md) for documented assumptions:

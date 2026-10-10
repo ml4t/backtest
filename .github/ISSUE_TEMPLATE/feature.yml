@@ -7,6 +7,11 @@ labels:
   - "status: needs-triage"
   - "compatibility: affected"
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues and describe one change.
+        Read [CONTRIBUTING.md](https://github.com/ml4t/backtest/blob/main/CONTRIBUTING.md).
   - type: dropdown
     id: library
     attributes:
@@ -62,5 +67,14 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: ai_assistance
+    attributes:
+      label: AI assistance
+      description: >-
+        State whether AI tools helped prepare this request and which parts they produced.
+        Write "None" if none.
     validations:
       required: true
