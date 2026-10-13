@@ -258,7 +258,7 @@ def build_report(
         "environment": {
             "platform": platform.platform(),
             "machine": platform.machine(),
-            "processor": platform.processor(),
+            "processor": platform.processor() or platform.machine(),
             "cpu_count": os.cpu_count(),
             "frameworks": targets["framework"],
         },

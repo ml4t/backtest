@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import polars as pl
+import pytest
 
 
 def _load_runner():
@@ -59,6 +60,33 @@ def _load_benchmark():
     finally:
         sys.path.pop(0)
     return module
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Publication timings identify a Linux host")
+def test_benchmark_report_accepts_linux_with_blank_processor_query(monkeypatch) -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    measurements = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    retained = {
+        (record["case_study"], record["framework"]): record for record in measurements["records"]
+    }
+
+    def measured_side(*, case_study, framework, side, **_settings):
+        key = "framework_engine" if side == "framework" else "ml4t_engine"
+        return copy.deepcopy(retained[(case_study, framework)][key])
+
+    # Reuse real measured samples to isolate report production from native engine runtimes.
+    monkeypatch.setattr(benchmark, "_measure_side", measured_side)
+    monkeypatch.setattr(benchmark.platform, "processor", lambda: "")
+    report = benchmark.build_report(
+        correctness=correctness,
+        bundle_root=validation,
+        warmups=1,
+        samples=10,
+    )
+
+    assert benchmark.report_failures(report, correctness) == []
 
 
 class _Broker:
