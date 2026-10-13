@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/ml4t/backtest/security/advisories/new
     about: Report suspected vulnerabilities privately.
   - name: Usage questions
-    url: https://github.com/orgs/ml4t/discussions
+    url: https://www.ml4trading.io/docs/backtest/user-guide/
     about: Ask questions that do not describe a defect or requested change.
