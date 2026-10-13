@@ -52,6 +52,9 @@ body:
     id: expected
     attributes:
       label: Expected behavior
+      description: >-
+        For a numerical defect, state the intended definition and expected result. An earlier
+        output alone does not establish correctness.
     validations:
       required: true
   - type: textarea

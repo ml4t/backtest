@@ -15,6 +15,10 @@ revision and the fix. Record both revisions, commands, and results in the pull r
 must fail because of the defect on the base and pass with the fix. Documentation changes need
 documentation checks, not an artificial regression test.
 
+For numerical defects, establish the intended result independently of the old output. If the
+definition, annualization, sign convention, or default changes, agree on the expected behavior in
+the owning issue and describe the compatibility impact.
+
 Run the relevant commands in the [Development section](README.md#development) and the
 [repository quality commands](AGENTS.md#quality-commands), then report the results. CI also checks
 compatibility, security, parity, and package artifacts. State whether AI tools helped with the issue

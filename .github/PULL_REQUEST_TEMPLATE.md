@@ -23,6 +23,10 @@ section does not apply.
 - [ ] No public compatibility impact
 - [ ] Compatibility impact is documented in the owning issue and migration guidance
 
+For numerical changes, state the intended result and how it was checked independently of the old
+output. If the definition, annualization, sign convention, or default changes, cite the decision in
+the owning issue and describe the compatibility impact.
+
 ## Verification
 
 - [ ] Bug regression fails on the base and passes with the fix, or this is not a bug fix
