@@ -42,7 +42,7 @@ def test_stable_matrix_runs_every_required_check_on_all_supported_platforms() ->
         assert required_command in commands
 
 
-def test_python_315_prerelease_matrix_is_blocking_on_all_platforms() -> None:
+def test_python_315_canary_matrix_is_blocking_on_all_platforms() -> None:
     workflow = _workflow("compatibility.yml")
     prerelease = workflow["jobs"]["prerelease"]
     gate = workflow["jobs"]["gate"]
@@ -52,7 +52,6 @@ def test_python_315_prerelease_matrix_is_blocking_on_all_platforms() -> None:
     assert setup_step["with"]["python-version"] == "3.15"
     commands = _step_commands(prerelease)
     assert "sys.version_info[:2] == (3, 15)" in commands
-    assert "{'beta', 'candidate'}" in commands
     assert "uv venv --python 3.15" in commands
     assert "https://pypi.anaconda.org/scientific-python-nightly-wheels/simple" in commands
     assert '--prerelease allow --only-binary :all: "numpy>=2.6.0.dev0"' in commands
