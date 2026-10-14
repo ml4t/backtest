@@ -33,7 +33,7 @@ Set `RebalanceConfig.rebalance_mode` when using `TargetWeightExecutor`:
 
 | Mode | Behavior inside an executor call |
 |------|----------------------------------|
-| `SNAPSHOT` (executor default) | Capture equity and current weights once; submit the batch without processing orders between assets. |
+| `SNAPSHOT` (executor default) | Use equity and current weights captured at the start of the call for every target. |
 | `INCREMENTAL` | Process eligible orders between submissions; refresh equity and current weights for the next target. |
 | `HYBRID` | Keep the initial equity and weights while processing eligible orders between submissions. |
 
