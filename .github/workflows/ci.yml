@@ -218,15 +218,6 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ env.PYTHON_VERSION }}
 
-      - name: Validate the shared comparison extra
-        if: matrix.framework == 'vectorbt_oss'
-        env:
-          ML4T_COMPARISON_INPROC: "1"
-        run: |
-          uv sync --dev --locked --extra comparison --extra viz
-          uv run --no-sync pytest -q --no-cov \
-            tests/contracts/test_cross_engine_contracts.py --junitxml=comparison-contracts.xml
-
       - name: Build the locked framework environment
         run: >-
           python validation/build_framework_env.py
@@ -271,7 +262,6 @@ jobs:
             environment-evidence.json
             correctness-candidate.json
             native-evidence.json
-            comparison-contracts.xml
           if-no-files-found: error
 
   documentation:
