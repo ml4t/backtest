@@ -2,7 +2,7 @@
 
 <!-- Generated from release/changelog.json. Do not edit managed entries. -->
 
-## 0.1.13 - Unreleased
+## 0.1.13 - 2026-10-15
 
 ### Fixed
 

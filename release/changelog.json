@@ -3,7 +3,7 @@
   "releases": [
     {
       "version": "0.1.13",
-      "date": "Unreleased",
+      "date": "2026-10-15",
       "sections": {
         "Fixed": [
           "Retain Sunday evening bars that belong to a Monday CME exchange session.",
