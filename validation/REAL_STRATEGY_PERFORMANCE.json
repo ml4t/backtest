@@ -1,5 +1,5 @@
 {
-  "correctness_evidence_generated_at": "2026-10-13T18:00:57.075986+00:00",
+  "correctness_evidence_generated_at": "2026-10-15T16:46:37.809985+00:00",
   "environment": {
     "cpu_count": 24,
     "frameworks": {
@@ -101,6 +101,29 @@
   },
   "generated_at": "2026-10-13T23:57:58.209855+00:00",
   "provenance": {
+    "certified_equivalent_sources": [
+      {
+        "certified_at": "2026-10-15T16:46:38.216859+00:00",
+        "correctness_evidence_generated_at": "2026-10-15T16:46:37.809985+00:00",
+        "correctness_evidence_sha256": "f16eb2d2cfb253bb99d6c08fa0119a17f9c023c27511eb04bc0f53223384dc03",
+        "correctness_pairs_passed": 17,
+        "engine_source_sha256": "eac30073df8b5b760934b60091592e1bd71bfd71b9ca20c97a7b3e5ac71e2eec",
+        "ml4t_commit": "5c87d0ca7cba14f00a1b57b35b7902507798bec4",
+        "reason": "Only RebalanceMode, RebalanceConfig and TargetWeightExecutor.execute docstrings changed. Executable ASTs are identical after removing docstrings; class/function descriptions are created outside the timed engine call. All17 fresh Backtest output identity sets match the original measured outputs, and all17 retained native identity sets remain unchanged. No algorithms, defaults, execution settings, adapters or timing boundaries changed.",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "df7dfe974ec02160168db3281cd71bcb944fa133d7d8f8ef338841fc6ef873d5",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      }
+    ],
     "ml4t_engine_source_sha256": "1e2bf2f45a835f8b0a81b59141843dae77b6341233d7c9ba494efada0a328a25",
     "sources": {
       "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
