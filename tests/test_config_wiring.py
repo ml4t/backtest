@@ -49,7 +49,7 @@ from ml4t.backtest.models import (
     VolumeShareSlippage,
 )
 from ml4t.backtest.profiles import get_profile_config
-from ml4t.backtest.types import OrderSide, Position
+from ml4t.backtest.types import AssetClass, ContractSpec, OrderSide, Position
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -452,6 +452,94 @@ class TestRejectOnInsufficientCash:
         assert order is not None
         assert order.status.value != "rejected"
         assert order.rejection_reason is None
+
+    def test_next_bar_simple_cash_check_includes_contract_multiplier(self):
+        """Futures notional is price times multiplier; the open check must use both."""
+        spec = {
+            "ES": ContractSpec(symbol="ES", asset_class=AssetClass.FUTURE, multiplier=50.0),
+        }
+
+        def broker_for(price: float) -> Broker:
+            broker = _make_broker(
+                initial_cash=100_000.0,
+                execution_mode=ExecutionMode.NEXT_BAR,
+                next_bar_simple_cash_check=True,
+                contract_specs=spec,
+                reject_on_insufficient_cash=True,
+            )
+            broker._update_time(
+                datetime(2024, 1, 2),
+                {"ES": price},
+                {"ES": price},
+                {"ES": price},
+                {"ES": price},
+                {"ES": 1_000_000.0},
+                {},
+            )
+            return broker
+
+        unaffordable = broker_for(4_000.0)
+        rejected = unaffordable.submit_order("ES", 1, OrderSide.BUY)
+        unaffordable._update_time(
+            datetime(2024, 1, 3),
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 1_000_000.0},
+            {},
+        )
+        unaffordable._process_orders(use_open=True)
+
+        assert rejected is not None
+        assert rejected.status.value == "rejected"
+        assert unaffordable.cash == 100_000.0
+
+        affordable = broker_for(1_000.0)
+        filled = affordable.submit_order("ES", 1, OrderSide.BUY)
+        affordable._update_time(
+            datetime(2024, 1, 3),
+            {"ES": 1_000.0},
+            {"ES": 1_000.0},
+            {"ES": 1_000.0},
+            {"ES": 1_000.0},
+            {"ES": 1_000_000.0},
+            {},
+        )
+        affordable._process_orders(use_open=True)
+
+        assert filled is not None
+        assert filled.status.value == "filled"
+        assert affordable.cash == 50_000.0
+
+    def test_buying_power_reservation_includes_contract_multiplier(self):
+        """Shadow buying power must reserve futures notional, not the raw price."""
+        spec = {
+            "ES": ContractSpec(symbol="ES", asset_class=AssetClass.FUTURE, multiplier=50.0),
+        }
+        broker = _make_broker(
+            initial_cash=100_000.0,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            buying_power_reservation=True,
+            fill_ordering=FillOrdering.SEQUENTIAL,
+            contract_specs=spec,
+            reject_on_insufficient_cash=True,
+        )
+        broker._update_time(
+            datetime(2024, 1, 2),
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 4_000.0},
+            {"ES": 1_000_000.0},
+            {},
+        )
+
+        order = broker.submit_order("ES", 1, OrderSide.BUY)
+
+        assert order is not None
+        assert order.status.value == "rejected"
+        assert broker.cash == 100_000.0
 
 
 # ---------------------------------------------------------------------------
