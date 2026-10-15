@@ -29,30 +29,40 @@ class EqualWeightStrategy(Strategy):
 
 ## Rebalance Modes
 
-The `rebalance_mode` config controls how portfolio value is computed during rebalancing:
+Set `RebalanceConfig.rebalance_mode` when using `TargetWeightExecutor`:
 
-| Mode | Behavior | Matches |
-|------|----------|---------|
-| `SNAPSHOT` | Freeze portfolio value at start of rebalance. All targets use the same base. | Backtrader `order_target_percent` |
-| `INCREMENTAL` | Recompute portfolio value after each fill. Most accurate cash tracking. | Default |
-| `HYBRID` | Freeze value for target computation, but fill sequentially with live cash checks. | VectorBT default |
+| Mode | Behavior inside an executor call |
+|------|----------------------------------|
+| `SNAPSHOT` (executor default) | Use equity and current weights captured at the start of the call for every target. |
+| `INCREMENTAL` | Process eligible orders between submissions; refresh equity and current weights for the next target. |
+| `HYBRID` | Keep the initial equity and weights while processing eligible orders between submissions. |
 
 ```python
 from ml4t.backtest.config import RebalanceMode
+from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig
 
-config = BacktestConfig(rebalance_mode=RebalanceMode.SNAPSHOT)
+executor = TargetWeightExecutor(RebalanceConfig(rebalance_mode=RebalanceMode.SNAPSHOT))
 ```
+
+Execution timing and account rules still determine which orders can fill. The broker's
+`rebalance_to_weights()` helper computes targets from account value captured at the start of
+its call; `BacktestConfig.rebalance_mode` does not select an executor mode. For framework
+comparisons, use the explicitly configured [comparison profiles](profiles.md).
 
 ## Rebalance Headroom
 
-The `rebalance_headroom_pct` parameter scales target weights to leave a cash buffer:
+The broker's `rebalance_headroom_pct` parameter scales weights passed to
+`rebalance_to_weights()`. Its default is `1.0`; set a smaller value to reserve part of
+the requested allocation:
 
 ```python
 config = BacktestConfig(rebalance_headroom_pct=0.998)
-# Targets 99.8% of computed weights, leaving 0.2% cash buffer
+# Request 99.8% of each target weight
 ```
 
-This prevents rounding-induced over-allocation. Backtrader uses 0.998 by default.
+This creates headroom in the requested targets. Rounding, costs and subsequent price changes
+still affect the resulting exposure. The `0.998` value above is an explicit example setting,
+not a Backtrader default.
 
 ## Late Assets and Missing Prices
 
@@ -85,7 +95,7 @@ contract and example. Keep `execution_mode=NEXT_BAR` for this workflow.
 
 ## Advanced: TargetWeightExecutor
 
-For more control, use the `TargetWeightExecutor` with a `RebalanceConfig`:
+For more control, use the [TargetWeightExecutor and RebalanceConfig API](../api/index.md#ml4t.backtest.execution.rebalancer.TargetWeightExecutor):
 
 ```python
 from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig
@@ -94,12 +104,16 @@ rebalance_config = RebalanceConfig(
     min_trade_value=100,        # Optional: skip trades smaller than $100
     min_weight_change=0.01,     # Optional: skip changes smaller than 1%
     allow_fractional=False,     # Round to whole shares
-    max_single_weight=0.25,     # Cap any single position at 25%
+    max_single_weight=0.25,     # Limit target weight before share rounding
     cancel_before_rebalance=True,
 )
 
 executor = TargetWeightExecutor(rebalance_config)
 ```
+
+With $100,000 equity and a $150 price, a 25% target rounds to 167 whole shares:
+$25,050 of exposure. `max_single_weight` limits the requested target before rounding;
+it does not enforce a continuous limit on realized portfolio weights.
 
 The executor integrates with external portfolio optimizers (riskfolio-lib, PyPortfolioOpt, cvxpy) through the `WeightProvider` protocol:
 

@@ -460,12 +460,13 @@ class OrderBook:
         )
 
         shadow_cash = self._submission_shadow_cash
+        multiplier = broker.get_multiplier(order.asset)
 
         if closed != 0.0:
-            shadow_cash += (-closed) * signal_price
+            shadow_cash += (-closed) * signal_price * multiplier
         if opened != 0.0:
             # LEAN semantics: shorts consume buying power rather than crediting cash.
-            shadow_cash -= abs(opened) * signal_price
+            shadow_cash -= abs(opened) * signal_price * multiplier
         shadow_cash -= estimate_commission(
             broker.commission_model, order.asset, order.quantity, signal_price
         )
