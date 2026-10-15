@@ -95,7 +95,7 @@ contract and example. Keep `execution_mode=NEXT_BAR` for this workflow.
 
 ## Advanced: TargetWeightExecutor
 
-For more control, use the `TargetWeightExecutor` with a `RebalanceConfig`:
+For more control, use the [TargetWeightExecutor and RebalanceConfig API](../api/index.md#ml4t.backtest.execution.rebalancer.TargetWeightExecutor):
 
 ```python
 from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig
