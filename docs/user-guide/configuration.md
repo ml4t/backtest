@@ -253,11 +253,17 @@ friction:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `rebalance_mode` | RebalanceMode | INCREMENTAL | SNAPSHOT, INCREMENTAL, or HYBRID |
-| `rebalance_headroom_pct` | float | 1.0 | Scale target weights (< 1.0 leaves cash buffer) |
+| `rebalance_mode` | RebalanceMode | INCREMENTAL | Serialized profile setting; does not select `TargetWeightExecutor` mode |
+| `rebalance_headroom_pct` | float | 1.0 | Scale requested weights in `Broker.rebalance_to_weights()` |
 | `missing_price_policy` | MissingPricePolicy | SKIP | Handle missing prices: SKIP or USE_LAST |
 | `late_asset_policy` | LateAssetPolicy | ALLOW | Handle late-starting assets: ALLOW or REQUIRE_HISTORY |
 | `late_asset_min_bars` | int | 1 | Minimum bars of history before trading |
+
+Set `RebalanceConfig.rebalance_mode` for `TargetWeightExecutor`. The broker's
+`rebalance_to_weights()` helper uses account value captured at the start of its call.
+Headroom changes requested targets; rounding, costs and price changes still affect
+realized exposure. See [Rebalancing](rebalancing.md#rebalance-modes) for the two configuration
+objects and executor mode behavior.
 
 ### Calendar
 
