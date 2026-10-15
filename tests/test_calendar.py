@@ -444,6 +444,24 @@ class TestFilterToTradingSessions:
         filtered = filter_to_trading_sessions(df, "NYSE")
         assert len(filtered) == 4  # All except the one after close
 
+    def test_filter_keeps_overnight_open_before_session_date(self):
+        """A CME Monday session opens Sunday evening; keep that bar when data ends Sunday."""
+        # 2024-06-09 is Sunday. CME_Equity opens 17:00 America/Chicago (22:00 UTC, CDT)
+        # and that session is dated Monday 2024-06-10.
+        in_session = datetime(2024, 6, 9, 23, 0, tzinfo=UTC)  # 18:00 CT
+        before_open = datetime(2024, 6, 9, 21, 0, tzinfo=UTC)  # 16:00 CT
+        df = pl.DataFrame(
+            {
+                "timestamp": [before_open, in_session],
+                "price": [100.0, 101.0],
+            }
+        )
+
+        filtered = filter_to_trading_sessions(df, "CME_Equity")
+
+        timestamps = filtered["timestamp"].to_list()
+        assert timestamps == [in_session]
+
 
 class TestGenerateTradingMinutes:
     """Tests for generate_trading_minutes function."""
