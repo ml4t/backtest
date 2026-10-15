@@ -2,7 +2,7 @@
 # Independent package configuration for standalone distribution
 
 [build-system]
-requires = ["hatchling==1.32.3", "hatch-vcs==0.5.0"]
+requires = ["hatchling==1.32.4", "hatch-vcs==0.5.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
@@ -105,6 +105,8 @@ advanced = [
 # Comparison libraries (for benchmarking)
 comparison = [
     "vectorbt>=0.24.0; python_version < '3.15'",
+    # Pyfolio keeps this group below pandas 3; VectorBT 1.0 cannot import Plotly 7.
+    "plotly<7; python_version < '3.15'",
     "backtrader>=1.9.0; python_version < '3.15'",
     "zipline-reloaded>=2.4.0; python_version < '3.15'",
     "pyfolio-reloaded>=0.9.9; python_version < '3.15'",

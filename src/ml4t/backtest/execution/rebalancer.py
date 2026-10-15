@@ -72,17 +72,20 @@ class RebalanceConfig:
         round_lots: Round to lot_size increments (e.g., 100-share lots).
         lot_size: Lot size for rounding (only used if round_lots=True).
         allow_short: Allow short positions via negative weights.
-        max_single_weight: Maximum weight allowed for any single asset.
+        max_single_weight: Maximum absolute requested weight before share rounding.
+            Long targets are capped at this value and short targets at its negation.
+            Rounded position exposure can exceed the exact target weight.
         max_gross_leverage: Maximum gross leverage (sum of abs weights). None means
             no cap — the gatekeeper's buying power check is the constraint. For cash
             accounts, the gatekeeper naturally prevents over-allocation. For margin
             accounts, set this as a risk guardrail (e.g., 5.0 for a CTA portfolio).
         cancel_before_rebalance: Cancel pending orders before rebalancing (safest).
         account_for_pending: Consider pending orders when calculating current weights.
-        rebalance_mode: How portfolio value is computed during rebalancing.
-            SNAPSHOT (default): Freeze value, batch fills (backward compatible).
-            INCREMENTAL: Recompute value after each fill (most accurate).
-            HYBRID: Frozen targets, sequential fills (VBT-style).
+        rebalance_mode: How successive targets use account value and current weights.
+            SNAPSHOT (default): Keep the starting value and weights for sizing.
+            INCREMENTAL: Process eligible orders and refresh the sizing basis.
+            HYBRID: Process eligible orders while keeping the starting sizing basis.
+            Execution timing and account rules still determine which orders fill.
         schedule: Optional event, session, weekly, month-end, or explicit schedule.
         calendar: Exchange calendar used to identify session closes and period ends. Required for
             weekly and month-end schedules.
@@ -241,14 +244,11 @@ class TargetWeightExecutor:
     ) -> list[Order]:
         """Execute rebalancing to target weights.
 
-        Behavior depends on ``self.config.rebalance_mode``:
-
-        - **SNAPSHOT** (default): Compute portfolio value once, submit all orders,
-          fill at once. Backward compatible — matches the pre-v0.18 behavior.
-        - **INCREMENTAL**: Recompute portfolio value after each fill. Most accurate
-          cash tracking. Each target uses the latest portfolio state.
-        - **HYBRID**: Freeze portfolio value for target computation, but fill
-          sequentially (cash constraints checked against live state).
+        ``SNAPSHOT`` (default) sizes all targets from starting account value and
+        weights. ``INCREMENTAL`` processes eligible orders between submissions
+        and refreshes that sizing basis. ``HYBRID`` processes eligible orders
+        while retaining the starting basis. Broker execution and account rules
+        determine fill eligibility; the mode does not force an order to fill.
 
         Args:
             target_weights: Dict of asset -> target weight. Negative weights
@@ -393,8 +393,13 @@ class TargetWeightExecutor:
         Returns:
             Order if trade needed, None otherwise.
         """
-        # Apply constraints
-        target_wt = min(target_wt, self.config.max_single_weight)
+        # Apply constraints. The cap is a magnitude limit: min() alone leaves
+        # shorts untouched because a negative weight is already below the cap.
+        cap = self.config.max_single_weight
+        if target_wt > cap:
+            target_wt = cap
+        elif target_wt < -cap:
+            target_wt = -cap
         if target_wt < 0 and not self.config.allow_short:
             target_wt = 0
 
