@@ -2,7 +2,167 @@
 
 <!-- Generated from release/changelog.json. Do not edit managed entries. -->
 
-## 0.1.0 - Unreleased
+## 0.1.13 - Unreleased
+
+### Fixed
+
+- Retain Sunday evening bars that belong to a Monday CME exchange session.
+- Apply max_single_weight symmetrically to requested long and short target weights.
+- Include futures contract multipliers in the affected simple-cash and sequential buying-power
+  reservation checks.
+- Return positive infinite CAGR when annualizing an extreme short positive-return window
+  overflows, so EquityCurve.to_dict completes.
+- Keep the shared comparison group compatible with Plotly below 7 on Python below 3.15 and
+  regenerate all isolated lock metadata.
+
+### Documentation
+
+- Correct executor-mode configuration, fill-eligibility descriptions, headroom and whole-share
+  target rounding. Link the rebalancing guide to the enum, configuration and executor API
+  reference.
+
+### Build and compatibility
+
+- Update the build backend, pinned workflow actions and vulnerable dependency locks while
+  preserving the frozen comparison framework identities.
+- Accept final CPython 3.15 in the canary and describe its steps accurately. Stable support
+  remains CPython 3.12 through 3.14; no blanket optional-package support for 3.15 is added.
+
+### Compatibility
+
+- Results change in the corrected overnight-session, short-target and futures-cash cases. Target
+  caps apply before whole-unit rounding and do not guarantee a continuous limit on realized
+  exposure.
+- Consumers of raw metric dictionaries must handle non-finite CAGR for extreme short windows.
+  Versioned result exports retain their documented tagged-JSON encoding for non-finite metrics.
+
+### Validation
+
+- Regenerate correctness evidence from frozen inputs and preserve original timing measurements,
+  using the existing source-certification mechanism for documentation-only source changes.
+
+## 0.1.12 - 2026-09-24
+
+### Changed
+
+- Complete task guides and the verified Book Guide with installed-wheel examples.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.12).
+
+## 0.1.11 - 2026-09-24
+
+### Changed
+
+- Correct User Guide API examples and explanations of strategy state.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.11).
+
+## 0.1.10 - 2026-09-24
+
+### Changed
+
+- Add an audited User Guide with task navigation.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.10).
+
+## 0.1.9 - 2026-09-24
+
+### Changed
+
+- Correct backtest behavior, add guided documentation and refresh the build backend.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.9).
+
+## 0.1.8 - 2026-09-21
+
+### Changed
+
+- Reconcile time zones before trade enrichment, improve verification of newly published packages,
+  and complete the closure documentation audit.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.8).
+
+## 0.1.7 - 2026-09-12
+
+### Changed
+
+- Remove the inert LinearImpact.permanent_fraction parameter and add source certification for
+  changes that preserve measured behavior.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.7).
+
+## 0.1.6 - 2026-09-09
+
+### Changed
+
+- Standardize ecosystem setup and public agent orientation.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.6).
+
+## 0.1.5 - 2026-09-05
+
+### Changed
+
+- Publish bounded real-strategy comparisons and timing evidence, and authenticate licensed
+  VectorBT Pro installation through GitHub CLI.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.5).
+
+## 0.1.4 - 2026-09-03
+
+### Changed
+
+- Use the feed VWAP for VWAP execution and reject unavailable required VWAP prices.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.4).
+
+## 0.1.3 - 2026-08-12
+
+### Changed
+
+- Update pinned GitHub Actions.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.3).
+
+## 0.1.2 - 2026-08-11 (tag only)
+
+### Tagged source
+
+- The annotated v0.1.2 tag exists. No matching published release or artifact is currently listed
+  in the GitHub/PyPI records checked on 2026-10-15. See [tagged
+  source](https://github.com/ml4t/backtest/tree/v0.1.2).
+
+## 0.1.1 - 2026-08-10
+
+### Changed
+
+- Add per-asset position rules for pre-open execution.
+
+### Release notes
+
+- [Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.1).
+
+## 0.1.0 - 2026-08-09
 
 ### Added
 
