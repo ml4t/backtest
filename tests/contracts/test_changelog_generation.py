@@ -35,12 +35,12 @@ def test_changelog_generator_uses_an_independent_legacy_source() -> None:
     assert generator._LEGACY.read_text(encoding="utf-8").startswith("## 0.1.0b17 -")
 
 
-def test_beta_18_through_stable_candidate_have_compatibility_impact() -> None:
+def test_beta_18_through_first_stable_release_keep_compatibility_history() -> None:
     source = json.loads((_ROOT / "release" / "changelog.json").read_text(encoding="utf-8"))
     releases = {release["version"]: release for release in source["releases"]}
     expected = {"0.1.0", *(f"0.1.0b{number}" for number in range(18, 23))}
 
-    assert set(releases) == expected
+    assert expected <= set(releases)
     for version in expected:
         assert releases[version]["sections"]["Compatibility"]
 
