@@ -661,13 +661,16 @@ def filter_to_trading_sessions(
     min_date = df.select(pl.col(timestamp_col).dt.date().min()).item()
     max_date = df.select(pl.col(timestamp_col).dt.date().max()).item()
 
-    # For overnight sessions (e.g., CME futures 5pm-4pm), a session that opened
-    # on the previous day may still be open. Expand window by 1 day to capture this.
+    # Overnight sessions (for example CME equity, 17:00–16:00 exchange time) can
+    # open on the calendar day before their session date. Expand both ends by one
+    # day so a bar is not dropped when the frame's UTC dates stop before that
+    # session date, or start after the previous session's open.
     prev_date = pd.Timestamp(min_date) - pd.Timedelta(days=1)
+    next_date = pd.Timestamp(max_date) + pd.Timedelta(days=1)
 
     # Get schedule for the expanded date range
     calendar = get_calendar(calendar_id)
-    schedule_pd = calendar.schedule(start_date=prev_date.date(), end_date=max_date)
+    schedule_pd = calendar.schedule(start_date=prev_date.date(), end_date=next_date.date())
 
     if schedule_pd.empty:
         return df.clear()  # No trading days in range

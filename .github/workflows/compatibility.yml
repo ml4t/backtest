@@ -49,6 +49,23 @@ jobs:
       - name: Build the package
         run: uv build
 
+      - name: Validate the shared comparison extra
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        env:
+          ML4T_COMPARISON_INPROC: "1"
+        run: |
+          uv sync --dev --locked --extra comparison --extra viz
+          uv run --no-sync pytest -q --no-cov \
+            tests/contracts/test_cross_engine_contracts.py --junitxml=comparison-contracts.xml
+
+      - name: Retain shared comparison contracts
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shared-comparison-contracts
+          path: comparison-contracts.xml
+          if-no-files-found: warn
+
   prerelease:
     name: Python 3.15 canary (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
