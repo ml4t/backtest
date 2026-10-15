@@ -20,6 +20,10 @@
 - Correct executor-mode configuration, fill-eligibility descriptions, headroom and whole-share
   target rounding. Link the rebalancing guide to the enum, configuration and executor API
   reference.
+- Make the Zipline migration guide explicit about input and execution assumptions, with a checked
+  synthetic target-weight example and a link to the tested Diagnostic portfolio-analysis handoff.
+- Publish the local contribution guide and issue/PR templates linked to the shared policy,
+  preserving private security reporting and the verified usage-documentation destination.
 
 ### Build and compatibility
 
@@ -31,10 +35,10 @@
 ### Compatibility
 
 - Results change in the corrected overnight-session, short-target and futures-cash cases. Target
-  caps apply before whole-unit rounding and do not guarantee a continuous limit on realized
+  caps apply before whole unit rounding and do not guarantee a continuous limit on realized
   exposure.
 - Consumers of raw metric dictionaries must handle non-finite CAGR for extreme short windows.
-  Versioned result exports retain their documented tagged-JSON encoding for non-finite metrics.
+  Versioned result exports retain their documented tagged JSON encoding for non-finite metrics.
 
 ### Validation
 
@@ -96,8 +100,8 @@
 
 ### Changed
 
-- Remove the inert LinearImpact.permanent_fraction parameter and add source certification for
-  changes that preserve measured behavior.
+- Remove the inert LinearImpact.permanent_fraction parameter and add provenance-preserving source
+  certification for performance evidence.
 
 ### Release notes
 

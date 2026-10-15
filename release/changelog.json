@@ -13,15 +13,17 @@
           "Keep the shared comparison group compatible with Plotly below 7 on Python below 3.15 and regenerate all isolated lock metadata."
         ],
         "Documentation": [
-          "Correct executor-mode configuration, fill-eligibility descriptions, headroom and whole-share target rounding. Link the rebalancing guide to the enum, configuration and executor API reference."
+          "Correct executor-mode configuration, fill-eligibility descriptions, headroom and whole-share target rounding. Link the rebalancing guide to the enum, configuration and executor API reference.",
+          "Make the Zipline migration guide explicit about input and execution assumptions, with a checked synthetic target-weight example and a link to the tested Diagnostic portfolio-analysis handoff.",
+          "Publish the local contribution guide and issue/PR templates linked to the shared policy, preserving private security reporting and the verified usage-documentation destination."
         ],
         "Build and compatibility": [
           "Update the build backend, pinned workflow actions and vulnerable dependency locks while preserving the frozen comparison framework identities.",
           "Accept final CPython 3.15 in the canary and describe its steps accurately. Stable support remains CPython 3.12 through 3.14; no blanket optional-package support for 3.15 is added."
         ],
         "Compatibility": [
-          "Results change in the corrected overnight-session, short-target and futures-cash cases. Target caps apply before whole-unit rounding and do not guarantee a continuous limit on realized exposure.",
-          "Consumers of raw metric dictionaries must handle non-finite CAGR for extreme short windows. Versioned result exports retain their documented tagged-JSON encoding for non-finite metrics."
+          "Results change in the corrected overnight-session, short-target and futures-cash cases. Target caps apply before whole unit rounding and do not guarantee a continuous limit on realized exposure.",
+          "Consumers of raw metric dictionaries must handle non-finite CAGR for extreme short windows. Versioned result exports retain their documented tagged JSON encoding for non-finite metrics."
         ],
         "Validation": [
           "Regenerate correctness evidence from frozen inputs and preserve original timing measurements, using the existing source-certification mechanism for documentation-only source changes."
@@ -93,7 +95,7 @@
       "date": "2026-09-12",
       "sections": {
         "Changed": [
-          "Remove the inert LinearImpact.permanent_fraction parameter and add source certification for changes that preserve measured behavior."
+          "Remove the inert LinearImpact.permanent_fraction parameter and add provenance-preserving source certification for performance evidence."
         ],
         "Release notes": [
           "[Published release notes](https://github.com/ml4t/backtest/releases/tag/v0.1.7)."
