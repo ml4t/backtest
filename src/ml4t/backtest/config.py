@@ -191,30 +191,22 @@ class LockNotionalUpdateMode(str, Enum):
 
 
 class RebalanceMode(str, Enum):
-    """How portfolio value is computed during multi-asset rebalancing.
+    """Sizing mode for ``TargetWeightExecutor``.
 
-    When rebalancing across multiple assets, the engine must decide whether
-    to recompute portfolio value after each fill or freeze it. Real brokers
-    differ: some snapshot account value at order placement, others update
-    incrementally as each fill settles.
+    Select this mode through ``RebalanceConfig.rebalance_mode``. The separate
+    ``BacktestConfig.rebalance_mode`` field does not configure the executor.
 
     SNAPSHOT:
-        Freeze portfolio value at the start of the rebalance. All targets
-        computed from the same base, orders batch and fill at once. Matches
-        Backtrader's ``order_target_percent`` in ``next()`` where
-        ``broker.getvalue()`` is constant across all submissions.
-
+        Use account value and current weights captured at the start of the call.
     INCREMENTAL:
-        Recompute portfolio value after each asset's order fills. Most
-        accurate cash tracking — each target uses the latest portfolio
-        state. May produce more trades than SNAPSHOT because cascading
-        value changes create small corrections.
-
+        Process eligible orders between submissions, then refresh account value
+        and current weights for the next target.
     HYBRID:
-        Freeze portfolio value for target computation, but fill
-        sequentially (cash constraints checked against live state).
-        Matches VectorBT's default behavior with ``auto_call_seq=False``
-        and ``update_value=False``.
+        Process eligible orders between submissions while retaining the starting
+        account value and weights for target sizing.
+
+    Execution timing and account rules still control fill eligibility. These
+    modes do not guarantee batch fills or define another framework's defaults.
     """
 
     SNAPSHOT = "snapshot"

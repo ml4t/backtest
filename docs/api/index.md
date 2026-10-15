@@ -50,6 +50,29 @@ Auto-generated from source docstrings.
         - get_profile_config
         - list_profiles
 
+## Rebalancing
+
+Use `RebalanceConfig.rebalance_mode` to select the executor mode. The
+[rebalancing guide](../user-guide/rebalancing.md) explains sizing, eligible fills,
+headroom and whole-share rounding.
+
+::: ml4t.backtest.config.RebalanceMode
+    options:
+      show_root_heading: true
+
+::: ml4t.backtest.execution.rebalancer.RebalanceConfig
+    options:
+      show_root_heading: true
+
+::: ml4t.backtest.execution.rebalancer.TargetWeightExecutor
+    options:
+      show_root_heading: true
+      members:
+        - execute
+        - should_rebalance
+        - validate_completed_run
+        - reset
+
 ## Broker
 
 ::: ml4t.backtest.broker.Broker
