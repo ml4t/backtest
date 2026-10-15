@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv and Python ${{ matrix.python-version }}
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "latest"
           python-version: ${{ matrix.python-version }}
@@ -79,12 +79,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv and Python 3.15
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "latest"
           python-version: "3.15"
 
-      - name: Create the prerelease environment
+      - name: Create the Python 3.15 environment
         run: uv venv --python 3.15
 
       - name: Install the CPython 3.15 numerical runtime
@@ -118,11 +118,11 @@ jobs:
       - name: Run the non-hardware test suite
         run: uv run --no-sync pytest tests/ -v --tb=short --no-cov -m "not benchmark"
 
-      - name: Record the prerelease dependency set
+      - name: Record the Python 3.15 dependency set
         run: uv pip freeze > prerelease-versions-${{ runner.os }}.txt
 
-      - name: Retain prerelease dependency evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Retain Python 3.15 dependency evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: prerelease-versions-${{ runner.os }}
           path: prerelease-versions-${{ runner.os }}.txt
@@ -141,7 +141,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv and Python ${{ matrix.python-version }}
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "latest"
           python-version: ${{ matrix.python-version }}
@@ -168,7 +168,7 @@ jobs:
         run: uv build
 
       - name: Retain minimum-version evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: minimum-versions-${{ matrix.python-version }}
           path: minimum-versions-${{ matrix.python-version }}.txt
