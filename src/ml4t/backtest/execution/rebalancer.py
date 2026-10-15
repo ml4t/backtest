@@ -72,7 +72,8 @@ class RebalanceConfig:
         round_lots: Round to lot_size increments (e.g., 100-share lots).
         lot_size: Lot size for rounding (only used if round_lots=True).
         allow_short: Allow short positions via negative weights.
-        max_single_weight: Maximum weight allowed for any single asset.
+        max_single_weight: Maximum absolute weight allowed for any single asset.
+            Long targets are capped at this value and short targets at its negation.
         max_gross_leverage: Maximum gross leverage (sum of abs weights). None means
             no cap — the gatekeeper's buying power check is the constraint. For cash
             accounts, the gatekeeper naturally prevents over-allocation. For margin
@@ -393,8 +394,13 @@ class TargetWeightExecutor:
         Returns:
             Order if trade needed, None otherwise.
         """
-        # Apply constraints
-        target_wt = min(target_wt, self.config.max_single_weight)
+        # Apply constraints. The cap is a magnitude limit: min() alone leaves
+        # shorts untouched because a negative weight is already below the cap.
+        cap = self.config.max_single_weight
+        if target_wt > cap:
+            target_wt = cap
+        elif target_wt < -cap:
+            target_wt = -cap
         if target_wt < 0 and not self.config.allow_short:
             target_wt = 0
 

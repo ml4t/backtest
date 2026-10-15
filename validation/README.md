@@ -56,25 +56,25 @@ The table reports engine-call wall time for all 17 correctness-passing pairs. Th
 
 | Real strategy | Pinned framework | Framework median (95% CI), s | ML4T median (95% CI), s | Framework / ML4T median |
 |---|---|---:|---:|---:|
-| ETF allocation | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.293 (0.290-0.298) | 0.424 (0.421-0.434) | 0.691x |
-| ETF allocation | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 0.192 (0.176-0.493) | 0.414 (0.413-0.417) | 0.462x |
-| ETF allocation | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 9.631 (9.428-9.710) | 0.439 (0.434-0.444) | 21.954x |
-| ETF allocation | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 3.888 (3.878-3.959) | 0.621 (0.618-0.626) | 6.256x |
-| ETF allocation | [LEAN 18001](https://github.com/QuantConnect/Lean) | 2.638 (2.516-2.707) | 0.750 (0.743-0.757) | 3.520x |
-| CME futures | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.290 (0.289-0.294) | 0.410 (0.406-0.958) | 0.708x |
-| CME futures | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 6.639 (5.831-8.332) | 0.428 (0.422-1.235) | 15.504x |
-| Crypto perpetual funding | [LEAN 18001](https://github.com/QuantConnect/Lean) | 2.828 (2.737-2.952) | 1.327 (0.657-2.183) | 2.131x |
-| FX allocation (USD-quoted pairs) | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.288 (0.286-0.294) | 0.148 (0.147-0.149) | 1.947x |
-| FX allocation (USD-quoted pairs) | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 0.144 (0.142-0.146) | 0.145 (0.145-0.146) | 0.988x |
-| FX allocation (USD-quoted pairs) | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 0.434 (0.430-0.440) | 0.147 (0.146-0.149) | 2.947x |
-| FX allocation (USD-quoted pairs) | [LEAN 18001](https://github.com/QuantConnect/Lean) | 0.953 (0.936-1.164) | 0.158 (0.155-0.164) | 6.033x |
-| US equity panel | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 3.806 (3.336-4.341) | 23.306 (21.906-25.833) | 0.163x |
-| US equity panel | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 17.116 (17.069-17.633) | 25.738 (24.983-27.163) | 0.665x |
-| US equity panel | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 668.611 (642.993-718.202) | 26.887 (26.406-29.406) | 24.868x |
-| US equity panel | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 117.445 (116.308-118.391) | 26.821 (25.473-27.644) | 4.379x |
-| US equity panel | [LEAN 18001](https://github.com/QuantConnect/Lean) | 48.436 (48.221-48.986) | 27.688 (27.575-27.796) | 1.749x |
+| ETF allocation | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.317 (0.297-0.330) | 0.420 (0.418-0.422) | 0.754x |
+| ETF allocation | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 0.173 (0.170-0.175) | 0.416 (0.414-0.417) | 0.415x |
+| ETF allocation | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 9.408 (9.378-9.537) | 0.437 (0.435-0.438) | 21.549x |
+| ETF allocation | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 3.846 (3.841-3.867) | 0.615 (0.613-0.622) | 6.254x |
+| ETF allocation | [LEAN 18001](https://github.com/QuantConnect/Lean) | 2.571 (2.515-2.635) | 0.749 (0.743-0.754) | 3.433x |
+| CME futures | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.286 (0.283-0.291) | 0.410 (0.408-0.412) | 0.697x |
+| CME futures | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 2.475 (2.465-2.535) | 0.422 (0.419-0.425) | 5.864x |
+| Crypto perpetual funding | [LEAN 18001](https://github.com/QuantConnect/Lean) | 2.793 (2.751-2.871) | 0.653 (0.649-0.658) | 4.280x |
+| FX allocation (USD-quoted pairs) | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.291 (0.283-0.294) | 0.149 (0.147-0.163) | 1.951x |
+| FX allocation (USD-quoted pairs) | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 0.146 (0.138-0.152) | 0.147 (0.145-0.149) | 0.988x |
+| FX allocation (USD-quoted pairs) | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 0.439 (0.434-0.447) | 0.152 (0.149-0.154) | 2.891x |
+| FX allocation (USD-quoted pairs) | [LEAN 18001](https://github.com/QuantConnect/Lean) | 0.961 (0.935-0.979) | 0.159 (0.158-0.161) | 6.055x |
+| US equity panel | [VectorBT Pro 2026.6.27](https://vectorbt.pro/) | 0.865 (0.851-1.004) | 22.991 (22.877-23.162) | 0.038x |
+| US equity panel | [VectorBT OSS 1.1.0](https://pypi.org/project/vectorbt/1.1.0/) | 17.246 (17.166-17.345) | 21.418 (21.157-24.293) | 0.805x |
+| US equity panel | [Backtrader 1.9.78.123](https://pypi.org/project/backtrader/1.9.78.123/) | 505.641 (499.073-515.494) | 23.585 (21.878-26.507) | 21.439x |
+| US equity panel | [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/) | 110.874 (105.635-113.330) | 22.831 (22.502-31.470) | 4.856x |
+| US equity panel | [LEAN 18001](https://github.com/QuantConnect/Lean) | 49.967 (48.757-50.759) | 40.260 (34.451-40.927) | 1.241x |
 
-Measured 2026-09-24 on `Linux-6.8.0-139-generic-x86_64-with-glibc2.39` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
+Measured 2026-10-13 on `Linux-7.0.0-38-generic-x86_64-with-glibc2.43` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
 ### Synthetic diagnostic scenarios
 
