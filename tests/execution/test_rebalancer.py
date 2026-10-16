@@ -600,6 +600,7 @@ class TestTargetWeightExecutorScheduling:
         with pytest.raises(ValueError, match="requires exchange calendar metadata"):
             RebalanceConfig(
                 schedule=RebalanceSchedule.every_session(),
+                calendar=None,
                 session_start_time="09:30",
                 data_frequency="1m",
             )
@@ -636,7 +637,9 @@ class TestTargetWeightExecutorScheduling:
 
     def test_period_schedule_requires_calendar_when_executor_is_constructed(self):
         with pytest.raises(ValueError, match="require calendar metadata"):
-            TargetWeightExecutor(config=RebalanceConfig(schedule=RebalanceSchedule.weekly()))
+            TargetWeightExecutor(
+                config=RebalanceConfig(schedule=RebalanceSchedule.weekly(), calendar=None)
+            )
 
     def test_mutated_schedule_configuration_requires_explicit_reset(self):
         config = RebalanceConfig(

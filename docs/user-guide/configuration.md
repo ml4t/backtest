@@ -301,11 +301,11 @@ None
 NYSE
 ```
 
-In observation mode, annualized metrics use 252 observations per numerical year by
+In observation mode, annualized metrics use 252 return periods per numerical year by
 default, regardless of timestamp spacing or `data_frequency`. This is a numerical
 convention, not a claim about exchange sessions. Set a positive finite `periods_per_year`
 to choose another scale; the override also survives config serialization. Calendar-free
-CAGR measures elapsed observations at that scale. A legacy payload without
+CAGR uses `(N - 1) / periods_per_year` years for `N` recorded equity values. A legacy payload without
 `calendar.time_contract_version` remains version 1, including its old null-as-inheritance
 behavior. Use `to_dict()` or `to_yaml()` to retain the v2 distinction between omission
 and explicit null; do not relabel an old payload without deciding what its null means.

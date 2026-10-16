@@ -8,8 +8,18 @@ import polars as pl
 import pytest
 from ml4t.specs import UNSET_CALENDAR, FeedSpec, TimestampSemantics
 
-from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest import (
+    BacktestConfig,
+    DataFeed,
+    Engine,
+    RebalanceConfig,
+    RebalanceSchedule,
+    Strategy,
+    TargetWeightExecutor,
+)
+from ml4t.backtest.analytics import EquityCurve
 from ml4t.backtest.config import DataFrequency
+from ml4t.backtest.execution.schedule import is_rebalance_timestamp, resolve_rebalance_timestamps
 
 
 class RecordBars(Strategy):
@@ -48,10 +58,10 @@ def test_omission_uses_nyse_when_feed_has_no_declaration():
 
 def test_omission_inherits_feed_calendar_positive_control():
     result, seen = run_engine(
-        BacktestConfig(enforce_sessions=True), metadata=FeedSpec(calendar="NYSE")
+        BacktestConfig(enforce_sessions=True), metadata=FeedSpec(calendar="crypto")
     )
-    assert len(seen) == 2
-    assert result.config.resolved_calendar == "NYSE"
+    assert len(seen) == 3
+    assert result.config.resolved_calendar == "crypto"
 
 
 def test_omission_respects_v2_declared_disable_instead_of_nyse():
@@ -168,3 +178,82 @@ def test_named_result_calendar_override_controls_actual_overnight_aggregation():
     assert len(result.to_daily_returns(calendar="CME_Equity")) == 1
     assert len(result.to_daily_returns(calendar="NYSE")) == 2
     assert len(result.to_daily_returns(calendar=None)) == 3
+
+
+def test_schedule_explicit_none_does_not_inherit_calendar_metadata():
+    times = [datetime(2025, 7, day, tzinfo=UTC) for day in (7, 8, 9, 10, 11)]
+    with pytest.raises(ValueError, match="require calendar"):
+        resolve_rebalance_timestamps(
+            times,
+            RebalanceSchedule.weekly(),
+            calendar=None,
+            feed_spec=FeedSpec(time_contract_version=2, calendar="NYSE"),
+        )
+
+
+def test_schedule_omission_inherits_distinct_continuous_metadata():
+    times = [datetime(2025, 7, day, tzinfo=UTC) for day in (11, 12, 14)]
+    resolved = resolve_rebalance_timestamps(
+        times,
+        RebalanceSchedule.every_session(),
+        feed_spec=FeedSpec(time_contract_version=2, calendar="crypto", data_frequency="daily"),
+    )
+    assert resolved.to_list() == times
+
+
+def test_schedule_omission_without_metadata_uses_nyse():
+    times = [datetime(2025, 7, day, tzinfo=UTC) for day in (11, 12, 14)]
+    resolved = resolve_rebalance_timestamps(
+        times, RebalanceSchedule.every_session(), data_frequency="daily"
+    )
+    assert resolved.to_list() == [times[0], times[2]]
+
+
+def test_executor_default_uses_nyse_but_explicit_none_requires_weekly_calendar():
+    executor = TargetWeightExecutor(
+        RebalanceConfig(schedule=RebalanceSchedule.weekly(), data_frequency="daily")
+    )
+    assert executor.should_rebalance(datetime(2025, 7, 11, tzinfo=UTC))
+    with pytest.raises(ValueError, match="require calendar"):
+        TargetWeightExecutor(RebalanceConfig(schedule=RebalanceSchedule.weekly(), calendar=None))
+
+
+def test_standalone_observation_equity_is_invariant_to_timestamp_spacing():
+    curves = [
+        EquityCurve(
+            values=[100.0, 110.0, 120.0],
+            timestamps=[datetime(2025, 7, d, tzinfo=UTC) for d in days],
+            observation_based=True,
+        )
+        for days in ((11, 12, 13), (11, 12, 20))
+    ]
+    assert [curve.periods_per_year for curve in curves] == [252.0, 252.0]
+    assert curves[0].cagr == curves[1].cagr
+
+
+def test_daily_event_time_executor_waits_for_actual_cme_close():
+    executor = TargetWeightExecutor(
+        RebalanceConfig(
+            schedule=RebalanceSchedule.every_session(),
+            calendar="CME_Equity",
+            data_frequency="daily",
+            timestamp_semantics=TimestampSemantics.EVENT_TIME,
+        )
+    )
+    assert not executor.should_rebalance(datetime(2025, 7, 6, 23, 30, tzinfo=UTC))
+    assert not executor.should_rebalance(datetime(2025, 7, 7, 0, 30, tzinfo=UTC))
+    assert executor.should_rebalance(datetime(2025, 7, 7, 21, tzinfo=UTC))
+
+
+def test_direct_schedule_nyse_default_does_not_rebalance_on_saturday():
+    timestamp = datetime(2025, 7, 12, tzinfo=UTC)
+    assert not is_rebalance_timestamp(
+        timestamp, RebalanceSchedule.every_session(), session_index=1, data_frequency="daily"
+    )
+    assert is_rebalance_timestamp(
+        timestamp,
+        RebalanceSchedule.every_session(),
+        session_index=1,
+        calendar=None,
+        data_frequency="daily",
+    )

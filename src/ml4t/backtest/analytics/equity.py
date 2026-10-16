@@ -80,7 +80,7 @@ class EquityCurve:
 
     @property
     def years(self) -> float:
-        """Duration in years based on elapsed wall-clock time."""
+        """Duration in observation periods or elapsed wall-clock years."""
         if self.observation_based:
             return max(len(self.values) - 1, 0) / self.periods_per_year
         if len(self.timestamps) >= 2:
@@ -94,6 +94,8 @@ class EquityCurve:
         """Annualization factor, preferring configured cadence over elapsed-time inference."""
         if self.periods_per_year_override is not None:
             return float(self.periods_per_year_override)
+        if self.observation_based:
+            return float(TRADING_DAYS_PER_YEAR)
         if len(self.values) < 2 or len(self.timestamps) < 2:
             return float(TRADING_DAYS_PER_YEAR)
         elapsed_seconds = (self.timestamps[-1] - self.timestamps[0]).total_seconds()
