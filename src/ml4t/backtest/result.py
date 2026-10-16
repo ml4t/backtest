@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import polars as pl
+from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
 try:
@@ -218,9 +219,11 @@ class BacktestResult:
             return None
         return self.config.resolved_feed_spec
 
-    def _auto_session_aligned(self, calendar: str | None = None) -> bool:
+    def _auto_session_aligned(self, calendar: str | None | CalendarUnset = UNSET_CALENDAR) -> bool:
         timestamps = [ts for ts, _ in self.equity_curve]
-        resolved_calendar = calendar or (self.config.resolved_calendar if self.config else None)
+        resolved_calendar = (
+            self._feed_spec() or FeedSpec(time_contract_version=2)
+        ).resolve_calendar(calendar=calendar)
         return should_session_align(
             calendar=resolved_calendar,
             feed_spec=self._feed_spec(),
@@ -502,6 +505,16 @@ class BacktestResult:
         ).sort("timestamp")
         return self._portfolio_state_df
 
+    def _session_pnl(self, calendar: str) -> pl.DataFrame:
+        from .sessions import SessionConfig, compute_session_pnl
+
+        session_config = SessionConfig(
+            calendar=calendar,
+            timezone=self.config.resolved_timezone if self.config else "UTC",
+            session_start_time=self.config.resolved_session_start_time if self.config else None,
+        )
+        return compute_session_pnl(self.equity_curve, session_config)
+
     def to_daily_pnl(self, session_aligned: bool = False) -> pl.DataFrame:
         """Get daily P&L DataFrame.
 
@@ -534,15 +547,7 @@ class BacktestResult:
         equity_df = self.to_equity_dataframe()
 
         if session_aligned and self.config and self.config.resolved_calendar:
-            # Use session alignment
-            from .sessions import SessionConfig, compute_session_pnl
-
-            session_config = SessionConfig(
-                calendar=self.config.resolved_calendar,
-                timezone=self.config.resolved_timezone,
-                session_start_time=self.config.resolved_session_start_time,
-            )
-            return compute_session_pnl(self.equity_curve, session_config)
+            return self._session_pnl(self.config.resolved_calendar)
 
         # Default: calendar day aggregation
         daily = (
@@ -587,14 +592,14 @@ class BacktestResult:
 
     def to_daily_returns(
         self,
-        calendar: str | None = None,
+        calendar: str | None | CalendarUnset = UNSET_CALENDAR,
         session_aligned: bool | None = None,
     ) -> pl.Series:
         """Get daily returns as Polars Series for ml4t-diagnostic integration.
 
-        This method properly aggregates bar-level equity to daily returns,
-        which is the correct input for computing risk metrics like Sharpe ratio.
-        For intraday data, using bar-level returns would give incorrect results.
+        Omission or a named calendar aggregates bar-level equity to daily returns.
+        In temporal v2, explicit None instead retains observation-level returns;
+        use the matching declared annualization scale for downstream metrics.
 
         Args:
             calendar: Trading calendar for context. If provided and known,
@@ -602,7 +607,8 @@ class BacktestResult:
                 - "crypto": 365 days/year (24/7)
                 - "NYSE", "NASDAQ": 252 days/year
                 - "CME_Equity", etc: Uses pandas_market_calendars
-                If None, uses config calendar or defaults to calendar day boundaries.
+                Omission uses the config calendar. In temporal v2, explicit None returns
+                one return per observation without daily aggregation.
             session_aligned: If True, align to trading sessions (e.g., CME 5pm CT).
                 If None, auto-detect from calendar (True for CME, False for crypto).
                 If False, use calendar day boundaries.
@@ -617,13 +623,27 @@ class BacktestResult:
             >>> from ml4t.diagnostic.evaluation.metrics.risk_adjusted import sharpe_ratio
             >>> sharpe = sharpe_ratio(daily_returns.to_numpy(), annualization_factor=252)
         """
-        # Determine session alignment
+        config_calendar = self.config.resolved_calendar if self.config else None
+        v2 = self.config is not None and self.config.time_contract_version == 2
+        if v2:
+            cal = FeedSpec(time_contract_version=2, calendar=config_calendar).resolve_calendar(
+                calendar=calendar
+            )
+            if cal is None:
+                if session_aligned:
+                    raise ValueError("session_aligned=True requires a calendar")
+                return self.to_returns_series().alias("daily_return")
+        else:
+            cal = calendar if isinstance(calendar, str) else config_calendar
         if session_aligned is None:
-            cal = calendar or (self.config.resolved_calendar if self.config else None)
             session_aligned = self._auto_session_aligned(cal)
 
         # Get daily P&L DataFrame
-        daily_df = self.to_daily_pnl(session_aligned=session_aligned)
+        daily_df = (
+            self._session_pnl(cal)
+            if session_aligned and cal is not None
+            else self.to_daily_pnl(session_aligned=False)
+        )
 
         if daily_df.is_empty():
             return pl.Series("daily_return", [], dtype=pl.Float64)

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
 from ..calendar import get_schedule
@@ -85,7 +86,7 @@ def resolve_periods_per_year(
 
 def should_session_align(
     *,
-    calendar: str | None,
+    calendar: str | None | CalendarUnset = UNSET_CALENDAR,
     feed_spec: FeedSpec | Any | None = None,
     timestamps: Sequence[datetime] | None = None,
 ) -> bool:
@@ -98,7 +99,8 @@ def should_session_align(
     if semantics == TimestampSemantics.SESSION_LABEL:
         return False
 
-    resolved_calendar = calendar if calendar is not None else (spec.calendar if spec else None)
+    resolver = spec if spec is not None else FeedSpec(time_contract_version=2)
+    resolved_calendar = resolver.resolve_calendar(calendar=calendar)
     if resolved_calendar is None:
         return False
 

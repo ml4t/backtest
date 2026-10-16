@@ -26,6 +26,7 @@ from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
 from .lifecycle import LifecycleDispatcher
 from .preopen import default_execution_policy
+from .sessions import session_date_for_timestamp
 from .strategy import Strategy
 from .types import ExecutionMode, OrderSide, OrderType
 
@@ -374,7 +375,14 @@ class Engine:
                     session_date = (
                         self.feed._session_by_timestamp[timestamp]
                         if session_mode
-                        else timestamp.date()
+                        else session_date_for_timestamp(
+                            timestamp,
+                            calendar=calendar_id,
+                            timezone=self.config.resolved_timezone,
+                            session_start_time=self.config.resolved_session_start_time,
+                            data_frequency=self.config.resolved_data_frequency,
+                            timestamp_semantics=self.config.resolved_timestamp_semantics,
+                        )
                     )
                     if not is_trading_day_fn(calendar_id, session_date):
                         self._skipped_bars += 1

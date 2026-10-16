@@ -269,10 +269,51 @@ objects and executor mode behavior.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `calendar` | str \| None | None | Exchange calendar ("NYSE", "CME_Equity", "LSE", etc.) |
+| `calendar` | str \| None | omitted | Explicit name or `None`; omission inherits declared feed metadata, then NYSE. |
 | `timezone` | str | "UTC" | Timezone for naive datetimes |
 | `data_frequency` | DataFrequency | DAILY | Data frequency (DAILY, 1m, 5m, 15m, 30m, 1h) |
 | `enforce_sessions` | bool | False | Skip bars outside trading sessions |
+
+New Python configs use `time_contract_version=2`. Explicit `calendar=None` disables
+calendar handling, even when the feed declares an exchange. Omission inherits a declared
+feed calendar, including explicit null in a v2 `FeedSpec`; otherwise it resolves to NYSE.
+A named continuous calendar still defines a schedule and is not observation mode.
+Inspect `config.resolved_calendar` for the effective selection.
+
+<!-- ml4t-doc-test: calendar-selection-v2 -->
+```python
+from ml4t.backtest import BacktestConfig
+from ml4t.specs import FeedSpec
+
+metadata = FeedSpec(time_contract_version=2, calendar="CME_Equity")
+assert BacktestConfig(feed_spec=metadata).resolved_calendar == "CME_Equity"
+assert BacktestConfig(calendar=None, feed_spec=metadata).resolved_calendar is None
+assert BacktestConfig().resolved_calendar == "NYSE"
+print(BacktestConfig(feed_spec=metadata).resolved_calendar)
+print(BacktestConfig(calendar=None, feed_spec=metadata).resolved_calendar)
+print(BacktestConfig().resolved_calendar)
+```
+
+<!-- ml4t-doc-output: calendar-selection-v2 -->
+```text
+CME_Equity
+None
+NYSE
+```
+
+In observation mode, annualized metrics use 252 observations per numerical year by
+default, regardless of timestamp spacing or `data_frequency`. This is a numerical
+convention, not a claim about exchange sessions. Set a positive finite `periods_per_year`
+to choose another scale; the override also survives config serialization. Calendar-free
+CAGR measures elapsed observations at that scale. A legacy payload without
+`calendar.time_contract_version` remains version 1, including its old null-as-inheritance
+behavior. Use `to_dict()` or `to_yaml()` to retain the v2 distinction between omission
+and explicit null; do not relabel an old payload without deciding what its null means.
+
+Calendar v2 on this development branch requires Specs source commit
+`701bde68744035050ede386efce498234c661c21`, pinned in the dependency declaration.
+The PyPI package numbered 0.1.5 does not contain this API. The pending Backtest 0.1.13
+release does not include this next-version behavior.
 
 ### Feed Contract
 
@@ -302,6 +343,8 @@ Supported keys mirror `FeedSpec`:
 - `bar_type`
 - `timestamp_semantics`
 - `session_start_time`
+- `time_contract_version`
+- `bar_grid_anchor`, `bar_label`, and `partial_bar_policy` (preserved v2 declarations)
 
 `session_start_time` can override an evening session boundary. Morning-start sessions use the
 local calendar date, so morning values must match the configured calendar's standard open.

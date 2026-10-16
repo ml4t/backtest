@@ -1089,11 +1089,11 @@ class TestRunBacktestWithConfig:
         )
 
         assert strategy.seen_config is not None
-        assert strategy.seen_config.calendar == "NYSE"
+        assert strategy.seen_config.resolved_calendar == "NYSE"
         assert strategy.seen_config.timezone == "America/New_York"
         assert strategy.seen_config.data_frequency == DataFrequency.MINUTE_1
         assert result.config is not None
-        assert result.config.calendar == "NYSE"
+        assert result.config.resolved_calendar == "NYSE"
 
     def test_run_backtest_preserves_explicit_runtime_config_over_feed_spec(self):
         """Explicit runtime config should not be overwritten by feed metadata."""
@@ -1140,7 +1140,7 @@ class TestRunBacktestWithConfig:
         )
 
         assert strategy.seen_config is not None
-        assert strategy.seen_config.calendar == "NYSE"
+        assert strategy.seen_config.resolved_calendar == "NYSE"
         assert strategy.seen_config.timezone == "UTC"
         assert strategy.seen_config.data_frequency == DataFrequency.DAILY
         assert result.config is not None

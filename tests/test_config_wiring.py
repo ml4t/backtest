@@ -2007,10 +2007,10 @@ class TestImmediateFill:
 
 
 class TestFromDictDefaultParity:
-    """from_dict({}) must produce the same defaults as BacktestConfig()."""
+    """Versioned payload defaults preserve the appropriate temporal boundary."""
 
-    def test_empty_dict_matches_constructor_defaults(self):
-        default = BacktestConfig()
+    def test_legacy_empty_dict_preserves_legacy_constructor_defaults(self):
+        default = BacktestConfig(time_contract_version=1)
         from_empty = BacktestConfig.from_dict({})
 
         assert from_empty == default
@@ -2040,7 +2040,7 @@ class TestFeedSpecConfigResolution:
         )
 
         assert isinstance(config.feed_spec, FeedSpec)
-        assert config.calendar == "NYSE"
+        assert config.resolved_calendar == "NYSE"
         assert config.timezone == "America/New_York"
         assert config.data_frequency == DataFrequency.MINUTE_1
 
@@ -2055,7 +2055,7 @@ class TestFeedSpecConfigResolution:
 
     def test_constructor_rejects_unverifiable_morning_session_boundary(self):
         with pytest.raises(ValueError, match="requires exchange calendar metadata"):
-            BacktestConfig(feed_spec=FeedSpec(session_start_time="09:30"))
+            BacktestConfig(calendar=None, feed_spec=FeedSpec(session_start_time="09:30"))
 
     def test_resolved_feed_spec_preserves_explicit_runtime_over_feed_metadata(self):
         config = BacktestConfig(
@@ -2098,7 +2098,7 @@ class TestFeedSpecConfigResolution:
 
         assert merged is not config
         assert merged.feed_spec is not None
-        assert merged.calendar == "NYSE"
+        assert merged.resolved_calendar == "NYSE"
         assert merged.timezone == "America/New_York"
         assert merged.data_frequency == DataFrequency.MINUTE_1
         assert merged._explicit_timezone is False
@@ -2115,7 +2115,7 @@ class TestFeedSpecConfigResolution:
             )
         )
 
-        assert merged.calendar == "NYSE"
+        assert merged.resolved_calendar == "NYSE"
         assert merged.timezone == "UTC"
         assert merged.data_frequency == DataFrequency.DAILY
         assert merged._explicit_timezone is True
