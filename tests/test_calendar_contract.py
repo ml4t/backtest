@@ -328,3 +328,52 @@ def test_declared_input_disable_survives_legacy_undeclared_config_feed_metadata(
     assert len(seen) == 3
     restored = BacktestConfig.from_dict(json.loads(json.dumps(result.config.to_dict())))
     assert restored.resolved_calendar is None
+
+
+@pytest.mark.parametrize("frequency", [DataFrequency.DAILY, DataFrequency.HOURLY])
+@pytest.mark.parametrize("semantics", [TimestampSemantics.EVENT_TIME, TimestampSemantics.BAR_CLOSE])
+def test_explicit_instants_reject_preopen_and_afterclose_at_each_frequency(frequency, semantics):
+    times = [datetime(2025, 7, 11, hour, tzinfo=UTC) for hour in (12, 15, 22)]
+    _, seen = run_engine(
+        BacktestConfig(calendar="NYSE", enforce_sessions=True, data_frequency=frequency),
+        metadata=FeedSpec(timestamp_semantics=semantics),
+        times=times,
+    )
+    assert seen == [times[1]]
+
+
+@pytest.mark.parametrize("frequency", [DataFrequency.DAILY, DataFrequency.HOURLY])
+def test_explicit_session_labels_use_dates_instead_of_intraday_hours(frequency):
+    result, seen = run_engine(
+        BacktestConfig(calendar="NYSE", enforce_sessions=True, data_frequency=frequency),
+        metadata=FeedSpec(timestamp_semantics=TimestampSemantics.SESSION_LABEL),
+    )
+    assert [timestamp.day for timestamp in seen] == [11, 14]
+    assert result.metrics["skipped_bars"] == 1
+
+
+@pytest.mark.parametrize("frequency", [DataFrequency.DAILY, DataFrequency.HOURLY])
+def test_offsession_funding_is_rejected_before_strategy_starts_for_instants(frequency):
+    class RecordStart(RecordBars):
+        started = False
+
+        def on_start(self, broker):
+            self.started = True
+
+    times = [datetime(2025, 7, 11, hour, tzinfo=UTC) for hour in (12, 15, 22)]
+    prices = pl.DataFrame({"timestamp": times, "asset": ["TEST"] * 3, "close": [10.0, 11.0, 12.0]})
+    strategy = RecordStart()
+    engine = Engine(
+        DataFeed(
+            prices_df=prices,
+            feed_spec=FeedSpec(timestamp_semantics=TimestampSemantics.EVENT_TIME),
+        ),
+        strategy,
+        BacktestConfig(calendar="NYSE", enforce_sessions=True, data_frequency=frequency),
+        funding_df=pl.DataFrame({"timestamp": [times[0]], "asset": ["TEST"], "rate": [0.01]}),
+    )
+    with pytest.raises(ValueError, match="funding event timestamp is excluded"):
+        engine.run()
+    assert strategy.started is False
+    assert strategy.seen == []
+    assert engine.broker.fills == []

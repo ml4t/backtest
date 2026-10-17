@@ -15,6 +15,7 @@ from ml4t.specs import (
     HistoricalStrategyCompatibilityError,
     LifecyclePhase,
     LifecycleVersion,
+    TimestampSemantics,
     negotiate_lifecycle_version,
 )
 
@@ -198,17 +199,19 @@ class Engine:
         # Lazy calendar initialization (zero cost if unused)
         is_trading_day_fn = None
         valid_intraday_bar_mask: bytearray | None = None
+        use_session_labels = False
         timestamps = self.feed.timestamps
         if self.config and self.config.resolved_calendar:
             from .calendar import filter_to_trading_sessions, get_calendar, is_trading_day
 
             self._calendar = get_calendar(self.config.resolved_calendar)
             is_trading_day_fn = is_trading_day
+            semantics = self.config.resolved_timestamp_semantics
+            use_session_labels = semantics == TimestampSemantics.SESSION_LABEL or (
+                semantics is None and self.config.resolved_data_frequency == DataFrequency.DAILY
+            )
 
-            if (
-                self.config.enforce_sessions
-                and self.config.resolved_data_frequency != DataFrequency.DAILY
-            ):
+            if self.config.enforce_sessions and not use_session_labels:
                 prices_frame = self.feed.prices
                 timestamp_dtype = (
                     prices_frame.schema[self.feed.feed_spec.timestamp_col]
@@ -324,7 +327,7 @@ class Engine:
                     valid_intraday_bar_mask[index] = 1
 
         if self._funding_events and self.config.enforce_sessions and self._calendar:
-            if self.config.resolved_data_frequency == DataFrequency.DAILY:
+            if use_session_labels:
                 assert is_trading_day_fn is not None
                 calendar_id = self.config.resolved_calendar
                 assert calendar_id is not None
@@ -370,8 +373,8 @@ class Engine:
                 and self.config.enforce_sessions
                 and is_trading_day_fn
             ):
-                # Daily bars use valid dates. Intraday bars use precomputed session intervals.
-                if self.config.resolved_data_frequency == DataFrequency.DAILY:
+                # Session labels use dates; instants use precomputed session intervals.
+                if use_session_labels:
                     session_date = (
                         self.feed._session_by_timestamp[timestamp]
                         if session_mode

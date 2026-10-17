@@ -281,6 +281,9 @@ A named continuous calendar still defines a schedule and is not observation mode
 Inspect `config.resolved_calendar` for the effective selection.
 When `config.feed_spec` leaves a calendar or other time field undeclared, the Engine inherits
 that field from the `DataFeed` metadata. A declaration in `config.feed_spec` takes precedence.
+With `enforce_sessions=True`, `event_time` and `bar_close` timestamps use actual session intervals;
+`session_label` timestamps use trading dates. Frequency supplies this distinction only when
+timestamp semantics are undeclared.
 
 <!-- ml4t-doc-test: calendar-selection-v2 -->
 ```python
