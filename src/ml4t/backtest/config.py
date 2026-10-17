@@ -797,7 +797,11 @@ class BacktestConfig:
 
     def __new__(cls, *args: Any, **kwargs: Any):
         instance = super().__new__(cls)
-        field_names = [name for name, value in cls.__dataclass_fields__.items() if value.init]
+        field_names = [
+            name
+            for name, value in cls.__dataclass_fields__.items()
+            if value.init and not value.kw_only
+        ]
         provided = set(kwargs)
         provided.update(field_names[: len(args)])
         instance._provided_init_fields = provided

@@ -1,5 +1,6 @@
 """Public Engine regressions for calendar declaration and observation semantics."""
 
+import inspect
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -257,3 +258,21 @@ def test_direct_schedule_nyse_default_does_not_rebalance_on_saturday():
         calendar=None,
         data_frequency="daily",
     )
+
+
+def test_positional_timezone_and_frequency_override_feed_metadata_in_engine():
+    arguments = []
+    overrides = {"calendar": None, "timezone": "UTC", "data_frequency": DataFrequency.HOURLY}
+    for name, parameter in inspect.signature(BacktestConfig.__init__).parameters.items():
+        if name == "self" or parameter.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD:
+            continue
+        arguments.append(overrides.get(name, parameter.default))
+        if name == "data_frequency":
+            break
+    config = BacktestConfig(
+        *arguments,
+        feed_spec=FeedSpec(timezone="America/New_York", data_frequency="daily"),
+    )
+    result, _ = run_engine(config)
+    assert result.config.resolved_timezone == "UTC"
+    assert result.config.resolved_data_frequency == DataFrequency.HOURLY
