@@ -110,9 +110,8 @@ def test_minimum_dependency_matrix_proves_declared_lower_bounds() -> None:
         if (requirement := Requirement(dependency)).name == "ml4t-specs"
     ]
     assert len(specs_dependencies) == 1
-    assert specs_dependencies[0].url == (
-        "git+https://github.com/ml4t/specs.git@701bde68744035050ede386efce498234c661c21"
-    )
+    assert specs_dependencies[0].url is None
+    assert str(specs_dependencies[0].specifier) == ">=0.2.0"
 
 
 def test_merge_and_release_builds_depend_on_compatibility_gate() -> None:

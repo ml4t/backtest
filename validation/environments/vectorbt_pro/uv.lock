@@ -229,7 +229,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
-    { name = "ml4t-specs", url = "https://github.com/ml4t/specs/archive/701bde68744035050ede386efce498234c661c21.tar.gz" },
+    { name = "ml4t-specs", specifier = ">=0.2.0" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.3.2" },
@@ -305,21 +305,15 @@ requires-dist = [
 
 [[package]]
 name = "ml4t-specs"
-version = "0.1.5"
-source = { url = "https://github.com/ml4t/specs/archive/701bde68744035050ede386efce498234c661c21.tar.gz" }
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { hash = "sha256:484e72c37363e74a97502c03344dafdead6e0ffd57ac8ca902704155a6554e1f" }
-
-[package.metadata]
-requires-dist = [
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6,<2" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5,<10" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24,<2" },
-    { name = "pyyaml", specifier = ">=6.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/2e/46/c734e5bcac1f214c83423243023b5d313bccabd25563da4e7d5e6b80f9f4/ml4t_specs-0.2.0.tar.gz", hash = "sha256:e5d5d614f71d14223341f992009d0d0bf14f30a8398c50872d2b3fb80fd33d82", size = 59749, upload-time = "2026-10-17T18:21:32.512Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/66/ff/bfc427bb71635f31cb240330aa2b1b486748999f05a5922ee5f58df721fe/ml4t_specs-0.2.0-py3-none-any.whl", hash = "sha256:cfd550d19b469f1b083d6ac3f83b235fe71aee19c28465f2ac2c8620064bae61", size = 36946, upload-time = "2026-10-17T18:21:30.964Z" },
 ]
-provides-extras = ["docs"]
 
 [[package]]
 name = "mypy-extensions"
