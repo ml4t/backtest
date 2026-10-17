@@ -117,9 +117,9 @@ variation-cash settlement method. The current leveraged ledger moves full signed
 notional through cash at fills, then includes the signed position market value
 in equity. A leveraged account's cash balance can therefore be negative.
 
-[CME's settlement calculation](https://www.cmegroup.com/clearing/files/CME-Money-Calculations-Futures-and-Options.pdf)
-instead posts daily futures price changes as cash variation. Backtest does not
-currently implement that settlement ledger. Compare cash, collateral and
+[The CFTC's mark-to-market definition](https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/CFTCGlossary/index.htm)
+describes daily futures cash flows from price changes. Backtest does not
+currently implement that variation-cash ledger. Compare cash, collateral and
 settlement timing separately when migrating a futures strategy; a matching
 terminal equity or contract P&L does not prove those fields match.
 
