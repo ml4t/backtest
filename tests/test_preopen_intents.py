@@ -585,8 +585,8 @@ def test_same_session_target_registered_after_market_event_is_rejected_without_o
 def test_decision_at_open_is_rejected_before_order_or_account_mutation() -> None:
     intent = replace(
         target_intent(),
-        decision_time=datetime(2026, 8, 3, tzinfo=UTC),
-        information_cutoff=datetime(2026, 8, 3, tzinfo=UTC),
+        decision_time=datetime(2026, 8, 3, 13, 30, tzinfo=UTC),
+        information_cutoff=datetime(2026, 8, 3, 13, 30, tzinfo=UTC),
     )
     engine = Engine(DataFeed(prices_df=prices()), InitialTargetStrategy(intent))
 

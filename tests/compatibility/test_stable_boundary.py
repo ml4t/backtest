@@ -14,7 +14,7 @@ import yaml
 from ml4t.backtest import ArtifactManifestError, BacktestResult, Broker
 
 _ROOT = Path(__file__).parents[2]
-_SNAPSHOT = _ROOT / "tests" / "compatibility" / "snapshots" / "v0.1.json"
+_SNAPSHOT = _ROOT / "tests" / "compatibility" / "snapshots" / "v0.2.json"
 _BETA_ARTIFACT = _ROOT / "tests" / "fixtures" / "artifacts" / "v0.1.0b22"
 
 

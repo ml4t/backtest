@@ -9,6 +9,7 @@ from datetime import date, datetime
 from typing import Any
 
 import polars as pl
+from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
 
@@ -105,6 +106,7 @@ class DataFeed:
         bid_size_col: str | None = None,
         ask_size_col: str | None = None,
         session_col: str | None = None,
+        calendar: str | None | CalendarUnset = UNSET_CALENDAR,
     ):
         if feed_spec is not None and contract is not None:
             raise ValueError("Pass either feed_spec or contract, not both")
@@ -135,7 +137,16 @@ class DataFeed:
         if self.prices is None:
             raise ValueError("prices_path or prices_df required")
 
-        raw_spec = FeedSpec.from_any(feed_spec if feed_spec is not None else contract)
+        metadata = feed_spec if feed_spec is not None else contract
+        raw_spec = (
+            FeedSpec.from_any(metadata)
+            if metadata is not None
+            else FeedSpec(time_contract_version=2)
+        )
+        if calendar is not UNSET_CALENDAR:
+            raw_spec = raw_spec.with_overrides(
+                time_contract_version=2, calendar=raw_spec.resolve_calendar(calendar=calendar)
+            )
         default_price_col = FeedSpec().price_col
         price_col_is_explicit = price_col is not None or raw_spec.price_col != default_price_col
         self.feed_spec = raw_spec.with_overrides(

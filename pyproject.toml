@@ -79,7 +79,7 @@ requires-python = ">=3.12"
 
 # Core dependencies
 dependencies = [
-    "ml4t-specs>=0.1.4,<0.2",
+    "ml4t-specs @ https://github.com/ml4t/specs/archive/701bde68744035050ede386efce498234c661c21.tar.gz#sha256=484e72c37363e74a97502c03344dafdead6e0ffd57ac8ca902704155a6554e1f",
     "polars>=1.36.1",
     "pandas>=2.3.3; python_version < '3.15'",
     "pandas>=3.0.5; python_version >= '3.15'",
@@ -261,3 +261,6 @@ exclude_lines = [
     "except ImportError:",
     "@abstractmethod",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
