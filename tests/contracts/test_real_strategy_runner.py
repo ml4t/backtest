@@ -632,10 +632,11 @@ def test_unreviewed_dependency_change_invalidates_timings(
     assert benchmark.report_failures(report, correctness) == []
 
     lock = tmp_path / "uv.lock"
-    original = benchmark.DEPENDENCY_PATHS["uv.lock"].read_text()
-    lock.write_text(original.replace('version = "0.2.0"', 'version = "0.2.1"'))
-    assert lock.read_text() != original
-    monkeypatch.setitem(benchmark.DEPENDENCY_PATHS, "uv.lock", lock)
+    dependency = "validation/environments/vectorbt_pro/uv.lock"
+    original = benchmark.DEPENDENCY_PATHS[dependency].read_bytes()
+    lock.write_bytes((validation / "environments/vectorbt_pro_2025_12_31/uv.lock").read_bytes())
+    assert lock.read_bytes() != original
+    monkeypatch.setitem(benchmark.DEPENDENCY_PATHS, dependency, lock)
 
     assert any(
         "performance-impact review" in failure
