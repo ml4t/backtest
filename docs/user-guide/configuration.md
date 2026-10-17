@@ -270,6 +270,8 @@ objects and executor mode behavior.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `calendar` | str \| None | omitted | Explicit name or `None`; omission inherits declared feed metadata, then NYSE. |
+| `time_contract_version` | int | 2 | Version 1 retains legacy null handling; version 2 distinguishes omission and explicit null. |
+| `periods_per_year` | float \| None | None | Optional positive finite return-period scale; observation mode defaults to 252. |
 | `timezone` | str | "UTC" | Timezone for naive datetimes |
 | `data_frequency` | DataFrequency | DAILY | Data frequency (DAILY, 1m, 5m, 15m, 30m, 1h) |
 | `enforce_sessions` | bool | False | Skip bars outside trading sessions |
