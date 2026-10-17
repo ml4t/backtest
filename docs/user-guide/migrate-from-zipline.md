@@ -77,6 +77,7 @@ result = Engine(
     DataFeed(prices_df=prices),
     strategy,
     BacktestConfig(
+        calendar=None,
         initial_cash=100_000,
         execution_mode=ExecutionMode.NEXT_BAR,
         share_type=ShareType.INTEGER,
@@ -84,6 +85,7 @@ result = Engine(
         slippage_type=SlippageType.NONE,
     ),
 ).run()
+assert result.config.resolved_calendar is None
 print("ml4t-backtest " + version("ml4t-backtest"))
 print(f"input: {prices.height} synthetic AAPL bars")
 for timestamp, target in strategy.decisions:
@@ -119,6 +121,17 @@ example passes a `BacktestResult` to `ml4t-diagnostic==0.1.4` and computes
 return and drawdown statistics.
 
 ## Check a migrated run
+
+The retained comparisons pin [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/),
+using the source distribution SHA-256
+`4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f`.
+The [framework manifest](https://github.com/ml4t/backtest/blob/dea188c6ecf832a4adeeef4e211489c5dd424b55/validation/framework_targets.toml)
+records that identity. The [real-strategy report](https://github.com/ml4t/backtest/blob/dea188c6ecf832a4adeeef4e211489c5dd424b55/validation/REAL_STRATEGY_RESULTS.json)
+covers ETF allocation and a US-equity panel under the frozen zero-cost protocol;
+the [synthetic report](https://github.com/ml4t/backtest/blob/dea188c6ecf832a4adeeef4e211489c5dd424b55/validation/CORRECTNESS_RESULTS.json)
+and [Profiles](profiles.md) state the remaining supported and excluded surfaces.
+These comparisons do not establish parity for arbitrary bundles, corporate
+actions, history queries or scheduling rules.
 
 1. Export Zipline's ordered transactions and portfolio values. Preserve the
    package version, bundle ingestion timestamp, asset IDs and lifetimes,
