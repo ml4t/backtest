@@ -896,6 +896,36 @@ class BacktestConfig:
             return self
 
         effective_feed_spec = FeedSpec.from_any(effective_feed_spec)
+        if self.time_contract_version == 2 and self.feed_spec is not None and feed_spec is not None:
+            input_spec = FeedSpec.from_any(feed_spec)
+            calendar = effective_feed_spec.calendar
+            calendar_inherited = False
+            if calendar is UNSET_CALENDAR or (
+                effective_feed_spec.time_contract_version == 1 and calendar is None
+            ):
+                calendar = input_spec.calendar
+                if input_spec.time_contract_version == 1 and calendar is None:
+                    calendar = UNSET_CALENDAR
+                calendar_inherited = calendar is not UNSET_CALENDAR
+            inherited_time = {
+                name: getattr(input_spec, name)
+                for name in (
+                    "timezone",
+                    "data_frequency",
+                    "bar_type",
+                    "timestamp_semantics",
+                    "session_start_time",
+                    "bar_grid_anchor",
+                    "bar_label",
+                    "partial_bar_policy",
+                )
+                if getattr(effective_feed_spec, name) is None
+                and getattr(input_spec, name) is not None
+            }
+            if calendar_inherited or inherited_time:
+                effective_feed_spec = effective_feed_spec.with_overrides(
+                    time_contract_version=2, calendar=calendar, **inherited_time
+                )
         updates: dict[str, Any] = {"feed_spec": effective_feed_spec}
         if (
             self.time_contract_version == 1

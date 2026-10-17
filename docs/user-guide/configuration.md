@@ -279,6 +279,8 @@ calendar handling, even when the feed declares an exchange. Omission inherits a 
 feed calendar, including explicit null in a v2 `FeedSpec`; otherwise it resolves to NYSE.
 A named continuous calendar still defines a schedule and is not observation mode.
 Inspect `config.resolved_calendar` for the effective selection.
+When `config.feed_spec` leaves a calendar or other time field undeclared, the Engine inherits
+that field from the `DataFeed` metadata. A declaration in `config.feed_spec` takes precedence.
 
 <!-- ml4t-doc-test: calendar-selection-v2 -->
 ```python

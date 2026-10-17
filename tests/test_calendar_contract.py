@@ -276,3 +276,55 @@ def test_positional_timezone_and_frequency_override_feed_metadata_in_engine():
     result, _ = run_engine(config)
     assert result.config.resolved_timezone == "UTC"
     assert result.config.resolved_data_frequency == DataFrequency.HOURLY
+
+
+@pytest.mark.parametrize("metadata_version", [1, 2])
+def test_undeclared_config_feed_calendar_does_not_mask_input_time_metadata(metadata_version):
+    declared = FeedSpec(time_contract_version=metadata_version)
+    config = BacktestConfig(feed_spec=declared, enforce_sessions=True)
+    times = [
+        datetime(2025, 7, 6, 23, 30, tzinfo=UTC),
+        datetime(2025, 7, 7, 0, 30, tzinfo=UTC),
+        datetime(2025, 7, 7, 1, 30, tzinfo=UTC),
+    ]
+    result, seen = run_engine(
+        config,
+        metadata=FeedSpec(
+            time_contract_version=2,
+            calendar="CME_Equity",
+            timezone="America/Chicago",
+            data_frequency="1h",
+            timestamp_semantics=TimestampSemantics.EVENT_TIME,
+        ),
+        times=times,
+    )
+    assert result.config.resolved_calendar == "CME_Equity"
+    assert result.config.resolved_timezone == "America/Chicago"
+    assert result.config.resolved_data_frequency == DataFrequency.HOURLY
+    assert result.config.resolved_timestamp_semantics == TimestampSemantics.EVENT_TIME
+    assert len(seen) == 3
+    assert config.feed_spec is declared
+    assert declared.calendar is (None if metadata_version == 1 else UNSET_CALENDAR)
+
+
+@pytest.mark.parametrize("selection,expected,count", [(None, None, 3), ("NYSE", "NYSE", 2)])
+def test_declared_config_feed_calendar_still_overrides_input_metadata(selection, expected, count):
+    result, seen = run_engine(
+        BacktestConfig(
+            feed_spec=FeedSpec(time_contract_version=2, calendar=selection), enforce_sessions=True
+        ),
+        metadata=FeedSpec(time_contract_version=2, calendar="crypto"),
+    )
+    assert result.config.resolved_calendar == expected
+    assert len(seen) == count
+
+
+def test_declared_input_disable_survives_legacy_undeclared_config_feed_metadata():
+    result, seen = run_engine(
+        BacktestConfig(feed_spec=FeedSpec(), enforce_sessions=True),
+        metadata=FeedSpec(time_contract_version=2, calendar=None),
+    )
+    assert result.config.resolved_calendar is None
+    assert len(seen) == 3
+    restored = BacktestConfig.from_dict(json.loads(json.dumps(result.config.to_dict())))
+    assert restored.resolved_calendar is None
