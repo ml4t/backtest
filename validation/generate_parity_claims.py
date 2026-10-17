@@ -12,6 +12,7 @@ from typing import Any
 from common.correctness_evidence import correctness_report_failures
 from common.framework_registry import load_framework_manifest
 from large_scale_evidence import report_failures as large_scale_report_failures
+from real_strategy_benchmark import applicable_review
 from real_strategy_benchmark import report_failures as real_strategy_performance_failures
 from real_strategy_evidence import report_failures as real_strategy_report_failures
 from scenarios.definitions import SCENARIOS
@@ -227,6 +228,19 @@ def render_claims(
     timing_policy = real_performance["timing_policy"]
     environment = real_performance["environment"]
     excluded = ", ".join(timing_policy["excluded"])
+    review = applicable_review(real_performance, real_strategy)
+    review_lines = (
+        [
+            "",
+            "A performance-impact review retains these measurements for engine source "
+            f"`{review['engine_source_sha256'][:12]}`. The measured source, review rationale "
+            "and current correctness evidence are recorded with the raw samples. "
+            "Measurements are repeated when changes materially affect timed execution; "
+            "a new source revision alone does not require a benchmark rerun.",
+        ]
+        if review is not None
+        else []
+    )
 
     return "\n".join(
         [
@@ -271,6 +285,7 @@ def render_claims(
             "apply only to the named strategy, framework version, frozen input bundle, and "
             f"machine. Raw samples and bootstrap intervals are retained in "
             f"[real-strategy performance evidence]({real_performance_url}).",
+            *review_lines,
             "",
             "### Synthetic diagnostic scenarios",
             "",

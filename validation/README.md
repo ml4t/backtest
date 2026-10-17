@@ -162,6 +162,16 @@ the same frozen targets. Timing excludes input loading, inference, target constr
 preparation, result extraction, serialization, and reporting. The performance runner refuses to
 time a pair that did not pass the retained correctness comparison.
 
+Retain accepted timings when a reviewed change has no material impact on the timed execution.
+Record that decision with `real_strategy_benchmark.py --certify-source --performance-impact none
+--reason 'TIMED-PATH AND DEPENDENCY REVIEW'`. The review requires current correctness evidence and
+binds the exact engine, runners and measurements. It preserves the measurement date, raw samples,
+ratios, environment and original correctness reference. Matching numerical outputs alone is not a
+performance-impact assessment. Material or uncertain timing changes require fresh measurements for
+the affected execution before updating the performance claims. Unchanged native reference engines
+do not need to be rerun solely because Backtest changed; their inputs, settings, dependencies,
+timing boundary and measurement environment must remain applicable.
+
 ### Retained synthetic scale and performance evidence
 
 ```bash

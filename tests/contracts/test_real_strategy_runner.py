@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import statistics
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -418,6 +420,7 @@ def test_certification_alone_publishes_a_later_engine_source() -> None:
         correctness,
         validation / "REAL_STRATEGY_RESULTS.json",
         "Test a later source with unchanged measured behavior",
+        performance_impact="none",
     )
     provenance = report["provenance"]
     certified = provenance["certified_equivalent_sources"]
@@ -441,6 +444,7 @@ def test_malformed_certification_is_refused() -> None:
         correctness,
         validation / "REAL_STRATEGY_RESULTS.json",
         "Test a later source with unchanged measured behavior",
+        performance_impact="none",
     )
 
     for field in ("reason", "correctness_evidence_sha256", "correctness_pairs_passed"):
@@ -448,3 +452,118 @@ def test_malformed_certification_is_refused() -> None:
         del changed["provenance"]["certified_equivalent_sources"][0][field]
         failures = benchmark.report_failures(changed, correctness)
         assert any("Certification 0 lacks" in failure for failure in failures), field
+
+
+def test_correctness_alone_cannot_certify_performance() -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    before = copy.deepcopy(report)
+
+    with pytest.raises(ValueError, match="performance-impact review"):
+        benchmark.certify_source(
+            report, correctness, validation / "REAL_STRATEGY_RESULTS.json", "Outputs still match"
+        )
+
+    assert report == before
+
+
+@pytest.mark.parametrize("impact", ["material", "unknown"])
+def test_material_or_unknown_performance_impact_cannot_reuse_timings(impact) -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    before = copy.deepcopy(report)
+
+    with pytest.raises(ValueError, match="requires fresh measurements"):
+        benchmark.certify_source(
+            report,
+            correctness,
+            validation / "REAL_STRATEGY_RESULTS.json",
+            "Changed timed execution",
+            performance_impact=impact,
+        )
+
+    assert report == before
+
+
+def test_review_cli_preserves_measurements_and_their_original_correctness_run(tmp_path) -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    original = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    report_path = tmp_path / "performance.json"
+    report_path.write_text(json.dumps(original))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(validation / "real_strategy_benchmark.py"),
+            "--certify-source",
+            "--performance",
+            str(report_path),
+            "--performance-impact",
+            "none",
+            "--reason",
+            "Exercise the reviewed-reuse workflow without invoking any measured process.",
+        ],
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    reviewed = json.loads(report_path.read_text())
+    for field in (
+        "generated_at",
+        "records",
+        "environment",
+        "timing_policy",
+        "correctness_evidence_generated_at",
+    ):
+        assert reviewed[field] == original[field], field
+    assert reviewed["provenance"]["sources"] == original["provenance"]["sources"]
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    assert benchmark.report_failures(reviewed, correctness) == []
+
+
+def test_performance_review_cannot_authorize_different_measurements_or_runner(
+    tmp_path, monkeypatch
+):
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    benchmark.certify_source(
+        report,
+        correctness,
+        validation / "REAL_STRATEGY_RESULTS.json",
+        "Review only this report and the current runner.",
+        performance_impact="none",
+    )
+    assert benchmark.report_failures(report, correctness) == []
+
+    different = copy.deepcopy(report)
+    result = different["records"][0]["ml4t_engine"]
+    result["samples_seconds"] = [sample * 2 for sample in result["samples_seconds"]]
+    result["median_seconds"] = statistics.median(result["samples_seconds"])
+    result["minimum_seconds"] = min(result["samples_seconds"])
+    result["maximum_seconds"] = max(result["samples_seconds"])
+    result["ci_95_seconds"] = list(benchmark.bootstrap_median_interval(result["samples_seconds"]))
+    different["records"][0]["framework_to_ml4t_median_ratio"] /= 2
+    assert any(
+        "performance-impact review" in failure
+        for failure in benchmark.report_failures(different, correctness)
+    )
+
+    runner = tmp_path / "real_strategy_runner.py"
+    runner.write_text(
+        benchmark.TIMING_SOURCE_PATHS["ml4t"]
+        .read_text()
+        .replace("    result = engine.run()", "    time.sleep(1)\n    result = engine.run()")
+    )
+    monkeypatch.setitem(benchmark.TIMING_SOURCE_PATHS, "ml4t", runner)
+    assert any(
+        "performance-impact review" in failure
+        for failure in benchmark.report_failures(report, correctness)
+    )
