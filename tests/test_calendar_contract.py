@@ -159,10 +159,18 @@ def test_daily_event_time_keeps_valid_cme_overnight_observation():
     assert len(result.equity_curve) == 3
 
 
-def test_result_explicit_none_returns_observations_without_daily_aggregation():
+@pytest.mark.parametrize("contract_version", [1, 2])
+def test_result_explicit_none_returns_observations_without_daily_aggregation(contract_version):
     times = [datetime(2025, 7, 11, hour, tzinfo=UTC) for hour in (10, 11, 12)]
-    result, _ = run_engine(BacktestConfig(calendar="NYSE"), times=times)
+    declaration = {"calendar": "NYSE"}
+    if contract_version == 2:
+        declaration["time_contract_version"] = 2
+    config = BacktestConfig.from_dict({"calendar": declaration})
+    result, _ = run_engine(config, times=times)
+    assert len(result.to_daily_returns()) == 1
     assert result.to_daily_returns(calendar=None).to_list() == result.to_returns_series().to_list()
+    with pytest.raises(ValueError, match="requires a calendar"):
+        result.to_daily_returns(calendar=None, session_aligned=True)
 
 
 def test_named_result_calendar_override_controls_actual_overnight_aggregation():

@@ -598,7 +598,7 @@ class BacktestResult:
         """Get daily returns as Polars Series for ml4t-diagnostic integration.
 
         Omission or a named calendar aggregates bar-level equity to daily returns.
-        In temporal v2, explicit None instead retains observation-level returns;
+        Explicit None instead retains observation-level returns;
         use the matching declared annualization scale for downstream metrics.
 
         Args:
@@ -607,7 +607,7 @@ class BacktestResult:
                 - "crypto": 365 days/year (24/7)
                 - "NYSE", "NASDAQ": 252 days/year
                 - "CME_Equity", etc: Uses pandas_market_calendars
-                Omission uses the config calendar. In temporal v2, explicit None returns
+                Omission resolves the feed calendar, then NYSE. Explicit None returns
                 one return per observation without daily aggregation.
             session_aligned: If True, align to trading sessions (e.g., CME 5pm CT).
                 If None, auto-detect from calendar (True for CME, False for crypto).
@@ -623,18 +623,12 @@ class BacktestResult:
             >>> from ml4t.diagnostic.evaluation.metrics.risk_adjusted import sharpe_ratio
             >>> sharpe = sharpe_ratio(daily_returns.to_numpy(), annualization_factor=252)
         """
-        config_calendar = self.config.resolved_calendar if self.config else None
-        v2 = self.config is not None and self.config.time_contract_version == 2
-        if v2:
-            cal = FeedSpec(time_contract_version=2, calendar=config_calendar).resolve_calendar(
-                calendar=calendar
-            )
-            if cal is None:
-                if session_aligned:
-                    raise ValueError("session_aligned=True requires a calendar")
-                return self.to_returns_series().alias("daily_return")
-        else:
-            cal = calendar if isinstance(calendar, str) else config_calendar
+        resolver = self._feed_spec() or FeedSpec(time_contract_version=2)
+        cal = resolver.resolve_calendar(calendar=calendar)
+        if cal is None:
+            if session_aligned:
+                raise ValueError("session_aligned=True requires a calendar")
+            return self.to_returns_series().alias("daily_return")
         if session_aligned is None:
             session_aligned = self._auto_session_aligned(cal)
 

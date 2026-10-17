@@ -314,6 +314,8 @@ CAGR uses `(N - 1) / periods_per_year` years for `N` recorded equity values. A l
 `calendar.time_contract_version` remains version 1, including its old null-as-inheritance
 behavior. Use `to_dict()` or `to_yaml()` to retain the v2 distinction between omission
 and explicit null; do not relabel an old payload without deciding what its null means.
+Direct result calls use the current selector contract: `result.to_daily_returns(calendar=None)`
+returns observations even when the result was built from a legacy configuration.
 
 Calendar v2 on this development branch requires Specs source commit
 `701bde68744035050ede386efce498234c661c21`, pinned in the dependency declaration.
