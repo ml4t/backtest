@@ -179,6 +179,8 @@ The table reports engine-call wall time for all 17 correctness-passing pairs. Th
 
 Measured 2026-10-13 on `Linux-7.0.0-38-generic-x86_64-with-glibc2.43` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
+A performance-impact review retains these measurements for engine source `656210f6fe91`. The measured source, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun.
+
 ### Synthetic diagnostic scenarios
 
 The scenario matrix contains synthetic conformance tests. "Exact" means terminal values, ordered closed trades, and ordered fills match after 1e-8 quantization. Each record declares whether a surface is native, reconstructed, aggregate-only, input-only, or unavailable. These results test isolated conventions, not realistic strategy equivalence.

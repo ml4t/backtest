@@ -122,6 +122,30 @@
           "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
           "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
         }
+      },
+      {
+        "certified_at": "2026-10-17T22:23:50.095344+00:00",
+        "correctness_evidence_generated_at": "2026-10-17T01:17:00.495296+00:00",
+        "correctness_evidence_sha256": "ba7f4978cdf675e3d7ff2c998a7eb2f13bc099cb86667d70d56879affdf46a3f",
+        "correctness_pairs_passed": 17,
+        "engine_source_sha256": "656210f6fe91eb6bac893598909f0363c5951e7bc8f7b14e15d8fb653fb23649",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "df10938aa2ae6ed54174d4a065860db196b7c647",
+        "performance_impact": "none",
+        "reason": "Performance-impact review of e74bed7..391cc8a for the 17 retained real-strategy pairs: all frozen bundles explicitly declare calendar and frequency and deserialize as legacy-v1 contracts; none uses a rebalance schedule. The new omitted-calendar defaults, explicit-None row mode and v2 schedule behavior are not exercised by these workloads. Broker/order processing, per-asset iteration, target execution, transaction costs, framework pins, frozen inputs and timing commands are unchanged. DataFeed/config construction and result extraction remain outside the engine-call boundary. Within Engine.run, changes resolve session semantics during initialization, derive EquityCurve metadata once, and use the existing session-date helper per timestamp for enforced calendars; daily labels still resolve to the same dates. The changed work does not add per-asset loops or change the dominant execution algorithms. Specs0.2.0 preserves these explicit legacy metadata settings; the other locked dependency versions and sources are unchanged. This code-path and dependency review finds no material impact on these measured workloads. Independently, all17 fresh correctness pairs retain identical fill/equity/terminal surface digests and counts; that numerical agreement is a correctness prerequisite, not proof of unchanged runtime. The benchmark validator changes are outside the measured subprocess and do not alter its commands or timing boundary. Preserve the accepted October13 measurements and their recorded environment. No new speed measurements or ratios are asserted by this review.",
+        "reviewed_correctness_sha256": "cbeac90d998cd3aa7830ea4e3e715e03a6437452695d1d7fd99b79f4a8cfb5c2",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "7c592e63020807dc11d965935271331f514780cda31d213fa67758c2413377ea",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
       }
     ],
     "ml4t_engine_source_sha256": "1e2bf2f45a835f8b0a81b59141843dae77b6341233d7c9ba494efada0a328a25",

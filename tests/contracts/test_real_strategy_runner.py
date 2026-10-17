@@ -407,8 +407,8 @@ def test_real_strategy_performance_evidence_fails_stale_source() -> None:
     assert any("neither the source these" in failure for failure in failures)
 
 
-def test_certification_alone_publishes_a_later_engine_source() -> None:
-    """Timings measured under one source publish for a certified later one."""
+def test_performance_impact_review_allows_reuse_for_a_later_engine_source() -> None:
+    """A reviewed change can retain measurements without changing their measured source."""
     benchmark = _load_benchmark()
     validation = Path(__file__).parents[2] / "validation"
     correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
@@ -567,3 +567,23 @@ def test_performance_review_cannot_authorize_different_measurements_or_runner(
         "performance-impact review" in failure
         for failure in benchmark.report_failures(report, correctness)
     )
+
+
+def test_failed_performance_review_does_not_partially_mutate_report() -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    report["records"][0]["input_bundle_sha256"] = "0" * 64
+    before = copy.deepcopy(report)
+
+    with pytest.raises(ValueError, match="timing input differs"):
+        benchmark.certify_source(
+            report,
+            correctness,
+            validation / "REAL_STRATEGY_RESULTS.json",
+            "The timing sample must belong to the compared frozen input.",
+            performance_impact="none",
+        )
+
+    assert report == before
