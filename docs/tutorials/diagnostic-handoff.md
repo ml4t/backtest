@@ -25,9 +25,11 @@ from ml4t.diagnostic.integration import portfolio_analysis_from_result
 prices = load_example_prices("crypto_perp").filter(pl.col("asset") == "BTC-PERP")
 result = Engine(
     DataFeed(prices_df=prices), ExampleRoundTrip("BTC-PERP", 1),
-    BacktestConfig(initial_cash=100_000, allow_leverage=True),
+    BacktestConfig(initial_cash=100_000, allow_leverage=True, calendar="crypto"),
     contract_specs={"BTC-PERP": ContractSpec("BTC-PERP", AssetClass.FUTURE, margin=4000)},
 ).run()
+assert result.config.resolved_calendar == "crypto"
+assert result.equity.periods_per_year == 365.0
 analysis = portfolio_analysis_from_result(result, calendar="crypto")
 stats = analysis.compute_summary_stats()
 print("ml4t-backtest " + version("ml4t-backtest"))

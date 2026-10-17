@@ -105,13 +105,15 @@ funding = pl.DataFrame({
     "asset": ["BTC-PERP", "BTC-PERP"],
     "rate": [0.001, -0.0005],
 })
-config = BacktestConfig(initial_cash=100_000, allow_leverage=True)
+config = BacktestConfig(initial_cash=100_000, allow_leverage=True, calendar="crypto")
 spec = ContractSpec("BTC-PERP", AssetClass.FUTURE, margin=4000)
 base = Engine(DataFeed(prices_df=prices), ExampleRoundTrip("BTC-PERP", 1),
               config, contract_specs={"BTC-PERP": spec}).run()
 funded = Engine(DataFeed(prices_df=prices), ExampleRoundTrip("BTC-PERP", 1),
                 config, contract_specs={"BTC-PERP": spec}, funding_df=funding).run()
 print("ml4t-backtest " + version("ml4t-backtest"))
+assert funded.config.resolved_calendar == "crypto"
+assert funded.equity.periods_per_year == 365.0
 for row in funded.to_funding_dataframe().iter_rows(named=True):
     print(f"{row['timestamp']:%Y-%m-%d} rate={row['rate']:.4f} cash={row['cash_delta']:.2f}")
 print(f"trading P&L: ${base.trades[0].pnl:.2f}")

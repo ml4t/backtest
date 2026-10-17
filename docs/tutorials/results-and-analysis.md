@@ -40,10 +40,12 @@ funding = pl.DataFrame({
 })
 result = Engine(
     DataFeed(prices_df=prices, signals_df=signals), ExampleRoundTrip("BTC-PERP", 1),
-    BacktestConfig(initial_cash=100_000, allow_leverage=True, timezone=zone),
+    BacktestConfig(initial_cash=100_000, allow_leverage=True, timezone=zone, calendar="crypto"),
     contract_specs={"BTC-PERP": ContractSpec("BTC-PERP", AssetClass.FUTURE, margin=4000)},
     funding_df=funding,
 ).run()
+assert result.config.resolved_calendar == "crypto"
+assert result.equity.periods_per_year == 365.0
 equity = result.to_equity_dataframe()
 fills = result.to_fills_dataframe()
 trades = result.to_trades_dataframe()
