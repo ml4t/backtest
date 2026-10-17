@@ -131,7 +131,9 @@ final equity: $100050.00
 
 ## Crypto perpetuals
 
-The contract uses the futures accounting convention; a later tutorial adds funding payments.
+The contract uses Backtest's notional-value cash ledger with per-contract margin
+requirements. It does not post daily variation cash. A later tutorial adds funding
+payments; see [account policies](../user-guide/accounts.md) for the ledger boundary.
 
 <!-- ml4t-doc-test: smoke-crypto-perp -->
 ```python
