@@ -233,8 +233,8 @@ def render_claims(
         [
             "",
             "A performance-impact review retains these measurements for engine source "
-            f"`{review['engine_source_sha256'][:12]}`. The measured source, review rationale "
-            "and current correctness evidence are recorded with the raw samples. "
+            f"`{review['engine_source_sha256'][:12]}`. The measured source, locked dependencies, "
+            "review rationale and current correctness evidence are recorded with the raw samples. "
             "Measurements are repeated when changes materially affect timed execution; "
             "a new source revision alone does not require a benchmark rerun.",
         ]

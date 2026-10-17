@@ -587,3 +587,57 @@ def test_failed_performance_review_does_not_partially_mutate_report() -> None:
         )
 
     assert report == before
+
+
+@pytest.mark.parametrize(
+    "measured_directly",
+    [
+        False,
+        pytest.param(
+            True,
+            marks=pytest.mark.skipif(
+                sys.platform != "linux", reason="Publication timings identify a Linux host"
+            ),
+        ),
+    ],
+)
+def test_unreviewed_dependency_change_invalidates_timings(
+    tmp_path, monkeypatch, measured_directly
+) -> None:
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    if measured_directly:
+        retained = {
+            (record["case_study"], record["framework"]): record for record in report["records"]
+        }
+
+        def measured_side(*, case_study, framework, side, **_settings):
+            key = "framework_engine" if side == "framework" else "ml4t_engine"
+            return copy.deepcopy(retained[(case_study, framework)][key])
+
+        monkeypatch.setattr(benchmark, "_measure_side", measured_side)
+        report = benchmark.build_report(
+            correctness=correctness, bundle_root=validation, warmups=1, samples=10
+        )
+    else:
+        benchmark.certify_source(
+            report,
+            correctness,
+            validation / "REAL_STRATEGY_RESULTS.json",
+            "Retain only the reviewed locked dependencies.",
+            performance_impact="none",
+        )
+    assert benchmark.report_failures(report, correctness) == []
+
+    lock = tmp_path / "uv.lock"
+    original = benchmark.DEPENDENCY_PATHS["uv.lock"].read_text()
+    lock.write_text(original.replace('version = "0.2.0"', 'version = "0.2.1"'))
+    assert lock.read_text() != original
+    monkeypatch.setitem(benchmark.DEPENDENCY_PATHS, "uv.lock", lock)
+
+    assert any(
+        "performance-impact review" in failure
+        for failure in benchmark.report_failures(report, correctness)
+    )

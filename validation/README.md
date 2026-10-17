@@ -76,7 +76,7 @@ The table reports engine-call wall time for all 17 correctness-passing pairs. Th
 
 Measured 2026-10-13 on `Linux-7.0.0-38-generic-x86_64-with-glibc2.43` with 24 logical CPUs. Each side used one isolated warm-up process and ten isolated measured processes. The timer includes only the engine call; it excludes input loading, model inference, target construction, adapter preparation, result extraction, serialization, reporting. These measurements apply only to the named strategy, framework version, frozen input bundle, and machine. Raw samples and bootstrap intervals are retained in [real-strategy performance evidence](https://github.com/ml4t/backtest/blob/main/validation/REAL_STRATEGY_PERFORMANCE.json).
 
-A performance-impact review retains these measurements for engine source `656210f6fe91`. The measured source, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun.
+A performance-impact review retains these measurements for engine source `656210f6fe91`. The measured source, locked dependencies, review rationale and current correctness evidence are recorded with the raw samples. Measurements are repeated when changes materially affect timed execution; a new source revision alone does not require a benchmark rerun.
 
 ### Synthetic diagnostic scenarios
 
@@ -167,8 +167,8 @@ time a pair that did not pass the retained correctness comparison.
 Retain accepted timings when a reviewed change has no material impact on the timed execution.
 Record that decision with `real_strategy_benchmark.py --certify-source --performance-impact none
 --reason 'TIMED-PATH AND DEPENDENCY REVIEW'`. The review requires current correctness evidence and
-binds the exact engine, runners and measurements. It preserves the measurement date, raw samples,
-ratios, environment and original correctness reference. Matching numerical outputs alone is not a
+binds the exact engine, runners, locked dependencies and measurements. It preserves the measurement
+date, raw samples, ratios, environment and original correctness reference. Matching numerical outputs alone is not a
 performance-impact assessment. Material or uncertain timing changes require fresh measurements for
 the affected execution before updating the performance claims. Unchanged native reference engines
 do not need to be rerun solely because Backtest changed; their inputs, settings, dependencies,

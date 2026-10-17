@@ -35,6 +35,13 @@ TIMING_SOURCE_PATHS = {
     **{name: path for name, path in ADAPTER_PATHS.items() if name != "evidence_builder"},
     "benchmark": Path(__file__).resolve(),
 }
+DEPENDENCY_PATHS = {
+    path.relative_to(PROJECT_ROOT).as_posix(): path
+    for path in [
+        PROJECT_ROOT / "uv.lock",
+        *sorted((VALIDATION_DIR / "environments").glob("*/uv.lock")),
+    ]
+}
 SUBPROCESS_TIMEOUT_SECONDS = 900
 PYTHONS = {
     "ml4t": ".venv/bin/python",
@@ -267,6 +274,7 @@ def build_report(
         "provenance": {
             "ml4t_engine_source_sha256": _tree_digest(PROJECT_ROOT / "src/ml4t/backtest"),
             "sources": {name: _sha256(path) for name, path in TIMING_SOURCE_PATHS.items()},
+            "dependencies": {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()},
         },
         "correctness_evidence_generated_at": correctness["generated_at"],
         "records": records,
@@ -306,7 +314,8 @@ def measurement_digest(report: dict[str, Any]) -> str:
             **{key: value for key, value in report.items() if key != "provenance"},
             "provenance": {
                 key: report["provenance"].get(key)
-                for key in ("ml4t_engine_source_sha256", "sources")
+                for key in ("ml4t_engine_source_sha256", "sources", "dependencies")
+                if key in report["provenance"]
             },
         }
     )
@@ -324,6 +333,8 @@ def applicable_review(report: dict[str, Any], correctness: dict[str, Any]) -> di
         entry is not None
         and entry.get("sources") == sources
         and entry.get("performance_impact") == "none"
+        and entry.get("dependencies")
+        == {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()}
         and entry.get("measurement_sha256") == measurement_digest(report)
         and entry.get("reviewed_correctness_sha256") == _json_sha256(correctness)
     ):
@@ -353,6 +364,13 @@ def certification_shape_failures(provenance: dict[str, Any]) -> list[str]:
             for field in ("measurement_sha256", "reviewed_correctness_sha256"):
                 if not _is_sha256(entry.get(field)):
                     failures.append(f"Certification {index} lacks {field}")
+            dependencies = entry.get("dependencies")
+            if (
+                not isinstance(dependencies, dict)
+                or not dependencies
+                or not all(_is_sha256(value) for value in dependencies.values())
+            ):
+                failures.append(f"Certification {index} lacks dependency identities")
         for field in ("certified_at", "reason", "ml4t_commit"):
             value = entry.get(field)
             if not isinstance(value, str) or not value.strip():
@@ -413,6 +431,7 @@ def certify_source(
         "reason": reason.strip(),
         "sources": {name: _sha256(path) for name, path in TIMING_SOURCE_PATHS.items()},
         "performance_impact": "none",
+        "dependencies": {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()},
         "measurement_sha256": measurement_digest(report),
         "reviewed_correctness_sha256": _json_sha256(correctness),
     }
@@ -501,6 +520,8 @@ def report_failures(report: dict[str, Any], correctness: dict[str, Any]) -> list
             provenance.get("ml4t_engine_source_sha256")
             == _tree_digest(PROJECT_ROOT / "src/ml4t/backtest")
             and provenance.get("sources") == expected_sources
+            and provenance.get("dependencies")
+            == {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()}
         )
         if not certification_failures and not measured_source and review is None:
             failures.append(
