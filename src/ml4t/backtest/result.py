@@ -664,7 +664,10 @@ class BacktestResult:
             session_start_time=self.config.resolved_session_start_time if self.config else None,
         )
         daily = compute_session_pnl(
-            self.equity_curve, session_config, initial_capital=self.initial_capital
+            self.equity_curve,
+            session_config,
+            initial_capital=self.initial_capital,
+            drawdown_values=self.to_equity_dataframe()["performance_equity"].to_list(),
         )
         return self._adjust_flow_pnl(daily, session_config)
 

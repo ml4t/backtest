@@ -205,6 +205,7 @@ def compute_session_pnl(
     session_config: SessionConfig,
     *,
     initial_capital: float | None = None,
+    drawdown_values: list[float] | None = None,
 ) -> pl.DataFrame:
     """Compute daily P&L aligned to trading session boundaries.
 
@@ -216,6 +217,8 @@ def compute_session_pnl(
         equity_curve: List of (timestamp, portfolio_value) tuples
         session_config: Session alignment configuration
         initial_capital: Pre-observation NAV, when recorded by the producing engine.
+        drawdown_values: Flow-adjusted investment wealth aligned to the equity observations.
+            Defaults to the observed equity values.
 
     Returns:
         DataFrame with columns:
@@ -231,6 +234,8 @@ def compute_session_pnl(
             intra_session_dd: Maximum intra-session drawdown
             num_bars: Number of bars in session
     """
+    if drawdown_values is not None and len(drawdown_values) != len(equity_curve):
+        raise ValueError("drawdown_values must align with equity_curve observations")
     if not equity_curve:
         return _empty_session_pnl_df()
 
@@ -260,7 +265,22 @@ def compute_session_pnl(
             "timestamp": timestamps,
             "equity": values,
             "session_date": session_dates,
+            "_performance": values if drawdown_values is None else drawdown_values,
         }
+    )
+
+    df = df.sort("timestamp")
+    peak = pl.col("_performance").cum_max().over("session_date")
+    if initial_capital is not None:
+        df = df.with_columns(
+            pl.col("_performance").shift(1).fill_null(initial_capital).alias("_prior")
+        )
+        peak = pl.max_horizontal(peak, pl.col("_prior").first().over("session_date"))
+    df = df.with_columns(peak.alias("_peak")).with_columns(
+        pl.when(pl.col("_peak") != 0)
+        .then(pl.col("_performance") / pl.col("_peak") - 1.0)
+        .otherwise(0.0)
+        .alias("_drawdown")
     )
 
     # Group by session and compute metrics
@@ -275,6 +295,7 @@ def compute_session_pnl(
                 pl.col("equity").max().alias("high_equity"),
                 pl.col("equity").min().alias("low_equity"),
                 pl.len().alias("num_bars"),
+                pl.col("_drawdown").min().alias("intra_session_dd"),
             ]
         )
         .sort("session_date")
@@ -298,9 +319,6 @@ def compute_session_pnl(
     return_pct = (session_pnl["close_equity"] - prev_close) / prev_close
     return_pct = return_pct.fill_null(0.0)
 
-    # Intra-session drawdown
-    intra_dd = (session_pnl["low_equity"] - session_pnl["high_equity"]) / session_pnl["high_equity"]
-
     # Cumulative return from first session
     initial = session_pnl["open_equity"][0] if len(session_pnl) > 0 else 1.0
     cum_return = (session_pnl["close_equity"] / initial) - 1.0
@@ -308,7 +326,6 @@ def compute_session_pnl(
     session_pnl = session_pnl.with_columns(
         [
             return_pct.alias("return_pct"),
-            intra_dd.alias("intra_session_dd"),
             cum_return.alias("cumulative_return"),
         ]
     )

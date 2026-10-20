@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
-from ml4t.backtest.config import CommissionType, ExecutionMode
+from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode
 from ml4t.backtest.result import BacktestResult
 
 
@@ -85,3 +85,62 @@ def test_all_cash_observations_remain_real_zero_returns(tmp_path):
         assert actual.to_equity_dataframe()["timestamp"].to_list() == timestamps
         assert actual.to_returns_series().to_list() == [0.0] * 3
         assert actual.to_fills_dataframe().is_empty()
+
+
+def test_session_drawdown_uses_the_observed_path_instead_of_reordering_high_and_low():
+    dates = [datetime(2025, 1, 2, hour, tzinfo=UTC) for hour in [15, 16, 17]]
+    prices = pl.DataFrame(
+        {"timestamp": dates, "asset": ["TEST"] * 3, "close": [100.0, 90.0, 110.0]}
+    )
+
+    class Invest(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if not broker.positions:
+                broker.submit_order("TEST", 100)
+
+    result = Engine(
+        DataFeed(prices_df=prices),
+        Invest(),
+        BacktestConfig(
+            initial_cash=10000,
+            calendar="NYSE",
+            data_frequency=DataFrequency.HOURLY,
+            execution_mode=ExecutionMode.SAME_BAR,
+        ),
+    ).run()
+    assert result.to_portfolio_state_dataframe()["equity"].to_list() == [10000, 9000, 11000]
+    assert result.to_daily_pnl(session_aligned=True)["intra_session_dd"].to_list() == pytest.approx(
+        [-0.1]
+    )
+
+
+def test_session_drawdown_excludes_external_cash_flows_and_keeps_first_fee(tmp_path):
+    dates = [datetime(2025, 1, 2, hour, tzinfo=UTC) for hour in [15, 16, 17]]
+    prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 3, "close": [100.0] * 3})
+    flows = pl.DataFrame(
+        {
+            "timestamp": dates[1:],
+            "event_id": ["deposit", "withdraw"],
+            "kind": ["delta", "delta"],
+            "value": [10000.0, -10000.0],
+        }
+    )
+    result = Engine(
+        DataFeed(prices_df=prices, capital_flows=flows),
+        BuyFirstBar(),
+        BacktestConfig(
+            initial_cash=10000,
+            calendar="NYSE",
+            data_frequency=DataFrequency.HOURLY,
+            execution_mode=ExecutionMode.SAME_BAR,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=10,
+        ),
+    ).run()
+    result.to_parquet(tmp_path)
+    for actual in [result, BacktestResult.from_parquet(tmp_path)]:
+        assert actual.to_portfolio_state_dataframe()["equity"].to_list() == [9990, 19990, 9990]
+        daily = actual.to_daily_pnl(session_aligned=True)
+        assert daily["intra_session_dd"].to_list() == pytest.approx([-0.001])
+        assert daily["return_pct"].to_list() == pytest.approx([-0.001])
+        assert daily["pnl"].to_list() == pytest.approx([-10])
