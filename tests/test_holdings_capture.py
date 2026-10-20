@@ -145,3 +145,128 @@ def test_fill_exports_keep_actual_multiplier_currency_and_signed_quantity(tmp_pa
         assert fills["currency"].to_list() == ["USD", "USD"]
         assert fills["signed_quantity"].to_list() == [2, -1]
         assert actual.returns_include_commissions is True
+
+
+def test_fill_sampling_keeps_a_round_trip_that_is_flat_at_every_bar_end(tmp_path):
+    dates = [datetime(2025, 1, 2, hour, tzinfo=UTC) for hour in [15, 16, 17]]
+    prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 3, "close": [100.0] * 3})
+    result = Engine(
+        DataFeed(prices_df=prices),
+        TradeAtBars({0: [("TEST", 10), ("TEST", -10)]}),
+        BacktestConfig(
+            initial_cash=10000,
+            calendar="NYSE",
+            execution_mode=ExecutionMode.SAME_BAR,
+            allow_short_selling=True,
+        ),
+        holdings_sampling="fill_and_session",
+    ).run()
+    result.to_parquet(tmp_path)
+    for actual in [result, BacktestResult.from_parquet(tmp_path)]:
+        account = actual.to_portfolio_state_dataframe()
+        assert account["observation_kind"].to_list() == [
+            "after_fill",
+            "after_fill",
+            "bar",
+            "bar",
+            "session_last_observed",
+        ]
+        assert account["holdings_complete"].to_list() == [True, True, False, False, True]
+        assert account["open_positions"].to_list() == [1, 0, 0, 0, 0]
+        assert account["cash"].to_list() == [9000, 10000, 10000, 10000, 10000]
+        holdings = actual.to_holdings_dataframe()
+        assert holdings["observation_id"].to_list() == [0]
+        assert holdings["quantity"].to_list() == [10]
+        assert len(actual.equity_curve) == 3
+        assert actual.to_returns_series().to_list() == [0, 0, 0]
+
+
+def test_session_capture_marks_only_the_last_observed_bar_complete(tmp_path):
+    dates = [datetime(2025, 1, day, hour, tzinfo=UTC) for day, hour in [(2, 15), (2, 16), (3, 15)]]
+    prices = pl.DataFrame(
+        {"timestamp": dates, "asset": ["TEST"] * 3, "close": [100.0, 110.0, 120.0]}
+    )
+    result = Engine(
+        DataFeed(prices_df=prices),
+        TradeAtBars({0: [("TEST", 10)]}),
+        BacktestConfig(initial_cash=10000, calendar="NYSE", execution_mode=ExecutionMode.SAME_BAR),
+        holdings_sampling="session",
+    ).run()
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.to_portfolio_state_dataframe()["holdings_complete"].to_list() == [
+        False,
+        True,
+        True,
+    ]
+    assert restored.to_holdings_dataframe()["observation_id"].to_list() == [1, 2]
+    assert restored.to_holdings_dataframe()["mark"].to_list() == [110, 120]
+
+
+def test_failed_immediate_callback_cannot_leave_observed_fill_state():
+    timestamp = datetime(2025, 1, 2, 16, tzinfo=UTC)
+    prices = pl.DataFrame({"timestamp": [timestamp], "asset": ["TEST"], "close": [100.0]})
+
+    class Failing(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            broker.submit_order("TEST", 10)
+            raise RuntimeError("callback failed")
+
+    engine = Engine(
+        DataFeed(prices_df=prices),
+        Failing(),
+        BacktestConfig(calendar="NYSE", execution_mode=ExecutionMode.SAME_BAR, immediate_fill=True),
+        holdings_sampling="fill_and_session",
+    )
+    with pytest.raises(RuntimeError, match="callback failed"):
+        engine.run()
+    assert engine.broker.fills == []
+    assert engine.broker._execution_journal.fill_snapshots == []
+    assert engine.broker.cash == engine.config.initial_cash
+
+
+def test_missing_position_row_cannot_be_reported_as_a_complete_snapshot(tmp_path):
+    result, _ = run_positions({0: [("LONG", 10), ("SHORT", -4)]})
+    result.to_parquet(tmp_path)
+    path = tmp_path / "holdings.parquet"
+    pl.read_parquet(path).slice(1).write_parquet(path)
+    with pytest.raises(ArtifactError, match="complete holdings"):
+        BacktestResult.from_parquet(tmp_path)
+
+
+@pytest.mark.parametrize("last_asset,last_price", [("TEST", 0.0), ("OTHER", 50.0)])
+def test_observed_zero_mark_is_not_replaced_by_entry_price(last_asset, last_price):
+    dates = [datetime(2025, 1, day, 16, tzinfo=UTC) for day in [2, 3, 6]]
+    prices = pl.DataFrame(
+        {
+            "timestamp": dates,
+            "asset": ["TEST", "TEST", last_asset],
+            "close": [100.0, 0.0, last_price],
+        }
+    )
+    result = Engine(
+        DataFeed(prices_df=prices),
+        TradeAtBars({0: [("TEST", 10)]}),
+        BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+    ).run()
+    assert result.to_portfolio_state_dataframe()["equity"].to_list() == [10000, 9000, 9000]
+    assert result.metrics["final_value"] == 9000
+    assert result.trades[0].pnl == -1000
+
+
+def test_carried_mark_keeps_its_observation_time_and_source(tmp_path):
+    dates = [datetime(2025, 1, day, 16, tzinfo=UTC) for day in [2, 3, 6]]
+    prices = pl.DataFrame(
+        {"timestamp": dates, "asset": ["TEST", "TEST", "OTHER"], "close": [100.0, 110.0, 50.0]}
+    )
+    result = Engine(
+        DataFeed(prices_df=prices),
+        TradeAtBars({0: [("TEST", 10)]}),
+        BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+        holdings_sampling="bar",
+    ).run()
+    result.to_parquet(tmp_path)
+    holdings = BacktestResult.from_parquet(tmp_path).to_holdings_dataframe()
+    assert holdings["mark_timestamp"].to_list() == [dates[0], dates[1], dates[1]]
+    assert holdings["mark_source"][-1] == "last_observed"
+    assert holdings["mark"].to_list() == [100, 110, 110]

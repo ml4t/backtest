@@ -102,10 +102,10 @@ class Engine:
         from .config import BacktestConfig as ConfigCls
 
         negotiated_version = negotiate_lifecycle_version(lifecycle_version)
-        if holdings_sampling not in {"none", "bar"}:
-            raise ValueError("holdings_sampling must be 'none' or 'bar'")
+        if holdings_sampling not in {"none", "bar", "session", "fill_and_session"}:
+            raise ValueError("holdings_sampling must be none, bar, session or fill_and_session")
         self.holdings_sampling = holdings_sampling
-        self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling == "bar" else None
+        self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling != "none" else None
         self._validate_strategy_lifecycle(strategy)
         if config is None:
             config = ConfigCls()
@@ -113,6 +113,12 @@ class Engine:
         self.feed = feed
         self.strategy = strategy
         self.config = config.merge_feed_spec(getattr(feed, "feed_spec", None))
+        if (
+            holdings_sampling in {"session", "fill_and_session"}
+            and self.config.resolved_calendar is None
+        ):
+            raise ValueError("session holdings sampling requires a calendar")
+        self._session_holdings: dict[Any, tuple[int, list[tuple[Any, ...]]]] = {}
         self.execution_mode = self.config.execution_mode
         if (
             getattr(feed, "session_col", None) is not None
@@ -127,6 +133,8 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        if holdings_sampling == "fill_and_session":
+            self.broker._execution_journal.fill_snapshots = []
         if funding_df is None:
             self._funding_events = {}
         else:
@@ -618,39 +626,57 @@ class Engine:
         return self.run().to_dict()
 
     def _record_portfolio_state(self, timestamp: datetime) -> None:
-        """Capture per-bar portfolio state for reporting."""
-        cash = self.broker.cash
-        gross_exposure = 0.0
-        net_exposure = 0.0
-
-        for asset, pos in self.broker.positions.items():
-            price = self.broker.get_mark_price(asset, quantity=pos.quantity)
-            if price is None:
-                price = self.broker.get_last_price(asset) or pos.current_price or pos.entry_price
-            position_value = pos.quantity * price * pos.multiplier
-            gross_exposure += abs(position_value)
-            net_exposure += position_value
-            if self.holdings is not None:
-                spec = self.broker.get_contract_spec(asset)
-                self.holdings.append(
-                    (
-                        timestamp,
-                        len(self.portfolio_state),
-                        asset,
-                        pos.quantity,
-                        price,
-                        pos.multiplier,
-                        spec.currency if spec is not None else None,
-                        position_value,
-                        position_value,
-                    )
-                )
-
-        equity = cash + net_exposure
-        self.equity_curve.append((timestamp, equity))
-        self.portfolio_state.append(
-            (timestamp, equity, cash, gross_exposure, net_exposure, len(self.broker.positions))
+        """Capture per-bar NAV and explicitly sampled observed positions."""
+        state, holdings = self.broker._portfolio_ledger.snapshot(
+            include_holdings=self.holdings is not None
         )
+        observation = len(self.portfolio_state)
+        self.equity_curve.append((timestamp, state[0]))
+        self.portfolio_state.append((timestamp, state[0], state[1], state[2], state[3], state[4]))
+        if holdings is not None:
+            if self.holdings_sampling == "bar":
+                assert self.holdings is not None
+                self.holdings.extend((timestamp, observation, *row) for row in holdings)
+            else:
+                session = session_date_for_timestamp(
+                    timestamp,
+                    calendar=self.config.resolved_calendar,
+                    timezone=self.config.resolved_timezone,
+                    session_start_time=self.config.resolved_session_start_time,
+                    data_frequency=self.config.resolved_data_frequency,
+                    timestamp_semantics=self.config.resolved_timestamp_semantics,
+                )
+                self._session_holdings[session] = (observation, holdings)
+
+    def _result_observations(self):
+        if self.holdings_sampling in {"none", "bar"}:
+            metadata = (
+                []
+                if self.holdings_sampling == "none"
+                else [("bar", True, None)] * len(self.portfolio_state)
+            )
+            return list(self.portfolio_state), self.holdings, metadata
+        selected = dict(self._session_holdings.values())
+        events = []
+        for index, row in enumerate(self.portfolio_state):
+            holdings = selected.get(index)
+            kind = "session_last_observed" if holdings is not None else "bar"
+            events.append((row[0], len(self.broker.fills), row, holdings, kind, None))
+        for sequence, timestamp, state, holdings in (
+            self.broker._execution_journal.fill_snapshots or []
+        ):
+            events.append(
+                (timestamp, sequence, (timestamp, *state), holdings, "after_fill", sequence)
+            )
+        events.sort(key=lambda event: (event[0], event[1]))
+        account, captured, metadata = [], [], []
+        for timestamp, _, state, holdings, kind, sequence in events:
+            observation = len(account)
+            account.append(state)
+            metadata.append((kind, holdings is not None, sequence))
+            if holdings is not None:
+                captured.extend((timestamp, observation, *row) for row in holdings)
+        return account, captured, metadata
 
     def _build_activity_metrics(self) -> dict[str, int | float]:
         """Compute fill and portfolio activity metrics."""
@@ -771,6 +797,8 @@ class Engine:
         if len(self.capital_changes) != sum(map(len, self._capital_events.values())):
             raise ValueError("capital flow occurs outside accepted calendar observations")
 
+        observed_account, observed_holdings, observation_metadata = self._result_observations()
+
         if not self.equity_curve:
             # Return empty result for no-data case
             return BacktestResult(
@@ -792,7 +820,8 @@ class Engine:
                 config=self.config,
                 initial_capital=self.config.initial_cash,
                 returns_include_commissions=True,
-                holdings=self.holdings,
+                holdings=observed_holdings,
+                observation_metadata=observation_metadata,
                 holdings_sampling=self.holdings_sampling,
                 capital_changes=list(self.capital_changes),
             )
@@ -811,9 +840,7 @@ class Engine:
             last_timestamp = self.equity_curve[-1][0]
             for asset, pos in self.broker.positions.items():
                 # Get last known price for this asset
-                last_price = (
-                    self.broker.get_mark_price(asset, quantity=pos.quantity) or pos.entry_price
-                )
+                last_price, _, _ = self.broker._portfolio_ledger.position_mark(asset, pos)
                 entry_quote = pos.context.get("entry_quote_context", {})
                 exit_quote = self.broker.get_quote_context(
                     asset,
@@ -920,12 +947,13 @@ class Engine:
             rejected_orders=self.broker.get_rejected_orders(),
             funding_payments=list(self.funding_payments),
             predictions=self.feed.signals,
-            portfolio_state=list(self.portfolio_state),
+            portfolio_state=observed_account,
             metrics=metrics,
             config=self.config,
             initial_capital=self.config.initial_cash,
             returns_include_commissions=True,
-            holdings=self.holdings,
+            holdings=observed_holdings,
+            observation_metadata=observation_metadata,
             holdings_sampling=self.holdings_sampling,
             capital_changes=list(self.capital_changes),
             equity=equity,

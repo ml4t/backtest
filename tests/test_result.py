@@ -401,6 +401,9 @@ class TestBacktestResultPortfolioStateDataFrame:
             "gross_exposure",
             "net_exposure",
             "open_positions",
+            "observation_kind",
+            "holdings_complete",
+            "fill_sequence",
         ]
 
     def test_portfolio_state_dataframe_values(self, backtest_result: BacktestResult):

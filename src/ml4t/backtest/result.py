@@ -169,6 +169,19 @@ class UnsupportedArtifactVersionError(ArtifactError):
     """Raised when an artifact uses an unsupported schema version."""
 
 
+def _validate_complete_holdings(account: pl.DataFrame, holdings: pl.DataFrame) -> None:
+    counts = dict(holdings.group_by("observation_id").len().iter_rows())
+    for row in account.iter_rows(named=True):
+        actual = counts.pop(row["observation_id"], 0)
+        if row["holdings_complete"]:
+            if actual != row["open_positions"]:
+                raise ArtifactError("Declared complete holdings omit or add observed positions")
+        elif actual:
+            raise ArtifactError("Uncaptured account observations cannot declare complete holdings")
+    if counts:
+        raise ArtifactError("Holdings do not refer to recorded account observations")
+
+
 @dataclass
 class BacktestResult:
     """Structured backtest result with export capabilities.
@@ -214,6 +227,7 @@ class BacktestResult:
     holdings_sampling: str = "none"
     capital_changes: list[CapitalChange] = field(default_factory=list)
     returns_include_commissions: bool | None = None
+    observation_metadata: list[tuple[str, bool, int | None]] = field(default_factory=list)
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -520,30 +534,27 @@ class BacktestResult:
         return self._equity_df
 
     def to_portfolio_state_dataframe(self) -> pl.DataFrame:
-        """Convert portfolio state snapshots to Polars DataFrame.
-
-        Returns DataFrame with columns:
-            timestamp, equity, cash, gross_exposure, net_exposure, open_positions
-
-        Returns:
-            Polars DataFrame with one row per bar, sorted by timestamp
-        """
+        """Return ordered account observations and explicit holdings completeness."""
         if self._portfolio_state_df is not None:
             return self._portfolio_state_df
-
         schema = self._portfolio_state_schema()
         schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.portfolio_state)
-        if not self.portfolio_state:
-            return pl.DataFrame(schema=schema).with_row_index("observation_id")
-
-        self._portfolio_state_df = (
-            pl.DataFrame(
-                self.portfolio_state,
-                schema=schema,
-                orient="row",
-            )
+        frame = (
+            pl.DataFrame(self.portfolio_state, schema=schema, orient="row")
             .sort("timestamp", maintain_order=True)
             .with_row_index("observation_id")
+        )
+        metadata = self.observation_metadata
+        if metadata and len(metadata) != len(frame):
+            raise ArtifactError("Account observation metadata must match the recorded timeline")
+        if not metadata:
+            metadata = [
+                ("bar", self.holdings_sampling == "bar" and self.holdings is not None, None)
+            ] * len(frame)
+        self._portfolio_state_df = frame.with_columns(
+            pl.Series("observation_kind", [row[0] for row in metadata], dtype=pl.String),
+            pl.Series("holdings_complete", [row[1] for row in metadata], dtype=pl.Boolean),
+            pl.Series("fill_sequence", [row[2] for row in metadata], dtype=pl.UInt32),
         )
         return self._portfolio_state_df
 
@@ -560,6 +571,7 @@ class BacktestResult:
             raise ArtifactError("Holdings were not captured; enable holdings_sampling='bar'")
         schema = self._holdings_schema()
         schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.holdings)
+        schema["mark_timestamp"] = self._timestamp_dtype(row[-1] for row in self.holdings)
         return pl.DataFrame(self.holdings, schema=schema, orient="row")
 
     def to_capital_flows_dataframe(self) -> pl.DataFrame:
@@ -602,6 +614,8 @@ class BacktestResult:
             "currency": pl.String(),
             "signed_notional": pl.Float64(),
             "liquidation_value": pl.Float64(),
+            "mark_source": pl.String(),
+            "mark_timestamp": pl.Datetime(),
         }
 
     def _session_pnl(self, calendar: str) -> pl.DataFrame:
@@ -930,6 +944,10 @@ class BacktestResult:
             ArtifactWriteError: If a requested component is unavailable or cannot be written.
         """
         explicitly_selected = include is not None
+        if self.holdings is not None:
+            _validate_complete_holdings(
+                self.to_portfolio_state_dataframe(), self.to_holdings_dataframe()
+            )
         requested = list(include) if include is not None else list(_COMPONENT_FILES)
         unknown = sorted(set(requested) - _COMPONENT_FILES.keys() - {"manifest"})
         if unknown:
@@ -1151,6 +1169,7 @@ class BacktestResult:
                 _REQUIRED_RESULT_COMPONENTS
                 | ({"funding"} if self.funding_payments else set())
                 | ({"capital_flows"} if self.capital_changes else set())
+                | ({"holdings"} if self.holdings_sampling != "none" else set())
             ),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
@@ -1528,9 +1547,40 @@ class BacktestResult:
                 for row in pl.read_parquet(component_path).iter_rows(named=True)
             ]
 
+        observation_metadata: list[tuple[str, bool, int | None]] = []
+
         def read_portfolio_state(
             component_path: Path,
         ) -> list[tuple[datetime, float, float, float, float, int]]:
+            frame = pl.read_parquet(component_path)
+            metadata_columns = {"observation_kind", "holdings_complete", "fill_sequence"}
+            if metadata_columns & set(frame.columns):
+                if not metadata_columns <= set(frame.columns):
+                    raise ValueError("Account observation metadata is incomplete")
+                metadata = []
+                for row in frame.iter_rows(named=True):
+                    kind, complete, sequence = (
+                        row["observation_kind"],
+                        row["holdings_complete"],
+                        row["fill_sequence"],
+                    )
+                    if kind not in {"bar", "after_fill", "session_last_observed"} or not isinstance(
+                        complete, bool
+                    ):
+                        raise ValueError("Account observation metadata is invalid")
+                    if kind == "after_fill":
+                        if (
+                            not isinstance(sequence, int)
+                            or not 0 <= sequence < len(fills)
+                            or fills[sequence].timestamp != row["timestamp"]
+                        ):
+                            raise ValueError(
+                                "Account fill observation must refer to its actual fill"
+                            )
+                    elif sequence is not None:
+                        raise ValueError("Only fill observations may identify a fill sequence")
+                    metadata.append((kind, complete, sequence))
+                observation_metadata.extend(metadata)
             return [
                 (
                     row["timestamp"],
@@ -1540,7 +1590,7 @@ class BacktestResult:
                     row["net_exposure"],
                     row["open_positions"],
                 )
-                for row in pl.read_parquet(component_path).iter_rows(named=True)
+                for row in frame.iter_rows(named=True)
             ]
 
         def read_metrics(component_path: Path) -> dict[str, Any]:
@@ -1603,11 +1653,11 @@ class BacktestResult:
         holdings_frame = read_component("holdings", pl.read_parquet, None)
         holdings = None
         holdings_sampling = manifest.get("holdings_sampling", "none") if manifest else "none"
-        if holdings_sampling not in {"none", "bar"}:
+        if holdings_sampling not in {"none", "bar", "session", "fill_and_session"}:
             raise ArtifactManifestError("Unknown holdings_sampling declaration")
-        if holdings_sampling == "bar" and holdings_frame is None:
+        if holdings_sampling != "none" and holdings_frame is None:
             if not recovery:
-                raise ArtifactReadError("holdings_sampling='bar' requires holdings.parquet")
+                raise ArtifactReadError("declared holdings sampling requires holdings.parquet")
             diagnostics.append(
                 ArtifactDiagnostic(
                     "component_unavailable", "holdings", "Declared holdings could not be loaded."
@@ -1615,10 +1665,15 @@ class BacktestResult:
             )
             holdings_sampling = "none"
         if holdings_frame is not None:
-            if holdings_sampling != "bar":
+            if holdings_sampling == "none":
                 raise ArtifactManifestError(
                     "holdings component requires a declared sampling method"
                 )
+            for name, dtype in {"mark_source": pl.String, "mark_timestamp": pl.Datetime}.items():
+                if name not in holdings_frame.columns:
+                    holdings_frame = holdings_frame.with_columns(
+                        pl.lit(None, dtype=dtype).alias(name)
+                    )
             required = set(cls._holdings_schema())
             if not required <= set(holdings_frame.columns):
                 raise ArtifactReadError("holdings.parquet is missing required fields")
@@ -1744,7 +1799,7 @@ class BacktestResult:
                     )
                 )
 
-        return cls(
+        result = cls(
             trades=trades,
             equity_curve=equity_curve,
             fills=fills,
@@ -1760,7 +1815,17 @@ class BacktestResult:
             holdings_sampling=holdings_sampling,
             capital_changes=capital_changes,
             returns_include_commissions=returns_include_commissions,
+            observation_metadata=observation_metadata,
         )
+        if result.holdings is not None:
+            if result.holdings_sampling in {"session", "fill_and_session"} and len(
+                result.observation_metadata
+            ) != len(result.portfolio_state):
+                raise ArtifactReadError("Sampled holdings require account observation metadata")
+            _validate_complete_holdings(
+                result.to_portfolio_state_dataframe(), result.to_holdings_dataframe()
+            )
+        return result
 
     @staticmethod
     def _trades_schema() -> dict[str, pl.DataType]:

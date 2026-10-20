@@ -361,7 +361,9 @@ account = result.to_portfolio_state_dataframe()
 
 Each holdings row records `timestamp`, `observation_id`, `asset`, signed
 `quantity`, `mark`, `multiplier`, declared `currency`, `signed_notional` and
-`liquidation_value`. These are observed bar-end positions, including open lots,
+`liquidation_value`, `mark_source` and `mark_timestamp`. The latter retains the
+original observation time when a last known mark is carried. These are observed
+simulator positions, including open lots,
 not positions reconstructed from closed trades. Currency is null when no contract
 specification declares it. The current signed-notional ledger reports identical
 notional and liquidation values; another account method must define them separately.
@@ -370,8 +372,24 @@ Account rows retain every accepted bar, including a completely flat portfolio.
 Join on `observation_id` to distinguish a complete all-cash observation from a
 missing observation. Capture defaults to `"none"`; asking for uncaptured holdings
 raises `ArtifactError`. An empty captured table means a complete all-cash run.
-Only `"none"` and `"bar"` are currently supported. Bar-end sampling can miss an
-open-and-flat cycle inside one bar; fills still retain that activity.
+Available sampling methods are:
+
+- `"none"`: retain ordinary account bars without holdings capture.
+- `"bar"`: capture complete holdings after every accepted bar.
+- `"session"`: capture the last delivered bar in each declared calendar session.
+- `"fill_and_session"`: also capture account and holdings immediately after each fill.
+
+Session methods require a calendar. A last delivered bar is not an invented
+exchange-close observation. Post-fill snapshots use the configured bar mark
+policy, rather than fabricating an intrabar market-price path. Feed timestamp
+semantics apply to both observation and mark timestamps.
+
+Account `observation_kind` distinguishes `after_fill`, `bar` and
+`session_last_observed`. Select `holdings_complete=True` for the complete capture
+keys; rows without capture are not flat portfolios. Account `fill_sequence`
+identifies the corresponding execution for a post-fill observation. A buy/sell
+round trip can therefore retain its temporary holdings even if every bar ends
+flat. Investment returns still use the original bar valuation timeline.
 
 The existing Parquet export stores the optional holdings component and its sampling
 declaration. Strict reload checks account keys and fill sequence. Old artifacts

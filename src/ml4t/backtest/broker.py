@@ -829,6 +829,7 @@ class Broker:
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
             "trades_length": len(self._execution_journal.trades),
+            "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
             "rebalance_counter": self._rebalance_counter,
             "original_asset_stats_keys": set(self._asset_stats),
             "asset_stats": {},
@@ -938,6 +939,8 @@ class Broker:
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
+        if self._execution_journal.fill_snapshots is not None:
+            del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
 
         self._rebalance_counter = state["rebalance_counter"]
         if state["all_asset_stats"]:
@@ -2491,8 +2494,10 @@ class Broker:
             self.account.release_settled(self._bar_index)
 
         for asset, price in prices.items():
-            if price > 0:
+            if isfinite(price):
                 self._last_prices[asset] = price
+                self._market_state.last_price_times[asset] = timestamp
+            if price > 0:
                 self._asset_bars_seen[asset] = self._asset_bars_seen.get(asset, 0) + 1
 
         # Clear per-bar tracking at start of new bar
