@@ -133,10 +133,10 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
-        if holdings_sampling != "none":
-            self.broker._market_state.last_price_times = {}
-        if holdings_sampling == "fill_and_session":
-            self.broker._execution_journal.fill_snapshots = []
+        self.broker._configure_result_capture(
+            mark_times=holdings_sampling != "none",
+            after_fill=holdings_sampling == "fill_and_session",
+        )
         if funding_df is None:
             self._funding_events = {}
         else:
@@ -631,18 +631,12 @@ class Engine:
 
     def _record_portfolio_state(self, timestamp: datetime) -> None:
         """Capture per-bar NAV and explicitly sampled observed positions."""
-        state, holdings = self.broker._portfolio_ledger.snapshot(
-            include_holdings=self.holdings is not None
-        )
         observation = len(self.portfolio_state)
+        state, holdings = self.broker._observe_portfolio(
+            timestamp, observation, include_holdings=self.holdings is not None
+        )
         self.equity_curve.append((timestamp, state[0]))
         self.portfolio_state.append((timestamp, state[0], state[1], state[2], state[3], state[4]))
-        recorded = self.broker._execution_journal.recorded_values
-        if recorded is not None:
-            rows = self.broker._execution_journal.recorded_rows
-            assert rows is not None
-            rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
-
         if holdings is not None:
             if self.holdings_sampling == "bar":
                 assert self.holdings is not None
@@ -672,9 +666,7 @@ class Engine:
             holdings = selected.get(index)
             kind = "session_last_observed" if holdings is not None else "bar"
             events.append((row[0], len(self.broker.fills), row, holdings, kind, None))
-        for sequence, timestamp, state, holdings in (
-            self.broker._execution_journal.fill_snapshots or []
-        ):
+        for sequence, timestamp, state, holdings in self.broker._observed_fill_accounts():
             events.append(
                 (timestamp, sequence, (timestamp, *state), holdings, "after_fill", sequence)
             )
@@ -833,7 +825,7 @@ class Engine:
                 account_method="signed_notional",
                 holdings=observed_holdings,
                 observation_metadata=observation_metadata,
-                recorded_variables=self.broker._execution_journal.recorded_rows,
+                recorded_variables=self.broker._recorded_variables(),
                 holdings_sampling=self.holdings_sampling,
                 capital_changes=list(self.capital_changes),
             )
@@ -852,7 +844,7 @@ class Engine:
             last_timestamp = self.equity_curve[-1][0]
             for asset, pos in self.broker.positions.items():
                 # Get last known price for this asset
-                last_price, _, _ = self.broker._portfolio_ledger.position_mark(asset, pos)
+                last_price, _, _ = self.broker._position_mark(asset, pos)
                 entry_quote = pos.context.get("entry_quote_context", {})
                 exit_quote = self.broker.get_quote_context(
                     asset,
@@ -967,7 +959,7 @@ class Engine:
             account_method="signed_notional",
             holdings=observed_holdings,
             observation_metadata=observation_metadata,
-            recorded_variables=self.broker._execution_journal.recorded_rows,
+            recorded_variables=self.broker._recorded_variables(),
             holdings_sampling=self.holdings_sampling,
             capital_changes=list(self.capital_changes),
             equity=equity,

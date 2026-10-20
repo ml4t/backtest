@@ -300,6 +300,7 @@ def test_lifecycle_rollback_covers_every_owned_state_field() -> None:
 def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
     required_scopes = {
         "cash": set(),
+        "record": set(),
         "_next_rebalance_id": set(),
         "mark_account_positions": {"all_positions"},
         "configure_stats": {"all_asset_stats"},

@@ -333,7 +333,7 @@ class FillExecutor:
                     self.orders.pending.remove(o)
 
         if self.journal.fill_snapshots is not None:
-            state, holdings = broker._portfolio_ledger.snapshot(include_holdings=True)
+            state, holdings = broker._portfolio_snapshot(include_holdings=True)
             assert holdings is not None
             self.journal.fill_snapshots.append(
                 (len(self.journal.fills) - 1, current_time, state, holdings)

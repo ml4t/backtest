@@ -456,6 +456,34 @@ class Broker:
         self._capture_lifecycle_mutation()
         self.account.cash = value
 
+    def _configure_result_capture(self, *, mark_times: bool, after_fill: bool) -> None:
+        if mark_times:
+            self._market_state.last_price_times = {}
+        if after_fill:
+            self._execution_journal.fill_snapshots = []
+
+    def _portfolio_snapshot(self, *, include_holdings: bool):
+        return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
+
+    def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
+        state = self._portfolio_snapshot(include_holdings=include_holdings)
+        recorded = self._execution_journal.recorded_values
+        if recorded is not None:
+            rows = self._execution_journal.recorded_rows
+            assert rows is not None
+            rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
+        return state
+
+    def _observed_fill_accounts(self):
+        return tuple(self._execution_journal.fill_snapshots or ())
+
+    def _recorded_variables(self):
+        rows = self._execution_journal.recorded_rows
+        return list(rows) if rows is not None else None
+
+    def _position_mark(self, asset: str, position: Position):
+        return self._portfolio_ledger.position_mark(asset, position)
+
     def record(self, **values: Any) -> None:
         """Record JSON-compatible strategy values, carrying them to later bar observations.
 
