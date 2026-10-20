@@ -456,6 +456,54 @@ class Broker:
         self._capture_lifecycle_mutation()
         self.account.cash = value
 
+    def record(self, **values: Any) -> None:
+        """Record JSON-compatible strategy values, carrying them to later bar observations.
+
+        Values live outside authoritative cash/return fields. Unsupported objects
+        and reserved artifact tags fail before any recorded value changes.
+        """
+        import json
+
+        import numpy as np
+        import polars as pl
+
+        from .result import _NONFINITE_FLOAT_KEY, ArtifactWriteError, _serialize_metric_value
+
+        def validate(value: Any) -> None:
+            if isinstance(value, dict):
+                if _NONFINITE_FLOAT_KEY in value:
+                    raise ValueError("record values cannot contain reserved artifact tags")
+                for nested in value.values():
+                    validate(nested)
+            elif isinstance(value, (list, tuple)):
+                for nested in value:
+                    validate(nested)
+            elif isinstance(value, (np.ndarray, np.generic)):
+                validate(value.tolist())
+            elif isinstance(value, pl.Series):
+                validate(value.to_list())
+
+        encoded = {}
+        for name, value in values.items():
+            if not name:
+                raise ValueError("record names must be nonempty")
+            validate(value)
+            try:
+                encoded[name] = json.dumps(
+                    _serialize_metric_value(value, path=f"record[{name!r}]"),
+                    allow_nan=False,
+                    sort_keys=True,
+                )
+            except (ArtifactWriteError, TypeError, ValueError) as exc:
+                raise ValueError(f"record value {name!r} is not serializable") from exc
+        if not encoded:
+            return
+        self._capture_lifecycle_mutation()
+        if self._execution_journal.recorded_values is None:
+            self._execution_journal.recorded_values = {}
+            self._execution_journal.recorded_rows = []
+        self._execution_journal.recorded_values.update(encoded)
+
     def _apply_capital_events(self, events: list[CapitalEvent]) -> list[CapitalChange]:
         nav = self.get_account_value()
         cash = self.cash
@@ -828,6 +876,10 @@ class Broker:
             "orders_this_bar": tuple(self._order_state.current_bar),
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
+            "recorded_values": dict(self._execution_journal.recorded_values)
+            if self._execution_journal.recorded_values is not None
+            else None,
+            "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
             "rebalance_counter": self._rebalance_counter,
@@ -937,6 +989,11 @@ class Broker:
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
+        self._execution_journal.recorded_values = state["recorded_values"]
+        if state["recorded_values"] is None:
+            self._execution_journal.recorded_rows = None
+        elif self._execution_journal.recorded_rows is not None:
+            del self._execution_journal.recorded_rows[state["recorded_length"] :]
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
         if self._execution_journal.fill_snapshots is not None:

@@ -63,6 +63,8 @@ class ExecutionJournal:
 
     fills: list[Fill] = field(default_factory=list)
     trades: list[Trade] = field(default_factory=list)
+    recorded_values: dict[str, str] | None = None
+    recorded_rows: list[tuple[datetime, int, str, str]] | None = None
     fill_snapshots: (
         list[tuple[int, datetime, tuple[float, float, float, float, int], list[tuple[Any, ...]]]]
         | None

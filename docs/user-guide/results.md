@@ -349,6 +349,49 @@ print(f"Investment return: {result.metrics['total_return_pct']:.1f}%")
 Investment return: -1.0%
 ```
 
+## Recorded strategy values
+
+Call `broker.record(score=value, ...)` from a strategy to retain non-account
+values. The latest value carries into later accepted bars until replaced.
+`result.to_recorded_records()` returns decoded values grouped by timestamp and
+zero-based return-bar index. Names stay inside each row's `values` mapping:
+recording a variable called `cash` does not change reported account cash.
+
+Recording copies values when called and samples them at bar end. JSON-compatible
+values, NumPy arrays/scalars and Polars Series use the existing portable artifact
+conversion; non-finite floats retain their tagged representation on disk.
+Unsupported Python objects and reserved artifact-tag keys raise `ValueError`
+before any value changes. If recording was never requested, the component is
+unavailable rather than an empty history of zero signals.
+
+<!-- ml4t-doc-test: results-recorded-values -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+
+class Record(Strategy):
+    def on_start(self, broker):
+        broker.record(score=1.0, cash=42)
+
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp.day == 3:
+            broker.record(score=2.0)
+
+prices = pl.DataFrame({
+    "timestamp": [datetime(2025, 1, day, 16, tzinfo=UTC) for day in (2, 3)],
+    "asset": ["TEST", "TEST"], "close": [100.0, 101.0],
+})
+result = Engine(DataFeed(prices_df=prices), Record(), BacktestConfig(calendar=None)).run()
+assert [row["values"]["score"] for row in result.to_recorded_records()] == [1.0, 2.0]
+assert result.to_portfolio_state_dataframe()["cash"].to_list() == [100000.0, 100000.0]
+```
+
+`to_recorded_dataframe()` exposes a long table with `timestamp`, `bar_index`,
+`name` and portable `value_json`. The existing Parquet artifact stores this
+optional component and its bar-end sampling declaration. The decoded record view
+restores the same values after strict reload.
+
 ## Observed holdings
 
 Enable per-asset capture explicitly when creating the engine:

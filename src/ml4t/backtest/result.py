@@ -62,6 +62,7 @@ _COMPONENT_FILES = {
     "portfolio_state": "portfolio_state.parquet",
     "holdings": "holdings.parquet",
     "capital_flows": "capital_flows.parquet",
+    "recorded_variables": "recorded_variables.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -169,17 +170,28 @@ class UnsupportedArtifactVersionError(ArtifactError):
     """Raised when an artifact uses an unsupported schema version."""
 
 
-def _validate_complete_holdings(account: pl.DataFrame, holdings: pl.DataFrame) -> None:
+def _decode_recorded_value(payload: str) -> Any:
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"Nonstandard JSON constant {value!r}; use tagged values")
+
+    return _deserialize_metric_value(json.loads(payload, parse_constant=reject_constant))
+
+
+def _validate_complete_holdings(
+    account: pl.DataFrame,
+    holdings: pl.DataFrame,
+    error_type: type[ArtifactError] = ArtifactReadError,
+) -> None:
     counts = dict(holdings.group_by("observation_id").len().iter_rows())
     for row in account.iter_rows(named=True):
         actual = counts.pop(row["observation_id"], 0)
         if row["holdings_complete"]:
             if actual != row["open_positions"]:
-                raise ArtifactError("Declared complete holdings omit or add observed positions")
+                raise error_type("Declared complete holdings omit or add observed positions")
         elif actual:
-            raise ArtifactError("Uncaptured account observations cannot declare complete holdings")
+            raise error_type("Uncaptured account observations cannot declare complete holdings")
     if counts:
-        raise ArtifactError("Holdings do not refer to recorded account observations")
+        raise error_type("Holdings do not refer to recorded account observations")
 
 
 @dataclass
@@ -228,6 +240,7 @@ class BacktestResult:
     capital_changes: list[CapitalChange] = field(default_factory=list)
     returns_include_commissions: bool | None = None
     observation_metadata: list[tuple[str, bool, int | None]] = field(default_factory=list)
+    recorded_variables: list[tuple[datetime, int, str, str]] | None = None
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -602,6 +615,29 @@ class BacktestResult:
             orient="row",
         ).with_row_index("flow_sequence")
 
+    def to_recorded_dataframe(self) -> pl.DataFrame:
+        """Return bar-end recorded values in portable tagged JSON, outside account fields."""
+        if self.recorded_variables is None:
+            raise ArtifactError("Strategy variables were not recorded")
+        schema = {
+            "timestamp": self._timestamp_dtype(row[0] for row in self.recorded_variables),
+            "bar_index": pl.UInt32,
+            "name": pl.String,
+            "value_json": pl.String,
+        }
+        return pl.DataFrame(self.recorded_variables, schema=schema, orient="row")
+
+    def to_recorded_records(self) -> list[dict[str, Any]]:
+        """Return decoded strategy values grouped by their actual bar observation."""
+        records: dict[int, dict[str, Any]] = {}
+        for row in self.to_recorded_dataframe().iter_rows(named=True):
+            record = records.setdefault(
+                row["bar_index"],
+                {"timestamp": row["timestamp"], "bar_index": row["bar_index"], "values": {}},
+            )
+            record["values"][row["name"]] = _decode_recorded_value(row["value_json"])
+        return list(records.values())
+
     @staticmethod
     def _holdings_schema() -> dict[str, pl.DataType]:
         return {
@@ -946,7 +982,9 @@ class BacktestResult:
         explicitly_selected = include is not None
         if self.holdings is not None:
             _validate_complete_holdings(
-                self.to_portfolio_state_dataframe(), self.to_holdings_dataframe()
+                self.to_portfolio_state_dataframe(),
+                self.to_holdings_dataframe(),
+                ArtifactWriteError,
             )
         requested = list(include) if include is not None else list(_COMPONENT_FILES)
         unknown = sorted(set(requested) - _COMPONENT_FILES.keys() - {"manifest"})
@@ -957,6 +995,8 @@ class BacktestResult:
         unavailable: dict[str, str] = {}
         if self.holdings is None:
             unavailable["holdings"] = "holdings were not captured"
+        if self.recorded_variables is None:
+            unavailable["recorded_variables"] = "strategy variables were not recorded"
         if self.predictions is None:
             unavailable["predictions"] = "result has no predictions"
         if self.config is None:
@@ -1134,6 +1174,16 @@ class BacktestResult:
             )
             written["capital_flows"] = flows_path
 
+        if "recorded_variables" in selected:
+            recorded_path = path / _COMPONENT_FILES["recorded_variables"]
+            write_component(
+                "recorded_variables",
+                lambda: self.to_recorded_dataframe().write_parquet(
+                    recorded_path, compression=compression
+                ),
+            )
+            written["recorded_variables"] = recorded_path
+
         if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
             write_component(
@@ -1163,6 +1213,7 @@ class BacktestResult:
             "library_version": __version__,
             "initial_capital": self.initial_capital,
             "holdings_sampling": self.holdings_sampling,
+            "recorded_sampling": "bar_end" if self.recorded_variables is not None else None,
             "returns_include_commissions": self.returns_include_commissions,
             "complete": written.keys()
             >= (
@@ -1170,6 +1221,7 @@ class BacktestResult:
                 | ({"funding"} if self.funding_payments else set())
                 | ({"capital_flows"} if self.capital_changes else set())
                 | ({"holdings"} if self.holdings_sampling != "none" else set())
+                | ({"recorded_variables"} if self.recorded_variables is not None else set())
             ),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
@@ -1371,7 +1423,10 @@ class BacktestResult:
             )
         if recovery:
             missing_components = sorted(
-                (_COMPONENT_FILES.keys() - {"funding", "holdings", "capital_flows"})
+                (
+                    _COMPONENT_FILES.keys()
+                    - {"funding", "holdings", "capital_flows", "recorded_variables"}
+                )
                 - components.keys()
             )
             diagnostics.extend(
@@ -1710,6 +1765,48 @@ class BacktestResult:
                         "holdings quantities and values must be finite with a positive multiplier"
                     )
             holdings = list(holdings_frame.select(list(cls._holdings_schema())).iter_rows())
+        recorded_frame = read_component("recorded_variables", pl.read_parquet, None)
+        recorded_variables = None
+        recorded_sampling = manifest.get("recorded_sampling") if manifest else None
+        if recorded_sampling not in {None, "bar_end"}:
+            raise ArtifactManifestError("Unknown recorded-variable sampling declaration")
+        if recorded_frame is not None:
+            if recorded_sampling != "bar_end":
+                raise ArtifactManifestError("Recorded variables require declared bar-end sampling")
+            required = ["timestamp", "bar_index", "name", "value_json"]
+            if not set(required) <= set(recorded_frame.columns):
+                raise ArtifactReadError("Recorded variables are missing required fields")
+            if recorded_frame.select(pl.struct("bar_index", "name").is_duplicated().any()).item():
+                raise ArtifactReadError("Recorded variable keys must be unique")
+            for row in recorded_frame.iter_rows(named=True):
+                index = row["bar_index"]
+                if (
+                    not isinstance(index, int)
+                    or not 0 <= index < len(equity_curve)
+                    or equity_curve[index][0] != row["timestamp"]
+                    or not isinstance(row["name"], str)
+                    or not row["name"]
+                ):
+                    raise ArtifactReadError(
+                        "Recorded variables must refer to actual bar observations"
+                    )
+                try:
+                    _decode_recorded_value(row["value_json"])
+                except (TypeError, ValueError) as exc:
+                    raise ArtifactReadError(
+                        "Recorded values must contain valid tagged JSON"
+                    ) from exc
+            recorded_variables = list(recorded_frame.select(required).iter_rows())
+        elif recorded_sampling == "bar_end":
+            if not recovery:
+                raise ArtifactReadError("Declared strategy variables are missing")
+            diagnostics.append(
+                ArtifactDiagnostic(
+                    "component_unavailable",
+                    "recorded_variables",
+                    "Declared strategy variables could not be loaded.",
+                )
+            )
         metrics = read_component("metrics", read_metrics, {})
         if metrics.get("num_capital_changes", 0) and flows_frame is None:
             raise ArtifactReadError(
@@ -1816,6 +1913,7 @@ class BacktestResult:
             capital_changes=capital_changes,
             returns_include_commissions=returns_include_commissions,
             observation_metadata=observation_metadata,
+            recorded_variables=recorded_variables,
         )
         if result.holdings is not None:
             if result.holdings_sampling in {"session", "fill_and_session"} and len(

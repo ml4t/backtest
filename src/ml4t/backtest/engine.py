@@ -637,6 +637,12 @@ class Engine:
         observation = len(self.portfolio_state)
         self.equity_curve.append((timestamp, state[0]))
         self.portfolio_state.append((timestamp, state[0], state[1], state[2], state[3], state[4]))
+        recorded = self.broker._execution_journal.recorded_values
+        if recorded is not None:
+            rows = self.broker._execution_journal.recorded_rows
+            assert rows is not None
+            rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
+
         if holdings is not None:
             if self.holdings_sampling == "bar":
                 assert self.holdings is not None
@@ -826,6 +832,7 @@ class Engine:
                 returns_include_commissions=True,
                 holdings=observed_holdings,
                 observation_metadata=observation_metadata,
+                recorded_variables=self.broker._execution_journal.recorded_rows,
                 holdings_sampling=self.holdings_sampling,
                 capital_changes=list(self.capital_changes),
             )
@@ -958,6 +965,7 @@ class Engine:
             returns_include_commissions=True,
             holdings=observed_holdings,
             observation_metadata=observation_metadata,
+            recorded_variables=self.broker._execution_journal.recorded_rows,
             holdings_sampling=self.holdings_sampling,
             capital_changes=list(self.capital_changes),
             equity=equity,
