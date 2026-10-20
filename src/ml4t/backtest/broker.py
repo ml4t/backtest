@@ -2494,8 +2494,8 @@ class Broker:
             self.account.release_settled(self._bar_index)
 
         for asset, price in prices.items():
-            if isfinite(price):
-                self._last_prices[asset] = price
+            self._last_prices[asset] = price
+            if self._market_state.last_price_times is not None:
                 self._market_state.last_price_times[asset] = timestamp
             if price > 0:
                 self._asset_bars_seen[asset] = self._asset_bars_seen.get(asset, 0) + 1

@@ -35,7 +35,8 @@ class PortfolioLedger:
             return price, self.broker.mark_price.value, self.market.time
         price = self.broker.get_last_price(asset)
         if price is not None:
-            return price, "last_observed", self.market.last_price_times.get(asset)
+            times = self.market.last_price_times
+            return price, "last_observed", times.get(asset) if times is not None else None
         if position.current_price is not None:
             return position.current_price, "position_current", None
         return position.entry_price, "position_entry", position.entry_time
@@ -47,7 +48,12 @@ class PortfolioLedger:
         gross = net = 0.0
         holdings = [] if include_holdings else None
         for asset, position in self.account.positions.items():
-            price, source, mark_time = self.position_mark(asset, position)
+            if include_holdings:
+                price, source, mark_time = self.position_mark(asset, position)
+            else:
+                price = self.broker.get_mark_price(asset, quantity=position.quantity)
+                if price is None:
+                    price, _, _ = self.position_mark(asset, position)
             value = position.quantity * price * position.multiplier
             gross += abs(value)
             net += value
@@ -71,7 +77,9 @@ class PortfolioLedger:
     def get_account_value(self) -> float:
         value = self.account.cash
         for asset, pos in self.account.positions.items():
-            price, _, _ = self.position_mark(asset, pos)
+            price = self.broker.get_mark_price(asset, quantity=pos.quantity)
+            if price is None:
+                price, _, _ = self.position_mark(asset, pos)
             multiplier = self.broker.get_multiplier(asset)
             value += pos.quantity * price * multiplier
         return value

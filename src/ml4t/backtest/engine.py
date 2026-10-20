@@ -133,6 +133,8 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        if holdings_sampling != "none":
+            self.broker._market_state.last_price_times = {}
         if holdings_sampling == "fill_and_session":
             self.broker._execution_journal.fill_snapshots = []
         if funding_df is None:
@@ -146,7 +148,9 @@ class Engine:
                 set(prices_frame[feed._entity_col].unique().to_list()),
             )
         self.funding_payments: list[FundingPayment] = []
-        self._capital_events = index_capital_events(feed.capital_flows, list(feed.timestamps))
+        self._capital_events = index_capital_events(
+            getattr(feed, "capital_flows", None), list(feed.timestamps)
+        )
         self.capital_changes: list[CapitalChange] = []
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
