@@ -1178,17 +1178,18 @@ class Broker:
         quantity: float | None = None,
         use_open: bool = False,
     ) -> float | None:
-        """Resolve the configured mark price for an asset."""
+        """Resolve a finite configured mark, returning None when unavailable."""
         mark_side = None
         if self.mark_price == ExecutionPrice.QUOTE_SIDE and quantity is not None:
             mark_side = OrderSide.SELL if quantity > 0 else OrderSide.BUY
-        return self.get_price_for_source(
+        price = self.get_price_for_source(
             self.mark_price,
             asset,
             side=mark_side,
             quantity=quantity,
             use_open=use_open,
         )
+        return price if price is not None and isfinite(price) else None
 
     def get_available_size(self, asset: str, side: OrderSide | None = None) -> float | None:
         """Return side-aware quote size when available, otherwise bar volume."""
@@ -2551,6 +2552,8 @@ class Broker:
             self.account.release_settled(self._bar_index)
 
         for asset, price in prices.items():
+            if not isfinite(price):
+                continue
             self._last_prices[asset] = price
             if self._market_state.last_price_times is not None:
                 self._market_state.last_price_times[asset] = timestamp

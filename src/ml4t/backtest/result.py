@@ -241,6 +241,7 @@ class BacktestResult:
     returns_include_commissions: bool | None = None
     observation_metadata: list[tuple[str, bool, int | None]] = field(default_factory=list)
     recorded_variables: list[tuple[datetime, int, str, str]] | None = None
+    account_method: str | None = None
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -878,6 +879,14 @@ class BacktestResult:
                 "fills": self.fills,
                 "funding_payments": self.funding_payments,
                 "portfolio_state": self.portfolio_state,
+                "initial_capital": self.initial_capital,
+                "account_method": self.account_method,
+                "holdings": self.holdings,
+                "holdings_sampling": self.holdings_sampling,
+                "observation_metadata": self.observation_metadata,
+                "capital_changes": self.capital_changes,
+                "recorded_variables": self.recorded_variables,
+                "returns_include_commissions": self.returns_include_commissions,
             }
         )
         if self.predictions is not None:
@@ -903,6 +912,8 @@ class BacktestResult:
             "version": 1,
             "library_version": __version__,
             "initial_capital": self.initial_capital,
+            "account_method": self.account_method,
+            "returns_include_commissions": self.returns_include_commissions,
             "lifecycle_version": self.metrics.get("lifecycle_version"),
             "lifecycle_callback_counts": self.metrics.get("lifecycle_callback_counts", {}),
             "lifecycle_invocations": self.metrics.get("lifecycle_invocations", []),
@@ -980,6 +991,10 @@ class BacktestResult:
             ArtifactWriteError: If a requested component is unavailable or cannot be written.
         """
         explicitly_selected = include is not None
+        if self.account_method not in (None, "signed_notional"):
+            raise ArtifactWriteError("Unknown account_method")
+        if self.holdings_sampling not in ("none", "bar", "session", "fill_and_session"):
+            raise ArtifactWriteError("Unknown holdings_sampling")
         if self.holdings is not None:
             _validate_complete_holdings(
                 self.to_portfolio_state_dataframe(),
@@ -1211,6 +1226,7 @@ class BacktestResult:
             "artifact_type": _ARTIFACT_TYPE,
             "schema_version": _ARTIFACT_SCHEMA_VERSION,
             "library_version": __version__,
+            "account_method": self.account_method,
             "initial_capital": self.initial_capital,
             "holdings_sampling": self.holdings_sampling,
             "recorded_sampling": "bar_end" if self.recorded_variables is not None else None,
@@ -1386,6 +1402,9 @@ class BacktestResult:
                     components = dict(component_data)
 
         initial_capital = manifest.get("initial_capital") if manifest is not None else None
+        account_method = manifest.get("account_method") if manifest else None
+        if account_method not in (None, "signed_notional"):
+            raise ArtifactManifestError("Unknown account_method")
         returns_include_commissions = (
             manifest.get("returns_include_commissions") if manifest else None
         )
@@ -1708,7 +1727,7 @@ class BacktestResult:
         holdings_frame = read_component("holdings", pl.read_parquet, None)
         holdings = None
         holdings_sampling = manifest.get("holdings_sampling", "none") if manifest else "none"
-        if holdings_sampling not in {"none", "bar", "session", "fill_and_session"}:
+        if holdings_sampling not in ("none", "bar", "session", "fill_and_session"):
             raise ArtifactManifestError("Unknown holdings_sampling declaration")
         if holdings_sampling != "none" and holdings_frame is None:
             if not recovery:
@@ -1768,7 +1787,7 @@ class BacktestResult:
         recorded_frame = read_component("recorded_variables", pl.read_parquet, None)
         recorded_variables = None
         recorded_sampling = manifest.get("recorded_sampling") if manifest else None
-        if recorded_sampling not in {None, "bar_end"}:
+        if recorded_sampling not in (None, "bar_end"):
             raise ArtifactManifestError("Unknown recorded-variable sampling declaration")
         if recorded_frame is not None:
             if recorded_sampling != "bar_end":
@@ -1914,6 +1933,7 @@ class BacktestResult:
             returns_include_commissions=returns_include_commissions,
             observation_metadata=observation_metadata,
             recorded_variables=recorded_variables,
+            account_method=account_method,
         )
         if result.holdings is not None:
             if result.holdings_sampling in {"session", "fill_and_session"} and len(

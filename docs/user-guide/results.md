@@ -293,6 +293,10 @@ Returns a Polars DataFrame with columns:
 | `high_water_mark` | Float | Running maximum investment wealth, including recorded initial capital |
 | `performance_equity` | Float | Investment wealth at initial capital scale, excluding external flows |
 
+The capital-flow, recorded-variable and detailed holdings interfaces below are
+part of the upcoming successor release. Earlier artifacts remain readable with
+their recorded component availability and valuation baseline.
+
 ## External capital and investment returns
 
 Pass a prepared `capital_flows` Polars table to `DataFeed`, or to `run_backtest`.
@@ -405,11 +409,16 @@ account = result.to_portfolio_state_dataframe()
 Each holdings row records `timestamp`, `observation_id`, `asset`, signed
 `quantity`, `mark`, `multiplier`, declared `currency`, `signed_notional` and
 `liquidation_value`, `mark_source` and `mark_timestamp`. The latter retains the
-original observation time when a last known mark is carried. These are observed
+original observation time when a last known mark is carried. `last_observed`
+means the last finite reference price; unusable current quotes stay unavailable
+for execution and do not replace that mark. A valid zero mark remains zero. These are observed
 simulator positions, including open lots,
 not positions reconstructed from closed trades. Currency is null when no contract
 specification declares it. The current signed-notional ledger reports identical
 notional and liquidation values; another account method must define them separately.
+`result.account_method` and the artifact manifest explicitly declare
+`"signed_notional"` for current Engine runs. Legacy artifacts without a declaration
+report an unknown method; margin settings alone do not imply variation cash.
 
 Account rows retain every accepted bar, including a completely flat portfolio.
 Join on `observation_id` to distinguish a complete all-cash observation from a

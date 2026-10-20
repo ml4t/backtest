@@ -270,3 +270,53 @@ def test_carried_mark_keeps_its_observation_time_and_source(tmp_path):
     assert holdings["mark_timestamp"].to_list() == [dates[0], dates[1], dates[1]]
     assert holdings["mark_source"][-1] == "last_observed"
     assert holdings["mark"].to_list() == [100, 110, 110]
+
+
+def test_account_method_is_declared_and_old_artifacts_remain_unknown(tmp_path):
+    from pathlib import Path
+
+    result, _ = run_positions({0: [("LONG", 10)]})
+    result.to_parquet(tmp_path)
+    assert result.account_method == "signed_notional"
+    assert BacktestResult.from_parquet(tmp_path).account_method == "signed_notional"
+    legacy = BacktestResult.from_parquet(
+        Path(__file__).parent / "fixtures/artifacts/v0.1.0b22", recovery=True
+    )
+    assert legacy.account_method is None
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_invalid_new_quote_does_not_replace_the_last_observed_finite_mark(invalid):
+    dates = [datetime(2025, 1, day, 16, tzinfo=UTC) for day in [2, 3]]
+    prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2, "close": [100.0, invalid]})
+
+    class Observe(Strategy):
+        def __init__(self):
+            self.observed = []
+
+        def on_data(self, timestamp, data, context, broker):
+            self.observed.append(broker.get_last_price("TEST"))
+
+    strategy = Observe()
+    Engine(DataFeed(prices_df=prices), strategy, BacktestConfig(calendar=None)).run()
+    assert strategy.observed == [100.0, 100.0]
+
+
+def test_unusable_current_mark_uses_carried_valuation_without_fabricating_a_quote(tmp_path):
+    dates = [datetime(2025, 1, day, 16, tzinfo=UTC) for day in [2, 3]]
+    prices = pl.DataFrame(
+        {"timestamp": dates, "asset": ["TEST"] * 2, "close": [100.0, float("nan")]}
+    )
+    result = Engine(
+        DataFeed(prices_df=prices),
+        TradeAtBars({0: [("TEST", 10)]}),
+        BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+        holdings_sampling="bar",
+    ).run()
+    result.to_parquet(tmp_path)
+    holdings = BacktestResult.from_parquet(tmp_path).to_holdings_dataframe()
+    assert holdings["mark"].to_list() == [100.0, 100.0]
+    assert holdings["mark_timestamp"].to_list() == [dates[0], dates[0]]
+    assert holdings["mark_source"][-1] == "last_observed"
+    assert len(result.fills) == 1
+    assert result.metrics["final_value"] == 10000
