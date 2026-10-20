@@ -654,10 +654,20 @@ def test_qualification_resolver_permission_preserves_unchanged_measured_dependen
 
     benchmark = _load_benchmark()
     validation = Path(__file__).parents[2] / "validation"
-    project = validation.parent
-    for name in ("pyproject.toml", "uv.lock", "README.md"):
-        shutil.copy2(project / name, tmp_path / name)
-    shutil.copytree(project / "src", tmp_path / "src", ignore=shutil.ignore_patterns("__pycache__"))
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "qualification-lock-fixture"\nversion = "0.0.0"\n'
+        'requires-python = ">=3.12"\ndependencies = []\n'
+    )
+    command = ["uv", "lock", "--directory", str(tmp_path), "--python", sys.executable, "--offline"]
+    environment = {**os.environ, "UV_CACHE_DIR": str(tmp_path / "empty-uv-cache")}
+    baseline = subprocess.run(
+        [*command, "--prerelease", "disallow"],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert baseline.returncode == 0, baseline.stderr
     dependency = "uv.lock"
     monkeypatch.setitem(benchmark.DEPENDENCY_PATHS, dependency, tmp_path / "uv.lock")
     correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
@@ -673,8 +683,8 @@ def test_qualification_resolver_permission_preserves_unchanged_measured_dependen
     before = tomllib.loads((tmp_path / "uv.lock").read_text())
     before_bytes = (tmp_path / "uv.lock").read_bytes()
     completed = subprocess.run(
-        ["uv", "lock", "--directory", str(tmp_path), "--prerelease", "allow", "--offline"],
-        env={**os.environ, "SETUPTOOLS_SCM_PRETEND_VERSION": "0.1.13"},
+        [*command, "--prerelease", "allow"],
+        env=environment,
         check=False,
         capture_output=True,
         text=True,
@@ -682,6 +692,7 @@ def test_qualification_resolver_permission_preserves_unchanged_measured_dependen
     assert completed.returncode == 0, completed.stderr
     after = tomllib.loads((tmp_path / "uv.lock").read_text())
     assert (tmp_path / "uv.lock").read_bytes() != before_bytes
+    assert before.pop("options", {}) in ({}, {"prerelease-mode": "disallow"})
     assert after.pop("options") == {"prerelease-mode": "allow"}
     assert after == before  # No selected version, artifact, hash, marker or source changed.
     assert benchmark.report_failures(report, correctness) == []
