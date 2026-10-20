@@ -120,6 +120,28 @@ If you need portfolio analysis after migration, evaluate the optional
 example passes a `BacktestResult` to `ml4t-diagnostic==0.1.4` and computes
 return and drawdown statistics.
 
+## Match ledger and corporate-action assumptions
+
+`Engine` does not automatically turn arbitrary `split_ratio` or `cash_dividend`
+columns into share adjustments or cash payments. Prepare the input price and
+share-unit basis explicitly upstream. Adjusted bars alone do not reproduce an
+unadjusted ledger's dividend entitlement, payment date or split-adjusted share
+count. Keep an action-sensitive migration on the reference engine until its
+required event workflow is supported and compared.
+
+Contract multipliers and fixed margin schedules support contract P&L and
+buying-power checks. Backtest's current leveraged ledger still moves full trade
+notional through cash and values the position at notional. It does not implement
+Zipline's futures variation-cash ledger. With $100,000 initial cash, buying one
+contract at 4,000 with a $50 multiplier moves $200,000 from cash into the
+position. A later 10-point rise adds $500 to equity; matching that equity does
+not establish cash-ledger parity. See [account policies](accounts.md).
+
+The retained CME workload contains continuous root series without a dated
+contract chain and roll map, so its Zipline comparison is explicitly unsupported.
+That input limitation is separate from cash-settlement semantics. The supported
+ETF and US-equity comparisons do not establish universal futures migration.
+
 ## Check a migrated run
 
 The retained comparisons pin [Zipline Reloaded 3.1.1](https://pypi.org/project/zipline-reloaded/3.1.1/),
