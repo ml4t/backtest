@@ -236,7 +236,9 @@ def render_claims(
             f"`{review['engine_source_sha256'][:12]}`. The measured source, locked dependencies, "
             "review rationale and current correctness evidence are recorded with the raw samples. "
             "Measurements are repeated when changes materially affect timed execution; "
-            "a new source revision alone does not require a benchmark rerun.",
+            "a new source revision alone does not require a benchmark rerun. "
+            "Dependency validation checks selected packages and artifacts; allowing prereleases "
+            "without changing those selections does not invalidate the measurements.",
         ]
         if review is not None
         else []

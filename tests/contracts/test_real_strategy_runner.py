@@ -642,3 +642,53 @@ def test_unreviewed_dependency_change_invalidates_timings(
         "performance-impact review" in failure
         for failure in benchmark.report_failures(report, correctness)
     )
+
+
+def test_qualification_resolver_permission_preserves_unchanged_measured_dependencies(
+    tmp_path, monkeypatch
+) -> None:
+    """uv's actual prerelease resolve must not invalidate an unchanged package graph."""
+    import os
+    import shutil
+    import tomllib
+
+    benchmark = _load_benchmark()
+    validation = Path(__file__).parents[2] / "validation"
+    project = validation.parent
+    for name in ("pyproject.toml", "uv.lock", "README.md"):
+        shutil.copy2(project / name, tmp_path / name)
+    shutil.copytree(project / "src", tmp_path / "src", ignore=shutil.ignore_patterns("__pycache__"))
+    dependency = "uv.lock"
+    monkeypatch.setitem(benchmark.DEPENDENCY_PATHS, dependency, tmp_path / "uv.lock")
+    correctness = json.loads((validation / "REAL_STRATEGY_RESULTS.json").read_text())
+    report = json.loads((validation / "REAL_STRATEGY_PERFORMANCE.json").read_text())
+    benchmark.certify_source(
+        report,
+        correctness,
+        validation / "REAL_STRATEGY_RESULTS.json",
+        "Review unchanged selected packages through shared qualification's resolver permission.",
+        performance_impact="none",
+    )
+    assert benchmark.report_failures(report, correctness) == []
+    before = tomllib.loads((tmp_path / "uv.lock").read_text())
+    before_bytes = (tmp_path / "uv.lock").read_bytes()
+    completed = subprocess.run(
+        ["uv", "lock", "--directory", str(tmp_path), "--prerelease", "allow", "--offline"],
+        env={**os.environ, "SETUPTOOLS_SCM_PRETEND_VERSION": "0.1.13"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    after = tomllib.loads((tmp_path / "uv.lock").read_text())
+    assert (tmp_path / "uv.lock").read_bytes() != before_bytes
+    assert after.pop("options") == {"prerelease-mode": "allow"}
+    assert after == before  # No selected version, artifact, hash, marker or source changed.
+    assert benchmark.report_failures(report, correctness) == []
+
+    # Another real uv lock selects materially different dependencies and must fail.
+    shutil.copy2(validation / "environments/vectorbt_pro_2025_12_31/uv.lock", tmp_path / "uv.lock")
+    assert any(
+        "performance-impact review" in failure
+        for failure in benchmark.report_failures(report, correctness)
+    )

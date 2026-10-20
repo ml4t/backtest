@@ -109,6 +109,20 @@ Common margin configurations:
 | Day trading | 0.25 | 4x |
 | Futures-style | 0.10 | 10x |
 
+## Futures cash and margin
+
+A contract multiplier changes notional exposure and price-move P&L. A fixed or
+percentage margin schedule constrains buying power; it does not select a
+variation-cash settlement method. The current leveraged ledger moves full signed
+notional through cash at fills, then includes the signed position market value
+in equity. A leveraged account's cash balance can therefore be negative.
+
+[The CFTC's mark-to-market definition](https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/CFTCGlossary/index.htm)
+describes daily futures cash flows from price changes. Backtest does not
+currently implement that variation-cash ledger. Compare cash, collateral and
+settlement timing separately when migrating a futures strategy; a matching
+terminal equity or contract P&L does not prove those fields match.
+
 ## Using Engine Directly
 
 Pass the account policy to `Engine` through `BacktestConfig`. This complete example
