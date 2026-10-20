@@ -56,6 +56,7 @@ from .result import (
 from .risk.position.composite import RuleChain
 from .risk.position.dynamic import TrailingStop
 from .risk.position.static import StopLoss, TakeProfit
+from .runtime import RuntimeServices
 from .strategy import Strategy
 from .types import (
     AssetClass,
@@ -80,6 +81,7 @@ __all__ = [
     "DataFeed",
     "Broker",
     "Strategy",
+    "RuntimeServices",
     "Engine",
     "run_backtest",
     "BacktestConfig",

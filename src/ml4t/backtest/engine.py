@@ -28,6 +28,7 @@ from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
 from .lifecycle import LifecycleDispatcher
 from .preopen import default_execution_policy
+from .runtime import RuntimeServices
 from .sessions import session_date_for_timestamp
 from .strategy import Strategy
 from .types import ExecutionMode, OrderSide, OrderType
@@ -98,12 +99,14 @@ class Engine:
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
         holdings_sampling: str = "none",
+        runtime: RuntimeServices | None = None,
     ):
         from .config import BacktestConfig as ConfigCls
 
         negotiated_version = negotiate_lifecycle_version(lifecycle_version)
         if holdings_sampling not in {"none", "bar", "session", "fill_and_session"}:
             raise ValueError("holdings_sampling must be none, bar, session or fill_and_session")
+        self.runtime = runtime
         self.holdings_sampling = holdings_sampling
         self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling != "none" else None
         self._validate_strategy_lifecycle(strategy)
@@ -201,6 +204,8 @@ class Engine:
         if self._has_run:
             raise RuntimeError("Engine.run() was already started; create a new Engine for each run")
         self._has_run = True
+        if self.runtime is not None:
+            self.runtime._bind(self)
         try:
             return self._run_once()
         except BaseException as failure:
@@ -212,6 +217,9 @@ class Engine:
                     f"{type(finalization_failure).__name__}: {finalization_failure}"
                 )
             raise
+        finally:
+            if self.runtime is not None:
+                self.runtime._unbind()
 
     def _run_once(self) -> BacktestResult:
         """Execute one guarded engine run."""
@@ -413,6 +421,11 @@ class Engine:
                 elif valid_intraday_bar_mask is None or not valid_intraday_bar_mask[feed_bar_index]:
                     self._skipped_bars += 1
                     continue
+
+            if self.runtime is not None:
+                if not self.runtime._accepts(timestamp):
+                    continue
+                assets_data = self.runtime._advance(timestamp, assets_data)
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
