@@ -397,6 +397,11 @@ Returns a Polars DataFrame with columns:
 
 `observation_id` identifies each account snapshot. Fill exports also include a
 zero-based `fill_sequence` that preserves execution order at equal timestamps.
+Fill `signed_quantity`, `multiplier` and declared `currency` retain execution
+units. Legacy fills without those declarations keep null multiplier/currency,
+rather than inferring them from a later contract specification. The manifest
+records whether investment returns include recorded commissions; it remains
+unknown for older artifacts without that declaration.
 
 This is the right primitive for downstream diagnostics such as:
 

@@ -1935,10 +1935,12 @@
         "bid_price": "Float64",
         "bid_size": "Float64",
         "commission": "Float64",
+        "currency": "String",
         "exit_reason": "String",
         "exit_reason_detail": "String",
         "fill_sequence": "UInt32",
         "limit_price": "Float64",
+        "multiplier": "Float64",
         "order_id": "String",
         "order_type": "String",
         "price": "Float64",
@@ -1948,6 +1950,7 @@
         "rebalance_id": "String",
         "reference_price": "Float64",
         "side": "String",
+        "signed_quantity": "Float64",
         "slippage": "Float64",
         "spread": "Float64",
         "stop_price": "Float64",
@@ -3101,7 +3104,7 @@
       },
       "module": "ml4t.backtest.result",
       "qualname": "BacktestResult",
-      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
+      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, returns_include_commissions: 'bool | None' = None, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
     },
     "ml4t.backtest.risk.portfolio.limits:BetaLimit": {
       "kind": "class",
@@ -3856,7 +3859,7 @@
       },
       "module": "ml4t.backtest.result",
       "qualname": "BacktestResult",
-      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
+      "signature": "(trades: 'list[Trade]', equity_curve: 'list[tuple[datetime, float]]', fills: 'list[Fill]', metrics: 'dict[str, Any]', predictions: 'pl.DataFrame | None' = None, config: 'BacktestConfig | None' = None, equity: 'EquityCurve | None' = None, trade_analyzer: 'TradeAnalyzer | None' = None, portfolio_state: 'list[tuple[datetime, float, float, float, float, int]]' = <factory>, rejected_orders: 'list[Order]' = <factory>, funding_payments: 'list[FundingPayment]' = <factory>, artifact_diagnostics: 'tuple[ArtifactDiagnostic, ...]' = <factory>, initial_capital: 'float | None' = None, holdings: 'list[tuple[Any, ...]] | None' = None, holdings_sampling: 'str' = 'none', capital_changes: 'list[CapitalChange]' = <factory>, returns_include_commissions: 'bool | None' = None, _trades_df: 'pl.DataFrame | None' = None, _equity_df: 'pl.DataFrame | None' = None, _fills_df: 'pl.DataFrame | None' = None, _portfolio_state_df: 'pl.DataFrame | None' = None, _rejected_orders_df: 'pl.DataFrame | None' = None) -> None"
     },
     "ml4t.backtest:Broker": {
       "kind": "class",
@@ -4196,7 +4199,7 @@
       },
       "module": "ml4t.backtest.types",
       "qualname": "Fill",
-      "signature": "(order_id: str, asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, price: float, timestamp: datetime.datetime, rebalance_id: str | None = None, commission: float = 0.0, slippage: float = 0.0, order_type: str = '', limit_price: float | None = None, stop_price: float | None = None, price_source: str = '', reference_price: float | None = None, quote_mid_price: float | None = None, bid_price: float | None = None, ask_price: float | None = None, spread: float | None = None, bid_size: float | None = None, ask_size: float | None = None, available_size: float | None = None, exit_reason: str = '', exit_reason_detail: str | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None) -> None"
+      "signature": "(order_id: str, asset: str, side: ml4t.backtest.types.OrderSide, quantity: float, price: float, timestamp: datetime.datetime, rebalance_id: str | None = None, commission: float = 0.0, slippage: float = 0.0, order_type: str = '', limit_price: float | None = None, stop_price: float | None = None, price_source: str = '', reference_price: float | None = None, quote_mid_price: float | None = None, bid_price: float | None = None, ask_price: float | None = None, spread: float | None = None, bid_size: float | None = None, ask_size: float | None = None, available_size: float | None = None, exit_reason: str = '', exit_reason_detail: str | None = None, target_intent_id: str | None = None, child_intent_id: str | None = None, intent_idempotency_key: str | None = None, multiplier: float | None = None, currency: str | None = None) -> None"
     },
     "ml4t.backtest:IntentOutcome": {
       "kind": "class",

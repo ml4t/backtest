@@ -128,3 +128,20 @@ def test_corrupted_holdings_cannot_claim_an_unobserved_account_key(tmp_path):
     ).write_parquet(path)
     with pytest.raises(ArtifactError, match="actual account observations"):
         BacktestResult.from_parquet(tmp_path)
+
+
+def test_fill_exports_keep_actual_multiplier_currency_and_signed_quantity(tmp_path):
+    result, _ = run_positions(
+        {0: [("LONG", 2), ("SHORT", -1)]},
+        contract_specs={
+            "LONG": ContractSpec(symbol="LONG", multiplier=10, currency="USD"),
+            "SHORT": ContractSpec(symbol="SHORT", multiplier=20, currency="USD"),
+        },
+    )
+    result.to_parquet(tmp_path)
+    for actual in [result, BacktestResult.from_parquet(tmp_path)]:
+        fills = actual.to_fills_dataframe()
+        assert fills["multiplier"].to_list() == [10, 20]
+        assert fills["currency"].to_list() == ["USD", "USD"]
+        assert fills["signed_quantity"].to_list() == [2, -1]
+        assert actual.returns_include_commissions is True

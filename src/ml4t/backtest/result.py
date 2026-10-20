@@ -213,6 +213,7 @@ class BacktestResult:
     holdings: list[tuple[Any, ...]] | None = None
     holdings_sampling: str = "none"
     capital_changes: list[CapitalChange] = field(default_factory=list)
+    returns_include_commissions: bool | None = None
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -345,6 +346,11 @@ class BacktestResult:
                     "asset": fill.asset,
                     "side": fill.side.value,
                     "quantity": fill.quantity,
+                    "signed_quantity": fill.quantity
+                    if fill.side is OrderSide.BUY
+                    else -fill.quantity,
+                    "multiplier": fill.multiplier,
+                    "currency": fill.currency,
                     "price": fill.price,
                     "timestamp": fill.timestamp,
                     "commission": fill.commission,
@@ -1139,6 +1145,7 @@ class BacktestResult:
             "library_version": __version__,
             "initial_capital": self.initial_capital,
             "holdings_sampling": self.holdings_sampling,
+            "returns_include_commissions": self.returns_include_commissions,
             "complete": written.keys()
             >= (
                 _REQUIRED_RESULT_COMPONENTS
@@ -1308,6 +1315,13 @@ class BacktestResult:
                     components = dict(component_data)
 
         initial_capital = manifest.get("initial_capital") if manifest is not None else None
+        returns_include_commissions = (
+            manifest.get("returns_include_commissions") if manifest else None
+        )
+        if returns_include_commissions is not None and not isinstance(
+            returns_include_commissions, bool
+        ):
+            raise ArtifactManifestError("returns_include_commissions must be a boolean or null")
         if initial_capital is not None and (
             isinstance(initial_capital, bool)
             or not isinstance(initial_capital, (int, float))
@@ -1444,6 +1458,8 @@ class BacktestResult:
                         asset=row["asset"],
                         side=OrderSide(row["side"]),
                         quantity=row["quantity"],
+                        multiplier=row.get("multiplier"),
+                        currency=row.get("currency"),
                         price=row["price"],
                         timestamp=row["timestamp"],
                         commission=row.get("commission", 0.0),
@@ -1743,6 +1759,7 @@ class BacktestResult:
             holdings=holdings,
             holdings_sampling=holdings_sampling,
             capital_changes=capital_changes,
+            returns_include_commissions=returns_include_commissions,
         )
 
     @staticmethod
@@ -1802,6 +1819,9 @@ class BacktestResult:
             "asset": pl.String(),
             "side": pl.String(),
             "quantity": pl.Float64(),
+            "signed_quantity": pl.Float64(),
+            "multiplier": pl.Float64(),
+            "currency": pl.String(),
             "price": pl.Float64(),
             "timestamp": pl.Datetime(),
             "commission": pl.Float64(),
