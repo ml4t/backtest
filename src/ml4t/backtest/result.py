@@ -38,6 +38,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for local editable edge cases
     __version__ = "0.0.0.dev0"
 from .analytics.annualization import should_session_align
+from .capital import CapitalChange, flow_adjusted_returns
 from .funding import FundingPayment
 from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
 
@@ -60,6 +61,7 @@ _COMPONENT_FILES = {
     "equity": "equity.parquet",
     "portfolio_state": "portfolio_state.parquet",
     "holdings": "holdings.parquet",
+    "capital_flows": "capital_flows.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -210,6 +212,7 @@ class BacktestResult:
     initial_capital: float | None = None
     holdings: list[tuple[Any, ...]] | None = None
     holdings_sampling: str = "none"
+    capital_changes: list[CapitalChange] = field(default_factory=list)
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -462,25 +465,50 @@ class BacktestResult:
         df = pl.DataFrame({"timestamp": timestamps, "equity": values}).sort("timestamp")
         initial = self.initial_capital if self.initial_capital is not None else df["equity"][0]
         previous = pl.col("equity").shift(1).fill_null(initial)
+        if self.capital_changes:
+            if self.initial_capital is None:
+                raise ArtifactError("Capital-flow returns require recorded initial_capital")
+            returns = flow_adjusted_returns(
+                list(df.iter_rows()), self.initial_capital, self.capital_changes
+            )
+            df = df.with_columns(pl.Series("return", returns))
+            df = df.with_columns(
+                ((pl.col("return") + 1).cum_prod() * initial).alias("performance_equity")
+            )
+        else:
+            df = df.with_columns(
+                (pl.col("equity") / previous - 1.0).alias("return"),
+                pl.col("equity").alias("performance_equity"),
+            )
 
         # Vectorized computation using Polars
         df = df.with_columns(
             [
-                (pl.col("equity") / previous - 1.0).alias("return"),
-                (pl.col("equity") / initial - 1.0).alias("cumulative_return"),
-                pl.col("equity").cum_max().clip(lower_bound=initial).alias("high_water_mark"),
+                (pl.col("performance_equity") / initial - 1.0).alias("cumulative_return"),
+                pl.col("performance_equity")
+                .cum_max()
+                .clip(lower_bound=initial)
+                .alias("high_water_mark"),
             ]
         ).with_columns(
             # Drawdown: (equity / hwm) - 1, handle division by zero
             pl.when(pl.col("high_water_mark") > 0)
-            .then(pl.col("equity") / pl.col("high_water_mark") - 1.0)
+            .then(pl.col("performance_equity") / pl.col("high_water_mark") - 1.0)
             .otherwise(0.0)
             .alias("drawdown")
         )
 
         # Reorder columns to match expected schema
         self._equity_df = df.select(
-            ["timestamp", "equity", "return", "cumulative_return", "drawdown", "high_water_mark"]
+            [
+                "timestamp",
+                "equity",
+                "return",
+                "cumulative_return",
+                "drawdown",
+                "high_water_mark",
+                "performance_equity",
+            ]
         )
 
         return self._equity_df
@@ -528,6 +556,34 @@ class BacktestResult:
         schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.holdings)
         return pl.DataFrame(self.holdings, schema=schema, orient="row")
 
+    def to_capital_flows_dataframe(self) -> pl.DataFrame:
+        """Return ordered external capital applications, with marked pre/post-flow NAV."""
+        schema = {
+            "timestamp": self._timestamp_dtype(change.timestamp for change in self.capital_changes),
+            "event_id": pl.String(),
+            "kind": pl.String(),
+            "value": pl.Float64(),
+            "cash_delta": pl.Float64(),
+            "nav_before": pl.Float64(),
+            "nav_after": pl.Float64(),
+        }
+        return pl.DataFrame(
+            [
+                (
+                    change.timestamp,
+                    change.event_id,
+                    change.kind,
+                    change.value,
+                    change.cash_delta,
+                    change.nav_before,
+                    change.nav_after,
+                )
+                for change in self.capital_changes
+            ],
+            schema=schema,
+            orient="row",
+        ).with_row_index("flow_sequence")
+
     @staticmethod
     def _holdings_schema() -> dict[str, pl.DataType]:
         return {
@@ -550,8 +606,45 @@ class BacktestResult:
             timezone=self.config.resolved_timezone if self.config else "UTC",
             session_start_time=self.config.resolved_session_start_time if self.config else None,
         )
-        return compute_session_pnl(
+        daily = compute_session_pnl(
             self.equity_curve, session_config, initial_capital=self.initial_capital
+        )
+        return self._adjust_flow_pnl(daily, session_config)
+
+    def _adjust_flow_pnl(self, daily: pl.DataFrame, session_config=None) -> pl.DataFrame:
+        if not self.capital_changes or daily.is_empty():
+            return daily
+        from zoneinfo import ZoneInfo
+
+        from .sessions import _timestamp_in_session_timezone, assign_session_date
+
+        def key(timestamp):
+            if session_config is None:
+                return timestamp.date()
+            tz = session_config.get_session_timezone()
+            return assign_session_date(
+                _timestamp_in_session_timezone(timestamp, ZoneInfo(session_config.timezone), tz),
+                tz,
+                session_config.get_session_start_hour(),
+                session_config.get_session_start_minute(),
+            ).date()
+
+        factors: dict[Any, float] = {}
+        external: dict[Any, float] = {}
+        for (timestamp, _), value in zip(self.equity_curve, self.to_returns_series()):
+            day = key(timestamp)
+            factors[day] = factors.get(day, 1.0) * (1 + value)
+        for change in self.capital_changes:
+            day = key(change.timestamp)
+            external[day] = external.get(day, 0.0) + change.cash_delta
+        dates = daily["date"] if session_config is None else daily["session_date"].dt.date()
+        returns = pl.Series("return_pct", [factors[day] - 1.0 for day in dates])
+        flows = pl.Series("external_flow", [external.get(day, 0.0) for day in dates])
+        return daily.with_columns(
+            returns,
+            ((returns + 1).cum_prod() - 1).alias("cumulative_return"),
+            (daily["pnl"] - flows).alias("pnl"),
+            flows,
         )
 
     def to_daily_pnl(self, session_aligned: bool = False) -> pl.DataFrame:
@@ -633,7 +726,7 @@ class BacktestResult:
             ]
         )
 
-        return daily
+        return self._adjust_flow_pnl(daily)
 
     def to_daily_returns(
         self,
@@ -1007,6 +1100,16 @@ class BacktestResult:
             )
             written["holdings"] = holdings_path
 
+        if "capital_flows" in selected:
+            flows_path = path / _COMPONENT_FILES["capital_flows"]
+            write_component(
+                "capital_flows",
+                lambda: self.to_capital_flows_dataframe().write_parquet(
+                    flows_path, compression=compression
+                ),
+            )
+            written["capital_flows"] = flows_path
+
         if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
             write_component(
@@ -1037,7 +1140,11 @@ class BacktestResult:
             "initial_capital": self.initial_capital,
             "holdings_sampling": self.holdings_sampling,
             "complete": written.keys()
-            >= (_REQUIRED_RESULT_COMPONENTS | ({"funding"} if self.funding_payments else set())),
+            >= (
+                _REQUIRED_RESULT_COMPONENTS
+                | ({"funding"} if self.funding_payments else set())
+                | ({"capital_flows"} if self.capital_changes else set())
+            ),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
             },
@@ -1231,7 +1338,8 @@ class BacktestResult:
             )
         if recovery:
             missing_components = sorted(
-                (_COMPONENT_FILES.keys() - {"funding", "holdings"}) - components.keys()
+                (_COMPONENT_FILES.keys() - {"funding", "holdings", "capital_flows"})
+                - components.keys()
             )
             diagnostics.extend(
                 ArtifactDiagnostic(
@@ -1456,6 +1564,23 @@ class BacktestResult:
         trades = read_component("trades", read_trades, [])
         fills = read_component("fills", read_fills, [])
         funding_payments = read_component("funding", read_funding, [])
+        flows_frame = read_component("capital_flows", pl.read_parquet, None)
+        capital_changes = []
+        if flows_frame is not None:
+            try:
+                if "flow_sequence" not in flows_frame.columns:
+                    raise ValueError("flow_sequence is required")
+                sequence = flows_frame["flow_sequence"]
+                if not sequence.dtype.is_integer() or sorted(sequence.to_list()) != list(
+                    range(len(flows_frame))
+                ):
+                    raise ValueError("flow_sequence must uniquely order every capital change")
+                for row in (
+                    flows_frame.sort("flow_sequence").drop("flow_sequence").iter_rows(named=True)
+                ):
+                    capital_changes.append(CapitalChange(**row))
+            except Exception as exc:
+                raise ArtifactReadError("Invalid capital_flows.parquet") from exc
         rejected_orders = read_component("rejected_orders", read_rejected_orders, [])
         equity_curve = read_component("equity", read_equity, [])
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
@@ -1515,6 +1640,39 @@ class BacktestResult:
                     )
             holdings = list(holdings_frame.select(list(cls._holdings_schema())).iter_rows())
         metrics = read_component("metrics", read_metrics, {})
+        if metrics.get("num_capital_changes", 0) and flows_frame is None:
+            raise ArtifactReadError(
+                "capital_flows.parquet is required for an artifact with external flows"
+            )
+        if capital_changes and (
+            metrics.get("num_capital_changes") != len(capital_changes)
+            or metrics.get("total_external_flow")
+            != sum(change.cash_delta for change in capital_changes)
+            or len({change.event_id for change in capital_changes}) != len(capital_changes)
+            or any(
+                change.kind not in {"delta", "target"}
+                or not isinstance(change.event_id, str)
+                or not change.event_id
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(value)
+                    for value in (
+                        change.value,
+                        change.cash_delta,
+                        change.nav_before,
+                        change.nav_after,
+                    )
+                )
+                or not math.isclose(
+                    change.nav_before + change.cash_delta, change.nav_after, rel_tol=1e-12
+                )
+                for change in capital_changes
+            )
+        ):
+            raise ArtifactReadError(
+                "capital flows are inconsistent with recorded valuations or metrics"
+            )
         if metrics.get("num_funding_events", 0) and not component_read_ok["funding"]:
             message = "funding.parquet is required for an artifact with funding events"
             if not recovery:
@@ -1556,6 +1714,7 @@ class BacktestResult:
                     fills=[],
                     metrics={},
                     initial_capital=initial_capital,
+                    capital_changes=capital_changes,
                 ).to_daily_pnl()
             if component_read_ok["equity"] and not daily_pnl.equals(expected_daily_pnl):
                 message = "daily_pnl.parquet is inconsistent with equity.parquet"
@@ -1583,6 +1742,7 @@ class BacktestResult:
             initial_capital=initial_capital,
             holdings=holdings,
             holdings_sampling=holdings_sampling,
+            capital_changes=capital_changes,
         )
 
     @staticmethod
@@ -1694,6 +1854,7 @@ class BacktestResult:
             "cumulative_return": pl.Float64(),
             "drawdown": pl.Float64(),
             "high_water_mark": pl.Float64(),
+            "performance_equity": pl.Float64(),
         }
 
     @staticmethod

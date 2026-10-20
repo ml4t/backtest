@@ -275,6 +275,7 @@ class TestBacktestResultEquityDataFrame:
             "cumulative_return",
             "drawdown",
             "high_water_mark",
+            "performance_equity",
         ]
 
     def test_equity_dataframe_values(self, backtest_result: BacktestResult):

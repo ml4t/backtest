@@ -97,11 +97,16 @@ def _check_equity_terminal(
     if "num_funding_events" in result.metrics:
         assert result.metrics["num_funding_events"] == len(result.funding_payments)
 
-    expected = initial_cash + realized_pnl + open_pnl + funding
+    external = sum(change.cash_delta for change in result.capital_changes)
+    if "total_external_flow" in result.metrics:
+        assert result.metrics["total_external_flow"] == external, (
+            "external capital does not reconcile"
+        )
+    expected = initial_cash + realized_pnl + open_pnl + funding + external
     diff = abs(expected - final_value)
 
     reported_trades = [*realized_trades, *open_trades]
-    terms = [initial_cash, *(t.pnl for t in reported_trades), funding]
+    terms = [initial_cash, *(t.pnl for t in reported_trades), funding, external]
     notionals = [abs(t.quantity) * t.exit_price * t.multiplier for t in reported_trades]
     tol = _accounting_tolerance(
         expected,
@@ -114,7 +119,7 @@ def _check_equity_terminal(
     assert diff <= tol, (
         f"Equity terminal invariant violated: "
         f"initial_cash({initial_cash}) + realized_pnl({realized_pnl:.6f}) + "
-        f"open_pnl({open_pnl:.6f}) + funding({funding:.6f}) = {expected:.6f} "
+        f"open_pnl({open_pnl:.6f}) + funding({funding:.6f}) + external({external:.6f}) = {expected:.6f} "
         f"!= final_value({final_value:.6f}), "
         f"diff={diff:.10f}, tol={tol:.6f}"
     )

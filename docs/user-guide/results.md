@@ -290,7 +290,64 @@ Returns a Polars DataFrame with columns:
 | `return` | Float | Return from the preceding NAV, or recorded initial capital for the first observation |
 | `cumulative_return` | Float | Cumulative return from start |
 | `drawdown` | Float | Current drawdown from HWM |
-| `high_water_mark` | Float | Running maximum equity |
+| `high_water_mark` | Float | Running maximum investment wealth, including recorded initial capital |
+| `performance_equity` | Float | Investment wealth at initial capital scale, excluding external flows |
+
+## External capital and investment returns
+
+Pass a prepared `capital_flows` Polars table to `DataFeed`, or to `run_backtest`.
+Each row requires `timestamp`, unique `event_id`, `kind` (`"delta"` or `"target"`)
+and finite `value` in account cash units. Negative deltas withdraw cash; targets
+specify total marked NAV, not a cash-balance target. Optional `known_at` cannot be
+later than the application timestamp. Each application must match an accepted feed
+observation. No exchange rate or missing event valuation is inferred.
+
+The engine marks current positions, applies external capital, then processes that
+bar's funding, fills and decisions. The change is visible to that decision's
+buying-power checks. Same-time rows retain input order, and the complete group is
+validated before cash changes. A withdrawal cannot create negative cash in an
+unleveraged account. Funding, fees and trading P&L remain investment returns.
+
+`to_capital_flows_dataframe()` records the request, actual cash delta and NAV
+immediately before and after application. Returns chain the independently valued
+subperiods around each flow. A contribution does not become investment profit.
+`equity` remains reported account NAV; `performance_equity` scales compounded
+investment returns to initial capital. Drawdown and `high_water_mark` use that
+investment wealth, so contributions and withdrawals do not create drawdowns.
+
+<!-- ml4t-doc-test: results-external-capital -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ExecutionMode
+
+class Invest(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if not broker.positions:
+            broker.submit_order("TEST", 100)
+
+dates = [datetime(2025, 1, day, 16, tzinfo=UTC) for day in (2, 3, 6)]
+prices = pl.DataFrame({
+    "timestamp": dates, "asset": ["TEST"] * 3, "close": [100.0, 110.0, 98.0]
+})
+flows = pl.DataFrame({
+    "timestamp": [dates[1]], "event_id": ["deposit"],
+    "kind": ["target"], "value": [12000.0]
+})
+result = Engine(
+    DataFeed(prices_df=prices, capital_flows=flows), Invest(),
+    BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+    holdings_sampling="bar",
+).run()
+assert result.to_capital_flows_dataframe()["cash_delta"].to_list() == [1000.0]
+assert result.to_portfolio_state_dataframe()["equity"].to_list() == [10000.0, 12000.0, 10800.0]
+print(f"Investment return: {result.metrics['total_return_pct']:.1f}%")
+```
+
+```text
+Investment return: -1.0%
+```
 
 ## Observed holdings
 

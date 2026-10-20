@@ -10,6 +10,7 @@ from math import isfinite
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 from zoneinfo import ZoneInfo
 
+from .capital import CapitalChange, CapitalEvent
 from .config import (
     EntryOrderPriority,
     ExecutionPrice,
@@ -454,6 +455,33 @@ class Broker:
         """Set cash balance (delegates to AccountState)."""
         self._capture_lifecycle_mutation()
         self.account.cash = value
+
+    def _apply_capital_events(self, events: list[CapitalEvent]) -> list[CapitalChange]:
+        nav = self.get_account_value()
+        cash = self.cash
+        changes = []
+        for event in events:
+            delta = event.value if event.kind == "delta" else event.value - nav
+            new_cash = cash + delta
+            new_nav = nav + delta
+            if not isfinite(new_cash) or not isfinite(new_nav) or new_nav < 0:
+                raise ValueError("capital change would make cash/NAV invalid")
+            if not self.allow_leverage and new_cash < 0:
+                raise ValueError("capital withdrawal exceeds available cash")
+            changes.append(
+                CapitalChange(
+                    event.timestamp, event.event_id, event.kind, event.value, delta, nav, new_nav
+                )
+            )
+            cash, nav = new_cash, new_nav
+        delta = cash - self.cash
+        free_cash = self.account._lock_notional_free_cash + delta
+        if not isfinite(free_cash):
+            raise ValueError("capital change would make available cash nonfinite")
+        if delta:
+            self.cash = cash
+            self.account._lock_notional_free_cash = free_cash
+        return changes
 
     def _apply_funding(self, events: list[FundingEvent]) -> list[FundingPayment]:
         """Apply one timestamp's validated funding events before any fills at that time."""

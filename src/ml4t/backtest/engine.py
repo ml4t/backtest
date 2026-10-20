@@ -22,6 +22,7 @@ from ml4t.specs import (
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
 from .broker import Broker
+from .capital import CapitalChange, index_capital_events
 from .config import DataFrequency, ExecutionPrice
 from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
@@ -137,6 +138,8 @@ class Engine:
                 set(prices_frame[feed._entity_col].unique().to_list()),
             )
         self.funding_payments: list[FundingPayment] = []
+        self._capital_events = index_capital_events(feed.capital_flows, list(feed.timestamps))
+        self.capital_changes: list[CapitalChange] = []
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -487,6 +490,9 @@ class Engine:
             if session_mode:
                 session_assets.update(assets_data)
                 session_context.update(context)
+            capital_events = self._capital_events.get(timestamp)
+            if capital_events:
+                self.capital_changes.extend(self.broker._apply_capital_events(capital_events))
             funding_events = self._funding_events.get(timestamp)
             if funding_events:
                 self.funding_payments.extend(self.broker._apply_funding(funding_events))
@@ -762,6 +768,9 @@ class Engine:
                 for invocation in self.lifecycle_dispatcher.invocations
             ]
 
+        if len(self.capital_changes) != sum(map(len, self._capital_events.values())):
+            raise ValueError("capital flow occurs outside accepted calendar observations")
+
         if not self.equity_curve:
             # Return empty result for no-data case
             return BacktestResult(
@@ -784,10 +793,12 @@ class Engine:
                 initial_capital=self.config.initial_cash,
                 holdings=self.holdings,
                 holdings_sampling=self.holdings_sampling,
+                capital_changes=list(self.capital_changes),
             )
 
         # Build EquityCurve from raw data
         equity = EquityCurve.from_config(self.config)
+        equity.capital_changes = list(self.capital_changes)
         for ts, value in self.equity_curve:
             equity.append(ts, value)
 
@@ -871,6 +882,8 @@ class Engine:
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(t.total_slippage_cost for t in all_trades),
             "total_funding": sum(payment.cash_delta for payment in self.funding_payments),
+            "total_external_flow": sum(change.cash_delta for change in self.capital_changes),
+            "num_capital_changes": len(self.capital_changes),
             "num_funding_events": len(self.funding_payments),
             # Additional metrics
             "sharpe": equity.sharpe,
@@ -912,6 +925,7 @@ class Engine:
             initial_capital=self.config.initial_cash,
             holdings=self.holdings,
             holdings_sampling=self.holdings_sampling,
+            capital_changes=list(self.capital_changes),
             equity=equity,
             trade_analyzer=trade_analyzer,
         )
@@ -980,6 +994,7 @@ def run_backtest(
     market_impact_model: Any | None = None,
     execution_limits: Any | None = None,
     funding_df: pl.DataFrame | None = None,
+    capital_flows: pl.DataFrame | None = None,
     lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
@@ -1027,6 +1042,7 @@ def run_backtest(
         context_df=context if isinstance(context, pl.DataFrame) else None,
         feed_spec=feed_spec,
         contract=contract,
+        capital_flows=capital_flows,
     )
 
     if isinstance(config, str):
