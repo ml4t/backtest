@@ -147,3 +147,103 @@ def test_schedule_on_a_filtered_calendar_bar_is_not_silently_ignored():
         engine.run()
     assert engine.broker.cash == 10000
     assert engine.capital_changes == []
+
+
+@pytest.mark.parametrize("clock_source", ["context", "other_asset"])
+def test_external_flow_rejects_an_unknown_held_asset_mark_before_changing_cash(clock_source):
+    times = [datetime(2025, 1, 2, hour, tzinfo=UTC) for hour in [15, 16, 17]]
+    prices = pl.DataFrame(
+        {"timestamp": [times[0], times[2]], "asset": ["TEST"] * 2, "close": [100.0, 110.0]}
+    )
+    context = pl.DataFrame({"timestamp": [times[1]], "funds_available": [True]})
+    if clock_source == "other_asset":
+        prices = pl.concat(
+            [prices, pl.DataFrame({"timestamp": [times[1]], "asset": ["OTHER"], "close": [2.0]})]
+        )
+        context = None
+    flows = pl.DataFrame(
+        {
+            "timestamp": [times[1]],
+            "event_id": ["contribution"],
+            "kind": ["delta"],
+            "value": [1000.0],
+        }
+    )
+
+    class Hold(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("TEST", 10)
+
+    engine = Engine(
+        DataFeed(prices_df=prices, context_df=context, capital_flows=flows),
+        Hold(),
+        BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+    )
+    with pytest.raises(ValueError, match="current mark"):
+        engine.run()
+    assert engine.broker.cash == 9000
+    assert engine.broker.positions["TEST"].quantity == 10
+    assert engine.capital_changes == []
+
+
+@pytest.mark.parametrize("mark", [0.0, 110.0])
+def test_current_event_marks_determine_exact_investment_return_including_zero(mark, tmp_path):
+    times = [datetime(2025, 1, 2, hour, tzinfo=UTC) for hour in [15, 16, 17]]
+    prices = pl.DataFrame({"timestamp": times, "asset": ["TEST"] * 3, "close": [100.0, mark, mark]})
+    flows = pl.DataFrame(
+        {
+            "timestamp": [times[1]],
+            "event_id": ["contribution"],
+            "kind": ["delta"],
+            "value": [1000.0],
+        }
+    )
+
+    class Hold(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                broker.submit_order("TEST", 10)
+
+    result = Engine(
+        DataFeed(prices_df=prices, capital_flows=flows),
+        Hold(),
+        BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+    ).run()
+    before = 9000.0 + 10 * mark
+    expected = -0.1 if mark == 0 else 0.01
+    result.to_parquet(tmp_path)
+    for actual in [result, BacktestResult.from_parquet(tmp_path)]:
+        flow = actual.to_capital_flows_dataframe().row(0, named=True)
+        assert flow["nav_before"] == before
+        assert flow["nav_after"] == before + 1000
+        assert actual.to_returns_series().to_list() == pytest.approx([0.0, expected, 0.0])
+        assert actual.metrics["total_return"] == pytest.approx(expected)
+
+
+def test_all_cash_capital_change_at_a_context_only_tick_has_an_independent_cash_valuation():
+    times = [datetime(2025, 1, 2, hour, tzinfo=UTC) for hour in [15, 16, 17]]
+    prices = pl.DataFrame(
+        {"timestamp": [times[0], times[2]], "asset": ["TEST"] * 2, "close": [100.0, 110.0]}
+    )
+    context = pl.DataFrame({"timestamp": [times[1]], "funds_available": [True]})
+    flows = pl.DataFrame(
+        {
+            "timestamp": [times[1]],
+            "event_id": ["contribution"],
+            "kind": ["delta"],
+            "value": [1000.0],
+        }
+    )
+
+    class Cash(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            pass
+
+    result = Engine(
+        DataFeed(prices_df=prices, context_df=context, capital_flows=flows),
+        Cash(),
+        BacktestConfig(initial_cash=10000, calendar=None),
+    ).run()
+    assert result.to_portfolio_state_dataframe()["equity"].to_list() == [10000.0, 11000.0, 11000.0]
+    assert result.to_returns_series().to_list() == [0.0, 0.0, 0.0]

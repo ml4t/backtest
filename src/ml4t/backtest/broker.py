@@ -533,6 +533,15 @@ class Broker:
         self._execution_journal.recorded_values.update(encoded)
 
     def _apply_capital_events(self, events: list[CapitalEvent]) -> list[CapitalChange]:
+        missing = [
+            asset
+            for asset, position in self.positions.items()
+            if self.get_mark_price(asset, quantity=position.quantity) is None
+        ]
+        if missing:
+            raise ValueError(
+                "capital change requires a current mark for held assets: " + ", ".join(missing)
+            )
         nav = self.get_account_value()
         cash = self.cash
         changes = []
