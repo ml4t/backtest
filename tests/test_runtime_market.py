@@ -102,3 +102,109 @@ def test_stale_history_is_an_explicit_view_and_missing_volume_stays_unknown():
     assert seen[1][1]["close"].to_list() == [100.0]
     assert seen[1][1]["close_observed_at"].to_list() == [times[0]]
     assert frame.filter(pl.col("asset") == "TEST")["timestamp"].to_list() == [times[0], times[2]]
+
+
+def test_late_price_cannot_reach_strategy_or_execute_until_a_known_quote():
+    frame = prices().with_columns(
+        pl.when(pl.col("timestamp").dt.day() == 3)
+        .then(pl.lit(datetime(2025, 1, 7, 16, tzinfo=UTC)))
+        .otherwise(pl.col("timestamp"))
+        .alias("known")
+    )
+    runtime = RuntimeServices(known_at_cols={"close": "known"})
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp.day == 3:
+                assert data["TEST"]["close"] is None
+                assert broker.get_mark_price("TEST") is None
+                broker.submit_order("TEST", 1)
+
+    result = Engine(
+        DataFeed(prices_df=frame),
+        Buy(),
+        BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+        runtime=runtime,
+    ).run()
+    assert result.to_fills_dataframe()["timestamp"].to_list() == [
+        datetime(2025, 1, 6, 16, tzinfo=UTC)
+    ]
+    assert result.to_fills_dataframe()["price"].to_list() == [120.0]
+    assert frame["close"].to_list() == [100.0, 110.0, 120.0, 130.0]
+
+
+def test_failed_nested_binding_does_not_detach_the_active_outer_market():
+    runtime = RuntimeServices()
+
+    class Outer(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            with pytest.raises(RuntimeError, match="active run"):
+                Engine(
+                    DataFeed(prices_df=prices()),
+                    self,
+                    BacktestConfig(calendar=None),
+                    runtime=runtime,
+                ).run()
+            assert runtime.market.current(["TEST"], ["close"])["close"].to_list() == [
+                data["TEST"]["close"]
+            ]
+            raise ValueError("abort outer callback")
+
+    with pytest.raises(ValueError, match="abort outer"):
+        Engine(
+            DataFeed(prices_df=prices()), Outer(), BacktestConfig(calendar=None), runtime=runtime
+        ).run()
+    with pytest.raises(RuntimeError, match="active run"):
+        runtime.market.current(["TEST"], ["close"])
+
+
+def test_last_trade_requires_observed_volume_and_stale_quotes_are_not_executable():
+    times = [datetime(2025, 1, 2, 15, tzinfo=UTC) + timedelta(minutes=i) for i in range(3)]
+    frame = pl.DataFrame(
+        {
+            "timestamp": times,
+            "asset": ["TEST"] * 3,
+            "close": [100.0, 101.0, 102.0],
+            "volume": [10.0, 0.0, 20.0],
+        }
+    )
+    runtime = RuntimeServices()
+    seen = []
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            seen.append(
+                (
+                    runtime.market.last_traded("TEST"),
+                    runtime.market.last_observed("TEST"),
+                    runtime.market.can_trade("TEST", require_volume=True),
+                )
+            )
+
+    Engine(DataFeed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+    assert seen == [
+        (times[0], times[0], True),
+        (times[0], times[1], False),
+        (times[2], times[2], True),
+    ]
+
+
+def test_market_view_retained_from_previous_run_cannot_read_during_a_new_run():
+    runtime = RuntimeServices()
+    views = []
+
+    class Retain(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if views:
+                with pytest.raises(RuntimeError, match="active run"):
+                    views[0].history(["TEST"], ["close"], bar_count=1)
+            if not views:
+                views.append(runtime.market)
+
+    single = prices().head(1)
+    Engine(
+        DataFeed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
+    ).run()
+    Engine(
+        DataFeed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
+    ).run()

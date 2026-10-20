@@ -34,7 +34,7 @@ class MarketDataView:
         self._roles["price"] = getattr(feed.feed_spec, "price_col", None) or self._roles["close"]
         if self._roles["price"] not in self._columns:
             self._roles["price"] = self._roles["close"]
-        self._rows: dict[str, dict[datetime, dict[str, Any]]] = {}
+        self._rows: dict[str, dict[datetime, int]] = {}
         self._times: dict[str, list[datetime]] = {}
         for field, column in runtime.known_at_cols.items():
             if self._column(field) not in self._columns:
@@ -43,7 +43,10 @@ class MarketDataView:
                 self._frame.schema[column], pl.Datetime
             ):
                 raise ValueError(f"Known-at column {column!r} must contain datetimes")
-        for row in self._frame.iter_rows(named=True):
+        index_columns = list(
+            dict.fromkeys([self._timestamp_col, self._entity_col, *runtime.known_at_cols.values()])
+        )
+        for index, row in enumerate(self._frame.select(index_columns).iter_rows(named=True)):
             asset, timestamp = row[self._entity_col], row[self._timestamp_col]
             rows = self._rows.setdefault(asset, {})
             if timestamp in rows:
@@ -56,12 +59,16 @@ class MarketDataView:
                         raise ValueError(
                             "Known-at and observation timezones must be compatible"
                         ) from exc
-            rows[timestamp] = row
+            rows[timestamp] = index
         for asset, rows in self._rows.items():
             self._times[asset] = sorted(rows)
         self._timestamps = sorted({t for times in self._times.values() for t in times})
         self._asof: datetime | None = None
         self._inclusive = False
+
+    def _row(self, asset: str, timestamp: datetime) -> dict[str, Any] | None:
+        index = self._rows.get(asset, {}).get(timestamp)
+        return self._frame.row(index, named=True) if index is not None else None
 
     def _column(self, field: str) -> str:
         return self._roles.get(field, field)
@@ -88,7 +95,7 @@ class MarketDataView:
         *,
         forward_fill: bool,
     ) -> pl.DataFrame:
-        if self._runtime._engine is None or self._asof is None:
+        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
             raise RuntimeError("market services require an active run")
         if isinstance(assets, str) or isinstance(fields, str) or not assets or not fields:
             raise ValueError("assets and fields must be nonempty sequences")
@@ -104,7 +111,7 @@ class MarketDataView:
         records = []
         for timestamp in times:
             for asset in assets:
-                row = self._rows.get(asset, {}).get(timestamp)
+                row = self._row(asset, timestamp)
                 result: dict[str, Any] = {"timestamp": timestamp, "asset": asset}
                 for field in fields:
                     candidate = row
@@ -117,10 +124,10 @@ class MarketDataView:
                         candidate = None
                         if forward_fill:
                             asset_times = self._times.get(asset, [])
-                            for past in reversed(
-                                asset_times[: bisect_right(asset_times, timestamp)]
-                            ):
-                                value = self._rows[asset][past]
+                            for index in range(bisect_right(asset_times, timestamp) - 1, -1, -1):
+                                past = asset_times[index]
+                                value = self._row(asset, past)
+                                assert value is not None
                                 if (
                                     self._available(field, value)
                                     and value.get(self._column(field)) is not None
@@ -158,7 +165,7 @@ class MarketDataView:
         declarations mask unavailable fields. Forward filling is explicit and retains
         the source timestamp; it never changes executable feed observations.
         """
-        if self._runtime._engine is None or self._asof is None:
+        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
             raise RuntimeError("market services require an active run")
         if isinstance(bar_count, bool) or not isinstance(bar_count, int) or bar_count <= 0:
             raise ValueError("bar_count must be a positive integer")
@@ -176,28 +183,66 @@ class MarketDataView:
         self, assets: Sequence[str], fields: Sequence[str], *, forward_fill: bool = False
     ) -> pl.DataFrame:
         """Return values at the active instant, with no implicit stale executable quote."""
-        if self._runtime._engine is None or self._asof is None:
+        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
             raise RuntimeError("market services require an active run")
         times = [self._asof] if self._inclusive else []
         return self._query(assets, fields, times, forward_fill=forward_fill)
 
-    def last_traded(self, asset: str) -> datetime | None:
-        """Return the last available finite positive price observation."""
-        if self._runtime._engine is None or self._asof is None:
+    def _past_rows(self, asset: str):
+        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
             raise RuntimeError("market services require an active run")
-        for timestamp in reversed(self._times.get(asset, [])):
-            if timestamp > self._asof or (timestamp == self._asof and not self._inclusive):
-                continue
-            row = self._rows[asset][timestamp]
-            value = row.get(self._column("price"))
+        times = self._times.get(asset, [])
+        end = bisect_right(times, self._asof)
+        if not self._inclusive and end and times[end - 1] == self._asof:
+            end -= 1
+        for index in range(end - 1, -1, -1):
+            timestamp = times[index]
+            row = self._row(asset, timestamp)
+            assert row is not None
+            yield timestamp, row
+
+    def last_observed(self, asset: str, field: str = "price") -> datetime | None:
+        """Return the source instant of the last known non-null field observation."""
+        for timestamp, row in self._past_rows(asset):
+            if self._available(field, row) and row.get(self._column(field)) is not None:
+                return timestamp
+        return None
+
+    def last_traded(self, asset: str) -> datetime | None:
+        """Return the last known finite-price bar with actual positive observed volume."""
+        if self._column("volume") not in self._columns:
+            raise ValueError("last_traded requires observed volume; use last_observed for quotes")
+        for timestamp, row in self._past_rows(asset):
+            price, volume = row.get(self._column("price")), row.get(self._column("volume"))
             if (
                 self._available("price", row)
-                and value is not None
-                and isfinite(value)
-                and value > 0
+                and self._available("volume", row)
+                and price is not None
+                and isfinite(price)
+                and volume is not None
+                and isfinite(volume)
+                and volume > 0
             ):
                 return timestamp
         return None
+
+    def can_trade(self, asset: str, *, require_volume: bool = False) -> bool:
+        """Check current known positive quotes, optionally requiring observed positive volume.
+
+        This tests data eligibility, not account buying power or order-specific controls.
+        A stale history value is never an executable quote for this native method.
+        """
+        fields = ["price", "volume"] if require_volume else ["price"]
+        frame = self.current([asset], fields)
+        if frame.is_empty():
+            return False
+        price = frame["price"][0]
+        if price is None or not isfinite(price) or price <= 0:
+            return False
+        if require_volume:
+            volume = frame["volume"][0]
+            return volume is not None and isfinite(volume) and volume > 0
+        return True
 
 
 class RuntimeServices:
@@ -259,7 +304,7 @@ class RuntimeServices:
             return data
         visible = {asset: dict(values) for asset, values in data.items()}
         for asset, values in visible.items():
-            row = market._rows.get(asset, {}).get(timestamp)
+            row = market._row(asset, timestamp)
             if row is None:
                 continue
             for field in [
