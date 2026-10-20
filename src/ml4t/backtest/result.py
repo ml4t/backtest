@@ -662,6 +662,9 @@ class BacktestResult:
             calendar=calendar,
             timezone=self.config.resolved_timezone if self.config else "UTC",
             session_start_time=self.config.resolved_session_start_time if self.config else None,
+            timestamp_semantics=self.config.resolved_timestamp_semantics if self.config else None,
+            bar_label=self.config.resolved_feed_spec.bar_label if self.config else None,
+            data_frequency=self.config.resolved_data_frequency if self.config else None,
         )
         daily = compute_session_pnl(
             self.equity_curve,
@@ -674,20 +677,13 @@ class BacktestResult:
     def _adjust_flow_pnl(self, daily: pl.DataFrame, session_config=None) -> pl.DataFrame:
         if not self.capital_changes or daily.is_empty():
             return daily
-        from zoneinfo import ZoneInfo
-
-        from .sessions import _timestamp_in_session_timezone, assign_session_date
 
         def key(timestamp):
-            if session_config is None:
-                return timestamp.date()
-            tz = session_config.get_session_timezone()
-            return assign_session_date(
-                _timestamp_in_session_timezone(timestamp, ZoneInfo(session_config.timezone), tz),
-                tz,
-                session_config.get_session_start_hour(),
-                session_config.get_session_start_minute(),
-            ).date()
+            return (
+                timestamp.date()
+                if session_config is None
+                else session_config.date_for_timestamp(timestamp).date()
+            )
 
         factors: dict[Any, float] = {}
         external: dict[Any, float] = {}

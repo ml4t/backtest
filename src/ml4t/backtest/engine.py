@@ -259,6 +259,8 @@ class Engine:
                     timestamp_frame,
                     self.config.resolved_calendar,
                     naive_tz=self.config.resolved_timezone,
+                    timestamp_semantics=self.config.resolved_timestamp_semantics,
+                    bar_label=self.config.resolved_feed_spec.bar_label,
                 )
                 retained_bars = len(filtered)
                 total_bars = len(timestamp_frame)
@@ -292,6 +294,8 @@ class Engine:
                                 diagnostic_frame,
                                 calendar_id,
                                 naive_tz=self.config.resolved_timezone,
+                                timestamp_semantics=self.config.resolved_timestamp_semantics,
+                                bar_label=self.config.resolved_feed_spec.bar_label,
                             )
                         )
                     alternative_sample_retained = len(
@@ -299,6 +303,8 @@ class Engine:
                             diagnostic_frame,
                             calendar_id,
                             naive_tz=calendar_timezone,
+                            timestamp_semantics=self.config.resolved_timestamp_semantics,
+                            bar_label=self.config.resolved_feed_spec.bar_label,
                         )
                     )
                 if configured_sample_retained:
@@ -662,6 +668,7 @@ class Engine:
                     session_start_time=self.config.resolved_session_start_time,
                     data_frequency=self.config.resolved_data_frequency,
                     timestamp_semantics=self.config.resolved_timestamp_semantics,
+                    bar_label=self.config.resolved_feed_spec.bar_label,
                 )
                 self._session_holdings[session] = (observation, holdings)
 

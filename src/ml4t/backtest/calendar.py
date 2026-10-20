@@ -599,6 +599,8 @@ def filter_to_trading_sessions(
     *,
     naive_tz: str = "UTC",
     include_breaks: bool = False,
+    timestamp_semantics: str | None = None,
+    bar_label: str | None = None,
 ) -> pl.DataFrame:
     """Filter a DataFrame to only include rows during trading sessions.
 
@@ -620,6 +622,8 @@ def filter_to_trading_sessions(
             Set this to match your data source (e.g., "America/New_York" for
             US equity data that's already in ET).
         include_breaks: If False (default), also filter out intraday breaks
+        timestamp_semantics: Declared timestamp role; bar_close uses closing endpoints.
+        bar_label: Explicit bar endpoint; right uses (open, close] intervals.
 
     Returns:
         DataFrame filtered to trading sessions only
@@ -634,6 +638,9 @@ def filter_to_trading_sessions(
         >>> # Keep data during intraday breaks
         >>> data = filter_to_trading_sessions(data, "CME_Equity", include_breaks=True)
     """
+    from .sessions import _is_right_labeled_bar
+
+    right = _is_right_labeled_bar(timestamp_semantics, bar_label)
     if df.is_empty():
         return df
 
@@ -703,14 +710,13 @@ def filter_to_trading_sessions(
             }
         )
         .with_columns(
-            pl.col("session_open").cast(pl.Datetime("us", "UTC")),
-            pl.col("session_close").cast(pl.Datetime("us", "UTC")),
+            pl.col("session_open").cast(df.schema[timestamp_col]),
+            pl.col("session_close").cast(df.schema[timestamp_col]),
         )
         .sort("session_open")
     )
 
-    # Use join_asof to find the session that starts at or before each timestamp
-    # Then filter to rows where timestamp < session_close (exclusive end)
+    # Event instants use [open, close); right-end bars use (open, close].
     result = (
         df.lazy()
         .sort(timestamp_col)
@@ -718,11 +724,13 @@ def filter_to_trading_sessions(
             sessions_df.lazy(),
             left_on=timestamp_col,
             right_on="session_open",
-            strategy="backward",  # Find session that starts at or before timestamp
+            strategy="backward",
+            allow_exact_matches=not right,
         )
         .filter(
-            # Timestamp must be within the matched session (exclusive end)
-            pl.col(timestamp_col) < pl.col("session_close")
+            (pl.col(timestamp_col) <= pl.col("session_close"))
+            if right
+            else (pl.col(timestamp_col) < pl.col("session_close"))
         )
         .drop(["session_open", "session_close"])
         .collect()
