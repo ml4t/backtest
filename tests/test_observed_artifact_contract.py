@@ -143,3 +143,100 @@ def test_empty_engine_export_keeps_empty_observations_and_unavailable_capture(tm
     assert restored.to_daily_returns(calendar=None).is_empty()
     with pytest.raises(ArtifactError, match="not captured"):
         restored.to_holdings_dataframe()
+
+
+@pytest.mark.parametrize(
+    "fault", ["missing_event_metadata", "invalid_phase", "fill_without_id", "bar_with_fill_id"]
+)
+def test_reader_rejects_account_event_writer_faults_before_linking_holdings(
+    observed_result, tmp_path, monkeypatch, fault
+):
+    from pathlib import Path
+
+    writer = pl.DataFrame.write_parquet
+
+    def faulty_writer(frame, file, *args, **kwargs):
+        if isinstance(file, (str, Path)) and Path(file).name == "portfolio_state.parquet":
+            if fault == "missing_event_metadata":
+                frame = frame.drop("fill_sequence")
+            elif fault == "invalid_phase":
+                frame = frame.with_columns(pl.lit("opening").alias("observation_kind"))
+            elif fault == "fill_without_id":
+                frame = frame.with_columns(pl.lit("after_fill").alias("observation_kind"))
+            else:
+                frame = frame.with_columns(pl.lit(0, dtype=pl.UInt32).alias("fill_sequence"))
+        return writer(frame, file, *args, **kwargs)
+
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", faulty_writer)
+    observed_result.to_parquet(tmp_path)
+    with pytest.raises(ArtifactReadError, match="portfolio_state.parquet"):
+        BacktestResult.from_parquet(tmp_path)
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", writer)
+    observed_result.to_parquet(tmp_path)
+    assert (
+        BacktestResult.from_parquet(tmp_path).to_holdings_dataframe()["quantity"].to_list()
+        == [10.0] * 3
+    )
+
+
+@pytest.mark.parametrize("fault", ["uncaptured_positions", "orphan_capture"])
+def test_export_refuses_holdings_that_cannot_be_reconciled_to_observed_accounts(
+    observed_result, tmp_path, monkeypatch, fault
+):
+    from ml4t.backtest.result import ArtifactWriteError
+
+    if fault == "uncaptured_positions":
+        frame = observed_result.to_portfolio_state_dataframe().with_columns(
+            pl.lit(False).alias("holdings_complete")
+        )
+        monkeypatch.setattr(observed_result, "to_portfolio_state_dataframe", lambda: frame)
+        reason = "Uncaptured account"
+    else:
+        frame = observed_result.to_holdings_dataframe()
+        extra = frame.tail(1).with_columns((pl.col("observation_id") + 1).alias("observation_id"))
+        frame = pl.concat([frame, extra])
+        monkeypatch.setattr(observed_result, "to_holdings_dataframe", lambda: frame)
+        reason = "recorded account observations"
+    with pytest.raises(ArtifactWriteError, match=reason):
+        observed_result.to_parquet(tmp_path)
+    assert not (tmp_path / "manifest.json").exists()
+
+
+def test_missing_external_flow_component_cannot_turn_a_deposit_into_investment_return(tmp_path):
+    class Cash(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            pass
+
+    times = [datetime(2025, 1, d, 16, tzinfo=UTC) for d in [2, 3]]
+    prices = pl.DataFrame({"timestamp": times, "asset": ["TEST"] * 2, "close": [100.0] * 2})
+    flows = pl.DataFrame(
+        {
+            "timestamp": [times[1]],
+            "event_id": ["contribution"],
+            "kind": ["delta"],
+            "value": [1000.0],
+        }
+    )
+    result = Engine(
+        DataFeed(prices_df=prices, capital_flows=flows),
+        Cash(),
+        BacktestConfig(initial_cash=10000, calendar=None),
+    ).run()
+    assert result.to_portfolio_state_dataframe()["equity"].to_list() == [10000.0, 11000.0]
+    assert result.to_returns_series().to_list() == [0.0, 0.0]
+    result.to_parquet(
+        tmp_path,
+        include=[
+            "trades",
+            "fills",
+            "rejected_orders",
+            "equity",
+            "portfolio_state",
+            "daily_pnl",
+            "metrics",
+        ],
+    )
+    with pytest.raises(ArtifactReadError, match="external flows"):
+        BacktestResult.from_parquet(tmp_path, recovery=True)
+    result.to_parquet(tmp_path)
+    assert BacktestResult.from_parquet(tmp_path).to_returns_series().to_list() == [0.0, 0.0]
