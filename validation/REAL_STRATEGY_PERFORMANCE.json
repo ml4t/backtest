@@ -281,6 +281,48 @@
           "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
           "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
         }
+      },
+      {
+        "certified_at": "2026-10-20T23:58:53.613289+00:00",
+        "correctness_evidence_generated_at": "2026-10-20T23:47:47.738947+00:00",
+        "correctness_evidence_sha256": "edb157bdcd9b711583fbc4aaaea6f1b2b052cedf5c9b9d081ae7200f4a686baf",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "08ffb5f56cf383d8129333aeb0b784cd6f641b44b9afee678a139570a413a344",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "0af1e08ca7a021310f5afa34aaa724e38b0538ea4c9388f41ae1e2130de0fbc3",
+          "validation/environments/vectorbt_oss/uv.lock": "cdd7f1882cbf3d283eebafbce4f93f1fcbf4a5eda6f938157e5f141e875c2961",
+          "validation/environments/vectorbt_pro/uv.lock": "b7ebebc44a571d583ede63f27552594bd7c1b605f5faa9908df30da13be59c38",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "e8fed15af7d562ea60b8a320836c6199e098e5392bb4db622e68c8b8d8b6a0a1",
+          "validation/environments/zipline/uv.lock": "43258cbcc10cdbc29c02da2d41603467b9386ee00f6ea73e501bbffad89d4de0"
+        },
+        "dependency_graphs": {
+          "uv.lock": "ed7c38a3f7ab567bd44db7e1558328728fd24f958a6be9897f15f2cb848e7fb9",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "f64352a45b275049d72e098df7deeea3c275d5eaf81ff1da1de84b66f9aabb95",
+          "validation/environments/vectorbt_oss/uv.lock": "ceabca20fb1b89ccd70e3778bcec19fc32b1ccd52704fe6725d8f22b8280afb8",
+          "validation/environments/vectorbt_pro/uv.lock": "0f0f61ac16d9bafc9c15394fd6c068d690dfa3d9bf25a80ba2d1f75df11db0ce",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "ed18504748215fcd7b16ca4ed2af45b16d8507654d9c809b5739eef24f645760",
+          "validation/environments/zipline/uv.lock": "e0e84d5ee04be1fb25a7176933e3b20b5944aafd35ee84ed6b84163bae7ced2f"
+        },
+        "engine_source_sha256": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+        "performance_impact": "none",
+        "reason": "Reviewed source against efbe057 and the frozen profiles. Detailed holdings, mark-time buffers, session/fill captures, capital events and recorded values are opt-in and unused in the17 measured configurations. Default account valuation remains one pass over held positions with the same signed-notional arithmetic; shared ledger dispatch and optional checks introduce no new market scan, history copy or per-fill DataFrame. Finite/zero carried-mark fixes do not change these positive finite inputs. Fill multiplier/currency assignments reuse existing contract lookups. Initial-capital corrections add one baseline element to existing vectorized metrics; no strategy decision, order/fill algorithm or input preparation changes. First-period return reporting changes intentionally. Review identified no material impact on the timed Engine.run boundary; this does not assert identical runtime bytes or qualify capture overhead. The existing feed-regression gate passed, but compares feeds under this engine, not absolute before/after speed. Separately, all17 fresh Backtest fill/equity/terminal identities agree with hash-verified native outputs. That correctness result alone does not infer timing equivalence. Timing runners, selected dependency graphs and original measurement identity remain unchanged. Retain original numbers, dates, environment and source scope; no new speed or new-workflow claim. The subsequent broker-ownership repair moves capture access behind Broker methods. Default per-bar work adds bounded method dispatch but no extra position pass or detailed buffers; recorded-value iteration and fill-account copying remain opt-in. Callback rollback and state-ownership contracts pass; fresh complete correctness covers the exact changed source. No material timed-path impact identified from that delegation. The subsequent capital-event guard requires independently available marks only when external capital events are present. All17 frozen timed inputs have no capital events, so that new guard is not executed in those workloads. The current complete correctness cohort uses published Specs0.2.0, including a package-only overlay in native conformance interpreters; no native numerical dependencies or retained timing environments changed. The published Specs market/calendar/lifecycle modules used by these workflows match the immutable prepublication source previously qualified; differences are package version and JSON-compatible YAML loading outside the timed Engine.run boundary. No new material timed-path impact identified. Retain all original measured ratios, dates and scope; neither new calendar scheduling nor detailed-capture performance is claimed.",
+        "reviewed_correctness_sha256": "8bc9e48a7e565bd154f136e0e34b542f107d2db54280e85d82d86cc7892adac1",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
       }
     ],
     "ml4t_engine_source_sha256": "1e2bf2f45a835f8b0a81b59141843dae77b6341233d7c9ba494efada0a328a25",
