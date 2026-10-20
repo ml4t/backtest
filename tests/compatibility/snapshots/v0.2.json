@@ -637,6 +637,7 @@
     "from ml4t.backtest.analytics.bridge import to_trade_records",
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
+    "from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode",
     "from ml4t.backtest.config import CommissionType, SlippageType",
     "from ml4t.backtest.config import ExecutionMode",
     "from ml4t.backtest.config import ExecutionPrice",
@@ -2657,6 +2658,18 @@
       },
       "module": "ml4t.backtest.config",
       "qualname": "CommissionType",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.config:DataFrequency": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.config",
+      "qualname": "DataFrequency",
       "signature": "(*values)"
     },
     "ml4t.backtest.config:ExecutionMode": {
