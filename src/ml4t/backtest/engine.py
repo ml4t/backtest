@@ -96,10 +96,15 @@ class Engine:
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
+        holdings_sampling: str = "none",
     ):
         from .config import BacktestConfig as ConfigCls
 
         negotiated_version = negotiate_lifecycle_version(lifecycle_version)
+        if holdings_sampling not in {"none", "bar"}:
+            raise ValueError("holdings_sampling must be 'none' or 'bar'")
+        self.holdings_sampling = holdings_sampling
+        self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling == "bar" else None
         self._validate_strategy_lifecycle(strategy)
         if config is None:
             config = ConfigCls()
@@ -619,6 +624,21 @@ class Engine:
             position_value = pos.quantity * price * pos.multiplier
             gross_exposure += abs(position_value)
             net_exposure += position_value
+            if self.holdings is not None:
+                spec = self.broker.get_contract_spec(asset)
+                self.holdings.append(
+                    (
+                        timestamp,
+                        len(self.portfolio_state),
+                        asset,
+                        pos.quantity,
+                        price,
+                        pos.multiplier,
+                        spec.currency if spec is not None else None,
+                        position_value,
+                        position_value,
+                    )
+                )
 
         equity = cash + net_exposure
         self.equity_curve.append((timestamp, equity))
@@ -762,6 +782,8 @@ class Engine:
                 },
                 config=self.config,
                 initial_capital=self.config.initial_cash,
+                holdings=self.holdings,
+                holdings_sampling=self.holdings_sampling,
             )
 
         # Build EquityCurve from raw data
@@ -888,6 +910,8 @@ class Engine:
             metrics=metrics,
             config=self.config,
             initial_capital=self.config.initial_cash,
+            holdings=self.holdings,
+            holdings_sampling=self.holdings_sampling,
             equity=equity,
             trade_analyzer=trade_analyzer,
         )
@@ -906,6 +930,7 @@ class Engine:
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
+        holdings_sampling: str = "none",
     ) -> Engine:
         """Create an Engine instance from a BacktestConfig.
 
@@ -935,6 +960,7 @@ class Engine:
             lifecycle_version=lifecycle_version,
             execution_policy=execution_policy,
             target_intent_state=target_intent_state,
+            holdings_sampling=holdings_sampling,
         )
 
 
@@ -957,6 +983,7 @@ def run_backtest(
     lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
+    holdings_sampling: str = "none",
 ) -> BacktestResult:
     """Run a backtest with minimal setup.
 
@@ -1018,4 +1045,5 @@ def run_backtest(
         lifecycle_version=lifecycle_version,
         execution_policy=execution_policy,
         target_intent_state=target_intent_state,
+        holdings_sampling=holdings_sampling,
     ).run()

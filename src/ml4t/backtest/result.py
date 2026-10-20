@@ -59,6 +59,7 @@ _COMPONENT_FILES = {
     "predictions": "predictions.parquet",
     "equity": "equity.parquet",
     "portfolio_state": "portfolio_state.parquet",
+    "holdings": "holdings.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -207,6 +208,8 @@ class BacktestResult:
     funding_payments: list[FundingPayment] = field(default_factory=list)
     artifact_diagnostics: tuple[ArtifactDiagnostic, ...] = field(default_factory=tuple)
     initial_capital: float | None = None
+    holdings: list[tuple[Any, ...]] | None = None
+    holdings_sampling: str = "none"
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -330,10 +333,11 @@ class BacktestResult:
             return pl.DataFrame(schema=schema)
 
         records = []
-        for fill in self.fills:
+        for sequence, fill in enumerate(self.fills):
             records.append(
                 {
                     "order_id": fill.order_id,
+                    "fill_sequence": sequence,
                     "rebalance_id": fill.rebalance_id,
                     "asset": fill.asset,
                     "side": fill.side.value,
@@ -496,14 +500,47 @@ class BacktestResult:
         schema = self._portfolio_state_schema()
         schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.portfolio_state)
         if not self.portfolio_state:
-            return pl.DataFrame(schema=schema)
+            return pl.DataFrame(schema=schema).with_row_index("observation_id")
 
-        self._portfolio_state_df = pl.DataFrame(
-            self.portfolio_state,
-            schema=schema,
-            orient="row",
-        ).sort("timestamp")
+        self._portfolio_state_df = (
+            pl.DataFrame(
+                self.portfolio_state,
+                schema=schema,
+                orient="row",
+            )
+            .sort("timestamp", maintain_order=True)
+            .with_row_index("observation_id")
+        )
         return self._portfolio_state_df
+
+    def to_holdings_dataframe(self) -> pl.DataFrame:
+        """Return complete bar snapshots, with account keys retaining all-cash observations.
+
+        Enable with ``Engine(..., holdings_sampling="bar")``. Missing legacy or
+        disabled capture is unavailable, rather than a complete empty portfolio.
+        Currency is null when no contract specification declares it. Under the
+        current signed-notional account method, liquidation value equals signed
+        notional; future account methods must report their own value separately.
+        """
+        if self.holdings is None:
+            raise ArtifactError("Holdings were not captured; enable holdings_sampling='bar'")
+        schema = self._holdings_schema()
+        schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.holdings)
+        return pl.DataFrame(self.holdings, schema=schema, orient="row")
+
+    @staticmethod
+    def _holdings_schema() -> dict[str, pl.DataType]:
+        return {
+            "timestamp": pl.Datetime(),
+            "observation_id": pl.UInt32(),
+            "asset": pl.String(),
+            "quantity": pl.Float64(),
+            "mark": pl.Float64(),
+            "multiplier": pl.Float64(),
+            "currency": pl.String(),
+            "signed_notional": pl.Float64(),
+            "liquidation_value": pl.Float64(),
+        }
 
     def _session_pnl(self, calendar: str) -> pl.DataFrame:
         from .sessions import SessionConfig, compute_session_pnl
@@ -801,6 +838,8 @@ class BacktestResult:
         requested = [name for name in requested if name != "manifest"]
 
         unavailable: dict[str, str] = {}
+        if self.holdings is None:
+            unavailable["holdings"] = "holdings were not captured"
         if self.predictions is None:
             unavailable["predictions"] = "result has no predictions"
         if self.config is None:
@@ -958,6 +997,16 @@ class BacktestResult:
             )
             written["portfolio_state"] = portfolio_state_path
 
+        if "holdings" in selected:
+            holdings_path = path / _COMPONENT_FILES["holdings"]
+            write_component(
+                "holdings",
+                lambda: self.to_holdings_dataframe().write_parquet(
+                    holdings_path, compression=compression
+                ),
+            )
+            written["holdings"] = holdings_path
+
         if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
             write_component(
@@ -986,6 +1035,7 @@ class BacktestResult:
             "schema_version": _ARTIFACT_SCHEMA_VERSION,
             "library_version": __version__,
             "initial_capital": self.initial_capital,
+            "holdings_sampling": self.holdings_sampling,
             "complete": written.keys()
             >= (_REQUIRED_RESULT_COMPONENTS | ({"funding"} if self.funding_payments else set())),
             "components": {
@@ -1180,7 +1230,9 @@ class BacktestResult:
                 f"missing components={missing_required_components}, missing files={missing_files}"
             )
         if recovery:
-            missing_components = sorted((_COMPONENT_FILES.keys() - {"funding"}) - components.keys())
+            missing_components = sorted(
+                (_COMPONENT_FILES.keys() - {"funding", "holdings"}) - components.keys()
+            )
             diagnostics.extend(
                 ArtifactDiagnostic(
                     code="component_missing",
@@ -1268,7 +1320,15 @@ class BacktestResult:
 
         def read_fills(component_path: Path) -> list[Fill]:
             result: list[Fill] = []
-            for row in pl.read_parquet(component_path).iter_rows(named=True):
+            frame = pl.read_parquet(component_path)
+            if "fill_sequence" in frame.columns:
+                sequence = frame["fill_sequence"]
+                if not sequence.dtype.is_integer() or sorted(sequence.to_list()) != list(
+                    range(len(frame))
+                ):
+                    raise ValueError("fill_sequence must uniquely order every fill from zero")
+                frame = frame.sort("fill_sequence")
+            for row in frame.iter_rows(named=True):
                 result.append(
                     Fill(
                         order_id=row["order_id"],
@@ -1399,6 +1459,61 @@ class BacktestResult:
         rejected_orders = read_component("rejected_orders", read_rejected_orders, [])
         equity_curve = read_component("equity", read_equity, [])
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
+        holdings_frame = read_component("holdings", pl.read_parquet, None)
+        holdings = None
+        holdings_sampling = manifest.get("holdings_sampling", "none") if manifest else "none"
+        if holdings_sampling not in {"none", "bar"}:
+            raise ArtifactManifestError("Unknown holdings_sampling declaration")
+        if holdings_sampling == "bar" and holdings_frame is None:
+            if not recovery:
+                raise ArtifactReadError("holdings_sampling='bar' requires holdings.parquet")
+            diagnostics.append(
+                ArtifactDiagnostic(
+                    "component_unavailable", "holdings", "Declared holdings could not be loaded."
+                )
+            )
+            holdings_sampling = "none"
+        if holdings_frame is not None:
+            if holdings_sampling != "bar":
+                raise ArtifactManifestError(
+                    "holdings component requires a declared sampling method"
+                )
+            required = set(cls._holdings_schema())
+            if not required <= set(holdings_frame.columns):
+                raise ArtifactReadError("holdings.parquet is missing required fields")
+            if holdings_frame.select(
+                pl.struct("observation_id", "asset").is_duplicated().any()
+            ).item():
+                raise ArtifactReadError("holdings observation/asset keys must be unique")
+            for row in holdings_frame.iter_rows(named=True):
+                observation = row["observation_id"]
+                if (
+                    not isinstance(observation, int)
+                    or not 0 <= observation < len(portfolio_state)
+                    or row["timestamp"] != portfolio_state[observation][0]
+                    or not isinstance(row["asset"], str)
+                    or not row["asset"]
+                ):
+                    raise ArtifactReadError(
+                        "holdings keys must refer to actual account observations"
+                    )
+                if (
+                    any(
+                        not isinstance(row[name], (int, float)) or not math.isfinite(row[name])
+                        for name in (
+                            "quantity",
+                            "mark",
+                            "multiplier",
+                            "signed_notional",
+                            "liquidation_value",
+                        )
+                    )
+                    or row["multiplier"] <= 0
+                ):
+                    raise ArtifactReadError(
+                        "holdings quantities and values must be finite with a positive multiplier"
+                    )
+            holdings = list(holdings_frame.select(list(cls._holdings_schema())).iter_rows())
         metrics = read_component("metrics", read_metrics, {})
         if metrics.get("num_funding_events", 0) and not component_read_ok["funding"]:
             message = "funding.parquet is required for an artifact with funding events"
@@ -1466,6 +1581,8 @@ class BacktestResult:
             config=config,
             artifact_diagnostics=tuple(diagnostics),
             initial_capital=initial_capital,
+            holdings=holdings,
+            holdings_sampling=holdings_sampling,
         )
 
     @staticmethod
@@ -1520,6 +1637,7 @@ class BacktestResult:
         """Schema for fills DataFrame."""
         return {
             "order_id": pl.String(),
+            "fill_sequence": pl.UInt32(),
             "rebalance_id": pl.String(),
             "asset": pl.String(),
             "side": pl.String(),

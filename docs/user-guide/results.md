@@ -292,6 +292,34 @@ Returns a Polars DataFrame with columns:
 | `drawdown` | Float | Current drawdown from HWM |
 | `high_water_mark` | Float | Running maximum equity |
 
+## Observed holdings
+
+Enable per-asset capture explicitly when creating the engine:
+
+```python
+result = Engine(feed, strategy, config, holdings_sampling="bar").run()
+holdings = result.to_holdings_dataframe()
+account = result.to_portfolio_state_dataframe()
+```
+
+Each holdings row records `timestamp`, `observation_id`, `asset`, signed
+`quantity`, `mark`, `multiplier`, declared `currency`, `signed_notional` and
+`liquidation_value`. These are observed bar-end positions, including open lots,
+not positions reconstructed from closed trades. Currency is null when no contract
+specification declares it. The current signed-notional ledger reports identical
+notional and liquidation values; another account method must define them separately.
+
+Account rows retain every accepted bar, including a completely flat portfolio.
+Join on `observation_id` to distinguish a complete all-cash observation from a
+missing observation. Capture defaults to `"none"`; asking for uncaptured holdings
+raises `ArtifactError`. An empty captured table means a complete all-cash run.
+Only `"none"` and `"bar"` are currently supported. Bar-end sampling can miss an
+open-and-flat cycle inside one bar; fills still retain that activity.
+
+The existing Parquet export stores the optional holdings component and its sampling
+declaration. Strict reload checks account keys and fill sequence. Old artifacts
+without capture remain readable and report holdings unavailable.
+
 ## Portfolio State DataFrame
 
 ```python
@@ -309,6 +337,9 @@ Returns a Polars DataFrame with columns:
 | `gross_exposure` | Float | Sum of absolute marked position values |
 | `net_exposure` | Float | Signed sum of marked position values |
 | `open_positions` | Int | Number of open positions |
+
+`observation_id` identifies each account snapshot. Fill exports also include a
+zero-based `fill_sequence` that preserves execution order at equal timestamps.
 
 This is the right primitive for downstream diagnostics such as:
 

@@ -327,6 +327,7 @@ class TestBacktestResultFillsDataFrame:
         assert len(df) == 2
         assert df.columns == [
             "order_id",
+            "fill_sequence",
             "rebalance_id",
             "asset",
             "side",
@@ -389,6 +390,7 @@ class TestBacktestResultPortfolioStateDataFrame:
         assert isinstance(df, pl.DataFrame)
         assert len(df) == 6
         assert df.columns == [
+            "observation_id",
             "timestamp",
             "equity",
             "cash",
@@ -667,6 +669,7 @@ class TestBacktestResultParquet:
             manifest = json.loads((path / "manifest.json").read_text())
 
             assert manifest["omitted_components"] == {
+                "holdings": "holdings were not captured",
                 "predictions": "result has no predictions",
                 "config": "result has no config",
                 "spec": "result has no config for a runtime spec",
