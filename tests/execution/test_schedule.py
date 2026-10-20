@@ -214,7 +214,9 @@ class TestResolveRebalanceTimestamps:
     def test_fixed_n_sessions_thins_session_closes(self) -> None:
         timestamps = _make_weekday_series("2024-01-01", "2024-01-10")
 
-        result = resolve_rebalance_timestamps(timestamps, RebalanceSchedule.fixed_n_sessions(2))
+        result = resolve_rebalance_timestamps(
+            timestamps, RebalanceSchedule.fixed_n_sessions(2), calendar=None
+        )
 
         expected = [datetime.combine(ts, datetime.min.time()) for ts in timestamps.to_list()[::2]]
         assert result.to_list() == expected
@@ -593,6 +595,7 @@ class TestCausalScheduleEvaluation:
                     datetime(2024, 3, 29),
                     schedule,
                     session_index=20,
+                    calendar=None,
                     data_frequency="daily",
                 )
 
@@ -624,6 +627,7 @@ class TestCausalScheduleEvaluation:
                 datetime(2024, 1, 5, 15, 0),
                 RebalanceSchedule.every_session(),
                 session_index=1,
+                calendar=None,
                 data_frequency="1m",
             )
 

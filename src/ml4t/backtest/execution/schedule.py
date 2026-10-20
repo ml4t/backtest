@@ -14,6 +14,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
 from ..calendar import get_calendar_sessions
@@ -98,7 +99,7 @@ def is_rebalance_timestamp(
     schedule: RebalanceSchedule | RebalanceCadence | str,
     *,
     session_index: int,
-    calendar: str | None = None,
+    calendar: str | None | CalendarUnset = UNSET_CALENDAR,
     timezone: str | None = None,
     session_start_time: str | None = None,
     data_frequency: Any | None = None,
@@ -111,7 +112,7 @@ def is_rebalance_timestamp(
         timestamp,
         resolved,
         session_index=session_index,
-        calendar=calendar,
+        calendar=FeedSpec(time_contract_version=2).resolve_calendar(calendar=calendar),
         timezone=timezone,
         session_start_time=session_start_time,
         data_frequency=data_frequency,
@@ -142,6 +143,18 @@ def _evaluate_rebalance_timestamp(
         event_time = _event_time_utc(timestamp, timezone)
         return event_time in _explicit_schedule_instants(schedule, timezone)
     _validate_schedule_calendar(schedule, calendar)
+    if is_session_close is not True and calendar is not None:
+        if session_date is None:
+            session_date = session_date_for_timestamp(
+                timestamp,
+                calendar=calendar,
+                timezone=timezone,
+                session_start_time=session_start_time,
+                data_frequency=data_frequency,
+                timestamp_semantics=timestamp_semantics,
+            )
+        if _calendar_close_for_session(calendar, session_date) is None:
+            return False
     if is_session_close is None:
         is_session_close = _is_session_close_timestamp(
             timestamp,
@@ -180,7 +193,9 @@ def _is_session_close_timestamp(
     timestamp_semantics: TimestampSemantics | str | None,
 ) -> bool:
     frequency, semantics = _normalize_schedule_metadata(data_frequency, timestamp_semantics)
-    if semantics is TimestampSemantics.SESSION_LABEL or frequency is DataFrequency.DAILY:
+    if semantics is TimestampSemantics.SESSION_LABEL or (
+        frequency is DataFrequency.DAILY and semantics is None
+    ):
         return True
     if timestamp.time() == time.min and semantics is None and frequency is None:
         return True
@@ -688,7 +703,7 @@ def resolve_rebalance_timestamps(
     schedule: RebalanceSchedule | RebalanceCadence | str,
     *,
     feed_spec: FeedSpec | Any | None = None,
-    calendar: str | None = None,
+    calendar: str | None | CalendarUnset = UNSET_CALENDAR,
     timezone: str | None = None,
     session_start_time: str | None = None,
     data_frequency: Any | None = None,
@@ -943,7 +958,7 @@ def _coerce_schedule(schedule: RebalanceSchedule | RebalanceCadence | str) -> Re
 def _resolve_schedule_metadata(
     *,
     feed_spec: FeedSpec | Any | None,
-    calendar: str | None,
+    calendar: str | None | CalendarUnset,
     timezone: str | None,
     session_start_time: str | None,
     data_frequency: Any | None,
@@ -951,7 +966,8 @@ def _resolve_schedule_metadata(
 ) -> dict[str, Any]:
     spec = FeedSpec.from_any(feed_spec) if feed_spec is not None else None
 
-    resolved_calendar = calendar if calendar is not None else (spec.calendar if spec else None)
+    resolver = spec if spec is not None else FeedSpec(time_contract_version=2)
+    resolved_calendar = resolver.resolve_calendar(calendar=calendar)
     resolved_timezone = timezone if timezone is not None else (spec.timezone if spec else None)
     if resolved_timezone is None:
         resolved_timezone = "UTC"

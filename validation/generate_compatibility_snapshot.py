@@ -1,4 +1,4 @@
-"""Generate or check the reviewed 0.1 compatibility boundary."""
+"""Generate or check the reviewed next-version compatibility boundary."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from ml4t.backtest.analytics import EquityCurve, MAEMFEAnalyzer, TradeAnalyzer
 from ml4t.backtest.config import StatsConfig
 
 _ROOT = Path(__file__).parents[1]
-_DEFAULT_SNAPSHOT = _ROOT / "tests" / "compatibility" / "snapshots" / "v0.1.json"
+_DEFAULT_SNAPSHOT = _ROOT / "tests" / "compatibility" / "snapshots" / "v0.2.json"
 _DOCS = (_ROOT / "README.md", *sorted((_ROOT / "docs").rglob("*.md")))
 _IMPORT = re.compile(
     r"^\s*(from\s+(ml4t\.backtest[\w.]*)\s+import\s+([^#]+)|import\s+(ml4t\.backtest[\w.]*))\s*$"
@@ -272,7 +272,7 @@ def build_snapshot() -> dict[str, object]:
 
     return {
         "snapshot_schema_version": 1,
-        "compatibility_version": "0.1",
+        "compatibility_version": "0.2",
         "beta_exclusions": {
             "Broker(account_type=...)": (
                 "Removed before 0.1 because one string silently selected multiple shorting and "

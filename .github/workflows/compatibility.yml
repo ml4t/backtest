@@ -150,7 +150,8 @@ jobs:
         run: |
           uv venv --python ${{ matrix.python-version }}
           uv pip install --resolution lowest-direct --only-binary :all: \
-            --no-binary ml4t-backtest --editable . --group test "ty>=0.0.18"
+            --no-binary ml4t-backtest --no-binary ml4t-specs \
+            --editable . --group test "ty>=0.0.18"
 
       - name: Record the resolved versions
         run: uv pip freeze > minimum-versions-${{ matrix.python-version }}.txt

@@ -28,7 +28,8 @@ if TYPE_CHECKING:
     from ..broker import Broker
     from ..types import Order
 
-from ml4t.specs.market_data import TimestampSemantics
+from ml4t.specs import UNSET_CALENDAR, CalendarUnset
+from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
 from ..config import (
     DataFrequency,
@@ -116,7 +117,7 @@ class RebalanceConfig:
     rebalance_mode: RebalanceMode = RebalanceMode.SNAPSHOT
     share_rounding: ShareRounding | str = ShareRounding.NEAREST
     schedule: RebalanceSchedule | None = None
-    calendar: str | None = None
+    calendar: str | None | CalendarUnset = UNSET_CALENDAR
     timezone: str | None = None
     session_start_time: str | None = None
     data_frequency: DataFrequency | str | None = None
@@ -128,7 +129,12 @@ class RebalanceConfig:
             return
         from ..sessions import _validate_session_start_time
 
-        _validate_session_start_time(self.calendar, self.session_start_time)
+        _validate_session_start_time(self.resolved_calendar, self.session_start_time)
+
+    @property
+    def resolved_calendar(self) -> str | None:
+        """Resolve omission to NYSE while preserving an explicit calendar disable."""
+        return FeedSpec(time_contract_version=2).resolve_calendar(calendar=self.calendar)
 
 
 class TargetWeightExecutor:
@@ -190,7 +196,7 @@ class TargetWeightExecutor:
                 if schedule is None
                 else _OnlineRebalanceEvaluator(
                     schedule,
-                    calendar=self.config.calendar,
+                    calendar=self.config.resolved_calendar,
                     timezone=self.config.timezone,
                     session_start_time=self.config.session_start_time,
                     data_frequency=self.config.data_frequency,

@@ -130,8 +130,13 @@ unless you opt into one explicitly.
 
 ### Schedule metadata
 
-Session-based schedules need enough metadata to identify exchange session closes. Weekly and
-month-end schedules require `calendar`. Daily feeds must also set `data_frequency="daily"`.
+Session-based schedules need enough metadata to identify exchange session closes. On the next-version
+calendar boundary, omission in `RebalanceConfig` and the scheduling functions resolves to NYSE;
+`resolve_rebalance_timestamps()` first inherits declared feed metadata. Explicit `calendar=None`
+disables that calendar selection, including when the feed names an exchange. Weekly and month-end
+schedules reject calendar-free operation. Use a named calendar for another exchange or continuous
+trading. Daily feeds must also set `data_frequency="daily"`. Explicit `event_time` or `bar_close`
+semantics still require observations at the actual session close, even at daily frequency.
 Intraday feeds must set `calendar`, `timezone`, `data_frequency`, and `timestamp_semantics`. Set
 `session_start_time` for a custom evening boundary. Morning-start sessions use the local calendar
 date, so a morning value may only restate the configured calendar's standard open. Intraday feeds

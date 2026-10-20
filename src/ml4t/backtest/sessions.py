@@ -139,7 +139,7 @@ def session_date_for_timestamp(
     )
     if (
         semantics is TimestampSemantics.SESSION_LABEL
-        or frequency is DataFrequency.DAILY
+        or (semantics is None and frequency is DataFrequency.DAILY)
         or (semantics is None and frequency is None)
     ):
         return timestamp.date()

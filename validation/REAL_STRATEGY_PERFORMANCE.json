@@ -122,6 +122,81 @@
           "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
           "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
         }
+      },
+      {
+        "certified_at": "2026-10-17T22:29:51.545630+00:00",
+        "correctness_evidence_generated_at": "2026-10-17T01:17:00.495296+00:00",
+        "correctness_evidence_sha256": "ba7f4978cdf675e3d7ff2c998a7eb2f13bc099cb86667d70d56879affdf46a3f",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "08ffb5f56cf383d8129333aeb0b784cd6f641b44b9afee678a139570a413a344",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "0af1e08ca7a021310f5afa34aaa724e38b0538ea4c9388f41ae1e2130de0fbc3",
+          "validation/environments/vectorbt_oss/uv.lock": "cdd7f1882cbf3d283eebafbce4f93f1fcbf4a5eda6f938157e5f141e875c2961",
+          "validation/environments/vectorbt_pro/uv.lock": "b7ebebc44a571d583ede63f27552594bd7c1b605f5faa9908df30da13be59c38",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "e8fed15af7d562ea60b8a320836c6199e098e5392bb4db622e68c8b8d8b6a0a1",
+          "validation/environments/zipline/uv.lock": "43258cbcc10cdbc29c02da2d41603467b9386ee00f6ea73e501bbffad89d4de0"
+        },
+        "engine_source_sha256": "656210f6fe91eb6bac893598909f0363c5951e7bc8f7b14e15d8fb653fb23649",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "df10938aa2ae6ed54174d4a065860db196b7c647",
+        "performance_impact": "none",
+        "reason": "Performance-impact review of e74bed7..391cc8a for the 17 retained real-strategy pairs: all frozen bundles explicitly declare calendar and frequency and deserialize as legacy-v1 contracts; none uses a rebalance schedule. The new omitted-calendar defaults, explicit-None row mode and v2 schedule behavior are not exercised by these workloads. Broker/order processing, per-asset iteration, target execution, transaction costs, framework pins, frozen inputs and timing commands are unchanged. DataFeed/config construction and result extraction remain outside the engine-call boundary. Within Engine.run, changes resolve session semantics during initialization, derive EquityCurve metadata once, and use the existing session-date helper per timestamp for enforced calendars; daily labels still resolve to the same dates. The changed work does not add per-asset loops or change the dominant execution algorithms. Specs0.2.0 preserves these explicit legacy metadata settings; the other locked dependency versions and sources are unchanged. This code-path and dependency review finds no material impact on these measured workloads. Independently, all17 fresh correctness pairs retain identical fill/equity/terminal surface digests and counts; that numerical agreement is a correctness prerequisite, not proof of unchanged runtime. The benchmark validator changes are outside the measured subprocess and do not alter its commands or timing boundary. Preserve the accepted October13 measurements and their recorded environment. No new speed measurements or ratios are asserted by this review.",
+        "reviewed_correctness_sha256": "cbeac90d998cd3aa7830ea4e3e715e03a6437452695d1d7fd99b79f4a8cfb5c2",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "ca9daec5048835a8c5994a30247c070e6fc72bcc0e9d937beceb2d6c0416dbbd",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-10-20T20:44:51.592393+00:00",
+        "correctness_evidence_generated_at": "2026-10-17T01:17:00.495296+00:00",
+        "correctness_evidence_sha256": "ba7f4978cdf675e3d7ff2c998a7eb2f13bc099cb86667d70d56879affdf46a3f",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "08ffb5f56cf383d8129333aeb0b784cd6f641b44b9afee678a139570a413a344",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "0af1e08ca7a021310f5afa34aaa724e38b0538ea4c9388f41ae1e2130de0fbc3",
+          "validation/environments/vectorbt_oss/uv.lock": "cdd7f1882cbf3d283eebafbce4f93f1fcbf4a5eda6f938157e5f141e875c2961",
+          "validation/environments/vectorbt_pro/uv.lock": "b7ebebc44a571d583ede63f27552594bd7c1b605f5faa9908df30da13be59c38",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "e8fed15af7d562ea60b8a320836c6199e098e5392bb4db622e68c8b8d8b6a0a1",
+          "validation/environments/zipline/uv.lock": "43258cbcc10cdbc29c02da2d41603467b9386ee00f6ea73e501bbffad89d4de0"
+        },
+        "dependency_graphs": {
+          "uv.lock": "ed7c38a3f7ab567bd44db7e1558328728fd24f958a6be9897f15f2cb848e7fb9",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "f64352a45b275049d72e098df7deeea3c275d5eaf81ff1da1de84b66f9aabb95",
+          "validation/environments/vectorbt_oss/uv.lock": "ceabca20fb1b89ccd70e3778bcec19fc32b1ccd52704fe6725d8f22b8280afb8",
+          "validation/environments/vectorbt_pro/uv.lock": "0f0f61ac16d9bafc9c15394fd6c068d690dfa3d9bf25a80ba2d1f75df11db0ce",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "ed18504748215fcd7b16ca4ed2af45b16d8507654d9c809b5739eef24f645760",
+          "validation/environments/zipline/uv.lock": "e0e84d5ee04be1fb25a7176933e3b20b5944aafd35ee84ed6b84163bae7ced2f"
+        },
+        "engine_source_sha256": "656210f6fe91eb6bac893598909f0363c5951e7bc8f7b14e15d8fb653fb23649",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "df10938aa2ae6ed54174d4a065860db196b7c647",
+        "performance_impact": "none",
+        "reason": "The only timing-boundary implementation change is dependency identity validation: shared qualification adds a prerelease resolver permission without changing any locked package, artifact, marker or environment. Runtime Engine, input preparation and comparison runners are unchanged. Retain original raw dependency hashes and bind the parsed lock graph; all actual dependency changes remain refused.",
+        "reviewed_correctness_sha256": "cbeac90d998cd3aa7830ea4e3e715e03a6437452695d1d7fd99b79f4a8cfb5c2",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
       }
     ],
     "ml4t_engine_source_sha256": "1e2bf2f45a835f8b0a81b59141843dae77b6341233d7c9ba494efada0a328a25",

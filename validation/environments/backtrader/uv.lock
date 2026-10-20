@@ -72,7 +72,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-diagnostic", marker = "extra == 'all'", specifier = ">=0.1.0b4" },
     { name = "ml4t-diagnostic", marker = "extra == 'dev'", specifier = ">=0.1.0b4" },
-    { name = "ml4t-specs", specifier = ">=0.1.4,<0.2" },
+    { name = "ml4t-specs", specifier = ">=0.2.0" },
     { name = "networkx", marker = "extra == 'advanced'", specifier = ">=3.0" },
     { name = "networkx", marker = "extra == 'all'", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.3.2" },
@@ -148,14 +148,14 @@ requires-dist = [
 
 [[package]]
 name = "ml4t-specs"
-version = "0.1.4"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/52/ba5c172ef1eddd3727832123dd6abf380ff39d36083ec37864bc488c2bd7/ml4t_specs-0.1.4.tar.gz", hash = "sha256:bc8e417e8049a05847ca30de52a59e28a18539c5e8aef8711dc5d57d7752e0a4", size = 51355, upload-time = "2026-09-03T02:06:36.74Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/46/c734e5bcac1f214c83423243023b5d313bccabd25563da4e7d5e6b80f9f4/ml4t_specs-0.2.0.tar.gz", hash = "sha256:e5d5d614f71d14223341f992009d0d0bf14f30a8398c50872d2b3fb80fd33d82", size = 59749, upload-time = "2026-10-17T18:21:32.512Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/1f/d03958fb90ac08adc78465e915501b1043ff7d12b68485592dac6139e59a/ml4t_specs-0.1.4-py3-none-any.whl", hash = "sha256:459928f55edb0c62dde535fc391f38446774bca821c5774617d40b50a0289725", size = 34033, upload-time = "2026-09-03T02:06:35.49Z" },
+    { url = "https://files.pythonhosted.org/packages/66/ff/bfc427bb71635f31cb240330aa2b1b486748999f05a5922ee5f58df721fe/ml4t_specs-0.2.0-py3-none-any.whl", hash = "sha256:cfd550d19b469f1b083d6ac3f83b235fe71aee19c28465f2ac2c8620064bae61", size = 36946, upload-time = "2026-10-17T18:21:30.964Z" },
 ]
 
 [[package]]

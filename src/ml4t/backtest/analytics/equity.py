@@ -36,6 +36,7 @@ class EquityCurve:
     timestamps: list[datetime] = field(default_factory=list)
     values: list[float] = field(default_factory=list)
     periods_per_year_override: float | None = None
+    observation_based: bool = False
 
     def append(self, timestamp: datetime, value: float) -> None:
         """Add a data point."""
@@ -79,7 +80,9 @@ class EquityCurve:
 
     @property
     def years(self) -> float:
-        """Duration in years based on elapsed wall-clock time."""
+        """Duration in observation periods or elapsed wall-clock years."""
+        if self.observation_based:
+            return max(len(self.values) - 1, 0) / self.periods_per_year
         if len(self.timestamps) >= 2:
             elapsed_seconds = (self.timestamps[-1] - self.timestamps[0]).total_seconds()
             if elapsed_seconds > 0:
@@ -91,6 +94,8 @@ class EquityCurve:
         """Annualization factor, preferring configured cadence over elapsed-time inference."""
         if self.periods_per_year_override is not None:
             return float(self.periods_per_year_override)
+        if self.observation_based:
+            return float(TRADING_DAYS_PER_YEAR)
         if len(self.values) < 2 or len(self.timestamps) < 2:
             return float(TRADING_DAYS_PER_YEAR)
         elapsed_seconds = (self.timestamps[-1] - self.timestamps[0]).total_seconds()
@@ -106,11 +111,16 @@ class EquityCurve:
     def from_config(cls, config: BacktestConfig) -> EquityCurve:
         """Create an equity curve with annualization metadata derived from config."""
         feed_spec = config.resolved_feed_spec
-        periods_per_year = resolve_periods_per_year(
-            feed_spec.data_frequency,
-            calendar=feed_spec.calendar,
-        )
-        return cls(periods_per_year_override=periods_per_year)
+        observation_based = config.time_contract_version == 2 and config.resolved_calendar is None
+        periods_per_year = config.periods_per_year
+        if periods_per_year is None and observation_based:
+            periods_per_year = float(TRADING_DAYS_PER_YEAR)
+        if periods_per_year is None:
+            periods_per_year = resolve_periods_per_year(
+                feed_spec.data_frequency,
+                calendar=config.resolved_calendar,
+            )
+        return cls(periods_per_year_override=periods_per_year, observation_based=observation_based)
 
     def max_drawdown_info(self) -> tuple[float, int, int]:
         """Maximum drawdown with peak/trough indices."""

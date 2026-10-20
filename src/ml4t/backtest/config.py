@@ -24,12 +24,13 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import yaml
+from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.base import serialize_artifact_value
 from ml4t.specs.market_data import FeedSpec, TimestampSemantics
 
@@ -315,7 +316,7 @@ class SpreadConvention(str, Enum):
 
 def _feed_spec_to_dict(feed_spec: FeedSpec) -> dict[str, Any]:
     """Serialize feed metadata to plain Python data for config round-trips."""
-    return serialize_artifact_value(asdict(feed_spec))
+    return feed_spec.to_dict()
 
 
 def _coerce_margin_schedule(
@@ -776,7 +777,9 @@ class BacktestConfig:
     late_asset_min_bars: int = 1
 
     # === Calendar & Timezone ===
-    calendar: str | None = None  # Exchange calendar (e.g., "NYSE", "CME_Equity", "LSE")
+    calendar: str | None | CalendarUnset = UNSET_CALENDAR
+    time_contract_version: int = field(default=2, kw_only=True)
+    periods_per_year: float | None = field(default=None, kw_only=True)
     timezone: str = "UTC"  # Default timezone for naive datetimes
     data_frequency: DataFrequency = DataFrequency.DAILY  # Data frequency
     enforce_sessions: bool = False  # Skip bars outside trading sessions (requires calendar)
@@ -794,13 +797,27 @@ class BacktestConfig:
 
     def __new__(cls, *args: Any, **kwargs: Any):
         instance = super().__new__(cls)
-        field_names = [name for name, value in cls.__dataclass_fields__.items() if value.init]
+        field_names = [
+            name
+            for name, value in cls.__dataclass_fields__.items()
+            if value.init and not value.kw_only
+        ]
         provided = set(kwargs)
         provided.update(field_names[: len(args)])
         instance._provided_init_fields = provided
         return instance
 
     def __post_init__(self) -> None:
+        FeedSpec(time_contract_version=self.time_contract_version, calendar=self.calendar)
+        if self.time_contract_version == 1 and self.calendar is UNSET_CALENDAR:
+            self.calendar = None
+        if self.periods_per_year is not None and (
+            isinstance(self.periods_per_year, bool)
+            or not isinstance(self.periods_per_year, int | float)
+            or not math.isfinite(self.periods_per_year)
+            or self.periods_per_year <= 0
+        ):
+            raise ValueError("periods_per_year must be a positive finite number")
         provided = getattr(self, "_provided_init_fields", set())
         self._explicit_timezone = "timezone" in provided
         self._explicit_data_frequency = "data_frequency" in provided
@@ -812,7 +829,7 @@ class BacktestConfig:
             return
 
         self.feed_spec = FeedSpec.from_any(self.feed_spec)
-        if self.calendar is None and self.feed_spec.calendar:
+        if self.time_contract_version == 1 and self.calendar is None and self.feed_spec.calendar:
             self.calendar = self.feed_spec.calendar
         if not self._explicit_timezone and self.feed_spec.timezone:
             self.timezone = self.feed_spec.timezone
@@ -825,7 +842,7 @@ class BacktestConfig:
             from .sessions import _validate_session_start_time
 
             _validate_session_start_time(
-                self.calendar or self.feed_spec.calendar,
+                self.resolved_calendar,
                 self.feed_spec.session_start_time,
             )
 
@@ -834,14 +851,22 @@ class BacktestConfig:
         """Effective feed metadata after applying runtime config precedence."""
         base = self.feed_spec if self.feed_spec is not None else FeedSpec()
         return base.with_overrides(
-            calendar=self.calendar,
+            time_contract_version=self.time_contract_version,
+            calendar=self.resolved_calendar,
             timezone=self.timezone,
             data_frequency=self.data_frequency,
         )
 
     @property
     def resolved_calendar(self) -> str | None:
-        return self.resolved_feed_spec.calendar
+        base = self.feed_spec if self.feed_spec is not None else FeedSpec()
+        if self.time_contract_version == 1:
+            return (
+                self.calendar
+                if isinstance(self.calendar, str)
+                else (base.calendar if isinstance(base.calendar, str) else None)
+            )
+        return base.resolve_calendar(calendar=self.calendar)
 
     @property
     def resolved_timezone(self) -> str:
@@ -871,8 +896,42 @@ class BacktestConfig:
             return self
 
         effective_feed_spec = FeedSpec.from_any(effective_feed_spec)
+        if self.time_contract_version == 2 and self.feed_spec is not None and feed_spec is not None:
+            input_spec = FeedSpec.from_any(feed_spec)
+            calendar = effective_feed_spec.calendar
+            calendar_inherited = False
+            if calendar is UNSET_CALENDAR or (
+                effective_feed_spec.time_contract_version == 1 and calendar is None
+            ):
+                calendar = input_spec.calendar
+                if input_spec.time_contract_version == 1 and calendar is None:
+                    calendar = UNSET_CALENDAR
+                calendar_inherited = calendar is not UNSET_CALENDAR
+            inherited_time = {
+                name: getattr(input_spec, name)
+                for name in (
+                    "timezone",
+                    "data_frequency",
+                    "bar_type",
+                    "timestamp_semantics",
+                    "session_start_time",
+                    "bar_grid_anchor",
+                    "bar_label",
+                    "partial_bar_policy",
+                )
+                if getattr(effective_feed_spec, name) is None
+                and getattr(input_spec, name) is not None
+            }
+            if calendar_inherited or inherited_time:
+                effective_feed_spec = effective_feed_spec.with_overrides(
+                    time_contract_version=2, calendar=calendar, **inherited_time
+                )
         updates: dict[str, Any] = {"feed_spec": effective_feed_spec}
-        if self.calendar is None and effective_feed_spec.calendar:
+        if (
+            self.time_contract_version == 1
+            and self.calendar is None
+            and effective_feed_spec.calendar
+        ):
             updates["calendar"] = effective_feed_spec.calendar
         if (
             not self._explicit_timezone
@@ -899,6 +958,18 @@ class BacktestConfig:
 
     def to_dict(self) -> dict:
         """Convert config to dictionary for serialization."""
+        declared_feed = (
+            self.feed_spec
+            if self.feed_spec is not None
+            else FeedSpec(time_contract_version=self.time_contract_version)
+        )
+        serialized_feed = (
+            self.resolved_feed_spec
+            if self.time_contract_version == 1
+            else declared_feed.with_overrides(
+                timezone=self.timezone, data_frequency=self.data_frequency
+            )
+        )
         return {
             "account": {
                 "allow_short_selling": self.allow_short_selling,
@@ -970,12 +1041,14 @@ class BacktestConfig:
                 "late_asset_min_bars": self.late_asset_min_bars,
             },
             "calendar": {
-                "calendar": self.calendar,
+                **({"calendar": self.calendar} if self.calendar is not UNSET_CALENDAR else {}),
+                "time_contract_version": self.time_contract_version,
+                "periods_per_year": self.periods_per_year,
                 "timezone": self.timezone,
                 "data_frequency": self.data_frequency.value,
                 "enforce_sessions": self.enforce_sessions,
             },
-            "feed": _feed_spec_to_dict(self.resolved_feed_spec),
+            "feed": _feed_spec_to_dict(serialized_feed),
             "result": {
                 "retain_intent_history": self.retain_intent_history,
                 "retain_lifecycle_history": self.retain_lifecycle_history,
@@ -1070,6 +1143,8 @@ class BacktestConfig:
                 },
                 "calendar": {
                     "calendar",
+                    "time_contract_version",
+                    "periods_per_year",
                     "timezone",
                     "data_frequency",
                     "enforce_sessions",
@@ -1095,6 +1170,10 @@ class BacktestConfig:
                     "bar_type",
                     "timestamp_semantics",
                     "session_start_time",
+                    "time_contract_version",
+                    "bar_grid_anchor",
+                    "bar_label",
+                    "partial_bar_policy",
                 },
                 "result": {"retain_intent_history", "retain_lifecycle_history"},
             }
@@ -1223,7 +1302,9 @@ class BacktestConfig:
             late_asset_policy=LateAssetPolicy(order_cfg.get("late_asset_policy", "allow")),
             late_asset_min_bars=order_cfg.get("late_asset_min_bars", 1),
             # Calendar
-            calendar=cal_cfg.get("calendar"),
+            calendar=cal_cfg.get("calendar", UNSET_CALENDAR),
+            time_contract_version=cal_cfg.get("time_contract_version", 1),
+            periods_per_year=cal_cfg.get("periods_per_year"),
             timezone=cal_cfg.get("timezone", "UTC"),
             data_frequency=DataFrequency(cal_cfg.get("data_frequency", "daily")),
             enforce_sessions=cal_cfg.get("enforce_sessions", False),

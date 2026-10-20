@@ -19,7 +19,8 @@ def market_data_spec_to_runtime_metadata(
     """Extract runtime scheduling and annualization metadata from a market-data spec."""
     feed_spec = market_data_spec_to_feed_spec(spec)
     return {
-        "calendar": feed_spec.calendar,
+        "calendar": feed_spec.resolve_calendar(),
+        **({"time_contract_version": 2} if feed_spec.time_contract_version == 2 else {}),
         "timezone": feed_spec.timezone,
         "data_frequency": feed_spec.data_frequency,
         "timestamp_semantics": feed_spec.timestamp_semantics,
