@@ -304,7 +304,10 @@ Each row requires `timestamp`, unique `event_id`, `kind` (`"delta"` or `"target"
 and finite `value` in account cash units. Negative deltas withdraw cash; targets
 specify total marked NAV, not a cash-balance target. Optional `known_at` cannot be
 later than the application timestamp. Each application must match an accepted feed
-observation. No exchange rate or missing event valuation is inferred.
+observation. Every held asset must have a finite current quote for the configured
+mark method at that instant. A stale carried quote cannot establish the pre-flow
+valuation. All-cash changes need no asset quote; zero is a valid current valuation
+mark for an already-held asset. No exchange rate or missing event valuation is inferred.
 
 The engine marks current positions, applies external capital, then processes that
 bar's funding, fills and decisions. The change is visible to that decision's
