@@ -287,7 +287,7 @@ Returns a Polars DataFrame with columns:
 |--------|------|-------------|
 | `timestamp` | Datetime | Bar timestamp |
 | `equity` | Float | Portfolio value |
-| `return` | Float | Bar-to-bar return |
+| `return` | Float | Return from the preceding NAV, or recorded initial capital for the first observation |
 | `cumulative_return` | Float | Cumulative return from start |
 | `drawdown` | Float | Current drawdown from HWM |
 | `high_water_mark` | Float | Running maximum equity |
@@ -418,7 +418,15 @@ from ml4t.backtest.result import BacktestResult
 result = BacktestResult.from_parquet("./results/my_backtest")
 ```
 
-`manifest.json` identifies artifact schema version 2 and every component written. Loading is
+Engine results retain starting capital before the first observed NAV. A run starting
+with $10,000 that pays a $10 fee before its first mark reports a first return of
+-0.001, cumulative return of -0.001 and drawdown of -0.001. Observation timestamps
+remain actual market observations. Older artifacts without a recorded initial
+valuation retain their original first-observation baseline.
+
+`manifest.json` identifies artifact schema version 3 and every component written.
+Schema 3 records `initial_capital` separately from the first observed NAV. Schema 2
+remains readable; its missing initial valuation is not reconstructed from configuration. Loading is
 strict by default. An empty directory, missing manifest or required component, interrupted write,
 malformed file, or unsupported schema version raises a specific `ArtifactError` subclass before a
 result is returned. Selective exports are valid component exports, but they are not complete result

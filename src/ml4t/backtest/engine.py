@@ -761,6 +761,7 @@ class Engine:
                     **contract_evidence,
                 },
                 config=self.config,
+                initial_capital=self.config.initial_cash,
             )
 
         # Build EquityCurve from raw data
@@ -886,6 +887,7 @@ class Engine:
             portfolio_state=list(self.portfolio_state),
             metrics=metrics,
             config=self.config,
+            initial_capital=self.config.initial_cash,
             equity=equity,
             trade_analyzer=trade_analyzer,
         )

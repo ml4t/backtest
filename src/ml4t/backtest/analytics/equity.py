@@ -37,6 +37,7 @@ class EquityCurve:
     values: list[float] = field(default_factory=list)
     periods_per_year_override: float | None = None
     observation_based: bool = False
+    initial_capital: float | None = None
 
     def append(self, timestamp: datetime, value: float) -> None:
         """Add a data point."""
@@ -49,6 +50,8 @@ class EquityCurve:
     @property
     def returns(self) -> np.ndarray:
         """Daily returns."""
+        if self.initial_capital is not None and self.values:
+            return returns_from_values([self.initial_capital, *self.values])
         if len(self.values) < 2:
             return np.array([])
         return returns_from_values(self.values)
@@ -58,12 +61,14 @@ class EquityCurve:
         """Cumulative returns from start."""
         if len(self.values) < 1:
             return np.array([])
-        initial = self.values[0]
+        initial = self.initial_value
         return np.array(self.values) / initial - 1
 
     @property
     def initial_value(self) -> float:
         """Starting portfolio value."""
+        if self.initial_capital is not None:
+            return self.initial_capital
         return self.values[0] if self.values else 0.0
 
     @property
@@ -74,9 +79,9 @@ class EquityCurve:
     @property
     def total_return(self) -> float:
         """Total return as decimal."""
-        if not self.values or self.values[0] == 0:
+        if not self.values or self.initial_value == 0:
             return 0.0
-        return self.values[-1] / self.values[0] - 1
+        return self.values[-1] / self.initial_value - 1
 
     @property
     def years(self) -> float:
@@ -120,10 +125,17 @@ class EquityCurve:
                 feed_spec.data_frequency,
                 calendar=config.resolved_calendar,
             )
-        return cls(periods_per_year_override=periods_per_year, observation_based=observation_based)
+        return cls(
+            periods_per_year_override=periods_per_year,
+            observation_based=observation_based,
+            initial_capital=config.initial_cash,
+        )
 
     def max_drawdown_info(self) -> tuple[float, int, int]:
         """Maximum drawdown with peak/trough indices."""
+        if self.initial_capital is not None:
+            drawdown, peak, trough = max_drawdown([self.initial_capital, *self.values])
+            return drawdown, peak - 1, trough - 1
         return max_drawdown(self.values)
 
     @property
@@ -165,10 +177,12 @@ class EquityCurve:
 
     def drawdown_series(self) -> np.ndarray:
         """Drawdown at each point (for underwater chart)."""
-        if len(self.values) < 2:
+        if not self.values:
             return np.array([])
         arr = np.array(self.values)
         running_max = np.maximum.accumulate(arr)
+        if self.initial_capital is not None:
+            running_max = np.maximum(running_max, self.initial_capital)
         return (arr - running_max) / running_max
 
     def to_dict(self) -> dict:

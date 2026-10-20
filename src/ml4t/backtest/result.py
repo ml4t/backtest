@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 
 _ARTIFACT_TYPE = "ml4t-backtest-result"
-_ARTIFACT_SCHEMA_VERSION = 2
+_ARTIFACT_SCHEMA_VERSION = 3
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -206,6 +206,7 @@ class BacktestResult:
     rejected_orders: list[Order] = field(default_factory=list)
     funding_payments: list[FundingPayment] = field(default_factory=list)
     artifact_diagnostics: tuple[ArtifactDiagnostic, ...] = field(default_factory=tuple)
+    initial_capital: float | None = None
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -455,16 +456,15 @@ class BacktestResult:
 
         # Build base DataFrame and sort by timestamp
         df = pl.DataFrame({"timestamp": timestamps, "equity": values}).sort("timestamp")
+        initial = self.initial_capital if self.initial_capital is not None else df["equity"][0]
+        previous = pl.col("equity").shift(1).fill_null(initial)
 
         # Vectorized computation using Polars
         df = df.with_columns(
             [
-                # Returns: percent change, first bar has no return
-                pl.col("equity").pct_change().fill_null(0.0).alias("return"),
-                # Cumulative return from initial equity
-                (pl.col("equity") / pl.first("equity") - 1.0).alias("cumulative_return"),
-                # High water mark (running maximum)
-                pl.col("equity").cum_max().alias("high_water_mark"),
+                (pl.col("equity") / previous - 1.0).alias("return"),
+                (pl.col("equity") / initial - 1.0).alias("cumulative_return"),
+                pl.col("equity").cum_max().clip(lower_bound=initial).alias("high_water_mark"),
             ]
         ).with_columns(
             # Drawdown: (equity / hwm) - 1, handle division by zero
@@ -513,7 +513,9 @@ class BacktestResult:
             timezone=self.config.resolved_timezone if self.config else "UTC",
             session_start_time=self.config.resolved_session_start_time if self.config else None,
         )
-        return compute_session_pnl(self.equity_curve, session_config)
+        return compute_session_pnl(
+            self.equity_curve, session_config, initial_capital=self.initial_capital
+        )
 
     def to_daily_pnl(self, session_aligned: bool = False) -> pl.DataFrame:
         """Get daily P&L DataFrame.
@@ -564,6 +566,10 @@ class BacktestResult:
             )
             .sort("date")
         )
+        if self.initial_capital is not None:
+            daily = daily.with_columns(
+                pl.col("close_equity").shift(1).fill_null(self.initial_capital).alias("open_equity")
+            )
 
         # Compute daily P&L and returns
         daily = daily.with_columns(
@@ -574,6 +580,8 @@ class BacktestResult:
 
         # Return percent (handle first day)
         prev_close = daily.select(pl.col("close_equity").shift(1)).to_series()
+        if self.initial_capital is not None:
+            prev_close = prev_close.fill_null(self.initial_capital)
         return_pct = (daily["close_equity"] - prev_close) / prev_close
         return_pct = return_pct.fill_null(0.0)
 
@@ -708,6 +716,7 @@ class BacktestResult:
         return {
             "version": 1,
             "library_version": __version__,
+            "initial_capital": self.initial_capital,
             "lifecycle_version": self.metrics.get("lifecycle_version"),
             "lifecycle_callback_counts": self.metrics.get("lifecycle_callback_counts", {}),
             "lifecycle_invocations": self.metrics.get("lifecycle_invocations", []),
@@ -976,6 +985,7 @@ class BacktestResult:
             "artifact_type": _ARTIFACT_TYPE,
             "schema_version": _ARTIFACT_SCHEMA_VERSION,
             "library_version": __version__,
+            "initial_capital": self.initial_capital,
             "complete": written.keys()
             >= (_REQUIRED_RESULT_COMPONENTS | ({"funding"} if self.funding_payments else set())),
             "components": {
@@ -1098,7 +1108,7 @@ class BacktestResult:
 
         if manifest is not None:
             schema_version = manifest.get("schema_version")
-            if schema_version != _ARTIFACT_SCHEMA_VERSION:
+            if schema_version not in (2, _ARTIFACT_SCHEMA_VERSION):
                 raise UnsupportedArtifactVersionError(
                     f"Unsupported result artifact schema version {schema_version!r}; "
                     f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
@@ -1140,6 +1150,14 @@ class BacktestResult:
                 else:
                     components = dict(component_data)
 
+        initial_capital = manifest.get("initial_capital") if manifest is not None else None
+        if initial_capital is not None and (
+            isinstance(initial_capital, bool)
+            or not isinstance(initial_capital, (int, float))
+            or not math.isfinite(initial_capital)
+            or initial_capital <= 0
+        ):
+            raise ArtifactManifestError("initial_capital must be a finite positive number or null")
         declared_incomplete = manifest is not None and manifest.get("complete") is not True
         if declared_incomplete and not recovery:
             raise ArtifactIncompleteError("Result artifact manifest marks the export incomplete")
@@ -1422,6 +1440,7 @@ class BacktestResult:
                     equity_curve=equity_curve,
                     fills=[],
                     metrics={},
+                    initial_capital=initial_capital,
                 ).to_daily_pnl()
             if component_read_ok["equity"] and not daily_pnl.equals(expected_daily_pnl):
                 message = "daily_pnl.parquet is inconsistent with equity.parquet"
@@ -1446,6 +1465,7 @@ class BacktestResult:
             metrics=metrics,
             config=config,
             artifact_diagnostics=tuple(diagnostics),
+            initial_capital=initial_capital,
         )
 
     @staticmethod

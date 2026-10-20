@@ -203,6 +203,8 @@ def _normalize_session_calendar(calendar: str) -> str:
 def compute_session_pnl(
     equity_curve: list[tuple[datetime, float]],
     session_config: SessionConfig,
+    *,
+    initial_capital: float | None = None,
 ) -> pl.DataFrame:
     """Compute daily P&L aligned to trading session boundaries.
 
@@ -213,6 +215,7 @@ def compute_session_pnl(
     Args:
         equity_curve: List of (timestamp, portfolio_value) tuples
         session_config: Session alignment configuration
+        initial_capital: Pre-observation NAV, when recorded by the producing engine.
 
     Returns:
         DataFrame with columns:
@@ -276,6 +279,10 @@ def compute_session_pnl(
         )
         .sort("session_date")
     )
+    if initial_capital is not None:
+        session_pnl = session_pnl.with_columns(
+            pl.col("close_equity").shift(1).fill_null(initial_capital).alias("open_equity")
+        )
 
     # Compute P&L and returns
     session_pnl = session_pnl.with_columns(
@@ -286,6 +293,8 @@ def compute_session_pnl(
 
     # Return percent (relative to previous session close)
     prev_close = session_pnl.select(pl.col("close_equity").shift(1)).to_series()
+    if initial_capital is not None:
+        prev_close = prev_close.fill_null(initial_capital)
     return_pct = (session_pnl["close_equity"] - prev_close) / prev_close
     return_pct = return_pct.fill_null(0.0)
 

@@ -807,7 +807,7 @@ class TestBacktestResultParquet:
             with open(path / "manifest.json") as file:
                 manifest = json.load(file)
             assert manifest["artifact_type"] == "ml4t-backtest-result"
-            assert manifest["schema_version"] == 2
+            assert manifest["schema_version"] == 3
             assert set(manifest["components"]) >= {
                 "trades",
                 "fills",
