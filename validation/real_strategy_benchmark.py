@@ -275,6 +275,7 @@ def build_report(
             "ml4t_engine_source_sha256": _tree_digest(PROJECT_ROOT / "src/ml4t/backtest"),
             "sources": {name: _sha256(path) for name, path in TIMING_SOURCE_PATHS.items()},
             "dependencies": {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()},
+            "dependency_graphs": dependency_graphs(),
         },
         "correctness_evidence_generated_at": correctness["generated_at"],
         "records": records,
@@ -307,6 +308,33 @@ def _json_sha256(payload: object) -> str:
     ).hexdigest()
 
 
+def dependency_graphs() -> dict[str, str]:
+    """Bind locked packages/artifacts while allowing an unchanged prerelease resolution.
+
+    Shared qualification resolves with ``--prerelease allow``. uv records that
+    resolver permission even when every selected package and artifact is unchanged.
+    All other lock declarations, markers, package records and hashes remain bound.
+    Raw lock hashes are retained separately as the original provenance.
+    """
+    graphs = {}
+    for name, path in DEPENDENCY_PATHS.items():
+        lock = tomllib.loads(path.read_text(encoding="utf-8"))
+        options = lock.get("options", {})
+        options.pop("prerelease-mode", None)
+        if not options:
+            lock.pop("options", None)
+        graphs[name] = _json_sha256(lock)
+    return graphs
+
+
+def dependencies_match(provenance: dict[str, Any]) -> bool:
+    if "dependency_graphs" in provenance:
+        return provenance["dependency_graphs"] == dependency_graphs()
+    return provenance.get("dependencies") == {
+        name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()
+    }
+
+
 def measurement_digest(report: dict[str, Any]) -> str:
     """Identify the original measurements without including subsequent reviews."""
     return _json_sha256(
@@ -333,8 +361,7 @@ def applicable_review(report: dict[str, Any], correctness: dict[str, Any]) -> di
         entry is not None
         and entry.get("sources") == sources
         and entry.get("performance_impact") == "none"
-        and entry.get("dependencies")
-        == {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()}
+        and dependencies_match(entry)
         and entry.get("measurement_sha256") == measurement_digest(report)
         and entry.get("reviewed_correctness_sha256") == _json_sha256(correctness)
     ):
@@ -371,6 +398,14 @@ def certification_shape_failures(provenance: dict[str, Any]) -> list[str]:
                 or not all(_is_sha256(value) for value in dependencies.values())
             ):
                 failures.append(f"Certification {index} lacks dependency identities")
+            graphs = entry.get("dependency_graphs")
+            if graphs is not None and (
+                not isinstance(graphs, dict)
+                or not isinstance(dependencies, dict)
+                or graphs.keys() != dependencies.keys()
+                or not all(_is_sha256(value) for value in graphs.values())
+            ):
+                failures.append(f"Certification {index} has invalid dependency graph identities")
         for field in ("certified_at", "reason", "ml4t_commit"):
             value = entry.get(field)
             if not isinstance(value, str) or not value.strip():
@@ -432,6 +467,7 @@ def certify_source(
         "sources": {name: _sha256(path) for name, path in TIMING_SOURCE_PATHS.items()},
         "performance_impact": "none",
         "dependencies": {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()},
+        "dependency_graphs": dependency_graphs(),
         "measurement_sha256": measurement_digest(report),
         "reviewed_correctness_sha256": _json_sha256(correctness),
     }
@@ -520,8 +556,7 @@ def report_failures(report: dict[str, Any], correctness: dict[str, Any]) -> list
             provenance.get("ml4t_engine_source_sha256")
             == _tree_digest(PROJECT_ROOT / "src/ml4t/backtest")
             and provenance.get("sources") == expected_sources
-            and provenance.get("dependencies")
-            == {name: _sha256(path) for name, path in DEPENDENCY_PATHS.items()}
+            and dependencies_match(provenance)
         )
         if not certification_failures and not measured_source and review is None:
             failures.append(
