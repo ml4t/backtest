@@ -696,13 +696,21 @@ class TestEngine:
         assert results.metrics["max_open_positions"] == 1
 
         assert portfolio_state.columns == [
+            "observation_id",
             "timestamp",
             "equity",
             "cash",
             "gross_exposure",
             "net_exposure",
             "open_positions",
+            "observation_kind",
+            "holdings_complete",
+            "fill_sequence",
         ]
+        assert portfolio_state["observation_id"].to_list() == [0, 1, 2]
+        assert portfolio_state["observation_kind"].to_list() == ["bar"] * 3
+        assert portfolio_state["holdings_complete"].to_list() == [False] * 3
+        assert portfolio_state["fill_sequence"].null_count() == 3
         assert portfolio_state["open_positions"].to_list() == [1, 0, 0]
         assert portfolio_state["gross_exposure"].to_list() == [1000.0, 0.0, 0.0]
 

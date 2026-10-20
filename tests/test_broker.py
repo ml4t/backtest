@@ -102,16 +102,19 @@ class TestBrokerBasics:
         assert pos.quantity == 100.0
         assert pos.entry_price == 150.0
 
-    def test_get_last_price_retains_only_positive_observations(self, broker):
+    def test_get_last_price_preserves_finite_zero_and_negative_marks(self, broker):
         assert broker.get_last_price("AAPL") is None
 
         mark_prices(broker, {"AAPL": 100.0})
         assert broker.get_last_price("AAPL") == 100.0
 
         mark_prices(broker, {"AAPL": 0.0})
+        assert broker.get_last_price("AAPL") == 0.0
         mark_prices(broker, {"AAPL": -1.0})
 
-        assert broker.get_last_price("AAPL") == 100.0
+        assert broker.get_last_price("AAPL") == -1.0
+        mark_prices(broker, {"AAPL": float("nan")})
+        assert broker.get_last_price("AAPL") == -1.0
         assert broker.get_last_price("MSFT") is None
 
     def test_bar_close_initializes_both_water_marks(self):

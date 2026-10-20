@@ -134,7 +134,7 @@ print(f"Net PF:        {m['profit_factor']:.2f}")
 
 - `trades`: realized exit legs plus end-of-backtest open-position marks
 - `fills`: execution blotter rows
-- `portfolio_state`: end-of-bar portfolio snapshots
+- `portfolio_state`: account observations, with end-of-bar snapshots by default
 
 For rebalancing strategies, `num_trades` is not the right proxy for trading activity.
 Use `num_fills`, `num_rebalance_events`, and `total_filled_notional` instead.
