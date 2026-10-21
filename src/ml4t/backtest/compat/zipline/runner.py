@@ -79,7 +79,7 @@ class _Positions(Mapping[Asset, PositionView]):
             asset,
             position.quantity if position is not None else 0,
             position.commission_adjusted_cost_basis if position is not None else 0.0,
-            (position.current_price if position.current_price is not None else position.entry_price)
+            self.context._require_broker()._portfolio_ledger.position_mark(asset.key, position)[0]
             if position is not None
             else 0.0,
         )
@@ -579,14 +579,19 @@ class MigrationContext:
             self._external_order_id(order.order_id),
             order.order_id,
             self._by_key[order.asset],
-            sign * order.requested_quantity,
+            sign
+            * (
+                order.action_adjusted_quantity
+                if order.action_adjusted_quantity is not None
+                else order.requested_quantity
+            ),
             sign * order.filled_quantity,
             order.commission_paid,
             statuses[order.status],
             utc(order.created_at),
             utc(max(observed)) if observed else None,
             order.limit_price,
-            order.stop_price,
+            None if order.stop_triggered else order.stop_price,
             order.stop_triggered,
             order.rejection_reason,
         )
@@ -889,6 +894,7 @@ def run_algorithm(
         execution_price=ExecutionPrice.CLOSE,
         next_bar_execution_price=ExecutionPrice.CLOSE,
         conditional_order_mode=ConditionalOrderMode.EXECUTION_PRICE,
+        corporate_action_policy="zipline_3_2",
         fill_ordering=FillOrdering.FIFO,
         metadata={
             "migration_adapter": "zipline",

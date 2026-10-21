@@ -31,6 +31,10 @@ class PortfolioLedger:
 
     def position_mark(self, asset: str, position: Position) -> tuple[float, str, datetime | None]:
         price = self.broker.get_mark_price(asset, quantity=position.quantity)
+        if asset in self.market.action_adjusted_assets:
+            adjusted = price if price is not None else self.broker.get_last_price(asset)
+            if adjusted is not None:
+                return adjusted, "action_adjusted_previous_mark", self.market.time
         if price is not None:
             return price, self.broker.mark_price.value, self.market.time
         price = self.broker.get_last_price(asset)

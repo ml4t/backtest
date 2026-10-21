@@ -33,6 +33,7 @@ class MarketState:
     asset_bars_seen: dict[str, int] = field(default_factory=dict)
     bar_index: int = 0
     observed_high_low: Callable[[str], tuple[float | None, float | None]] | None = None
+    action_adjusted_assets: set[str] = field(default_factory=set)
 
 
 @dataclass(slots=True)

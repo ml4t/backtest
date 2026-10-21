@@ -3085,6 +3085,7 @@ class Broker:
         for asset, price in prices.items():
             if not isfinite(price):
                 continue
+            self._market_state.action_adjusted_assets.discard(asset)
             self._last_prices[asset] = price
             if self._market_state.last_price_times is not None:
                 self._market_state.last_price_times[asset] = timestamp

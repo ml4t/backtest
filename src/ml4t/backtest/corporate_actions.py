@@ -141,7 +141,11 @@ class CorporateActionLedger:
                 raise ValueError(
                     "Post-effective action corrections require an explicit forward event"
                 )
-            if row.get("currency") != broker._get_contract_currency(row["asset"]):
+            if (
+                not isinstance(row.get("currency"), str)
+                or not row["currency"]
+                or row["currency"] != broker._get_contract_currency(row["asset"])
+            ):
                 raise ValueError(
                     "Action currency must match the source instrument; FX conversion is not implicit"
                 )
@@ -218,7 +222,8 @@ class CorporateActionLedger:
         for row in temporal_rows(rows, named=True):
             if row["session_date"] != value:
                 continue
-            opened = pd.Timestamp(row["market_open"])
+            # A session label applies from its UTC session boundary, before pre-market callbacks.
+            opened = pd.Timestamp(value, tz="UTC")
             return (
                 opened.tz_localize(None).to_pydatetime()
                 if reference is not None and reference.tzinfo is None
@@ -254,7 +259,14 @@ class CorporateActionLedger:
                 all_asset_stats=True,
                 target_intents=True,
             )
-            market = deepcopy(broker._market_state)
+            market = {
+                slot: (
+                    getattr(broker._market_state, slot)
+                    if slot == "observed_high_low"
+                    else deepcopy(getattr(broker._market_state, slot))
+                )
+                for slot in broker._market_state.__slots__
+            }
             length = len(self.records)
             try:
                 for _, _, event, operation in self._events[self._cursor : end]:
@@ -270,11 +282,43 @@ class CorporateActionLedger:
             except Exception:
                 broker._restore_lifecycle_state(state)
                 for slot in broker._market_state.__slots__:
-                    setattr(broker._market_state, slot, getattr(market, slot))
+                    setattr(broker._market_state, slot, market[slot])
                 self.entitlements = broker.account.corporate_entitlements
                 del self.records[length:]
                 raise
             self._cursor = end
+
+    def _cash(self, delta: float) -> None:
+        account = self.broker.account
+        cash = account.cash + delta
+        free = account._lock_notional_free_cash + delta
+        if not isfinite(cash) or not isfinite(free):
+            raise ValueError("Corporate action would make the cash ledger nonfinite")
+        account.cash, account._lock_notional_free_cash = cash, free
+
+    def _rebase_mark(self, asset: str, *, ratio: float = 1.0, cash: float = 0.0) -> None:
+        market = self.broker._market_state
+        for field in (
+            "prices",
+            "opens",
+            "highs",
+            "lows",
+            "closes",
+            "vwaps",
+            "bids",
+            "asks",
+            "mids",
+            "last_prices",
+        ):
+            cache = getattr(market, field)
+            if asset in cache:
+                value = cache[asset] / ratio - cash
+                if not isfinite(value) or value <= 0:
+                    raise ValueError("Corporate action requires a positive adjusted previous mark")
+                updated = dict(cache)
+                updated[asset] = value
+                setattr(market, field, updated)
+        market.action_adjusted_assets.add(asset)
 
     def _split(self, event: _Action, instant: datetime) -> None:
         broker, row = self.broker, event.terms
@@ -285,6 +329,8 @@ class CorporateActionLedger:
         cash_delta = 0.0
         if position is not None:
             exact = old_quantity * ratio
+            if not isfinite(exact) or not isfinite(position.entry_price / ratio):
+                raise ValueError("split_ratio would make the position nonfinite")
             whole = (
                 trunc(exact) if legacy or row.get("fractional_policy") == "cash_in_lieu" else exact
             )
@@ -309,14 +355,28 @@ class CorporateActionLedger:
                     setattr(position, field, value / ratio)
             if not whole:
                 del broker.positions[asset]
-            broker.account.cash += cash_delta
+            self._cash(cash_delta)
+            if old_quantity < 0 and fraction:
+                debt = broker.account._lock_notional_short_basis.get(asset, 0.0)
+                released = debt * abs(fraction / exact)
+                broker.account._lock_notional_short_basis[asset] = debt - released
+                broker.account._lock_notional_free_cash += 2 * released
         for order in broker.pending_orders:
             if order.asset != asset or order.status is not OrderStatus.PENDING:
                 continue
             before = order.quantity
             rounding = trunc if legacy or broker.share_type is ShareType.INTEGER else float
-            order.quantity = float(rounding(order.quantity * ratio))
+            total = (
+                order.action_adjusted_quantity
+                if order.action_adjusted_quantity is not None
+                else order.requested_quantity
+            )
+            assert total is not None
+            order.action_adjusted_quantity = float(rounding(total * ratio))
             order.filled_quantity = float(rounding(order.filled_quantity * ratio))
+            order.quantity = max(0.0, order.action_adjusted_quantity - order.filled_quantity)
+            if order.filled_price is not None:
+                order.filled_price /= ratio
             for field in (
                 "limit_price",
                 "stop_price",
@@ -328,9 +388,10 @@ class CorporateActionLedger:
                 if value is not None:
                     setattr(order, field, round(value / ratio, 2) if legacy else value / ratio)
             if order.order_id in broker._order_state.partial_quantities:
-                broker._order_state.partial_quantities[order.order_id] = max(
-                    0.0, order.quantity - order.filled_quantity
-                )
+                broker._order_state.partial_quantities[order.order_id] = max(0.0, order.quantity)
+            if order.quantity == 0:
+                order.status = OrderStatus.FILLED
+                order.filled_at = instant
             self._record(
                 event,
                 instant,
@@ -339,21 +400,7 @@ class CorporateActionLedger:
                 quantity_before=before,
                 quantity_after=order.quantity,
             )
-        for field in (
-            "prices",
-            "opens",
-            "highs",
-            "lows",
-            "closes",
-            "vwaps",
-            "bids",
-            "asks",
-            "mids",
-            "last_prices",
-        ):
-            cache = getattr(broker._market_state, field)
-            if asset in cache:
-                cache[asset] /= ratio
+        self._rebase_mark(asset, ratio=ratio)
         self._record(
             event,
             instant,
@@ -390,6 +437,14 @@ class CorporateActionLedger:
         self._record(
             event, instant, "entitlement", quantity_before=quantity, quantity_after=quantity
         )
+        if row["action_kind"] in {"cash_dividend", "cash_distribution"}:
+            adjustment = row["cash_per_share"]
+        else:
+            mark = self.broker.get_last_price(row["destination_asset"])
+            if mark is None:
+                raise ValueError("Distribution requires an observed destination mark")
+            adjustment = row["quantity_ratio"] * mark
+        self._rebase_mark(row["asset"], cash=adjustment)
 
     def _add_security(self, asset: str, quantity: float, basis: float, instant: datetime) -> None:
         if not quantity:
@@ -426,7 +481,7 @@ class CorporateActionLedger:
         entitlement = self.entitlements.get(event.key)
         if entitlement is None or entitlement["paid"]:
             return
-        self.broker.account.cash += entitlement["cash_amount"]
+        self._cash(entitlement["cash_amount"])
         self._add_security(
             entitlement["destination_asset"],
             entitlement["security_quantity"],
