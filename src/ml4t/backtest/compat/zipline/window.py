@@ -1,11 +1,12 @@
 """Translate legacy session dates into a borrowed native physical trading window."""
 
+from bisect import bisect_left
 from contextlib import contextmanager
 from datetime import timedelta
 
 import pandas as pd
 
-from ...calendar import get_schedule
+from ...calendar import get_calendar, get_schedule
 from ...sessions import SessionConfig
 
 
@@ -32,6 +33,45 @@ def _utc(value, timezone):
 def _physical(value, naive, timezone):
     stamp = pd.Timestamp(value)
     return stamp.tz_convert(timezone).tz_localize(None) if naive else stamp
+
+
+def _execution_windows(feed, config, runtime):
+    """Translate the published legacy synthetic calendar's simulation interval."""
+    calendar = config.resolved_calendar
+    if calendar is None or get_calendar(calendar).name != "us_futures":
+        return runtime.execution_windows
+    points = feed.timestamps
+    if not points:
+        return ()
+    rows = get_schedule(
+        calendar, points[0].date() - timedelta(days=2), points[-1].date() + timedelta(days=2)
+    )
+    windows = []
+    for row in rows.iter_rows(named=True):
+        opened = _physical(
+            pd.Timestamp(row["market_open"]) + timedelta(hours=12, minutes=31),
+            points[0].tzinfo is None,
+            config.resolved_timezone,
+        )
+        closed = _physical(
+            pd.Timestamp(row["market_close"]) - timedelta(hours=1),
+            points[0].tzinfo is None,
+            config.resolved_timezone,
+        )
+        selected = (
+            ((opened, closed),)
+            if runtime.execution_windows is None
+            else (
+                (max(opened, start), min(closed, end))
+                for start, end in runtime.execution_windows
+                if start <= closed and end >= opened
+            )
+        )
+        for start, end in selected:
+            index = bisect_left(points, start)
+            if index < len(points) and points[index] <= end:
+                windows.append((start, end))
+    return tuple(windows)
 
 
 def _window(feed, config, runtime, start, end):
@@ -99,10 +139,12 @@ def _window(feed, config, runtime, start, end):
 
 
 @contextmanager
-def _borrow_window(runtime, start, end):
-    previous = runtime.start, runtime.end
+def _borrow_window(runtime, start, end, execution_windows=None):
+    previous = runtime.start, runtime.end, runtime.execution_windows
+    runtime.execution_windows = execution_windows
     runtime.start, runtime.end = start, end
     try:
         yield
     finally:
-        runtime.start, runtime.end = previous
+        runtime.start, runtime.end = previous[:2]
+        runtime.execution_windows = previous[2]

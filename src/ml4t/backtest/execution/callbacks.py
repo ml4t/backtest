@@ -37,7 +37,9 @@ class SessionScheduler:
     """Schedule callbacks through the Engine's existing transactional dispatcher.
 
     Pre-open clocks are explicit calendar events with no invented market observation.
-    Other callbacks require an actual price event at the requested instant. Offsets
+    Explicit intrabar clock callbacks run before an observation at the same instant,
+    with no new quote, fill or account sample. Other callbacks require an actual
+    price event at the requested instant. Offsets
     are elapsed minutes from the calendar endpoint, not ordinal price observations.
     """
 
@@ -79,14 +81,25 @@ class SessionScheduler:
             LifecyclePhase.CLOSE,
         }:
             raise ValueError("Unsupported scheduled callback phase")
-        if at not in {"bar", "session_open", "session_close"}:
-            raise ValueError("at must be bar, session_open or session_close")
+        if at not in {"bar", "clock", "session_open", "session_close"}:
+            raise ValueError("at must be bar, clock, session_open or session_close")
         for value in [minutes_before, minutes_after]:
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValueError("Minute offsets must be nonnegative integers")
         if minutes_before and minutes_after:
             raise ValueError("Choose minutes_before or minutes_after")
         offset = timedelta(minutes=minutes_after - minutes_before)
+        if schedule is not None and not isinstance(schedule, RebalanceSchedule):
+            raise TypeError("schedule must be a RebalanceSchedule")
+        if at == "clock" and (
+            phase is not LifecyclePhase.INTRABAR
+            or offset
+            or schedule is None
+            or schedule.cadence is not RebalanceCadence.EXPLICIT_TIMESTAMPS
+        ):
+            raise ValueError(
+                "clock callbacks require intrabar phase and explicit physical timestamps"
+            )
         if at == "bar" and offset:
             raise ValueError("Bar callbacks do not accept elapsed offsets")
         if phase is LifecyclePhase.PRE_OPEN and (at != "session_open" or offset > timedelta(0)):
@@ -97,8 +110,6 @@ class SessionScheduler:
             raise ValueError("include_start_session is a Boolean option for pre_open callbacks")
         if phase is LifecyclePhase.OPENING_AUCTION and (at != "session_open" or offset):
             raise ValueError("opening_auction callbacks require the actual session_open")
-        if schedule is not None and not isinstance(schedule, RebalanceSchedule):
-            raise TypeError("schedule must be a RebalanceSchedule")
         self._registrations.append(
             _Registration(
                 callback,
@@ -116,7 +127,7 @@ class SessionScheduler:
         engine = self._runtime._engine
         assert engine is not None
         if engine.config.resolved_calendar is None and any(
-            r.at != "bar" for r in self._registrations
+            r.at in {"session_open", "session_close"} for r in self._registrations
         ):
             raise ValueError("Session callbacks require a declared calendar")
         if (
@@ -156,10 +167,41 @@ class SessionScheduler:
             return
         timestamps = [t for t in engine.feed.timestamps if self._runtime._accepts(t)]
         first, last = timestamps[0], timestamps[-1]
+        timezone = ZoneInfo(engine.config.resolved_timezone)
+
+        def feed_time(timestamp):
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone)
+            return (
+                timestamp.astimezone(first.tzinfo)
+                if first.tzinfo is not None
+                else timestamp.astimezone(timezone).replace(tzinfo=None)
+            )
+
+        for index, registration in enumerate(registrations):
+            if registration.at != "clock":
+                continue
+            for scheduled in registration.schedule.timestamps:
+                instant = feed_time(scheduled)
+                if not self._runtime._accepts(instant):
+                    continue
+                if instant > last:
+                    raise ValueError("Clock callback is after the last captured market event")
+                self._pre_events.append((instant, index))
+        if not any(
+            r.at in {"session_open", "session_close"}
+            or r.at == "bar"
+            and r.schedule.cadence
+            not in {RebalanceCadence.EVERY_BAR, RebalanceCadence.EXPLICIT_TIMESTAMPS}
+            for r in registrations
+        ):
+            self._pre_events.sort()
+            if self._runtime._assets is not None:
+                self._runtime._assets._prepare_points([time for time, _ in self._pre_events])
+            return
         calendar = engine.config.resolved_calendar
         if calendar is None:
             raise ValueError("Session cadence requires a declared calendar")
-        timezone = ZoneInfo(engine.config.resolved_timezone)
         clock = SessionConfig(
             calendar,
             engine.config.resolved_timezone,
@@ -169,13 +211,6 @@ class SessionScheduler:
             engine.config.resolved_data_frequency,
         )
         first_session = clock.date_for_timestamp(first).date()
-
-        def feed_time(timestamp):
-            return (
-                timestamp.astimezone(first.tzinfo)
-                if first.tzinfo is not None
-                else timestamp.astimezone(timezone).replace(tzinfo=None)
-            )
 
         sessions = get_schedule(
             calendar, first.date() - timedelta(days=1), last.date() + timedelta(days=1)
@@ -188,7 +223,7 @@ class SessionScheduler:
             session_index += 1
             self._session_indexes[row["session_date"]] = session_index
             for index, registration in enumerate(registrations):
-                if registration.at == "bar":
+                if registration.at in {"bar", "clock"}:
                     continue
                 anchor = opened if registration.at == "session_open" else closed
                 timestamp = anchor + registration.offset
@@ -216,7 +251,9 @@ class SessionScheduler:
                     self._pre_events.append((timestamp, index))
                 else:
                     self._events.setdefault(timestamp, []).append(index)
-        self._pre_events.sort()
+        self._pre_events.sort(
+            key=lambda event: (event[0], self._registrations[event[1]].at != "clock", event[1])
+        )
         if self._runtime._assets is not None:
             self._runtime._assets._prepare_points(
                 [time for time, _ in self._pre_events]
@@ -232,6 +269,7 @@ class SessionScheduler:
             timestamp,
             session_date=self._event_sessions.get((timestamp, index)),
             session_open=self._event_opens.get((timestamp, index)),
+            has_price_event=registration.at != "clock",
         ):
             engine.lifecycle_dispatcher.dispatch_registered(
                 registration.phase,
@@ -249,7 +287,10 @@ class SessionScheduler:
         while self._pre_index < len(self._pre_events):
             instant, index = self._pre_events[self._pre_index]
             if instant > timestamp or (
-                instant == timestamp and has_price_event and self._defer_pre_at_close
+                instant == timestamp
+                and has_price_event
+                and self._defer_pre_at_close
+                and self._registrations[index].at != "clock"
             ):
                 break
             self._pre_index += 1

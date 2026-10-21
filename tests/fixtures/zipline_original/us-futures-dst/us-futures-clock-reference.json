@@ -1,0 +1,47 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "calendar": "us_futures",
+  "bars": 1260,
+  "input_rows": 2880,
+  "trace": [
+    {
+      "kind": "open",
+      "timestamp": "2025-03-07T11:31:00+00:00",
+      "price": 107.5,
+      "bars_seen": 1
+    },
+    {
+      "kind": "before_trading_start",
+      "timestamp": "2025-03-07T13:45:00+00:00",
+      "price": 108.83,
+      "bars_seen": 134
+    },
+    {
+      "kind": "close",
+      "timestamp": "2025-03-07T21:59:00+00:00",
+      "price": 113.78,
+      "bars_seen": 629
+    },
+    {
+      "kind": "open",
+      "timestamp": "2025-03-10T10:31:00+00:00",
+      "price": 121.9,
+      "bars_seen": 631
+    },
+    {
+      "kind": "before_trading_start",
+      "timestamp": "2025-03-10T12:45:00+00:00",
+      "price": 123.23,
+      "bars_seen": 764
+    },
+    {
+      "kind": "close",
+      "timestamp": "2025-03-10T20:59:00+00:00",
+      "price": 128.18,
+      "bars_seen": 1259
+    }
+  ],
+  "scope": "Clock callbacks only, actual original future asset, no order/account/default futures slippage claim",
+  "timing_claim": false
+}

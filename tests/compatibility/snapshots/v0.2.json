@@ -670,6 +670,7 @@
     "from ml4t.backtest import run_backtest",
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
+    "from ml4t.backtest.calendar import get_schedule",
     "from ml4t.backtest.compat.zipline import PreparedAssetLookup, run_algorithm",
     "from ml4t.backtest.compat.zipline import PreparedCSV, run_algorithm",
     "from ml4t.backtest.compat.zipline import PreparedPipeline, run_algorithm",
@@ -2658,6 +2659,12 @@
       "module": "ml4t.backtest.analytics.metrics",
       "qualname": "volatility",
       "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, annualize: bool = True) -> float"
+    },
+    "ml4t.backtest.calendar:get_schedule": {
+      "kind": "function",
+      "module": "ml4t.backtest.calendar",
+      "qualname": "get_schedule",
+      "signature": "(calendar_id: str, start_date: datetime.date | datetime.datetime | str, end_date: datetime.date | datetime.datetime | str, *, include_breaks: bool = False, include_extended_hours: bool = False) -> polars.dataframe.frame.DataFrame"
     },
     "ml4t.backtest.compat.zipline.api:date_rules": {
       "kind": "class",
@@ -5055,6 +5062,10 @@
           "kind": "method",
           "signature": "(self, sources: 'Sequence[AuxiliaryData]') -> 'Iterator[RuntimeServices]'"
         },
+        "execution_windows": {
+          "kind": "property",
+          "signature": "(self) -> 'tuple[tuple[datetime, datetime], ...] | None'"
+        },
         "history_source": {
           "kind": "method",
           "signature": "(self, source_id: 'str') -> 'MarketDataView'"
@@ -5070,7 +5081,7 @@
       },
       "module": "ml4t.backtest.runtime",
       "qualname": "RuntimeServices",
-      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, history_sources: 'Mapping[str, HistoryProvider] | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, auxiliary: 'Sequence[AuxiliaryData]' = (), instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
+      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, execution_windows: 'Sequence[tuple[datetime, datetime]] | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, history_sources: 'Mapping[str, HistoryProvider] | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, auxiliary: 'Sequence[AuxiliaryData]' = (), instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
     },
     "ml4t.backtest:StopFillMode": {
       "kind": "class",

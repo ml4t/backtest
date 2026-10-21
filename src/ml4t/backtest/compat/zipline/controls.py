@@ -1,12 +1,15 @@
 """Parameter conversion for native pre-submission validators."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 import pandas as pd
 
+from ...calendar import get_calendar, get_schedule
 from ...controls import (
     AccountConstraints,
+    AccountControlContext,
     OrderControlContext,
     TradingControl,
     TradingControlViolation,
@@ -36,6 +39,25 @@ class _TradingRule:
             logging.getLogger(__name__).error("%s", error)
 
 
+@dataclass
+class _ExecutionCloseRule:
+    rule: AccountConstraints
+    closes: frozenset[datetime]
+    seen: set[datetime] = field(default_factory=set)
+
+    def validate(self, account: AccountControlContext) -> None:
+        if account.timestamp in self.closes:
+            self.rule.validate(account)
+            self.seen.add(account.timestamp)
+
+    def completed(self, _event_count: int) -> None:
+        missing = self.closes - self.seen
+        if missing:
+            raise ValueError(
+                f"Session account controls require execution close observations: {sorted(missing)}"
+            )
+
+
 def _register_account_controls(context, runtime):
     if not context._account_controls:
         return
@@ -55,6 +77,27 @@ def _register_account_controls(context, runtime):
         config.resolved_feed_spec.bar_label,
         config.resolved_data_frequency,
     )
+    execution_closes = None
+    if get_calendar(config.resolved_calendar).name == "us_futures":
+        sessions = {clock.date_for_timestamp(point).date() for point in points}
+        closes = []
+        for row in get_schedule(config.resolved_calendar, min(sessions), max(sessions)).iter_rows(
+            named=True
+        ):
+            if row["session_date"] not in sessions:
+                continue
+            closed = pd.Timestamp(row["market_close"]) - timedelta(hours=1)
+            if points[0].tzinfo is None:
+                closed = closed.tz_convert(config.resolved_timezone).tz_localize(None)
+            closes.append(closed)
+        execution_closes = frozenset(closes)
+        if execution_closes - set(points):
+            raise ValueError(
+                "Session account controls require each legacy execution close observation"
+            )
+        config.metadata["migration_account_control_execution_closes"] = [
+            point.isoformat() for point in sorted(execution_closes)
+        ]
     session = clock.date_for_timestamp(points[0]).date()
     for kind, value, grace in context._account_controls:
         if kind == "maximum":
@@ -64,4 +107,9 @@ def _register_account_controls(context, runtime):
             if points[0].tzinfo is None:
                 deadline = deadline.tz_convert(config.resolved_timezone).tz_localize(None)
             rule = AccountConstraints(min_leverage=value, deadline=deadline)
-        engine.broker.register_account_control(rule, boundary="session_end")
+        if execution_closes is None:
+            engine.broker.register_account_control(rule, boundary="session_end")
+        else:
+            scheduled = _ExecutionCloseRule(rule, execution_closes)
+            engine.broker.register_account_control(scheduled, boundary="after_fills")
+            engine.broker._register_completion_validator(scheduled, scheduled.completed)

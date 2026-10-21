@@ -198,6 +198,7 @@ class Broker:
         self._order_session_config: SessionConfig | None = None
         self._scheduled_session_date: date | None = None
         self._scheduled_session_open: datetime | None = None
+        self._scheduled_price_event = True
         self.cancel_policy = CancelPolicy(cancel_policy)
         self._session_expiry_cache: dict[tuple[str, date], tuple[datetime, datetime]] = {}
         self._risk_state = RiskState()
@@ -1137,10 +1138,13 @@ class Broker:
         *,
         session_date: date | None = None,
         session_open: datetime | None = None,
+        has_price_event: bool = True,
     ) -> Iterator[None]:
         previous = self._market_state.time
         previous_session = self._scheduled_session_date
         previous_open = self._scheduled_session_open
+        previous_price_event = self._scheduled_price_event
+        self._scheduled_price_event = has_price_event
         self._market_state.time = timestamp
         self._scheduled_session_date = session_date
         self._scheduled_session_open = session_open
@@ -1151,6 +1155,7 @@ class Broker:
             self._market_state.time = previous
             self._scheduled_session_date = previous_session
             self._scheduled_session_open = previous_open
+            self._scheduled_price_event = previous_price_event
 
     def _preopen_order_eligibility(self) -> tuple[datetime | None, bool]:
         if self._scheduled_session_open is None:
@@ -1170,7 +1175,10 @@ class Broker:
     def _may_fill_immediately(self) -> bool:
         from ml4t.specs import LifecyclePhase
 
-        return self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN
+        return (
+            self._scheduled_price_event
+            and self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN
+        )
 
     def _begin_lifecycle_dispatch(
         self,

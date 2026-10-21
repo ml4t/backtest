@@ -713,6 +713,7 @@ class RuntimeServices:
         *,
         start: datetime | None = None,
         end: datetime | None = None,
+        execution_windows: Sequence[tuple[datetime, datetime]] | None = None,
         known_at_cols: dict[str, str] | None = None,
         history_provider: HistoryProvider | None = None,
         history_sources: Mapping[str, HistoryProvider] | None = None,
@@ -731,6 +732,7 @@ class RuntimeServices:
         if start is not None and end is not None and start > end:
             raise ValueError("start must not exceed end")
         self.start, self.end = start, end
+        self.execution_windows = execution_windows
         self.known_at_cols = dict(known_at_cols or {})
         self.signal_known_at_cols = dict(signal_known_at_cols or {})
         self.context_known_at_cols = dict(context_known_at_cols or {})
@@ -776,6 +778,34 @@ class RuntimeServices:
         self._market: MarketDataView | None = None
         self._signals: FeatureDataView | None = None
         self._assets: InstrumentView | None = None
+
+    @property
+    def execution_windows(self) -> tuple[tuple[datetime, datetime], ...] | None:
+        """Inclusive physical event intervals; excluded feed rows remain read-only history."""
+        return self._execution_windows
+
+    @execution_windows.setter
+    def execution_windows(self, value: Sequence[tuple[datetime, datetime]] | None) -> None:
+        if getattr(self, "_engine", None) is not None:
+            raise RuntimeError("Configure execution windows before an active run")
+        try:
+            windows = None if value is None else tuple(tuple(pair) for pair in value)
+        except TypeError as exc:
+            raise TypeError("Execution windows require pairs of physical datetimes") from exc
+        previous = None
+        for pair in windows or ():
+            if len(pair) != 2 or any(not isinstance(time, datetime) for time in pair):
+                raise TypeError("Each execution window requires two physical datetimes")
+            opened, closed = pair
+            try:
+                invalid = opened > closed or previous is not None and opened <= previous
+            except TypeError as exc:
+                raise ValueError("Execution window timezones must be compatible") from exc
+            if invalid:
+                raise ValueError("Execution windows must be ordered, nonoverlapping intervals")
+            previous = closed
+        self._execution_windows = windows
+        self._execution_window_starts = tuple(pair[0] for pair in windows or ())
 
     def history_source(self, source_id: str) -> MarketDataView:
         """Read an explicitly prepared independent grid at this run's actual cutoff.
@@ -977,9 +1007,15 @@ class RuntimeServices:
             raise
 
     def _accepts(self, timestamp: datetime) -> bool:
-        return (self.start is None or timestamp >= self.start) and (
-            self.end is None or timestamp <= self.end
-        )
+        if not (
+            (self.start is None or timestamp >= self.start)
+            and (self.end is None or timestamp <= self.end)
+        ):
+            return False
+        if self._execution_windows is None:
+            return True
+        index = bisect_right(self._execution_window_starts, timestamp) - 1
+        return index >= 0 and timestamp <= self._execution_windows[index][1]
 
     def _advance(self, timestamp: datetime, data: dict[str, dict]) -> dict[str, dict]:
         market = self.market

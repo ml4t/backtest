@@ -53,7 +53,7 @@ from .finance.order import ORDER_STATUS, OrderView
 from .lookup import PreparedAssetLookup, _lookup_instant, _symbol_parts
 from .pipeline import PreparedPipeline, _PipelineState
 from .results import to_performance_frame
-from .window import _borrow_window, _window
+from .window import _borrow_window, _execution_windows, _window
 
 
 @dataclass(frozen=True)
@@ -803,9 +803,16 @@ def run_algorithm(
         },
     )
     runtime = runtime if runtime is not None else RuntimeServices()
-    bounded_start, bounded_end, environment, window_mode = _window(
-        feed, config.merge_feed_spec(feed.feed_spec), runtime, start, end
-    )
+    effective_config = config.merge_feed_spec(feed.feed_spec)
+    execution_windows = _execution_windows(feed, effective_config, runtime)
+    with _borrow_window(runtime, runtime.start, runtime.end, execution_windows):
+        bounded_start, bounded_end, environment, window_mode = _window(
+            feed, effective_config, runtime, start, end
+        )
+    if execution_windows is not None:
+        config.metadata["migration_execution_windows"] = [
+            [opened.isoformat(), closed.isoformat()] for opened, closed in execution_windows
+        ]
     config.metadata["migration_window"] = {
         "mode": window_mode,
         "start": environment["start"].isoformat(),
@@ -857,7 +864,7 @@ def run_algorithm(
         ],
         "order_id_prefix": context._order_prefix,
     }
-    with _borrow_window(runtime, bounded_start, bounded_end):
+    with _borrow_window(runtime, bounded_start, bounded_end, execution_windows):
         if initialize is not None:
             with callback_scope(context):
                 initialize(context)

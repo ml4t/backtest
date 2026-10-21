@@ -143,6 +143,7 @@ def _register(context, runtime, data, before_trading_start):
     start, end = first.date() - timedelta(days=45), last.date() + timedelta(days=45)
     rows = get_schedule(calendar, start, end, include_breaks=True).to_dicts()
     source_calendar = get_calendar(calendar)
+    legacy_futures = source_calendar.name == "us_futures"
     schedule = source_calendar.schedule(start_date=start, end_date=end)
     early = {t.date() for t in source_calendar.early_closes(schedule).index}
     clock = SessionConfig(
@@ -207,18 +208,33 @@ def _register(context, runtime, data, before_trading_start):
         "calendar": calendar,
         "daily_ignores_time_rule": daily,
         "before_trading_start_minutes_before_session_open": 45
-        if before_trading_start is not None
+        if before_trading_start is not None and not legacy_futures
+        else None,
+        "before_trading_start_clock": "08:45 America/New_York"
+        if before_trading_start is not None and legacy_futures
         else None,
         "rules": [],
     }
     if before_trading_start is not None:
-        runtime.scheduler.register(
-            wrapper(before_trading_start, pre=True),
-            phase=LifecyclePhase.PRE_OPEN,
-            at="session_open",
-            minutes_before=45,
-            include_start_session=True,
-        )
+        if legacy_futures:
+            clocks = [
+                pd.Timestamp(date).replace(hour=8, minute=45).tz_localize("America/New_York")
+                for date in by_session
+            ]
+            runtime.scheduler.register(
+                wrapper(before_trading_start, pre=True),
+                phase=LifecyclePhase.INTRABAR,
+                at="clock",
+                schedule=RebalanceSchedule.explicit_timestamps(clocks),
+            )
+        else:
+            runtime.scheduler.register(
+                wrapper(before_trading_start, pre=True),
+                phase=LifecyclePhase.PRE_OPEN,
+                at="session_open",
+                minutes_before=45,
+                include_start_session=True,
+            )
     for plan in context._schedules:
         if plan.calendar is not None and get_calendar(plan.calendar).name != source_calendar.name:
             raise ValueError("Schedule calendar must match the declared execution calendar")
@@ -235,6 +251,9 @@ def _register(context, runtime, data, before_trading_start):
                 targets.append(observed[0])
                 continue
             opened, closed = pd.Timestamp(row["market_open"]), pd.Timestamp(row["market_close"])
+            if legacy_futures:
+                opened += timedelta(hours=12, minutes=30)
+                closed -= timedelta(hours=1)
 
             eligible = regular_by_session.get(date, [])
             if plan.time_rule.kind == "every_minute":

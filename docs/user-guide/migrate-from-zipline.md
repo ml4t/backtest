@@ -1328,3 +1328,79 @@ The captured and installed producer/consumer tests use Data revision
 `0.2.2.dev21+gc3b9db80a`, with wheel SHA-256
 `713b032ddd07b5512837e093249fed2e56aad8fabad26a6352e38164674dfe88`.
 This is a qualified source build, not a claim about a published Data version.
+
+### Use the legacy synthetic futures execution clock
+
+With a feed declared as `calendar="us_futures"`, the callback adapter uses the
+published Zipline 3.2.0 synthetic futures execution window. It starts 12 hours
+and 31 minutes after the calendar open and ends one hour before its close.
+For the retained March fixtures, that is 6:31 through 17:00 New York time,
+630 minute callbacks per session. Scheduled market-open and market-close rules
+use those execution endpoints. `before_trading_start` runs at 8:45 New York
+time, before the quote update and pending fills at that instant.
+
+The underlying calendar and captured overnight observations remain available
+for history. These intervals restrict execution events; they do not relabel
+prices or create missing bars. Native `Engine` usage continues to use the
+full declared calendar unless the caller supplies execution windows. A
+product calendar such as `CME_Equity` remains a separate choice; it is not
+silently replaced by the synthetic `us_futures` calendar.
+
+<!-- ml4t-doc-test: legacy-us-futures-clock -->
+```python
+from datetime import timedelta
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.calendar import get_schedule
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+row = get_schedule("us_futures", "2025-03-03", "2025-03-03").row(0, named=True)
+minutes = pl.datetime_range(row["market_open"] + timedelta(minutes=1), row["market_close"],
+                             interval="1m", time_unit="ns", eager=True)
+asset = Asset("ES", "ESH25", 8)
+feed = DataFeed(prices_df=pl.DataFrame({"timestamp": minutes, "asset": ["ES"] * len(minutes),
+                                       "close": [100.] * len(minutes), "volume": [1000.] * len(minutes)}),
+                feed_spec={"time_contract_version": 2, "calendar": "us_futures",
+                           "data_frequency": "1m", "timestamp_semantics": "bar_close",
+                           "bar_label": "right", "bar_grid_anchor": "session_open",
+                           "partial_bar_policy": "include"})
+seen = []
+
+def before_trading_start(context, data):
+    seen.append(context.get_datetime().isoformat())
+    assert data.current(asset, "price") == 100.
+
+performance = run_algorithm(feed=feed, assets=[asset], before_trading_start=before_trading_start,
+                            handle_data=lambda context, data: None)
+assert seen == ["2025-03-03T13:45:00+00:00"]
+assert len(performance) == 630
+assert str(performance.index[0]) == "2025-03-03 11:31:00+00:00"
+assert str(performance.index[-1]) == "2025-03-03 22:00:00+00:00"
+print("Legacy futures execution windows preserve the captured overnight history.")
+```
+
+The original-engine fixtures cover 2,880 captured minute observations, the
+1,260 selected events across two sessions, scheduled endpoint callbacks,
+known-price reads and the daylight-saving transition. The callback's known
+`price` is a read view; no current quote or fill is synthesized at a clock
+callback. This example makes no order, settlement or default futures-slippage
+comparison. Those financial definitions require their separate qualifications.
+
+Native callers can supply inclusive physical intervals through
+`RuntimeServices(execution_windows=[(start, end), ...])`. Intervals must be
+ordered and nonoverlapping. Feed rows outside them remain available for
+causal history but do not produce market callbacks or account samples.
+The adapter intersects existing caller intervals with its legacy window and
+restores the caller's runtime configuration after the run. Session account
+controls use the legacy execution close, and require that closing observation.
+A failed control does not turn a partial capture into a completed session.
+
+For a physical timer that is independent of observed bars, register an
+explicit `RebalanceSchedule` with `runtime.scheduler.register(...,
+phase=LifecyclePhase.INTRABAR, at="clock", schedule=...)`. These callbacks
+receive empty data and context mappings. They run before an observation at
+the same instant. The timer does not update quotes, execute fills or add an
+account sample. Session expiration still follows its declared policy. A selected timer
+after the last captured market event is rejected. Explicit run bounds exclude
+clock registrations outside those bounds.

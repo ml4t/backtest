@@ -157,6 +157,8 @@ class FillExecutor:
                 negative, or directionally favorable value outside its contract.
         """
         broker = self.broker
+        if not broker._scheduled_price_event:
+            return False
         current_time = self.market.time
         assert current_time is not None, "Cannot execute fill without current time"
 
