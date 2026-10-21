@@ -328,6 +328,8 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
         "cancel_order": {"order_id"},
         "_expire_session_orders": {"order_id"},
         "register_trading_control": set(),
+        "unregister_trading_control": set(),
+        "_cancel_order_at": {"order_id"},
         "register_account_control": set(),
         "_process_pending_exits": {
             "all_positions",

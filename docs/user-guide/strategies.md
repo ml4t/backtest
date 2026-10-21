@@ -249,6 +249,78 @@ assert result.to_equity_dataframe()["timestamp"].to_list() == dates
 print("History windows retain the gap without creating an executable bar.")
 ```
 
+### Resolve dated instruments and enforce their lifetimes
+
+Pass Data's offline `InstrumentRegistry` and the same `FeedSpec` used to construct
+it as `RuntimeServices(instruments=registry, instrument_feed_spec=identity_spec)`.
+Backtest does not fetch symbols, infer delistings from missing bars, or build a
+second asset database. Use stable IDs in prices and orders. Their dtype must match
+the registry's declared entity column.
+
+During the run, `services.assets.resolve(symbol, exchange=..., on=...)` delegates
+dated symbol resolution to Data. `active(on=..., universe=...)` returns Data's
+selected identities and membership; `is_active(asset)` checks current identity
+coverage. Every query supplies the physical simulation instant as `as_of`.
+Omitting `on` uses that instant, with the registry's declared session-label
+conversion. Future revisions cannot become visible early. Saved views stop
+working when their owning run ends.
+
+Inactive instruments reject new orders before allocating an order ID. A pre-open
+order instead checks identity coverage at its earliest eligible opening instant,
+using only facts known at submission. It still cannot fill before that opening
+or obtain a future quote. Pending orders are cancelled when their instrument
+becomes inactive, with `cancellation_reason="instrument_inactive"` and the actual
+event timestamp. `broker.get_orders(pending_only=True)` returns detached snapshots.
+A real input quote for an unknown or inactive instrument raises before updating
+account marks; fix the input or declared lifetime rather than silently dropping it.
+
+The default `inactive_position_policy="retain_last_mark"` retains an existing
+holding at its last eligible observed mark and timestamp. It does not infer a
+liquidation, dividend or zero valuation. Choose `"require_flat"` to fail before
+account mutation if a position reaches an inactive event; close it explicitly
+while it is active. Corporate actions and futures roll execution have separate
+accounting contracts.
+
+This recipe uses the same qualified Data development artifact and Specs 0.2.0
+identified in the adjusted-history section below. It requires that Data producer;
+it is not an API claim about an older published Data package.
+
+<!-- ml4t-doc-optional: runtime-instruments -->
+```python
+from datetime import UTC, date, datetime
+import polars as pl
+from ml4t.data.assets import InstrumentRegistry
+from ml4t.specs import FeedSpec
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+
+identity_spec = FeedSpec(time_contract_version=2, entity_col="asset",
+                         timestamp_col="valid_from", calendar="NYSE",
+                         timezone="America/New_York", timestamp_semantics="session_label")
+identities = pl.DataFrame({
+    "asset": ["ID1", "ID1", "ID2"], "symbol": ["ALPHA", "BETA", "ALPHA"],
+    "exchange": ["NYSE"] * 3, "instrument_type": ["equity"] * 3,
+    "valid_from": [date(2025, 1, 1), date(2025, 1, 8), date(2025, 1, 8)],
+    "valid_to": pl.Series([date(2025, 1, 8), None, None], dtype=pl.Date),
+    "available_at": [datetime(2025, 1, 1, tzinfo=UTC)] * 3,
+    "source": ["example"] * 3, "revision_id": ["r1"] * 3,
+})
+registry = InstrumentRegistry.from_frame(identities, feed_spec=identity_spec)
+services = RuntimeServices(instruments=registry, instrument_feed_spec=identity_spec)
+seen = []
+
+class ReadSymbols(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        seen.append(services.assets.resolve("ALPHA"))
+
+prices = pl.DataFrame({
+    "timestamp": [datetime(2025, 1, d, 21, tzinfo=UTC) for d in [6, 8]],
+    "asset": ["ID1", "ID2"], "close": [100.0, 50.0],
+})
+result = Engine(DataFeed(prices_df=prices, feed_spec={"timestamp_semantics": "event_time"}),
+                ReadSymbols(), BacktestConfig(calendar=None), runtime=services).run()
+assert seen == ["ID1", "ID2"]
+```
+
 ### Read Data-prepared adjusted history
 
 The optional `history_provider` receives `as_of` at the active decision cutoff.

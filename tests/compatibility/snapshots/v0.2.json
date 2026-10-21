@@ -4137,6 +4137,10 @@
           "kind": "method",
           "signature": "(self, order_id: 'str') -> 'Order | None'"
         },
+        "get_orders": {
+          "kind": "method",
+          "signature": "(self, asset: 'str | None' = None, *, pending_only: 'bool' = False) -> 'tuple[Order, ...]'"
+        },
         "get_pending_orders": {
           "kind": "method",
           "signature": "(self, asset: 'str | None' = None) -> 'list[Order]'"
@@ -4264,6 +4268,10 @@
         "trades": {
           "kind": "property",
           "signature": "(self) -> 'list[Trade]'"
+        },
+        "unregister_trading_control": {
+          "kind": "method",
+          "signature": "(self, control: 'TradingControl') -> 'bool'"
         },
         "update_order": {
           "kind": "method",
@@ -4639,6 +4647,10 @@
     "ml4t.backtest:RuntimeServices": {
       "kind": "class",
       "members": {
+        "assets": {
+          "kind": "property",
+          "signature": "(self) -> 'InstrumentView'"
+        },
         "market": {
           "kind": "property",
           "signature": "(self) -> 'MarketDataView'"
@@ -4650,7 +4662,7 @@
       },
       "module": "ml4t.backtest.runtime",
       "qualname": "RuntimeServices",
-      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None) -> 'None'"
+      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
     },
     "ml4t.backtest:StopFillMode": {
       "kind": "class",

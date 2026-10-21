@@ -14,6 +14,7 @@ import polars as pl
 from ml4t.specs import FeedSpec, TimestampSemantics, WindowUnit
 
 from ._history_clock import expected_times, session_times
+from ._instruments import InstrumentSource, InstrumentView
 from ._temporal import temporal_frame, temporal_row, temporal_rows
 from .execution.callbacks import SessionScheduler
 
@@ -185,7 +186,15 @@ class MarketDataView:
 
     def _available(self, field: str, row: dict[str, Any]) -> bool:
         column = self._eligible_cols.get(field)
-        return self._published(field, row) and (column is None or row.get(column) is True)
+        if not self._published(field, row) or (column is not None and row.get(column) is not True):
+            return False
+        instruments = self._runtime._assets
+        if self._quote_fields and instruments is not None:
+            assert self._asof is not None
+            return instruments._active_at(
+                row[self._entity_col], row[self._timestamp_col], self._asof
+            )
+        return True
 
     def _query(
         self,
@@ -592,6 +601,9 @@ class RuntimeServices:
         signal_known_at_cols: dict[str, str] | None = None,
         context_known_at_cols: dict[str, str] | None = None,
         signal_eligible_cols: dict[str, str] | None = None,
+        instruments: InstrumentSource | None = None,
+        instrument_feed_spec: FeedSpec | Any | None = None,
+        inactive_position_policy: Literal["retain_last_mark", "require_flat"] = "retain_last_mark",
     ) -> None:
         if start is not None and not isinstance(start, datetime):
             raise TypeError("start must be a datetime")
@@ -607,10 +619,39 @@ class RuntimeServices:
         if history_provider is not None and not callable(history_provider):
             raise TypeError("history_provider must be callable")
         self.history_provider = history_provider
+        if inactive_position_policy not in {"retain_last_mark", "require_flat"}:
+            raise ValueError("inactive_position_policy must be retain_last_mark or require_flat")
+        if instruments is None and (
+            instrument_feed_spec is not None or inactive_position_policy != "retain_last_mark"
+        ):
+            raise ValueError("Instrument metadata and policies require instruments")
+        if instruments is not None and (
+            instrument_feed_spec is None
+            or not callable(getattr(instruments, "lifetimes", None))
+            or not callable(getattr(instruments, "resolve", None))
+        ):
+            raise ValueError(
+                "instruments requires causal lifetimes/resolve methods and instrument_feed_spec"
+            )
+        self.instruments = instruments
+        self.instrument_feed_spec = (
+            FeedSpec.from_any(instrument_feed_spec) if instruments is not None else None
+        )
+        self.inactive_position_policy = inactive_position_policy
         self.scheduler = SessionScheduler(self)
         self._engine: Engine | None = None
         self._market: MarketDataView | None = None
         self._signals: FeatureDataView | None = None
+        self._assets: InstrumentView | None = None
+
+    @property
+    def assets(self) -> InstrumentView:
+        """Causal identity queries over the declared offline source during this run."""
+        if self._engine is None:
+            raise RuntimeError("instrument services require an active run")
+        if self._assets is None:
+            raise ValueError("Instrument queries require instruments and instrument_feed_spec")
+        return self._assets
 
     @property
     def market(self) -> MarketDataView:
@@ -711,8 +752,19 @@ class RuntimeServices:
         self._engine, self._market = engine, market
         self._signals = signals
         try:
+            if self.instruments is not None:
+                assert self.instrument_feed_spec is not None
+                self._assets = InstrumentView(
+                    self, engine, self.instruments, self.instrument_feed_spec
+                )
+                self._assets.active()
+                engine.broker.register_trading_control(self._assets)
             self.scheduler._bind()
         except BaseException:
+            if self._assets is not None:
+                engine.broker.unregister_trading_control(self._assets)
+                self._assets._close()
+                self._assets = None
             self._engine, self._market = None, None
             self._signals = None
             raise
@@ -725,13 +777,15 @@ class RuntimeServices:
     def _advance(self, timestamp: datetime, data: dict[str, dict]) -> dict[str, dict]:
         market = self.market
         market._asof, market._inclusive = timestamp, True
+        if self._assets is not None:
+            self._assets._before_event(timestamp, data)
         signal_view = self._signals._view if self._signals is not None else None
         signal_fields = (
             signal_view._known_at_cols.keys() | signal_view._eligible_cols.keys()
             if signal_view is not None
             else set()
         )
-        if not self.known_at_cols and not signal_fields:
+        if not self.known_at_cols and not signal_fields and self._assets is None:
             return data
         visible = {asset: dict(values) for asset, values in data.items()}
         for asset, values in visible.items():
@@ -793,5 +847,10 @@ class RuntimeServices:
 
     def _unbind(self) -> None:
         self.scheduler._unbind()
+        if self._assets is not None:
+            assert self._engine is not None
+            self._engine.broker.unregister_trading_control(self._assets)
+            self._assets._close()
+            self._assets = None
         self._engine, self._market = None, None
         self._signals = None

@@ -189,6 +189,12 @@ class SessionScheduler:
                 else:
                     self._events.setdefault(timestamp, []).append(index)
         self._pre_events.sort()
+        if self._runtime._assets is not None:
+            self._runtime._assets._prepare_points(
+                [time for time, _ in self._pre_events]
+                + list(self._events)
+                + list(self._event_opens.values())
+            )
 
     def _invoke(self, index: int, timestamp: datetime, data: Any, context: dict) -> None:
         engine = self._runtime._engine

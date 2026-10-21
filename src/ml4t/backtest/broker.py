@@ -1734,6 +1734,15 @@ class Broker:
         self._capture_lifecycle_mutation()
         self._trading_controls.append(control)
 
+    def unregister_trading_control(self, control: TradingControl) -> bool:
+        """Remove the exact registered validator, preserving every other rule."""
+        for index, registered in enumerate(self._trading_controls):
+            if registered is control:
+                self._capture_lifecycle_mutation()
+                del self._trading_controls[index]
+                return True
+        return False
+
     def register_account_control(
         self,
         control: AccountControl,
@@ -2090,6 +2099,19 @@ class Broker:
         """
         self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.cancel_order(order_id)
+
+    def _cancel_order_at(self, order_id: str, *, timestamp: datetime, reason: str) -> bool:
+        self._capture_lifecycle_mutation(order_id=order_id)
+        return self._order_book.cancel_order(order_id, timestamp=timestamp, reason=reason)
+
+    def get_orders(
+        self, asset: str | None = None, *, pending_only: bool = False
+    ) -> tuple[Order, ...]:
+        """Return detached order snapshots in submission order."""
+        source = self._order_state.pending if pending_only else self._order_state.orders
+        return tuple(
+            copy.deepcopy(order) for order in source if asset is None or order.asset == asset
+        )
 
     def close_position(
         self,
