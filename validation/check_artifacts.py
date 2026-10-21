@@ -11,10 +11,29 @@ from pathlib import Path
 _ROOT = Path(__file__).parents[1]
 _PACKAGE = _ROOT / "src" / "ml4t" / "backtest"
 _TESTS = _ROOT / "tests"
+_EXAMPLES = _ROOT / "examples"
 _INTERNAL_NAMES = {"AGENTS.md", "CLAUDE.md"}
 _APPROVED_TEST_DATA = (
     _TESTS / "compatibility" / "snapshots",
     _TESTS / "fixtures" / "artifacts",
+    _TESTS / "fixtures" / "history_sources",
+    _TESTS / "fixtures" / "performance_reuse",
+    _TESTS / "fixtures" / "prepared_benchmark",
+    _TESTS / "fixtures" / "prepared_features",
+    _TESTS / "fixtures" / "prepared_history",
+    _TESTS / "fixtures" / "prepared_instruments",
+    _TESTS / "fixtures" / "prepared_pipeline",
+    _TESTS / "fixtures" / "stale_instruments",
+    _TESTS / "fixtures" / "zipline_bardata",
+    _TESTS / "fixtures" / "zipline_cancel",
+    _TESTS / "fixtures" / "zipline_daily_futures",
+    _TESTS / "fixtures" / "zipline_future_costs",
+    _TESTS / "fixtures" / "zipline_original",
+    _TESTS / "fixtures" / "zipline_partial_session",
+    _TESTS / "fixtures" / "zipline_position_basis",
+    _TESTS / "fixtures" / "zipline_symbol_lookup",
+    _TESTS / "fixtures" / "zipline_volatility",
+    _TESTS / "fixtures" / "zipline_volatility_missing",
 )
 
 
@@ -100,11 +119,13 @@ def artifact_failures(directory: Path) -> list[str]:
         _python_files(_PACKAGE)
         | package_data
         | _python_files(_TESTS)
+        | _python_files(_EXAMPLES)
         | set().union(*(_data_files(path) for path in _APPROVED_TEST_DATA))
         | {
             ".gitignore",
             "CHANGELOG.md",
             "LICENSE",
+            "examples/LICENSE.zipline",
             "README.md",
             "PKG-INFO",
             "pyproject.toml",
