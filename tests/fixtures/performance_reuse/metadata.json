@@ -1,0 +1,442 @@
+{
+  "environment": {
+    "cpu_count": 24,
+    "frameworks": {
+      "backtrader": {
+        "access": "public",
+        "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+        "display_name": "Backtrader",
+        "environment": ".venv-backtrader",
+        "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+        "license": "GPL-3.0-or-later",
+        "package": "backtrader",
+        "profile": "backtrader_strict",
+        "python": "3.12 audit interpreter; upstream package metadata does not declare a range",
+        "python_env_var": "ML4T_BACKTRADER_PYTHON",
+        "required_scenarios": 17,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/backtrader/1.9.78.123/",
+        "unsupported_scenarios": 0,
+        "version": "1.9.78.123"
+      },
+      "lean": {
+        "access": "public",
+        "artifact": "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+        "cli_immutable_id": "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c",
+        "cli_version": "1.0.228",
+        "display_name": "LEAN",
+        "environment": ".venv-lean",
+        "immutable_id": "sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+        "license": "Apache-2.0",
+        "package": "lean",
+        "platform_artifact": "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307",
+        "profile": "lean",
+        "python": "3.11",
+        "python_env_var": "ML4T_LEAN_PYTHON",
+        "required_scenarios": 0,
+        "scenario_matrix": false,
+        "source": "https://github.com/QuantConnect/Lean",
+        "source_commit": "278fcb3d1b815b63ccadba68d7ae54422e34b792",
+        "unsupported_scenarios": 0,
+        "version": "18001"
+      },
+      "vectorbt_oss": {
+        "access": "public",
+        "artifact": "vectorbt-1.1.0.tar.gz",
+        "display_name": "VectorBT OSS",
+        "environment": ".venv-vectorbt-oss",
+        "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
+        "license": "Apache-2.0 WITH Commons-Clause",
+        "package": "vectorbt",
+        "profile": "vectorbt_oss_strict",
+        "python": ">=3.11,<3.15",
+        "python_env_var": "ML4T_VECTORBT_OSS_PYTHON",
+        "required_scenarios": 16,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/vectorbt/1.1.0/",
+        "source_commit": "259d2d89fe2e7638baf3ca76c394937cd32b656d",
+        "unsupported_scenarios": 1,
+        "version": "1.1.0"
+      },
+      "vectorbt_pro": {
+        "access": "licensed",
+        "display_name": "VectorBT Pro",
+        "environment": ".venv-vectorbt-pro",
+        "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+        "license": "Proprietary",
+        "package": "vectorbtpro",
+        "profile": "vectorbt_strict",
+        "python": ">=3.11",
+        "python_env_var": "ML4T_VECTORBT_PRO_PYTHON",
+        "required_scenarios": 17,
+        "scenario_matrix": true,
+        "source": "https://github.com/polakowo/vectorbt.pro",
+        "source_commit": "6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+        "unsupported_scenarios": 0,
+        "version": "2026.6.27"
+      },
+      "zipline": {
+        "access": "public",
+        "artifact": "zipline_reloaded-3.1.1.tar.gz",
+        "display_name": "Zipline Reloaded",
+        "environment": ".venv-zipline",
+        "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+        "license": "Apache-2.0",
+        "package": "zipline-reloaded",
+        "profile": "zipline_strict",
+        "python": ">=3.10",
+        "python_env_var": "ML4T_ZIPLINE_PYTHON",
+        "required_scenarios": 16,
+        "scenario_matrix": true,
+        "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
+        "source_commit": "09885a2ebc7567d40942c891b3879dc03c745070",
+        "unsupported_scenarios": 1,
+        "version": "3.1.1"
+      }
+    },
+    "machine": "x86_64",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+    "processor": "x86_64"
+  },
+  "fixture_scope": "Metadata projection from an actual Backtest-only timing run. No raw runtime samples or performance claims.",
+  "generated_at": "2026-10-21T20:51:09.852244+00:00",
+  "provenance": {
+    "measurement_cohorts": {
+      "backtest": {
+        "completed_at": "2026-10-21T20:51:09.852244+00:00",
+        "dependencies": {
+          "ml4t-specs": "0.2.0",
+          "numpy": "2.5.3",
+          "pandas": "2.3.3",
+          "polars": "1.44.1"
+        },
+        "source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "started_at": "2026-10-21T20:19:56.553803+00:00"
+      },
+      "framework": {
+        "environment": {
+          "cpu_count": 24,
+          "frameworks": {
+            "backtrader": {
+              "access": "public",
+              "artifact": "backtrader-1.9.78.123-py2.py3-none-any.whl",
+              "display_name": "Backtrader",
+              "environment": ".venv-backtrader",
+              "immutable_id": "sha256:9a07a516b0de9155539a35c56e9404d8711dd7020b3d37b30495e83e1b9d5dfd",
+              "license": "GPL-3.0-or-later",
+              "package": "backtrader",
+              "profile": "backtrader_strict",
+              "python": "3.12 audit interpreter; upstream package metadata does not declare a range",
+              "python_env_var": "ML4T_BACKTRADER_PYTHON",
+              "required_scenarios": 17,
+              "scenario_matrix": true,
+              "source": "https://pypi.org/project/backtrader/1.9.78.123/",
+              "unsupported_scenarios": 0,
+              "version": "1.9.78.123"
+            },
+            "lean": {
+              "access": "public",
+              "artifact": "quantconnect/lean@sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+              "cli_immutable_id": "sha256:eaa4c08f16295b76f005e429d9ca0d0453784dc1a40c1f5cbe5e50c02a05bd7c",
+              "cli_version": "1.0.228",
+              "display_name": "LEAN",
+              "environment": ".venv-lean",
+              "immutable_id": "sha256:ecd62b0e418d40d1d7c0cd95e90a94e397642a21d2c8810614830c8a4e9a8f70",
+              "license": "Apache-2.0",
+              "package": "lean",
+              "platform_artifact": "linux/amd64@sha256:cbe3f26b3f16c57be836b2cf913253d434f58e010c84ed038360d26b9df88307",
+              "profile": "lean",
+              "python": "3.11",
+              "python_env_var": "ML4T_LEAN_PYTHON",
+              "required_scenarios": 0,
+              "scenario_matrix": false,
+              "source": "https://github.com/QuantConnect/Lean",
+              "source_commit": "278fcb3d1b815b63ccadba68d7ae54422e34b792",
+              "unsupported_scenarios": 0,
+              "version": "18001"
+            },
+            "vectorbt_oss": {
+              "access": "public",
+              "artifact": "vectorbt-1.1.0.tar.gz",
+              "display_name": "VectorBT OSS",
+              "environment": ".venv-vectorbt-oss",
+              "immutable_id": "sha256:67a3b41466234485af70c18d201da105f1ebb2c1d1fac079db20059e45ddc73b",
+              "license": "Apache-2.0 WITH Commons-Clause",
+              "package": "vectorbt",
+              "profile": "vectorbt_oss_strict",
+              "python": ">=3.11,<3.15",
+              "python_env_var": "ML4T_VECTORBT_OSS_PYTHON",
+              "required_scenarios": 16,
+              "scenario_matrix": true,
+              "source": "https://pypi.org/project/vectorbt/1.1.0/",
+              "source_commit": "259d2d89fe2e7638baf3ca76c394937cd32b656d",
+              "unsupported_scenarios": 1,
+              "version": "1.1.0"
+            },
+            "vectorbt_pro": {
+              "access": "licensed",
+              "display_name": "VectorBT Pro",
+              "environment": ".venv-vectorbt-pro",
+              "immutable_id": "git:6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+              "license": "Proprietary",
+              "package": "vectorbtpro",
+              "profile": "vectorbt_strict",
+              "python": ">=3.11",
+              "python_env_var": "ML4T_VECTORBT_PRO_PYTHON",
+              "required_scenarios": 17,
+              "scenario_matrix": true,
+              "source": "https://github.com/polakowo/vectorbt.pro",
+              "source_commit": "6e18cf0aa37849cfc20848f40f1d26ecfdc771b4",
+              "unsupported_scenarios": 0,
+              "version": "2026.6.27"
+            },
+            "zipline": {
+              "access": "public",
+              "artifact": "zipline_reloaded-3.1.1.tar.gz",
+              "display_name": "Zipline Reloaded",
+              "environment": ".venv-zipline",
+              "immutable_id": "sha256:4a305524616f7aad836f929e5a2ba5afc7db0e238757f47eb49487d9e2457a6f",
+              "license": "Apache-2.0",
+              "package": "zipline-reloaded",
+              "profile": "zipline_strict",
+              "python": ">=3.10",
+              "python_env_var": "ML4T_ZIPLINE_PYTHON",
+              "required_scenarios": 16,
+              "scenario_matrix": true,
+              "source": "https://pypi.org/project/zipline-reloaded/3.1.1/",
+              "source_commit": "09885a2ebc7567d40942c891b3879dc03c745070",
+              "unsupported_scenarios": 1,
+              "version": "3.1.1"
+            }
+          },
+          "machine": "x86_64",
+          "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.43",
+          "processor": "x86_64"
+        },
+        "generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "provenance": {
+          "sources": {
+            "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+            "benchmark": "df7dfe974ec02160168db3281cd71bcb944fa133d7d8f8ef338841fc6ef873d5",
+            "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+            "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+            "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+            "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+            "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+            "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+            "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+            "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+          }
+        },
+        "reason": "Unchanged framework artifacts, adapters, frozen inputs and settings; original accepted samples retained exactly"
+      }
+    }
+  },
+  "records": [
+    {
+      "case_study": "etfs",
+      "framework": "vectorbt_pro",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:20:37.619624+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:20:26.562719+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "etfs",
+      "framework": "vectorbt_oss",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:20:48.717078+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:20:37.619791+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "etfs",
+      "framework": "backtrader",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:21:00.152745+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:20:48.717274+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "etfs",
+      "framework": "zipline",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:21:14.166124+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:21:00.152938+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "etfs",
+      "framework": "lean",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:21:29.697990+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:21:14.166338+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "cme_futures",
+      "framework": "vectorbt_pro",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:21:41.996145+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:21:29.698288+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "cme_futures",
+      "framework": "backtrader",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:21:54.434323+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:21:41.996404+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "crypto_perps_funding",
+      "framework": "lean",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:22:09.018677+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:21:54.434606+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "framework": "vectorbt_pro",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:22:15.898820+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:22:09.018961+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "framework": "vectorbt_oss",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:22:22.781985+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:22:15.899389+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "framework": "backtrader",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:22:29.589936+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:22:22.782303+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "fx_pairs",
+      "framework": "lean",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:22:36.570832+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:22:29.590255+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "us_equities_panel",
+      "framework": "vectorbt_pro",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:27:49.304810+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:22:36.571249+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "us_equities_panel",
+      "framework": "vectorbt_oss",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:33:09.752407+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:27:49.305225+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "us_equities_panel",
+      "framework": "backtrader",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:39:14.455644+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:33:09.752805+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "us_equities_panel",
+      "framework": "zipline",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:44:45.125092+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:39:14.456038+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    },
+    {
+      "case_study": "us_equities_panel",
+      "framework": "lean",
+      "measurement_lineage": {
+        "backtest_completed_at": "2026-10-21T20:51:09.851837+00:00",
+        "backtest_source_head": "b56e5cf3481e65e813625113a7e28a6f81edead2",
+        "backtest_started_at": "2026-10-21T20:44:45.125483+00:00",
+        "framework_generated_at": "2026-10-13T23:57:58.209855+00:00",
+        "framework_original_measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "framework_samples_reused_unchanged": true
+      }
+    }
+  ]
+}
