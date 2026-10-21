@@ -666,8 +666,11 @@
     "from ml4t.backtest import run_backtest",
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
+    "from ml4t.backtest.compat.zipline import run_algorithm",
+    "from ml4t.backtest.compat.zipline.api import order, record, set_commission, set_slippage, symbol",
     "from ml4t.backtest.compat.zipline.assets import Asset",
     "from ml4t.backtest.compat.zipline.data import BarData",
+    "from ml4t.backtest.compat.zipline.finance import commission, slippage",
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
     "from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode",
@@ -2638,6 +2641,36 @@
       "qualname": "volatility",
       "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, annualize: bool = True) -> float"
     },
+    "ml4t.backtest.compat.zipline.api:order": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "order",
+      "signature": "(asset: ml4t.backtest.compat.zipline.assets.Asset, amount: float) -> str | None"
+    },
+    "ml4t.backtest.compat.zipline.api:record": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "record",
+      "signature": "(**values: Any) -> None"
+    },
+    "ml4t.backtest.compat.zipline.api:set_commission": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "set_commission",
+      "signature": "(model: Any) -> None"
+    },
+    "ml4t.backtest.compat.zipline.api:set_slippage": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "set_slippage",
+      "signature": "(model: Any) -> None"
+    },
+    "ml4t.backtest.compat.zipline.api:symbol": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "symbol",
+      "signature": "(symbol_str: str) -> ml4t.backtest.compat.zipline.assets.Asset"
+    },
     "ml4t.backtest.compat.zipline.assets:Asset": {
       "kind": "class",
       "members": {
@@ -2669,6 +2702,24 @@
       "module": "ml4t.backtest.compat.zipline.data",
       "qualname": "BarData",
       "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None) -> None"
+    },
+    "ml4t.backtest.compat.zipline.finance:commission": {
+      "kind": "module",
+      "module": "builtins",
+      "qualname": "module",
+      "signature": null
+    },
+    "ml4t.backtest.compat.zipline.finance:slippage": {
+      "kind": "module",
+      "module": "builtins",
+      "qualname": "module",
+      "signature": null
+    },
+    "ml4t.backtest.compat.zipline:run_algorithm": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.runner",
+      "qualname": "run_algorithm",
+      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset]', initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None) -> 'pd.DataFrame'"
     },
     "ml4t.backtest.config:BacktestConfig": {
       "kind": "class",

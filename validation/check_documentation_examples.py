@@ -59,6 +59,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "installation-import",
         "migration-zipline-target",
         "zipline-read-shapes",
+        "zipline-callback-runner",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",

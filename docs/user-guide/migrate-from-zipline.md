@@ -19,13 +19,13 @@ lookup and adjustment rules.
 | Zipline Reloaded task | ML4T Backtest task | Difference to check |
 |---|---|---|
 | Ingest a data bundle, then select assets with `symbol()` | Prepare a Polars panel with `timestamp`, `asset`, and `close`; pass it to [`DataFeed`](data-feed.md) | Map each Zipline asset ID and valid dates to stable feed IDs; Data's registry can supply native runtime lookup. Prepare causal adjusted history in Data, retain the declared execution basis, and check the account-action scope below. `DataFeed` does not ingest a bundle. |
-| Define `initialize(context)` and `handle_data(context, data)` | Subclass [`Strategy`](strategies.md), initialize state in `__init__` or `on_start`, and decide in `on_data(timestamp, data, context, broker)` | `on_data` receives a mapping of assets present at that event. State belongs on the strategy instance. `on_start` and `on_prepare` run before the first feed bar; neither receives future bars. |
+| Define `initialize(context)` and `handle_data(context, data)` | Use the [callback adapter](#run-original-callback-signatures), or subclass [`Strategy`](strategies.md) and decide in `on_data(timestamp, data, context, broker)` | `on_data` receives a mapping of assets present at that event. State belongs on the strategy instance. `on_start` and `on_prepare` run before the first feed bar; neither receives future bars. |
 | Read `data.current(asset, "price")` and `data.history(...)` | Use [`RuntimeServices`](strategies.md#use-causal-history-and-session-callbacks) for causal Polars reads, or the [Pandas read adapter](#preserve-zipline-read-shapes) | Declare the grid, availability, adjustment basis and stale-read policy. Prepared features can also enter through `signals_df`; their decision and publication clocks remain explicit. |
 | Call `order(asset, quantity)` or `order_target_percent(asset, weight)` | Call [`broker.submit_order`](../api/index.md#ml4t.backtest.broker.Broker.submit_order) or [`broker.order_target_percent`](../api/index.md#ml4t.backtest.broker.Broker.order_target_percent) inside `on_data` | The asset is a string identifier. Check share precision, pending orders, buying power, and next eligible fill; identical method names do not imply identical execution. |
 | Use `schedule_function` with date and time rules | Register native callbacks through [`RuntimeServices.scheduler`](strategies.md#use-causal-history-and-session-callbacks), or use [`RebalanceSchedule`](rebalancing.md#schedule-metadata) for rebalancing | Match phase, calendar and offset. Pre-open callbacks have an explicit clock; other scheduled callbacks require a real observed bar at their requested instant. |
 | Set commission and slippage models | Set explicit [`BacktestConfig`](configuration.md) costs and, where needed, market impact and funding inputs | Default ML4T examples charge no commission or slippage. Reconcile cost amounts separately from fills and share quantities. |
-| Call `record(...)` and inspect the performance frame | Call [`broker.record`](results.md#recorded-strategy-values); inspect native account, holdings, fills and recorded-value exports | Recorded values have their own bar-end component and do not overwrite account fields. A Zipline-shaped performance-frame runner is separate from these native exports. |
-| Run `zipline run` or `run_algorithm(...)` | Construct [`Engine`](../api/index.md#ml4t.backtest.engine.Engine) and call `run()`, or use `run_backtest(...)` | A run uses prepared inputs and one `Engine` instance. Create a new engine for another scenario. |
+| Call `record(...)` and inspect the performance frame | Call [`broker.record`](results.md#recorded-strategy-values); inspect native account, holdings, fills and recorded-value exports | Recorded values have their own bar-end component and do not overwrite account fields. The callback adapter projects recorded values beside native cash and portfolio value; the full native result remains available on the frame. |
+| Run `zipline run` or `run_algorithm(...)` | Use the [bundle-free callback adapter](#run-original-callback-signatures), or construct [`Engine`](../api/index.md#ml4t.backtest.engine.Engine) and call `run()` | A run uses prepared inputs and one `Engine` instance. Create a new engine for another scenario. |
 
 Zipline's [tutorial](https://zipline.ml4trading.io/beginner-tutorial) documents
 its callback, bundle, order, history, and `record` workflow. Its
@@ -127,7 +127,7 @@ The upcoming Backtest release includes `compat.zipline.assets.Asset` and
 `Strategy`. Supply the stable account key and any actual legacy SID explicitly;
 these containers do not resolve symbols or ingest a bundle. Native dated-symbol
 resolution is [documented separately](strategies.md#resolve-dated-instruments-and-enforce-their-lifetimes).
-The original `initialize`/`handle_data` callback runner is still separate work.
+The [callback adapter](#run-original-callback-signatures) also uses these read containers.
 
 The read-container fixtures use the published
 [Zipline Reloaded 3.2.0](https://pypi.org/project/zipline-reloaded/3.2.0/)
@@ -263,3 +263,101 @@ The [engine-divergence notebook](https://github.com/stefan-jansen/machine-learni
 calls `ml4t-backtest` with controlled setting changes. The [Book Guide](../book-guide/index.md)
 identifies the role of other linked notebooks. For existing framework evidence,
 see [Profiles](profiles.md); its supported workload and cost boundaries apply.
+
+## Run original callback signatures
+
+In a development build containing the callback adapter, import `run_algorithm`
+and API names from `ml4t.backtest.compat.zipline`. This API is not part of the
+pending 0.1.13 release candidate. Pass prepared prices and an explicit mapping
+from native account keys to display symbols and optional original SIDs. The
+adapter executes callbacks through the native Engine; it does not discover a
+Zipline bundle or rewrite imports in user source.
+
+This example preserves the `initialize`, `handle_data` and `analyze` signatures.
+Change the imports in your strategy to the migration namespace. Default adapter
+execution is next-bar close with integer shares, FIFO processing, shorting and
+leverage enabled, and unconstrained cash admission as in the reference workflow.
+Default costs are per-share 0.001, minimum zero, with quadratic volume impact
+0.1 and an asset/bar participation cap of 0.025. These adapter choices leave
+native Engine defaults unchanged. Supply actual positive observed volume;
+missing or zero volume prevents fills, including with `NoSlippage`.
+
+<!-- ml4t-doc-test: zipline-callback-runner -->
+```python
+from datetime import UTC, datetime
+
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.api import order, record, set_commission, set_slippage, symbol
+from ml4t.backtest.compat.zipline.assets import Asset
+from ml4t.backtest.compat.zipline.finance import commission, slippage
+
+
+def initialize(context):
+    context.asset = symbol("ALPHA")
+    context.count = 0
+    set_commission(commission.PerShare(cost=0.1, min_trade_cost=1.0))
+    set_slippage(slippage.VolumeShareSlippage(volume_limit=1.0, price_impact=0.0))
+
+
+def handle_data(context, data):
+    if context.count == 0:
+        order(context.asset, 10)
+    record(observed_price=data.current(context.asset, "price"))
+    context.count += 1
+
+
+def analyze(context, performance):
+    assert context.portfolio.positions[context.asset].amount == 10
+    assert performance.portfolio_value.tolist() == [10000.0, 9999.0, 10099.0]
+
+
+feed = DataFeed(
+    prices_df=pl.DataFrame({
+        "timestamp": [datetime(2025, 1, d, 21, tzinfo=UTC) for d in [6, 7, 8]],
+        "asset": ["A"] * 3,
+        "close": [100.0, 110.0, 120.0],
+        "volume": [1000] * 3,
+    }),
+    feed_spec={"time_contract_version": 2, "timestamp_semantics": "event_time", "calendar": None},
+)
+performance = run_algorithm(
+    feed=feed, assets=[Asset("A", symbol="ALPHA", legacy_sid=17)],
+    initialize=initialize, handle_data=handle_data, analyze=analyze, capital_base=10000,
+)
+native = performance.attrs["backtest_result"]
+assert [(fill.quantity, fill.price, fill.commission) for fill in native.fills] == [(10, 110, 1)]
+assert performance.observed_price.tolist() == [100, 110, 120]
+print("native callback run: 10 shares, one fee, all three account observations")
+```
+
+<!-- ml4t-doc-output: zipline-callback-runner -->
+```text
+native callback run: 10 shares, one fee, all three account observations
+```
+
+The returned Pandas frame contains native cash, portfolio value, returns and recorded
+variables at actual account observations, preserving timestamp precision. Names
+that collide with those account columns are rejected. Access native holdings,
+fills, returns, configuration and versioned artifacts through
+`performance.attrs["backtest_result"]`. The adapter does not reconstruct NAV
+from completed trades. Account and position objects read the native broker;
+position `cost_basis` projects its explicit commission-adjusted reporting basis.
+
+The preserved OLMAR fixture from published Zipline Reloaded 3.2.0 is exercised
+in `tests/test_zipline_callback_runner.py`. With seven explicit assets and 13
+shared daily sessions, its weights, quantities, basis, cash, position value,
+NAV and 47 fills match the reference. This is a correctness comparison for that
+input and its declared costs, not a performance measurement or a claim that
+all Zipline workflows are supported.
+
+This initial adapter does not yet implement `schedule_function`, target/value
+order helpers, the original Pipeline construction API, `fetch_csv`, benchmark
+return inputs, raw corporate actions or futures variation-cash settlement.
+Native scheduler and prepared feature/history routes remain available as
+shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
+records it as not supplied. An asset benchmark currently needs a separately
+prepared workflow. No implicit SPY download or synthetic benchmark return is
+created. Pass physical run bounds and warmup through `RuntimeServices`; do not
+reinterpret session labels as event instants.
