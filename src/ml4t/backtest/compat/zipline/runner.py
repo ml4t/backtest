@@ -696,7 +696,9 @@ def run_algorithm(
         context._default_lookup_date = pd.Timestamp(session)
         config.metadata["migration_symbol_lookup"] = {
             **asset_lookup.metadata,
-            "default_policy": "end_session",
+            "default_policy": "end_session"
+            if resolved.resolved_calendar is not None
+            else "end_observation_UTC_date",
             "default_date": context._default_lookup_date.isoformat(),
         }
 

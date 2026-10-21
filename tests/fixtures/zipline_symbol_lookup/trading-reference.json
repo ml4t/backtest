@@ -1,0 +1,86 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "initial": [
+    {
+      "default": {
+        "sid": 1,
+        "symbol": "ALPHA"
+      },
+      "old": {
+        "sid": 0,
+        "symbol": "BETA"
+      },
+      "symbols_type": "list",
+      "symbols": [
+        {
+          "sid": 2,
+          "symbol": "BRK_B"
+        },
+        {
+          "sid": 2,
+          "symbol": "BRK_B"
+        }
+      ],
+      "utc_override": {
+        "sid": 1,
+        "symbol": "ALPHA"
+      },
+      "after_lifetime": {
+        "sid": 0,
+        "symbol": "BETA"
+      }
+    }
+  ],
+  "trace": [
+    {
+      "timestamp": "2025-07-02T13:31:00+00:00",
+      "sid": 1,
+      "new_price": null,
+      "cash": 1000.0,
+      "equity": 1000.0,
+      "quantity": 0
+    },
+    {
+      "timestamp": "2025-07-02T20:00:00+00:00",
+      "sid": 1,
+      "new_price": null,
+      "cash": 1000.0,
+      "equity": 1000.0,
+      "quantity": 0
+    },
+    {
+      "timestamp": "2025-07-03T13:31:00+00:00",
+      "sid": 1,
+      "new_price": 50.0,
+      "cash": 1000.0,
+      "equity": 1000.0,
+      "quantity": 0
+    },
+    {
+      "timestamp": "2025-07-03T13:32:00+00:00",
+      "sid": 1,
+      "new_price": 50.0,
+      "cash": 950.0,
+      "equity": 1000.0,
+      "quantity": 1
+    },
+    {
+      "timestamp": "2025-07-03T17:00:00+00:00",
+      "sid": 1,
+      "new_price": 50.0,
+      "cash": 950.0,
+      "equity": 1000.0,
+      "quantity": 1
+    }
+  ],
+  "callback_count": 600,
+  "timing_claim": false,
+  "fills": [
+    {
+      "timestamp": "2025-07-03T13:32:00+00:00",
+      "sid": 1,
+      "amount": 1,
+      "price": 50.0
+    }
+  ]
+}

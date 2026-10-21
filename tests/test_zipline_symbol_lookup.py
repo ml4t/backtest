@@ -159,3 +159,84 @@ def test_date_and_country_operations_require_facts_instead_of_accepting_and_igno
     run_algorithm(
         feed=_feed(_snapshot()), assets=[Asset("symbol-demo:1", "ALPHA", 1)], initialize=initialize
     )
+
+
+def test_calendar_none_names_observation_date_policy_without_inventing_an_end_session():
+    from ml4t.backtest.compat.zipline import PreparedAssetLookup
+
+    snapshot = _snapshot()
+    original = _feed(snapshot)
+    feed = DataFeed(
+        prices_df=original.prices, feed_spec=original.feed_spec.with_overrides(calendar=None)
+    )
+    result = run_algorithm(feed=feed, asset_lookup=PreparedAssetLookup(snapshot))
+    metadata = result.attrs["backtest_result"].config.metadata["migration_symbol_lookup"]
+    assert metadata["default_policy"] == "end_observation_UTC_date"
+    assert metadata["default_date"] == "2025-07-03T00:00:00"
+
+
+def test_exported_lookup_drives_actual_fill_and_reloaded_account_with_published_trade_trace(
+    tmp_path,
+):
+    from ml4t.backtest import BacktestResult
+    from ml4t.backtest.compat.zipline import PreparedAssetLookup, to_performance_frame
+    from ml4t.backtest.compat.zipline.finance import commission, slippage
+
+    reference = json.loads((_ROOT / "trading-reference.json").read_text())
+    snapshot = _snapshot()
+    trace = []
+
+    def initialize(context):
+        context.new = context.symbol("ALPHA")
+        context.n = 0
+        context.set_commission(commission.PerShare(0, 0))
+        context.set_slippage(slippage.FixedSlippage(0))
+
+    def handle(context, data):
+        if context.n == 390:
+            context.order(context.new, 1)
+        if context.n in [0, 389, 390, 391, 599]:
+            price = data.current(context.new, "price")
+            trace.append(
+                {
+                    "timestamp": context.get_datetime().isoformat(),
+                    "sid": int(context.symbol("ALPHA")),
+                    "new_price": None if math.isnan(price) else price,
+                    "cash": context.portfolio.cash,
+                    "equity": context.portfolio.portfolio_value,
+                    "quantity": context.portfolio.positions[context.new].amount,
+                }
+            )
+        context.n += 1
+
+    frame = run_algorithm(
+        feed=_feed(snapshot),
+        asset_lookup=PreparedAssetLookup(snapshot),
+        initialize=initialize,
+        handle_data=handle,
+        start="2025-07-02",
+        end="2025-07-03",
+        capital_base=1000,
+    )
+    assert trace == reference["trace"]
+    actual = [
+        {
+            "timestamp": item["dt"].isoformat(),
+            "sid": int(item["sid"]),
+            "amount": item["amount"],
+            "price": item["price"],
+        }
+        for group in frame.transactions
+        for item in group
+    ]
+    assert actual == reference["fills"]
+    native = frame.attrs["backtest_result"]
+    assert native.fills[0].asset == "symbol-demo:1"
+    native.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    reopened = to_performance_frame(restored)
+    assert reopened.cash.iloc[-1] == 950 and reopened.portfolio_value.iloc[-1] == 1000
+    transaction = next(group[0] for group in reopened.transactions if group)
+    assert int(transaction["sid"]) == 1 and transaction["sid"].key == "symbol-demo:1"
+    assert transaction["sid"].symbol == "ALPHA" and transaction["commission"] == 0
+    assert restored.config.metadata["migration_symbol_lookup"]["source_id"] == snapshot.snapshot_id

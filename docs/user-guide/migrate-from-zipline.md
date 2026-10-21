@@ -778,8 +778,9 @@ bundle exporter. It supplies both immutable `Asset` identifiers and the captured
 symbol-ownership policy. Pass either `asset_lookup=...` or an explicit `assets`
 sequence to `run_algorithm`.
 
-With this lookup, `symbol` defaults to the selected **end session**, as in
-published Zipline 3.2.0. `set_symbol_lookup_date(value)` overrides that date;
+With a declared calendar, `symbol` defaults to the selected **end session**, as
+in published Zipline 3.2.0. Calendar-free observation mode instead uses the UTC
+civil date of the last accepted instant and names that policy explicitly. `set_symbol_lookup_date(value)` overrides that date;
 timezone-aware overrides are converted to UTC before removing the timezone.
 This lookup-date contract differs from the midnight-only run-date contract.
 `symbols(...)` returns a list in request order. Case and the first share-class
