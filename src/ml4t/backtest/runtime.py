@@ -193,7 +193,8 @@ class MarketDataView:
         fields: Sequence[str],
         times: list[datetime],
         *,
-        forward_fill: bool,
+        forward_fill: bool | Mapping[str, bool],
+        max_age: timedelta | None = None,
     ) -> pl.DataFrame:
         if (
             self._runtime._engine is None
@@ -207,11 +208,23 @@ class MarketDataView:
             raise ValueError("assets and fields cannot contain duplicates")
         if set(fields) & {"timestamp", "asset"}:
             raise ValueError("Requested fields collide with observation keys")
+        if max_age is not None and (not isinstance(max_age, timedelta) or max_age < timedelta(0)):
+            raise ValueError("max_age must be a nonnegative timedelta")
+        if isinstance(forward_fill, bool):
+            fill_fields = list(fields) if forward_fill else []
+        elif isinstance(forward_fill, Mapping):
+            if set(forward_fill) - set(fields) or any(
+                not isinstance(enabled, bool) for enabled in forward_fill.values()
+            ):
+                raise ValueError("forward_fill must map requested field names to booleans")
+            fill_fields = [field for field in fields if forward_fill.get(field, False)]
+        else:
+            raise ValueError("forward_fill must be Boolean or a per-field mapping")
         for field in fields:
             if self._column(field) not in self._columns and field not in self._roles:
                 raise ValueError(f"Unknown market field {field!r}")
             if (
-                forward_fill
+                field in fill_fields
                 and self._quote_fields
                 and self._column(field)
                 in {
@@ -235,7 +248,9 @@ class MarketDataView:
                         or candidate.get(self._column(field)) is None
                     ):
                         candidate = None
-                        if forward_fill and not (row is not None and self._ineligible(field, row)):
+                        if field in fill_fields and not (
+                            row is not None and self._ineligible(field, row)
+                        ):
                             asset_times = self._times.get(asset, [])
                             for index in range(bisect_right(asset_times, timestamp) - 1, -1, -1):
                                 past = asset_times[index]
@@ -249,10 +264,13 @@ class MarketDataView:
                                 ):
                                     candidate, observed = value, past
                                     break
+                    expired = max_age is not None and timestamp - observed > max_age
                     result[field] = (
-                        candidate.get(self._column(field)) if candidate is not None else None
+                        candidate.get(self._column(field))
+                        if candidate is not None and not expired
+                        else None
                     )
-                    if forward_fill:
+                    if field in fill_fields:
                         result[f"{field}_observed_at"] = observed if candidate is not None else None
                 records.append(result)
         schema = {
@@ -260,9 +278,9 @@ class MarketDataView:
             "asset": self._frame.schema[self._entity_col],
         }
         schema.update({f: self._frame.schema.get(self._column(f), pl.Float64) for f in fields})
-        if forward_fill:
+        if fill_fields:
             schema.update(
-                {f"{f}_observed_at": self._frame.schema[self._timestamp_col] for f in fields}
+                {f"{f}_observed_at": self._frame.schema[self._timestamp_col] for f in fill_fields}
             )
         return temporal_frame(records, schema=schema)
 
@@ -339,7 +357,8 @@ class MarketDataView:
         bar_count: int | None = None,
         unit: WindowUnit | str = WindowUnit.OBSERVATION,
         duration: timedelta | None = None,
-        forward_fill: bool = False,
+        forward_fill: bool | Mapping[str, bool] = False,
+        max_age: timedelta | None = None,
         view: Literal["raw", "prepared"] = "raw",
     ) -> pl.DataFrame:
         """Select causal raw observations or declared grid points, without resampling.
@@ -357,6 +376,7 @@ class MarketDataView:
                 unit=unit,
                 duration=duration,
                 forward_fill=forward_fill,
+                max_age=max_age,
             )
         if view != "raw":
             raise ValueError("history view must be raw or prepared")
@@ -397,19 +417,22 @@ class MarketDataView:
             engine = self._runtime._engine
             select = expected_times if unit is WindowUnit.EXPECTED_BAR else session_times
             times = select(engine.config, self._asof, bar_count, self._inclusive, self._timestamps)
-        return self._query(assets, fields, times, forward_fill=forward_fill)
+        return self._query(assets, fields, times, forward_fill=forward_fill, max_age=max_age)
 
     def current(
         self,
         assets: Sequence[str],
         fields: Sequence[str],
         *,
-        forward_fill: bool = False,
+        forward_fill: bool | Mapping[str, bool] = False,
+        max_age: timedelta | None = None,
         view: Literal["raw", "prepared"] = "raw",
     ) -> pl.DataFrame:
         """Return values at the active instant, with no implicit stale executable quote."""
         if view == "prepared":
-            return self._prepared_view().current(assets, fields, forward_fill=forward_fill)
+            return self._prepared_view().current(
+                assets, fields, forward_fill=forward_fill, max_age=max_age
+            )
         if view != "raw":
             raise ValueError("current view must be raw or prepared")
         if (
@@ -418,8 +441,12 @@ class MarketDataView:
             or self._asof is None
         ):
             raise RuntimeError("market services require an active run")
-        times = [self._asof] if self._inclusive else []
-        return self._query(assets, fields, times, forward_fill=forward_fill)
+        stale_view = forward_fill is True or (
+            isinstance(forward_fill, Mapping)
+            and any(value is True for value in forward_fill.values())
+        )
+        times = [self._asof] if self._inclusive or stale_view else []
+        return self._query(assets, fields, times, forward_fill=forward_fill, max_age=max_age)
 
     def _past_rows(self, asset: str):
         if (
@@ -481,6 +508,27 @@ class MarketDataView:
             return volume is not None and isfinite(volume) and volume > 0
         return True
 
+    def observation_age(self, asset: str, field: str = "price") -> timedelta | None:
+        """Elapsed time since a known non-null observation, or None without history."""
+        if self._column(field) not in self._columns and field not in self._roles:
+            raise ValueError(f"Unknown market field {field!r}")
+        observed = self.last_observed(asset, field)
+        assert self._asof is not None
+        return None if observed is None else self._asof - observed
+
+    def is_stale(
+        self, asset: str, field: str = "price", *, max_age: timedelta = timedelta(0)
+    ) -> bool:
+        """Test recency separately from quote validity and execution eligibility.
+
+        No observed history returns False; can_trade separately rejects missing
+        or unusable current quotes. This method never enables stale execution.
+        """
+        if not isinstance(max_age, timedelta) or max_age < timedelta(0):
+            raise ValueError("max_age must be a nonnegative timedelta")
+        age = self.observation_age(asset, field)
+        return age is not None and age > max_age
+
 
 class FeatureDataView:
     """Causal prepared fields sharing the runtime cutoff, without executable quote roles."""
@@ -489,9 +537,14 @@ class FeatureDataView:
         self._view = view
 
     def current(
-        self, assets: Sequence[str], fields: Sequence[str], *, forward_fill: bool = False
+        self,
+        assets: Sequence[str],
+        fields: Sequence[str],
+        *,
+        forward_fill: bool | Mapping[str, bool] = False,
+        max_age: timedelta | None = None,
     ) -> pl.DataFrame:
-        return self._view.current(assets, fields, forward_fill=forward_fill)
+        return self._view.current(assets, fields, forward_fill=forward_fill, max_age=max_age)
 
     def history(
         self,
@@ -501,7 +554,8 @@ class FeatureDataView:
         bar_count: int | None = None,
         unit: WindowUnit | str = WindowUnit.OBSERVATION,
         duration: timedelta | None = None,
-        forward_fill: bool = False,
+        forward_fill: bool | Mapping[str, bool] = False,
+        max_age: timedelta | None = None,
     ) -> pl.DataFrame:
         if WindowUnit(unit) not in {WindowUnit.OBSERVATION, WindowUnit.ELAPSED}:
             raise ValueError(
@@ -514,6 +568,7 @@ class FeatureDataView:
             unit=unit,
             duration=duration,
             forward_fill=forward_fill,
+            max_age=max_age,
         )
 
     def last_observed(self, asset: str, field: str) -> datetime | None:

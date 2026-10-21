@@ -44,6 +44,7 @@ _API_AUDIT_PATHS = (
 _REQUIRED_EXAMPLES = frozenset(
     {
         "runtime-causal-session",
+        "runtime-stale-views",
         "runtime-history-windows",
         "runtime-feature-availability",
         "prepared-feature-panel",

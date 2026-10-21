@@ -151,6 +151,56 @@ bars cannot supply an opening quote. Where continuous sessions meet at the same
 instant, a right-labeled closing bar and its close callback run before the next
 session's pre-open callback. That callback can read the bar that just closed.
 
+### Bound stale reads
+
+Use a per-field `forward_fill` mapping to carry prices while leaving volume or
+other fields missing. Forward filling observed volume or quote depth is rejected.
+`max_age` bounds a carried value by elapsed time from its original observation to
+the requested history/current instant. An expired value becomes `None`; its
+`<field>_observed_at` column retains the actual old source instant.
+
+<!-- ml4t-doc-test: runtime-stale-views -->
+```python
+from datetime import UTC, datetime, timedelta
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+
+times = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [6, 7]]
+prices = pl.DataFrame({"timestamp": times, "asset": ["A", "B"],
+                       "close": [100.0, 50.0], "volume": [10.0, 20.0]})
+runtime = RuntimeServices()
+seen = []
+
+class Read(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == times[1]:
+            values = runtime.market.current(["A"], ["price", "volume"],
+                forward_fill={"price": True, "volume": False}, max_age=timedelta(days=1))
+            assert values["price"].to_list() == [100.0]
+            assert values["volume"].to_list() == [None]
+            assert values["price_observed_at"].to_list() == [times[0]]
+            assert runtime.market.observation_age("A") == timedelta(days=1)
+            assert runtime.market.is_stale("A")
+            assert not runtime.market.can_trade("A")
+            seen.append(values["price"][0])
+
+result = Engine(DataFeed(prices_df=prices, feed_spec={"timestamp_semantics": "event_time"}),
+                Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+assert seen == [100.0] and result.to_fills_dataframe().is_empty()
+print("Stale price views retain provenance and cannot create a tradable quote.")
+```
+
+`observation_age` measures time since the last known non-null observation;
+`is_stale` compares that age with a nonnegative `max_age` (zero by default).
+An asset with no observed history has age `None` and `is_stale=False`.
+Use `can_trade` to distinguish that missing or unusable quote from an executable
+one. Recency, validity and buying power are separate checks.
+
+Before an opening event, ordinary `current` remains empty. An explicit stale
+read can return the prior close with its original observation timestamp. Orders
+from that callback wait for an eligible real quote; reading a stale price does
+not make it an execution price.
+
 ### Select a history window
 
 `unit="expected_bar"` counts the declared calendar grid, including missing bars
