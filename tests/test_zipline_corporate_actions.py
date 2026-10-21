@@ -26,6 +26,7 @@ from ml4t.backtest.types import ContractSpec
 
 ROOT = Path(__file__).parent / "fixtures/corporate_actions"
 REFERENCE = json.loads((ROOT / "reference.json").read_text())
+BOUNDARIES = json.loads((ROOT / "boundary-reference.json").read_text())
 
 
 def prepared_feed(reference, *, declarations=True, ex_close=None):
@@ -159,6 +160,27 @@ def run_reference_case(reference, **options):
         contract_specs={a.key: ContractSpec(a.key, currency="USD") for a in assets},
     )
     return performance, trace, premarket
+
+
+@pytest.mark.parametrize("reference", BOUNDARIES["cases"], ids=lambda c: c["input"]["name"])
+def test_real_exported_stock_record_date_and_price_moves_match_closing_ledger_without_premarket_lookahead(
+    reference,
+):
+    performance, trace, premarket = run_reference_case(reference)
+    assert performance["portfolio_value"].to_list() == reference["nav"]
+    assert performance["cash"].to_list() == reference["cash"]
+    for got, wanted in zip(trace, reference["trace"], strict=True):
+        assert got["positions"] == wanted["positions"]
+        assert got["cash"] == wanted["cash"]
+    case = reference["input"]
+    if case.get("extra_move"):
+        causal_mark = 99.0 if case.get("dividend") else 80.0
+        assert premarket[2]["positions"][0]["last_sale_price"] == causal_mark
+        assert reference["premarket"][2]["positions"][0]["last_sale_price"] == causal_mark + 7
+        assert premarket[2]["nav"] == 9000 + 10 * causal_mark
+    if case.get("record_offset"):
+        # The real source retains record_date separately; selling after ex does not forfeit payment.
+        assert performance["cash"].to_list()[-1] == 10000
 
 
 @pytest.mark.parametrize("reference", REFERENCE["cases"], ids=lambda c: c["input"]["name"])

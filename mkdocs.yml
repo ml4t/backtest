@@ -127,6 +127,7 @@ nav:
     - Migrate from Zipline: user-guide/migrate-from-zipline.md
     - Risk Management: user-guide/risk-management.md
     - Account Policies: user-guide/accounts.md
+    - Corporate Actions: user-guide/corporate-actions.md
     - Rebalancing: user-guide/rebalancing.md
     - Data Feed: user-guide/data-feed.md
     - Results & Analysis: user-guide/results.md

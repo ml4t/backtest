@@ -12,7 +12,7 @@ import pandas as pd
 import polars as pl
 
 from ._temporal import temporal_rows
-from .accounting.account import CorporateState
+from .accounting.account import AccountState, CorporateState
 from .calendar import get_schedule
 from .config import ShareType, ShortCashPolicy
 from .types import AssetClass, OrderStatus, Position
@@ -20,6 +20,7 @@ from .types import AssetClass, OrderStatus, Position
 if TYPE_CHECKING:
     from .broker import Broker
     from .config import BacktestConfig
+    from .core.state import ExecutionJournal, MarketState, OrderState
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,11 @@ class CorporateActionLedger:
         config: BacktestConfig,
         broker: Broker,
         timestamps: list[datetime],
+        *,
+        account: AccountState,
+        market: MarketState,
+        orders: OrderState,
+        journal: ExecutionJournal,
     ) -> None:
         _raw_metadata(manifest)
         if not isinstance(frame, pl.DataFrame):
@@ -105,13 +111,12 @@ class CorporateActionLedger:
                 f"corporate_actions missing required fields: {sorted(required - set(frame.columns))}"
             )
         self.broker, self.config = broker, config
+        self.account, self.market, self.orders = account, market, orders
         self.policy = config.corporate_action_policy
         self.records: list[dict[str, Any]] = []
-        broker.account.corporate = CorporateState()
-        broker._execution_journal.completed_corporate_entitlements = []
-        self.completed: list[dict[str, Any]] = (
-            broker._execution_journal.completed_corporate_entitlements
-        )
+        account.corporate = CorporateState()
+        journal.completed_corporate_entitlements = []
+        self.completed: list[dict[str, Any]] = journal.completed_corporate_entitlements
         self._cursor = 0
         self._events: list[tuple[datetime, int, _Action, str]] = []
         reference = timestamps[0] if timestamps else None
@@ -137,7 +142,7 @@ class CorporateActionLedger:
                 "merger",
             }:
                 raise ValueError(f"Unsupported action_kind: {kind}")
-            effective = self._clock(row["effective_at"], reference)
+            effective_term = row["effective_at"]
             if kind != "split" and kind != "merger":
                 eligibility = (
                     row.get("ex_at") if self.policy == "zipline_3_2" else row.get("entitlement_at")
@@ -147,7 +152,8 @@ class CorporateActionLedger:
                 if eligibility is None:
                     eligibility = row.get("entitlement_date")
                 if eligibility is not None:
-                    effective = self._clock(eligibility, reference)
+                    effective_term = eligibility
+            effective = self._clock(effective_term, reference)
             available = row["available_at"]
             if not isinstance(available, datetime):
                 raise ValueError("Action available_at must be a known physical instant")
@@ -235,7 +241,7 @@ class CorporateActionLedger:
 
     @property
     def state(self) -> CorporateState:
-        state = self.broker.account.corporate
+        state = self.account.corporate
         assert state is not None
         return state
 
@@ -316,7 +322,7 @@ class CorporateActionLedger:
             self._cursor = end
 
     def _cash(self, delta: float) -> None:
-        account = self.broker.account
+        account = self.account
         cash = account.cash + delta
         free = account._lock_notional_free_cash + delta
         if not isfinite(cash) or not isfinite(free):
@@ -339,7 +345,7 @@ class CorporateActionLedger:
             raise ValueError(
                 "Corporate action requires a finite nonnegative adjusted previous mark"
             )
-        market = self.broker._market_state
+        market = self.market
         known = self.state.marks.get(asset)
         observed = (
             known[2]
@@ -394,7 +400,7 @@ class CorporateActionLedger:
                 if value is not None:
                     setattr(position, field, value / ratio)
             if not whole:
-                del broker.positions[asset]
+                del self.account.positions[asset]
             self._cash(cash_delta)
             if old_quantity < 0 and fraction:
                 debt = broker.account._lock_notional_short_basis.get(asset, 0.0)
@@ -427,8 +433,8 @@ class CorporateActionLedger:
                 value = getattr(order, field)
                 if value is not None:
                     setattr(order, field, round(value / ratio, 2) if legacy else value / ratio)
-            if order.order_id in broker._order_state.partial_quantities:
-                broker._order_state.partial_quantities[order.order_id] = max(0.0, order.quantity)
+            if order.order_id in self.orders.partial_quantities:
+                self.orders.partial_quantities[order.order_id] = max(0.0, order.quantity)
             if order.quantity == 0:
                 order.status = OrderStatus.FILLED
                 order.filled_at = instant
@@ -536,7 +542,7 @@ class CorporateActionLedger:
                 - allocated
             )
             if total == 0:
-                del broker.positions[asset]
+                del self.account.positions[asset]
                 return realized, allocated
             if total * existing.quantity > 0:
                 existing.quantity = total
@@ -545,7 +551,7 @@ class CorporateActionLedger:
             commission -= allocated_incoming
             existing = None
         if existing is None:
-            broker.positions[asset] = Position(
+            self.account.positions[asset] = Position(
                 asset,
                 total,
                 basis,
@@ -576,7 +582,7 @@ class CorporateActionLedger:
             or self.broker.short_cash_policy is not ShortCashPolicy.LOCK_NOTIONAL
         ):
             return
-        account = self.broker.account
+        account = self.account
         before = account._lock_notional_short_basis.get(asset, 0.0)
         if new_quantity >= 0:
             after = 0.0
@@ -705,7 +711,7 @@ class CorporateActionLedger:
                     realized = (
                         quantity * (row["cash_component"] - position.entry_price) - commission
                     )
-            del broker.positions[row["asset"]]
+            del self.account.positions[row["asset"]]
         self._record(
             event,
             instant,

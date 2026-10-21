@@ -207,12 +207,12 @@ native key; use `int(asset)` only when an actual legacy integer SID was supplied
 
 ## Match ledger and corporate-action assumptions
 
-`Engine` does not automatically turn arbitrary `split_ratio` or `cash_dividend`
-columns into share adjustments or cash payments. Prepare the input price and
-share-unit basis explicitly upstream. Adjusted bars alone do not reproduce an
-unadjusted ledger's dividend entitlement, payment date or split-adjusted share
-count. Keep an action-sensitive migration on the reference engine until its
-required event workflow is supported and compared.
+Pass explicit raw event facts through `DataFeed(corporate_actions=...,
+input_manifest=...)`. The [corporate-action guide](corporate-actions.md) runs a
+split and delayed dividend payment, specifies event clocks and input basis, and
+documents the tested `zipline_3_2` method. Arbitrary event columns in a price frame
+do not activate accounting. Adjusted bars alone do not reproduce raw share counts
+or payment entitlements. Match your event terms and method to the tested scope.
 
 Contract multipliers and fixed margin schedules support contract P&L and
 buying-power checks. Backtest's current leveraged ledger still moves full trade
@@ -358,8 +358,8 @@ all Zipline workflows are supported.
 This initial adapter does not yet implement
 the original Pipeline construction API. Use the [prepared panel route](#deliver-prepared-pipeline-results)
 for factor delivery and the [frozen CSV route](#register-an-offline-csv-source)
-for auxiliary inputs. Raw corporate actions and futures variation-cash settlement
-remain separate unfinished accounting work.
+for auxiliary inputs. [Raw corporate actions](corporate-actions.md) use explicit
+event inputs; futures variation-cash settlement remains separate unfinished work.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
 records it as not supplied unless prepared benchmark data is passed. An asset

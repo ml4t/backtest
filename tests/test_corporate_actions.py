@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import polars as pl
 import pytest
 
-from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy, run_backtest
 from ml4t.backtest.config import ShortCashPolicy
 from ml4t.backtest.types import ContractSpec
 
@@ -81,6 +81,101 @@ def test_raw_split_conserves_actual_quantity_cash_basis_and_nav(quantity, ratio)
     assert result.fills[0].quantity == abs(quantity)
     applications = result.to_actions_dataframe()
     assert applications.filter(pl.col("operation") == "split").height == 1
+
+
+def test_convenience_runner_consumes_raw_actions_instead_of_silently_losing_the_share_change():
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+
+    result = run_backtest(
+        pl.DataFrame(
+            {"timestamp": TIMES, "asset": ["A"] * 5, "close": [100.0, 100.0, 50.0, 50.0, 50.0]}
+        ),
+        Buy(),
+        config=BacktestConfig(
+            calendar=None, initial_cash=10000, commission_rate=0, slippage_rate=0
+        ),
+        corporate_actions=pl.DataFrame([action(split_ratio=2.0)]),
+        input_manifest=RAW,
+        contract_specs={"A": ContractSpec("A")},
+        holdings_sampling="bar",
+    )
+    assert result.to_equity_dataframe()["equity"].to_list() == [10000] * 5
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "split")[
+        "quantity_after"
+    ].to_list() == [20]
+
+
+def test_physical_entitlement_overrides_civil_effective_label_when_calendars_are_disabled():
+    event = action(
+        "cash_dividend",
+        cash_per_share=1.0,
+        effective_at=TIMES[2].date(),
+        entitlement_at=TIMES[2],
+        payment_at=TIMES[4],
+    )
+    engine, result, _ = run_actions([event], [100, 100, 99, 99, 99])
+    assert engine.broker.cash == 9010
+    assert result.to_entitlements_dataframe()["entitlement_at"].to_list() == [TIMES[2]]
+
+
+def test_duplicate_revision_pays_once_and_a_pre_effective_revision_replaces_earlier_terms():
+    first = action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])
+    revised = {**first, "revision_id": "r2", "available_at": TIMES[1], "cash_per_share": 2.0}
+    engine, result, _ = run_actions([first, first, revised, revised], [100, 100, 98, 98, 98])
+    assert engine.broker.cash == 9020
+    assert result.to_entitlements_dataframe()["revision_id"].to_list() == ["r2"]
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "payment").height == 1
+
+
+def test_conflicting_same_revision_does_not_choose_arbitrary_distribution_terms():
+    first = action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])
+    with pytest.raises(ValueError, match="Conflicting terms"):
+        run_actions([first, {**first, "cash_per_share": 2.0}], [100] * 5)
+
+
+@pytest.mark.parametrize("share_basis,expected", [("pre_event", 10.0), ("post_event", 20.0)])
+def test_same_clock_split_eligibility_uses_the_explicit_share_basis(share_basis, expected):
+    dividend = action(
+        "cash_dividend",
+        event_id="dividend",
+        share_basis=share_basis,
+        cash_per_share=1.0,
+        payment_at=TIMES[4],
+    )
+    _, result, _ = run_actions([action(split_ratio=2.0), dividend], [100, 100, 49, 49, 49])
+    assert result.to_entitlements_dataframe()["eligible_quantity"].to_list() == [expected]
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "payment")[
+        "cash_delta"
+    ].to_list() == [expected]
+
+
+def test_same_clock_failure_rolls_back_prior_split_position_cash_and_action_journal():
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+
+    # Both declarations are individually finite, but their composition overflows actual holdings.
+    events = [action(split_ratio=2.0), action(event_id="later", split_ratio=1e308)]
+    engine = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame({"timestamp": TIMES, "asset": ["A"] * 5, "close": [100.0] * 5}),
+            corporate_actions=pl.DataFrame(events),
+            input_manifest=RAW,
+        ),
+        Buy(),
+        BacktestConfig(calendar=None, initial_cash=10000, commission_rate=0, slippage_rate=0),
+        contract_specs={"A": ContractSpec("A")},
+    )
+    with pytest.raises(ValueError, match="nonfinite"):
+        engine.run()
+    assert engine.broker.cash == 9000
+    assert engine.broker.get_position("A").quantity == 10
+    assert engine.broker.get_position("A").entry_price == 100
+    assert engine._corporate_actions.records == []
 
 
 @pytest.mark.parametrize("quantity", [10, -10])

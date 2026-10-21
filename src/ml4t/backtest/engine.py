@@ -27,7 +27,6 @@ from .benchmark import BenchmarkData
 from .broker import Broker
 from .capital import CapitalChange, index_capital_events
 from .config import DataFrequency, ExecutionPrice
-from .corporate_actions import CorporateActionLedger
 from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
 from .lifecycle import LifecycleDispatcher
@@ -189,15 +188,12 @@ class Engine:
         self.capital_changes: list[CapitalChange] = []
         actions = getattr(feed, "corporate_actions", None)
         self._corporate_actions = (
-            CorporateActionLedger(
-                actions, feed.input_manifest, self.config, self.broker, list(feed.timestamps)
+            self.broker._create_corporate_action_ledger(
+                actions, feed.input_manifest, self.config, list(feed.timestamps)
             )
             if actions is not None
             else None
         )
-        if self._corporate_actions is not None:
-            self.broker._execution_journal.corporate_receivable_snapshots = {}
-            self.broker._market_state.last_price_times = {}
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -523,13 +519,15 @@ class Engine:
                 if not self.runtime._accepts(timestamp):
                     continue
                 self.runtime.scheduler._before_event(timestamp, has_price_event=bool(assets_data))
+                if corporate_actions is not None:
+                    corporate_actions.advance(timestamp)
                 assets_data = self.runtime._advance(timestamp, assets_data)
                 context = self.runtime._mask_context(timestamp, context)
 
             if expire_orders is not None:
                 expire_orders(timestamp, after_event=False)
 
-            if corporate_actions is not None:
+            if corporate_actions is not None and self.runtime is None:
                 corporate_actions.advance(timestamp)
 
             prices = getattr(assets_data, "_prices", None)
@@ -961,18 +959,8 @@ class Engine:
                 )
             )
         )
-        receipt_snapshots = self.broker._execution_journal.corporate_receivable_snapshots
-        action_receivables = (
-            None
-            if receipt_snapshots is None
-            else [
-                receipt_snapshots[(row[0], metadata[2])]
-                for row, metadata in zip(
-                    observed_account,
-                    observation_metadata or [("bar", False, None)] * len(observed_account),
-                    strict=True,
-                )
-            ]
+        action_receivables = self.broker._corporate_receivable_observations(
+            observed_account, observation_metadata
         )
 
         if not self.equity_curve:
@@ -1224,6 +1212,8 @@ def run_backtest(
     execution_limits: Any | None = None,
     funding_df: pl.DataFrame | None = None,
     capital_flows: pl.DataFrame | None = None,
+    corporate_actions: pl.DataFrame | None = None,
+    input_manifest: dict[str, Any] | None = None,
     lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
@@ -1277,6 +1267,8 @@ def run_backtest(
         feed_spec=feed_spec,
         contract=contract,
         capital_flows=capital_flows,
+        corporate_actions=corporate_actions,
+        input_manifest=input_manifest,
     )
 
     if isinstance(config, str):

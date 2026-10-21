@@ -145,6 +145,45 @@ def test_native_engine_retains_exact_prepared_returns_without_a_callback_adapter
     assert result.to_equity_dataframe()["equity"].to_list() == [1000.0] * 3
 
 
+def test_action_enabled_artifact_keeps_the_real_benchmark_instead_of_rejecting_the_combined_schema(
+    tmp_path,
+):
+    from ml4t.backtest import ContractSpec
+
+    feed = _feed()
+    times = [datetime.fromisoformat(t) for t in _REFERENCE["closes"]]
+    feed.corporate_actions = pl.DataFrame(
+        [
+            {
+                "source": "declared-benchmark-fixture",
+                "event_id": "distribution",
+                "revision_id": "r1",
+                "asset": "A",
+                "action_kind": "cash_dividend",
+                "currency": "USD",
+                "available_at": times[0],
+                "effective_at": times[2],
+                "payment_at": times[3],
+                "share_basis": "pre_event",
+                "cash_per_share": 1.0,
+            }
+        ]
+    )
+    feed.input_manifest = {"price_basis": "raw"}
+    result = Engine(
+        feed,
+        _Cash(),
+        BacktestConfig(initial_cash=1000),
+        benchmark=_benchmark(),
+        runtime=RuntimeServices(start=times[1]),
+        contract_specs={"A": ContractSpec("A")},
+    ).run()
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert_frame_equal(restored.to_benchmark_dataframe(), result.to_benchmark_dataframe())
+    assert_frame_equal(restored.to_entitlements_dataframe(), result.to_entitlements_dataframe())
+
+
 def test_public_convenience_and_config_constructors_deliver_the_same_benchmark():
     from ml4t.backtest import run_backtest
 

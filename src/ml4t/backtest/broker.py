@@ -538,6 +538,35 @@ class Broker:
         if after_fill:
             self._execution_journal.fill_snapshots = []
 
+    def _create_corporate_action_ledger(self, frame, manifest, config, timestamps):
+        from .corporate_actions import CorporateActionLedger
+
+        ledger = CorporateActionLedger(
+            frame,
+            manifest,
+            config,
+            self,
+            timestamps,
+            account=self.account,
+            market=self._market_state,
+            orders=self._order_state,
+            journal=self._execution_journal,
+        )
+        self._execution_journal.corporate_receivable_snapshots = {}
+        self._market_state.last_price_times = {}
+        return ledger
+
+    def _corporate_receivable_observations(self, account, metadata):
+        snapshots = self._execution_journal.corporate_receivable_snapshots
+        if snapshots is None:
+            return None
+        return [
+            snapshots[(row[0], observation[2])]
+            for row, observation in zip(
+                account, metadata or [("bar", False, None)] * len(account), strict=True
+            )
+        ]
+
     def _portfolio_snapshot(self, *, include_holdings: bool):
         return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
 

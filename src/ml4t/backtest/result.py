@@ -1923,11 +1923,11 @@ class BacktestResult:
 
         def read_benchmark(component_path):
             frame = _validate_benchmark_frame(pl.read_parquet(component_path))
-            if (
-                manifest is None
-                or manifest.get("schema_version") != _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+            if manifest is None or manifest.get("schema_version") not in (
+                _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
+                _ACTION_ARTIFACT_SCHEMA_VERSION,
             ):
-                raise ValueError("Prepared benchmark requires artifact schema version 4")
+                raise ValueError("Prepared benchmark requires artifact schema version 4 or 5")
             if _benchmark_digest(frame) != manifest.get("benchmark_content_sha256"):
                 raise ValueError("Prepared benchmark content does not match its retained digest")
             probe = cls(
