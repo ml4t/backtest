@@ -36,6 +36,7 @@ from ...types import Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from .assets import Asset
 from .controls import _register_account_controls, _TradingRule
+from .csv import PreparedCSV
 from .data import BarData
 from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time_rules
 from .finance import commission, slippage
@@ -128,6 +129,8 @@ class MigrationContext:
         self._in_before_trading_start = False
         self._schedules: list[_Schedule] = []
         self._pipelines: dict[str, _PipelineState] = {}
+        self._csv_sources: dict[str, PreparedCSV] = {}
+        self._active_csv: dict[str, PreparedCSV] = {}
         self._trading_controls: list[TradingControl] = []
         self._account_controls: list[tuple[str, float, timedelta | None]] = []
         self._slippage: Any = slippage.VolumeShareSlippage()
@@ -137,6 +140,17 @@ class MigrationContext:
     @property
     def account(self) -> AccountControlContext:
         return self._require_broker().get_account_snapshot()
+
+    def fetch_csv(self, url: str) -> PreparedCSV:
+        self._setup_only()
+        if url not in self._csv_sources:
+            raise ValueError(
+                "No frozen CSV for this original source identity; prepare it before the run"
+            )
+        source = self._csv_sources[url]
+        self._active_csv.pop(url, None)
+        self._active_csv[url] = source
+        return source
 
     def attach_pipeline(
         self, pipeline: PreparedPipeline, name: str, chunks: Any = None, eager: bool = True
@@ -664,6 +678,7 @@ def run_algorithm(
     before_trading_start: Callable[..., Any] | None = None,
     capital_base: float = 100000.0,
     runtime: RuntimeServices | None = None,
+    csv_sources: Sequence[PreparedCSV] = (),
     start: date | datetime | str | None = None,
     end: date | datetime | str | None = None,
 ) -> pd.DataFrame:
@@ -712,6 +727,12 @@ def run_algorithm(
         "end": environment["end"].isoformat(),
     }
     context = MigrationContext(assets, config)
+    for source in csv_sources:
+        if not isinstance(source, PreparedCSV):
+            raise TypeError("csv_sources requires PreparedCSV inputs")
+        if source.source.source_id in context._csv_sources:
+            raise ValueError("Duplicate original CSV source identity")
+        context._csv_sources[source.source.source_id] = source
     context._environment = environment
     context._asset_lookup = asset_lookup
     if asset_lookup is not None:
@@ -757,12 +778,25 @@ def run_algorithm(
                 name: {"definition": state.definition.metadata, "eager": state.eager}
                 for name, state in context._pipelines.items()
             }
+        if context._active_csv:
+            config.metadata["migration_csv"] = {
+                key: source.metadata for key, source in context._active_csv.items()
+            }
         with runtime.auxiliary_scope(
-            tuple(state.definition.source for state in context._pipelines.values())
+            (
+                *[state.definition.source for state in context._pipelines.values()],
+                *[source.source for source in context._active_csv.values()],
+            )
         ):
             result = Engine(
                 feed,
-                _Callbacks(context, BarData(runtime), handle_data, runtime, before_trading_start),
+                _Callbacks(
+                    context,
+                    BarData(runtime, csv_sources=tuple(context._active_csv.values())),
+                    handle_data,
+                    runtime,
+                    before_trading_start,
+                ),
                 config,
                 runtime=runtime,
                 execution_limits=limits,

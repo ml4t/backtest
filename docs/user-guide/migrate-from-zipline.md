@@ -355,7 +355,8 @@ all Zipline workflows are supported.
 
 This initial adapter does not yet implement
 the original Pipeline construction API. Use the [prepared panel route](#deliver-prepared-pipeline-results)
-for factor delivery. `fetch_csv`, benchmark
+for factor delivery and the [frozen CSV route](#register-an-offline-csv-source)
+for auxiliary inputs. Benchmark
 return inputs, raw corporate actions or futures variation-cash settlement.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
@@ -941,3 +942,97 @@ uses explicit finite asset lifetimes, two output columns, a volume screen,
 eager/lazy attachments and July 3's early close. Its premarket and market
 frames match the prepared route, including column order and dtypes. This
 comparison does not qualify arbitrary custom Pipeline terms.
+
+### Register an offline CSV source
+
+Move CSV loading and preprocessing before the run. `PreparedCSV` accepts the
+caller-loaded Pandas frame and freezes it as native `AuxiliaryData`. Pass it
+through `run_algorithm(csv_sources=[...])`; the original callback's
+`fetch_csv(url)` then selects that exact original source identity. An
+unregistered identity raises an error. No callback downloads data.
+
+The original `pre_func` runs before date parsing and symbol mapping. The
+original `post_func` receives a UTC DatetimeIndex and a `sid` column containing
+the mapped immutable `Asset` objects or fixed research identifiers. Move both
+functions, parser options and symbol lookup into `PreparedCSV`. The callback
+keeps only `fetch_csv(original_source_id)`.
+
+<!-- ml4t-doc-test: prepared-csv-delivery -->
+```python
+from datetime import UTC, datetime
+import pandas as pd
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import PreparedCSV, run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+source_id = "https://example.org/original-research.csv"
+asset = Asset("A", "ALPHA", 7)
+# In production, load these bytes through your data-preparation workflow.
+raw = pd.DataFrame({"date": ["2025-07-01"], "ticker": ["ALPHA"], "raw_score": [5.0],
+                    "published": ["2025-07-01T18:00:00Z"]})
+
+def preprocess(frame):
+    return frame.rename(columns={"ticker": "symbol"})
+
+def postprocess(frame):
+    return frame.assign(signal=frame["raw_score"] * 2 + 1).drop(columns="raw_score")
+
+prepared = PreparedCSV(
+    source_id, raw, available_at_col="published", assets={"ALPHA": asset},
+    pre_func=preprocess, post_func=postprocess,
+)
+prices = pl.DataFrame({"timestamp": [datetime(2025, 7, 1, 20, tzinfo=UTC),
+                                     datetime(2025, 7, 2, 20, tzinfo=UTC)],
+                       "asset": ["A", "A"], "close": [10.0, 20.0], "volume": [1000, 1000]})
+feed = DataFeed(prices_df=prices, feed_spec={
+    "calendar": "NYSE", "time_contract_version": 2, "data_frequency": "1d",
+    "timestamp_semantics": "bar_close", "bar_label": "right",
+})
+seen = []
+
+def initialize(context):
+    context.fetch_csv(source_id)
+
+def handle_data(context, data):
+    seen.append(data.current(asset, "signal"))
+    assert data.fetcher_assets == [asset]
+
+performance = run_algorithm(feed=feed, assets=[asset], csv_sources=[prepared],
+                            initialize=initialize, handle_data=handle_data)
+assert seen == [11.0, 11.0]
+assert performance.attrs["backtest_result"].config.metadata["migration_csv"][source_id]["source_id"] == source_id
+print("Frozen original CSV source verified.")
+```
+
+`assets` may instead be a `PreparedAssetLookup` for dated, country-specific
+symbol resolution. `mask=True` excludes unresolved symbols and records them
+in preparation metadata; `mask=False` retains unresolved nonempty strings as
+research keys. `symbol="VIX"` assigns one fixed research key to every row.
+Read those values with `data.current("VIX", "field")`; an order still requires
+a declared tradable `Asset`. With several registered sources, `fetcher_assets`
+reports the last selected source's known asset keys.
+
+CSV dates identify physical observations in the declared `timezone` (UTC by
+default). An explicit `date_format` is honored. Invalid dates are dropped and
+counted; duplicate observation/asset keys require upstream resolution.
+Publication comes from the separate required `available_at_col`. Obtain that
+timestamp from the source's availability facts; the adapter does not infer it
+from the observation date. Unknown publication stays unavailable, and a value
+published one nanosecond after the decision cannot be read at the decision.
+
+These clock choices differ from the published reference's session-date
+normalization and deprecated `date_format` handling. Prepare any required
+session rolling upstream. The frozen reference fixture in
+`tests/fixtures/zipline_original/csv-reference.json` qualifies the preprocessing,
+postprocessing, symbol mapping, daily stale delivery and fetcher-asset route
+against published Zipline Reloaded 3.2.0 with SID 7. Native tests additionally
+cover SID 0, delayed publication, timezones, missing values and research keys.
+
+Market OHLCV for a declared `Asset` keeps its execution-source meaning. An
+auxiliary column named `close` cannot replace its market close. Conflicting
+research field/asset pairs across sources raise an error; query
+`runtime.auxiliary(original_source_id)` explicitly to distinguish them. The
+native result retains the original identity, prepared content hash, parser
+choices, transformation names and excluded-row counts. No extra market event
+is created by an auxiliary row.

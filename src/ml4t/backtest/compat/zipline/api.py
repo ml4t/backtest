@@ -8,6 +8,7 @@ import pandas as pd
 
 from ._scope import current
 from .assets import Asset
+from .csv import PreparedCSV
 from .events import _DateRule, _TimeRule
 from .events import calendars as calendars
 from .events import date_rules as date_rules
@@ -56,6 +57,10 @@ def set_slippage(model: Any) -> None:
 
 def set_benchmark(asset: Asset | None) -> None:
     current().set_benchmark(asset)
+
+
+def fetch_csv(url: str) -> PreparedCSV:
+    return current().fetch_csv(url)
 
 
 def order_value(
