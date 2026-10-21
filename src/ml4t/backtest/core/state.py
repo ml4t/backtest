@@ -28,6 +28,7 @@ class MarketState:
     ask_sizes: dict[str, float] = field(default_factory=dict)
     signals: dict[str, dict[str, float]] = field(default_factory=dict)
     last_prices: dict[str, float] = field(default_factory=dict)
+    last_price_times: dict[str, datetime] | None = None
     asset_bars_seen: dict[str, int] = field(default_factory=dict)
     bar_index: int = 0
 
@@ -62,3 +63,9 @@ class ExecutionJournal:
 
     fills: list[Fill] = field(default_factory=list)
     trades: list[Trade] = field(default_factory=list)
+    recorded_values: dict[str, str] | None = None
+    recorded_rows: list[tuple[datetime, int, str, str]] | None = None
+    fill_snapshots: (
+        list[tuple[int, datetime, tuple[float, float, float, float, int], list[tuple[Any, ...]]]]
+        | None
+    ) = None

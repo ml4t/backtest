@@ -107,7 +107,11 @@ class DataFeed:
         ask_size_col: str | None = None,
         session_col: str | None = None,
         calendar: str | None | CalendarUnset = UNSET_CALENDAR,
+        capital_flows: pl.DataFrame | None = None,
     ):
+        if capital_flows is not None and not isinstance(capital_flows, pl.DataFrame):
+            raise TypeError("capital_flows must be a Polars DataFrame")
+        self.capital_flows = capital_flows.clone() if capital_flows is not None else None
         if feed_spec is not None and contract is not None:
             raise ValueError("Pass either feed_spec or contract, not both")
         for label, path, frame in (
