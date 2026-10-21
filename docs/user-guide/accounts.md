@@ -192,6 +192,19 @@ broker = Broker.from_config(config)
 
 ## Transaction Costs
 
+In development source, fill-time affordability uses the actual price after market
+impact and slippage, including the commission at that price. With leverage
+disabled, a ten-share buy at $100 with 1% slippage requires $1,010. A $1,000
+account rejects it when `partial_fills_allowed=False`, or fills nine integer
+shares when partial fills are enabled. Quantity-dependent impact is recomputed
+for the affordable quantity. Cash sizing retains the originally requested
+quantity in the order's `requested_quantity` field.
+
+Custom price models must support independent `deepcopy` for non-consuming quotes
+and produce deterministic costs. Only actual executions advance their model
+state. Explicit `skip_cash_validation=True` retains unconstrained behavior;
+leveraged accounts continue to use their configured margin policy.
+
 Account policy often interacts with trading costs, especially when leverage or high
 turnover magnifies drag:
 
