@@ -77,6 +77,8 @@ class MarketDataView:
         if frame is None:
             raise ValueError("Runtime market services require a prices frame")
         self._frame = frame
+        self._history_config = engine.config
+        self._snapshot_cutoff: datetime | None = None
         self._columns = set(self._frame.columns)
         self._roles = (
             {
@@ -205,6 +207,10 @@ class MarketDataView:
             or self._asof is None
         ):
             raise RuntimeError("market services require an active run")
+        if self._snapshot_cutoff is not None and self._snapshot_cutoff != self._asof:
+            raise RuntimeError(
+                "Prepared source snapshot is no longer active; request it at this cutoff"
+            )
 
     def _query(
         self,
@@ -384,6 +390,9 @@ class MarketDataView:
     @property
     def prepared_metadata(self) -> dict[str, Any]:
         """Copy the active provider's basis, cutoff and source preparation declarations."""
+        self._check_active()
+        if self._preparation_metadata:
+            return deepcopy(self._preparation_metadata)
         return deepcopy(self._prepared_view()._preparation_metadata)
 
     def history(
@@ -452,7 +461,9 @@ class MarketDataView:
             engine = self._runtime._engine
             assert engine is not None
             select = expected_times if unit is WindowUnit.EXPECTED_BAR else session_times
-            times = select(engine.config, self._asof, bar_count, self._inclusive, self._timestamps)
+            times = select(
+                self._history_config, self._asof, bar_count, self._inclusive, self._timestamps
+            )
         return self._query(
             assets,
             fields,
@@ -704,6 +715,7 @@ class RuntimeServices:
         end: datetime | None = None,
         known_at_cols: dict[str, str] | None = None,
         history_provider: HistoryProvider | None = None,
+        history_sources: Mapping[str, HistoryProvider] | None = None,
         signal_known_at_cols: dict[str, str] | None = None,
         context_known_at_cols: dict[str, str] | None = None,
         signal_eligible_cols: dict[str, str] | None = None,
@@ -726,6 +738,13 @@ class RuntimeServices:
         if history_provider is not None and not callable(history_provider):
             raise TypeError("history_provider must be callable")
         self.history_provider = history_provider
+        self.history_sources = dict(history_sources or {})
+        if any(
+            not isinstance(name, str) or not name or not callable(provider)
+            for name, provider in self.history_sources.items()
+        ):
+            raise TypeError("history_sources requires nonempty source names and callable providers")
+        self._history_views: dict[str, tuple[datetime, bool, MarketDataView]] = {}
         if inactive_position_policy not in {"retain_last_mark", "require_flat"}:
             raise ValueError("inactive_position_policy must be retain_last_mark or require_flat")
         if instruments is None and (
@@ -757,6 +776,26 @@ class RuntimeServices:
         self._market: MarketDataView | None = None
         self._signals: FeatureDataView | None = None
         self._assets: InstrumentView | None = None
+
+    def history_source(self, source_id: str) -> MarketDataView:
+        """Read an explicitly prepared independent grid at this run's actual cutoff.
+
+        Providers own aggregation, adjustment and source availability. These rows
+        never enter the execution feed or replace executable quotes.
+        """
+        from ._history_source import prepare_history_source
+
+        market = self.market
+        market._check_active()
+        if source_id not in self.history_sources:
+            raise ValueError(f"No prepared history source {source_id!r}")
+        assert market._asof is not None
+        cached = self._history_views.get(source_id)
+        if cached is not None and cached[:2] == (market._asof, market._inclusive):
+            return cached[2]
+        view = prepare_history_source(self, self.history_sources[source_id])
+        self._history_views[source_id] = (market._asof, market._inclusive, view)
+        return view
 
     @property
     def assets(self) -> InstrumentView:
@@ -934,6 +973,7 @@ class RuntimeServices:
             self._engine, self._market = None, None
             self._signals = None
             self._auxiliary_views.clear()
+            self._history_views.clear()
             raise
 
     def _accepts(self, timestamp: datetime) -> bool:
@@ -1022,3 +1062,4 @@ class RuntimeServices:
         self._engine, self._market = None, None
         self._signals = None
         self._auxiliary_views.clear()
+        self._history_views.clear()

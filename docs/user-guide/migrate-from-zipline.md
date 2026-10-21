@@ -192,7 +192,8 @@ with OHLCV/price fields. With a declared calendar, the default uses native expec
 Explicit `calendar=None` selects observation windows and retains physical UTC
 indexes for daily and minute reads. An explicit expected-bar request still
 requires a calendar. Requesting before captured source coverage raises and
-requires warmup bars. Cross-frequency
+requires warmup bars. For a separate prepared grid, use the
+[native read-source route](#use-a-separate-prepared-history-grid). Cross-frequency
 aggregation belongs in Data preparation. `history_view="prepared"` selects the
 [Data-prepared view](strategies.md#read-data-prepared-adjusted-history); it does
 not adjust executable prices. Asset, action and futures-account migration still
@@ -1236,3 +1237,94 @@ callback runner to select the existing causal Data history provider, or
 `history_unit="observation"` to count observations explicitly. This prepared
 view retains the execution grid; separate cross-frequency preparation and
 delivery remain required for a different history grid.
+
+
+### Use a separate prepared history grid
+
+Register named providers with `RuntimeServices(history_sources={...})`. Each
+provider receives the actual decision cutoff as an aware physical instant and
+returns Data's `prices` and `metadata` interface. The source carries its own
+version-2 `FeedSpec`, calendar, frequency, price basis and source availability.
+Native strategies read it with `runtime.history_source(name).history(...)`.
+The callback adapter maps `"1d"` or `"1m"` to those names with its separate
+`history_sources` argument.
+
+The following offline example supplies completed daily observations while the
+execution feed advances in minutes. Its frozen rows have explicitly declared
+availability at their daily closes. In a Data workflow, the provider can instead
+return `prepare_adjusted_history(..., as_of=as_of, feed_spec=daily_spec, ...)`;
+aggregation must already have happened before that history preparation call.
+
+<!-- ml4t-doc-test: zipline-independent-history-grid -->
+```python
+from datetime import datetime
+from types import SimpleNamespace
+import pandas as pd
+import polars as pl
+from ml4t.specs import FeedSpec
+from ml4t.backtest import DataFeed, RuntimeServices
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+asset = Asset("A", "ALPHA", 7)
+daily_spec = FeedSpec(time_contract_version=2, entity_col="asset", calendar="NYSE",
+                      data_frequency="daily", timestamp_semantics="bar_close",
+                      bar_label="right", bar_grid_anchor="session_open",
+                      partial_bar_policy="include")
+closes = [datetime.fromisoformat(s) for s in
+          ["2024-07-01T20:00:00+00:00", "2024-07-02T20:00:00+00:00"]]
+daily = pl.DataFrame({"timestamp": closes, "available_at": closes,
+                      "asset": ["A", "A"], "close": [90., 100.]})
+
+def prepare_daily(*, as_of):
+    return SimpleNamespace(prices=daily, metadata={
+        "perspective": "causal", "as_of": as_of.isoformat(), "price_basis": "raw",
+        "feed_spec": daily_spec.to_dict(),
+    })
+
+minutes = [datetime.fromisoformat(s) for s in
+           ["2024-07-03T13:31:00+00:00", "2024-07-03T13:32:00+00:00"]]
+feed = DataFeed(prices_df=pl.DataFrame({"timestamp": minutes, "asset": ["A", "A"],
+                                       "close": [201., 202.], "volume": [1000., 1000.]}),
+                feed_spec=daily_spec.with_overrides(data_frequency="1m"))
+seen = []
+
+def handle_data(context, data):
+    history = data.history(asset, "price", 2, "1d")
+    assert history.index.tolist() == [pd.Timestamp("2024-07-01"), pd.Timestamp("2024-07-02")]
+    assert history.tolist() == [90., 100.]
+    seen.append(data.current(asset, "price"))
+    if len(seen) == 1:
+        context.order(asset, 1)
+
+performance = run_algorithm(feed=feed, assets=[asset], handle_data=handle_data,
+                            runtime=RuntimeServices(history_sources={"daily": prepare_daily}),
+                            history_sources={"1d": "daily"})
+assert seen == [201., 202.]
+fills = performance.attrs["backtest_result"].to_fills_dataframe()
+assert abs(fills["price"][0] - 202.101) < 1e-12
+print("Separate daily reads preserve minute execution prices.")
+```
+
+The source is cached only at its exact decision cutoff. Obtain it again after
+the clock advances; retained snapshots cannot silently answer for a later
+cutoff. Expected-bar windows use the source's grid. Future observations, late
+revisions, imputed observations and asset keys outside the execution universe
+are rejected. Source metadata is copied when read. The existing same-grid
+`history_view="prepared"` checks remain in force.
+
+This example intentionally returns the last two completed sessions. Published
+Zipline's daily history during minute execution can include the current
+session's in-progress daily bar. The retained published-3.2 probe
+(`tests/fixtures/zipline_original/cross-frequency-reference.json`) observes
+previous close 100 and current closes 201, 202 and 203, with current-session
+volumes 1000, 2000 and 3000 at its first three minutes. Delivering that bar remains unfinished: it
+requires a causal aggregation output with an explicit partial-bar observation
+clock and availability. Declaring minute rows as daily data does not aggregate
+them. No partial daily close is inferred from a future completed daily close.
+
+The captured and installed producer/consumer tests use Data revision
+`c3b9db80a66397420fb27adeccc762559dd41e07`, version
+`0.2.2.dev21+gc3b9db80a`, with wheel SHA-256
+`713b032ddd07b5512837e093249fed2e56aad8fabad26a6352e38164674dfe88`.
+This is a qualified source build, not a claim about a published Data version.

@@ -1,6 +1,6 @@
 """Pandas container projection over causal native market reads."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from math import isfinite
 from typing import Any, Literal
 
@@ -28,6 +28,7 @@ class BarData:
         *,
         history_view: Literal["raw", "prepared"] = "raw",
         history_unit: WindowUnit | str | None = None,
+        history_sources: Mapping[str, str] | None = None,
         csv_sources: Sequence[PreparedCSV] = (),
         restriction: Callable[[Asset, Any], bool] | None = None,
         read_policy: Literal["native", "zipline"] = "native",
@@ -40,6 +41,12 @@ class BarData:
         self._csv_sources = tuple(csv_sources)
         self._restriction = restriction
         self._read_policy = read_policy
+        self._history_sources = dict(history_sources or {})
+        if any(
+            frequency not in {"1d", "1m"} or not isinstance(name, str) or not name
+            for frequency, name in self._history_sources.items()
+        ):
+            raise ValueError("history_sources maps 1d/1m to explicit native source names")
         self._history_view = history_view
         self._history_unit = None if history_unit is None else WindowUnit(history_unit)
         if self._history_unit not in {None, WindowUnit.OBSERVATION, WindowUnit.EXPECTED_BAR}:
@@ -263,10 +270,10 @@ class BarData:
             return result[names[0]]
         return result
 
-    def _labels(self, times, frequency):
+    def _labels(self, times, frequency, config=None):
         engine = self._runtime._engine
         assert engine is not None
-        config = engine.config
+        config = engine.config if config is None else config
         if frequency == "1m" or config.resolved_calendar is None:
             stamps = pd.DatetimeIndex(times)
             if stamps.tz is None:
@@ -298,7 +305,12 @@ class BarData:
         self._runtime.market._check_active()
         engine = self._runtime._engine
         assert engine is not None
-        declared = engine.config.resolved_feed_spec.data_frequency
+        market = self._runtime.market
+        source = self._history_sources.get(frequency)
+        if source is not None:
+            market = self._runtime.history_source(source)
+        config = market._history_config
+        declared = config.resolved_feed_spec.data_frequency
         canonical = {"daily": "1d", "d": "1d", "1d": "1d", "minute": "1m", "1m": "1m"}
         if (
             frequency not in {"1d", "1m"}
@@ -312,26 +324,26 @@ class BarData:
         if unit is None:
             unit = (
                 WindowUnit.OBSERVATION
-                if engine.config.resolved_calendar is None
+                if config.resolved_calendar is None
                 else WindowUnit.EXPECTED_BAR
             )
-        frame = self._runtime.market.history(
+        frame = market.history(
             [asset.key for asset in chosen],
             names,
             bar_count=bar_count,
             unit=unit,
-            view=self._history_view,
+            view="raw" if source is not None else self._history_view,
             forward_fill=self._stale_fields(names, ffill),
             finite_prices_only=self._read_policy == "zipline",
         )
         rows = list(temporal_rows(frame, named=True))
         times = list(dict.fromkeys(row["timestamp"] for row in rows))
-        source_times = self._runtime.market._timestamps
+        source_times = market._timestamps
         if len(times) != bar_count or (times and source_times and times[0] < source_times[0]):
             raise ValueError(
                 "History window starts before captured source coverage; supply warmup bars"
             )
-        labels = self._labels(times, frequency)
+        labels = self._labels(times, frequency, config)
         lookup = {(row["timestamp"], row["asset"]): row for row in rows}
         if one_field:
             result = pd.DataFrame(

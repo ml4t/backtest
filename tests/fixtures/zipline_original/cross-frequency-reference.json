@@ -1,0 +1,89 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "trace": [
+    {
+      "timestamp": "2024-07-03T13:31:00+00:00",
+      "index": [
+        [
+          "2024-07-02T00:00:00",
+          7
+        ],
+        [
+          "2024-07-03T00:00:00",
+          7
+        ]
+      ],
+      "values": [
+        [
+          100.0,
+          390000.0
+        ],
+        [
+          201.0,
+          1000.0
+        ]
+      ],
+      "columns": [
+        "price",
+        "volume"
+      ]
+    },
+    {
+      "timestamp": "2024-07-03T13:32:00+00:00",
+      "index": [
+        [
+          "2024-07-02T00:00:00",
+          7
+        ],
+        [
+          "2024-07-03T00:00:00",
+          7
+        ]
+      ],
+      "values": [
+        [
+          100.0,
+          390000.0
+        ],
+        [
+          202.0,
+          2000.0
+        ]
+      ],
+      "columns": [
+        "price",
+        "volume"
+      ]
+    },
+    {
+      "timestamp": "2024-07-03T13:33:00+00:00",
+      "index": [
+        [
+          "2024-07-02T00:00:00",
+          7
+        ],
+        [
+          "2024-07-03T00:00:00",
+          7
+        ]
+      ],
+      "values": [
+        [
+          100.0,
+          390000.0
+        ],
+        [
+          203.0,
+          3000.0
+        ]
+      ],
+      "columns": [
+        "price",
+        "volume"
+      ]
+    }
+  ],
+  "scope": "Original minute-execution daily history includes partial current-session OHLCV; completed daily source route is an explicit separate method, not a matching replacement for partial aggregation",
+  "timing_claim": false
+}

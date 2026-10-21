@@ -763,6 +763,7 @@ def run_algorithm(
     benchmark: BenchmarkData | None = None,
     history_view: Literal["raw", "prepared"] = "raw",
     history_unit: WindowUnit | str | None = None,
+    history_sources: Mapping[str, str] | None = None,
     start: date | datetime | str | None = None,
     end: date | datetime | str | None = None,
 ) -> pd.DataFrame:
@@ -898,6 +899,7 @@ def run_algorithm(
                         read_policy="zipline",
                         history_view=history_view,
                         history_unit=history_unit,
+                        history_sources=history_sources,
                     ),
                     handle_data,
                     runtime,

@@ -2775,7 +2775,7 @@
       },
       "module": "ml4t.backtest.compat.zipline.data",
       "qualname": "BarData",
-      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None, csv_sources: collections.abc.Sequence[ml4t.backtest.compat.zipline.csv.PreparedCSV] = (), restriction: collections.abc.Callable[[ml4t.backtest.compat.zipline.assets.Asset, Any], bool] | None = None, read_policy: Literal['native', 'zipline'] = 'native') -> None"
+      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None, history_sources: collections.abc.Mapping[str, str] | None = None, csv_sources: collections.abc.Sequence[ml4t.backtest.compat.zipline.csv.PreparedCSV] = (), restriction: collections.abc.Callable[[ml4t.backtest.compat.zipline.assets.Asset, Any], bool] | None = None, read_policy: Literal['native', 'zipline'] = 'native') -> None"
     },
     "ml4t.backtest.compat.zipline.finance.asset_restrictions:HistoricalRestrictions": {
       "kind": "class",
@@ -2904,7 +2904,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.runner",
       "qualname": "run_algorithm",
-      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, csv_sources: 'Sequence[PreparedCSV]' = (), benchmark: 'BenchmarkData | None' = None, history_view: \"Literal['raw', 'prepared']\" = 'raw', history_unit: 'WindowUnit | str | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
+      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, csv_sources: 'Sequence[PreparedCSV]' = (), benchmark: 'BenchmarkData | None' = None, history_view: \"Literal['raw', 'prepared']\" = 'raw', history_unit: 'WindowUnit | str | None' = None, history_sources: 'Mapping[str, str] | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
     },
     "ml4t.backtest.compat.zipline:to_performance_frame": {
       "kind": "function",
@@ -5014,6 +5014,10 @@
           "kind": "method",
           "signature": "(self, sources: 'Sequence[AuxiliaryData]') -> 'Iterator[RuntimeServices]'"
         },
+        "history_source": {
+          "kind": "method",
+          "signature": "(self, source_id: 'str') -> 'MarketDataView'"
+        },
         "market": {
           "kind": "property",
           "signature": "(self) -> 'MarketDataView'"
@@ -5025,7 +5029,7 @@
       },
       "module": "ml4t.backtest.runtime",
       "qualname": "RuntimeServices",
-      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, auxiliary: 'Sequence[AuxiliaryData]' = (), instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
+      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, history_sources: 'Mapping[str, HistoryProvider] | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, auxiliary: 'Sequence[AuxiliaryData]' = (), instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
     },
     "ml4t.backtest:StopFillMode": {
       "kind": "class",
