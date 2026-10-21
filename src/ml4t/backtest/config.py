@@ -539,6 +539,7 @@ class BacktestConfig:
     # === Execution Timing ===
     execution_price: ExecutionPrice = ExecutionPrice.OPEN
     mark_price: ExecutionPrice = ExecutionPrice.PRICE
+    next_bar_execution_price: ExecutionPrice | None = field(default=None, kw_only=True)
     execution_mode: ExecutionMode = ExecutionMode.NEXT_BAR  # Order execution timing
 
     # === Stop Configuration ===
@@ -808,6 +809,8 @@ class BacktestConfig:
         return instance
 
     def __post_init__(self) -> None:
+        if self.next_bar_execution_price is not None:
+            self.next_bar_execution_price = ExecutionPrice(self.next_bar_execution_price)
         FeedSpec(time_contract_version=self.time_contract_version, calendar=self.calendar)
         if self.time_contract_version == 1 and self.calendar is UNSET_CALENDAR:
             self.calendar = None
@@ -986,6 +989,11 @@ class BacktestConfig:
                 "execution_price": self.execution_price.value,
                 "mark_price": self.mark_price.value,
                 "execution_mode": self.execution_mode.value,
+                "next_bar_execution_price": (
+                    self.next_bar_execution_price.value
+                    if self.next_bar_execution_price is not None
+                    else None
+                ),
             },
             "stops": {
                 "stop_fill_mode": self.stop_fill_mode.value,
@@ -1102,7 +1110,12 @@ class BacktestConfig:
                     "short_cash_policy",
                     "lock_notional_update_mode",
                 },
-                "execution": {"execution_price", "mark_price", "execution_mode"},
+                "execution": {
+                    "execution_price",
+                    "mark_price",
+                    "execution_mode",
+                    "next_bar_execution_price",
+                },
                 "stops": {
                     "stop_fill_mode",
                     "stop_level_basis",
@@ -1243,6 +1256,7 @@ class BacktestConfig:
             execution_mode=ExecutionMode(
                 exec_cfg.get("execution_mode", ExecutionMode.NEXT_BAR.value)
             ),
+            next_bar_execution_price=exec_cfg.get("next_bar_execution_price"),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),

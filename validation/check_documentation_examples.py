@@ -31,6 +31,7 @@ _DEFAULT_PATHS = (
     _ROOT / "docs" / "tutorials" / "profiles-and-parity.md",
     _ROOT / "docs" / "tutorials" / "results-and-analysis.md",
     _ROOT / "docs" / "user-guide" / "accounts.md",
+    _ROOT / "docs" / "user-guide" / "strategies.md",
     _ROOT / "docs" / "user-guide" / "execution-semantics.md",
     _ROOT / "docs" / "user-guide" / "risk-management.md",
     _ROOT / "docs" / "user-guide" / "migrate-from-zipline.md",
@@ -41,6 +42,7 @@ _API_AUDIT_PATHS = (
 )
 _REQUIRED_EXAMPLES = frozenset(
     {
+        "runtime-causal-session",
         "account-engine-direct",
         "account-gatekeeper",
         "installation-import",

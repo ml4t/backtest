@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from .execution.callbacks import SessionScheduler
+
 if TYPE_CHECKING:
     from .engine import Engine
 
@@ -29,7 +31,19 @@ class MarketDataView:
         self._columns = set(self._frame.columns)
         self._roles = {
             name: getattr(feed.feed_spec, f"{name}_col", name)
-            for name in ["open", "high", "low", "close", "volume", "vwap", "bid", "ask", "mid"]
+            for name in [
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "vwap",
+                "bid",
+                "ask",
+                "mid",
+                "bid_size",
+                "ask_size",
+            ]
         }
         self._roles["price"] = getattr(feed.feed_spec, "price_col", None) or self._roles["close"]
         if self._roles["price"] not in self._columns:
@@ -85,7 +99,9 @@ class MarketDataView:
         known = row.get(declaration) if declaration else row[self._timestamp_col]
         if known is None:
             return False
-        return known <= self._asof if self._inclusive else known < self._asof
+        if row[self._timestamp_col] == self._asof and not self._inclusive:
+            return False
+        return known <= self._asof
 
     def _query(
         self,
@@ -106,7 +122,11 @@ class MarketDataView:
         for field in fields:
             if self._column(field) not in self._columns and field not in self._roles:
                 raise ValueError(f"Unknown market field {field!r}")
-            if forward_fill and field in {"volume", "bid_size", "ask_size"}:
+            if forward_fill and self._column(field) in {
+                self._column("volume"),
+                self._column("bid_size"),
+                self._column("ask_size"),
+            }:
                 raise ValueError(f"Forward filling {field!r} would invent tradable volume")
         records = []
         for timestamp in times:
@@ -267,6 +287,7 @@ class RuntimeServices:
             raise ValueError("start must not exceed end")
         self.start, self.end = start, end
         self.known_at_cols = dict(known_at_cols or {})
+        self.scheduler = SessionScheduler(self)
         self._engine: Engine | None = None
         self._market: MarketDataView | None = None
 
@@ -291,6 +312,11 @@ class RuntimeServices:
                 )
         market._asof = eligible[0]
         self._engine, self._market = engine, market
+        try:
+            self.scheduler._bind()
+        except BaseException:
+            self._engine, self._market = None, None
+            raise
 
     def _accepts(self, timestamp: datetime) -> bool:
         return (self.start is None or timestamp >= self.start) and (
@@ -332,4 +358,5 @@ class RuntimeServices:
         return visible
 
     def _unbind(self) -> None:
+        self.scheduler._unbind()
         self._engine, self._market = None, None

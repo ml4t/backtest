@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import copy
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from datetime import datetime
 from math import isfinite
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
@@ -130,6 +131,7 @@ class Broker:
         late_asset_min_bars: int = 1,
         settlement_delay: int = 0,
         settlement_reduces_buying_power: bool = True,
+        next_bar_execution_price: ExecutionPrice | None = None,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -149,6 +151,11 @@ class Broker:
         self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
         self.execution_price = execution_price
+        self.next_bar_execution_price = (
+            ExecutionPrice(next_bar_execution_price)
+            if next_bar_execution_price is not None
+            else None
+        )
         self.mark_price = mark_price
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
@@ -401,6 +408,7 @@ class Broker:
             stop_slippage_rate=config.stop_slippage_rate,
             execution_mode=config.execution_mode,
             execution_price=config.execution_price,
+            next_bar_execution_price=config.next_bar_execution_price,
             mark_price=config.mark_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
@@ -1051,6 +1059,20 @@ class Broker:
         target_intent_state = state["target_intent_state"]
         if target_intent_state is not None and self._preopen_target_manager is not None:
             self._preopen_target_manager.restore_transaction_state(target_intent_state)
+
+    @contextmanager
+    def _scheduled_callback_clock(self, timestamp: datetime) -> Iterator[None]:
+        previous = self._market_state.time
+        self._market_state.time = timestamp
+        try:
+            yield
+        finally:
+            self._market_state.time = previous
+
+    def _may_fill_immediately(self) -> bool:
+        from ml4t.specs import LifecyclePhase
+
+        return self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN
 
     def _begin_lifecycle_dispatch(
         self,

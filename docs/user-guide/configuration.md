@@ -147,6 +147,16 @@ Account type is determined by the flag combination:
 | `execution_mode` | ExecutionMode | NEXT_BAR | When orders fill (SAME_BAR or NEXT_BAR) |
 | `execution_price` | ExecutionPrice | OPEN | Price used for market fills |
 | `mark_price` | ExecutionPrice | PRICE | Price used for open-position marking |
+| `next_bar_execution_price` | ExecutionPrice or None | None | Explicit deferred market-fill source; None preserves the native next-open rule |
+
+To execute an ordinary market order at the next observed bar's close, select
+`execution_mode=ExecutionMode.NEXT_BAR` and
+`next_bar_execution_price=ExecutionPrice.CLOSE`. The order remains deferred;
+changing this source does not move it to its decision bar. The default `None`
+retains existing next-open behavior, including existing quote/VWAP handling.
+Market-on-close orders retain their own close rule, and canonical opening-auction
+child intents continue to use the opening price. The option is persisted under
+`execution.next_bar_execution_price` in the resolved JSON/YAML configuration.
 
 Available `ExecutionPrice` values:
 

@@ -147,6 +147,7 @@ class OrderBook:
         broker = self.broker
         return (
             broker.immediate_fill
+            and broker._may_fill_immediately()
             and broker.execution_mode is ExecutionMode.SAME_BAR
             and order.order_type is OrderType.MARKET
             and order.child_intent_id is None

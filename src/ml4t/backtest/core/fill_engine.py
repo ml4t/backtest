@@ -233,6 +233,10 @@ class FillEngine:
                 side=order.side,
                 use_open=False,
             )
+        if use_open and broker.next_bar_execution_price is not None:
+            return broker.get_price_for_source(
+                broker.next_bar_execution_price, order.asset, side=order.side, use_open=False
+            )
         return broker.get_price_for_source(
             broker.execution_price,
             order.asset,

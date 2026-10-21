@@ -394,6 +394,9 @@ class Engine:
             self.config,
         )
 
+        if self.runtime is not None:
+            self.runtime.scheduler._prepare()
+
         session_mode = getattr(self.feed, "session_col", None) is not None
         session_assets: dict[str, dict[str, Any]] = {}
         session_context: dict[str, Any] = {}
@@ -431,6 +434,7 @@ class Engine:
             if self.runtime is not None:
                 if not self.runtime._accepts(timestamp):
                     continue
+                self.runtime.scheduler._before_event(timestamp)
                 assets_data = self.runtime._advance(timestamp, assets_data)
 
             prices = getattr(assets_data, "_prices", None)
@@ -545,6 +549,8 @@ class Engine:
             if self.execution_mode == ExecutionMode.NEXT_BAR:
                 # Process same-cycle risk exits before ordinary strategy decisions.
                 self.broker._process_orders(use_open=True)
+                if self.runtime is not None:
+                    self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=True)
                 # Strategy generates new orders
                 if not session_mode or timestamp in self.feed._session_decision_timestamps:
                     self._dispatch_market_event(
@@ -554,6 +560,8 @@ class Engine:
                     )
                     session_assets = {}
                     session_context = {}
+                if self.runtime is not None:
+                    self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=False)
                 # MOC orders are the one next-bar exception: they execute on the
                 # current session close after strategy logic runs.
                 self.broker._process_orders(
@@ -563,7 +571,11 @@ class Engine:
             else:
                 # Same-bar mode: process before and after strategy
                 self.broker._process_orders()
+                if self.runtime is not None:
+                    self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=True)
                 self._dispatch_market_event(timestamp, assets_data, context)
+                if self.runtime is not None:
+                    self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=False)
                 self.broker._process_orders()
 
             self.preopen_target_manager.reconcile(timestamp)

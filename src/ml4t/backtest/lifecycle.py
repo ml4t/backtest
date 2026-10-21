@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -71,11 +71,48 @@ class LifecycleDispatcher:
         """Invoke one callback and roll back broker mutation if it raises."""
         specification = self.contract.phase_spec(phase)
         callback = getattr(self.strategy, specification.callback)
+        return self._invoke(
+            phase,
+            callback,
+            broker,
+            *args,
+            event_time=event_time,
+            contract_callback_name=specification.callback,
+        )
+
+    def dispatch_registered(
+        self,
+        phase: LifecyclePhase,
+        callback: Callable[..., Any],
+        broker: Any,
+        *args: Any,
+        event_time: datetime | None = None,
+    ) -> Any:
+        """Invoke an extra callback with the same transaction and independent cardinality."""
+        return self._invoke(phase, callback, broker, *args, event_time=event_time)
+
+    def _invoke(
+        self,
+        phase: LifecyclePhase,
+        callback: Callable[..., Any],
+        broker: Any,
+        *args: Any,
+        event_time: datetime | None = None,
+        contract_callback_name: str | None = None,
+    ) -> Any:
         transaction = _BrokerTransaction(broker)
         previous_phase = broker._begin_lifecycle_dispatch(phase, transaction)
-        self._counts[phase] += 1
+        if contract_callback_name is not None:
+            self._counts[phase] += 1
         if self.retain_invocations:
-            self.invocations.append(LifecycleInvocation(phase, specification.callback, event_time))
+            self.invocations.append(
+                LifecycleInvocation(
+                    phase,
+                    contract_callback_name
+                    or getattr(callback, "__name__", type(callback).__name__),
+                    event_time,
+                )
+            )
         try:
             return callback(*args)
         except BaseException:

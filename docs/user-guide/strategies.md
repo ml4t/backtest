@@ -65,6 +65,82 @@ data = {
 
 Signals come from the optional signals DataFrame passed to DataFeed. Access them via `bar.get("signals", {}).get("column_name")`.
 
+## Use causal history and session callbacks
+
+Pass a `RuntimeServices` instance to the existing `Engine`. The strategy's `context`
+remains the input feed context. Rows before `start` supply history but cannot trade
+or create account observations. The service becomes unavailable after the run.
+
+This example requires actual timestamped closing bars and Specs 0.2.0. It does
+not reinterpret midnight session labels as close instants.
+
+<!-- ml4t-doc-test: runtime-causal-session -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.specs import FeedSpec, LifecyclePhase, TimestampSemantics
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+
+dates = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [2, 3, 6]]
+prices = pl.DataFrame({
+    "timestamp": dates,
+    "asset": ["TEST"] * 3,
+    "close": [100.0, 101.0, 102.0],
+})
+services = RuntimeServices(start=datetime(2025, 1, 6, tzinfo=UTC))
+trace = []
+
+def before(timestamp, data, context, broker):
+    history = services.market.history(["TEST"], ["close"], bar_count=2)
+    assert history["close"].to_list() == [100.0, 101.0]
+    assert data == {} and context == {}
+    trace.append(("before", timestamp))
+
+def at_close(timestamp, data, context, broker):
+    assert services.market.current(["TEST"], ["close"])["close"].to_list() == [102.0]
+    trace.append(("close", timestamp))
+
+services.scheduler.register(
+    before, phase=LifecyclePhase.PRE_OPEN, at="session_open", minutes_before=45
+)
+services.scheduler.register(at_close, phase=LifecyclePhase.CLOSE, at="session_close")
+
+class Observe(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        trace.append(("data", timestamp))
+
+spec = FeedSpec(time_contract_version=2, calendar="NYSE", timezone="UTC",
+                data_frequency="1d", timestamp_semantics=TimestampSemantics.BAR_CLOSE,
+                bar_label="right")
+result = Engine(DataFeed(prices_df=prices, feed_spec=spec), Observe(),
+                BacktestConfig(initial_cash=10000), runtime=services).run()
+assert trace == [("before", datetime(2025, 1, 6, 13, 45, tzinfo=UTC)),
+                 ("data", dates[-1]), ("close", dates[-1])]
+assert result.to_equity_dataframe()["timestamp"].to_list() == [dates[-1]]
+print("Runtime callbacks and causal warmup verified.")
+```
+
+History's `bar_count` counts observed price instants, retaining missing asset
+rows. `known_at_cols={"field": "publication_timestamp_column"}` masks fields until
+available. `forward_fill=True` is an explicit read view with source timestamps;
+it never adds executable quotes or volume. Missing raw volume remains unknown
+in the view. `last_traded` requires actual positive observed volume;
+`last_observed` works with quotes alone. `can_trade` checks the current quote,
+not buying power or all order controls.
+
+Register callbacks before execution or in `on_start`/`on_prepare`. Registrations
+made during a run are removed afterward; registrations made beforehand persist
+when reusing the service for a new Engine. Callbacks use the existing lifecycle
+transaction and roll back broker mutations if they fail.
+
+Pre-open callbacks are calendar events with empty data/context. They use only
+previously available history and cannot fill orders immediately. Other scheduled
+callbacks require an observed price event at the requested instant; the last
+input row is never promoted to an official session close. Offsets count elapsed
+minutes from the named endpoint. Calendar events can occur between sparse price
+observations without adding price bars or account marks. A disabled calendar
+rejects session schedules.
+
 ## Broker Methods
 
 ### Submitting Orders
