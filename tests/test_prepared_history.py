@@ -254,9 +254,14 @@ def test_actual_data_provider_can_return_empty_history_before_the_first_availabl
     raw, spec = _inputs()
     actions = pl.read_parquet(ROOT / "actions.parquet")
 
-    def prepare(*, as_of):
+    def prepare(*, as_of, observation_before=None):
+        visible = (
+            raw
+            if observation_before is None
+            else raw.filter(pl.col(spec.timestamp_col) < observation_before)
+        )
         return adjustments.prepare_adjusted_history(
-            raw, actions, as_of=as_of, feed_spec=spec, **MANIFEST["method"]
+            visible, actions, as_of=as_of, feed_spec=spec, **MANIFEST["method"]
         )
 
     runtime = RuntimeServices(

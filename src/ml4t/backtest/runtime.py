@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timedelta
 from math import isfinite
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
-import pandas as pd
 import polars as pl
 from ml4t.specs import FeedSpec, TimestampSemantics, WindowUnit
 
@@ -35,9 +34,24 @@ class PreparedHistory(Protocol):
 
 
 class HistoryProvider(Protocol):
-    """Caller-owned offline preparation, with the actual decision cutoff supplied."""
+    """Offline preparation with the actual inclusive availability cutoff.
+
+    Before-event queries additionally pass ``observation_before``. The provider
+    must exclude those observations before calculating derived values, while
+    preserving availability equality at ``as_of``.
+    """
 
     def __call__(self, *, as_of: datetime) -> PreparedHistory: ...
+
+
+def _request_history(
+    provider: HistoryProvider, *, as_of: datetime, observation_before: datetime | None
+) -> PreparedHistory:
+    if observation_before is None:
+        return provider(as_of=as_of)
+    return cast(Callable[..., PreparedHistory], provider)(
+        as_of=as_of, observation_before=observation_before
+    )
 
 
 class MarketDataView:
@@ -336,17 +350,13 @@ class MarketDataView:
             raise ValueError("view='prepared' requires a causal history_provider")
         if self._prepared is not None and self._prepared[:2] == (asof, self._inclusive):
             return self._prepared[2]
-        prepared = runtime.history_provider(as_of=asof)
-        frame, metadata = prepared.prices, prepared.metadata
-        if not isinstance(frame, pl.DataFrame) or not isinstance(metadata, Mapping):
-            raise TypeError("history_provider must return prepared prices and metadata")
-        if metadata.get("perspective") != "causal" or metadata.get("as_of") is None:
-            raise ValueError("Prepared history must declare a causal as_of perspective")
-        if pd.Timestamp(metadata["as_of"]) != asof:
-            raise ValueError("Prepared history as_of must equal the requested decision cutoff")
-        if metadata.get("price_basis") not in {"raw", "split_adjusted", "total_return"}:
-            raise ValueError("Prepared history must declare its price_basis")
-        spec = FeedSpec.from_any(metadata.get("feed_spec"))
+        from ._history_source import prepare_history_source
+
+        view = prepare_history_source(
+            runtime, runtime.history_provider, known_at_cols=self._known_at_cols
+        )
+        frame, metadata = view._frame, view._preparation_metadata
+        spec = FeedSpec.from_any(metadata["feed_spec"])
         if spec.timestamp_semantics != engine.config.resolved_timestamp_semantics:
             raise ValueError("Prepared history cannot reinterpret the observation timestamp role")
         if spec.resolve_calendar() != engine.config.resolved_calendar:
@@ -355,35 +365,11 @@ class MarketDataView:
         for name in ("bar_label", "bar_grid_anchor", "partial_bar_policy", "session_start_time"):
             if getattr(spec, name) != getattr(source_spec, name):
                 raise ValueError(f"Prepared history cannot change the declared {name}")
-        if (
-            spec.timestamp_col not in frame
-            or not isinstance(spec.entity_col, str)
-            or spec.entity_col not in frame
-        ):
-            raise ValueError("Prepared history must retain declared observation keys")
-        if "available_at" not in frame or not isinstance(frame.schema["available_at"], pl.Datetime):
-            raise ValueError("Prepared history requires available_at source timestamps")
-        if frame["available_at"].null_count() or frame.filter(pl.col("available_at") > asof).height:
-            raise ValueError("Prepared history contains source revisions unavailable at the cutoff")
-        if "is_imputed" in frame and frame["is_imputed"].fill_null(False).any():
-            raise ValueError("Prepared history cannot promote imputed rows to observations")
-        for row in temporal_rows(frame.select(spec.timestamp_col, spec.entity_col), named=True):
-            instant, asset = row[spec.timestamp_col], row[spec.entity_col]
-            if instant is None or instant > asof or instant not in self._rows.get(asset, {}):
-                raise ValueError(
-                    "Prepared history must retain observed execution keys without future or imputed rows"
-                )
-        known = {
-            name: "available_at"
-            for name in frame.columns
-            if name not in {spec.timestamp_col, spec.entity_col}
-        }
-        known.update(self._known_at_cols)
-        view = MarketDataView(
-            runtime, engine, prices=frame, feed_spec=spec, owner=self._owner, known_at_cols=known
-        )
-        view._asof, view._inclusive = asof, self._inclusive
-        view._preparation_metadata = deepcopy(dict(metadata))
+        for row in temporal_rows(frame.select(view._timestamp_col, view._entity_col), named=True):
+            instant, asset = row[view._timestamp_col], row[view._entity_col]
+            if instant not in self._rows.get(asset, {}):
+                raise ValueError("Prepared history must retain observed execution keys")
+        view._history_config = engine.config
         self._prepared = (asof, self._inclusive, view)
         return view
 

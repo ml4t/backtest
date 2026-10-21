@@ -199,10 +199,10 @@ aggregation belongs in Data preparation. `history_view="prepared"` selects the
 not adjust executable prices. Asset, action and futures-account migration still
 requires the separate contracts below.
 
-Reads follow native causal visibility and explicit stale-view policies. In
-particular, a pre-open current read reports missing values rather than exposing
-a future daily close. The native Polars APIs remain available when a strategy
-needs their window and provenance fields. An `Asset` compares by its stable
+Native current reads at a pre-open clock contain no current quote. The
+callback adapter can return a known price and a completed-bar projection;
+neither reads a future daily close. The native Polars APIs retain the window
+and provenance fields. An `Asset` compares by its stable
 native key; use `int(asset)` only when an actual legacy integer SID was supplied.
 
 ## Match ledger and corporate-action assumptions
@@ -1276,8 +1276,11 @@ closes = [datetime.fromisoformat(s) for s in
 daily = pl.DataFrame({"timestamp": closes, "available_at": closes,
                       "asset": ["A", "A"], "close": [90., 100.]})
 
-def prepare_daily(*, as_of):
-    return SimpleNamespace(prices=daily, metadata={
+def prepare_daily(*, as_of, observation_before=None):
+    visible = daily.filter(pl.col("available_at") <= as_of)
+    if observation_before is not None:
+        visible = visible.filter(pl.col("timestamp") < observation_before)
+    return SimpleNamespace(prices=visible, metadata={
         "perspective": "causal", "as_of": as_of.isoformat(), "price_basis": "raw",
         "feed_spec": daily_spec.to_dict(),
     })
@@ -1350,7 +1353,7 @@ silently replaced by the synthetic `us_futures` calendar.
 ```python
 from datetime import timedelta
 import polars as pl
-from ml4t.backtest import DataFeed
+from ml4t.backtest import DataFeed, RuntimeServices
 from ml4t.backtest.calendar import get_schedule
 from ml4t.backtest.compat.zipline import run_algorithm
 from ml4t.backtest.compat.zipline.assets import Asset
@@ -1366,12 +1369,17 @@ feed = DataFeed(prices_df=pl.DataFrame({"timestamp": minutes, "asset": ["ES"] * 
                            "bar_label": "right", "bar_grid_anchor": "session_open",
                            "partial_bar_policy": "include"})
 seen = []
+services = RuntimeServices()
 
 def before_trading_start(context, data):
     seen.append(context.get_datetime().isoformat())
     assert data.current(asset, "price") == 100.
+    assert data.current(asset, ["price", "close", "volume"]).tolist() == [100., 100., 1000.]
+    assert not data.is_stale(asset)
+    assert services.market.current(["ES"], ["close", "volume"]).is_empty()
 
-performance = run_algorithm(feed=feed, assets=[asset], before_trading_start=before_trading_start,
+performance = run_algorithm(feed=feed, assets=[asset], runtime=services,
+                            before_trading_start=before_trading_start,
                             handle_data=lambda context, data: None)
 assert seen == ["2025-03-03T13:45:00+00:00"]
 assert len(performance) == 630
@@ -1404,3 +1412,51 @@ the same instant. The timer does not update quotes, execute fills or add an
 account sample. Session expiration still follows its declared policy. A selected timer
 after the last captured market event is rejected. Explicit run bounds exclude
 clock registrations outside those bounds.
+
+
+### Read completed bars before trading
+
+At a clock before a market observation, the Zipline read policy projects
+OHLCV from the preceding point on the declared history grid. It does not fill
+missing OHLCV fields. `price` keeps its explicit known-price policy;
+`last_traded` retains the actual trade timestamp, and `is_stale` examines the
+completed bar's volume without indexing an absent current quote. Native
+`market.current` remains strict and can still be empty at the same clock.
+
+The default projection uses expected bars with a calendar and observations
+without one. An explicit `history_unit` selects the same supported unit as
+history requests. `history_view="prepared"` also applies to this historical
+pre-event projection and requires the causal Data provider. It does not
+reprice executable quotes. The installed producer test checks a known 2:1
+split: prepared prior price/volume are 100/20, raw prior values remain 200/10,
+and the active raw quote remains absent until its actual market event.
+
+The published 3.2.0 minute fixture checks current price, OHLCV, last trade,
+staleness and tradability at the real futures callback clocks.
+Those before-trading values come from 8:44 New York time at an 8:45 callback.
+Supply complete clock metadata for expected-bar reads. No future completed
+daily close is inferred by this projection.
+
+Prepared providers used before a market event must accept both `as_of` and
+`observation_before`. `as_of` remains the actual decision time: source facts
+published exactly then are available. `observation_before` excludes price
+observations at that time, because the market callback has not observed them
+yet. During a market callback, Backtest calls the provider with only `as_of`,
+so existing providers used only there remain compatible.
+
+Filter the input price observations before calculating adjusted history.
+For example, a caller-owned Data provider can select
+`prices.filter(pl.col(spec.timestamp_col) < observation_before)` when the
+boundary is present, then call `prepare_adjusted_history` with the unchanged
+`as_of`. The boundary is a Backtest provider argument, not an argument to
+Data's preparation function. Filtering only the prepared output is too late:
+an excluded close could already have influenced older adjusted prices.
+Backtest also rejects prepared output containing an excluded observation.
+
+A native cash-dividend factor that requires an ex-date close cannot be
+calculated before that close is observed. The installed producer regression
+checks that Data rejects this request, then computes the factor once the
+market event has occurred. Do not substitute a future close or move `as_of`
+back by a nanosecond; either would change the information available to the
+strategy. Split factors whose required facts are already available can be
+used before the market event.

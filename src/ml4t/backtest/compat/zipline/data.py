@@ -77,6 +77,26 @@ class BarData:
             raise ValueError("BarData asset and field selections cannot contain duplicates")
         return chosen, names, one_asset, one_field
 
+    def _market_current(self, assets, fields, **kwargs):
+        market = self._runtime.market
+        market._check_active()
+        if (
+            self._read_policy == "zipline"
+            and not market._inclusive
+            and not (set(fields) == {"price"} and self._history_view == "raw")
+        ):
+            engine = self._runtime._engine
+            assert engine is not None
+            unit = self._history_unit or (
+                WindowUnit.OBSERVATION
+                if engine.config.resolved_calendar is None
+                else WindowUnit.EXPECTED_BAR
+            )
+            return market.history(
+                assets, fields, bar_count=1, unit=unit, view=self._history_view, **kwargs
+            )
+        return market.current(assets, fields, **kwargs)
+
     def _current_value(self, asset, name):
         if isinstance(asset, Asset) and name == "last_traded":
             return self._last_traded_value(asset)
@@ -108,7 +128,7 @@ class BarData:
             raise ValueError("Research key/field requires a registered frozen CSV source")
         if not market_field and any(name in source.fields for source in self._csv_sources):
             return float("nan")
-        frame = self._runtime.market.current(
+        frame = self._market_current(
             [key],
             [name],
             forward_fill=self._stale_fields([name]),
@@ -180,7 +200,7 @@ class BarData:
     def _known_price_tradable(self, asset):
         if not self._alive(asset):
             return False
-        frame = self._runtime.market.current(
+        frame = self._market_current(
             [asset.key], ["price"], forward_fill=True, finite_prices_only=True
         )
         price = frame["price"][0] if not frame.is_empty() else None
@@ -200,7 +220,8 @@ class BarData:
                 return market.is_stale(asset.key)
             if not self._alive(asset):
                 return False
-            volume = market.current([asset.key], ["volume"])["volume"][0]
+            observed = self._market_current([asset.key], ["volume"])
+            volume = None if observed.is_empty() else observed["volume"][0]
             return (
                 not (volume is not None and volume > 0)
                 and market.last_traded(asset.key) is not None
@@ -219,7 +240,7 @@ class BarData:
         if not self._csv_sources:
             raw = [name for name in names if name != "last_traded"]
             if raw:
-                frame = self._runtime.market.current(
+                frame = self._market_current(
                     [asset.key for asset in chosen],
                     raw,
                     forward_fill=self._stale_fields(raw),
