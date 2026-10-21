@@ -131,7 +131,7 @@ The original `initialize`/`handle_data` callback runner is still separate work.
 
 The read-container fixtures use the published
 [Zipline Reloaded 3.2.0](https://pypi.org/project/zipline-reloaded/3.2.0/)
-CPython 3.12 Linux wheel, SHA-256
+CPython 3.12 Linux wheel with Pandas 2.3.3, SHA-256
 `1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b`.
 Real daily and minute `run_algorithm` probes cover scalar/sequence selections,
 reversed asset and field order, numeric dtypes and datetime indexes. This is a

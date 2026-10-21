@@ -541,5 +541,10 @@
     ]
   },
   "observed_difference_from_reference_prose": "Published3.2 multi-field history returns a MultiIndex even for one asset; second index level remains None. Adapter matches actual implementation.",
-  "dtype_qualification": "Actual published3.2 captured numeric column and datetime index dtypes."
+  "dtype_qualification": "Actual published3.2 captured numeric column and datetime index dtypes.",
+  "reference_environment": {
+    "pandas": "2.3.3",
+    "numpy": "2.5.4",
+    "exchange-calendars": "4.13.2"
+  }
 }

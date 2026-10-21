@@ -538,5 +538,10 @@
     ]
   },
   "scope": "Read outputs at14:33UTC from a real full-session minute algorithm. Does not claim callback-event-count parity for a sparse native three-bar feed.",
-  "dtype_qualification": "Actual published3.2 captured numeric column and datetime index dtypes."
+  "dtype_qualification": "Actual published3.2 captured numeric column and datetime index dtypes.",
+  "reference_environment": {
+    "pandas": "2.3.3",
+    "numpy": "2.5.4",
+    "exchange-calendars": "4.13.2"
+  }
 }

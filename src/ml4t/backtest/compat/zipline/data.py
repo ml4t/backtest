@@ -65,7 +65,7 @@ class BarData:
                 for asset in chosen
             ],
             index=pd.Index(chosen),
-            columns=names,
+            columns=pd.Index(names, dtype=object),
         )
         if one_asset and one_field:
             value = result.iloc[0, 0]
@@ -162,7 +162,7 @@ class BarData:
             index=pd.MultiIndex.from_product(
                 [labels, chosen], names=["date" if frequency == "1d" else "date_time", None]
             ),
-            columns=pd.Index(names, name="fields"),
+            columns=pd.Index(names, name="fields", dtype=object),
             dtype="float64",
         )
         return result.sort_index()
