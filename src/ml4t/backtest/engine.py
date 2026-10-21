@@ -435,7 +435,7 @@ class Engine:
             if self.runtime is not None:
                 if not self.runtime._accepts(timestamp):
                     continue
-                self.runtime.scheduler._before_event(timestamp)
+                self.runtime.scheduler._before_event(timestamp, has_price_event=bool(assets_data))
                 assets_data = self.runtime._advance(timestamp, assets_data)
 
             prices = getattr(assets_data, "_prices", None)
@@ -587,6 +587,8 @@ class Engine:
             self.broker._update_water_marks()
 
             self._record_portfolio_state(timestamp)
+            if self.runtime is not None:
+                self.runtime.scheduler._after_event(timestamp)
 
         self._finalize_strategy()
         self.strategy._validate_completed_run()

@@ -9,6 +9,7 @@ from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
+from ml4t.specs import TimestampSemantics
 
 from ._temporal import temporal_frame, temporal_row, temporal_rows
 from .execution.callbacks import SessionScheduler
@@ -302,6 +303,14 @@ class RuntimeServices:
     def _bind(self, engine: Engine) -> None:
         if self._engine is not None:
             raise RuntimeError("RuntimeServices already belongs to an active run")
+        if engine.config.resolved_timestamp_semantics not in {
+            TimestampSemantics.EVENT_TIME,
+            TimestampSemantics.BAR_CLOSE,
+        }:
+            raise ValueError(
+                "RuntimeServices requires declared timestamp_semantics='event_time' or 'bar_close'; "
+                "prepare session labels as actual instants before binding physical runtime cutoffs"
+            )
         market = MarketDataView(self, engine)
         eligible = [t for t in engine.feed.timestamps if self._accepts(t)]
         if not eligible:

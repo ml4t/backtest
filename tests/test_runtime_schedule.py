@@ -10,6 +10,13 @@ from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Str
 from ml4t.backtest.config import CommissionType, ExecutionMode, ExecutionPrice, SlippageType
 
 
+def _instant_feed(**kwargs):
+    spec = FeedSpec.from_any(kwargs.pop("feed_spec", None))
+    if spec.timestamp_semantics is None:
+        spec = spec.with_overrides(timestamp_semantics=TimestampSemantics.EVENT_TIME)
+    return DataFeed(feed_spec=spec, **kwargs)
+
+
 class Cash(Strategy):
     def on_data(self, timestamp, data, context, broker):
         pass
@@ -72,7 +79,7 @@ def test_daily_pre_session_sees_only_prior_prices_and_close_callbacks_follow_han
                 broker.submit_order("TEST", 10)
 
     result = Engine(
-        DataFeed(
+        _instant_feed(
             prices_df=prices,
             feed_spec=FeedSpec(
                 time_contract_version=2,
@@ -119,7 +126,7 @@ def test_missing_official_close_does_not_generate_a_close_event_from_the_last_in
 
     frame = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2, "close": [100.0, 101.0]})
     result = Engine(
-        DataFeed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
+        _instant_feed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
     ).run()
     assert calls == []
     assert result.to_equity_dataframe()["timestamp"].to_list() == dates
@@ -142,7 +149,7 @@ def test_calendar_none_rejects_session_registration_before_trading_starts():
     )
     with pytest.raises(ValueError, match="calendar"):
         Engine(
-            DataFeed(prices_df=frame), Cash(), BacktestConfig(calendar=None), runtime=runtime
+            _instant_feed(prices_df=frame), Cash(), BacktestConfig(calendar=None), runtime=runtime
         ).run()
     assert seen == []
 
@@ -161,7 +168,9 @@ def test_registered_failure_rolls_back_cash_orders_and_records_and_restores_cloc
 
     runtime.scheduler.register(failing, at="session_close", phase=LifecyclePhase.CLOSE)
     engine = Engine(
-        DataFeed(prices_df=pl.DataFrame({"timestamp": times, "asset": ["TEST"], "close": [100.0]})),
+        _instant_feed(
+            prices_df=pl.DataFrame({"timestamp": times, "asset": ["TEST"], "close": [100.0]})
+        ),
         Cash(),
         BacktestConfig(initial_cash=10000, calendar="NYSE"),
         runtime=runtime,
@@ -188,7 +197,7 @@ def test_pre_open_orders_wait_for_actual_quote_even_with_immediate_fills_enabled
     runtime.scheduler.register(before, at="session_open", phase=LifecyclePhase.PRE_OPEN)
     instant = datetime(2025, 1, 2, 21, tzinfo=UTC)
     result = Engine(
-        DataFeed(
+        _instant_feed(
             prices_df=pl.DataFrame({"timestamp": [instant], "asset": ["TEST"], "close": [100.0]})
         ),
         Cash(),
@@ -235,7 +244,7 @@ def test_dst_and_early_close_come_from_calendar_and_registration_order_is_stable
         {"timestamp": dates, "asset": ["TEST"] * len(dates), "close": [100.0] * len(dates)}
     )
     Engine(
-        DataFeed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
+        _instant_feed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
     ).run()
     assert trace == [
         item
@@ -268,7 +277,7 @@ def test_next_bar_close_is_explicit_and_does_not_change_native_next_open_default
         slippage_type=SlippageType.NONE,
     )
     restored = BacktestConfig.from_dict(config.to_dict(), strict=True)
-    result = Engine(DataFeed(prices_df=frame), Buy(), restored).run()
+    result = Engine(_instant_feed(prices_df=frame), Buy(), restored).run()
     assert result.to_fills_dataframe()["price"].to_list() == [expected]
     assert result.to_fills_dataframe()["timestamp"].to_list() == [times[1]]
     assert result.to_equity_dataframe()["equity"].to_list() == [10000.0, 10200.0 - expected]
@@ -285,7 +294,7 @@ def test_bar_cadence_counts_sessions_instead_of_treating_every_bar_as_session_on
     )
     frame = pl.DataFrame({"timestamp": times, "asset": ["TEST"] * 3, "close": [100.0] * 3})
     Engine(
-        DataFeed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
+        _instant_feed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
     ).run()
     assert seen == [times[0], times[2]]
 
@@ -304,7 +313,10 @@ def test_run_scoped_registrations_do_not_accumulate_when_runtime_is_reused():
     )
     for _ in range(2):
         Engine(
-            DataFeed(prices_df=frame), Observe(), BacktestConfig(calendar=None), runtime=runtime
+            _instant_feed(prices_df=frame),
+            Observe(),
+            BacktestConfig(calendar=None),
+            runtime=runtime,
         ).run()
     assert seen == ["static", "run", "static", "run"]
 
@@ -331,6 +343,80 @@ def test_pre_open_history_respects_publication_at_the_callback_instant():
 
     runtime.scheduler.register(before, at="session_open", phase=LifecyclePhase.PRE_OPEN)
     Engine(
-        DataFeed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
+        _instant_feed(prices_df=frame), Cash(), BacktestConfig(calendar="NYSE"), runtime=runtime
     ).run()
     assert seen == [[3.0]]
+
+
+def test_previous_crypto_close_precedes_next_session_pre_open_at_the_same_instant():
+    dates = [datetime(2025, 1, 2, 0, m, tzinfo=UTC) for m in [0, 1]]
+    frame = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2, "close": [100.0, 101.0]})
+    runtime = RuntimeServices(start=datetime(2025, 1, 1, 23, 59, tzinfo=UTC))
+    trace = []
+
+    def before(timestamp, data, context, broker):
+        trace.append(
+            (
+                "before",
+                timestamp,
+                runtime.market.history(["TEST"], ["close"], bar_count=1)["close"].to_list(),
+            )
+        )
+
+    def close(timestamp, data, context, broker):
+        trace.append(("close", timestamp))
+
+    runtime.scheduler.register(before, at="session_open", phase=LifecyclePhase.PRE_OPEN)
+    runtime.scheduler.register(close, at="session_close", phase=LifecyclePhase.CLOSE)
+
+    class Observe(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            trace.append(("data", timestamp))
+
+    spec = FeedSpec(
+        time_contract_version=2,
+        calendar="crypto",
+        data_frequency="1m",
+        timestamp_semantics=TimestampSemantics.BAR_CLOSE,
+        bar_label="right",
+    )
+    result = Engine(
+        _instant_feed(prices_df=frame, feed_spec=spec), Observe(), BacktestConfig(), runtime=runtime
+    ).run()
+    assert trace == [
+        ("data", dates[0]),
+        ("close", dates[0]),
+        ("before", dates[0], [100.0]),
+        ("data", dates[1]),
+    ]
+    assert result.to_equity_dataframe()["timestamp"].to_list() == dates
+
+
+def test_opening_callbacks_require_opening_instants_instead_of_completed_bar_inputs():
+    runtime = RuntimeServices()
+    runtime.scheduler.register(
+        lambda *_args: None, at="session_open", phase=LifecyclePhase.OPENING_AUCTION
+    )
+    started = []
+
+    class Observe(Cash):
+        def on_start(self, broker):
+            started.append(True)
+
+    frame = pl.DataFrame(
+        {"timestamp": [datetime(2025, 1, 2, 21, tzinfo=UTC)], "asset": ["TEST"], "close": [100.0]}
+    )
+    spec = FeedSpec(
+        time_contract_version=2,
+        timestamp_semantics=TimestampSemantics.BAR_CLOSE,
+        bar_label="right",
+        data_frequency="1d",
+    )
+    with pytest.raises(ValueError, match="opening.*event_time"):
+        Engine(
+            DataFeed(prices_df=frame, feed_spec=spec),
+            Observe(),
+            BacktestConfig(calendar="NYSE"),
+            runtime=runtime,
+        ).run()
+    assert started == []

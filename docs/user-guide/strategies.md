@@ -75,7 +75,9 @@ remains the input feed context. Rows before `start` supply history but cannot tr
 or create account observations. The service becomes unavailable after the run.
 
 This example requires actual timestamped closing bars and Specs 0.2.0. It does
-not reinterpret midnight session labels as close instants.
+not reinterpret midnight session labels as close instants. Runtime services
+require a declared `event_time` or `bar_close` timestamp role. Convert session
+labels to physical instants before using these services.
 
 <!-- ml4t-doc-test: runtime-causal-session -->
 ```python
@@ -143,6 +145,11 @@ input row is never promoted to an official session close. Offsets count elapsed
 minutes from the named endpoint. Calendar events can occur between sparse price
 observations without adding price bars or account marks. A disabled calendar
 rejects session schedules.
+
+Opening-auction callbacks require `event_time` opening observations. Completed
+bars cannot supply an opening quote. Where continuous sessions meet at the same
+instant, a right-labeled closing bar and its close callback run before the next
+session's pre-open callback. That callback can read the bar that just closed.
 
 ## Broker Methods
 

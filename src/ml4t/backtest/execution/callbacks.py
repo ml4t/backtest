@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from ml4t.specs import LifecyclePhase, TimestampSemantics
 
 from ..calendar import get_schedule
-from ..sessions import session_date_for_timestamp
+from ..sessions import _is_right_labeled_bar, session_date_for_timestamp
 from .schedule import (
     RebalanceCadence,
     RebalanceSchedule,
@@ -45,6 +45,7 @@ class SessionScheduler:
         self._registrations: list[_Registration] = []
         self._initial_count = 0
         self._prepared = False
+        self._defer_pre_at_close = False
         self._pre_events: list[tuple[datetime, int]] = []
         self._pre_index = 0
         self._events: dict[datetime, list[int]] = {}
@@ -109,6 +110,15 @@ class SessionScheduler:
         ):
             raise ValueError("Scheduled callbacks require event instants, not session labels")
 
+        if any(r.phase is LifecyclePhase.OPENING_AUCTION for r in self._registrations) and (
+            engine.config.resolved_timestamp_semantics is not TimestampSemantics.EVENT_TIME
+            or _is_right_labeled_bar(
+                engine.config.resolved_timestamp_semantics,
+                engine.config.resolved_feed_spec.bar_label,
+            )
+        ):
+            raise ValueError("opening_auction callbacks require event_time opening observations")
+
     def _bind(self) -> None:
         self._initial_count = len(self._registrations)
         self._validate()
@@ -117,6 +127,9 @@ class SessionScheduler:
         self._validate()
         engine = self._runtime._engine
         assert engine is not None
+        self._defer_pre_at_close = _is_right_labeled_bar(
+            engine.config.resolved_timestamp_semantics, engine.config.resolved_feed_spec.bar_label
+        )
         self._prepared = True
         registrations = self._registrations
         if not any(
@@ -189,14 +202,26 @@ class SessionScheduler:
                 event_time=timestamp,
             )
 
-    def _before_event(self, timestamp: datetime) -> None:
+    def _before_event(self, timestamp: datetime, *, has_price_event: bool) -> None:
         market = self._runtime.market
         while self._pre_index < len(self._pre_events):
             instant, index = self._pre_events[self._pre_index]
-            if instant > timestamp:
+            if instant > timestamp or (
+                instant == timestamp and has_price_event and self._defer_pre_at_close
+            ):
                 break
             self._pre_index += 1
             market._asof, market._inclusive = instant, False
+            self._invoke(index, instant, {}, {})
+
+    def _after_event(self, timestamp: datetime) -> None:
+        while self._pre_index < len(self._pre_events):
+            instant, index = self._pre_events[self._pre_index]
+            if instant != timestamp:
+                break
+            self._pre_index += 1
+            market = self._runtime.market
+            market._asof, market._inclusive = instant, True
             self._invoke(index, instant, {}, {})
 
     def _on_event(self, timestamp: datetime, data: Any, context: dict, *, opening: bool) -> None:
@@ -242,6 +267,7 @@ class SessionScheduler:
     def _unbind(self) -> None:
         del self._registrations[self._initial_count :]
         self._prepared = False
+        self._defer_pre_at_close = False
         self._pre_events.clear()
         self._pre_index = 0
         self._events.clear()

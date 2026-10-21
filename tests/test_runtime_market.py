@@ -4,9 +4,17 @@ from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
+from ml4t.specs import FeedSpec, TimestampSemantics
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
 from ml4t.backtest.config import ExecutionMode
+
+
+def _instant_feed(**kwargs):
+    spec = FeedSpec.from_any(kwargs.pop("feed_spec", None))
+    if spec.timestamp_semantics is None:
+        spec = spec.with_overrides(timestamp_semantics=TimestampSemantics.EVENT_TIME)
+    return DataFeed(feed_spec=spec, **kwargs)
 
 
 def prices(extra_future=False):
@@ -35,7 +43,7 @@ def test_warmup_history_is_visible_but_cannot_create_prestart_trades_or_accounts
                 broker.submit_order("TEST", 10)
 
     result = Engine(
-        DataFeed(prices_df=prices()),
+        _instant_feed(prices_df=prices()),
         Average(),
         BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
         runtime=services,
@@ -71,7 +79,9 @@ def test_future_prices_and_late_known_features_cannot_change_an_earlier_decision
                 services.market.history(["TEST"], ["close"], bar_count=3)["close"].to_list()
             )
 
-    Engine(DataFeed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=services).run()
+    Engine(
+        _instant_feed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=services
+    ).run()
     assert seen == [[100.0], [100.0, None], [100.0, None, 120.0]]
 
 
@@ -96,7 +106,9 @@ def test_stale_history_is_an_explicit_view_and_missing_volume_stays_unknown():
                 )
             )
 
-    Engine(DataFeed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=services).run()
+    Engine(
+        _instant_feed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=services
+    ).run()
     assert seen[1][0]["close"].to_list() == [None]
     assert seen[1][0]["volume"].to_list() == [None]
     assert seen[1][1]["close"].to_list() == [100.0]
@@ -121,7 +133,7 @@ def test_late_price_cannot_reach_strategy_or_execute_until_a_known_quote():
                 broker.submit_order("TEST", 1)
 
     result = Engine(
-        DataFeed(prices_df=frame),
+        _instant_feed(prices_df=frame),
         Buy(),
         BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR),
         runtime=runtime,
@@ -140,7 +152,7 @@ def test_failed_nested_binding_does_not_detach_the_active_outer_market():
         def on_data(self, timestamp, data, context, broker):
             with pytest.raises(RuntimeError, match="active run"):
                 Engine(
-                    DataFeed(prices_df=prices()),
+                    _instant_feed(prices_df=prices()),
                     self,
                     BacktestConfig(calendar=None),
                     runtime=runtime,
@@ -152,7 +164,10 @@ def test_failed_nested_binding_does_not_detach_the_active_outer_market():
 
     with pytest.raises(ValueError, match="abort outer"):
         Engine(
-            DataFeed(prices_df=prices()), Outer(), BacktestConfig(calendar=None), runtime=runtime
+            _instant_feed(prices_df=prices()),
+            Outer(),
+            BacktestConfig(calendar=None),
+            runtime=runtime,
         ).run()
     with pytest.raises(RuntimeError, match="active run"):
         runtime.market.current(["TEST"], ["close"])
@@ -181,7 +196,9 @@ def test_last_trade_requires_observed_volume_and_stale_quotes_are_not_executable
                 )
             )
 
-    Engine(DataFeed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+    Engine(
+        _instant_feed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=runtime
+    ).run()
     assert seen == [
         (times[0], times[0], True),
         (times[0], times[1], False),
@@ -203,10 +220,10 @@ def test_market_view_retained_from_previous_run_cannot_read_during_a_new_run():
 
     single = prices().head(1)
     Engine(
-        DataFeed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
+        _instant_feed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
     ).run()
     Engine(
-        DataFeed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
+        _instant_feed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
     ).run()
 
 
@@ -236,7 +253,9 @@ def test_initialization_uses_declared_start_not_the_future_first_trading_bar():
                 runtime.market.history(["TEST"], ["feature"], bar_count=2)["feature"].to_list()
             )
 
-    Engine(DataFeed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+    Engine(
+        _instant_feed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=runtime
+    ).run()
     assert seen == [[None], [3.0, 9.0]]
 
 
@@ -266,7 +285,7 @@ def test_unpublished_quote_depth_cannot_leak_from_the_history_view_into_executab
                 broker.submit_order("TEST", 10)
 
     result = Engine(
-        DataFeed(prices_df=frame, ask_col="ask", ask_size_col="ask_size"),
+        _instant_feed(prices_df=frame, ask_col="ask", ask_size_col="ask_size"),
         Buy(),
         BacktestConfig(
             initial_cash=10000,
@@ -280,3 +299,27 @@ def test_unpublished_quote_depth_cannot_leak_from_the_history_view_into_executab
     assert result.to_fills_dataframe()["timestamp"].to_list() == [dates[1]]
     assert result.to_fills_dataframe()["quantity"].to_list() == [10.0]
     assert seen == [(None, None), (1000.0, 1000.0)]
+
+
+@pytest.mark.parametrize("role", [None, TimestampSemantics.SESSION_LABEL])
+def test_physical_runtime_cutoffs_reject_undeclared_or_session_label_clocks(role):
+    dates = [datetime(2025, 1, d, tzinfo=UTC) for d in [6, 7]]
+    frame = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2, "close": [999.0, 100.0]})
+    seen = []
+    runtime = RuntimeServices(start=datetime(2025, 1, 6, 13, 45, tzinfo=UTC))
+
+    class Read(Strategy):
+        def on_start(self, broker):
+            seen.append(runtime.market.history(["TEST"], ["close"], bar_count=1)["close"].to_list())
+
+        def on_data(self, *args):
+            pass
+
+    with pytest.raises(ValueError, match="timestamp_semantics"):
+        Engine(
+            DataFeed(prices_df=frame, feed_spec=FeedSpec(timestamp_semantics=role)),
+            Read(),
+            BacktestConfig(calendar=None),
+            runtime=runtime,
+        ).run()
+    assert seen == []

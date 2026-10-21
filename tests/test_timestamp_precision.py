@@ -10,6 +10,14 @@ from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Str
 from ml4t.backtest.config import CommissionType, ExecutionMode, ExecutionPrice, SlippageType
 from ml4t.backtest.result import BacktestResult
 
+
+def _instant_feed(**kwargs):
+    spec = FeedSpec.from_any(kwargs.pop("feed_spec", None))
+    if spec.timestamp_semantics is None:
+        spec = spec.with_overrides(timestamp_semantics=TimestampSemantics.EVENT_TIME)
+    return DataFeed(feed_spec=spec, **kwargs)
+
+
 BASE = 1735830000000000000
 
 
@@ -48,7 +56,7 @@ def test_distinct_ns_events_keep_fill_account_holdings_and_artifact_identity(tmp
     frame = pl.DataFrame(
         {"timestamp": instants([1, 2]), "asset": ["TEST"] * 2, "close": [100.0, 110.0]}
     )
-    feed = DataFeed(prices_df=frame)
+    feed = _instant_feed(prices_df=frame)
     result = Engine(
         feed, Trade(), config(calendar="NYSE"), holdings_sampling="fill_and_session"
     ).run()
@@ -89,7 +97,7 @@ def test_ns_known_at_and_history_cannot_merge_a_future_observation():
             h = runtime.market.history(["TEST"], ["close", "feature"], bar_count=2)
             seen.append((epochs(h), h["close"].to_list(), h["feature"].to_list()))
 
-    Engine(DataFeed(prices_df=frame), Read(), config(), runtime=runtime).run()
+    Engine(_instant_feed(prices_df=frame), Read(), config(), runtime=runtime).run()
     assert seen == [
         ([BASE + 1], [100.0], [None]),
         ([BASE + 1, BASE + 2], [100.0, 999.0], [3.0, 9.0]),
@@ -114,7 +122,7 @@ def test_ns_cash_events_apply_to_their_actual_separate_quotes_and_survive_save(t
             if not broker.positions:
                 broker.submit_order("TEST", 1)
 
-    result = Engine(DataFeed(prices_df=frame, capital_flows=flows), Hold(), config()).run()
+    result = Engine(_instant_feed(prices_df=frame, capital_flows=flows), Hold(), config()).run()
     assert epochs(result.to_capital_flows_dataframe()) == [BASE + 2, BASE + 3]
     assert result.to_equity_dataframe()["equity"].to_list() == [10000.0, 10510.0, 10770.0]
     assert result.to_equity_dataframe()["return"].to_list() == pytest.approx([0, 0.001, 10 / 10510])
@@ -147,7 +155,9 @@ def test_ns_close_filter_keeps_only_inclusive_declared_closing_endpoint():
         data_frequency="1m",
     )
     result = Engine(
-        DataFeed(prices_df=frame, feed_spec=spec), Cash(), BacktestConfig(enforce_sessions=True)
+        _instant_feed(prices_df=frame, feed_spec=spec),
+        Cash(),
+        BacktestConfig(enforce_sessions=True),
     ).run()
     assert epochs(result.to_equity_dataframe()) == [close - 1, close]
 
@@ -165,7 +175,7 @@ def test_ns_funding_records_are_distinct_cash_movements_and_round_trip(tmp_path)
             if not broker.positions:
                 broker.submit_order("TEST", 1)
 
-    result = Engine(DataFeed(prices_df=frame), Hold(), config(), funding_df=funding).run()
+    result = Engine(_instant_feed(prices_df=frame), Hold(), config(), funding_df=funding).run()
     assert epochs(result.to_funding_dataframe()) == [BASE + 2, BASE + 3]
     assert result.to_funding_dataframe()["cash_delta"].to_list() == [-1.0, -2.0]
     assert result.to_equity_dataframe()["equity"].to_list() == [10000.0, 9999.0, 9997.0]
