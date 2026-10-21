@@ -193,6 +193,16 @@ class FillExecutor:
                 base_price,
             )
             fill_quantity = exec_result.fillable_quantity
+            if (
+                not math.isfinite(fill_quantity)
+                or fill_quantity < 0
+                or fill_quantity > effective_quantity
+            ):
+                raise ValueError(
+                    "Invalid execution quantity from "
+                    f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}, "
+                    f"requested {effective_quantity!r}"
+                )
             if shared_budget is not None:
                 capacity = shared_budget(self.market.volumes.get(order.asset), base_price)
                 if not math.isfinite(capacity) or capacity < 0:

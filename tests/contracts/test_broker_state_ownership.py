@@ -13,6 +13,7 @@ from ml4t.backtest.core.state import OrderState, RiskState
 SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
 BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
 FORBIDDEN_BROKER_STATE = {
+    "_account_controls",
     "_asset_stats",
     "_asset_bars_seen",
     "_bar_index",
@@ -44,6 +45,7 @@ FORBIDDEN_BROKER_STATE = {
     "_order_book",
     "_order_counter",
     "_order_state",
+    "_order_session_config",
     "_orders_this_bar",
     "_orders_this_bar_ids",
     "_partial_orders",
@@ -57,9 +59,13 @@ FORBIDDEN_BROKER_STATE = {
     "_risk_engine",
     "_risk_state",
     "_session_config",
+    "_scheduled_session_date",
+    "_scheduled_session_open",
+    "_session_expiry_cache",
     "_session_boundary",
     "_stats_config",
     "_stop_exits_this_bar",
+    "_trading_controls",
     "_active_lifecycle_phase",
 }
 STRATEGY_CALLBACKS = {"on_data", "on_end", "on_prepare", "on_start"}
@@ -320,6 +326,9 @@ def test_broker_mutators_declare_their_lifecycle_rollback_scope() -> None:
         "submit_order": {"asset"},
         "update_order": {"order_id"},
         "cancel_order": {"order_id"},
+        "_expire_session_orders": {"order_id"},
+        "register_trading_control": set(),
+        "register_account_control": set(),
         "_process_pending_exits": {
             "all_positions",
             "all_pending_orders",

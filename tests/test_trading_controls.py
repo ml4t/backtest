@@ -138,6 +138,27 @@ def test_failed_callback_restores_order_control_counts_together_with_pending_ord
     assert engine.broker._order_state.control_counts == {}
 
 
+def test_failed_callback_cannot_leave_registered_order_or_account_controls_active():
+    from ml4t.backtest.controls import OrderConstraints
+
+    class RejectAccount:
+        def validate(self, account):
+            raise ValueError("uncommitted account control")
+
+    class Submit(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            broker.register_trading_control(OrderConstraints(max_order_quantity=0.5))
+            broker.register_account_control(RejectAccount())
+            raise RuntimeError("abort control registration")
+
+    engine = _engine(Submit())
+    with pytest.raises(RuntimeError, match="abort control registration"):
+        engine.run()
+    engine.broker.validate_account_controls()
+    order = engine.broker.submit_order("TEST", 1)
+    assert order is not None and order.order_id == "ORD-1"
+
+
 def test_long_only_and_dated_restrictions_see_current_positions_and_the_actual_order_time():
     from ml4t.backtest.controls import OrderConstraints, TradingControlViolation
 

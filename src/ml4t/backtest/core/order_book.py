@@ -73,18 +73,10 @@ class OrderBook:
             if existing_pos is None:
                 return None
 
-        control_request = (
-            broker._validate_trading_controls(
-                asset, quantity if side is OrderSide.BUY else -quantity
-            )
-            if broker._trading_controls
-            else None
+        control_request = broker._validate_trading_controls(
+            asset, quantity if side is OrderSide.BUY else -quantity
         )
-        eligible_from, eligible_on_boundary = (
-            broker._preopen_order_eligibility()
-            if broker._scheduled_session_open is not None
-            else (None, True)
-        )
+        eligible_from, eligible_on_boundary = broker._preopen_order_eligibility()
         submitted_session = (
             broker._submission_session_date(validate_active=True)
             if broker.cancel_policy is CancelPolicy.SESSION_END

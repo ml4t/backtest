@@ -1132,6 +1132,8 @@ class Broker:
             self._scheduled_session_open = previous_open
 
     def _preopen_order_eligibility(self) -> tuple[datetime | None, bool]:
+        if self._scheduled_session_open is None:
+            return None, True
         from ml4t.specs import LifecyclePhase
 
         from .sessions import _is_right_labeled_bar
@@ -1865,6 +1867,9 @@ class Broker:
             counts[("session", request.session_date)] = request.orders_in_session + 1
         if request.timestamp is not None:
             counts[("day", request.timestamp.date())] = request.orders_in_day + 1
+
+    def _has_account_controls(self) -> bool:
+        return bool(self._account_controls)
 
     def validate_account_controls(
         self, *, boundary: Literal["after_callbacks", "after_fills"] | None = None
