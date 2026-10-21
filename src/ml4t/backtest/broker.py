@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from .capital import CapitalChange, CapitalEvent
 from .config import (
     CancelPolicy,
+    ConditionalOrderMode,
     EntryOrderPriority,
     ExecutionPrice,
     FillOrdering,
@@ -135,6 +136,8 @@ class Broker:
         settlement_reduces_buying_power: bool = True,
         next_bar_execution_price: ExecutionPrice | None = None,
         cancel_policy: CancelPolicy = CancelPolicy.NEVER,
+        *,
+        conditional_order_mode: ConditionalOrderMode = ConditionalOrderMode.BAR_OHLC,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -154,6 +157,7 @@ class Broker:
         self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
         self.execution_price = execution_price
+        self.conditional_order_mode = ConditionalOrderMode(conditional_order_mode)
         self.next_bar_execution_price = (
             ExecutionPrice(next_bar_execution_price)
             if next_bar_execution_price is not None
@@ -436,6 +440,7 @@ class Broker:
             execution_price=config.execution_price,
             next_bar_execution_price=config.next_bar_execution_price,
             cancel_policy=config.cancel_policy,
+            conditional_order_mode=config.conditional_order_mode,
             mark_price=config.mark_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,

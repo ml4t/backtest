@@ -34,6 +34,7 @@ from ..types import (
     Order,
     OrderSide,
     OrderStatus,
+    OrderType,
     Position,
     Trade,
 )
@@ -139,7 +140,7 @@ class FillExecutor:
         self.record_pnl = record_pnl
         self.fill_engine: FillEngine | None = None
 
-    def execute(self, order: Order, base_price: float) -> bool:
+    def execute(self, order: Order, base_price: float, *, price_source: str | None = None) -> bool:
         """Execute a fill and update positions.
 
         This is the main entry point, replacing Broker._execute_fill().
@@ -229,6 +230,8 @@ class FillExecutor:
         fill_price, slippage = self._price_for_quantity(
             order, fill_quantity, base_price, available_size, quote=True
         )
+        if not self._within_limit(order, fill_price):
+            return False
 
         if not broker.skip_cash_validation and fill_price != base_price:
             valid, reason, code = self._validate_final_price(order, fill_quantity, fill_price)
@@ -248,6 +251,8 @@ class FillExecutor:
                 fill_price, slippage = self._price_for_quantity(
                     order, fill_quantity, base_price, available_size, quote=True
                 )
+                if not self._within_limit(order, fill_price):
+                    return False
                 order.quantity = fill_quantity
                 remaining_quantity = 0.0
                 self.orders.partial_quantities.pop(order.order_id, None)
@@ -289,7 +294,10 @@ class FillExecutor:
                 self.orders.partial_quantities.pop(order.order_id, None)
 
         # Create fill record
-        price_source = "open" if order.child_intent_id is not None else broker.execution_price.value
+        if price_source is None:
+            price_source = (
+                "open" if order.child_intent_id is not None else broker.execution_price.value
+            )
         multiplier = broker.get_multiplier(order.asset)
         contract_spec = broker.get_contract_spec(order.asset)
         fill = Fill(
@@ -305,6 +313,7 @@ class FillExecutor:
             order_type=order.order_type.value,
             limit_price=order.limit_price,
             stop_price=order.stop_price,
+            stop_triggered_at=order.stop_triggered_at,
             price_source=price_source,
             reference_price=quote_context["reference_price"],
             quote_mid_price=quote_context["quote_mid_price"],
@@ -401,6 +410,17 @@ class FillExecutor:
             )
 
         return not is_partial
+
+    @staticmethod
+    def _within_limit(order: Order, price: float) -> bool:
+        if order.order_type not in {OrderType.LIMIT, OrderType.STOP_LIMIT}:
+            return True
+        assert order.limit_price is not None
+        return (
+            price <= order.limit_price
+            if order.side is OrderSide.BUY
+            else price >= order.limit_price
+        )
 
     def _has_mutable_price_model(self) -> bool:
         return type(self.broker.slippage_model) not in (

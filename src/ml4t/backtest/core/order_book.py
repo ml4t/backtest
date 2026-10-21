@@ -47,6 +47,24 @@ class OrderBook:
         self._submission_shadow_cash: float = 0.0
         self._submission_shadow_positions: dict[str, tuple[float, float]] = {}
 
+    @staticmethod
+    def _validate_prices(
+        order_type: OrderType, limit_price: float | None, stop_price: float | None
+    ) -> None:
+        for name, value, required in (
+            ("limit_price", limit_price, order_type in {OrderType.LIMIT, OrderType.STOP_LIMIT}),
+            ("stop_price", stop_price, order_type in {OrderType.STOP, OrderType.STOP_LIMIT}),
+        ):
+            if value is None and not required:
+                continue
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, Real)
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise ValueError(f"{name} must be a finite positive price for {order_type.value}")
+
     def submit_order(
         self,
         asset: str,
@@ -59,6 +77,13 @@ class OrderBook:
         options: SubmitOrderOptions | None = None,
     ) -> Order | None:
         broker = self.broker
+        self._validate_prices(order_type, limit_price, stop_price)
+        if (
+            isinstance(quantity, bool)
+            or not isinstance(quantity, Real)
+            or not math.isfinite(quantity)
+        ):
+            raise ValueError("Order quantity must be a finite real number")
 
         if side is None:
             if quantity == 0:
@@ -284,6 +309,14 @@ class OrderBook:
                     quantity if order.side is OrderSide.BUY else -quantity,
                     replacing_order_id=order_id,
                 )
+                self._validate_prices(
+                    order.order_type,
+                    kwargs.get("limit_price", order.limit_price),
+                    kwargs.get("stop_price", order.stop_price),
+                )
+                if "stop_price" in kwargs and kwargs["stop_price"] != order.stop_price:
+                    order._stop_triggered = False
+                    order._stop_triggered_at = None
                 for key, value in kwargs.items():
                     setattr(order, key, value)
                 if "quantity" in kwargs and order_id in self.orders.partial_quantities:

@@ -182,6 +182,18 @@ class Order:
     _submitted_session_date: date | None = field(default=None, kw_only=True)
     _eligible_from: datetime | None = field(default=None, kw_only=True)
     _eligible_on_boundary: bool = field(default=True, kw_only=True)
+    _stop_triggered: bool = field(default=False, kw_only=True)
+    _stop_triggered_at: datetime | None = field(default=None, kw_only=True)
+
+    @property
+    def stop_triggered(self) -> bool:
+        """Whether a stop or stop-limit order has become eligible for execution."""
+        return self._stop_triggered
+
+    @property
+    def stop_triggered_at(self) -> datetime | None:
+        """Actual observed trigger instant, before any later partial fills."""
+        return self._stop_triggered_at
 
     def __post_init__(self) -> None:
         if self.requested_quantity is None:
@@ -424,6 +436,7 @@ class Fill:
     intent_idempotency_key: str | None = None
     multiplier: float | None = None
     currency: str | None = None
+    stop_triggered_at: datetime | None = field(default=None, kw_only=True)
 
 
 @dataclass

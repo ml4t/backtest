@@ -137,6 +137,68 @@ broker.submit_order(
 )
 ```
 
+In development source, a triggered stop-limit stays a limit order until filled,
+cancelled or expired. A gap beyond its limit does not execute it. A triggered
+stop's partial remainder stays market eligible without needing to touch its stop
+again. Changing `stop_price` rearms the trigger; changing only its limit or
+remaining quantity preserves activation. `order.stop_triggered_at` records the
+observed trigger instant, which is also retained on subsequent fills.
+
+### Conditional price methods
+
+The native `conditional_order_mode="bar_ohlc"` uses bar extrema for triggers,
+fills limits at their limit level and fills newly triggered stops at the stop or
+gap-open price. When a stop activates intrabar and its limit requires a reversal,
+an earlier low/high cannot prove execution after activation. The order waits
+unless the opening gap or closing observation establishes that sequence.
+
+Select `"execution_price"` to use the configured execution observation for both
+triggers and fills. For example, deferred close execution tests the close alone,
+without using an intrabar high to trigger a stop. This method can improve a limit
+fill when that observation is better than its limit. Both methods enforce the
+limit against the final price after impact and slippage. An inadmissible price
+leaves the order pending and consumes no fees or participation.
+
+<!-- ml4t-doc-test: conditional-stop-limit -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy, OrderType
+from ml4t.backtest.config import ConditionalOrderMode, ExecutionMode, ExecutionPrice
+
+times = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [6, 7, 8, 10]]
+prices = pl.DataFrame({"timestamp": times, "asset": ["TEST"] * 4,
+    "open": [100.0, 110.0, 103.0, 99.0], "high": [101.0, 112.0, 104.0, 100.0],
+    "low": [99.0, 109.0, 101.0, 98.0], "close": [100.0, 111.0, 102.0, 99.0]})
+
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == times[0]:
+            broker.submit_order("TEST", 10, order_type=OrderType.STOP_LIMIT,
+                                stop_price=105.0, limit_price=104.0)
+
+result = Engine(DataFeed(prices_df=prices), Buy(), BacktestConfig(
+    calendar=None, initial_cash=10000, execution_mode=ExecutionMode.NEXT_BAR,
+    next_bar_execution_price=ExecutionPrice.CLOSE,
+    conditional_order_mode=ConditionalOrderMode.EXECUTION_PRICE)).run()
+fills = result.to_fills_dataframe()
+assert fills["price"].to_list() == [102.0]
+assert fills["timestamp"].to_list() == [times[2]]
+assert fills["stop_triggered_at"].to_list() == [times[1]]
+assert result.to_portfolio_state_dataframe()["cash"].to_list() == [10000, 10000, 8980, 8980]
+assert result.to_equity_dataframe()["equity"].to_list() == [10000, 10000, 10000, 9970]
+print("Stop-limit activation, execution and account values verified.")
+```
+
+This four-session close-price case was also run through published Zipline
+Reloaded 3.2.0 with `StopLimitOrder(104, 105)`, zero commission and zero impact.
+Its fill, cash and NAV agree. Other callback, account and slippage settings need
+their own qualification.
+
+Conditional orders require finite positive price parameters. Invalid prices and
+nonfinite, Boolean or nonnumeric quantities fail before consuming an order ID or
+changing the account. Zero quantity remains a no-op.
+
 ## Trailing Stop Orders
 
 Dynamic stop that follows price movement:

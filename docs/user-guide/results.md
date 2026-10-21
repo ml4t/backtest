@@ -526,13 +526,14 @@ Fill objects carry order-type metadata for audit:
 
 | Field | Description |
 |-------|-------------|
-| `fill.order_type` | `"market"`, `"limit"`, or `"stop"` |
+| `fill.order_type` | Native order type, including `"stop_limit"`, `"moc"` and `"trailing_stop"` |
 | `fill.limit_price` | Limit price (for limit orders) |
 | `fill.stop_price` | Stop price (for stop orders) |
+| `fill.stop_triggered_at` | Observed activation instant, retained across later partial fills; None when unavailable |
 | `fill.price` | Actual fill price |
 | `fill.commission` | Commission charged |
 | `fill.slippage` | Slippage applied |
-| `fill.price_source` | Configured source used for the fill |
+| `fill.price_source` | Resolved configured execution source, including a next-bar override; conditional order fields identify level-based pricing |
 | `fill.reference_price` | Feed reference price (`bar["price"]`) |
 | `fill.quote_mid_price` | Quote midpoint at fill time |
 | `fill.bid_price` / `fill.ask_price` | Best bid / ask |

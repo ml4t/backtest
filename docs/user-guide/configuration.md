@@ -147,7 +147,8 @@ Account type is determined by the flag combination:
 | `execution_mode` | ExecutionMode | NEXT_BAR | When orders fill (SAME_BAR or NEXT_BAR) |
 | `execution_price` | ExecutionPrice | OPEN | Price used for market fills |
 | `mark_price` | ExecutionPrice | PRICE | Price used for open-position marking |
-| `next_bar_execution_price` | ExecutionPrice or None | None | Explicit deferred market-fill source; None preserves the native next-open rule |
+| `next_bar_execution_price` | ExecutionPrice or None | None | Explicit deferred execution source; None preserves the native next-open rule |
+| `conditional_order_mode` | ConditionalOrderMode | BAR_OHLC | Extrema/level-based conditional orders, or EXECUTION_PRICE for triggers and fills on the selected observation |
 
 To execute an ordinary market order at the next observed bar's close, select
 `execution_mode=ExecutionMode.NEXT_BAR` and

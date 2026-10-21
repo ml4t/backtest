@@ -229,6 +229,13 @@ class LateAssetPolicy(str, Enum):
     REQUIRE_HISTORY = "require_history"
 
 
+class ConditionalOrderMode(str, Enum):
+    """Price evidence used for conditional triggers and executions."""
+
+    BAR_OHLC = "bar_ohlc"
+    EXECUTION_PRICE = "execution_price"
+
+
 class CancelPolicy(str, Enum):
     NEVER = "never"
     SESSION_END = "session_end"
@@ -549,6 +556,9 @@ class BacktestConfig:
     mark_price: ExecutionPrice = ExecutionPrice.PRICE
     next_bar_execution_price: ExecutionPrice | None = field(default=None, kw_only=True)
     cancel_policy: CancelPolicy = field(default=CancelPolicy.NEVER, kw_only=True)
+    conditional_order_mode: ConditionalOrderMode = field(
+        default=ConditionalOrderMode.BAR_OHLC, kw_only=True
+    )
     execution_mode: ExecutionMode = ExecutionMode.NEXT_BAR  # Order execution timing
 
     # === Stop Configuration ===
@@ -825,6 +835,7 @@ class BacktestConfig:
 
     def __post_init__(self) -> None:
         self.cancel_policy = CancelPolicy(self.cancel_policy)
+        self.conditional_order_mode = ConditionalOrderMode(self.conditional_order_mode)
         if self.next_bar_execution_price is not None:
             self.next_bar_execution_price = ExecutionPrice(self.next_bar_execution_price)
         FeedSpec(time_contract_version=self.time_contract_version, calendar=self.calendar)
@@ -1006,6 +1017,7 @@ class BacktestConfig:
                 "mark_price": self.mark_price.value,
                 "execution_mode": self.execution_mode.value,
                 "cancel_policy": self.cancel_policy.value,
+                "conditional_order_mode": self.conditional_order_mode.value,
                 "next_bar_execution_price": (
                     self.next_bar_execution_price.value
                     if self.next_bar_execution_price is not None
@@ -1133,6 +1145,7 @@ class BacktestConfig:
                     "execution_mode",
                     "next_bar_execution_price",
                     "cancel_policy",
+                    "conditional_order_mode",
                 },
                 "stops": {
                     "stop_fill_mode",
@@ -1276,6 +1289,7 @@ class BacktestConfig:
             ),
             next_bar_execution_price=exec_cfg.get("next_bar_execution_price"),
             cancel_policy=exec_cfg.get("cancel_policy", "never"),
+            conditional_order_mode=exec_cfg.get("conditional_order_mode", "bar_ohlc"),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),
@@ -1546,6 +1560,7 @@ class BacktestConfig:
                 "Execution:",
                 f"  Execution mode: {self.execution_mode.value}",
                 f"  Execution price: {self.execution_price.value}",
+                f"  Conditional order mode: {self.conditional_order_mode.value}",
                 f"  Mark price: {self.mark_price.value}",
                 "",
                 "Stops:",

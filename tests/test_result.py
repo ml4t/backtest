@@ -343,6 +343,7 @@ class TestBacktestResultFillsDataFrame:
             "order_type",
             "limit_price",
             "stop_price",
+            "stop_triggered_at",
             "price_source",
             "reference_price",
             "quote_mid_price",

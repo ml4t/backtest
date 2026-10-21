@@ -359,6 +359,7 @@ class BacktestResult:
 
         schema = self._fills_schema()
         schema["timestamp"] = self._timestamp_dtype(fill.timestamp for fill in self.fills)
+        schema["stop_triggered_at"] = schema["timestamp"]
         if not self.fills:
             return temporal_frame(schema=schema)
 
@@ -384,6 +385,7 @@ class BacktestResult:
                     "order_type": fill.order_type,
                     "limit_price": fill.limit_price,
                     "stop_price": fill.stop_price,
+                    "stop_triggered_at": fill.stop_triggered_at,
                     "price_source": fill.price_source,
                     "reference_price": fill.reference_price,
                     "quote_mid_price": fill.quote_mid_price,
@@ -1541,6 +1543,11 @@ class BacktestResult:
                     raise ValueError("fill_sequence must uniquely order every fill from zero")
                 frame = frame.sort("fill_sequence")
             for row in temporal_rows(frame, named=True):
+                triggered_at = row.get("stop_triggered_at")
+                if triggered_at is not None and (
+                    not isinstance(triggered_at, datetime) or triggered_at > row["timestamp"]
+                ):
+                    raise ValueError("Stop trigger instant must not follow its fill")
                 result.append(
                     Fill(
                         order_id=row["order_id"],
@@ -1557,6 +1564,7 @@ class BacktestResult:
                         order_type=row.get("order_type", ""),
                         limit_price=row.get("limit_price"),
                         stop_price=row.get("stop_price"),
+                        stop_triggered_at=row.get("stop_triggered_at"),
                         price_source=row.get("price_source", ""),
                         reference_price=row.get("reference_price"),
                         quote_mid_price=row.get("quote_mid_price"),
@@ -2009,6 +2017,7 @@ class BacktestResult:
             "order_type": pl.String(),
             "limit_price": pl.Float64(),
             "stop_price": pl.Float64(),
+            "stop_triggered_at": pl.Datetime(),
             "price_source": pl.String(),
             "reference_price": pl.Float64(),
             "quote_mid_price": pl.Float64(),

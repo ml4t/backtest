@@ -49,6 +49,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "prepared-feature-panel",
         "trading-account-controls",
         "session-end-cancel",
+        "conditional-stop-limit",
         "order-context-fees",
         "account-engine-direct",
         "account-gatekeeper",

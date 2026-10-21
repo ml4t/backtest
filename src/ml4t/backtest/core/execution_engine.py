@@ -145,7 +145,7 @@ class ExecutionEngine:
                 continue
             fill_price = fill.check_fill(order, price)
             if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
-                fully_filled = fill.execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                 if fully_filled:
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
@@ -268,7 +268,7 @@ class ExecutionEngine:
         for order, fill_price in accepted_orders:
             if not fill.constrain_locked_short_cover(order, fill_price):
                 continue
-            fully_filled = fill.execute_fill(order, fill_price)
+            fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
             if fully_filled:
                 filled_orders.append(order)
                 self.orders.partial_quantities.pop(order.order_id, None)
@@ -511,7 +511,7 @@ class ExecutionEngine:
                 # Entries fill directly when shadow-validated at submission.
                 fill_price = fill.check_fill(order, price)
                 if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
-                    fully_filled = fill.execute_fill(order, fill_price)
+                    fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                     if fully_filled:
                         filled_orders.append(order)
                         self.orders.partial_quantities.pop(order.order_id, None)
@@ -570,7 +570,7 @@ class ExecutionEngine:
                 if not fill.constrain_locked_short_cover(order, fill_price):
                     return
 
-                fully_filled = fill.execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                 if fully_filled:
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
@@ -616,14 +616,16 @@ class ExecutionEngine:
 
             insufficient_cash = "insufficient" in rejection_reason.lower()
             if valid:
-                fully_filled = fill.execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                 if fully_filled:
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     fill.update_partial_order(order)
             elif not broker.reject_on_insufficient_cash and insufficient_cash:
-                if broker.partial_fills_allowed and fill.try_partial_fill(order, fill_price):
+                if broker.partial_fills_allowed and fill.try_partial_fill(
+                    order, fill_price, use_open=use_open
+                ):
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
                 else:
@@ -634,7 +636,7 @@ class ExecutionEngine:
                 broker.partial_fills_allowed
                 or (order.rebalance_id is not None and broker.share_type.value == "integer")
             ):
-                if fill.try_partial_fill(order, fill_price):
+                if fill.try_partial_fill(order, fill_price, use_open=use_open):
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
                 else:
