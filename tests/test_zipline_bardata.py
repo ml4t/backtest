@@ -241,3 +241,31 @@ def test_merging_bundle_sid_columns_cannot_alias_distinct_native_assets():
             assert broker.get_orders() == ()
 
     Engine(_feed(), Read(), BacktestConfig(calendar="NYSE"), runtime=runtime).run()
+
+
+@pytest.mark.parametrize("unit", [None, "observation", "expected_bar"])
+def test_explicit_calendar_none_uses_observations_and_preserves_physical_indexes(unit):
+    from ml4t.backtest.compat.zipline.data import BarData
+
+    runtime = RuntimeServices()
+    seen = []
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp.day != 7:
+                return
+            kwargs = {} if unit is None else {"history_unit": unit}
+            reader = BarData(runtime, **kwargs)
+            if unit == "expected_bar":
+                with pytest.raises(ValueError, match="require a declared calendar"):
+                    reader.history(_assets()[0], "price", 2, "1d")
+            else:
+                frame = reader.history(_assets()[0], "price", 2, "1d")
+                assert frame.index.tolist() == list(
+                    pd.to_datetime(["2025-01-06T21:00:00Z", "2025-01-07T21:00:00Z"])
+                )
+                assert frame.tolist() == [100.0, 101.0]
+            seen.append(timestamp)
+
+    result = Engine(_feed(), Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+    assert result.config.resolved_calendar is None and len(seen) == 1

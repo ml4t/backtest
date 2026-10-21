@@ -25,14 +25,14 @@ class BarData:
         runtime: RuntimeServices,
         *,
         history_view: Literal["raw", "prepared"] = "raw",
-        history_unit: WindowUnit | str = WindowUnit.EXPECTED_BAR,
+        history_unit: WindowUnit | str | None = None,
     ) -> None:
         if history_view not in {"raw", "prepared"}:
             raise ValueError("history_view must be raw or prepared")
         self._runtime = runtime
         self._history_view = history_view
-        self._history_unit = WindowUnit(history_unit)
-        if self._history_unit not in {WindowUnit.OBSERVATION, WindowUnit.EXPECTED_BAR}:
+        self._history_unit = None if history_unit is None else WindowUnit(history_unit)
+        if self._history_unit not in {None, WindowUnit.OBSERVATION, WindowUnit.EXPECTED_BAR}:
             raise ValueError("Zipline bar_count history requires observation or expected_bar units")
 
     @staticmethod
@@ -82,13 +82,11 @@ class BarData:
         engine = self._runtime._engine
         assert engine is not None
         config = engine.config
-        if frequency == "1m":
+        if frequency == "1m" or config.resolved_calendar is None:
             stamps = pd.DatetimeIndex(times)
             if stamps.tz is None:
                 stamps = stamps.tz_localize(config.resolved_timezone)
             return stamps.tz_convert("UTC").as_unit("ns")
-        if config.resolved_calendar is None:
-            raise ValueError("Daily Zipline history labels require a declared calendar")
         session = SessionConfig(
             config.resolved_calendar,
             config.resolved_timezone,
@@ -124,11 +122,18 @@ class BarData:
                 "Requested history frequency must match its explicitly prepared source grid; "
                 "prepare cross-frequency bars in Data before the run"
             )
+        unit = self._history_unit
+        if unit is None:
+            unit = (
+                WindowUnit.OBSERVATION
+                if engine.config.resolved_calendar is None
+                else WindowUnit.EXPECTED_BAR
+            )
         frame = self._runtime.market.history(
             [asset.key for asset in chosen],
             names,
             bar_count=bar_count,
-            unit=self._history_unit,
+            unit=unit,
             view=self._history_view,
         )
         rows = list(temporal_rows(frame, named=True))

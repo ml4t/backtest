@@ -150,8 +150,8 @@ the second index level unnamed. The adapter preserves the actual output:
 `["date", None]` for daily history and `["date_time", None]` for minute history.
 Multi-field history sorts its asset index by supplied legacy SID (otherwise native key); single-field
 history and current reads retain the requested order. History numeric columns
-are Float64; daily indexes are naive session dates and minute indexes are UTC
-instants, both with nanosecond datetime units.
+are Float64. With a declared calendar, daily indexes are naive session dates;
+minute indexes are UTC instants. Both use nanosecond datetime units.
 
 <!-- ml4t-doc-test: zipline-read-shapes -->
 ```python
@@ -188,8 +188,11 @@ print("Zipline read containers preserve the native causal history.")
 ```
 
 History requests require `"1d"` or `"1m"` matching the declared source grid,
-with OHLCV/price fields. The default uses native expected-bar windows; requesting
-before captured source coverage raises and requires warmup bars. Cross-frequency
+with OHLCV/price fields. With a declared calendar, the default uses native expected-bar windows.
+Explicit `calendar=None` selects observation windows and retains physical UTC
+indexes for daily and minute reads. An explicit expected-bar request still
+requires a calendar. Requesting before captured source coverage raises and
+requires warmup bars. Cross-frequency
 aggregation belongs in Data preparation. `history_view="prepared"` selects the
 [Data-prepared view](strategies.md#read-data-prepared-adjusted-history); it does
 not adjust executable prices. Asset, action and futures-account migration still

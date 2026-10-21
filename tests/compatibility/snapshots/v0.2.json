@@ -2667,7 +2667,7 @@
       },
       "module": "ml4t.backtest.compat.zipline.data",
       "qualname": "BarData",
-      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str = <WindowUnit.EXPECTED_BAR: 'expected_bar'>) -> None"
+      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None) -> None"
     },
     "ml4t.backtest.config:BacktestConfig": {
       "kind": "class",
