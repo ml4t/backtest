@@ -79,6 +79,9 @@ def test_original_callback_orders_and_record_use_native_fills_fees_and_marked_po
     assert result.to_fills_dataframe()["commission"].to_list() == [1.0]
     assert performance.observed_price.tolist() == [100.0, 110.0, 120.0]
     assert performance.returns.tolist() == pytest.approx([0, -0.0001, 100 / 9999])
+    assert [len(row) for row in performance.transactions] == [0, 1, 0]
+    assert performance.transactions.iloc[1][0]["amount"] == 10
+    assert performance.transactions.iloc[1][0]["commission"] == 1
     assert events[0] == "initialize" and events[-1] == "analyze"
     assert len(events) == 5
     with pytest.raises(RuntimeError, match="active migration callback"):

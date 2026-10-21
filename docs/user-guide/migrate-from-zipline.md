@@ -352,8 +352,8 @@ NAV and 47 fills match the reference. This is a correctness comparison for that
 input and its declared costs, not a performance measurement or a claim that
 all Zipline workflows are supported.
 
-This initial adapter does not yet implement `schedule_function`, target/value
-order helpers, the original Pipeline construction API, `fetch_csv`, benchmark
+This initial adapter does not yet implement `schedule_function`,
+the original Pipeline construction API, `fetch_csv`, benchmark
 return inputs, raw corporate actions or futures variation-cash settlement.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
@@ -361,3 +361,27 @@ records it as not supplied. An asset benchmark currently needs a separately
 prepared workflow. No implicit SPY download or synthetic benchmark return is
 created. Pass physical run bounds and warmup through `RuntimeServices`; do not
 reinterpret session labels as event instants.
+
+### Quantity, value and target orders
+
+The callback API and context expose `order`, `order_value`, `order_percent`,
+`order_target`, `order_target_value` and `order_target_percent`. They use native
+scalar sizing and order submission. Value orders divide by the last observed
+native price and contract multiplier. Targets subtract held quantity before
+rounding their signed delta. Integer amounts within 0.0001 of an integer snap
+to it; other amounts truncate toward zero. Targets deliberately ignore pending
+orders, so submitting the same target twice can create two orders. This is not
+a batch weight rebalance or a guarantee that the target is affordable.
+
+Pass explicit `limit_price`/`stop_price`, or a `MarketOrder`, `LimitOrder`,
+`StopOrder` or `StopLimitOrder` from
+`ml4t.backtest.compat.zipline.finance.execution`. Native trigger state,
+next-bar eligibility, volume limits and final slipped-price limit checks still
+apply. Do not pass a style together with separate price arguments.
+
+The frame's `transactions` column groups actual native fills by observation.
+It supplies mapped assets, signed amounts, actual price, timestamp, native order
+ID and actual fill commission. Zipline's transaction records may leave commission
+null; this projection reports the native fill fee. The authoritative fill table
+remains in the attached native result. No order or transaction is fabricated to
+fill a missing observation.

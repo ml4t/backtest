@@ -20,10 +20,12 @@ from ...config import (
     SlippageType,
 )
 from ...execution.limits import PositiveVolumeLimit, SharedVolumeParticipationLimit
+from ...execution.sizing import quantity_for_value, quantity_to_target, round_quantity
 from ._scope import callback_scope
 from .assets import Asset
 from .data import BarData
 from .finance import commission, slippage
+from .finance.execution import _native_style
 
 
 @dataclass(frozen=True)
@@ -126,20 +128,101 @@ class MigrationContext:
             raise ValueError(f"SID {sid!r} has no explicit asset mapping")
         return matches[0]
 
-    def order(self, asset: Asset, amount: float) -> str | None:
+    def order(
+        self,
+        asset: Asset,
+        amount: float,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        style: Any | None = None,
+    ) -> str | None:
         self._validate_asset(asset)
         if not self._running:
             raise RuntimeError("Orders require a running market callback")
-        if not isfinite(amount):
-            raise ValueError("Order amount must be finite")
-        # The historical share-order boundary rounds near integers, then truncates.
-        rounded = round(amount)
-        quantity = int(rounded if abs(amount - rounded) <= 0.0001 else amount)
+        kind, limit_price, stop_price = _native_style(style, limit_price, stop_price)
+        quantity = round_quantity(amount, rounding="near_integer")
         broker = self._require_broker()
         if quantity == 0:
             return None
-        submitted = broker.submit_order(asset.key, quantity)
+        submitted = broker.submit_order(
+            asset.key, quantity, order_type=kind, limit_price=limit_price, stop_price=stop_price
+        )
         return submitted.order_id if submitted is not None else None
+
+    def _value_quantity(self, asset: Asset, value: float) -> float | None:
+        self._validate_asset(asset)
+        broker = self._require_broker()
+        price = broker.get_last_price(asset.key)
+        return (
+            None
+            if price is None
+            else quantity_for_value(value, price, broker.get_multiplier(asset.key))
+        )
+
+    def order_value(
+        self,
+        asset: Asset,
+        value: float,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        style: Any | None = None,
+    ) -> str | None:
+        amount = self._value_quantity(asset, value)
+        return None if amount is None else self.order(asset, amount, limit_price, stop_price, style)
+
+    def order_percent(
+        self,
+        asset: Asset,
+        percent: float,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        style: Any | None = None,
+    ) -> str | None:
+        return self.order_value(
+            asset, self._require_broker().equity() * percent, limit_price, stop_price, style
+        )
+
+    def order_target(
+        self,
+        asset: Asset,
+        target: float,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        style: Any | None = None,
+    ) -> str | None:
+        self._validate_asset(asset)
+        position = self._require_broker().get_position(asset.key)
+        amount = quantity_to_target(
+            target, position.quantity if position is not None else 0, rounding="near_integer"
+        )
+        return self.order(asset, amount, limit_price, stop_price, style)
+
+    def order_target_value(
+        self,
+        asset: Asset,
+        target: float,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        style: Any | None = None,
+    ) -> str | None:
+        amount = self._value_quantity(asset, target)
+        return (
+            None
+            if amount is None
+            else self.order_target(asset, amount, limit_price, stop_price, style)
+        )
+
+    def order_target_percent(
+        self,
+        asset: Asset,
+        target: float,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        style: Any | None = None,
+    ) -> str | None:
+        return self.order_target_value(
+            asset, self._require_broker().equity() * target, limit_price, stop_price, style
+        )
 
     def record(self, **values: Any) -> None:
         if not self._running:
@@ -238,7 +321,7 @@ class _Callbacks(Strategy):
                 self.handle_data(self.context, self.data)
 
 
-def _performance(result) -> pd.DataFrame:
+def _performance(result, assets: Mapping[str, Asset]) -> pd.DataFrame:
     frame = result.to_portfolio_state_dataframe()
     rows = list(temporal_rows(frame, named=True))
     index = pd.DatetimeIndex([row["timestamp"] for row in rows])
@@ -252,6 +335,25 @@ def _performance(result) -> pd.DataFrame:
         },
         index=index.tz_convert("UTC").as_unit("ns"),
     )
+    transactions: dict[pd.Timestamp, list[dict[str, Any]]] = {}
+    for fill in result.fills:
+        timestamp = pd.Timestamp(fill.timestamp)
+        if timestamp.tz is None:
+            timestamp = timestamp.tz_localize(result.config.resolved_timezone)
+        timestamp = timestamp.tz_convert("UTC")
+        transactions.setdefault(timestamp, []).append(
+            {
+                "sid": assets[fill.asset],
+                "amount": fill.quantity * (1 if fill.side.value == "buy" else -1),
+                "dt": timestamp,
+                "price": fill.price,
+                "order_id": fill.order_id,
+                "commission": fill.commission,
+            }
+        )
+    performance["transactions"] = [
+        transactions.get(timestamp, []) for timestamp in performance.index
+    ]
     if result.recorded_variables is not None:
         records = result.to_recorded_records()
         by_observation = {row["bar_index"]: row["values"] for row in records}
@@ -294,7 +396,12 @@ def run_algorithm(
         next_bar_execution_price=ExecutionPrice.CLOSE,
         conditional_order_mode=ConditionalOrderMode.EXECUTION_PRICE,
         fill_ordering=FillOrdering.FIFO,
-        metadata={"migration_adapter": "zipline", "benchmark_status": "not_supplied"},
+        metadata={
+            "migration_adapter": "zipline",
+            "benchmark_status": "not_supplied",
+            "quantity_rounding": "near_integer",
+            "target_pending_orders": "ignored",
+        },
     )
     context = MigrationContext(assets, config)
     if initialize is not None:
@@ -311,7 +418,7 @@ def run_algorithm(
         execution_limits=limits,
         holdings_sampling="bar",
     ).run()
-    performance = _performance(result)
+    performance = _performance(result, context._by_key)
     if analyze is not None:
         with callback_scope(context):
             analyze(context, performance)

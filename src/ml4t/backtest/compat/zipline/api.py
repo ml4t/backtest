@@ -20,8 +20,14 @@ def sid(sid: int) -> Asset:
     return current().sid(sid)
 
 
-def order(asset: Asset, amount: float) -> str | None:
-    return current().order(asset, amount)
+def order(
+    asset: Asset,
+    amount: float,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    style: Any | None = None,
+) -> str | None:
+    return current().order(asset, amount, limit_price, stop_price, style)
 
 
 def record(**values: Any) -> None:
@@ -42,3 +48,53 @@ def set_slippage(model: Any) -> None:
 
 def set_benchmark(asset: Asset | None) -> None:
     current().set_benchmark(asset)
+
+
+def order_value(
+    asset: Asset,
+    value: float,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    style: Any | None = None,
+) -> str | None:
+    return current().order_value(asset, value, limit_price, stop_price, style)
+
+
+def order_percent(
+    asset: Asset,
+    percent: float,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    style: Any | None = None,
+) -> str | None:
+    return current().order_percent(asset, percent, limit_price, stop_price, style)
+
+
+def order_target(
+    asset: Asset,
+    target: float,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    style: Any | None = None,
+) -> str | None:
+    return current().order_target(asset, target, limit_price, stop_price, style)
+
+
+def order_target_value(
+    asset: Asset,
+    target: float,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    style: Any | None = None,
+) -> str | None:
+    return current().order_target_value(asset, target, limit_price, stop_price, style)
+
+
+def order_target_percent(
+    asset: Asset,
+    target: float,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    style: Any | None = None,
+) -> str | None:
+    return current().order_target_percent(asset, target, limit_price, stop_price, style)
