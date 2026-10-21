@@ -667,6 +667,7 @@
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
     "from ml4t.backtest.compat.zipline import run_algorithm",
+    "from ml4t.backtest.compat.zipline.api import date_rules, get_datetime, record, schedule_function",
     "from ml4t.backtest.compat.zipline.api import order, record, set_commission, set_slippage, symbol",
     "from ml4t.backtest.compat.zipline.assets import Asset",
     "from ml4t.backtest.compat.zipline.data import BarData",
@@ -2641,6 +2642,40 @@
       "qualname": "volatility",
       "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, annualize: bool = True) -> float"
     },
+    "ml4t.backtest.compat.zipline.api:date_rules": {
+      "kind": "class",
+      "members": {
+        "every_day": {
+          "kind": "method",
+          "signature": "() -> '_DateRule'"
+        },
+        "month_end": {
+          "kind": "method",
+          "signature": "(days_offset: 'int' = 0) -> '_DateRule'"
+        },
+        "month_start": {
+          "kind": "method",
+          "signature": "(days_offset: 'int' = 0) -> '_DateRule'"
+        },
+        "week_end": {
+          "kind": "method",
+          "signature": "(days_offset: 'int' = 0) -> '_DateRule'"
+        },
+        "week_start": {
+          "kind": "method",
+          "signature": "(days_offset: 'int' = 0) -> '_DateRule'"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.events",
+      "qualname": "date_rules",
+      "signature": "()"
+    },
+    "ml4t.backtest.compat.zipline.api:get_datetime": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "get_datetime",
+      "signature": "(tz: str | None = None) -> pandas._libs.tslibs.timestamps.Timestamp"
+    },
     "ml4t.backtest.compat.zipline.api:order": {
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
@@ -2652,6 +2687,12 @@
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "record",
       "signature": "(**values: Any) -> None"
+    },
+    "ml4t.backtest.compat.zipline.api:schedule_function": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.api",
+      "qualname": "schedule_function",
+      "signature": "(func: collections.abc.Callable[..., Any], date_rule: ml4t.backtest.compat.zipline.events._DateRule | ml4t.backtest.compat.zipline.events._TimeRule | None = None, time_rule: ml4t.backtest.compat.zipline.events._TimeRule | None = None, half_days: bool = True, calendar: str | None = None) -> None"
     },
     "ml4t.backtest.compat.zipline.api:set_commission": {
       "kind": "function",
@@ -2719,7 +2760,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.runner",
       "qualname": "run_algorithm",
-      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset]', initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None) -> 'pd.DataFrame'"
+      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset]', initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None) -> 'pd.DataFrame'"
     },
     "ml4t.backtest.config:BacktestConfig": {
       "kind": "class",

@@ -353,7 +353,7 @@ NAV and 47 fills match the reference. This is a correctness comparison for that
 input and its declared costs, not a performance measurement or a claim that
 all Zipline workflows are supported.
 
-This initial adapter does not yet implement `schedule_function`,
+This initial adapter does not yet implement
 the original Pipeline construction API, `fetch_csv`, benchmark
 return inputs, raw corporate actions or futures variation-cash settlement.
 Native scheduler and prepared feature/history routes remain available as
@@ -409,3 +409,85 @@ run cannot refer to a later run's local `ORD-1`. Use `native_order_id` when
 joining the projected order or transaction to the attached native result.
 Native IDs and their serialization are unchanged. Native strategies can call
 `broker.get_fills(order_id)` to obtain detached actual fill records directly.
+
+### Schedule original callbacks on declared sessions
+
+Register `schedule_function` during `initialize` using `date_rules.every_day`,
+`week_start`, `week_end`, `month_start` or `month_end`. Week and month offsets
+count trading sessions in the full calendar period, including sessions before
+the supplied feed starts. `half_days=False` suppresses callbacks on an early
+close identified by the calendar; it does not move them to a different day.
+
+Daily runs ignore the intraday `time_rule` and execute selected callbacks after
+`handle_data`, in registration order, before the account observation. Minute
+runs require explicitly right-labelled minute observations. `market_open()`
+means one minute after open; `market_open(minutes=30)` means 30 minutes after
+open. `market_close()` means one minute before close. With no time rule, or
+with `every_minute()`, a scheduled function runs once per selected session at
+its first observed regular minute, following the reference's once-per-day
+wrapper. The native `handle_data` callback still runs at every observed event.
+Missing endpoints do not produce artificial bars or callback executions.
+
+Pass `before_trading_start(context, data)` to the runner for a native PRE callback
+45 minutes before the declared session open. This matches the tested NYSE
+clock. Other calendars may differ from a legacy fixed wall-clock or restricted
+execution window; compare those clocks explicitly. Raw same-day completed prices
+are unavailable then. All order helper variants are disallowed in this callback.
+`calendar=None` disables session scheduling and rejects these session callbacks;
+it does not restore NYSE implicitly. Failed or reused runs remove registrations
+owned by the adapter.
+
+<!-- ml4t-doc-test: zipline-scheduled-callbacks -->
+```python
+from datetime import UTC, datetime
+
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.api import date_rules, get_datetime, record, schedule_function
+from ml4t.backtest.compat.zipline.assets import Asset
+
+trace = []
+
+
+def scheduled(context, data):
+    trace.append(get_datetime().isoformat())
+    record(selected_close=data.current(context.asset, "price"))
+
+
+def initialize(context):
+    context.asset = context.symbol("ALPHA")
+    schedule_function(scheduled, date_rules.every_day())
+
+
+feed = DataFeed(
+    prices_df=pl.DataFrame({
+        "timestamp": [datetime(2025, 7, 2, 20, tzinfo=UTC), datetime(2025, 7, 3, 17, tzinfo=UTC)],
+        "asset": ["A", "A"], "close": [100.0, 101.0], "volume": [1000, 1000],
+    }),
+    feed_spec={"time_contract_version": 2, "calendar": "NYSE", "data_frequency": "1d",
+               "timestamp_semantics": "bar_close", "bar_label": "right",
+               "bar_grid_anchor": "session_open", "partial_bar_policy": "include"},
+)
+performance = run_algorithm(feed=feed, assets=[Asset("A", "ALPHA")], initialize=initialize)
+assert trace == ["2025-07-02T20:00:00+00:00", "2025-07-03T17:00:00+00:00"]
+assert performance.selected_close.tolist() == [100, 101]
+print("daily callbacks include the observed early-close session")
+```
+
+<!-- ml4t-doc-output: zipline-scheduled-callbacks -->
+```text
+daily callbacks include the observed early-close session
+```
+
+The retained published Zipline Reloaded 3.2.0 daily reference omits the July 3
+`every_day` callback after July 2's normal close. Its `OncePerDay` state resets
+after 24 elapsed hours, so the earlier close does not reset an already-triggered
+rule. Backtest executes once on each selected session, including the early
+close. This is an intentional correction, recorded separately from matching
+callback traces. The minute reference matches on 600 observed events across a
+normal and an early-close session, including default, open-offset, close-offset
+and half-day rules. Native performance rows remain per observed minute;
+Zipline's minute simulation returns daily performance packets. Use native
+account/return exports with the intended observation frequency when comparing
+analysis.

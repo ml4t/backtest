@@ -60,6 +60,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "migration-zipline-target",
         "zipline-read-shapes",
         "zipline-callback-runner",
+        "zipline-scheduled-callbacks",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",

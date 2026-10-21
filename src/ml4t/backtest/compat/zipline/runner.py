@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from math import isfinite
@@ -26,6 +27,7 @@ from ...types import Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from .assets import Asset
 from .data import BarData
+from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time_rules
 from .finance import commission, slippage
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
@@ -104,6 +106,8 @@ class MigrationContext:
         self._broker: Broker | None = None
         self._initializing = True
         self._running = False
+        self._in_before_trading_start = False
+        self._schedules: list[_Schedule] = []
         self._slippage: Any = slippage.VolumeShareSlippage()
         self._set_commission(commission.PerShare())
         self.portfolio = _Portfolio(self)
@@ -140,9 +144,8 @@ class MigrationContext:
         stop_price: float | None = None,
         style: Any | None = None,
     ) -> str | None:
+        self._require_order_phase()
         self._validate_asset(asset)
-        if not self._running:
-            raise RuntimeError("Orders require a running market callback")
         kind, limit_price, stop_price = _native_style(style, limit_price, stop_price)
         quantity = round_quantity(amount, rounding="near_integer")
         broker = self._require_broker()
@@ -153,7 +156,14 @@ class MigrationContext:
         )
         return self._external_order_id(submitted.order_id) if submitted is not None else None
 
+    def _require_order_phase(self) -> None:
+        if self._in_before_trading_start:
+            raise RuntimeError("Orders are disallowed in before_trading_start")
+        if not self._running:
+            raise RuntimeError("Orders require a running market callback")
+
     def _value_quantity(self, asset: Asset, value: float) -> float | None:
+        self._require_order_phase()
         self._validate_asset(asset)
         broker = self._require_broker()
         price = broker.get_last_price(asset.key)
@@ -194,6 +204,7 @@ class MigrationContext:
         stop_price: float | None = None,
         style: Any | None = None,
     ) -> str | None:
+        self._require_order_phase()
         self._validate_asset(asset)
         position = self._require_broker().get_position(asset.key)
         amount = quantity_to_target(
@@ -227,6 +238,29 @@ class MigrationContext:
         return self.order_target_value(
             asset, self._require_broker().equity() * target, limit_price, stop_price, style
         )
+
+    def schedule_function(
+        self,
+        func: Callable[..., Any],
+        date_rule: _DateRule | _TimeRule | None = None,
+        time_rule: _TimeRule | None = None,
+        half_days: bool = True,
+        calendar: str | None = None,
+    ) -> None:
+        if not self._initializing:
+            raise RuntimeError("Register callbacks during initialize")
+        if not callable(func):
+            raise TypeError("Scheduled callback must be callable")
+        if isinstance(date_rule, _TimeRule) and time_rule is None:
+            warnings.warn("Pass a standalone time rule with time_rule=", UserWarning, stacklevel=2)
+            time_rule, date_rule = date_rule, None
+        date_rule = date_rule if date_rule is not None else date_rules.every_day()
+        time_rule = time_rule if time_rule is not None else time_rules.every_minute()
+        if not isinstance(date_rule, _DateRule) or not isinstance(time_rule, _TimeRule):
+            raise TypeError("Use migration date_rules/time_rules factories")
+        if not isinstance(half_days, bool):
+            raise TypeError("half_days must be boolean")
+        self._schedules.append(_Schedule(func, date_rule, time_rule, half_days, calendar))
 
     def _external_order_id(self, native: str) -> str:
         return f"{self._order_prefix}:{native}"
@@ -385,13 +419,20 @@ class MigrationContext:
 
 class _Callbacks(Strategy):
     def __init__(
-        self, context: MigrationContext, data: BarData, handle_data: Callable[..., Any] | None
+        self,
+        context: MigrationContext,
+        data: BarData,
+        handle_data: Callable[..., Any] | None,
+        runtime: RuntimeServices,
+        before_trading_start: Callable[..., Any] | None,
     ):
         self.context, self.data, self.handle_data = context, data, handle_data
+        self.runtime, self.before_trading_start = runtime, before_trading_start
 
     def on_start(self, broker: Broker) -> None:
         self.context._broker = broker
         self.context._running = True
+        _register(self.context, self.runtime, self.data, self.before_trading_start)
 
     def on_end(self, broker: Broker) -> None:
         self.context._running = False
@@ -459,6 +500,7 @@ def run_algorithm(
     initialize: Callable[..., Any] | None = None,
     handle_data: Callable[..., Any] | None = None,
     analyze: Callable[..., Any] | None = None,
+    before_trading_start: Callable[..., Any] | None = None,
     capital_base: float = 100000.0,
     runtime: RuntimeServices | None = None,
 ) -> pd.DataFrame:
@@ -496,7 +538,7 @@ def run_algorithm(
     runtime = runtime if runtime is not None else RuntimeServices()
     result = Engine(
         feed,
-        _Callbacks(context, BarData(runtime), handle_data),
+        _Callbacks(context, BarData(runtime), handle_data, runtime, before_trading_start),
         config,
         runtime=runtime,
         execution_limits=limits,

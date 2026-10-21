@@ -1,11 +1,16 @@
 """Callback-scoped migration API; all account mutations use the native broker."""
 
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
 
 from ._scope import current
 from .assets import Asset
+from .events import _DateRule, _TimeRule
+from .events import calendars as calendars
+from .events import date_rules as date_rules
+from .events import time_rules as time_rules
 from .finance.order import OrderView
 
 
@@ -111,3 +116,13 @@ def get_open_orders(asset: Asset | None = None) -> dict[Asset, list[OrderView]] 
 
 def cancel_order(order_param: str | OrderView) -> None:
     current().cancel_order(order_param)
+
+
+def schedule_function(
+    func: Callable[..., Any],
+    date_rule: _DateRule | _TimeRule | None = None,
+    time_rule: _TimeRule | None = None,
+    half_days: bool = True,
+    calendar: str | None = None,
+) -> None:
+    current().schedule_function(func, date_rule, time_rule, half_days, calendar)
