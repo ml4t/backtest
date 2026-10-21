@@ -274,13 +274,14 @@ class FillExecutor:
                 raise ValueError("Execution price model must produce its quoted deterministic cost")
 
         # Calculate commission
+        multiplier = broker.get_multiplier(order.asset)
         commission = calculate_commission(
             broker.commission_model,
             order.asset,
             fill_quantity,
             fill_price,
             order=order,
-            multiplier=broker.get_multiplier(order.asset),
+            multiplier=multiplier,
         )
         quote_context = broker.get_quote_context(order.asset, order.side)
 
@@ -307,8 +308,6 @@ class FillExecutor:
             price_source = (
                 "open" if order.child_intent_id is not None else broker.execution_price.value
             )
-        multiplier = broker.get_multiplier(order.asset)
-        contract_spec = broker.get_contract_spec(order.asset)
         fill = Fill(
             order_id=order.order_id,
             rebalance_id=order.rebalance_id,
@@ -338,7 +337,7 @@ class FillExecutor:
             child_intent_id=order.child_intent_id,
             intent_idempotency_key=order.intent_idempotency_key,
             multiplier=multiplier,
-            currency=contract_spec.currency if contract_spec is not None else None,
+            currency=broker._get_contract_currency(order.asset),
         )
         self.journal.fills.append(fill)
 

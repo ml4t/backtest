@@ -4,7 +4,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from math import isfinite
+from math import inf, isfinite
 from numbers import Real
 from typing import Any
 
@@ -68,6 +68,8 @@ class AssetClass(Enum):
 
 
 def _validated_multiplier(value: float) -> float:
+    if type(value) is float and 0.0 < value < inf:
+        return value
     try:
         valid = (
             not isinstance(value, bool)

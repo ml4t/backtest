@@ -1264,10 +1264,14 @@ class Broker:
         spec = self._contract_specs.get(asset)
         return copy.deepcopy(spec) if spec is not None else None
 
+    def _get_contract_currency(self, asset: str) -> str | None:
+        spec = self._contract_specs.get(asset)
+        return spec.currency if spec is not None else None
+
     def get_multiplier(self, asset: str) -> float:
         """Get contract multiplier for an asset (1.0 for equities)."""
         spec = self._contract_specs.get(asset)
-        return _validated_multiplier(spec.multiplier) if spec else 1.0
+        return _validated_multiplier(spec.multiplier) if spec is not None else 1.0
 
     def _next_rebalance_id(self) -> str:
         self._capture_lifecycle_mutation()

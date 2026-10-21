@@ -314,3 +314,58 @@ def test_routed_midpoint_does_not_replace_an_opening_child_intents_declared_open
     assert fills["price"].to_list() == [90.0]
     assert fills["price_source"].to_list() == ["open"]
     assert fills["quantity"].to_list() == [111.0]
+
+
+@pytest.mark.parametrize("truthy", [True, False], ids=["ordinary_spec", "false_valued_spec"])
+def test_partial_fills_preserve_declared_units_without_requesting_new_contract_snapshots(truthy):
+    from dataclasses import dataclass
+
+    from ml4t.backtest.execution.limits import VolumeParticipationLimit
+
+    snapshots = []
+
+    @dataclass
+    class ProviderContract(ContractSpec):
+        def __bool__(self):
+            return truthy
+
+        def __deepcopy__(self, memo):
+            snapshots.append(self.symbol)
+            result = type(self)(
+                self.symbol,
+                self.asset_class,
+                self.multiplier,
+                self.tick_size,
+                self.margin,
+                self.margin_pct,
+                self.currency,
+            )
+            memo[id(self)] = result
+            return result
+
+    contract = ProviderContract("ES", AssetClass.FUTURE, multiplier=50.0, currency="USD")
+
+    class Submit(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp.day == 3:
+                broker.submit_order("ES", 2)
+
+    engine = Engine(
+        DataFeed(prices_df=_prices().filter(pl.col("timestamp").dt.day() <= 5)),
+        Submit(),
+        BacktestConfig(
+            calendar=None,
+            execution_mode=ExecutionMode.NEXT_BAR,
+            next_bar_execution_price=ExecutionPrice.CLOSE,
+        ),
+        contract_specs={"ES": contract},
+        execution_limits=VolumeParticipationLimit(0.25),
+    )
+    owned_snapshots = list(snapshots)
+    result = engine.run()
+    assert [fill.price for fill in result.fills] == [100.0, 100.0]
+    assert [fill.multiplier for fill in result.fills] == [50.0, 50.0]
+    assert [fill.currency for fill in result.fills] == ["USD", "USD"]
+    assert result.to_portfolio_state_dataframe()["cash"].to_list() == [100000.0, 95000.0, 90000.0]
+    assert result.to_portfolio_state_dataframe()["equity"].to_list() == [100000.0] * 3
+    assert snapshots == owned_snapshots
