@@ -63,5 +63,5 @@ def _register_account_controls(context, runtime):
             deadline = pd.Timestamp(session, tz="UTC") + grace
             if points[0].tzinfo is None:
                 deadline = deadline.tz_convert(config.resolved_timezone).tz_localize(None)
-            rule = AccountConstraints(min_leverage=value, deadline=deadline.to_pydatetime())
+            rule = AccountConstraints(min_leverage=value, deadline=deadline)
         engine.broker.register_account_control(rule, boundary="session_end")

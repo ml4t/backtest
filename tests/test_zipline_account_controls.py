@@ -99,15 +99,15 @@ def test_max_leverage_allows_recovered_intraday_breach_but_rejects_persistent_at
     assert seen == expected["trace"]
 
 
-@pytest.mark.parametrize("grace_days", [0, 1, 2])
-def test_min_leverage_deadline_uses_start_session_midnight_and_actual_early_close(grace_days):
+@pytest.mark.parametrize("grace_hours", [0, 8, 20, 24, 48])
+def test_min_leverage_deadline_uses_start_session_midnight_and_actual_early_close(grace_hours):
     reference = _reference("min-leverage-reference.json")
-    expected = reference["cases"][str(grace_days)]
+    expected = reference["cases"][str(grace_hours)]
     calls, seen = [], []
 
     def initialize(context):
         _costs(context)
-        context.set_min_leverage(0.5, timedelta(days=grace_days))
+        context.set_min_leverage(0.5, timedelta(hours=grace_hours))
 
     def handle(context, data):
         now = context.get_datetime()
@@ -124,7 +124,7 @@ def test_min_leverage_deadline_uses_start_session_midnight_and_actual_early_clos
             capital_base=1000,
         )
 
-    if grace_days < 2:
+    if grace_hours < 48:
         with pytest.raises(AccountControlViolation):
             execute()
     else:

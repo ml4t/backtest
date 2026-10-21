@@ -614,7 +614,18 @@
       "last_callback": "2025-07-02T20:00:00+00:00",
       "error": "AccountControlViolation"
     },
-    "1": {
+    "8": {
+      "trace": [
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "leverage": 0.0
+        }
+      ],
+      "callback_count": 390,
+      "last_callback": "2025-07-02T20:00:00+00:00",
+      "error": "AccountControlViolation"
+    },
+    "20": {
       "trace": [
         {
           "timestamp": "2025-07-02T20:00:00+00:00",
@@ -629,7 +640,22 @@
       "last_callback": "2025-07-03T17:00:00+00:00",
       "error": "AccountControlViolation"
     },
-    "2": {
+    "24": {
+      "trace": [
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "leverage": 0.0
+        },
+        {
+          "timestamp": "2025-07-03T17:00:00+00:00",
+          "leverage": 0.0
+        }
+      ],
+      "callback_count": 600,
+      "last_callback": "2025-07-03T17:00:00+00:00",
+      "error": "AccountControlViolation"
+    },
+    "48": {
       "trace": [
         {
           "timestamp": "2025-07-02T20:00:00+00:00",
