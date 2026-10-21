@@ -2674,7 +2674,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "get_datetime",
-      "signature": "(tz: str | None = None) -> pandas._libs.tslibs.timestamps.Timestamp"
+      "signature": "(tz: str | None = None) -> pandas.Timestamp"
     },
     "ml4t.backtest.compat.zipline.api:order": {
       "kind": "function",

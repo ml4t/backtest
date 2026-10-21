@@ -61,6 +61,7 @@ def _canonical_type_text(value: str) -> str:
         _TYPING_PREFIX.sub("", value)
         .replace("pandas.core.frame.DataFrame", "pandas.DataFrame")
         .replace("pandas.core.series.Series", "pandas.Series")
+        .replace("pandas._libs.tslibs.timestamps.Timestamp", "pandas.Timestamp")
     )
 
 
