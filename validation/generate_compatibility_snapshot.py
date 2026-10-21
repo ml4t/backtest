@@ -57,7 +57,11 @@ def _signature(value: object) -> str | None:
 
 def _canonical_type_text(value: str) -> str:
     """Remove interpreter-dependent qualification from type representations."""
-    return _TYPING_PREFIX.sub("", value)
+    return (
+        _TYPING_PREFIX.sub("", value)
+        .replace("pandas.core.frame.DataFrame", "pandas.DataFrame")
+        .replace("pandas.core.series.Series", "pandas.Series")
+    )
 
 
 def _member_surface(value: type) -> dict[str, dict[str, object]]:

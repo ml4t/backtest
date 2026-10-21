@@ -2663,7 +2663,7 @@
         },
         "history": {
           "kind": "method",
-          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset], fields: str | collections.abc.Sequence[str], bar_count: int, frequency: str) -> pandas.core.frame.DataFrame | pandas.core.series.Series"
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset], fields: str | collections.abc.Sequence[str], bar_count: int, frequency: str) -> pandas.DataFrame | pandas.Series"
         }
       },
       "module": "ml4t.backtest.compat.zipline.data",
@@ -3909,7 +3909,7 @@
       },
       "module": "ml4t.backtest.auxiliary",
       "qualname": "AuxiliaryData",
-      "signature": "(source_id: str, frame: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.core.frame.DataFrame, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any, known_at_cols: collections.abc.Mapping[str, str], preparation: collections.abc.Mapping[str, Any] | None = None) -> None"
+      "signature": "(source_id: str, frame: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any, known_at_cols: collections.abc.Mapping[str, str], preparation: collections.abc.Mapping[str, Any] | None = None) -> None"
     },
     "ml4t.backtest:BacktestConfig": {
       "kind": "class",
@@ -4413,7 +4413,7 @@
       },
       "module": "ml4t.backtest.datafeed",
       "qualname": "DataFeed",
-      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.core.frame.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, feature_spec: Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, vwap_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None, session_col: str | None = None, calendar: str | None | ml4t.specs.time.CalendarUnset = <CalendarUnset.UNSET: 'unset'>, capital_flows: polars.dataframe.frame.DataFrame | None = None)"
+      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, feature_spec: Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, vwap_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None, session_col: str | None = None, calendar: str | None | ml4t.specs.time.CalendarUnset = <CalendarUnset.UNSET: 'unset'>, capital_flows: polars.dataframe.frame.DataFrame | None = None)"
     },
     "ml4t.backtest:Engine": {
       "kind": "class",
@@ -4597,6 +4597,10 @@
           "kind": "method",
           "signature": "(self) -> str"
         },
+        "commission_adjusted_cost_basis": {
+          "kind": "property",
+          "signature": "(self) -> float"
+        },
         "market_value": {
           "kind": "property",
           "signature": "(self) -> float"
@@ -4624,7 +4628,7 @@
       },
       "module": "ml4t.backtest.types",
       "qualname": "Position",
-      "signature": "(asset: str, quantity: float, entry_price: float, entry_time: datetime.datetime, current_price: float | None = None, bars_held: int = 0, high_water_mark: float | None = None, low_water_mark: float | None = None, max_favorable_excursion: float = 0.0, max_adverse_excursion: float = 0.0, initial_quantity: float | None = None, context: dict = <factory>, multiplier: float = 1.0, entry_commission: float = 0.0, entry_slippage: float = 0.0) -> None"
+      "signature": "(asset: str, quantity: float, entry_price: float, entry_time: datetime.datetime, current_price: float | None = None, bars_held: int = 0, high_water_mark: float | None = None, low_water_mark: float | None = None, max_favorable_excursion: float = 0.0, max_adverse_excursion: float = 0.0, initial_quantity: float | None = None, context: dict = <factory>, multiplier: float = 1.0, entry_commission: float = 0.0, entry_slippage: float = 0.0, *, _commission_adjusted_cost_basis: float | None = None) -> None"
     },
     "ml4t.backtest:PreOpenIntentError": {
       "kind": "class",

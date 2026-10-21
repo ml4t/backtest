@@ -364,11 +364,25 @@ class FillExecutor:
 
         old_position = self.account.positions.get(order.asset)
         old_quantity = old_position.quantity if old_position is not None else 0.0
+        old_basis = (
+            old_position._commission_adjusted_cost_basis if old_position is not None else None
+        )
+        old_entry = old_position.entry_price if old_position is not None else 0.0
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
         fill.commission = actual_commission
         order.commission_paid += actual_commission
+        position = self.account.positions.get(order.asset)
+        if position is not None and (actual_commission != 0.0 or old_basis is not None):
+            basis = old_entry if old_basis is None else old_basis
+            if old_quantity == 0.0 or old_quantity * position.quantity < 0.0:
+                basis = fill_price
+            elif old_quantity * signed_qty > 0.0:
+                basis = (basis * old_quantity + fill_price * signed_qty) / position.quantity
+            position._commission_adjusted_cost_basis = basis + (
+                actual_commission / (position.quantity * multiplier)
+            )
 
         self._update_lock_notional_free_cash(
             ctx,

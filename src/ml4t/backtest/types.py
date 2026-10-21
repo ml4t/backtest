@@ -295,6 +295,22 @@ class Position:
     entry_commission: float = 0.0  # Commission paid on entry (for Trade PnL)
     entry_slippage: float = 0.0  # Per-unit slippage on entry (for cost decomposition)
 
+    _commission_adjusted_cost_basis: float | None = field(default=None, kw_only=True, repr=False)
+
+    @property
+    def commission_adjusted_cost_basis(self) -> float:
+        """Reported price basis with each fill fee allocated over remaining signed units.
+
+        Reductions retain the prior price basis before their fee adjustment; reversals
+        reset it to the fill price before allocating the entire reversal fee. This is
+        a reporting convention and does not replace gross entry price or P&L costs.
+        """
+        return (
+            self.entry_price
+            if self._commission_adjusted_cost_basis is None
+            else self._commission_adjusted_cost_basis
+        )
+
     def __post_init__(self):
         # Initialize water marks to entry price
         if self.high_water_mark is None:

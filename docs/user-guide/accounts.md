@@ -368,3 +368,20 @@ Engine captures its input configuration when constructed, including nested mappi
 Prepare settings before constructing the Engine. Editing the original configuration
 does not reconfigure a bound run, and the returned result keeps a detached copy of
 the settings used for that run.
+
+### Gross entry and commission-adjusted reporting basis
+
+`broker.get_position(asset).entry_price` is the gross weighted entry price used
+for native P&L. `commission_adjusted_cost_basis` is a separate reporting price:
+it includes each transaction fee divided by the remaining signed quantity and
+contract multiplier. A partial reduction retains the prior basis before adding
+its fee; a reversal resets the basis to the fill price before adding the whole
+reversal fee. This follows the position-reporting convention tested against
+Zipline Reloaded 3.2.0. Cash and trade P&L continue to account for actual fees
+once, using their existing entry/exit allocation.
+
+For example, buying 10 shares at 100 with a fee of 1 reports a basis of 100.1.
+Buying another 10 at 110 with a fee of 1 reports 105.1. Selling 5 at 120 with a
+fee of 0.5 reports 105.13333333333334 on the remaining 15 shares, while their
+gross entry price stays 105. The property is a live position view; it does not
+add a field to saved holdings artifacts.
