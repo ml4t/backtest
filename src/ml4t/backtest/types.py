@@ -2,7 +2,7 @@
 
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
@@ -177,6 +177,11 @@ class Order:
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
     commission_paid: float = field(default=0.0, kw_only=True)
+    cancelled_at: datetime | None = field(default=None, kw_only=True)
+    cancellation_reason: str | None = field(default=None, kw_only=True)
+    _submitted_session_date: date | None = field(default=None, kw_only=True)
+    _eligible_from: datetime | None = field(default=None, kw_only=True)
+    _eligible_on_boundary: bool = field(default=True, kw_only=True)
 
     def __post_init__(self) -> None:
         if self.requested_quantity is None:

@@ -7,7 +7,7 @@ from datetime import datetime
 from numbers import Real
 from typing import TYPE_CHECKING
 
-from ..config import MissingPricePolicy
+from ..config import CancelPolicy, MissingPricePolicy
 from ..models import estimate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
@@ -73,8 +73,22 @@ class OrderBook:
             if existing_pos is None:
                 return None
 
-        control_request = broker._validate_trading_controls(
-            asset, quantity if side is OrderSide.BUY else -quantity
+        control_request = (
+            broker._validate_trading_controls(
+                asset, quantity if side is OrderSide.BUY else -quantity
+            )
+            if broker._trading_controls
+            else None
+        )
+        eligible_from, eligible_on_boundary = (
+            broker._preopen_order_eligibility()
+            if broker._scheduled_session_open is not None
+            else (None, True)
+        )
+        submitted_session = (
+            broker._submission_session_date(validate_active=True)
+            if broker.cancel_policy is CancelPolicy.SESSION_END
+            else None
         )
 
         self.orders.counter += 1
@@ -99,6 +113,9 @@ class OrderBook:
             intent_idempotency_key=(
                 options.intent_idempotency_key if options is not None else None
             ),
+            _submitted_session_date=submitted_session,
+            _eligible_from=eligible_from,
+            _eligible_on_boundary=eligible_on_boundary,
         )
 
         order._signal_price = self.market.prices.get(asset)
@@ -282,10 +299,14 @@ class OrderBook:
                 return True
         return False
 
-    def cancel_order(self, order_id: str) -> bool:
+    def cancel_order(
+        self, order_id: str, *, timestamp: datetime | None = None, reason: str = "user"
+    ) -> bool:
         for order in self.orders.pending:
             if order.order_id == order_id:
                 order.status = OrderStatus.CANCELLED
+                order.cancelled_at = timestamp if timestamp is not None else self.market.time
+                order.cancellation_reason = reason
                 self.orders.pending.remove(order)
                 self.orders.partial_quantities.pop(order_id, None)
                 return True

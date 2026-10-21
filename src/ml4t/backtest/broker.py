@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from .capital import CapitalChange, CapitalEvent
 from .config import (
+    CancelPolicy,
     EntryOrderPriority,
     ExecutionPrice,
     FillOrdering,
@@ -133,6 +134,7 @@ class Broker:
         settlement_delay: int = 0,
         settlement_reduces_buying_power: bool = True,
         next_bar_execution_price: ExecutionPrice | None = None,
+        cancel_policy: CancelPolicy = CancelPolicy.NEVER,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -188,6 +190,9 @@ class Broker:
         self._account_controls: list[tuple[str, AccountControl]] = []
         self._order_session_config: SessionConfig | None = None
         self._scheduled_session_date: date | None = None
+        self._scheduled_session_open: datetime | None = None
+        self.cancel_policy = CancelPolicy(cancel_policy)
+        self._session_expiry_cache: dict[tuple[str, date], tuple[datetime, datetime]] = {}
         self._risk_state = RiskState()
         self._execution_journal = ExecutionJournal()
 
@@ -427,6 +432,7 @@ class Broker:
             execution_mode=config.execution_mode,
             execution_price=config.execution_price,
             next_bar_execution_price=config.next_bar_execution_price,
+            cancel_policy=config.cancel_policy,
             mark_price=config.mark_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
@@ -1102,17 +1108,38 @@ class Broker:
 
     @contextmanager
     def _scheduled_callback_clock(
-        self, timestamp: datetime, *, session_date: date | None = None
+        self,
+        timestamp: datetime,
+        *,
+        session_date: date | None = None,
+        session_open: datetime | None = None,
     ) -> Iterator[None]:
         previous = self._market_state.time
         previous_session = self._scheduled_session_date
+        previous_open = self._scheduled_session_open
         self._market_state.time = timestamp
         self._scheduled_session_date = session_date
+        self._scheduled_session_open = session_open
         try:
+            self._expire_session_orders(timestamp, after_event=False)
             yield
         finally:
             self._market_state.time = previous
             self._scheduled_session_date = previous_session
+            self._scheduled_session_open = previous_open
+
+    def _preopen_order_eligibility(self) -> tuple[datetime | None, bool]:
+        from ml4t.specs import LifecyclePhase
+
+        from .sessions import _is_right_labeled_bar
+
+        if self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN:
+            return None, True
+        clock = self._order_session_config or self._session_config
+        inclusive = clock is None or not _is_right_labeled_bar(
+            clock.timestamp_semantics, clock.bar_label
+        )
+        return self._scheduled_session_open, inclusive
 
     def _may_fill_immediately(self) -> bool:
         from ml4t.specs import LifecyclePhase
@@ -1757,6 +1784,76 @@ class Broker:
         for control in self._trading_controls:
             control.validate(request)
         return request
+
+    def _submission_session_date(self, *, validate_active: bool = False) -> date | None:
+        timestamp = self._market_state.time
+        clock = self._order_session_config or self._session_config
+        session = self._scheduled_session_date or (
+            clock.date_for_timestamp(timestamp).date()
+            if clock is not None and timestamp is not None
+            else None
+        )
+        if validate_active and clock is not None and session is not None and timestamp is not None:
+            from ml4t.specs import LifecyclePhase
+
+            from .sessions import _is_right_labeled_bar
+
+            opened, closed = self._order_session_bounds(clock, session)
+            instant = (
+                timestamp
+                if timestamp.tzinfo is not None
+                else timestamp.replace(tzinfo=ZoneInfo(clock.timezone))
+            )
+            pre = self._active_lifecycle_phase is LifecyclePhase.PRE_OPEN
+            right = not pre and _is_right_labeled_bar(clock.timestamp_semantics, clock.bar_label)
+            active = opened < instant <= closed if right else opened <= instant < closed
+            if not active and not (
+                pre and self._scheduled_session_date is not None and instant < opened
+            ):
+                raise ValueError(
+                    "session_end orders require an active declared session or its scheduled pre-open"
+                )
+        return session
+
+    def _order_session_bounds(
+        self, clock: SessionConfig, session: date
+    ) -> tuple[datetime, datetime]:
+        from .calendar import get_schedule
+
+        if clock.calendar is None:
+            raise ValueError("session_end cancellation requires a declared calendar")
+        key = (clock.calendar, session)
+        bounds = self._session_expiry_cache.get(key)
+        if bounds is None:
+            schedule = get_schedule(clock.calendar, session, session)
+            if schedule.height != 1:
+                raise ValueError(f"Cannot assign an order to non-session {session}")
+            bounds = (schedule["market_open"][0], schedule["market_close"][0])
+            self._session_expiry_cache[key] = bounds
+        return bounds
+
+    def _expire_session_orders(self, timestamp: datetime, *, after_event: bool) -> None:
+        if self.cancel_policy is CancelPolicy.NEVER or not self.pending_orders:
+            return
+        clock = self._order_session_config or self._session_config
+        if clock is None or clock.calendar is None:
+            raise ValueError("session_end cancellation requires a declared calendar")
+        current = self._submission_session_date()
+        if self._scheduled_session_date is None:
+            current = clock.date_for_timestamp(timestamp).date()
+        for order in list(self.pending_orders):
+            if order._submitted_session_date is None:
+                order._submitted_session_date = current
+            session = order._submitted_session_date
+            assert session is not None
+            _, closed = self._order_session_bounds(clock, session)
+            if timestamp.tzinfo is None:
+                closed = closed.astimezone(ZoneInfo(clock.timezone)).replace(tzinfo=None)
+            if timestamp > closed or timestamp == closed and (after_event or current != session):
+                self._capture_lifecycle_mutation(order_id=order.order_id)
+                self._order_book.cancel_order(
+                    order.order_id, timestamp=closed, reason="session_end"
+                )
 
     def _commit_control_order(self, request: OrderControlContext) -> None:
         counts = self._order_state.control_counts

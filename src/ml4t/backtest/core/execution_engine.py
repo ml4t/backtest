@@ -669,6 +669,13 @@ class ExecutionEngine:
         eligible_orders = []
         orders_this_bar_ids = self.orders.current_bar_ids
         for order in self.orders.pending[:]:
+            if order._eligible_from is not None and (
+                self.market.time is None
+                or self.market.time < order._eligible_from
+                or self.market.time == order._eligible_from
+                and not order._eligible_on_boundary
+            ):
+                continue
             if use_open and order.order_type is OrderType.MOC:
                 continue
             if order_types is not None and order.order_type not in order_types:

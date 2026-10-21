@@ -137,6 +137,16 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        if self.config.cancel_policy.value == "session_end":
+            if self.config.resolved_calendar is None:
+                raise ValueError("session_end cancellation requires a declared calendar")
+            if self.config.resolved_timestamp_semantics not in {
+                TimestampSemantics.EVENT_TIME,
+                TimestampSemantics.BAR_CLOSE,
+            }:
+                raise ValueError(
+                    "session_end cancellation requires declared physical timestamp_semantics"
+                )
         self.broker._configure_result_capture(
             mark_times=holdings_sampling != "none",
             after_fill=holdings_sampling == "fill_and_session",
@@ -401,6 +411,11 @@ class Engine:
         session_mode = getattr(self.feed, "session_col", None) is not None
         session_assets: dict[str, dict[str, Any]] = {}
         session_context: dict[str, Any] = {}
+        expire_orders = (
+            self.broker._expire_session_orders
+            if self.config.cancel_policy.value == "session_end"
+            else None
+        )
         for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
@@ -437,6 +452,9 @@ class Engine:
                     continue
                 self.runtime.scheduler._before_event(timestamp, has_price_event=bool(assets_data))
                 assets_data = self.runtime._advance(timestamp, assets_data)
+
+            if expire_orders is not None:
+                expire_orders(timestamp, after_event=False)
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
@@ -566,7 +584,7 @@ class Engine:
                 if self.broker._account_controls:
                     self.broker.validate_account_controls(boundary="after_callbacks")
                 # MOC orders are the one next-bar exception: they execute on the
-                # current session close after strategy logic runs.
+                # current bar close after strategy logic runs.
                 self.broker._process_orders(
                     order_types={OrderType.MOC},
                     include_orders_this_bar=not session_mode,
@@ -584,6 +602,8 @@ class Engine:
                 self.broker._process_orders()
 
             self.preopen_target_manager.reconcile(timestamp)
+            if expire_orders is not None:
+                expire_orders(timestamp, after_event=True)
             if self.broker._account_controls:
                 self.broker.validate_account_controls(boundary="after_fills")
 

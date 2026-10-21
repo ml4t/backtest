@@ -51,6 +51,7 @@ class SessionScheduler:
         self._events: dict[datetime, list[int]] = {}
         self._session_indexes: dict[date, int] = {}
         self._event_sessions: dict[tuple[datetime, int], date] = {}
+        self._event_opens: dict[tuple[datetime, int], datetime] = {}
 
     def register(
         self,
@@ -182,6 +183,7 @@ class SessionScheduler:
                 ):
                     continue
                 self._event_sessions[(timestamp, index)] = row["session_date"]
+                self._event_opens[(timestamp, index)] = opened
                 if registration.phase is LifecyclePhase.PRE_OPEN:
                     self._pre_events.append((timestamp, index))
                 else:
@@ -193,7 +195,9 @@ class SessionScheduler:
         assert engine is not None
         registration = self._registrations[index]
         with engine.broker._scheduled_callback_clock(
-            timestamp, session_date=self._event_sessions.get((timestamp, index))
+            timestamp,
+            session_date=self._event_sessions.get((timestamp, index)),
+            session_open=self._event_opens.get((timestamp, index)),
         ):
             engine.lifecycle_dispatcher.dispatch_registered(
                 registration.phase,
@@ -277,3 +281,4 @@ class SessionScheduler:
         self._events.clear()
         self._session_indexes.clear()
         self._event_sessions.clear()
+        self._event_opens.clear()

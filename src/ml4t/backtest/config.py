@@ -229,6 +229,11 @@ class LateAssetPolicy(str, Enum):
     REQUIRE_HISTORY = "require_history"
 
 
+class CancelPolicy(str, Enum):
+    NEVER = "never"
+    SESSION_END = "session_end"
+
+
 class CommissionType(str, Enum):
     """Commission calculation method."""
 
@@ -542,6 +547,7 @@ class BacktestConfig:
     execution_price: ExecutionPrice = ExecutionPrice.OPEN
     mark_price: ExecutionPrice = ExecutionPrice.PRICE
     next_bar_execution_price: ExecutionPrice | None = field(default=None, kw_only=True)
+    cancel_policy: CancelPolicy = field(default=CancelPolicy.NEVER, kw_only=True)
     execution_mode: ExecutionMode = ExecutionMode.NEXT_BAR  # Order execution timing
 
     # === Stop Configuration ===
@@ -811,6 +817,7 @@ class BacktestConfig:
         return instance
 
     def __post_init__(self) -> None:
+        self.cancel_policy = CancelPolicy(self.cancel_policy)
         if self.next_bar_execution_price is not None:
             self.next_bar_execution_price = ExecutionPrice(self.next_bar_execution_price)
         FeedSpec(time_contract_version=self.time_contract_version, calendar=self.calendar)
@@ -991,6 +998,7 @@ class BacktestConfig:
                 "execution_price": self.execution_price.value,
                 "mark_price": self.mark_price.value,
                 "execution_mode": self.execution_mode.value,
+                "cancel_policy": self.cancel_policy.value,
                 "next_bar_execution_price": (
                     self.next_bar_execution_price.value
                     if self.next_bar_execution_price is not None
@@ -1117,6 +1125,7 @@ class BacktestConfig:
                     "mark_price",
                     "execution_mode",
                     "next_bar_execution_price",
+                    "cancel_policy",
                 },
                 "stops": {
                     "stop_fill_mode",
@@ -1259,6 +1268,7 @@ class BacktestConfig:
                 exec_cfg.get("execution_mode", ExecutionMode.NEXT_BAR.value)
             ),
             next_bar_execution_price=exec_cfg.get("next_bar_execution_price"),
+            cancel_policy=exec_cfg.get("cancel_policy", "never"),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),

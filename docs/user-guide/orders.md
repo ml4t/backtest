@@ -22,7 +22,7 @@ In `NEXT_BAR` mode (default), ordinary market orders fill at the next eligible a
 
 ## Market-On-Close Orders
 
-Execute at the current session close.
+Execute at the current eligible bar's close.
 
 ```python
 from ml4t.backtest.types import OrderType
@@ -40,6 +40,60 @@ mode, orders submitted during `on_data()` normally fill at the next bar's open, 
 `SAME_BAR` mode, `MOC` also fills at the current bar's close.
 
 With an exact-timestamp feed, this models a market-on-close fill at the current daily bar. With `DataFeed(session_col=...)`, a session decision occurs after every component bar has closed; a new `MOC` order waits for that asset's next bar close.
+
+### Expire orders at a session close
+
+This policy is a development-source feature outside the preserved 0.1.13 release
+candidate. The default `cancel_policy="never"` retains pending orders across
+sessions. Choose `cancel_policy="session_end"` to expire only the unfilled
+remainder at its assigned calendar session's close. A closing quote can fill the
+order first. `MOC` retains its current-bar meaning; submit it at the actual
+session endpoint when that is the desired execution time.
+
+<!-- ml4t-doc-test: session-end-cancel -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.types import OrderStatus
+
+dates = [datetime(2025, 1, 2, 20, 55, tzinfo=UTC),
+         datetime(2025, 1, 3, 14, 30, tzinfo=UTC)]
+prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2,
+                       "close": [100.0, 100.0]})
+orders = []
+
+class Submit(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == dates[0]:
+            orders.append(broker.submit_order("TEST", 1))
+
+result = Engine(DataFeed(prices_df=prices,
+                        feed_spec={"timestamp_semantics": "event_time"}),
+                Submit(), BacktestConfig(calendar="NYSE",
+                                          cancel_policy="session_end")).run()
+assert result.to_fills_dataframe().is_empty()
+assert orders[0].status is OrderStatus.CANCELLED
+assert orders[0].cancelled_at == datetime(2025, 1, 2, 21, tzinfo=UTC)
+assert orders[0].cancellation_reason == "session_end"
+assert result.to_equity_dataframe()["timestamp"].to_list() == dates
+print("The prior-session order expired before the next opening quote.")
+```
+
+The policy requires a named calendar and declared `event_time` or `bar_close`
+instants. Session labels must first be converted to physical clocks. New orders
+must belong to an active session or its scheduled pre-open. Pre-open orders are
+not eligible before that callback's target session opens. A right-labeled bar at
+the opening instant still belongs to the previous interval and cannot fill an
+upcoming-session order.
+
+With sparse inputs, expiration is processed as the simulation clock advances,
+with `cancelled_at` retaining the official session close. No closing price is
+invented. A declared `context_df` clock at the close can advance expiration when
+no price bar exists. If neither price nor scheduled/context clocks reach the
+close, the pending order remains open. An `end` filter alone does not create a
+closing observation. User cancellations retain `cancellation_reason="user"` and
+the current clock when available.
 
 ## Limit Orders
 
