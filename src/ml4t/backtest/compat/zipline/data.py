@@ -1,6 +1,6 @@
 """Pandas container projection over causal native market reads."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import pandas as pd
@@ -28,11 +28,13 @@ class BarData:
         history_view: Literal["raw", "prepared"] = "raw",
         history_unit: WindowUnit | str | None = None,
         csv_sources: Sequence[PreparedCSV] = (),
+        restriction: Callable[[Asset, Any], bool] | None = None,
     ) -> None:
         if history_view not in {"raw", "prepared"}:
             raise ValueError("history_view must be raw or prepared")
         self._runtime = runtime
         self._csv_sources = tuple(csv_sources)
+        self._restriction = restriction
         self._history_view = history_view
         self._history_unit = None if history_unit is None else WindowUnit(history_unit)
         if self._history_unit not in {None, WindowUnit.OBSERVATION, WindowUnit.EXPECTED_BAR}:
@@ -104,6 +106,21 @@ class BarData:
         return sorted(
             {asset for asset in source.df["sid"] if isinstance(asset, Asset) and asset.key in known}
         )
+
+    def can_trade(self, assets: Asset | Sequence[Asset]) -> bool | pd.Series:
+        market = self._runtime.market
+        if isinstance(assets, Asset):
+            chosen, one = [assets], True
+        else:
+            chosen, one = list(assets), False
+        if any(not isinstance(asset, Asset) for asset in chosen):
+            raise TypeError("Tradability queries require declared Assets")
+        flags = [
+            market.can_trade(asset.key)
+            and not (self._restriction is not None and self._restriction(asset, market._asof))
+            for asset in chosen
+        ]
+        return flags[0] if one else pd.Series(flags, index=chosen, dtype=bool)
 
     def current(
         self, assets: Asset | str | Sequence[Asset | str], fields: str | Sequence[str]

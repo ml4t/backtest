@@ -125,8 +125,8 @@ def test_screened_prepared_factors_drive_native_next_close_orders_and_account_re
     assert fills["asset"].to_list() == ["A"]
     assert fills["quantity"].to_list() == [1.0]
     assert fills["timestamp"][0].isoformat() == "2025-07-03T17:00:00+00:00"
-    # Default cumulative impact is .1*(1/1000)**2; per-share commission is .001.
-    price = 40.0 * (1.0 + 0.1 * (1.0 / 1000.0) ** 2)
+    # Published default equity impact is 5bps; per-share commission is .001.
+    price = 40.0 * (1.0 + 5.0 / 10000.0)
     assert fills["price"][0] == pytest.approx(price)
     assert fills["commission"].to_list() == [0.001]
     assert performance.cash.tolist() == pytest.approx([1000.0, 999.999 - price])

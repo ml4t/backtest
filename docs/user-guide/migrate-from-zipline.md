@@ -277,8 +277,9 @@ This example preserves the `initialize`, `handle_data` and `analyze` signatures.
 Change the imports in your strategy to the migration namespace. Default adapter
 execution is next-bar close with integer shares, FIFO processing, shorting and
 leverage enabled, and unconstrained cash admission as in the reference workflow.
-Default costs are per-share 0.001, minimum zero, with quadratic volume impact
-0.1 and an asset/bar participation cap of 0.025. These adapter choices leave
+Default equity costs match published Zipline Reloaded 3.2.0: per-share 0.001,
+minimum zero, fixed 5-basis-point slippage and a shared asset/bar volume cap
+of 0.1. Select `VolumeShareSlippage` explicitly for quadratic impact. These adapter choices leave
 native Engine defaults unchanged. Supply actual positive observed volume;
 missing or zero volume prevents fills, including with `NoSlippage`.
 
@@ -1061,3 +1062,103 @@ native and actual Data output. Prepare returns at the required frequency;
 no daily-to-minute repetition or automatic download occurs. If dividends
 matter, a price-only proxy cannot stand in for the reference's declared
 dividend-adjusted convention.
+
+### Restrict assets by effective time
+
+Import `NoRestrictions`, `StaticRestrictions`, `HistoricalRestrictions`,
+`Restriction`, `RESTRICTION_STATES` and `SecurityListRestrictions` from
+`ml4t.backtest.compat.zipline.finance.asset_restrictions`. Set them during
+`initialize` with `set_asset_restrictions(rules, on_error="fail")` or the
+equivalent context method. `set_do_not_order_list` remains an alias for an
+explicit asset container or a caller-owned `current_securities(dt)` provider.
+No security-list download or legacy runtime is required.
+
+The adapter compiles each declaration into the existing native
+`OrderConstraints.restriction` validator. Native strategies can use that
+predicate directly, or `blocked_assets` for fixed stable keys. No separate
+order book or rejection path is created.
+
+<!-- ml4t-doc-test: dated-asset-restrictions -->
+```python
+from datetime import UTC, datetime
+import pandas as pd
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+from ml4t.backtest.compat.zipline.finance.asset_restrictions import HistoricalRestrictions
+from ml4t.backtest.compat.zipline.finance.asset_restrictions import Restriction
+from ml4t.backtest.compat.zipline.finance.asset_restrictions import RESTRICTION_STATES
+from ml4t.backtest.compat.zipline.finance.asset_restrictions import StaticRestrictions
+
+a, b = Asset("A", "ALPHA", 7), Asset("B", "BETA", 8)
+times = [datetime(2025, 7, 1, 20, tzinfo=UTC), datetime(2025, 7, 2, 20, tzinfo=UTC),
+         datetime(2025, 7, 3, 17, tzinfo=UTC)]
+prices = pl.DataFrame([{"timestamp": point, "asset": asset.key,
+                        "close": 100.0 + index, "volume": 1000}
+                       for index, point in enumerate(times) for asset in [a, b]])
+feed = DataFeed(prices_df=prices, feed_spec={
+    "calendar": "NYSE", "time_contract_version": 2, "data_frequency": "1d",
+    "timestamp_semantics": "bar_close", "bar_label": "right",
+})
+flags = []
+
+def initialize(context):
+    dated = HistoricalRestrictions([
+        Restriction(a, pd.Timestamp(times[1]), RESTRICTION_STATES.FROZEN),
+        Restriction(a, pd.Timestamp(times[2]), RESTRICTION_STATES.ALLOWED),
+    ])
+    context.set_asset_restrictions(StaticRestrictions([b]) | dated)
+
+def handle_data(context, data):
+    flags.append(data.can_trade([a, b]).tolist())
+    if len(flags) == 1:
+        context.order(a, 1)
+
+performance = run_algorithm(feed=feed, assets=[a, b], initialize=initialize,
+                            handle_data=handle_data, capital_base=1000)
+assert flags == [[True, False], [False, False], [True, False]]
+fills = performance.attrs["backtest_result"].to_fills_dataframe()
+assert fills["quantity"].to_list() == [1.0]
+assert abs(fills["price"][0] - 101.0505) < 1e-12
+print("Dated restriction queries and native orders verified.")
+```
+
+The first order was submitted before the restriction became effective. It
+still fills at the next close; these rules do not cancel existing orders.
+Equality with an effective timestamp selects the new state. Naive effective
+dates use the query's timezone; migration callbacks query in UTC. A
+`SecurityListRestrictions` provider may return declared `Asset` objects or
+explicit legacy integer SIDs. Strings are not inferred as symbols or IDs.
+The `|` operator combines rules by logical OR and preserves Boolean Series
+shapes in requested asset order. Future effective events cannot change earlier
+queries.
+
+`on_error="fail"` rejects a restricted order through native validation.
+`on_error="log"` records the violation and permits the order, while
+`data.can_trade` still reports the restriction. Failed requests continue to
+consume the adapter's declared order-request count. The captured published
+3.2.0 fixture in `tests/fixtures/zipline_original/restrictions-reference.json`
+checks those queries, submissions, fills and cash for both policies.
+
+`data.can_trade` currently combines native current-quote eligibility with
+these restriction predicates. It does not promise an execution fill or check
+buying power. The reference's stale-known-price presentation is a separate
+read-policy difference; supply real quotes for execution. Native lifetime
+eligibility remains with the Data-backed runtime instrument service.
+
+### Configure equity basis-point slippage
+
+`FixedBasisPointsSlippage(basis_points=5.0, volume_limit=0.1)` is the adapter's
+default equity model, matching published Zipline Reloaded 3.2.0. It compiles
+to native percentage slippage and the shared asset/bar volume limit. For a
+buy at close 101, 5 basis points gives 101.0505. Two orders share the same
+bar's capacity; at volume 1000, the default cap fills at most 100 shares in
+total. The supported `volume_limit` range is `(0, 1]`.
+
+Both positional model arguments and the original `us_equities=` keyword are
+accepted by `set_slippage` and `set_commission`. A call with no model preserves
+the selected model. Use `VolumeShareSlippage(volume_limit=..., price_impact=...)`
+explicitly for the quadratic cumulative-participation method, `FixedSlippage`
+for a fixed spread, or `NoSlippage` for zero impact with positive observed
+volume. These adapter choices leave native Backtest defaults unchanged.

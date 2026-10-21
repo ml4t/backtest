@@ -679,6 +679,10 @@
     "from ml4t.backtest.compat.zipline.assets import Asset",
     "from ml4t.backtest.compat.zipline.data import BarData",
     "from ml4t.backtest.compat.zipline.finance import commission, slippage",
+    "from ml4t.backtest.compat.zipline.finance.asset_restrictions import HistoricalRestrictions",
+    "from ml4t.backtest.compat.zipline.finance.asset_restrictions import RESTRICTION_STATES",
+    "from ml4t.backtest.compat.zipline.finance.asset_restrictions import Restriction",
+    "from ml4t.backtest.compat.zipline.finance.asset_restrictions import StaticRestrictions",
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
     "from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode",
@@ -2714,13 +2718,13 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "set_commission",
-      "signature": "(model: Any) -> None"
+      "signature": "(model: Any = None, *, us_equities: Any = None) -> None"
     },
     "ml4t.backtest.compat.zipline.api:set_slippage": {
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "set_slippage",
-      "signature": "(model: Any) -> None"
+      "signature": "(model: Any = None, *, us_equities: Any = None) -> None"
     },
     "ml4t.backtest.compat.zipline.api:symbol": {
       "kind": "function",
@@ -2747,6 +2751,10 @@
     "ml4t.backtest.compat.zipline.data:BarData": {
       "kind": "class",
       "members": {
+        "can_trade": {
+          "kind": "method",
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset]) -> bool | pandas.Series"
+        },
         "current": {
           "kind": "method",
           "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | str | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset | str], fields: str | collections.abc.Sequence[str]) -> Any"
@@ -2762,7 +2770,58 @@
       },
       "module": "ml4t.backtest.compat.zipline.data",
       "qualname": "BarData",
-      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None, csv_sources: collections.abc.Sequence[ml4t.backtest.compat.zipline.csv.PreparedCSV] = ()) -> None"
+      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None, csv_sources: collections.abc.Sequence[ml4t.backtest.compat.zipline.csv.PreparedCSV] = (), restriction: collections.abc.Callable[[ml4t.backtest.compat.zipline.assets.Asset, Any], bool] | None = None) -> None"
+    },
+    "ml4t.backtest.compat.zipline.finance.asset_restrictions:HistoricalRestrictions": {
+      "kind": "class",
+      "members": {
+        "is_restricted": {
+          "kind": "method",
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Iterable[ml4t.backtest.compat.zipline.assets.Asset], dt: Any) -> bool | pandas.Series"
+        },
+        "metadata": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, Any]"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.finance.asset_restrictions",
+      "qualname": "HistoricalRestrictions",
+      "signature": "(restrictions: collections.abc.Iterable[ml4t.backtest.compat.zipline.finance.asset_restrictions.Restriction]) -> None"
+    },
+    "ml4t.backtest.compat.zipline.finance.asset_restrictions:RESTRICTION_STATES": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.compat.zipline.finance.asset_restrictions",
+      "qualname": "RESTRICTION_STATES",
+      "signature": "(*values)"
+    },
+    "ml4t.backtest.compat.zipline.finance.asset_restrictions:Restriction": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.finance.asset_restrictions",
+      "qualname": "Restriction",
+      "signature": "(asset: ml4t.backtest.compat.zipline.assets.Asset, effective_date: pandas.Timestamp, state: ml4t.backtest.compat.zipline.finance.asset_restrictions.RESTRICTION_STATES)"
+    },
+    "ml4t.backtest.compat.zipline.finance.asset_restrictions:StaticRestrictions": {
+      "kind": "class",
+      "members": {
+        "is_restricted": {
+          "kind": "method",
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Iterable[ml4t.backtest.compat.zipline.assets.Asset], dt: Any) -> bool | pandas.Series"
+        },
+        "metadata": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, Any]"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.finance.asset_restrictions",
+      "qualname": "StaticRestrictions",
+      "signature": "(restricted_list: collections.abc.Iterable[ml4t.backtest.compat.zipline.assets.Asset]) -> None"
     },
     "ml4t.backtest.compat.zipline.finance:commission": {
       "kind": "module",

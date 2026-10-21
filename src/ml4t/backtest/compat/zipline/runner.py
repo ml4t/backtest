@@ -41,6 +41,12 @@ from .csv import PreparedCSV
 from .data import BarData
 from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time_rules
 from .finance import commission, slippage
+from .finance.asset_restrictions import (
+    NoRestrictions,
+    Restrictions,
+    SecurityListRestrictions,
+    StaticRestrictions,
+)
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
 from .lookup import PreparedAssetLookup, _lookup_instant, _symbol_parts
@@ -136,7 +142,8 @@ class MigrationContext:
         self._benchmark: BenchmarkData | None = None
         self._trading_controls: list[TradingControl] = []
         self._account_controls: list[tuple[str, float, timedelta | None]] = []
-        self._slippage: Any = slippage.VolumeShareSlippage()
+        self._restrictions: Restrictions = NoRestrictions()
+        self._slippage: Any = slippage.FixedBasisPointsSlippage()
         self._set_commission(commission.PerShare())
         self.portfolio = _Portfolio(self)
 
@@ -377,6 +384,42 @@ class MigrationContext:
             {**metadata, "on_error": on_error}
         )
 
+    def _is_restricted(self, asset: Asset, timestamp) -> bool:
+        point = pd.Timestamp(timestamp)
+        if point.tz is None:
+            point = point.tz_localize(self._config.resolved_timezone)
+        return bool(self._restrictions.is_restricted(asset, point.tz_convert("UTC")))
+
+    def set_asset_restrictions(self, restrictions: Restrictions, on_error: str = "fail") -> None:
+        self._setup_only()
+        if not isinstance(restrictions, Restrictions):
+            raise TypeError(
+                "Supply a migration Restrictions object; native strategies use OrderConstraints"
+            )
+
+        def restricted(request):
+            asset = self._by_key[request.asset]
+            point = pd.Timestamp(request.timestamp)
+            if point.tz is None:
+                point = point.tz_localize(self._config.resolved_timezone)
+            return bool(restrictions.is_restricted(asset, point.tz_convert("UTC")))
+
+        self._control(
+            OrderConstraints(restriction=restricted),
+            on_error,
+            {"rule": "asset_restrictions", "definition": restrictions.metadata},
+        )
+        self._restrictions = self._restrictions | restrictions
+
+    def set_do_not_order_list(self, restricted_list: Any, on_error: str = "fail") -> None:
+        self._setup_only()
+        restrictions = (
+            SecurityListRestrictions(restricted_list)
+            if callable(getattr(restricted_list, "current_securities", None))
+            else StaticRestrictions(restricted_list)
+        )
+        self.set_asset_restrictions(restrictions, on_error)
+
     def set_max_order_count(self, max_count: int, on_error: str = "fail") -> None:
         self._control(
             OrderRequestCount(max_count, timezone="UTC"),
@@ -589,14 +632,28 @@ class MigrationContext:
         else:
             raise TypeError("Use a declared migration commission model")
 
-    def set_commission(self, model: Any) -> None:
+    def set_commission(self, model: Any = None, *, us_equities: Any = None) -> None:
         self._setup_only()
+        if model is not None and us_equities is not None:
+            raise ValueError("Declare the equity commission once, positionally or as us_equities")
+        model = us_equities if us_equities is not None else model
+        if model is None:
+            return
         self._set_commission(model)
 
-    def set_slippage(self, model: Any) -> None:
+    def set_slippage(self, model: Any = None, *, us_equities: Any = None) -> None:
         self._setup_only()
+        if model is not None and us_equities is not None:
+            raise ValueError("Declare equity slippage once, positionally or as us_equities")
+        model = us_equities if us_equities is not None else model
+        if model is None:
+            return
         if not isinstance(
-            model, slippage.VolumeShareSlippage | slippage.FixedSlippage | slippage.NoSlippage
+            model,
+            slippage.VolumeShareSlippage
+            | slippage.FixedBasisPointsSlippage
+            | slippage.FixedSlippage
+            | slippage.NoSlippage,
         ):
             raise TypeError("Use a declared migration slippage model")
         self._slippage = model
@@ -617,6 +674,18 @@ class MigrationContext:
 
     def _execution_limits(self):
         config, model = self._config, self._slippage
+        if isinstance(model, slippage.FixedBasisPointsSlippage):
+            if not isfinite(model.basis_points) or model.basis_points < 0:
+                raise ValueError("basis_points must be finite and nonnegative")
+            if not isfinite(model.volume_limit) or not 0 < model.volume_limit <= 1:
+                raise ValueError("volume_limit must be finite and in (0, 1]")
+            config.slippage_type = SlippageType.PERCENTAGE
+            config.slippage_rate = model.basis_points / 10000.0
+            config.metadata["execution_limits"] = {
+                "model": "shared_observed_bar_volume",
+                "max_participation": model.volume_limit,
+            }
+            return SharedVolumeParticipationLimit(max_participation=model.volume_limit)
         if isinstance(model, slippage.VolumeShareSlippage):
             config.slippage_type = SlippageType.CUMULATIVE_VOLUME_SHARE
             config.slippage_rate = model.price_impact
@@ -809,7 +878,11 @@ def run_algorithm(
                 feed,
                 _Callbacks(
                     context,
-                    BarData(runtime, csv_sources=tuple(context._active_csv.values())),
+                    BarData(
+                        runtime,
+                        csv_sources=tuple(context._active_csv.values()),
+                        restriction=context._is_restricted,
+                    ),
                     handle_data,
                     runtime,
                     before_trading_start,

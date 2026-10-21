@@ -13,6 +13,7 @@ from .events import _DateRule, _TimeRule
 from .events import calendars as calendars
 from .events import date_rules as date_rules
 from .events import time_rules as time_rules
+from .finance.asset_restrictions import Restrictions
 from .finance.order import OrderView
 from .pipeline import PreparedPipeline
 
@@ -47,16 +48,24 @@ def get_datetime(tz: str | None = None) -> pd.Timestamp:
     return current().get_datetime(tz)
 
 
-def set_commission(model: Any) -> None:
-    current().set_commission(model)
+def set_commission(model: Any = None, *, us_equities: Any = None) -> None:
+    current().set_commission(model, us_equities=us_equities)
 
 
-def set_slippage(model: Any) -> None:
-    current().set_slippage(model)
+def set_slippage(model: Any = None, *, us_equities: Any = None) -> None:
+    current().set_slippage(model, us_equities=us_equities)
 
 
 def set_benchmark(asset: Asset | None) -> None:
     current().set_benchmark(asset)
+
+
+def set_asset_restrictions(restrictions: Restrictions, on_error: str = "fail") -> None:
+    current().set_asset_restrictions(restrictions, on_error)
+
+
+def set_do_not_order_list(restricted_list: Any, on_error: str = "fail") -> None:
+    current().set_do_not_order_list(restricted_list, on_error)
 
 
 def fetch_csv(url: str) -> PreparedCSV:
