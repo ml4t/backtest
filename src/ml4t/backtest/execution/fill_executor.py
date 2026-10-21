@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from ..config import InitialHwmSource, LockNotionalUpdateMode, ShareType
 from ..core.shared import add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
-from ..models import calculate_commission, calculate_slippage
+from ..models import SlippageContext, calculate_commission, calculate_slippage
 from ..types import (
     ExitReason,
     Fill,
@@ -150,6 +150,14 @@ class FillExecutor:
         self._validate_execution_price(base_price, source="base execution price")
 
         available_size = broker.get_available_size(order.asset, order.side)
+        contextual_slippage = callable(
+            getattr(broker.slippage_model, "calculate_with_context", None)
+        )
+        traded_volume = self.market.volumes.get(order.asset)
+        if getattr(broker.slippage_model, "requires_traded_volume", False) and (
+            traded_volume is None or not math.isfinite(traded_volume) or traded_volume <= 0
+        ):
+            return False
 
         # Get effective quantity (considering partial fills from previous bars)
         if self.fill_engine is None:
@@ -216,6 +224,19 @@ class FillExecutor:
             fill_quantity,
             base_price,
             available_size,
+            context=(
+                SlippageContext(
+                    order.asset,
+                    fill_quantity,
+                    base_price,
+                    traded_volume,
+                    self.orders.volume_consumed_by_asset.get(order.asset, 0.0),
+                    available_size,
+                    current_time,
+                )
+                if contextual_slippage
+                else None
+            ),
         )
         fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
         self._validate_execution_price(fill_price, source="execution price")
@@ -331,7 +352,7 @@ class FillExecutor:
         # Update cash (include multiplier for futures/derivatives)
         cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
-        if shared_budget is not None:
+        if shared_budget is not None or contextual_slippage:
             self.orders.volume_consumed_by_asset[order.asset] = (
                 self.orders.volume_consumed_by_asset.get(order.asset, 0.0) + fill_quantity
             )

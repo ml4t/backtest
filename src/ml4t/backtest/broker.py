@@ -345,6 +345,7 @@ class Broker:
         from .config import CommissionType, SlippageType
         from .models import (
             CombinedCommission,
+            CumulativeVolumeShareSlippage,
             FixedSlippage,
             NoCommission,
             NoSlippage,
@@ -421,6 +422,8 @@ class Broker:
             )
         elif effective_slippage_type == SlippageType.VOLUME_BASED:
             slippage_model = VolumeShareSlippage(impact_factor=config.slippage_rate)
+        elif effective_slippage_type == SlippageType.CUMULATIVE_VOLUME_SHARE:
+            slippage_model = CumulativeVolumeShareSlippage(price_impact=config.slippage_rate)
         elif effective_slippage_type == SlippageType.NONE:
             slippage_model = NoSlippage()
 

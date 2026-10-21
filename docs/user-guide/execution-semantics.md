@@ -546,6 +546,7 @@ print("Partial order fees and shared volume verified.")
 | `PERCENTAGE` | % of price | `slippage_rate=0.001` (0.1%) |
 | `FIXED` | Fixed $ per share | `slippage_fixed=0.01` |
 | `VOLUME_BASED` | Linear size-to-volume impact | `slippage_rate=0.1` (impact coefficient) |
+| `CUMULATIVE_VOLUME_SHARE` | Quadratic committed asset/bar participation | `slippage_rate=0.1` (impact coefficient) |
 
 Slippage models remain separate from quote-side execution:
 

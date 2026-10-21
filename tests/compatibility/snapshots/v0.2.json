@@ -980,6 +980,10 @@
       {
         "name": "VOLUME_BASED",
         "value": "volume_based"
+      },
+      {
+        "name": "CUMULATIVE_VOLUME_SHARE",
+        "value": "cumulative_volume_share"
       }
     ],
     "ml4t.backtest.config.SpreadConvention": [

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -47,6 +48,19 @@ class CommissionContext:
     filled_quantity: float
     commission_paid: float
     filled_notional: float
+
+
+@dataclass(frozen=True)
+class SlippageContext:
+    """Actual fill size, observed traded volume and already committed asset/bar volume."""
+
+    asset: str
+    quantity: float
+    price: float
+    traded_volume: float | None
+    volume_consumed: float
+    quoted_size: float | None
+    timestamp: datetime
 
 
 def calculate_commission(
@@ -135,8 +149,15 @@ def calculate_slippage(
     quantity: float,
     price: float,
     volume: float | None,
+    *,
+    context: SlippageContext | None = None,
 ) -> float:
-    value = model.calculate(asset, quantity, price, volume)
+    contextual = getattr(model, "calculate_with_context", None) if context is not None else None
+    value = (
+        contextual(context)
+        if callable(contextual)
+        else model.calculate(asset, quantity, price, volume)
+    )
     return _validate_nonnegative_model_output("slippage", model, value)
 
 
@@ -396,6 +417,31 @@ class VolumeShareSlippage:
         impact = volume_fraction * self.impact_factor
         # Return per-unit price adjustment (not total dollars)
         return price * impact
+
+
+class CumulativeVolumeShareSlippage:
+    """Quadratic adverse impact using committed total absolute asset/bar participation.
+
+    This is distinct from the existing per-fill linear VolumeShareSlippage. A
+    participation cap belongs to ExecutionLimits, not this price-impact model.
+    """
+
+    requires_traded_volume = True
+
+    def __init__(self, price_impact: float = 0.1):
+        if not math.isfinite(price_impact) or price_impact < 0:
+            raise ValueError("price_impact must be finite and nonnegative")
+        self.price_impact = price_impact
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        raise TypeError("CumulativeVolumeShareSlippage requires SlippageContext")
+
+    def calculate_with_context(self, context: SlippageContext) -> float:
+        volume = context.traded_volume
+        if volume is None or not math.isfinite(volume) or volume <= 0:
+            raise ValueError("Cumulative volume impact requires positive observed traded volume")
+        participation = (context.volume_consumed + abs(context.quantity)) / volume
+        return context.price * self.price_impact * participation**2
 
 
 class FuturesSlippage:

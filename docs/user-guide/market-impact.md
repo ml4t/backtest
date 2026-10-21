@@ -18,12 +18,14 @@ Commission and slippage are configured via BacktestConfig. Market impact is an o
 
 ## Commission Models
 
-### Percentage (Default)
+### Percentage
 
 ```python
 from ml4t.backtest import BacktestConfig
+from ml4t.backtest.config import CommissionType
 
 config = BacktestConfig(
+    commission_type=CommissionType.PERCENTAGE,
     commission_rate=0.001,  # 10 bps per trade
 )
 ```
@@ -148,16 +150,49 @@ they were read; schedules change, so check them before relying on a result.
 
 Slippage adjusts the configured execution price in the adverse direction. Use the spread model for a bar-only estimate of bid-ask crossing, or a percentage or fixed amount for other execution drag.
 
-### Percentage (Default)
+### Percentage
 
 ```python
+from ml4t.backtest.config import SlippageType
+
 config = BacktestConfig(
+    slippage_type=SlippageType.PERCENTAGE,
     slippage_rate=0.001,        # 10 bps for market orders
     stop_slippage_rate=0.001,   # Additional 10 bps for stop exits
 )
 ```
 
 Stop exits can have additional slippage because stops trigger during fast markets.
+
+### Cumulative volume share
+
+The development-source `CUMULATIVE_VOLUME_SHARE` option uses quadratic participation
+across committed fills on the same asset and bar. Its adverse per-unit adjustment is
+`price * slippage_rate * ((already_filled + fill_quantity) / traded_volume) ** 2`.
+The existing `VOLUME_BASED` option remains linear and computes each fill separately.
+
+Use `SharedVolumeParticipationLimit` to cap aggregate participation. The impact
+model uses actual traded volume, independently of quoted depth. Missing or zero
+traded volume defers execution. Only completed fills consume participation, and
+the counter resets on the next actual bar.
+
+```python
+from ml4t.backtest.config import SlippageType
+from ml4t.backtest.execution import SharedVolumeParticipationLimit
+
+config = BacktestConfig(
+    slippage_type=SlippageType.CUMULATIVE_VOLUME_SHARE,
+    slippage_rate=0.1,  # quadratic impact coefficient
+)
+participation = SharedVolumeParticipationLimit(max_participation=1.0)
+# Pass execution_limits=participation to Engine.
+```
+
+At a base price of $100 and observed volume of 100 shares, successive ten-share
+buys execute at $100.10 and $100.40. This case agrees with published Zipline
+Reloaded 3.2.0's `VolumeShareSlippage(volume_limit=1.0, price_impact=0.1)`.
+The native model also supports other configured price sources. This comparison
+does not assert equivalence for other execution or account settings.
 
 ### Fixed
 

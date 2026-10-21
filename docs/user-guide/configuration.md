@@ -202,8 +202,8 @@ mark source.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `slippage_type` | SlippageType | NONE | Model: NONE, PERCENTAGE, FIXED, SPREAD, VOLUME_BASED |
-| `slippage_rate` | float | 0.0 | Rate for percentage model |
+| `slippage_type` | SlippageType | NONE | Model: NONE, PERCENTAGE, FIXED, SPREAD, VOLUME_BASED, CUMULATIVE_VOLUME_SHARE |
+| `slippage_rate` | float | 0.0 | Percentage rate, or coefficient for the selected volume-impact model |
 | `slippage_fixed` | float | 0.0 | Fixed dollar amount per share |
 | `slippage_spread` | float | 0.0 | Spread in currency units for bar-only spread approximation |
 | `slippage_spread_by_asset` | dict[str, float] | `{}` | Optional per-asset spread overrides |

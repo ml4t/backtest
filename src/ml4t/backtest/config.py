@@ -261,6 +261,7 @@ class SlippageType(str, Enum):
     FIXED = "fixed"  # Fixed dollar amount
     SPREAD = "spread"  # Bid-ask spread approximation in currency units
     VOLUME_BASED = "volume_based"  # Based on trade size vs volume
+    CUMULATIVE_VOLUME_SHARE = "cumulative_volume_share"
 
 
 class DataFrequency(str, Enum):
@@ -600,7 +601,13 @@ class BacktestConfig:
             )
 
         # High slippage + high commission
-        total_cost = self.slippage_rate + self.commission_rate
+        flat_slippage = (
+            self.slippage_rate
+            if self.slippage_type
+            not in {SlippageType.VOLUME_BASED, SlippageType.CUMULATIVE_VOLUME_SHARE}
+            else 0.0
+        )
+        total_cost = flat_slippage + self.commission_rate
         if total_cost > 0.01:  # > 1% round-trip
             issues.append(
                 f"Total transaction cost ({total_cost:.2%}) is high. "
@@ -1558,6 +1565,9 @@ class BacktestConfig:
                     f"{self.slippage_type.value} default_spread={self.slippage_spread:.6f} "
                     f"convention={self.slippage_spread_convention.value}"
                     if self.slippage_type == SlippageType.SPREAD
+                    else f"  Slippage: {self.slippage_type.value} coefficient={self.slippage_rate}"
+                    if self.slippage_type
+                    in {SlippageType.VOLUME_BASED, SlippageType.CUMULATIVE_VOLUME_SHARE}
                     else f"  Slippage: {self.slippage_type.value} @ {self.slippage_rate:.2%}"
                 ),
             ]
