@@ -107,6 +107,15 @@ def estimate_commission(
     multiplier: float = 1.0,
 ) -> float:
     """Estimate a fee without advancing a stateful model's execution state."""
+    if type(model) is AssetCommission:
+        return estimate_commission(
+            model.models.get(asset, model.default),
+            asset,
+            quantity,
+            price,
+            order=order,
+            multiplier=multiplier,
+        )
     try:
         estimate_model = deepcopy(model)
     except Exception as exc:
@@ -128,6 +137,15 @@ def quote_commission(
     multiplier: float = 1.0,
 ) -> float:
     """Quote without consuming mutable models; retain native stateless validation cost."""
+    if type(model) is AssetCommission:
+        return quote_commission(
+            model.models.get(asset, model.default),
+            asset,
+            quantity,
+            price,
+            order=order,
+            multiplier=multiplier,
+        )
     if type(model) in (
         NoCommission,
         PercentageCommission,
