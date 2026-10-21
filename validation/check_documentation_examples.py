@@ -70,6 +70,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "dated-asset-restrictions",
         "legacy-stale-price-view",
         "zipline-independent-history-grid",
+        "zipline-partial-session",
         "legacy-us-futures-clock",
         "declared-future-costs",
         "futures-volatility-volume",

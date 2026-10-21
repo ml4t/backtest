@@ -147,6 +147,17 @@ price roles and leaves genuine feature NaNs unchanged. It does not alter
 execution data or create volume. The Zipline callback adapter selects this
 price-view policy explicitly.
 
+`runtime.market.session_bars(assets, fields, bar_count=...)` consolidates a
+declared intraday grid into causal session OHLCV, including the current partial
+session. It requires an explicit calendar. The returned `timestamp` is capped
+at the active simulation clock, with `window_start`, `session_closed`,
+`expected_bars` and `observed_bars` describing coverage. Unknown minute volume
+leaves the total unknown. `view="prepared"` uses Data's causal input and
+adjustment policy before consolidation. Ordinary `history(unit="session")`
+continues to return the individual observations without aggregation. See the
+[runnable partial-session example](migrate-from-zipline.md#read-the-current-partial-daily-bar)
+for native reads alongside the original callback projection.
+
 Register callbacks before execution or in `on_start`/`on_prepare`. Registrations
 made during a run are removed afterward; registrations made beforehand persist
 when reusing the service for a new Engine. Callbacks use the existing lifecycle

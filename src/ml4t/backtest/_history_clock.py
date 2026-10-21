@@ -92,13 +92,7 @@ def session_times(
     ]
 
 
-def expected_times(
-    config: BacktestConfig,
-    asof: datetime,
-    count: int,
-    inclusive: bool,
-    observed: Sequence[datetime],
-) -> list[datetime]:
+def _grid_parameters(config: BacktestConfig):
     feed = config.resolved_feed_spec
     if feed.time_contract_version != 2 or any(
         getattr(feed, field) is None
@@ -124,6 +118,18 @@ def expected_times(
         step = timedelta(seconds=amount * seconds)
     right = feed.bar_label == BarLabel.RIGHT
     partial = feed.partial_bar_policy == PartialBarPolicy.INCLUDE
+    return step, right, partial
+
+
+def expected_times(
+    config: BacktestConfig,
+    asof: datetime,
+    count: int,
+    inclusive: bool,
+    observed: Sequence[datetime],
+) -> list[datetime]:
+    step, right, partial = _grid_parameters(config)
+    daily = step is None
     # Each session contributes at least one eligible bar for daily inputs; sparse or
     # oversized intraday intervals may require additional earlier sessions.
     session_count = min(count + 1, 14)

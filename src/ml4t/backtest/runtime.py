@@ -470,6 +470,36 @@ class MarketDataView:
             finite_prices_only=finite_prices_only,
         )
 
+    def session_bars(
+        self,
+        assets: Sequence[str],
+        fields: Sequence[str],
+        *,
+        bar_count: int,
+        view: Literal["raw", "prepared"] = "raw",
+        forward_fill: bool | Mapping[str, bool] = False,
+        finite_prices_only: bool = False,
+    ) -> pl.DataFrame:
+        """Aggregate available intraday OHLCV through the simulation clock.
+
+        The window counts declared exchange sessions and includes the current
+        partial session. Timestamp is the observed cutoff, capped at session
+        close. Session/grid coverage accompanies each read-only row; missing
+        volume never becomes a known zero or a complete volume sum.
+        """
+        from ._session_bars import session_bars
+
+        if view not in {"raw", "prepared"}:
+            raise ValueError("history view must be raw or prepared")
+        return session_bars(
+            self._prepared_view() if view == "prepared" else self,
+            assets,
+            fields,
+            bar_count=bar_count,
+            forward_fill=forward_fill,
+            finite_prices_only=finite_prices_only,
+        )
+
     def current(
         self,
         assets: Sequence[str],

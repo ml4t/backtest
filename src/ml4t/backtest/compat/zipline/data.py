@@ -18,8 +18,9 @@ class BarData:
     """Project current/history without a separate price store or execution path.
 
     With a calendar, daily labels are native session dates. Calendar-free reads
-    and minute output preserve physical UTC instants. Requested history frequency must match the prepared
-    source grid; this boundary never resamples raw data or computes adjustments.
+    and minute output preserve physical UTC instants. Daily reads on minute
+    execution may project native causal session aggregation. Adjustment policy
+    remains with the declared prepared source.
     """
 
     def __init__(
@@ -333,10 +334,14 @@ class BarData:
         config = market._history_config
         declared = config.resolved_feed_spec.data_frequency
         canonical = {"daily": "1d", "d": "1d", "1d": "1d", "minute": "1m", "1m": "1m"}
-        if (
-            frequency not in {"1d", "1m"}
-            or canonical.get(str(getattr(declared, "value", declared))) != frequency
-        ):
+        source_frequency = canonical.get(str(getattr(declared, "value", declared)))
+        aggregate = (
+            self._read_policy == "zipline"
+            and source is None
+            and frequency == "1d"
+            and source_frequency == "1m"
+        )
+        if frequency not in {"1d", "1m"} or source_frequency != frequency and not aggregate:
             raise ValueError(
                 "Requested history frequency must match its explicitly prepared source grid; "
                 "prepare cross-frequency bars in Data before the run"
@@ -348,19 +353,38 @@ class BarData:
                 if config.resolved_calendar is None
                 else WindowUnit.EXPECTED_BAR
             )
-        frame = market.history(
-            [asset.key for asset in chosen],
-            names,
-            bar_count=bar_count,
-            unit=unit,
-            view="raw" if source is not None else self._history_view,
-            forward_fill=self._stale_fields(names, ffill),
-            finite_prices_only=self._read_policy == "zipline",
-        )
+        if aggregate:
+            frame = market.session_bars(
+                [asset.key for asset in chosen],
+                names,
+                bar_count=bar_count,
+                view=self._history_view,
+                forward_fill=self._stale_fields(names, ffill),
+                finite_prices_only=True,
+            )
+        else:
+            frame = market.history(
+                [asset.key for asset in chosen],
+                names,
+                bar_count=bar_count,
+                unit=unit,
+                view="raw" if source is not None else self._history_view,
+                forward_fill=self._stale_fields(names, ffill),
+                finite_prices_only=self._read_policy == "zipline",
+            )
         rows = list(temporal_rows(frame, named=True))
         times = list(dict.fromkeys(row["timestamp"] for row in rows))
         source_times = market._timestamps
-        if len(times) != bar_count or (times and source_times and times[0] < source_times[0]):
+        first = (
+            frame["window_start"][0]
+            if aggregate and not frame.is_empty()
+            else times[0]
+            if times
+            else None
+        )
+        if len(times) != bar_count or (
+            first is not None and source_times and first < source_times[0]
+        ):
             raise ValueError(
                 "History window starts before captured source coverage; supply warmup bars"
             )

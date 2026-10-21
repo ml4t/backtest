@@ -1267,7 +1267,7 @@ Minute execution can use an explicitly declared completed daily source via
 `RuntimeServices(history_sources={"daily": provider})`; the existing
 [independent history source contract](#use-a-separate-prepared-history-grid)
 supplies causal, prepared observations. Without one, a minute feed uses the
-insufficient-history method. The adapter does not resample minute data or
+insufficient-history method. This cost model does not resample minute data or
 read a future completed daily close. Newly available source revisions apply
 at their actual fill clock. High and low must be actual published observations;
 the native feed's close fallback is not accepted. Opening-auction targets
@@ -1461,9 +1461,77 @@ Before trading starts, price reads can return causal warmup prices. They do
 not expose that session's future close. Pass `history_view="prepared"` to the
 callback runner to select the existing causal Data history provider, or
 `history_unit="observation"` to count observations explicitly. This prepared
-view retains the execution grid; separate cross-frequency preparation and
-delivery remain required for a different history grid.
+view retains the execution grid. For daily reads during minute execution,
+the Zipline policy projects native partial-session aggregation as described
+below. Other history grids require an explicitly prepared source.
 
+### Read the current partial daily bar
+
+With the default Zipline read policy, `data.history(..., "1d")` on a declared
+minute feed includes the current session through the active observation.
+It uses native `runtime.market.session_bars(...)`; raw minute observations
+and executable quotes remain unchanged. Supply the earlier minute observations
+needed for each requested session, including warmup before the run starts.
+The native service counts exchange sessions and requires a complete declared
+intraday bar grid and calendar. `calendar=None` does not invent session boundaries.
+
+Open is the first available value, high/low are extrema of available values,
+and close is the last available value in that session. Only the explicit
+`price` read view can carry a prior price across missing observations.
+Volume is the sum of known expected-bar volumes; an absent or unknown value
+makes the session total unavailable. A captured reader zero remains zero.
+These reads do not infer whether a missing quote means no trade.
+
+The native frame retains physical `timestamp` and `window_start` cutoffs,
+`session_closed`, `expected_bars` and `observed_bars`. The latter counts input
+bar rows with published requested fields, including rows with unknown values;
+it does not count carried prices as observations. These columns describe
+coverage, not complete-data certification. The adapter projects daily session
+labels and the original Pandas container shape. It does not label an in-progress
+price as a future completed close.
+
+<!-- ml4t-doc-test: zipline-partial-session -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import DataFeed, RuntimeServices
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+asset = Asset("A", "ALPHA", 7)
+times = [datetime(2024, 7, 3, 13, minute, tzinfo=UTC) for minute in [31, 32, 33]]
+prices = pl.DataFrame({"timestamp": times, "asset": ["A"] * 3,
+                       "close": [201., 202., 203.], "volume": [1000.] * 3})
+feed = DataFeed(prices_df=prices, feed_spec={"time_contract_version": 2,
+    "calendar": "NYSE", "data_frequency": "1m", "timestamp_semantics": "bar_close",
+    "bar_label": "right", "bar_grid_anchor": "session_open", "partial_bar_policy": "include"})
+runtime = RuntimeServices()
+seen = []
+
+def handle(context, data):
+    history = data.history(asset, ["close", "volume"], 1, "1d")
+    native = runtime.market.session_bars([asset.key], ["close", "volume"], bar_count=1)
+    assert not native["session_closed"][0]
+    assert native["timestamp"][0] == context.get_datetime().to_pydatetime()
+    assert native["window_start"][0] == times[0]
+    assert native["expected_bars"][0] == native["observed_bars"][0] == len(seen) + 1
+    assert native.select("close", "volume").rows() == [tuple(history.iloc[0])]
+    seen.append(tuple(history.iloc[0]))
+
+performance = run_algorithm(feed=feed, assets=[asset], runtime=runtime, handle_data=handle)
+assert seen == [(201., 1000.), (202., 2000.), (203., 3000.)]
+assert performance.attrs["backtest_result"].fills == []
+print("Partial daily history uses only observed minutes and creates no fills.")
+```
+
+Pass `history_view="prepared"` to aggregate the existing causal Data provider's
+minute observations after its selected adjustment policy. Backtest owns the
+simulation-clock consolidation; Data owns as-of source preparation, revisions
+and adjustment basis. The published 3.2.0 fixture in
+`tests/fixtures/zipline_partial_session` checks all OHLCV fields, a sparse second
+asset, price carry, the first three minute cutoffs and a half-day close. Its
+actual Data export keeps raw missingness; synthetic input availability is
+explicitly declared at each bar close. No historical publication is inferred.
 
 ### Use a separate prepared history grid
 
@@ -1547,10 +1615,11 @@ Zipline's daily history during minute execution can include the current
 session's in-progress daily bar. The retained published-3.2 probe
 (`tests/fixtures/zipline_original/cross-frequency-reference.json`) observes
 previous close 100 and current closes 201, 202 and 203, with current-session
-volumes 1000, 2000 and 3000 at its first three minutes. Delivering that bar remains unfinished: it
-requires a causal aggregation output with an explicit partial-bar observation
-clock and availability. Declaring minute rows as daily data does not aggregate
-them. No partial daily close is inferred from a future completed daily close.
+volumes 1000, 2000 and 3000 at its first three minutes. Use the
+[partial daily route](#read-the-current-partial-daily-bar) for that definition.
+An explicit named daily source selects its own completed grid instead.
+Declaring minute rows as daily data does not aggregate them. No partial daily
+close is inferred from a future completed daily close.
 
 The captured and installed producer/consumer tests use Data revision
 `c3b9db80a66397420fb27adeccc762559dd41e07`, version
