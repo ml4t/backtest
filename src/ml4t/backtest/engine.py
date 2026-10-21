@@ -30,7 +30,7 @@ from .config import DataFrequency, ExecutionPrice
 from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
 from .lifecycle import LifecycleDispatcher
-from .models import CommissionModel
+from .models import CommissionModel, SlippageModel
 from .preopen import default_execution_policy
 from .runtime import RuntimeServices
 from .sessions import session_date_for_timestamp
@@ -98,6 +98,7 @@ class Engine:
         contract_specs: dict[str, Any] | None = None,
         market_impact_model: Any | None = None,
         commission_model: CommissionModel | None = None,
+        slippage_model: SlippageModel | None = None,
         execution_limits: Any | None = None,
         funding_df: pl.DataFrame | None = None,
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
@@ -150,6 +151,7 @@ class Engine:
             contract_specs=contract_specs,
             market_impact_model=market_impact_model,
             commission_model=commission_model,
+            slippage_model=slippage_model,
             execution_limits=execution_limits,
         )
         if self.config.cancel_policy.value == "session_end":
@@ -1093,6 +1095,7 @@ class Engine:
         contract_specs: dict[str, Any] | None = None,
         market_impact_model: Any | None = None,
         commission_model: CommissionModel | None = None,
+        slippage_model: SlippageModel | None = None,
         execution_limits: Any | None = None,
         funding_df: pl.DataFrame | None = None,
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
@@ -1113,6 +1116,7 @@ class Engine:
             contract_specs: Per-asset contract specifications (futures multipliers, etc.)
             market_impact_model: Market impact model for fill simulation
             commission_model: Explicit native fee model overriding configured fee rates
+            slippage_model: Explicit native slippage model overriding configured rates
             execution_limits: Execution limits (max order size, etc.)
             funding_df: Timestamped funding rates or amounts for named assets
 
@@ -1126,6 +1130,7 @@ class Engine:
             contract_specs=contract_specs,
             market_impact_model=market_impact_model,
             commission_model=commission_model,
+            slippage_model=slippage_model,
             execution_limits=execution_limits,
             funding_df=funding_df,
             lifecycle_version=lifecycle_version,
@@ -1151,6 +1156,7 @@ def run_backtest(
     contract_specs: dict[str, Any] | None = None,
     market_impact_model: Any | None = None,
     commission_model: CommissionModel | None = None,
+    slippage_model: SlippageModel | None = None,
     execution_limits: Any | None = None,
     funding_df: pl.DataFrame | None = None,
     capital_flows: pl.DataFrame | None = None,
@@ -1173,6 +1179,7 @@ def run_backtest(
         contract_specs: Per-asset contract specifications (futures multipliers, etc.)
         market_impact_model: Market impact model for fill simulation
         commission_model: Explicit native fee model overriding configured fee rates
+        slippage_model: Explicit native slippage model overriding configured rates
         execution_limits: Execution limits (max order size, etc.)
         funding_df: Timestamped funding rates or amounts for named assets
 
@@ -1218,6 +1225,7 @@ def run_backtest(
         contract_specs=contract_specs,
         market_impact_model=market_impact_model,
         commission_model=commission_model,
+        slippage_model=slippage_model,
         execution_limits=execution_limits,
         funding_df=funding_df,
         lifecycle_version=lifecycle_version,

@@ -156,8 +156,8 @@ class Broker:
 
         self.initial_cash = initial_cash
         # Note: self.cash is now a property delegating to self.account.cash (Bug #5 fix)
-        self.commission_model = commission_model or NoCommission()
-        self.slippage_model = slippage_model or NoSlippage()
+        self.commission_model = commission_model if commission_model is not None else NoCommission()
+        self.slippage_model = slippage_model if slippage_model is not None else NoSlippage()
         self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
         self.execution_price = execution_price
@@ -340,6 +340,7 @@ class Broker:
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
         commission_model: CommissionModel | None = None,
+        slippage_model: SlippageModel | None = None,
     ) -> Broker:
         """Create Broker from BacktestConfig.
 
@@ -352,6 +353,7 @@ class Broker:
             market_impact_model: Optional market impact model (not in config)
             contract_specs: Optional contract specifications (not in config)
             commission_model: Explicit fee model overriding configured fee rates
+            slippage_model: Explicit slippage model overriding configured rates
 
         Returns:
             Configured Broker instance
@@ -429,6 +431,9 @@ class Broker:
         elif effective_commission_type == CommissionType.NONE:
             commission_model = NoCommission()
 
+        explicit_slippage = slippage_model
+        if explicit_slippage is not None and not isinstance(explicit_slippage, SlippageModel):
+            raise TypeError("slippage_model must implement the native SlippageModel protocol")
         # Build slippage model from config
         slippage_model = None
         if effective_slippage_type == SlippageType.PERCENTAGE:
@@ -453,7 +458,7 @@ class Broker:
             commission_model=explicit_commission
             if explicit_commission is not None
             else commission_model,
-            slippage_model=slippage_model,
+            slippage_model=explicit_slippage if explicit_slippage is not None else slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
             execution_mode=config.execution_mode,
             execution_price=config.execution_price,

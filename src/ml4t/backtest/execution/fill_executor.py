@@ -18,11 +18,13 @@ from ..config import InitialHwmSource, LockNotionalUpdateMode, ShareType
 from ..core.shared import CASH_TOLERANCE, add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
 from ..models import (
+    AssetSlippage,
     CumulativeVolumeShareSlippage,
     FixedSlippage,
     NoSlippage,
     PercentageSlippage,
     SlippageContext,
+    SlippageModel,
     SpreadSlippage,
     VolumeShareSlippage,
     calculate_commission,
@@ -39,6 +41,7 @@ from ..types import (
     Trade,
 )
 from .impact import LinearImpact, NoImpact, PowerLawImpact, SquareRootImpact
+from .limits import AssetExecutionLimits
 
 if TYPE_CHECKING:
     from ..accounting import AccountState
@@ -165,11 +168,12 @@ class FillExecutor:
         self._validate_execution_price(base_price, source="base execution price")
 
         available_size = broker.get_available_size(order.asset, order.side)
-        contextual_slippage = callable(
-            getattr(broker.slippage_model, "calculate_with_context", None)
-        )
+        slippage_model = broker.slippage_model
+        if isinstance(slippage_model, AssetSlippage):
+            slippage_model = slippage_model.for_asset(order.asset)
+        contextual_slippage = callable(getattr(slippage_model, "calculate_with_context", None))
         traded_volume = self.market.volumes.get(order.asset)
-        if getattr(broker.slippage_model, "requires_traded_volume", False) and (
+        if getattr(slippage_model, "requires_traded_volume", False) and (
             traded_volume is None or not math.isfinite(traded_volume) or traded_volume <= 0
         ):
             return False
@@ -183,12 +187,15 @@ class FillExecutor:
         # Apply execution limits (volume participation)
         remaining_quantity = 0.0
         shared_budget = None
-        if broker.execution_limits is not None:
-            shared_budget = getattr(broker.execution_limits, "bar_capacity", None)
+        limits = broker.execution_limits
+        if isinstance(limits, AssetExecutionLimits):
+            limits = limits.for_asset(order.asset)
+        if limits is not None:
+            shared_budget = getattr(limits, "bar_capacity", None)
             if order.order_id in self.orders.filled_this_bar:
                 return False
 
-            exec_result = broker.execution_limits.calculate(
+            exec_result = limits.calculate(
                 effective_quantity,
                 self.market.volumes.get(order.asset)
                 if shared_budget is not None
@@ -203,7 +210,7 @@ class FillExecutor:
             ):
                 raise ValueError(
                     "Invalid execution quantity from "
-                    f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}, "
+                    f"{type(limits).__name__}: got {fill_quantity!r}, "
                     f"requested {effective_quantity!r}"
                 )
             if shared_budget is not None:
@@ -218,7 +225,7 @@ class FillExecutor:
             if not math.isfinite(fill_quantity) or fill_quantity < 0:
                 raise ValueError(
                     "Invalid execution quantity from "
-                    f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}"
+                    f"{type(limits).__name__}: got {fill_quantity!r}"
                 )
             if broker.share_type == ShareType.INTEGER:
                 fill_quantity = float(int(fill_quantity))
@@ -259,7 +266,7 @@ class FillExecutor:
                 remaining_quantity = 0.0
                 self.orders.partial_quantities.pop(order.order_id, None)
 
-        if self._has_mutable_price_model():
+        if self._has_mutable_price_model(slippage_model):
             actual_price, actual_slippage = self._price_for_quantity(
                 order, fill_quantity, base_price, available_size, quote=False
             )
@@ -438,8 +445,8 @@ class FillExecutor:
             else price >= order.limit_price
         )
 
-    def _has_mutable_price_model(self) -> bool:
-        return type(self.broker.slippage_model) not in (
+    def _has_mutable_price_model(self, slippage_model: SlippageModel) -> bool:
+        return type(slippage_model) not in (
             NoSlippage,
             FixedSlippage,
             PercentageSlippage,
@@ -466,10 +473,13 @@ class FillExecutor:
         broker = self.broker
         impact_model = broker.market_impact_model
         slippage_model = broker.slippage_model
-        if quote and self._has_mutable_price_model():
+        if isinstance(slippage_model, AssetSlippage):
+            slippage_model = slippage_model.for_asset(order.asset)
+        original_slippage = slippage_model
+        if quote and self._has_mutable_price_model(slippage_model):
             impact_model = deepcopy(impact_model)
             slippage_model = deepcopy(slippage_model)
-            if slippage_model is broker.slippage_model or (
+            if slippage_model is original_slippage or (
                 impact_model is not None and impact_model is broker.market_impact_model
             ):
                 raise TypeError("Execution price models must support independent deepcopy quotes")

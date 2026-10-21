@@ -15,6 +15,7 @@ from .impact import (
     SquareRootImpact,
 )
 from .limits import (
+    AssetExecutionLimits,
     ExecutionLimits,
     NoLimits,
     PositiveVolumeLimit,
@@ -40,6 +41,7 @@ __all__ = [
     "FillContext",
     # Limits
     "ExecutionLimits",
+    "AssetExecutionLimits",
     "NoLimits",
     "PositiveVolumeLimit",
     "VolumeParticipationLimit",

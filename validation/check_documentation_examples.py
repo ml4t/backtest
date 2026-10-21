@@ -74,6 +74,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "declared-future-costs",
         "legacy-session-end-cancel",
         "native-asset-commission",
+        "native-asset-execution",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",

@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from ..config import ConditionalOrderMode, ExecutionPrice, LockNotionalUpdateMode, ShareType
-from ..models import estimate_commission
+from ..models import AssetSlippage, estimate_commission
 from ..types import ExecutionMode, OrderSide, OrderType
 from .shared import CASH_TOLERANCE, add_with_zero_cancellation
 from .state import MarketState, OrderState
@@ -225,6 +225,10 @@ class FillEngine:
             return ExecutionPrice.OPEN
         if order.order_type is OrderType.MOC:
             return ExecutionPrice.CLOSE
+        if isinstance(broker.slippage_model, AssetSlippage):
+            source = broker.slippage_model.price_sources.get(order.asset)
+            if source is not None:
+                return source
         if use_open and broker.next_bar_execution_price is not None:
             return broker.next_bar_execution_price
         source = broker.execution_price

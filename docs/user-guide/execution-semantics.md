@@ -603,6 +603,62 @@ simulation. Saved result artifacts retain the executed fees and account path.
 
 ### Slippage Models
 
+`Engine`, `Engine.from_config`, `run_backtest` and `Broker.from_config` accept
+an explicit `slippage_model=`. `AssetSlippage` selects native models by stable
+key, with a required default. Its optional `price_sources` mapping sets the
+execution basis for ordinary market and conditional orders. Explicit MOC close
+orders and typed opening child intents retain their declared close/open basis.
+Marks continue to use the separate marking policy.
+
+`AssetExecutionLimits` selects existing participation limits by stable key.
+Shared capacity remains owned by the native order state for each asset/bar;
+separate orders cannot reuse it. Quote estimates copy only the selected model
+and do not advance its actual fill state.
+
+<!-- ml4t-doc-test: native-asset-execution -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ExecutionMode, ExecutionPrice
+from ml4t.backtest.execution import AssetExecutionLimits, SharedVolumeParticipationLimit
+from ml4t.backtest.models import AssetSlippage, FixedSlippage, PercentageSlippage
+
+prices = pl.DataFrame([
+    {"timestamp": datetime(2025, 3, day, 21, tzinfo=UTC), "asset": asset,
+     "close": 100., "high": 120., "low": 100., "volume": 4.}
+    for day in [3, 4, 5, 6] for asset in ["A", "ES"]
+])
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp.day == 3:
+            broker.submit_order("A", 3)
+            broker.submit_order("ES", 3)
+
+result = Engine(DataFeed(prices_df=prices), Buy(), BacktestConfig(
+    calendar=None, execution_mode=ExecutionMode.NEXT_BAR,
+    next_bar_execution_price=ExecutionPrice.CLOSE),
+    slippage_model=AssetSlippage({"ES": FixedSlippage(.5)},
+        default=PercentageSlippage(.01), price_sources={"ES": ExecutionPrice.MID}),
+    execution_limits=AssetExecutionLimits({"ES": SharedVolumeParticipationLimit(.25)},
+        default=SharedVolumeParticipationLimit(.5)),
+    contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.)}).run()
+fills = result.to_fills_dataframe()
+assert fills.filter(pl.col("asset") == "A")["price"].to_list() == [101., 101.]
+assert fills.filter(pl.col("asset") == "ES")["price"].to_list() == [110.5] * 3
+assert result.to_portfolio_state_dataframe()["cash"][-1] == 83122.
+assert result.to_equity_dataframe()["equity"][-1] == 98422.
+print("Distinct asset execution bases, costs and volume caps verified.")
+```
+
+The futures fills use the observed high/low midpoint 110 plus a 0.5 adverse
+cost; the equity uses close 100 plus 1%. These deliberately different sources
+are recorded on the fills. The future is marked at 100 with multiplier 50,
+so its marked loss includes the 10.5-point difference. This example selects
+native signed-notional accounting and does not claim a variation-cash result.
+Retain supplied model parameters alongside the inputs when rerunning; Python
+model objects are not reconstructed by `BacktestConfig` serialization.
+
 | Type | Calculation | Config |
 |------|------------|--------|
 | `NONE` | No slippage | |

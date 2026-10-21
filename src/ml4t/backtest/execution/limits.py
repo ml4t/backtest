@@ -2,7 +2,9 @@
 
 import math
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from .result import ExecutionResult
 
@@ -32,6 +34,31 @@ class ExecutionLimits(ABC):
             ExecutionResult with fillable and remaining quantities
         """
         pass
+
+
+class AssetExecutionLimits(ExecutionLimits):
+    """Select an existing native limit for each explicit stable asset key."""
+
+    def __init__(self, models: Mapping[str, ExecutionLimits], *, default: ExecutionLimits) -> None:
+        if not isinstance(default, ExecutionLimits) or any(
+            not isinstance(key, str) or not key or not isinstance(model, ExecutionLimits)
+            for key, model in models.items()
+        ):
+            raise TypeError("Asset limits require stable string keys and native ExecutionLimits")
+        if isinstance(default, AssetExecutionLimits) or any(
+            isinstance(model, AssetExecutionLimits) for model in models.values()
+        ):
+            raise TypeError("Declare one asset limit routing table, without nested routes")
+        self.models = MappingProxyType(dict(models))
+        self.default = default
+
+    def for_asset(self, asset: str) -> ExecutionLimits:
+        return self.models.get(asset, self.default)
+
+    def calculate(
+        self, order_quantity: float, bar_volume: float | None, price: float
+    ) -> ExecutionResult:
+        raise TypeError("Asset execution limits require an explicit asset selection")
 
 
 @dataclass

@@ -7,7 +7,10 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+from .config import ExecutionPrice
 
 if TYPE_CHECKING:
     from .types import Order
@@ -62,6 +65,50 @@ class SlippageContext:
     volume_consumed: float
     quoted_size: float | None
     timestamp: datetime
+
+
+class AssetSlippage:
+    """Route stable keys to native models and explicit execution-price bases."""
+
+    def __init__(
+        self,
+        models: Mapping[str, SlippageModel],
+        *,
+        default: SlippageModel,
+        price_sources: Mapping[str, ExecutionPrice | str] | None = None,
+    ) -> None:
+        if not isinstance(default, SlippageModel) or any(
+            not isinstance(key, str) or not key or not isinstance(model, SlippageModel)
+            for key, model in models.items()
+        ):
+            raise TypeError("Asset slippage requires stable string keys and native SlippageModels")
+        if isinstance(default, AssetSlippage) or any(
+            isinstance(model, AssetSlippage) for model in models.values()
+        ):
+            raise TypeError("Declare one asset slippage routing table, without nested routes")
+        if any(not isinstance(key, str) or not key for key in (price_sources or {})):
+            raise ValueError("Execution-price sources require stable string asset keys")
+        self.models = MappingProxyType(dict(models))
+        self.default = default
+        self.price_sources = MappingProxyType(
+            {key: ExecutionPrice(value) for key, value in (price_sources or {}).items()}
+        )
+
+    def for_asset(self, asset: str) -> SlippageModel:
+        return self.models.get(asset, self.default)
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        return self.for_asset(asset).calculate(asset, quantity, price, volume)
+
+    def calculate_with_context(self, context: SlippageContext) -> float:
+        return calculate_slippage(
+            self.for_asset(context.asset),
+            context.asset,
+            context.quantity,
+            context.price,
+            context.traded_volume,
+            context=context,
+        )
 
 
 def calculate_commission(
