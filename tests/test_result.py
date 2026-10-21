@@ -678,6 +678,7 @@ class TestBacktestResultParquet:
 
             assert manifest["omitted_components"] == {
                 "holdings": "holdings were not captured",
+                "benchmark": "result has no prepared benchmark",
                 "recorded_variables": "strategy variables were not recorded",
                 "predictions": "result has no predictions",
                 "config": "result has no config",

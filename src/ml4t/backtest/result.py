@@ -26,6 +26,7 @@ import math
 from collections.abc import ItemsView, Iterable, KeysView
 from dataclasses import dataclass, field
 from datetime import datetime
+from hashlib import sha256
 from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -41,6 +42,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for local editable edge cases
     __version__ = "0.0.0.dev0"
 from .analytics.annualization import should_session_align
+from .benchmark import _validate_benchmark_frame, _validate_benchmark_metadata
 from .capital import CapitalChange, flow_adjusted_returns
 from .funding import FundingPayment
 from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
@@ -52,6 +54,7 @@ if TYPE_CHECKING:
 
 _ARTIFACT_TYPE = "ml4t-backtest-result"
 _ARTIFACT_SCHEMA_VERSION = 3
+_BENCHMARK_ARTIFACT_SCHEMA_VERSION = 4
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -66,6 +69,7 @@ _COMPONENT_FILES = {
     "holdings": "holdings.parquet",
     "capital_flows": "capital_flows.parquet",
     "recorded_variables": "recorded_variables.parquet",
+    "benchmark": "benchmark.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -197,6 +201,15 @@ def _validate_complete_holdings(
         raise error_type("Holdings do not refer to recorded account observations")
 
 
+def _benchmark_digest(frame: pl.DataFrame) -> str:
+    rows = zip(
+        frame["timestamp"].cast(pl.Int64).to_list(),
+        [value.hex() for value in frame["benchmark_return"].to_list()],
+        strict=True,
+    )
+    return sha256(json.dumps(list(rows), separators=(",", ":")).encode()).hexdigest()
+
+
 @dataclass
 class BacktestResult:
     """Structured backtest result with export capabilities.
@@ -245,6 +258,8 @@ class BacktestResult:
     observation_metadata: list[tuple[str, bool, int | None]] = field(default_factory=list)
     recorded_variables: list[tuple[datetime, int, str, str]] | None = None
     account_method: str | None = None
+    benchmark: pl.DataFrame | None = None
+    benchmark_metadata: dict[str, Any] | None = None
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -252,6 +267,29 @@ class BacktestResult:
     _fills_df: pl.DataFrame | None = field(default=None, repr=False)
     _portfolio_state_df: pl.DataFrame | None = field(default=None, repr=False)
     _rejected_orders_df: pl.DataFrame | None = field(default=None, repr=False)
+
+    def to_benchmark_dataframe(self) -> pl.DataFrame:
+        """Return prepared period returns with their source and financial definition."""
+        if self.benchmark is None:
+            raise ValueError("Result has no prepared benchmark")
+        _validate_benchmark_metadata(self.benchmark_metadata)
+        frame = _validate_benchmark_frame(self.benchmark)
+        timezone = self.config.resolved_timezone if self.config is not None else "UTC"
+        import pandas as pd
+
+        expected = {
+            (
+                pd.Timestamp(point).tz_localize(timezone)
+                if pd.Timestamp(point).tz is None
+                else pd.Timestamp(point)
+            )
+            .tz_convert("UTC")
+            .value
+            for point, _ in self.equity_curve
+        }
+        if set(frame["timestamp"].cast(pl.Int64).to_list()) != expected:
+            raise ValueError("Benchmark periods do not match observed equity periods")
+        return frame
 
     def _feed_spec(self) -> FeedSpec | None:
         if self.config is None:
@@ -1013,6 +1051,8 @@ class BacktestResult:
             unavailable["recorded_variables"] = "strategy variables were not recorded"
         if self.predictions is None:
             unavailable["predictions"] = "result has no predictions"
+        if self.benchmark is None:
+            unavailable["benchmark"] = "result has no prepared benchmark"
         if self.config is None:
             unavailable["config"] = "result has no config"
             unavailable["spec"] = "result has no config for a runtime spec"
@@ -1023,6 +1063,13 @@ class BacktestResult:
             raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
 
         selected = [name for name in requested if name not in unavailable]
+        benchmark_frame = None
+        if self.benchmark is not None:
+            try:
+                benchmark_frame = self.to_benchmark_dataframe()
+                json.dumps(self.benchmark_metadata, allow_nan=False)
+            except Exception as exc:
+                raise ArtifactWriteError(f"Invalid prepared benchmark: {exc}") from exc
 
         text_payloads: dict[str, str] = {}
         if "metrics" in selected:
@@ -1198,6 +1245,15 @@ class BacktestResult:
             )
             written["recorded_variables"] = recorded_path
 
+        if "benchmark" in selected:
+            benchmark_path = path / _COMPONENT_FILES["benchmark"]
+            assert benchmark_frame is not None
+            write_component(
+                "benchmark",
+                lambda: benchmark_frame.write_parquet(benchmark_path, compression=compression),
+            )
+            written["benchmark"] = benchmark_path
+
         if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
             write_component(
@@ -1223,7 +1279,17 @@ class BacktestResult:
 
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
-            "schema_version": _ARTIFACT_SCHEMA_VERSION,
+            "schema_version": _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+            if self.benchmark is not None
+            else _ARTIFACT_SCHEMA_VERSION,
+            **(
+                {
+                    "benchmark_metadata": self.benchmark_metadata,
+                    "benchmark_content_sha256": _benchmark_digest(benchmark_frame),
+                }
+                if benchmark_frame is not None
+                else {}
+            ),
             "library_version": __version__,
             "account_method": self.account_method,
             "initial_capital": self.initial_capital,
@@ -1237,6 +1303,7 @@ class BacktestResult:
                 | ({"capital_flows"} if self.capital_changes else set())
                 | ({"holdings"} if self.holdings_sampling != "none" else set())
                 | ({"recorded_variables"} if self.recorded_variables is not None else set())
+                | ({"benchmark"} if self.benchmark is not None else set())
             ),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
@@ -1358,10 +1425,14 @@ class BacktestResult:
 
         if manifest is not None:
             schema_version = manifest.get("schema_version")
-            if schema_version not in (2, _ARTIFACT_SCHEMA_VERSION):
+            if schema_version not in (
+                2,
+                _ARTIFACT_SCHEMA_VERSION,
+                _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
+            ):
                 raise UnsupportedArtifactVersionError(
                     f"Unsupported result artifact schema version {schema_version!r}; "
-                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
+                    f"supported versions are 2, {_ARTIFACT_SCHEMA_VERSION} and {_BENCHMARK_ARTIFACT_SCHEMA_VERSION}"
                 )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
@@ -1430,7 +1501,17 @@ class BacktestResult:
                 )
             )
 
-        missing_required_components = sorted(_REQUIRED_RESULT_COMPONENTS - components.keys())
+        benchmark_metadata = manifest.get("benchmark_metadata") if manifest else None
+        benchmark_declared = benchmark_metadata is not None or (
+            manifest is not None
+            and manifest.get("schema_version") == _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+        )
+        if benchmark_declared and benchmark_metadata is None and not recovery:
+            raise ArtifactManifestError("Benchmark artifact has no provenance declaration")
+        required_components = _REQUIRED_RESULT_COMPONENTS | (
+            {"benchmark"} if benchmark_declared else set()
+        )
+        missing_required_components = sorted(required_components - components.keys())
         missing_files = sorted(
             name for name, filename in components.items() if not (path / filename).is_file()
         )
@@ -1443,7 +1524,7 @@ class BacktestResult:
             missing_components = sorted(
                 (
                     _COMPONENT_FILES.keys()
-                    - {"funding", "holdings", "capital_flows", "recorded_variables"}
+                    - {"funding", "holdings", "capital_flows", "recorded_variables", "benchmark"}
                 )
                 - components.keys()
             )
@@ -1455,6 +1536,12 @@ class BacktestResult:
                 )
                 for name in missing_components
             )
+            if benchmark_declared and "benchmark" not in components:
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        "component_missing", "benchmark", "Declared benchmark.parquet is absent."
+                    )
+                )
             for name in missing_files:
                 diagnostics.append(
                     ArtifactDiagnostic(
@@ -1728,6 +1815,27 @@ class BacktestResult:
                 raise ArtifactReadError("Invalid capital_flows.parquet") from exc
         rejected_orders = read_component("rejected_orders", read_rejected_orders, [])
         equity_curve = read_component("equity", read_equity, [])
+
+        def read_benchmark(component_path):
+            frame = _validate_benchmark_frame(pl.read_parquet(component_path))
+            if (
+                manifest is None
+                or manifest.get("schema_version") != _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+            ):
+                raise ValueError("Prepared benchmark requires artifact schema version 4")
+            if _benchmark_digest(frame) != manifest.get("benchmark_content_sha256"):
+                raise ValueError("Prepared benchmark content does not match its retained digest")
+            probe = cls(
+                trades=[],
+                fills=[],
+                metrics={},
+                equity_curve=equity_curve,
+                config=config,
+                benchmark=frame,
+                benchmark_metadata=benchmark_metadata,
+            )
+            return probe.to_benchmark_dataframe()
+
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
         holdings_frame = read_component("holdings", pl.read_parquet, None)
         holdings = None
@@ -1890,6 +1998,8 @@ class BacktestResult:
         if config is None:
             config = spec_config
 
+        benchmark = read_component("benchmark", read_benchmark, None)
+
         if daily_pnl is not None:
             if not component_read_ok["equity"]:
                 diagnostics.append(
@@ -1939,6 +2049,8 @@ class BacktestResult:
             observation_metadata=observation_metadata,
             recorded_variables=recorded_variables,
             account_method=account_method,
+            benchmark=benchmark,
+            benchmark_metadata=benchmark_metadata if benchmark is not None else None,
         )
         if result.holdings is not None:
             if result.holdings_sampling in {"session", "fill_and_session"} and len(

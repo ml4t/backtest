@@ -16,6 +16,7 @@ except ImportError:
     __version__ = "0.0.0.dev0"
 
 from .auxiliary import AuxiliaryData
+from .benchmark import BenchmarkData
 from .broker import Broker
 from .config import BacktestConfig, CommissionType
 from .datafeed import DataFeed
@@ -78,6 +79,7 @@ from .types import (
 del _compat
 
 __all__ = [
+    "BenchmarkData",
     # Core API
     "DataFeed",
     "Broker",

@@ -20,9 +20,10 @@ from ml4t.specs import (
     negotiate_lifecycle_version,
 )
 
-from ._temporal import temporal_frame
+from ._temporal import temporal_frame, timestamp_values
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
+from .benchmark import BenchmarkData
 from .broker import Broker
 from .capital import CapitalChange, index_capital_events
 from .config import DataFrequency, ExecutionPrice
@@ -102,6 +103,7 @@ class Engine:
         target_intent_state: dict[str, Any] | None = None,
         holdings_sampling: str = "none",
         runtime: RuntimeServices | None = None,
+        benchmark: BenchmarkData | None = None,
     ):
         from .config import BacktestConfig as ConfigCls
 
@@ -116,6 +118,9 @@ class Engine:
             else None
         )
         self.holdings_sampling = holdings_sampling
+        if benchmark is not None and not isinstance(benchmark, BenchmarkData):
+            raise TypeError("benchmark must be prepared BenchmarkData")
+        self._benchmark = benchmark
         self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling != "none" else None
         self._validate_strategy_lifecycle(strategy)
         if config is None:
@@ -222,10 +227,19 @@ class Engine:
         if self._has_run:
             raise RuntimeError("Engine.run() was already started; create a new Engine for each run")
         self._has_run = True
+        if self._benchmark is not None:
+            self._validate_benchmark_coverage()
         if self.runtime is not None:
             self.runtime._bind(self)
         try:
-            return self._run_once()
+            result = self._run_once()
+            if self._benchmark is not None:
+                result.benchmark = self._benchmark.select(
+                    [time for time, _ in result.equity_curve],
+                    timezone=self.config.resolved_timezone,
+                )
+                result.benchmark_metadata = self._benchmark.metadata
+            return result
         except BaseException as failure:
             try:
                 self._finalize_strategy()
@@ -238,6 +252,36 @@ class Engine:
         finally:
             if self.runtime is not None:
                 self.runtime._unbind()
+
+    def _validate_benchmark_coverage(self) -> None:
+        from .calendar import filter_to_trading_sessions
+
+        if self.config.resolved_timestamp_semantics not in {
+            TimestampSemantics.EVENT_TIME,
+            TimestampSemantics.BAR_CLOSE,
+        }:
+            raise ValueError(
+                "Benchmark alignment requires physical event_time/bar_close feed instants"
+            )
+
+        points = [
+            point
+            for point in self.feed.timestamps
+            if self.runtime is None or self.runtime._accepts(point)
+        ]
+        frame = temporal_frame({"timestamp": points})
+        if self.config.resolved_calendar is not None and self.config.enforce_sessions:
+            frame = filter_to_trading_sessions(
+                frame,
+                self.config.resolved_calendar,
+                naive_tz=self.config.resolved_timezone,
+                timestamp_semantics=self.config.resolved_timestamp_semantics,
+                bar_label=self.config.resolved_feed_spec.bar_label,
+            )
+        assert self._benchmark is not None
+        self._benchmark.select(
+            timestamp_values(frame["timestamp"]), timezone=self.config.resolved_timezone
+        )
 
     def _run_once(self) -> BacktestResult:
         """Execute one guarded engine run."""
@@ -1051,6 +1095,7 @@ class Engine:
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
         holdings_sampling: str = "none",
+        benchmark: BenchmarkData | None = None,
     ) -> Engine:
         """Create an Engine instance from a BacktestConfig.
 
@@ -1081,6 +1126,7 @@ class Engine:
             execution_policy=execution_policy,
             target_intent_state=target_intent_state,
             holdings_sampling=holdings_sampling,
+            benchmark=benchmark,
         )
 
 
@@ -1105,6 +1151,7 @@ def run_backtest(
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
     holdings_sampling: str = "none",
+    benchmark: BenchmarkData | None = None,
 ) -> BacktestResult:
     """Run a backtest with minimal setup.
 
@@ -1168,4 +1215,5 @@ def run_backtest(
         execution_policy=execution_policy,
         target_intent_state=target_intent_state,
         holdings_sampling=holdings_sampling,
+        benchmark=benchmark,
     ).run()

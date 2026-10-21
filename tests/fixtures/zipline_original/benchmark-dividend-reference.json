@@ -1,0 +1,44 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "asset_sid": 7,
+  "raw_close": [
+    100.0,
+    95.0,
+    104.5,
+    99.0
+  ],
+  "sessions": [
+    "2025-06-30T00:00:00",
+    "2025-07-01T00:00:00",
+    "2025-07-02T00:00:00",
+    "2025-07-03T00:00:00"
+  ],
+  "closes": [
+    "2025-06-30T20:00:00+00:00",
+    "2025-07-01T20:00:00+00:00",
+    "2025-07-02T20:00:00+00:00",
+    "2025-07-03T17:00:00+00:00"
+  ],
+  "dividend": {
+    "amount": 10.0,
+    "ex_date": "2025-07-01T00:00:00",
+    "pay_date": "2025-07-03T00:00:00"
+  },
+  "method": "adjusted_price_change; cash factor=1-amount/previous_close; do not confuse with cash held until payment",
+  "benchmark_period_return": [
+    0.05555555555555558,
+    0.1611111111111112,
+    0.10000000000000009
+  ],
+  "expected_period_returns": [
+    0.05555555555555558,
+    0.10000000000000009,
+    -0.052631578947368474
+  ],
+  "portfolio_value": [
+    1000.0,
+    1000.0,
+    1000.0
+  ],
+  "timing_claim": false
+}

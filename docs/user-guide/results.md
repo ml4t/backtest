@@ -591,7 +591,8 @@ with $10,000 that pays a $10 fee before its first mark reports a first return of
 remain actual market observations. Older artifacts without a recorded initial
 valuation retain their original first-observation baseline.
 
-`manifest.json` identifies artifact schema version 3 and every component written.
+`manifest.json` identifies artifact schema version 3, or version 4 when the
+result contains a prepared benchmark, and every component written.
 Schema 3 records `initial_capital` separately from the first observed NAV. Schema 2
 remains readable; its missing initial valuation is not reconstructed from configuration. Loading is
 strict by default. An empty directory, missing manifest or required component, interrupted write,
@@ -621,6 +622,83 @@ Non-finite metric floats use a tagged JSON object and are restored on load, so `
 remains standards-compliant without losing `NaN` or infinity. NumPy arrays and Polars Series are
 stored and loaded as JSON lists. The returned path mapping includes `manifest`; passing its keys
 back through `include` treats that key as a no-op because the manifest is always written.
+
+## Prepared benchmark returns
+
+In a development build containing `BenchmarkData`, pass a prepared per-period
+return table to `Engine`, `Engine.from_config` or `run_backtest`. Declare the
+original source, financial return method and reinvestment convention. Backtest
+retains the supplied decimal returns; it does not derive a dividend-adjusted
+benchmark from raw execution prices.
+
+This example uses a cash-dividend adjustment convention from the pinned
+Zipline Reloaded 3.2.0 reference. The pre-ex-date close is 100 and the dividend
+is 10, giving a retained previous-close factor of 0.9. The adjusted prior
+close is therefore 90. Subsequent closes 95, 104.5 and 99 produce a cumulative
+benchmark return of 10%. A raw-price-only series would report -1% from 100 to
+99. A cash-dividend holding ledger is a separate account definition.
+
+<!-- ml4t-doc-test: prepared-benchmark-returns -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, BenchmarkData, DataFeed, Engine, Strategy
+
+times = [datetime(2025, 7, 1, 20, tzinfo=UTC), datetime(2025, 7, 2, 20, tzinfo=UTC),
+         datetime(2025, 7, 3, 17, tzinfo=UTC)]
+spec = {"time_contract_version": 2, "calendar": "NYSE", "data_frequency": "1d",
+        "timestamp_semantics": "bar_close", "bar_label": "right"}
+returns = pl.DataFrame({"timestamp": times,
+                        "return": [95 / 90 - 1, 104.5 / 95 - 1, 99 / 104.5 - 1]})
+benchmark = BenchmarkData(
+    returns, source_id="fixture://declared-dividend-benchmark", asset="A",
+    return_method="total_return", reinvestment="zipline_previous_close_cash_factor",
+    feed_spec=spec,
+)
+prices = pl.DataFrame({"timestamp": times, "asset": ["A"] * 3,
+                       "close": [95.0, 104.5, 99.0]})
+
+class Cash(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        pass
+
+result = Engine(DataFeed(prices_df=prices, feed_spec=spec), Cash(),
+                BacktestConfig(initial_cash=1000), benchmark=benchmark).run()
+retained = result.to_benchmark_dataframe()
+cumulative = (retained["benchmark_return"] + 1).product() - 1
+assert abs(cumulative - 0.1) < 1e-15
+assert result.to_equity_dataframe()["equity"].to_list() == [1000.0] * 3
+assert result.benchmark_metadata["return_method"] == "total_return"
+print("Prepared benchmark periods and unchanged account verified.")
+```
+
+Timestamp values are timezone-aware physical period ends on the run's actual
+observation grid. The constructor accepts Polars frames or a Pandas frame
+with named timestamp columns. `return_col` selects a differently named return
+column; its values must be finite decimal returns. Duplicate periods, missing
+returns and missing observed periods raise errors. Backtest checks feed
+coverage before strategy callbacks. It never forward-fills a daily percentage
+across minute rows, converts session labels implicitly, or fills an absent
+benchmark period with zero.
+
+The actual Data preparation test in `tests/test_benchmark_data.py` passes the
+reference's captured 0.9 factor through
+`ml4t.data.adjustments.prepare_adjusted_history`, then consumes the resulting
+return table through native Engine and the result artifact. It uses
+[Data source c3b9db80](https://github.com/ml4t/data/commit/c3b9db80a66397420fb27adeccc762559dd41e07)
+and Specs 0.2.0. This is a source-candidate integration. The report input uses
+explicit retrospective supplied factors, with historical factor publication
+left unknown; it is not a feature available to strategy decisions. Native Data
+total-return preparation has its own declared method. Select the intended
+method upstream and retain its provenance instead of relabelling it.
+
+`to_parquet` writes `benchmark.parquet` and uses artifact schema 4 for results
+with a benchmark. The manifest retains its source/method/reinvestment metadata
+and a digest of the retained period keys and values. Strict reload validates
+the digest, clock, coverage and provenance. Recovery reports an omitted or
+invalid benchmark; it does not substitute one. Results without a benchmark
+continue to write schema 3 and add no benchmark return columns. The current
+reader accepts schemas 2, 3 and 4; older readers cannot read schema 4.
 
 ## Integration with ml4t-diagnostic
 

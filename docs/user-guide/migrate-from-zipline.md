@@ -356,12 +356,13 @@ all Zipline workflows are supported.
 This initial adapter does not yet implement
 the original Pipeline construction API. Use the [prepared panel route](#deliver-prepared-pipeline-results)
 for factor delivery and the [frozen CSV route](#register-an-offline-csv-source)
-for auxiliary inputs. Benchmark
-return inputs, raw corporate actions or futures variation-cash settlement.
+for auxiliary inputs. Raw corporate actions and futures variation-cash settlement
+remain separate unfinished accounting work.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
-records it as not supplied. An asset benchmark currently needs a separately
-prepared workflow. No implicit SPY download or synthetic benchmark return is
+records it as not supplied unless prepared benchmark data is passed. An asset
+benchmark uses the [declared return input](#supply-a-declared-benchmark).
+No implicit SPY download or synthetic benchmark return is
 created. Pass physical run bounds and warmup through `RuntimeServices`; do not
 reinterpret session labels as event instants.
 
@@ -1036,3 +1037,27 @@ research field/asset pairs across sources raise an error; query
 native result retains the original identity, prepared content hash, parser
 choices, transformation names and excluded-row counts. No extra market event
 is created by an auxiliary row.
+
+### Supply a declared benchmark
+
+Pass native [`BenchmarkData`](results.md#prepared-benchmark-returns) through
+`run_algorithm(benchmark=prepared_benchmark, ...)`. An existing
+`set_benchmark(asset)` callback selects that supplied input only when its
+stable asset key matches. It does not compute returns from `data.current`.
+Omitting `set_benchmark` uses the supplied input; `set_benchmark(None)`
+explicitly disables it. Without a prepared input, selecting an asset raises
+an error before market callbacks.
+
+The performance frame adds `benchmark_return` for each observed period and
+`benchmark_period_return` for the cumulative product. The native result keeps
+the original table and provenance, including through artifact reload.
+Benchmark data does not change cash, holdings, fills, NAV or strategy returns.
+
+The dividend-bearing reference in
+`tests/fixtures/zipline_original/benchmark-dividend-reference.json` verifies
+the actual published 3.2.0 asset-benchmark convention and early-close period
+keys. `tests/test_benchmark_data.py` compares those values with prepared
+native and actual Data output. Prepare returns at the required frequency;
+no daily-to-minute repetition or automatic download occurs. If dividends
+matter, a price-only proxy cannot stand in for the reference's declared
+dividend-adjusted convention.

@@ -13,6 +13,7 @@ from uuid import uuid4
 import pandas as pd
 
 from ... import BacktestConfig, Broker, DataFeed, Engine, RuntimeServices, Strategy
+from ...benchmark import BenchmarkData
 from ...config import (
     CommissionType,
     ConditionalOrderMode,
@@ -131,6 +132,8 @@ class MigrationContext:
         self._pipelines: dict[str, _PipelineState] = {}
         self._csv_sources: dict[str, PreparedCSV] = {}
         self._active_csv: dict[str, PreparedCSV] = {}
+        self._benchmark_input: BenchmarkData | None = None
+        self._benchmark: BenchmarkData | None = None
         self._trading_controls: list[TradingControl] = []
         self._account_controls: list[tuple[str, float, timedelta | None]] = []
         self._slippage: Any = slippage.VolumeShareSlippage()
@@ -600,9 +603,17 @@ class MigrationContext:
 
     def set_benchmark(self, asset: Asset | None) -> None:
         self._setup_only()
-        if asset is not None:
-            raise ValueError("A benchmark asset requires explicitly prepared benchmark returns")
-        self._config.metadata["benchmark_status"] = "explicitly_disabled"
+        if asset is None:
+            self._benchmark = None
+            self._config.metadata["benchmark_status"] = "explicitly_disabled"
+            return
+        self._validate_asset(asset)
+        if self._benchmark_input is None or self._benchmark_input.asset != asset.key:
+            raise ValueError(
+                "A benchmark asset requires explicitly prepared benchmark returns for its stable key"
+            )
+        self._benchmark = self._benchmark_input
+        self._config.metadata["benchmark_status"] = "prepared_returns"
 
     def _execution_limits(self):
         config, model = self._config, self._slippage
@@ -679,6 +690,7 @@ def run_algorithm(
     capital_base: float = 100000.0,
     runtime: RuntimeServices | None = None,
     csv_sources: Sequence[PreparedCSV] = (),
+    benchmark: BenchmarkData | None = None,
     start: date | datetime | str | None = None,
     end: date | datetime | str | None = None,
 ) -> pd.DataFrame:
@@ -727,6 +739,11 @@ def run_algorithm(
         "end": environment["end"].isoformat(),
     }
     context = MigrationContext(assets, config)
+    if benchmark is not None and not isinstance(benchmark, BenchmarkData):
+        raise TypeError("benchmark requires prepared BenchmarkData")
+    context._benchmark_input = context._benchmark = benchmark
+    if benchmark is not None:
+        config.metadata["benchmark_status"] = "prepared_returns"
     for source in csv_sources:
         if not isinstance(source, PreparedCSV):
             raise TypeError("csv_sources requires PreparedCSV inputs")
@@ -800,6 +817,7 @@ def run_algorithm(
                 config,
                 runtime=runtime,
                 execution_limits=limits,
+                benchmark=context._benchmark,
                 holdings_sampling="bar",
             ).run()
     if asset_lookup is not None and result.config is not None:

@@ -1,11 +1,12 @@
 """Pandas presentation of observed native accounts, fills and recorded variables."""
 
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from typing import Any
 
 import pandas as pd
 
-from ..._temporal import temporal_rows
+from ..._temporal import temporal_rows, timestamp_values
 from ...result import BacktestResult
 from .assets import Asset
 
@@ -62,6 +63,15 @@ def _performance(
         },
         index=index.tz_convert("UTC").as_unit("ns"),
     )
+    if result.benchmark is not None:
+        benchmark = result.to_benchmark_dataframe()
+        benchmark_index = pd.DatetimeIndex(timestamp_values(benchmark["timestamp"])).as_unit("ns")
+        period_returns = pd.Series(benchmark["benchmark_return"].to_list(), index=benchmark_index)
+        performance["benchmark_return"] = period_returns.reindex(performance.index)
+        performance["benchmark_period_return"] = ((1 + period_returns).cumprod() - 1).reindex(
+            performance.index
+        )
+        performance.attrs["benchmark_metadata"] = deepcopy(result.benchmark_metadata)
     transactions: dict[pd.Timestamp, list[dict[str, Any]]] = {}
     for fill in result.fills:
         timestamp = pd.Timestamp(fill.timestamp)
