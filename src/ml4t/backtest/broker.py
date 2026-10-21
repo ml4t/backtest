@@ -2808,6 +2808,14 @@ class Broker:
         """Return an order from the complete order history, or None when unknown."""
         return self._order_book.get_order(order_id)
 
+    def get_fills(self, order_id: str | None = None) -> list[Fill]:
+        """Return detached observed fills, optionally selecting one native order."""
+        return [
+            copy.deepcopy(fill)
+            for fill in self._execution_journal.fills
+            if order_id is None or fill.order_id == order_id
+        ]
+
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
         """Return a copy of pending orders, optionally filtered by asset."""
         return self._order_book.get_pending_orders(asset=asset)

@@ -4233,6 +4233,10 @@
           "kind": "method",
           "signature": "(self, asset: 'str') -> 'ContractSpec | None'"
         },
+        "get_fills": {
+          "kind": "method",
+          "signature": "(self, order_id: 'str | None' = None) -> 'list[Fill]'"
+        },
         "get_intent_reconciliations": {
           "kind": "method",
           "signature": "(self) -> 'tuple[IntentReconciliation, ...]'"

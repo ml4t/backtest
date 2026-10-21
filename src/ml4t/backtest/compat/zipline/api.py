@@ -6,6 +6,7 @@ import pandas as pd
 
 from ._scope import current
 from .assets import Asset
+from .finance.order import OrderView
 
 
 def symbol(symbol_str: str) -> Asset:
@@ -98,3 +99,15 @@ def order_target_percent(
     style: Any | None = None,
 ) -> str | None:
     return current().order_target_percent(asset, target, limit_price, stop_price, style)
+
+
+def get_order(order_id: str) -> OrderView | None:
+    return current().get_order(order_id)
+
+
+def get_open_orders(asset: Asset | None = None) -> dict[Asset, list[OrderView]] | list[OrderView]:
+    return current().get_open_orders(asset)
+
+
+def cancel_order(order_param: str | OrderView) -> None:
+    current().cancel_order(order_param)

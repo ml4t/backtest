@@ -193,3 +193,32 @@ def test_bound_and_recorded_settings_are_independent_of_caller_and_completed_eng
     engine.config.slippage_spread_by_asset["A"] = 4.0
     assert result.config.initial_cash == 1000
     assert result.config.slippage_spread_by_asset == {"A": 2.0}
+
+
+def test_get_fills_returns_detached_native_records_without_mutating_observed_execution():
+    class Trade(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            first = broker.submit_order("A", 2)
+            broker.submit_order("A", 3)
+            selected = broker.get_fills(first.order_id)
+            assert [fill.quantity for fill in selected] == [2]
+            selected[0].quantity = 1000
+            selected.clear()
+            assert [fill.quantity for fill in broker.get_fills()] == [2, 3]
+            assert broker.get_fills("unknown") == []
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [datetime(2025, 1, 6, 21, tzinfo=UTC)],
+                    "asset": ["A"],
+                    "close": [100.0],
+                }
+            )
+        ),
+        Trade(),
+        BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR, immediate_fill=True),
+    ).run()
+    assert [fill.quantity for fill in result.fills] == [2, 3]
+    assert result.to_portfolio_state_dataframe()["cash"].to_list() == [99500]

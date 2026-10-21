@@ -1,0 +1,147 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "traces": {
+    "1:False": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "amount": 10,
+        "filled": 0,
+        "commission": 0,
+        "status": 0,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-06T21:00:00+00:00",
+        "open_for_asset": 1,
+        "open_groups": 1
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "amount": 10,
+        "filled": 5,
+        "commission": 1.0,
+        "status": 0,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-07T21:00:00+00:00",
+        "open_for_asset": 1,
+        "open_groups": 1
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "amount": 10,
+        "filled": 10,
+        "commission": 1.0,
+        "status": 1,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-08T21:00:00+00:00",
+        "open_for_asset": 0,
+        "open_groups": 0
+      }
+    ],
+    "1:True": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "amount": 10,
+        "filled": 0,
+        "commission": 0,
+        "status": 0,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-06T21:00:00+00:00",
+        "open_for_asset": 1,
+        "open_groups": 1
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "amount": 10,
+        "filled": 5,
+        "commission": 1.0,
+        "status": 2,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-07T21:00:00+00:00",
+        "open_for_asset": 0,
+        "open_groups": 0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "amount": 10,
+        "filled": 5,
+        "commission": 1.0,
+        "status": 2,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-07T21:00:00+00:00",
+        "open_for_asset": 0,
+        "open_groups": 0
+      }
+    ],
+    "-1:False": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "amount": -10,
+        "filled": 0,
+        "commission": 0,
+        "status": 0,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-06T21:00:00+00:00",
+        "open_for_asset": 1,
+        "open_groups": 1
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "amount": -10,
+        "filled": -5,
+        "commission": 1.0,
+        "status": 0,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-07T21:00:00+00:00",
+        "open_for_asset": 1,
+        "open_groups": 1
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "amount": -10,
+        "filled": -10,
+        "commission": 1.0,
+        "status": 1,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-08T21:00:00+00:00",
+        "open_for_asset": 0,
+        "open_groups": 0
+      }
+    ],
+    "-1:True": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "amount": -10,
+        "filled": 0,
+        "commission": 0,
+        "status": 0,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-06T21:00:00+00:00",
+        "open_for_asset": 1,
+        "open_groups": 1
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "amount": -10,
+        "filled": -5,
+        "commission": 1.0,
+        "status": 2,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-07T21:00:00+00:00",
+        "open_for_asset": 0,
+        "open_groups": 0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "amount": -10,
+        "filled": -5,
+        "commission": 1.0,
+        "status": 2,
+        "created": "2025-01-06T21:00:00+00:00",
+        "dt": "2025-01-07T21:00:00+00:00",
+        "open_for_asset": 0,
+        "open_groups": 0
+      }
+    ]
+  },
+  "timing_claim": false,
+  "reference_wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b"
+}

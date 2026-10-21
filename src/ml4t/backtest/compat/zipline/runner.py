@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from math import isfinite
 from typing import Any
+from uuid import uuid4
 
 import pandas as pd
 
@@ -21,11 +22,13 @@ from ...config import (
 )
 from ...execution.limits import PositiveVolumeLimit, SharedVolumeParticipationLimit
 from ...execution.sizing import quantity_for_value, quantity_to_target, round_quantity
+from ...types import Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from .assets import Asset
 from .data import BarData
 from .finance import commission, slippage
 from .finance.execution import _native_style
+from .finance.order import ORDER_STATUS, OrderView
 
 
 @dataclass(frozen=True)
@@ -97,6 +100,7 @@ class MigrationContext:
         if len(set(sids)) != len(sids):
             raise ValueError("Ambiguous legacy SID mapping")
         self._config = config
+        self._order_prefix = uuid4().hex
         self._broker: Broker | None = None
         self._initializing = True
         self._running = False
@@ -147,7 +151,7 @@ class MigrationContext:
         submitted = broker.submit_order(
             asset.key, quantity, order_type=kind, limit_price=limit_price, stop_price=stop_price
         )
-        return submitted.order_id if submitted is not None else None
+        return self._external_order_id(submitted.order_id) if submitted is not None else None
 
     def _value_quantity(self, asset: Asset, value: float) -> float | None:
         self._validate_asset(asset)
@@ -223,6 +227,83 @@ class MigrationContext:
         return self.order_target_value(
             asset, self._require_broker().equity() * target, limit_price, stop_price, style
         )
+
+    def _external_order_id(self, native: str) -> str:
+        return f"{self._order_prefix}:{native}"
+
+    def _native_order_id(self, external: str) -> str | None:
+        if not isinstance(external, str):
+            raise TypeError("order_id must be the migration string identifier")
+        prefix, delimiter, native = external.partition(":")
+        return native if delimiter and prefix == self._order_prefix and native else None
+
+    def _order_view(self, order: Order) -> OrderView:
+        broker = self._require_broker()
+        events = [order.created_at, order.filled_at, order.cancelled_at]
+        fills = broker.get_fills(order.order_id)
+        if fills:
+            events.append(fills[-1].timestamp)
+        observed = [pd.Timestamp(t) for t in events if t is not None]
+
+        def utc(value):
+            if value is None:
+                return None
+            stamp = pd.Timestamp(value)
+            if stamp.tz is None:
+                stamp = stamp.tz_localize(self._config.resolved_timezone)
+            return stamp.tz_convert("UTC")
+
+        sign = 1 if order.side is OrderSide.BUY else -1
+        statuses = {
+            OrderStatus.PENDING: ORDER_STATUS.OPEN,
+            OrderStatus.FILLED: ORDER_STATUS.FILLED,
+            OrderStatus.CANCELLED: ORDER_STATUS.CANCELLED,
+            OrderStatus.REJECTED: ORDER_STATUS.REJECTED,
+        }
+        assert order.requested_quantity is not None
+        return OrderView(
+            self._external_order_id(order.order_id),
+            order.order_id,
+            self._by_key[order.asset],
+            sign * order.requested_quantity,
+            sign * order.filled_quantity,
+            order.commission_paid,
+            statuses[order.status],
+            utc(order.created_at),
+            utc(max(observed)) if observed else None,
+            order.limit_price,
+            order.stop_price,
+            order.stop_triggered,
+            order.rejection_reason,
+        )
+
+    def get_order(self, order_id: str) -> OrderView | None:
+        native = self._native_order_id(order_id)
+        if native is None:
+            return None
+        order = self._require_broker().get_order(native)
+        return self._order_view(order) if order is not None else None
+
+    def get_open_orders(
+        self, asset: Asset | None = None
+    ) -> dict[Asset, list[OrderView]] | list[OrderView]:
+        if asset is not None:
+            self._validate_asset(asset)
+        orders = self._require_broker().get_pending_orders(None if asset is None else asset.key)
+        if asset is not None:
+            return [self._order_view(order) for order in orders]
+        groups: dict[Asset, list[OrderView]] = {}
+        for order in orders:
+            groups.setdefault(self._by_key[order.asset], []).append(self._order_view(order))
+        return groups
+
+    def cancel_order(self, order_param: str | OrderView) -> None:
+        if not self._running:
+            raise RuntimeError("Cancellation requires a running market callback")
+        external = order_param.id if isinstance(order_param, OrderView) else order_param
+        native = self._native_order_id(external)
+        if native is not None:
+            self._require_broker().cancel_order(native)
 
     def record(self, **values: Any) -> None:
         if not self._running:
@@ -321,7 +402,9 @@ class _Callbacks(Strategy):
                 self.handle_data(self.context, self.data)
 
 
-def _performance(result, assets: Mapping[str, Asset]) -> pd.DataFrame:
+def _performance(
+    result, assets: Mapping[str, Asset], order_id: Callable[[str], str]
+) -> pd.DataFrame:
     frame = result.to_portfolio_state_dataframe()
     rows = list(temporal_rows(frame, named=True))
     index = pd.DatetimeIndex([row["timestamp"] for row in rows])
@@ -347,7 +430,8 @@ def _performance(result, assets: Mapping[str, Asset]) -> pd.DataFrame:
                 "amount": fill.quantity * (1 if fill.side.value == "buy" else -1),
                 "dt": timestamp,
                 "price": fill.price,
-                "order_id": fill.order_id,
+                "order_id": order_id(fill.order_id),
+                "native_order_id": fill.order_id,
                 "commission": fill.commission,
             }
         )
@@ -418,7 +502,7 @@ def run_algorithm(
         execution_limits=limits,
         holdings_sampling="bar",
     ).run()
-    performance = _performance(result, context._by_key)
+    performance = _performance(result, context._by_key, context._external_order_id)
     if analyze is not None:
         with callback_scope(context):
             analyze(context, performance)

@@ -303,7 +303,8 @@ def initialize(context):
 
 def handle_data(context, data):
     if context.count == 0:
-        order(context.asset, 10)
+        context.order_id = order(context.asset, 10)
+    assert context.get_order(context.order_id).filled == (0 if context.count == 0 else 10)
     record(observed_price=data.current(context.asset, "price"))
     context.count += 1
 
@@ -380,8 +381,31 @@ next-bar eligibility, volume limits and final slipped-price limit checks still
 apply. Do not pass a style together with separate price arguments.
 
 The frame's `transactions` column groups actual native fills by observation.
-It supplies mapped assets, signed amounts, actual price, timestamp, native order
-ID and actual fill commission. Zipline's transaction records may leave commission
+It supplies mapped assets, signed amounts, actual price, timestamp, a scoped migration order
+ID, its original `native_order_id` and actual fill commission. Zipline's transaction records may leave commission
 null; this projection reports the native fill fee. The authoritative fill table
 remains in the attached native result. No order or transaction is fabricated to
 fill a missing observation.
+
+### Inspect and cancel orders
+
+`get_order(order_id)` returns a detached order view, or `None` for an unknown
+identifier. It preserves original signed `amount`, cumulative signed `filled`,
+cumulative `commission`, creation and last-activity clocks, and native limit,
+stop and captured stop-trigger state. A partial fill keeps status
+`finance.order.ORDER_STATUS.OPEN`; completion and cancellation have their own
+statuses. Native remaining quantity is not substituted for original amount.
+The view does not synthesize a `limit_reached` flag that the native order has
+not recorded.
+
+`get_open_orders()` returns an asset-to-list mapping; passing one mapped Asset
+returns its list. These containers are detached. `cancel_order` accepts the
+migration string ID or an order view and delegates to native cancellation.
+Cancellation is allowed during market callbacks, not after simulation in
+`analyze`. Unknown IDs have no effect.
+
+Migration order IDs include a run identifier. An ID retained from an earlier
+run cannot refer to a later run's local `ORD-1`. Use `native_order_id` when
+joining the projected order or transaction to the attached native result.
+Native IDs and their serialization are unchanged. Native strategies can call
+`broker.get_fills(order_id)` to obtain detached actual fill records directly.
