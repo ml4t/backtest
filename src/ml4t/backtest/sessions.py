@@ -28,6 +28,8 @@ import polars as pl
 from ml4t.specs import BarLabel
 from ml4t.specs.market_data import TimestampSemantics
 
+from ._temporal import temporal_frame
+
 if TYPE_CHECKING:
     pass
 
@@ -294,7 +296,7 @@ def compute_session_pnl(
 
     session_dates = [session_config.date_for_timestamp(ts) for ts in timestamps]
 
-    df = pl.DataFrame(
+    df = temporal_frame(
         {
             "timestamp": timestamps,
             "equity": values,
@@ -466,7 +468,7 @@ def align_to_sessions(
 
 def _empty_session_pnl_df() -> pl.DataFrame:
     """Return empty DataFrame with session P&L schema."""
-    return pl.DataFrame(
+    return temporal_frame(
         schema={
             "session_date": pl.Datetime,
             "session_start": pl.Datetime,

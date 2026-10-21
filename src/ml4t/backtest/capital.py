@@ -8,6 +8,8 @@ from math import isfinite
 
 import polars as pl
 
+from ._temporal import temporal_rows
+
 
 @dataclass(frozen=True)
 class CapitalEvent:
@@ -42,7 +44,7 @@ def index_capital_events(
     canonical = {timestamp: timestamp for timestamp in feed_timestamps}
     events: dict[datetime, list[CapitalEvent]] = {}
     seen = set()
-    for row in frame.sort("timestamp", maintain_order=True).iter_rows(named=True):
+    for row in temporal_rows(frame.sort("timestamp", maintain_order=True), named=True):
         timestamp = canonical.get(row["timestamp"])
         if timestamp is None:
             raise ValueError("capital flow timestamp must match a feed event timestamp")

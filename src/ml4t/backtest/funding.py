@@ -8,6 +8,8 @@ from math import isfinite
 
 import polars as pl
 
+from ._temporal import temporal_rows
+
 
 @dataclass(frozen=True)
 class FundingEvent:
@@ -54,7 +56,7 @@ def index_funding_events(
     canonical_timestamps = {timestamp: timestamp for timestamp in feed_timestamps}
     indexed: dict[datetime, list[FundingEvent]] = {}
     seen: set[tuple[datetime, str]] = set()
-    for row in frame.iter_rows(named=True):
+    for row in temporal_rows(frame, named=True):
         timestamp = canonical_timestamps.get(row["timestamp"])
         if timestamp is None:
             raise ValueError("funding timestamp must match a feed event timestamp")

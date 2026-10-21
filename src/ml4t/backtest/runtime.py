@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
+from ._temporal import temporal_frame, temporal_row, temporal_rows
 from .execution.callbacks import SessionScheduler
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ class MarketDataView:
         index_columns = list(
             dict.fromkeys([self._timestamp_col, self._entity_col, *runtime.known_at_cols.values()])
         )
-        for index, row in enumerate(self._frame.select(index_columns).iter_rows(named=True)):
+        for index, row in enumerate(temporal_rows(self._frame.select(index_columns), named=True)):
             asset, timestamp = row[self._entity_col], row[self._timestamp_col]
             rows = self._rows.setdefault(asset, {})
             if timestamp in rows:
@@ -82,7 +83,7 @@ class MarketDataView:
 
     def _row(self, asset: str, timestamp: datetime) -> dict[str, Any] | None:
         index = self._rows.get(asset, {}).get(timestamp)
-        return self._frame.row(index, named=True) if index is not None else None
+        return temporal_row(self._frame, index) if index is not None else None
 
     def _column(self, field: str) -> str:
         return self._roles.get(field, field)
@@ -169,7 +170,7 @@ class MarketDataView:
             schema.update(
                 {f"{f}_observed_at": self._frame.schema[self._timestamp_col] for f in fields}
             )
-        return pl.DataFrame(records, schema=schema)
+        return temporal_frame(records, schema=schema)
 
     def history(
         self,

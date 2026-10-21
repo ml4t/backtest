@@ -19,6 +19,7 @@ from ml4t.specs import (
     negotiate_lifecycle_version,
 )
 
+from ._temporal import temporal_frame
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
 from .broker import Broker
@@ -249,7 +250,7 @@ class Engine:
                 naive_timestamps = (
                     isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None
                 )
-                timestamp_frame = pl.DataFrame(
+                timestamp_frame = temporal_frame(
                     {
                         "timestamp": timestamps,
                         "__feed_bar_index": range(len(timestamps)),
