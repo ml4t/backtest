@@ -125,8 +125,8 @@ assert result.to_equity_dataframe()["timestamp"].to_list() == [dates[-1]]
 print("Runtime callbacks and causal warmup verified.")
 ```
 
-History's `bar_count` counts observed price instants, retaining missing asset
-rows. `known_at_cols={"field": "publication_timestamp_column"}` masks fields until
+History's default `unit="observation"` counts observed price instants, retaining
+missing asset rows. `known_at_cols={"field": "publication_timestamp_column"}` masks fields until
 available. `forward_fill=True` is an explicit read view with source timestamps;
 it never adds executable quotes or volume. Missing raw volume remains unknown
 in the view. `last_traded` requires actual positive observed volume;
@@ -150,6 +150,54 @@ Opening-auction callbacks require `event_time` opening observations. Completed
 bars cannot supply an opening quote. Where continuous sessions meet at the same
 instant, a right-labeled closing bar and its close callback run before the next
 session's pre-open callback. That callback can read the bar that just closed.
+
+### Select a history window
+
+`unit="expected_bar"` counts the declared calendar grid, including missing bars
+as nulls. It requires a version-2 feed with frequency, `bar_grid_anchor`,
+`bar_label` and `partial_bar_policy`. The grid restarts at each tradable interval
+open, excludes exchange breaks and follows early closes. A visible off-grid
+price in the requested window raises an error.
+
+`unit="session"` selects observations from the last `bar_count` exchange sessions,
+including the active session up to the decision cutoff. It retains original
+instants and does not aggregate OHLCV into daily bars. Both calendar units reject
+`calendar=None`.
+
+`unit="elapsed"` instead requires a positive `duration=datetime.timedelta(...)`
+and no `bar_count`. It selects `(cutoff-duration, cutoff]`, excluding the current
+event during initialization or pre-open access. It also works without a calendar.
+
+<!-- ml4t-doc-test: runtime-history-windows -->
+```python
+from datetime import UTC, datetime, timedelta
+import polars as pl
+from ml4t.specs import FeedSpec
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+
+dates = [datetime(2025, 1, 2, 14, minute, tzinfo=UTC) for minute in [35, 45]]
+prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2,
+                       "close": [100.0, 110.0]})
+spec = FeedSpec(time_contract_version=2, calendar="NYSE", data_frequency="5m",
+                timestamp_semantics="bar_close", bar_grid_anchor="session_open",
+                bar_label="right", partial_bar_policy="include")
+services = RuntimeServices()
+
+class ReadWindows(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == dates[-1]:
+            grid = services.market.history(["TEST"], ["close"], bar_count=2,
+                                           unit="expected_bar")
+            assert grid["close"].to_list() == [None, 110.0]
+            elapsed = services.market.history(["TEST"], ["close"], unit="elapsed",
+                                              duration=timedelta(minutes=5))
+            assert elapsed["timestamp"].to_list() == [dates[-1]]
+
+result = Engine(DataFeed(prices_df=prices, feed_spec=spec), ReadWindows(),
+                BacktestConfig(), runtime=services).run()
+assert result.to_equity_dataframe()["timestamp"].to_list() == dates
+print("History windows retain the gap without creating an executable bar.")
+```
 
 ## Broker Methods
 

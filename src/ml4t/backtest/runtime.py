@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 import polars as pl
-from ml4t.specs import TimestampSemantics
+from ml4t.specs import TimestampSemantics, WindowUnit
 
+from ._history_clock import expected_times, session_times
 from ._temporal import temporal_frame, temporal_row, temporal_rows
 from .execution.callbacks import SessionScheduler
 
@@ -178,28 +179,52 @@ class MarketDataView:
         assets: Sequence[str],
         fields: Sequence[str],
         *,
-        bar_count: int,
+        bar_count: int | None = None,
+        unit: WindowUnit | str = WindowUnit.OBSERVATION,
+        duration: timedelta | None = None,
         forward_fill: bool = False,
     ) -> pl.DataFrame:
-        """Return the last N observed feed-price instants, retaining missing asset rows.
+        """Select causal raw observations or declared grid points, without resampling.
 
-        Window units are observations, not elapsed minutes or sessions. Known-at
-        declarations mask unavailable fields. Forward filling is explicit and retains
-        the source timestamp; it never changes executable feed observations.
+        ``bar_count`` counts observation instants, expected bars or exchange sessions.
+        Elapsed windows instead require ``duration`` and select ``(asof-duration, asof]``.
+        Session windows retain each observed instant, without aggregating fields.
+        Grid gaps remain null unless the caller explicitly requests a stale read view.
         """
         if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
             raise RuntimeError("market services require an active run")
-        if isinstance(bar_count, bool) or not isinstance(bar_count, int) or bar_count <= 0:
-            raise ValueError("bar_count must be a positive integer")
+        unit = WindowUnit(unit)
+        if unit is WindowUnit.ELAPSED:
+            if (
+                bar_count is not None
+                or not isinstance(duration, timedelta)
+                or duration <= timedelta(0)
+            ):
+                raise ValueError("elapsed history requires a positive duration and no bar_count")
+        elif (
+            duration is not None
+            or isinstance(bar_count, bool)
+            or not isinstance(bar_count, int)
+            or bar_count <= 0
+        ):
+            raise ValueError("bar_count must be a positive integer, without duration")
         end = bisect_right(self._timestamps, self._asof)
         if not self._inclusive and end and self._timestamps[end - 1] == self._asof:
             end -= 1
-        return self._query(
-            assets,
-            fields,
-            self._timestamps[max(0, end - bar_count) : end],
-            forward_fill=forward_fill,
-        )
+        if unit is WindowUnit.ELAPSED:
+            assert duration is not None
+            times = self._timestamps[
+                bisect_right(self._timestamps, self._asof - duration, hi=end) : end
+            ]
+        elif unit is WindowUnit.OBSERVATION:
+            assert bar_count is not None
+            times = self._timestamps[max(0, end - bar_count) : end]
+        else:
+            assert bar_count is not None
+            engine = self._runtime._engine
+            select = expected_times if unit is WindowUnit.EXPECTED_BAR else session_times
+            times = select(engine.config, self._asof, bar_count, self._inclusive, self._timestamps)
+        return self._query(assets, fields, times, forward_fill=forward_fill)
 
     def current(
         self, assets: Sequence[str], fields: Sequence[str], *, forward_fill: bool = False
