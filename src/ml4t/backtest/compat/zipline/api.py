@@ -161,3 +161,7 @@ def set_max_leverage(max_leverage: float) -> None:
 
 def set_min_leverage(min_leverage: float, grace_period: timedelta) -> None:
     current().set_min_leverage(min_leverage, grace_period)
+
+
+def get_environment(field: str = "platform") -> Any:
+    return current().get_environment(field)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from math import isfinite
 from typing import Any
 from uuid import uuid4
@@ -41,6 +41,7 @@ from .finance import commission, slippage
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
 from .results import to_performance_frame
+from .window import _borrow_window, _window
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,7 @@ class MigrationContext:
         if len(set(sids)) != len(sids):
             raise ValueError("Ambiguous legacy SID mapping")
         self._config = config
+        self._environment: dict[str, Any] = {}
         self._order_prefix = uuid4().hex
         self._broker: Broker | None = None
         self._initializing = True
@@ -149,6 +151,14 @@ class MigrationContext:
                 "boundary": "session_end",
             }
         )
+
+    def get_environment(self, field: str = "platform") -> Any:
+        if field == "*":
+            return dict(self._environment)
+        try:
+            return self._environment[field]
+        except KeyError as error:
+            raise ValueError(f"Unknown environment field {field!r}") from error
 
     def _require_broker(self) -> Broker:
         if self._broker is None:
@@ -581,12 +591,16 @@ def run_algorithm(
     before_trading_start: Callable[..., Any] | None = None,
     capital_base: float = 100000.0,
     runtime: RuntimeServices | None = None,
+    start: date | datetime | str | None = None,
+    end: date | datetime | str | None = None,
 ) -> pd.DataFrame:
     """Run imported callback functions on explicit bundle-free native inputs.
 
     Import migration API and finance names from this namespace. No legacy package,
     bundle discovery, network download or module rewriting occurs. Runtime bounds
     are physical instants, with pre-start rows available for warmup history.
+    Optional start/end instead accept timezone-naive midnight session labels and
+    select the declared calendar's first tradable minute through its last close.
     """
     config = BacktestConfig(
         feed_spec=feed.feed_spec,
@@ -607,7 +621,17 @@ def run_algorithm(
             "target_pending_orders": "ignored",
         },
     )
+    runtime = runtime if runtime is not None else RuntimeServices()
+    bounded_start, bounded_end, environment, window_mode = _window(
+        feed, config.merge_feed_spec(feed.feed_spec), runtime, start, end
+    )
+    config.metadata["migration_window"] = {
+        "mode": window_mode,
+        "start": environment["start"].isoformat(),
+        "end": environment["end"].isoformat(),
+    }
     context = MigrationContext(assets, config)
+    context._environment = environment
     config.metadata["migration_result"] = {
         "assets": [
             {"key": asset.key, "symbol": asset.symbol, "legacy_sid": asset.legacy_sid}
@@ -615,20 +639,20 @@ def run_algorithm(
         ],
         "order_id_prefix": context._order_prefix,
     }
-    if initialize is not None:
-        with callback_scope(context):
-            initialize(context)
-    context._initializing = False
-    limits = context._execution_limits()
-    runtime = runtime if runtime is not None else RuntimeServices()
-    result = Engine(
-        feed,
-        _Callbacks(context, BarData(runtime), handle_data, runtime, before_trading_start),
-        config,
-        runtime=runtime,
-        execution_limits=limits,
-        holdings_sampling="bar",
-    ).run()
+    with _borrow_window(runtime, bounded_start, bounded_end):
+        if initialize is not None:
+            with callback_scope(context):
+                initialize(context)
+        context._initializing = False
+        limits = context._execution_limits()
+        result = Engine(
+            feed,
+            _Callbacks(context, BarData(runtime), handle_data, runtime, before_trading_start),
+            config,
+            runtime=runtime,
+            execution_limits=limits,
+            holdings_sampling="bar",
+        ).run()
     performance = to_performance_frame(result)
     if analyze is not None:
         with callback_scope(context):

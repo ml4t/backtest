@@ -64,6 +64,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "zipline-trading-constraints",
         "zipline-account-constraints",
         "zipline-saved-performance",
+        "zipline-session-window",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",

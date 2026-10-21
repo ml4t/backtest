@@ -705,3 +705,67 @@ corporate actions, futures accounting, cross-frequency preparation or missing-ba
 imputation. For causal feature preparation use Engineer, for adjustment inputs
 use Data, and keep their declared availability and basis when constructing the
 feed. The strategy owns decisions; the native broker owns fills and accounts.
+
+## Session run dates and execution environment
+
+`run_algorithm(start=..., end=...)` accepts session dates, represented as `date`,
+date strings or timezone-naive midnight timestamps. It selects the first calendar
+session on or after `start` through the last on or before `end`. Non-midnight and
+timezone-aware timestamps are rejected as session labels. For exact physical
+cutoffs, supply `RuntimeServices(start=instant, end=instant)` instead. Calendar-free
+runs use physical bounds; they cannot interpret legacy session dates.
+
+For a session window, the first tradable minute is one minute after the declared
+calendar open, matching the right-labelled minute reference clock; the end is the
+actual close, including early closes. Existing pre-start observations remain
+available for causal history, but produce no trading callbacks or account rows.
+A borrowed runtime retains its original bounds after completion or any error.
+Conflicting explicit native and session bounds raise before the initializer runs.
+
+`get_environment(field="platform")` is available through the context or scoped
+API, including during initialization. `"*"` returns an independent dictionary
+with `arena`, `data_frequency`, `start`, `end`, `capital_base` and `platform`.
+The platform is truthfully `"ml4t.backtest"`. Daily and one-minute frequency
+names are `"daily"` and `"minute"`; other prepared native frequencies retain
+their declared values. Bounds are UTC physical timestamps. When no session dates
+are supplied, this adapter preserves native observation filtering and reports
+the native bounds or first/last accepted observations.
+
+<!-- ml4t-doc-test: zipline-session-window -->
+```python
+from datetime import UTC, datetime
+
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.api import get_environment
+from ml4t.backtest.compat.zipline.assets import Asset
+
+environments = []
+
+
+def initialize(context):
+    environments.append(get_environment("*"))
+
+
+feed = DataFeed(
+    prices_df=pl.DataFrame({"timestamp": [datetime(2025, 7, 2, 20, tzinfo=UTC),
+                                          datetime(2025, 7, 3, 17, tzinfo=UTC)],
+                            "asset": ["A", "A"], "close": [100.0, 101.0]}),
+    feed_spec={"calendar": "NYSE", "time_contract_version": 2,
+               "timestamp_semantics": "bar_close", "data_frequency": "1d",
+               "bar_label": "right", "bar_grid_anchor": "session_open",
+               "partial_bar_policy": "include"},
+)
+performance = run_algorithm(feed=feed, assets=[Asset("A")], initialize=initialize,
+                            start="2025-07-03", end="2025-07-05")
+assert len(performance) == 1
+assert environments[0]["end"].isoformat() == "2025-07-03T17:00:00+00:00"
+assert environments[0]["platform"] == "ml4t.backtest"
+print("session window ends at the actual early close")
+```
+
+<!-- ml4t-doc-output: zipline-session-window -->
+```text
+session window ends at the actual early close
+```
