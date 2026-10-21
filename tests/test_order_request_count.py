@@ -28,19 +28,34 @@ def test_request_count_resets_on_declared_utc_day_instead_of_delivered_timezone_
     from ml4t.backtest.controls import OrderRequestCount
 
     seen = []
+    delivered_dates = []
 
     class Trade(Strategy):
         def on_start(self, broker):
             broker.register_trading_control(OrderRequestCount(1, timezone="UTC"))
 
         def on_data(self, timestamp, data, context, broker):
+            delivered_dates.append(timestamp.date().isoformat())
             seen.append(broker.submit_order("A", 1).order_id)
 
     times = [
         datetime(2025, 1, 6, 18, 59, tzinfo=ZoneInfo("America/New_York")),
         datetime(2025, 1, 6, 19, 1, tzinfo=ZoneInfo("America/New_York")),
     ]
-    Engine(_feed(times), Trade(), BacktestConfig(calendar=None)).run()
+    prepared = _feed(times).prices.with_columns(
+        pl.col("timestamp").dt.convert_time_zone("America/New_York")
+    )
+    feed = DataFeed(
+        prices_df=prepared,
+        feed_spec={
+            "time_contract_version": 2,
+            "timestamp_semantics": "event_time",
+            "calendar": None,
+            "timezone": "America/New_York",
+        },
+    )
+    Engine(feed, Trade(), BacktestConfig(calendar=None)).run()
+    assert delivered_dates == ["2025-01-06", "2025-01-06"]
     assert seen == ["ORD-1", "ORD-2"]
 
 
