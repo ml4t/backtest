@@ -416,6 +416,8 @@ class Fill:
     target_intent_id: str | None = None
     child_intent_id: str | None = None
     intent_idempotency_key: str | None = None
+    multiplier: float | None = None
+    currency: str | None = None
 
 
 @dataclass

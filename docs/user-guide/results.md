@@ -134,7 +134,7 @@ print(f"Net PF:        {m['profit_factor']:.2f}")
 
 - `trades`: realized exit legs plus end-of-backtest open-position marks
 - `fills`: execution blotter rows
-- `portfolio_state`: end-of-bar portfolio snapshots
+- `portfolio_state`: account observations, with end-of-bar snapshots by default
 
 For rebalancing strategies, `num_trades` is not the right proxy for trading activity.
 Use `num_fills`, `num_rebalance_events`, and `total_filled_notional` instead.
@@ -287,10 +287,168 @@ Returns a Polars DataFrame with columns:
 |--------|------|-------------|
 | `timestamp` | Datetime | Bar timestamp |
 | `equity` | Float | Portfolio value |
-| `return` | Float | Bar-to-bar return |
+| `return` | Float | Return from the preceding NAV, or recorded initial capital for the first observation |
 | `cumulative_return` | Float | Cumulative return from start |
 | `drawdown` | Float | Current drawdown from HWM |
-| `high_water_mark` | Float | Running maximum equity |
+| `high_water_mark` | Float | Running maximum investment wealth, including recorded initial capital |
+| `performance_equity` | Float | Investment wealth at initial capital scale, excluding external flows |
+
+The capital-flow, recorded-variable and detailed holdings interfaces below are
+part of the upcoming successor release. Earlier artifacts remain readable with
+their recorded component availability and valuation baseline.
+
+## External capital and investment returns
+
+Pass a prepared `capital_flows` Polars table to `DataFeed`, or to `run_backtest`.
+Each row requires `timestamp`, unique `event_id`, `kind` (`"delta"` or `"target"`)
+and finite `value` in account cash units. Negative deltas withdraw cash; targets
+specify total marked NAV, not a cash-balance target. Optional `known_at` cannot be
+later than the application timestamp. Each application must match an accepted feed
+observation. Every held asset must have a finite current quote for the configured
+mark method at that instant. A stale carried quote cannot establish the pre-flow
+valuation. All-cash changes need no asset quote; zero is a valid current valuation
+mark for an already-held asset. No exchange rate or missing event valuation is inferred.
+
+The engine marks current positions, applies external capital, then processes that
+bar's funding, fills and decisions. The change is visible to that decision's
+buying-power checks. Same-time rows retain input order, and the complete group is
+validated before cash changes. A withdrawal cannot create negative cash in an
+unleveraged account. Funding, fees and trading P&L remain investment returns.
+
+`to_capital_flows_dataframe()` records the request, actual cash delta and NAV
+immediately before and after application. Returns chain the independently valued
+subperiods around each flow. A contribution does not become investment profit.
+`equity` remains reported account NAV; `performance_equity` scales compounded
+investment returns to initial capital. Drawdown and `high_water_mark` use that
+investment wealth, so contributions and withdrawals do not create drawdowns.
+
+<!-- ml4t-doc-test: results-external-capital -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ExecutionMode
+
+class Invest(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if not broker.positions:
+            broker.submit_order("TEST", 100)
+
+dates = [datetime(2025, 1, day, 16, tzinfo=UTC) for day in (2, 3, 6)]
+prices = pl.DataFrame({
+    "timestamp": dates, "asset": ["TEST"] * 3, "close": [100.0, 110.0, 98.0]
+})
+flows = pl.DataFrame({
+    "timestamp": [dates[1]], "event_id": ["deposit"],
+    "kind": ["target"], "value": [12000.0]
+})
+result = Engine(
+    DataFeed(prices_df=prices, capital_flows=flows), Invest(),
+    BacktestConfig(initial_cash=10000, calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+    holdings_sampling="bar",
+).run()
+assert result.to_capital_flows_dataframe()["cash_delta"].to_list() == [1000.0]
+assert result.to_portfolio_state_dataframe()["equity"].to_list() == [10000.0, 12000.0, 10800.0]
+print(f"Investment return: {result.metrics['total_return_pct']:.1f}%")
+```
+
+```text
+Investment return: -1.0%
+```
+
+## Recorded strategy values
+
+Call `broker.record(score=value, ...)` from a strategy to retain non-account
+values. The latest value carries into later accepted bars until replaced.
+`result.to_recorded_records()` returns decoded values grouped by timestamp and
+zero-based return-bar index. Names stay inside each row's `values` mapping:
+recording a variable called `cash` does not change reported account cash.
+
+Recording copies values when called and samples them at bar end. JSON-compatible
+values, NumPy arrays/scalars and Polars Series use the existing portable artifact
+conversion; non-finite floats retain their tagged representation on disk.
+Unsupported Python objects and reserved artifact-tag keys raise `ValueError`
+before any value changes. If recording was never requested, the component is
+unavailable rather than an empty history of zero signals.
+
+<!-- ml4t-doc-test: results-recorded-values -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+
+class Record(Strategy):
+    def on_start(self, broker):
+        broker.record(score=1.0, cash=42)
+
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp.day == 3:
+            broker.record(score=2.0)
+
+prices = pl.DataFrame({
+    "timestamp": [datetime(2025, 1, day, 16, tzinfo=UTC) for day in (2, 3)],
+    "asset": ["TEST", "TEST"], "close": [100.0, 101.0],
+})
+result = Engine(DataFeed(prices_df=prices), Record(), BacktestConfig(calendar=None)).run()
+assert [row["values"]["score"] for row in result.to_recorded_records()] == [1.0, 2.0]
+assert result.to_portfolio_state_dataframe()["cash"].to_list() == [100000.0, 100000.0]
+```
+
+`to_recorded_dataframe()` exposes a long table with `timestamp`, `bar_index`,
+`name` and portable `value_json`. The existing Parquet artifact stores this
+optional component and its bar-end sampling declaration. The decoded record view
+restores the same values after strict reload.
+
+## Observed holdings
+
+Enable per-asset capture explicitly when creating the engine:
+
+```python
+result = Engine(feed, strategy, config, holdings_sampling="bar").run()
+holdings = result.to_holdings_dataframe()
+account = result.to_portfolio_state_dataframe()
+```
+
+Each holdings row records `timestamp`, `observation_id`, `asset`, signed
+`quantity`, `mark`, `multiplier`, declared `currency`, `signed_notional` and
+`liquidation_value`, `mark_source` and `mark_timestamp`. The latter retains the
+original observation time when a last known mark is carried. `last_observed`
+means the last finite reference price; unusable current quotes stay unavailable
+for execution and do not replace that mark. A valid zero mark remains zero. These are observed
+simulator positions, including open lots,
+not positions reconstructed from closed trades. Currency is null when no contract
+specification declares it. The current signed-notional ledger reports identical
+notional and liquidation values; another account method must define them separately.
+`result.account_method` and the artifact manifest explicitly declare
+`"signed_notional"` for current Engine runs. Legacy artifacts without a declaration
+report an unknown method; margin settings alone do not imply variation cash.
+
+Account rows retain every accepted bar, including a completely flat portfolio.
+Join on `observation_id` to distinguish a complete all-cash observation from a
+missing observation. Capture defaults to `"none"`; asking for uncaptured holdings
+raises `ArtifactError`. An empty captured table means a complete all-cash run.
+Available sampling methods are:
+
+- `"none"`: retain ordinary account bars without holdings capture.
+- `"bar"`: capture complete holdings after every accepted bar.
+- `"session"`: capture the last delivered bar in each declared calendar session.
+- `"fill_and_session"`: also capture account and holdings immediately after each fill.
+
+Session methods require a calendar. A last delivered bar is not an invented
+exchange-close observation. Post-fill snapshots use the configured bar mark
+policy, rather than fabricating an intrabar market-price path. Feed timestamp
+semantics apply to both observation and mark timestamps.
+
+Account `observation_kind` distinguishes `after_fill`, `bar` and
+`session_last_observed`. Select `holdings_complete=True` for the complete capture
+keys; rows without capture are not flat portfolios. Account `fill_sequence`
+identifies the corresponding execution for a post-fill observation. A buy/sell
+round trip can therefore retain its temporary holdings even if every bar ends
+flat. Investment returns still use the original bar valuation timeline.
+
+The existing Parquet export stores the optional holdings component and its sampling
+declaration. Strict reload checks account keys and fill sequence. Old artifacts
+without capture remain readable and report holdings unavailable.
 
 ## Portfolio State DataFrame
 
@@ -309,6 +467,14 @@ Returns a Polars DataFrame with columns:
 | `gross_exposure` | Float | Sum of absolute marked position values |
 | `net_exposure` | Float | Signed sum of marked position values |
 | `open_positions` | Int | Number of open positions |
+
+`observation_id` identifies each account snapshot. Fill exports also include a
+zero-based `fill_sequence` that preserves execution order at equal timestamps.
+Fill `signed_quantity`, `multiplier` and declared `currency` retain execution
+units. Legacy fills without those declarations keep null multiplier/currency,
+rather than inferring them from a later contract specification. The manifest
+records whether investment returns include recorded commissions; it remains
+unknown for older artifacts without that declaration.
 
 This is the right primitive for downstream diagnostics such as:
 
@@ -418,7 +584,15 @@ from ml4t.backtest.result import BacktestResult
 result = BacktestResult.from_parquet("./results/my_backtest")
 ```
 
-`manifest.json` identifies artifact schema version 2 and every component written. Loading is
+Engine results retain starting capital before the first observed NAV. A run starting
+with $10,000 that pays a $10 fee before its first mark reports a first return of
+-0.001, cumulative return of -0.001 and drawdown of -0.001. Observation timestamps
+remain actual market observations. Older artifacts without a recorded initial
+valuation retain their original first-observation baseline.
+
+`manifest.json` identifies artifact schema version 3 and every component written.
+Schema 3 records `initial_capital` separately from the first observed NAV. Schema 2
+remains readable; its missing initial valuation is not reconstructed from configuration. Loading is
 strict by default. An empty directory, missing manifest or required component, interrupted write,
 malformed file, or unsupported schema version raises a specific `ArtifactError` subclass before a
 result is returned. Selective exports are valid component exports, but they are not complete result

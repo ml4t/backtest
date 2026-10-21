@@ -22,6 +22,7 @@ from ml4t.specs import (
 from .analytics import EquityCurve, TradeAnalyzer
 from .analytics.metrics import calmar_ratio
 from .broker import Broker
+from .capital import CapitalChange, index_capital_events
 from .config import DataFrequency, ExecutionPrice
 from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
@@ -96,10 +97,15 @@ class Engine:
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
+        holdings_sampling: str = "none",
     ):
         from .config import BacktestConfig as ConfigCls
 
         negotiated_version = negotiate_lifecycle_version(lifecycle_version)
+        if holdings_sampling not in {"none", "bar", "session", "fill_and_session"}:
+            raise ValueError("holdings_sampling must be none, bar, session or fill_and_session")
+        self.holdings_sampling = holdings_sampling
+        self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling != "none" else None
         self._validate_strategy_lifecycle(strategy)
         if config is None:
             config = ConfigCls()
@@ -107,6 +113,12 @@ class Engine:
         self.feed = feed
         self.strategy = strategy
         self.config = config.merge_feed_spec(getattr(feed, "feed_spec", None))
+        if (
+            holdings_sampling in {"session", "fill_and_session"}
+            and self.config.resolved_calendar is None
+        ):
+            raise ValueError("session holdings sampling requires a calendar")
+        self._session_holdings: dict[Any, tuple[int, list[tuple[Any, ...]]]] = {}
         self.execution_mode = self.config.execution_mode
         if (
             getattr(feed, "session_col", None) is not None
@@ -121,6 +133,10 @@ class Engine:
             market_impact_model=market_impact_model,
             execution_limits=execution_limits,
         )
+        self.broker._configure_result_capture(
+            mark_times=holdings_sampling != "none",
+            after_fill=holdings_sampling == "fill_and_session",
+        )
         if funding_df is None:
             self._funding_events = {}
         else:
@@ -132,6 +148,10 @@ class Engine:
                 set(prices_frame[feed._entity_col].unique().to_list()),
             )
         self.funding_payments: list[FundingPayment] = []
+        self._capital_events = index_capital_events(
+            getattr(feed, "capital_flows", None), list(feed.timestamps)
+        )
+        self.capital_changes: list[CapitalChange] = []
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -482,6 +502,9 @@ class Engine:
             if session_mode:
                 session_assets.update(assets_data)
                 session_context.update(context)
+            capital_events = self._capital_events.get(timestamp)
+            if capital_events:
+                self.capital_changes.extend(self.broker._apply_capital_events(capital_events))
             funding_events = self._funding_events.get(timestamp)
             if funding_events:
                 self.funding_payments.extend(self.broker._apply_funding(funding_events))
@@ -607,24 +630,55 @@ class Engine:
         return self.run().to_dict()
 
     def _record_portfolio_state(self, timestamp: datetime) -> None:
-        """Capture per-bar portfolio state for reporting."""
-        cash = self.broker.cash
-        gross_exposure = 0.0
-        net_exposure = 0.0
-
-        for asset, pos in self.broker.positions.items():
-            price = self.broker.get_mark_price(asset, quantity=pos.quantity)
-            if price is None:
-                price = self.broker.get_last_price(asset) or pos.current_price or pos.entry_price
-            position_value = pos.quantity * price * pos.multiplier
-            gross_exposure += abs(position_value)
-            net_exposure += position_value
-
-        equity = cash + net_exposure
-        self.equity_curve.append((timestamp, equity))
-        self.portfolio_state.append(
-            (timestamp, equity, cash, gross_exposure, net_exposure, len(self.broker.positions))
+        """Capture per-bar NAV and explicitly sampled observed positions."""
+        observation = len(self.portfolio_state)
+        state, holdings = self.broker._observe_portfolio(
+            timestamp, observation, include_holdings=self.holdings is not None
         )
+        self.equity_curve.append((timestamp, state[0]))
+        self.portfolio_state.append((timestamp, state[0], state[1], state[2], state[3], state[4]))
+        if holdings is not None:
+            if self.holdings_sampling == "bar":
+                assert self.holdings is not None
+                self.holdings.extend((timestamp, observation, *row) for row in holdings)
+            else:
+                session = session_date_for_timestamp(
+                    timestamp,
+                    calendar=self.config.resolved_calendar,
+                    timezone=self.config.resolved_timezone,
+                    session_start_time=self.config.resolved_session_start_time,
+                    data_frequency=self.config.resolved_data_frequency,
+                    timestamp_semantics=self.config.resolved_timestamp_semantics,
+                )
+                self._session_holdings[session] = (observation, holdings)
+
+    def _result_observations(self):
+        if self.holdings_sampling in {"none", "bar"}:
+            metadata = (
+                []
+                if self.holdings_sampling == "none"
+                else [("bar", True, None)] * len(self.portfolio_state)
+            )
+            return list(self.portfolio_state), self.holdings, metadata
+        selected = dict(self._session_holdings.values())
+        events = []
+        for index, row in enumerate(self.portfolio_state):
+            holdings = selected.get(index)
+            kind = "session_last_observed" if holdings is not None else "bar"
+            events.append((row[0], len(self.broker.fills), row, holdings, kind, None))
+        for sequence, timestamp, state, holdings in self.broker._observed_fill_accounts():
+            events.append(
+                (timestamp, sequence, (timestamp, *state), holdings, "after_fill", sequence)
+            )
+        events.sort(key=lambda event: (event[0], event[1]))
+        account, captured, metadata = [], [], []
+        for timestamp, _, state, holdings, kind, sequence in events:
+            observation = len(account)
+            account.append(state)
+            metadata.append((kind, holdings is not None, sequence))
+            if holdings is not None:
+                captured.extend((timestamp, observation, *row) for row in holdings)
+        return account, captured, metadata
 
     def _build_activity_metrics(self) -> dict[str, int | float]:
         """Compute fill and portfolio activity metrics."""
@@ -742,6 +796,11 @@ class Engine:
                 for invocation in self.lifecycle_dispatcher.invocations
             ]
 
+        if len(self.capital_changes) != sum(map(len, self._capital_events.values())):
+            raise ValueError("capital flow occurs outside accepted calendar observations")
+
+        observed_account, observed_holdings, observation_metadata = self._result_observations()
+
         if not self.equity_curve:
             # Return empty result for no-data case
             return BacktestResult(
@@ -761,10 +820,19 @@ class Engine:
                     **contract_evidence,
                 },
                 config=self.config,
+                initial_capital=self.config.initial_cash,
+                returns_include_commissions=True,
+                account_method="signed_notional",
+                holdings=observed_holdings,
+                observation_metadata=observation_metadata,
+                recorded_variables=self.broker._recorded_variables(),
+                holdings_sampling=self.holdings_sampling,
+                capital_changes=list(self.capital_changes),
             )
 
         # Build EquityCurve from raw data
         equity = EquityCurve.from_config(self.config)
+        equity.capital_changes = list(self.capital_changes)
         for ts, value in self.equity_curve:
             equity.append(ts, value)
 
@@ -776,9 +844,7 @@ class Engine:
             last_timestamp = self.equity_curve[-1][0]
             for asset, pos in self.broker.positions.items():
                 # Get last known price for this asset
-                last_price = (
-                    self.broker.get_mark_price(asset, quantity=pos.quantity) or pos.entry_price
-                )
+                last_price, _, _ = self.broker._position_mark(asset, pos)
                 entry_quote = pos.context.get("entry_quote_context", {})
                 exit_quote = self.broker.get_quote_context(
                     asset,
@@ -848,6 +914,8 @@ class Engine:
             "total_commission": sum(f.commission for f in self.broker.fills),
             "total_slippage": sum(t.total_slippage_cost for t in all_trades),
             "total_funding": sum(payment.cash_delta for payment in self.funding_payments),
+            "total_external_flow": sum(change.cash_delta for change in self.capital_changes),
+            "num_capital_changes": len(self.capital_changes),
             "num_funding_events": len(self.funding_payments),
             # Additional metrics
             "sharpe": equity.sharpe,
@@ -883,9 +951,17 @@ class Engine:
             rejected_orders=self.broker.get_rejected_orders(),
             funding_payments=list(self.funding_payments),
             predictions=self.feed.signals,
-            portfolio_state=list(self.portfolio_state),
+            portfolio_state=observed_account,
             metrics=metrics,
             config=self.config,
+            initial_capital=self.config.initial_cash,
+            returns_include_commissions=True,
+            account_method="signed_notional",
+            holdings=observed_holdings,
+            observation_metadata=observation_metadata,
+            recorded_variables=self.broker._recorded_variables(),
+            holdings_sampling=self.holdings_sampling,
+            capital_changes=list(self.capital_changes),
             equity=equity,
             trade_analyzer=trade_analyzer,
         )
@@ -904,6 +980,7 @@ class Engine:
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
+        holdings_sampling: str = "none",
     ) -> Engine:
         """Create an Engine instance from a BacktestConfig.
 
@@ -933,6 +1010,7 @@ class Engine:
             lifecycle_version=lifecycle_version,
             execution_policy=execution_policy,
             target_intent_state=target_intent_state,
+            holdings_sampling=holdings_sampling,
         )
 
 
@@ -952,9 +1030,11 @@ def run_backtest(
     market_impact_model: Any | None = None,
     execution_limits: Any | None = None,
     funding_df: pl.DataFrame | None = None,
+    capital_flows: pl.DataFrame | None = None,
     lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
+    holdings_sampling: str = "none",
 ) -> BacktestResult:
     """Run a backtest with minimal setup.
 
@@ -998,6 +1078,7 @@ def run_backtest(
         context_df=context if isinstance(context, pl.DataFrame) else None,
         feed_spec=feed_spec,
         contract=contract,
+        capital_flows=capital_flows,
     )
 
     if isinstance(config, str):
@@ -1016,4 +1097,5 @@ def run_backtest(
         lifecycle_version=lifecycle_version,
         execution_policy=execution_policy,
         target_intent_state=target_intent_state,
+        holdings_sampling=holdings_sampling,
     ).run()

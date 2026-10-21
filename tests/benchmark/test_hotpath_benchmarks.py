@@ -245,3 +245,13 @@ def test_optimized_feed_runtime_vs_legacy_baseline():
         f"Interleaved median optimized/legacy ratio {median_ratio:.3f} exceeds 1.100; "
         f"paired ratios={ratios}"
     )
+
+
+def test_legacy_feed_without_optional_capital_events_can_complete_a_run():
+    prices, signals = _build_benchmark_data(n_bars=2, n_assets=2)
+    result = Engine(
+        _LegacyDataFeed(prices, signals), _NoopStrategy(), BacktestConfig(calendar=None)
+    ).run()
+    assert len(result.equity_curve) == 2
+    assert result.metrics["final_value"] == 100000
+    assert result.capital_changes == []

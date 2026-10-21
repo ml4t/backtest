@@ -10,6 +10,7 @@ from math import isfinite
 from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 from zoneinfo import ZoneInfo
 
+from .capital import CapitalChange, CapitalEvent
 from .config import (
     EntryOrderPriority,
     ExecutionPrice,
@@ -455,6 +456,118 @@ class Broker:
         self._capture_lifecycle_mutation()
         self.account.cash = value
 
+    def _configure_result_capture(self, *, mark_times: bool, after_fill: bool) -> None:
+        if mark_times:
+            self._market_state.last_price_times = {}
+        if after_fill:
+            self._execution_journal.fill_snapshots = []
+
+    def _portfolio_snapshot(self, *, include_holdings: bool):
+        return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
+
+    def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
+        state = self._portfolio_snapshot(include_holdings=include_holdings)
+        recorded = self._execution_journal.recorded_values
+        if recorded is not None:
+            rows = self._execution_journal.recorded_rows
+            assert rows is not None
+            rows.extend((timestamp, observation, name, recorded[name]) for name in sorted(recorded))
+        return state
+
+    def _observed_fill_accounts(self):
+        return tuple(self._execution_journal.fill_snapshots or ())
+
+    def _recorded_variables(self):
+        rows = self._execution_journal.recorded_rows
+        return list(rows) if rows is not None else None
+
+    def _position_mark(self, asset: str, position: Position):
+        return self._portfolio_ledger.position_mark(asset, position)
+
+    def record(self, **values: Any) -> None:
+        """Record JSON-compatible strategy values, carrying them to later bar observations.
+
+        Values live outside authoritative cash/return fields. Unsupported objects
+        and reserved artifact tags fail before any recorded value changes.
+        """
+        import json
+
+        import numpy as np
+        import polars as pl
+
+        from .result import _NONFINITE_FLOAT_KEY, ArtifactWriteError, _serialize_metric_value
+
+        def validate(value: Any) -> None:
+            if isinstance(value, dict):
+                if _NONFINITE_FLOAT_KEY in value:
+                    raise ValueError("record values cannot contain reserved artifact tags")
+                for nested in value.values():
+                    validate(nested)
+            elif isinstance(value, (list, tuple)):
+                for nested in value:
+                    validate(nested)
+            elif isinstance(value, (np.ndarray, np.generic)):
+                validate(value.tolist())
+            elif isinstance(value, pl.Series):
+                validate(value.to_list())
+
+        encoded = {}
+        for name, value in values.items():
+            if not name:
+                raise ValueError("record names must be nonempty")
+            validate(value)
+            try:
+                encoded[name] = json.dumps(
+                    _serialize_metric_value(value, path=f"record[{name!r}]"),
+                    allow_nan=False,
+                    sort_keys=True,
+                )
+            except (ArtifactWriteError, TypeError, ValueError) as exc:
+                raise ValueError(f"record value {name!r} is not serializable") from exc
+        if not encoded:
+            return
+        self._capture_lifecycle_mutation()
+        if self._execution_journal.recorded_values is None:
+            self._execution_journal.recorded_values = {}
+            self._execution_journal.recorded_rows = []
+        self._execution_journal.recorded_values.update(encoded)
+
+    def _apply_capital_events(self, events: list[CapitalEvent]) -> list[CapitalChange]:
+        missing = [
+            asset
+            for asset, position in self.positions.items()
+            if self.get_mark_price(asset, quantity=position.quantity) is None
+        ]
+        if missing:
+            raise ValueError(
+                "capital change requires a current mark for held assets: " + ", ".join(missing)
+            )
+        nav = self.get_account_value()
+        cash = self.cash
+        changes = []
+        for event in events:
+            delta = event.value if event.kind == "delta" else event.value - nav
+            new_cash = cash + delta
+            new_nav = nav + delta
+            if not isfinite(new_cash) or not isfinite(new_nav) or new_nav < 0:
+                raise ValueError("capital change would make cash/NAV invalid")
+            if not self.allow_leverage and new_cash < 0:
+                raise ValueError("capital withdrawal exceeds available cash")
+            changes.append(
+                CapitalChange(
+                    event.timestamp, event.event_id, event.kind, event.value, delta, nav, new_nav
+                )
+            )
+            cash, nav = new_cash, new_nav
+        delta = cash - self.cash
+        free_cash = self.account._lock_notional_free_cash + delta
+        if not isfinite(free_cash):
+            raise ValueError("capital change would make available cash nonfinite")
+        if delta:
+            self.cash = cash
+            self.account._lock_notional_free_cash = free_cash
+        return changes
+
     def _apply_funding(self, events: list[FundingEvent]) -> list[FundingPayment]:
         """Apply one timestamp's validated funding events before any fills at that time."""
         payments: list[FundingPayment] = []
@@ -800,7 +913,12 @@ class Broker:
             "orders_this_bar": tuple(self._order_state.current_bar),
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
+            "recorded_values": dict(self._execution_journal.recorded_values)
+            if self._execution_journal.recorded_values is not None
+            else None,
+            "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
+            "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
             "rebalance_counter": self._rebalance_counter,
             "original_asset_stats_keys": set(self._asset_stats),
             "asset_stats": {},
@@ -908,8 +1026,15 @@ class Broker:
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
+        self._execution_journal.recorded_values = state["recorded_values"]
+        if state["recorded_values"] is None:
+            self._execution_journal.recorded_rows = None
+        elif self._execution_journal.recorded_rows is not None:
+            del self._execution_journal.recorded_rows[state["recorded_length"] :]
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
+        if self._execution_journal.fill_snapshots is not None:
+            del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
 
         self._rebalance_counter = state["rebalance_counter"]
         if state["all_asset_stats"]:
@@ -1090,17 +1215,18 @@ class Broker:
         quantity: float | None = None,
         use_open: bool = False,
     ) -> float | None:
-        """Resolve the configured mark price for an asset."""
+        """Resolve a finite configured mark, returning None when unavailable."""
         mark_side = None
         if self.mark_price == ExecutionPrice.QUOTE_SIDE and quantity is not None:
             mark_side = OrderSide.SELL if quantity > 0 else OrderSide.BUY
-        return self.get_price_for_source(
+        price = self.get_price_for_source(
             self.mark_price,
             asset,
             side=mark_side,
             quantity=quantity,
             use_open=use_open,
         )
+        return price if price is not None and isfinite(price) else None
 
     def get_available_size(self, asset: str, side: OrderSide | None = None) -> float | None:
         """Return side-aware quote size when available, otherwise bar volume."""
@@ -2463,8 +2589,12 @@ class Broker:
             self.account.release_settled(self._bar_index)
 
         for asset, price in prices.items():
+            if not isfinite(price):
+                continue
+            self._last_prices[asset] = price
+            if self._market_state.last_price_times is not None:
+                self._market_state.last_price_times[asset] = timestamp
             if price > 0:
-                self._last_prices[asset] = price
                 self._asset_bars_seen[asset] = self._asset_bars_seen.get(asset, 0) + 1
 
         # Clear per-bar tracking at start of new bar

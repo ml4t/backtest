@@ -199,6 +199,132 @@
         }
       },
       {
+        "certified_at": "2026-10-20T22:23:16.069523+00:00",
+        "correctness_evidence_generated_at": "2026-10-20T22:22:16.311328+00:00",
+        "correctness_evidence_sha256": "caf270cf00a554426ce10035cb98e806e8e7f670283ed166614ad37c8e6073a9",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "08ffb5f56cf383d8129333aeb0b784cd6f641b44b9afee678a139570a413a344",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "0af1e08ca7a021310f5afa34aaa724e38b0538ea4c9388f41ae1e2130de0fbc3",
+          "validation/environments/vectorbt_oss/uv.lock": "cdd7f1882cbf3d283eebafbce4f93f1fcbf4a5eda6f938157e5f141e875c2961",
+          "validation/environments/vectorbt_pro/uv.lock": "b7ebebc44a571d583ede63f27552594bd7c1b605f5faa9908df30da13be59c38",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "e8fed15af7d562ea60b8a320836c6199e098e5392bb4db622e68c8b8d8b6a0a1",
+          "validation/environments/zipline/uv.lock": "43258cbcc10cdbc29c02da2d41603467b9386ee00f6ea73e501bbffad89d4de0"
+        },
+        "dependency_graphs": {
+          "uv.lock": "ed7c38a3f7ab567bd44db7e1558328728fd24f958a6be9897f15f2cb848e7fb9",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "f64352a45b275049d72e098df7deeea3c275d5eaf81ff1da1de84b66f9aabb95",
+          "validation/environments/vectorbt_oss/uv.lock": "ceabca20fb1b89ccd70e3778bcec19fc32b1ccd52704fe6725d8f22b8280afb8",
+          "validation/environments/vectorbt_pro/uv.lock": "0f0f61ac16d9bafc9c15394fd6c068d690dfa3d9bf25a80ba2d1f75df11db0ce",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "ed18504748215fcd7b16ca4ed2af45b16d8507654d9c809b5739eef24f645760",
+          "validation/environments/zipline/uv.lock": "e0e84d5ee04be1fb25a7176933e3b20b5944aafd35ee84ed6b84163bae7ced2f"
+        },
+        "engine_source_sha256": "0c2cc20287a254d34be54fb3b489b00fc8d4e75b1ce4ae0377693c3c40d46f82",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "7c2732e96266ce204ea77a232c38f822ceb01a73",
+        "performance_impact": "none",
+        "reason": "Reviewed source against efbe057 and the frozen profiles. Detailed holdings, mark-time buffers, session/fill captures, capital events and recorded values are opt-in and unused in the17 measured configurations. Default account valuation remains one pass over held positions with the same signed-notional arithmetic; shared ledger dispatch and optional checks introduce no new market scan, history copy or per-fill DataFrame. Finite/zero carried-mark fixes do not change these positive finite inputs. Fill multiplier/currency assignments reuse existing contract lookups. Initial-capital corrections add one baseline element to existing vectorized metrics; no strategy decision, order/fill algorithm or input preparation changes. First-period return reporting changes intentionally. Review identified no material impact on the timed Engine.run boundary; this does not assert identical runtime bytes or qualify capture overhead. The existing feed-regression gate passed, but compares feeds under this engine, not absolute before/after speed. Separately, all17 fresh Backtest fill/equity/terminal identities agree with hash-verified native outputs. That correctness result alone does not infer timing equivalence. Timing runners, selected dependency graphs and original measurement identity remain unchanged. Retain original numbers, dates, environment and source scope; no new speed or new-workflow claim.",
+        "reviewed_correctness_sha256": "379b6306457558689347108682c4e4cc6ac980b9ab324b6cca09d48fb0c765b4",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-10-20T22:44:26.335826+00:00",
+        "correctness_evidence_generated_at": "2026-10-20T22:40:31.225499+00:00",
+        "correctness_evidence_sha256": "ceb0226774df2ec7a2b81a9c30fcc71822afb37a9bc7b5597121f96a008f41a3",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "08ffb5f56cf383d8129333aeb0b784cd6f641b44b9afee678a139570a413a344",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "0af1e08ca7a021310f5afa34aaa724e38b0538ea4c9388f41ae1e2130de0fbc3",
+          "validation/environments/vectorbt_oss/uv.lock": "cdd7f1882cbf3d283eebafbce4f93f1fcbf4a5eda6f938157e5f141e875c2961",
+          "validation/environments/vectorbt_pro/uv.lock": "b7ebebc44a571d583ede63f27552594bd7c1b605f5faa9908df30da13be59c38",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "e8fed15af7d562ea60b8a320836c6199e098e5392bb4db622e68c8b8d8b6a0a1",
+          "validation/environments/zipline/uv.lock": "43258cbcc10cdbc29c02da2d41603467b9386ee00f6ea73e501bbffad89d4de0"
+        },
+        "dependency_graphs": {
+          "uv.lock": "ed7c38a3f7ab567bd44db7e1558328728fd24f958a6be9897f15f2cb848e7fb9",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "f64352a45b275049d72e098df7deeea3c275d5eaf81ff1da1de84b66f9aabb95",
+          "validation/environments/vectorbt_oss/uv.lock": "ceabca20fb1b89ccd70e3778bcec19fc32b1ccd52704fe6725d8f22b8280afb8",
+          "validation/environments/vectorbt_pro/uv.lock": "0f0f61ac16d9bafc9c15394fd6c068d690dfa3d9bf25a80ba2d1f75df11db0ce",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "ed18504748215fcd7b16ca4ed2af45b16d8507654d9c809b5739eef24f645760",
+          "validation/environments/zipline/uv.lock": "e0e84d5ee04be1fb25a7176933e3b20b5944aafd35ee84ed6b84163bae7ced2f"
+        },
+        "engine_source_sha256": "3c6d3ff5e4f5000aa99b9bf7701467d07fc30e49d8ca22de36a4a2d85b0ca1e9",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "bf270876858c89596fcdc67044eba1b370d3b967",
+        "performance_impact": "none",
+        "reason": "Reviewed source against efbe057 and the frozen profiles. Detailed holdings, mark-time buffers, session/fill captures, capital events and recorded values are opt-in and unused in the17 measured configurations. Default account valuation remains one pass over held positions with the same signed-notional arithmetic; shared ledger dispatch and optional checks introduce no new market scan, history copy or per-fill DataFrame. Finite/zero carried-mark fixes do not change these positive finite inputs. Fill multiplier/currency assignments reuse existing contract lookups. Initial-capital corrections add one baseline element to existing vectorized metrics; no strategy decision, order/fill algorithm or input preparation changes. First-period return reporting changes intentionally. Review identified no material impact on the timed Engine.run boundary; this does not assert identical runtime bytes or qualify capture overhead. The existing feed-regression gate passed, but compares feeds under this engine, not absolute before/after speed. Separately, all17 fresh Backtest fill/equity/terminal identities agree with hash-verified native outputs. That correctness result alone does not infer timing equivalence. Timing runners, selected dependency graphs and original measurement identity remain unchanged. Retain original numbers, dates, environment and source scope; no new speed or new-workflow claim. The subsequent broker-ownership repair moves capture access behind Broker methods. Default per-bar work adds bounded method dispatch but no extra position pass or detailed buffers; recorded-value iteration and fill-account copying remain opt-in. Callback rollback and state-ownership contracts pass; fresh complete correctness covers the exact changed source. No material timed-path impact identified from that delegation.",
+        "reviewed_correctness_sha256": "cacd09e54b99a9e20800222bca6c590b12a2a1296a7fe3b6369e4f8cf336aeaa",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-10-20T23:58:53.613289+00:00",
+        "correctness_evidence_generated_at": "2026-10-20T23:47:47.738947+00:00",
+        "correctness_evidence_sha256": "edb157bdcd9b711583fbc4aaaea6f1b2b052cedf5c9b9d081ae7200f4a686baf",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "08ffb5f56cf383d8129333aeb0b784cd6f641b44b9afee678a139570a413a344",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "0af1e08ca7a021310f5afa34aaa724e38b0538ea4c9388f41ae1e2130de0fbc3",
+          "validation/environments/vectorbt_oss/uv.lock": "cdd7f1882cbf3d283eebafbce4f93f1fcbf4a5eda6f938157e5f141e875c2961",
+          "validation/environments/vectorbt_pro/uv.lock": "b7ebebc44a571d583ede63f27552594bd7c1b605f5faa9908df30da13be59c38",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "e8fed15af7d562ea60b8a320836c6199e098e5392bb4db622e68c8b8d8b6a0a1",
+          "validation/environments/zipline/uv.lock": "43258cbcc10cdbc29c02da2d41603467b9386ee00f6ea73e501bbffad89d4de0"
+        },
+        "dependency_graphs": {
+          "uv.lock": "ed7c38a3f7ab567bd44db7e1558328728fd24f958a6be9897f15f2cb848e7fb9",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "f64352a45b275049d72e098df7deeea3c275d5eaf81ff1da1de84b66f9aabb95",
+          "validation/environments/vectorbt_oss/uv.lock": "ceabca20fb1b89ccd70e3778bcec19fc32b1ccd52704fe6725d8f22b8280afb8",
+          "validation/environments/vectorbt_pro/uv.lock": "0f0f61ac16d9bafc9c15394fd6c068d690dfa3d9bf25a80ba2d1f75df11db0ce",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "ed18504748215fcd7b16ca4ed2af45b16d8507654d9c809b5739eef24f645760",
+          "validation/environments/zipline/uv.lock": "e0e84d5ee04be1fb25a7176933e3b20b5944aafd35ee84ed6b84163bae7ced2f"
+        },
+        "engine_source_sha256": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+        "performance_impact": "none",
+        "reason": "Reviewed source against efbe057 and the frozen profiles. Detailed holdings, mark-time buffers, session/fill captures, capital events and recorded values are opt-in and unused in the17 measured configurations. Default account valuation remains one pass over held positions with the same signed-notional arithmetic; shared ledger dispatch and optional checks introduce no new market scan, history copy or per-fill DataFrame. Finite/zero carried-mark fixes do not change these positive finite inputs. Fill multiplier/currency assignments reuse existing contract lookups. Initial-capital corrections add one baseline element to existing vectorized metrics; no strategy decision, order/fill algorithm or input preparation changes. First-period return reporting changes intentionally. Review identified no material impact on the timed Engine.run boundary; this does not assert identical runtime bytes or qualify capture overhead. The existing feed-regression gate passed, but compares feeds under this engine, not absolute before/after speed. Separately, all17 fresh Backtest fill/equity/terminal identities agree with hash-verified native outputs. That correctness result alone does not infer timing equivalence. Timing runners, selected dependency graphs and original measurement identity remain unchanged. Retain original numbers, dates, environment and source scope; no new speed or new-workflow claim. The subsequent broker-ownership repair moves capture access behind Broker methods. Default per-bar work adds bounded method dispatch but no extra position pass or detailed buffers; recorded-value iteration and fill-account copying remain opt-in. Callback rollback and state-ownership contracts pass; fresh complete correctness covers the exact changed source. No material timed-path impact identified from that delegation. The subsequent capital-event guard requires independently available marks only when external capital events are present. All17 frozen timed inputs have no capital events, so that new guard is not executed in those workloads. The current complete correctness cohort uses published Specs0.2.0, including a package-only overlay in native conformance interpreters; no native numerical dependencies or retained timing environments changed. The published Specs market/calendar/lifecycle modules used by these workflows match the immutable prepublication source previously qualified; differences are package version and JSON-compatible YAML loading outside the timed Engine.run boundary. No new material timed-path impact identified. Retain all original measured ratios, dates and scope; neither new calendar scheduling nor detailed-capture performance is claimed.",
+        "reviewed_correctness_sha256": "8bc9e48a7e565bd154f136e0e34b542f107d2db54280e85d82d86cc7892adac1",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
         "certified_at": "2026-10-21T00:01:46.589172+00:00",
         "correctness_evidence_generated_at": "2026-10-17T01:17:00.495296+00:00",
         "correctness_evidence_sha256": "ba7f4978cdf675e3d7ff2c998a7eb2f13bc099cb86667d70d56879affdf46a3f",
@@ -227,6 +353,48 @@
         "performance_impact": "none",
         "reason": "Dependency-only security repair. Reviewed all six regenerated lockfiles: the only package records changed are certifi2026.7.22 to2026.10.19 and Pillow12.3.0 to13.0.0; no simulation, comparison runner, native framework, numerical dependency, profile or input changes. Certifi updates the TLS CA store used outside Engine.run; Pillow updates image decoding/rendering, absent from all17 frozen engine-only timed workloads. Neither component is invoked by the frozen run boundary. Existing correctness has the identical current engine and adapter digests and remains valid within its recorded environments; its provenance is not relabeled as a new dependency run. Original timing environments and raw measurements are untouched. Current install, security, docs/package and supported-platform checks qualify the patched lock resolution separately. No material performance impact identified, no new speed claim or rerun requested.",
         "reviewed_correctness_sha256": "cbeac90d998cd3aa7830ea4e3e715e03a6437452695d1d7fd99b79f4a8cfb5c2",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
+      },
+      {
+        "certified_at": "2026-10-21T01:11:11.891940+00:00",
+        "correctness_evidence_generated_at": "2026-10-20T23:47:47.738947+00:00",
+        "correctness_evidence_sha256": "edb157bdcd9b711583fbc4aaaea6f1b2b052cedf5c9b9d081ae7200f4a686baf",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "d662dbede860b284b3bd3ed8a5d24237d8dfa040a4a45ec48c329d0f58005afd",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "929781e6ce00969d94b6e4a89318e34d6989f5c5a905c00b623369f6da8cedda",
+          "validation/environments/vectorbt_oss/uv.lock": "230dc89d48115785e622cc6149a044a995d313239ca4a52da20f644b9e5da63d",
+          "validation/environments/vectorbt_pro/uv.lock": "ab641a3f62ac66793f942bdf98040a8542570ed6c94a75eb3c1607f3fbddfcc5",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "32484892717199eb7da9421f4de7742814c6e670c1f6e50112e168c6cdc40717",
+          "validation/environments/zipline/uv.lock": "494dbe9123d8a286e9fff53ea97536634c6df18728ef106bbb0854d6ec5f0300"
+        },
+        "dependency_graphs": {
+          "uv.lock": "d177390653cd4fd91ef479de041f81fc989cb8c66b4a96817f6225f032d99586",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "cbac9c8e792e635343f518003f79fe6abdac343ad0ac1f50ff1843fc8bacd982",
+          "validation/environments/vectorbt_oss/uv.lock": "76ae8d3f76644701eabbec66b4b2fb3e00f32380b9cbbeab4600d0898055348c",
+          "validation/environments/vectorbt_pro/uv.lock": "24140b9890f02448799f00f0ead220514b5283232edfc346870bc0b32431718c",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "8936e2ec99550b05703ab5983bb34bf21004b9a81c659c10758363802c6fd7fe",
+          "validation/environments/zipline/uv.lock": "c5073b844e2b749e74496a13da4291110f705798e20529b2931797ce75d24f81"
+        },
+        "engine_source_sha256": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+        "measurement_sha256": "4bbc924aeeed357ab44a196c003ba7647c0d0faf60aee25ed534f7481ade1852",
+        "ml4t_commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+        "performance_impact": "none",
+        "reason": "Dependency-only security repair refreshed after reviewed observed-account PR161 merged. The current Engine, adapters and correctness evidence exactly match the qualified source in that PR; its actual66synthetic/17real outputs retain their true source and published-Specs provenance. Onlycertifi2026.10.19 andPillow13.0.0 package records changed across regenerated locks. TLS CA validation and image decoding/rendering do not run inside any frozen engine-only timed workload. Numerical libraries, framework revisions, profiles, runners and inputs are unchanged. Original native timing environments and accepted measurement digest remain untouched. Source review found no material timed-path impact from these two dependency patches; current lock installation, full dependency audit9base/0fixed, docs and all hosted/platform/package gates qualify the patched dependency resolution separately. Existing comparison outputs are reused within unchanged engine/runner scope, not relabeled as new executions under patched dependencies. No new timing or speed claim.",
+        "reviewed_correctness_sha256": "8bc9e48a7e565bd154f136e0e34b542f107d2db54280e85d82d86cc7892adac1",
         "sources": {
           "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
           "benchmark": "28d04f313753a900e97e51cda70458a78ecfd9665f062df8aca6051e0b489746",

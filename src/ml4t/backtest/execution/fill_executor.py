@@ -234,6 +234,8 @@ class FillExecutor:
 
         # Create fill record
         price_source = "open" if order.child_intent_id is not None else broker.execution_price.value
+        multiplier = broker.get_multiplier(order.asset)
+        contract_spec = broker.get_contract_spec(order.asset)
         fill = Fill(
             order_id=order.order_id,
             rebalance_id=order.rebalance_id,
@@ -261,6 +263,8 @@ class FillExecutor:
             target_intent_id=order.target_intent_id,
             child_intent_id=order.child_intent_id,
             intent_idempotency_key=order.intent_idempotency_key,
+            multiplier=multiplier,
+            currency=contract_spec.currency if contract_spec is not None else None,
         )
         self.journal.fills.append(fill)
 
@@ -307,7 +311,6 @@ class FillExecutor:
         )
 
         # Update cash (include multiplier for futures/derivatives)
-        multiplier = broker.get_multiplier(order.asset)
         cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
 
@@ -328,6 +331,13 @@ class FillExecutor:
                 if o.parent_id == order.parent_id and o.order_id != order.order_id:
                     o.status = OrderStatus.CANCELLED
                     self.orders.pending.remove(o)
+
+        if self.journal.fill_snapshots is not None:
+            state, holdings = broker._portfolio_snapshot(include_holdings=True)
+            assert holdings is not None
+            self.journal.fill_snapshots.append(
+                (len(self.journal.fills) - 1, current_time, state, holdings)
+            )
 
         return not is_partial
 

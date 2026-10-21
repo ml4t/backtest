@@ -275,6 +275,7 @@ class TestBacktestResultEquityDataFrame:
             "cumulative_return",
             "drawdown",
             "high_water_mark",
+            "performance_equity",
         ]
 
     def test_equity_dataframe_values(self, backtest_result: BacktestResult):
@@ -327,10 +328,14 @@ class TestBacktestResultFillsDataFrame:
         assert len(df) == 2
         assert df.columns == [
             "order_id",
+            "fill_sequence",
             "rebalance_id",
             "asset",
             "side",
             "quantity",
+            "signed_quantity",
+            "multiplier",
+            "currency",
             "price",
             "timestamp",
             "commission",
@@ -389,12 +394,16 @@ class TestBacktestResultPortfolioStateDataFrame:
         assert isinstance(df, pl.DataFrame)
         assert len(df) == 6
         assert df.columns == [
+            "observation_id",
             "timestamp",
             "equity",
             "cash",
             "gross_exposure",
             "net_exposure",
             "open_positions",
+            "observation_kind",
+            "holdings_complete",
+            "fill_sequence",
         ]
 
     def test_portfolio_state_dataframe_values(self, backtest_result: BacktestResult):
@@ -667,6 +676,8 @@ class TestBacktestResultParquet:
             manifest = json.loads((path / "manifest.json").read_text())
 
             assert manifest["omitted_components"] == {
+                "holdings": "holdings were not captured",
+                "recorded_variables": "strategy variables were not recorded",
                 "predictions": "result has no predictions",
                 "config": "result has no config",
                 "spec": "result has no config for a runtime spec",
@@ -807,7 +818,7 @@ class TestBacktestResultParquet:
             with open(path / "manifest.json") as file:
                 manifest = json.load(file)
             assert manifest["artifact_type"] == "ml4t-backtest-result"
-            assert manifest["schema_version"] == 2
+            assert manifest["schema_version"] == 3
             assert set(manifest["components"]) >= {
                 "trades",
                 "fills",
