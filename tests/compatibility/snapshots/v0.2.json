@@ -687,6 +687,7 @@
     "from ml4t.backtest.compat.zipline.finance.asset_restrictions import RESTRICTION_STATES",
     "from ml4t.backtest.compat.zipline.finance.asset_restrictions import Restriction",
     "from ml4t.backtest.compat.zipline.finance.asset_restrictions import StaticRestrictions",
+    "from ml4t.backtest.compat.zipline.finance.cancel_policy import EODCancel",
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
     "from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode",
@@ -2850,6 +2851,18 @@
       "qualname": "StaticRestrictions",
       "signature": "(restricted_list: collections.abc.Iterable[ml4t.backtest.compat.zipline.assets.Asset]) -> None"
     },
+    "ml4t.backtest.compat.zipline.finance.cancel_policy:EODCancel": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.finance.cancel_policy",
+      "qualname": "EODCancel",
+      "signature": "(warn_on_cancel: bool = True) -> None"
+    },
     "ml4t.backtest.compat.zipline.finance:commission": {
       "kind": "module",
       "module": "builtins",
@@ -4464,6 +4477,10 @@
         "close_position": {
           "kind": "method",
           "signature": "(self, asset: 'str', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, _options: 'SubmitOrderOptions | None' = None) -> 'Order | None'"
+        },
+        "configure_session_cancellation": {
+          "kind": "method",
+          "signature": "(self, *, bounds: 'Mapping[date, tuple[datetime, datetime]] | None' = None, warn_on_cancel: 'bool' = False) -> 'None'"
         },
         "configure_stats": {
           "kind": "method",

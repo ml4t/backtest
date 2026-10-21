@@ -16,6 +16,7 @@ from ml4t.specs import WindowUnit
 from ... import BacktestConfig, Broker, DataFeed, Engine, RuntimeServices, Strategy
 from ...benchmark import BenchmarkData
 from ...config import (
+    CancelPolicy,
     CommissionType,
     ConditionalOrderMode,
     ExecutionMode,
@@ -49,6 +50,7 @@ from .finance.asset_restrictions import (
     SecurityListRestrictions,
     StaticRestrictions,
 )
+from .finance.cancel_policy import EODCancel, NeverCancel, _configure_cancellation
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
 from .lookup import PreparedAssetLookup, _lookup_instant, _symbol_parts
@@ -147,6 +149,7 @@ class MigrationContext:
         self._restrictions: Restrictions = NoRestrictions()
         self._slippage: Any = slippage.FixedBasisPointsSlippage()
         self._futures_commission = commission.PerContract(0.85, {})
+        self._cancel_policy: EODCancel | NeverCancel = NeverCancel()
         self._set_commission(commission.PerShare())
         self.portfolio = _Portfolio(self)
 
@@ -724,6 +727,19 @@ class MigrationContext:
         self._benchmark = self._benchmark_input
         self._config.metadata["benchmark_status"] = "prepared_returns"
 
+    def set_cancel_policy(self, cancel_policy: EODCancel | NeverCancel) -> None:
+        self._setup_only()
+        if not isinstance(cancel_policy, EODCancel | NeverCancel):
+            raise TypeError("Use a declared EODCancel or NeverCancel policy")
+        if isinstance(cancel_policy, EODCancel) and not isinstance(
+            cancel_policy.warn_on_cancel, bool
+        ):
+            raise TypeError("warn_on_cancel must be boolean")
+        self._cancel_policy = cancel_policy
+        self._config.cancel_policy = (
+            CancelPolicy.SESSION_END if isinstance(cancel_policy, EODCancel) else CancelPolicy.NEVER
+        )
+
     def _execution_limits(self):
         config, model = self._config, self._slippage
         if isinstance(model, slippage.FixedBasisPointsSlippage):
@@ -959,7 +975,7 @@ def run_algorithm(
                 *[source.source for source in context._active_csv.values()],
             )
         ):
-            result = Engine(
+            engine = Engine(
                 feed,
                 _Callbacks(
                     context,
@@ -983,7 +999,10 @@ def run_algorithm(
                 contract_specs=specs,
                 benchmark=context._benchmark,
                 holdings_sampling="bar",
-            ).run()
+            )
+            if isinstance(context._cancel_policy, EODCancel):
+                _configure_cancellation(engine, context._cancel_policy)
+            result = engine.run()
     if asset_lookup is not None and result.config is not None:
         result.config.metadata["migration_symbol_lookup"]["date_overrides"] = list(
             context._lookup_overrides

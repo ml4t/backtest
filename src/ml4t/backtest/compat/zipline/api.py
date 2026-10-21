@@ -64,6 +64,10 @@ def set_benchmark(asset: Asset | None) -> None:
     current().set_benchmark(asset)
 
 
+def set_cancel_policy(cancel_policy: Any) -> None:
+    current().set_cancel_policy(cancel_policy)
+
+
 def set_asset_restrictions(restrictions: Restrictions, on_error: str = "fail") -> None:
     current().set_asset_restrictions(restrictions, on_error)
 

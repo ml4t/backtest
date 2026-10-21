@@ -64,6 +64,8 @@ FORBIDDEN_BROKER_STATE = {
     "_scheduled_session_open",
     "_scheduled_price_event",
     "_session_expiry_cache",
+    "_session_order_bounds",
+    "_warn_on_session_cancel",
     "_session_boundary",
     "_stats_config",
     "_stop_exits_this_bar",

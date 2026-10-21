@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+import logging
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
 from datetime import date, datetime
 from math import isfinite
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack
 from zoneinfo import ZoneInfo
 
@@ -201,6 +203,8 @@ class Broker:
         self._scheduled_price_event = True
         self.cancel_policy = CancelPolicy(cancel_policy)
         self._session_expiry_cache: dict[tuple[str, date], tuple[datetime, datetime]] = {}
+        self._session_order_bounds: Mapping[date, tuple[datetime, datetime]] = MappingProxyType({})
+        self._warn_on_session_cancel = False
         self._risk_state = RiskState()
         self._execution_journal = ExecutionJournal()
 
@@ -1929,6 +1933,46 @@ class Broker:
                 )
         return session
 
+    def configure_session_cancellation(
+        self,
+        *,
+        bounds: Mapping[date, tuple[datetime, datetime]] | None = None,
+        warn_on_cancel: bool = False,
+    ) -> None:
+        """Set explicit physical order-session bounds before the first market event.
+
+        Bounds must lie within their declared calendar session. Native defaults
+        continue to expire at the full calendar close. This only configures the
+        existing session-end cancellation policy; it does not enable that policy.
+        """
+        if self._market_state.time is not None or self.orders:
+            raise RuntimeError("Configure session cancellation before the first market event")
+        clock = self._order_session_config or self._session_config
+        if clock is None or clock.calendar is None:
+            raise ValueError("Session cancellation bounds require a declared calendar")
+        if not isinstance(warn_on_cancel, bool):
+            raise TypeError("warn_on_cancel must be boolean")
+        selected = {}
+        for session, pair in (bounds or {}).items():
+            if not isinstance(session, date) or isinstance(session, datetime):
+                raise ValueError("Order-session bounds require civil session dates")
+            if len(pair) != 2 or any(
+                not isinstance(value, datetime) or value.tzinfo is None for value in pair
+            ):
+                raise ValueError("Order-session bounds require aware physical open/close instants")
+            opened, closed = pair
+            from .calendar import get_schedule
+
+            schedule = get_schedule(clock.calendar, session, session)
+            if schedule.height != 1:
+                raise ValueError(f"Cannot assign order-session bounds to non-session {session}")
+            native_open, native_close = schedule["market_open"][0], schedule["market_close"][0]
+            if not native_open <= opened < closed <= native_close:
+                raise ValueError("Order-session bounds must lie within their declared session")
+            selected[session] = (opened, closed)
+        self._session_order_bounds = MappingProxyType(selected)
+        self._warn_on_session_cancel = warn_on_cancel
+
     def _order_session_bounds(
         self, clock: SessionConfig, session: date
     ) -> tuple[datetime, datetime]:
@@ -1936,6 +1980,8 @@ class Broker:
 
         if clock.calendar is None:
             raise ValueError("session_end cancellation requires a declared calendar")
+        if session in self._session_order_bounds:
+            return self._session_order_bounds[session]
         key = (clock.calendar, session)
         bounds = self._session_expiry_cache.get(key)
         if bounds is None:
@@ -1965,9 +2011,18 @@ class Broker:
                 closed = closed.astimezone(ZoneInfo(clock.timezone)).replace(tzinfo=None)
             if timestamp > closed or timestamp == closed and (after_event or current != session):
                 self._capture_lifecycle_mutation(order_id=order.order_id)
+                remaining = self._order_state.partial_quantities.get(order.order_id, order.quantity)
                 self._order_book.cancel_order(
                     order.order_id, timestamp=closed, reason="session_end"
                 )
+                if self._warn_on_session_cancel:
+                    logging.getLogger(__name__).warning(
+                        "Order %s for %s cancelled at session end: %s filled, %s remaining",
+                        order.order_id,
+                        order.asset,
+                        order.filled_quantity,
+                        remaining,
+                    )
 
     def _commit_control_order(self, request: OrderControlContext) -> None:
         counts = self._order_state.control_counts

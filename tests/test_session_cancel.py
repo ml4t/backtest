@@ -17,6 +17,60 @@ def _frame(times):
     )
 
 
+@pytest.mark.parametrize("warn", [False, True])
+def test_explicit_order_session_bounds_expire_only_the_partial_remainder_and_keep_caller_copy(
+    caplog,
+    warn,
+):
+    from ml4t.backtest.execution import VolumeParticipationLimit
+
+    times = [
+        datetime(2025, 7, 2, 15, 59, tzinfo=UTC),
+        datetime(2025, 7, 2, 16, tzinfo=UTC),
+        datetime(2025, 7, 2, 16, 1, tzinfo=UTC),
+    ]
+    orders = []
+
+    class Submit(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == times[0]:
+                orders.append(broker.submit_order("TEST", 3))
+            with pytest.raises(RuntimeError, match="before the first market event"):
+                broker.configure_session_cancellation(bounds={})
+
+    engine = Engine(
+        DataFeed(
+            prices_df=_frame(times).with_columns(pl.lit(2.0).alias("volume")),
+            feed_spec={"timestamp_semantics": "bar_close"},
+        ),
+        Submit(),
+        BacktestConfig(
+            calendar="NYSE", execution_mode=ExecutionMode.NEXT_BAR, cancel_policy="session_end"
+        ),
+        execution_limits=VolumeParticipationLimit(0.5),
+    )
+    opened = datetime(2025, 7, 2, 13, 30, tzinfo=UTC)
+    bounds = {times[0].date(): (opened, times[1])}
+    engine.broker.configure_session_cancellation(bounds=bounds, warn_on_cancel=warn)
+    bounds[times[0].date()] = (opened, times[2])
+    # A rejected replacement must not discard the previously validated configuration.
+    with pytest.raises(ValueError, match="within their declared session"):
+        engine.broker.configure_session_cancellation(
+            bounds={times[0].date(): (opened, datetime(2025, 7, 2, 23, tzinfo=UTC))}
+        )
+    result = engine.run()
+    assert result.to_fills_dataframe()["quantity"].to_list() == [1.0]
+    assert orders[0].status is OrderStatus.CANCELLED and orders[0].filled_quantity == 1.0
+    assert orders[0].cancelled_at == times[1]
+    warnings = [
+        record.message for record in caplog.records if "cancelled at session end" in record.message
+    ]
+    if warn:
+        assert len(warnings) == 1 and "1.0 filled, 2.0 remaining" in warnings[0]
+    else:
+        assert warnings == []
+
+
 @pytest.mark.parametrize(
     "policy,expected_status",
     [("never", OrderStatus.FILLED), ("session_end", OrderStatus.CANCELLED)],

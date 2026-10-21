@@ -1237,6 +1237,73 @@ slippage, rolling or variation-cash parity. The example explicitly chooses
 volume-share slippage, and its cash follows the native signed-notional method
 described in [ledger assumptions](#match-ledger-and-corporate-action-assumptions).
 
+### Cancel pending orders at session end
+
+Declare `set_cancel_policy(EODCancel(warn_on_cancel=True))` during
+initialization, or `NeverCancel()` to keep the default pending-order policy.
+The adapter selects native session-end expiration. Orders can still fill on
+the closing bar. After all callbacks and fills at that bar, remaining
+quantities expire, including orders submitted by the close callback.
+Warnings report each actual cancellation and its filled/remaining quantities;
+`warn_on_cancel=False` suppresses those messages.
+
+<!-- ml4t-doc-test: legacy-session-end-cancel -->
+```python
+from datetime import datetime, timezone
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+from ml4t.backtest.compat.zipline.finance import commission, slippage
+from ml4t.backtest.compat.zipline.finance.cancel_policy import EODCancel
+
+asset = Asset("A", "ALPHA", 7)
+times = [datetime(2025, 7, 3, 16, 59, tzinfo=timezone.utc),
+         datetime(2025, 7, 3, 17, tzinfo=timezone.utc)]
+final = []
+def initialize(context):
+    context.ids = []
+    context.set_cancel_policy(EODCancel(warn_on_cancel=False))
+    context.set_commission(commission.PerShare(0))
+    context.set_slippage(slippage.FixedBasisPointsSlippage(0, .5))
+def handle_data(context, data):
+    context.ids.append(context.order(asset, 3 if not context.ids else 4))
+def analyze(context, performance):
+    final.extend((context.get_order(key).amount, context.get_order(key).filled,
+                  int(context.get_order(key).status)) for key in context.ids)
+
+performance = run_algorithm(feed=DataFeed(prices_df=pl.DataFrame({
+    "timestamp": times, "asset": ["A", "A"], "close": [100., 100.], "volume": [2., 2.],
+}), feed_spec={"calendar": "NYSE", "time_contract_version": 2,
+    "timestamp_semantics": "bar_close", "bar_label": "right", "data_frequency": "1m"}),
+    assets=[asset], initialize=initialize, handle_data=handle_data, analyze=analyze)
+assert final == [(3., 1., 2), (4., 0., 2)]
+assert performance.attrs["backtest_result"].to_fills_dataframe()["quantity"].to_list() == [1.]
+print("Half-day close fills precede remainder cancellation.")
+```
+
+The calendar is required. Each selected session must contain its actual
+execution-close observation; a truncated capture cannot claim EOD processing
+completed. For the legacy `us_futures` route, expiration uses the explicit
+17:00 New York execution close rather than the full calendar's 18:00 close.
+The underlying calendar and native default remain unchanged.
+
+The published 3.2.0 minute captures compare unfilled limits, partial orders,
+orders submitted at the close, next-session visibility, execution times and
+cancellation timestamps across an NYSE half-day and the synthetic futures
+clock. Its daily EOD implementation behaves differently: with three unfilled
+orders, it cancels only one per session and leaves the last pending order
+open. The daily fixture records final statuses `[2, 2, 0]`. Backtest cancels
+all three at the first close, giving `[2, 2, 2]`; it does not reproduce that
+reference defect.
+
+Native callers can configure a shorter declared order session with
+`engine.broker.configure_session_cancellation(bounds=..., warn_on_cancel=...)`
+before the first market event. Each civil session date maps to aware physical
+open/close instants within that calendar session. Use it with
+`cancel_policy="session_end"`; other sessions retain their full calendar
+close. It cannot change cancellation settings during a running strategy.
+
 ### Separate stale reads from executable quotes
 
 The callback runner selects `BarData(read_policy="zipline")`. In this read
