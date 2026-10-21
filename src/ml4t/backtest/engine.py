@@ -1105,6 +1105,7 @@ class Engine:
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
         holdings_sampling: str = "none",
+        runtime: RuntimeServices | None = None,
         benchmark: BenchmarkData | None = None,
     ) -> Engine:
         """Create an Engine instance from a BacktestConfig.
@@ -1122,6 +1123,7 @@ class Engine:
             slippage_model: Explicit native slippage model overriding configured rates
             execution_limits: Execution limits (max order size, etc.)
             funding_df: Timestamped funding rates or amounts for named assets
+            runtime: Optional causal market/history and callback services for this run
 
         Returns:
             Configured Engine instance
@@ -1140,6 +1142,7 @@ class Engine:
             execution_policy=execution_policy,
             target_intent_state=target_intent_state,
             holdings_sampling=holdings_sampling,
+            runtime=runtime,
             benchmark=benchmark,
         )
 
@@ -1167,6 +1170,7 @@ def run_backtest(
     execution_policy: ExecutionPolicy | None = None,
     target_intent_state: dict[str, Any] | None = None,
     holdings_sampling: str = "none",
+    runtime: RuntimeServices | None = None,
     benchmark: BenchmarkData | None = None,
 ) -> BacktestResult:
     """Run a backtest with minimal setup.
@@ -1185,6 +1189,7 @@ def run_backtest(
         slippage_model: Explicit native slippage model overriding configured rates
         execution_limits: Execution limits (max order size, etc.)
         funding_df: Timestamped funding rates or amounts for named assets
+        runtime: Optional causal market/history and callback services for this run
 
     Returns:
         BacktestResult with metrics, trades, equity curve, and export methods.
@@ -1235,5 +1240,6 @@ def run_backtest(
         execution_policy=execution_policy,
         target_intent_state=target_intent_state,
         holdings_sampling=holdings_sampling,
+        runtime=runtime,
         benchmark=benchmark,
     ).run()

@@ -126,6 +126,41 @@ def test_contract_input_and_returned_metadata_cannot_change_bound_execution_unit
     assert result.to_portfolio_state_dataframe()["cash"].to_list() == [99900.0]
 
 
+@pytest.mark.parametrize("false_valued", [False, True])
+def test_holdings_preserve_declared_currency_even_when_contract_spec_is_false_valued(false_valued):
+    class DeclaredContract(ContractSpec):
+        def __bool__(self):
+            return not false_valued
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            broker.submit_order("A", 2)
+
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [datetime(2025, 1, 6, 21, tzinfo=UTC)],
+                    "asset": ["A"],
+                    "close": [100.0],
+                }
+            )
+        ),
+        Buy(),
+        BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+        contract_specs={"A": DeclaredContract("A", multiplier=50.0, currency="USD")},
+        holdings_sampling="bar",
+    ).run()
+    holdings = result.to_holdings_dataframe()
+    assert holdings["currency"].to_list() == ["USD"]
+    assert holdings["quantity"].to_list() == [2.0]
+    assert holdings["multiplier"].to_list() == [50.0]
+    assert holdings["signed_notional"].to_list() == [10000.0]
+    assert holdings["liquidation_value"].to_list() == [10000.0]
+    assert result.to_portfolio_state_dataframe()["cash"].to_list() == [90000.0]
+    assert result.to_portfolio_state_dataframe()["equity"].to_list() == [100000.0]
+
+
 def test_position_value_is_observed_directly_instead_of_subtracting_large_cash_from_nav():
     seen = []
 

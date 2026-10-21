@@ -73,6 +73,7 @@ preserved 0.1.13 release candidate.
 Pass a `RuntimeServices` instance to the existing `Engine`. The strategy's `context`
 remains the input feed context. Rows before `start` supply history but cannot trade
 or create account observations. The service becomes unavailable after the run.
+The same `runtime` argument is accepted by `Engine.from_config` and `run_backtest`.
 
 This example requires actual timestamped closing bars and Specs 0.2.0. It does
 not reinterpret midnight session labels as close instants. Runtime services

@@ -60,6 +60,47 @@ def test_warmup_history_is_visible_but_cannot_create_prestart_trades_or_accounts
         services.market.history(["TEST"], ["close"], bar_count=1)
 
 
+@pytest.mark.parametrize("entry_point", ["from_config", "run_backtest"])
+def test_convenience_entry_points_bind_runtime_warmup_history_and_release_it_after_run(entry_point):
+    from ml4t.backtest import run_backtest
+
+    start = datetime(2025, 1, 6, 16, tzinfo=UTC)
+    services = RuntimeServices(start=start)
+    seen = []
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            seen.append(
+                services.market.history(["TEST"], ["close"], bar_count=3)["close"].to_list()
+            )
+            if timestamp == start:
+                broker.submit_order("TEST", 1)
+
+    config = BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR)
+    if entry_point == "from_config":
+        result = Engine.from_config(
+            _instant_feed(prices_df=prices()), Read(), config, runtime=services
+        ).run()
+    else:
+        result = run_backtest(
+            prices(),
+            Read(),
+            config=config,
+            feed_spec=FeedSpec(timestamp_semantics=TimestampSemantics.EVENT_TIME),
+            runtime=services,
+        )
+    assert seen == [[100.0, 110.0, 120.0], [110.0, 120.0, 130.0]]
+    assert [(fill.timestamp, fill.price, fill.quantity) for fill in result.fills] == [
+        (start, 120.0, 1)
+    ]
+    assert result.to_equity_dataframe()["timestamp"].to_list() == [
+        start,
+        datetime(2025, 1, 7, 16, tzinfo=UTC),
+    ]
+    with pytest.raises(RuntimeError, match="active run"):
+        services.market.history(["TEST"], ["close"], bar_count=1)
+
+
 @pytest.mark.parametrize("extra_future", [False, True])
 def test_future_prices_and_late_known_features_cannot_change_an_earlier_decision(extra_future):
     frame = prices(extra_future).with_columns(

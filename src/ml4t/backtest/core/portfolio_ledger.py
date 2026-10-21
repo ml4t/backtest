@@ -58,14 +58,13 @@ class PortfolioLedger:
             gross += abs(value)
             net += value
             if holdings is not None:
-                spec = self.broker.get_contract_spec(asset)
                 holdings.append(
                     (
                         asset,
                         position.quantity,
                         price,
                         position.multiplier,
-                        spec.currency if spec else None,
+                        self.broker._get_contract_currency(asset),
                         value,
                         value,
                         source,
