@@ -18,13 +18,13 @@ lookup and adjustment rules.
 
 | Zipline Reloaded task | ML4T Backtest task | Difference to check |
 |---|---|---|
-| Ingest a data bundle, then select assets with `symbol()` | Prepare a Polars panel with `timestamp`, `asset`, and `close`; pass it to [`DataFeed`](data-feed.md) | Map each Zipline asset ID and its valid dates to a stable feed identifier. Match the source price adjustment basis and account for corporate actions upstream. `DataFeed` does not ingest the bundle or perform that mapping. |
+| Ingest a data bundle, then select assets with `symbol()` | Prepare a Polars panel with `timestamp`, `asset`, and `close`; pass it to [`DataFeed`](data-feed.md) | Map each Zipline asset ID and valid dates to stable feed IDs; Data's registry can supply native runtime lookup. Prepare causal adjusted history in Data, retain the declared execution basis, and check the account-action scope below. `DataFeed` does not ingest a bundle. |
 | Define `initialize(context)` and `handle_data(context, data)` | Subclass [`Strategy`](strategies.md), initialize state in `__init__` or `on_start`, and decide in `on_data(timestamp, data, context, broker)` | `on_data` receives a mapping of assets present at that event. State belongs on the strategy instance. `on_start` and `on_prepare` run before the first feed bar; neither receives future bars. |
-| Read `data.current(asset, "price")` and `data.history(...)` | Read the current asset's bar in `data[asset]`; precompute rolling features and supply them through `signals_df` | A `DataFeed` callback does not expose Zipline's rolling `data.history` API. Align each feature with the bar on which it becomes available. |
+| Read `data.current(asset, "price")` and `data.history(...)` | Use [`RuntimeServices`](strategies.md#use-causal-history-and-session-callbacks) for causal Polars reads, or the [Pandas read adapter](#preserve-zipline-read-shapes) | Declare the grid, availability, adjustment basis and stale-read policy. Prepared features can also enter through `signals_df`; their decision and publication clocks remain explicit. |
 | Call `order(asset, quantity)` or `order_target_percent(asset, weight)` | Call [`broker.submit_order`](../api/index.md#ml4t.backtest.broker.Broker.submit_order) or [`broker.order_target_percent`](../api/index.md#ml4t.backtest.broker.Broker.order_target_percent) inside `on_data` | The asset is a string identifier. Check share precision, pending orders, buying power, and next eligible fill; identical method names do not imply identical execution. |
-| Use `schedule_function` with date and time rules | Decide in `on_data`, or use [`RebalanceSchedule`](rebalancing.md#schedule-metadata) with `TargetWeightExecutor` for session-based rebalancing | Match the source decision instant and calendar explicitly. For assets with different close times, `session_col` requires one bar per asset per decision session and next-bar execution. |
+| Use `schedule_function` with date and time rules | Register native callbacks through [`RuntimeServices.scheduler`](strategies.md#use-causal-history-and-session-callbacks), or use [`RebalanceSchedule`](rebalancing.md#schedule-metadata) for rebalancing | Match phase, calendar and offset. Pre-open callbacks have an explicit clock; other scheduled callbacks require a real observed bar at their requested instant. |
 | Set commission and slippage models | Set explicit [`BacktestConfig`](configuration.md) costs and, where needed, market impact and funding inputs | Default ML4T examples charge no commission or slippage. Reconcile cost amounts separately from fills and share quantities. |
-| Call `record(...)` and inspect the performance frame | Keep custom observations on the strategy instance; inspect [`BacktestResult`](results.md) fills, trades, equity, and exported frames | There is no `record` call with Zipline's performance-frame contract. Join your observations to result timestamps explicitly. |
+| Call `record(...)` and inspect the performance frame | Call [`broker.record`](results.md#recorded-strategy-values); inspect native account, holdings, fills and recorded-value exports | Recorded values have their own bar-end component and do not overwrite account fields. A Zipline-shaped performance-frame runner is separate from these native exports. |
 | Run `zipline run` or `run_algorithm(...)` | Construct [`Engine`](../api/index.md#ml4t.backtest.engine.Engine) and call `run()`, or use `run_backtest(...)` | A run uses prepared inputs and one `Engine` instance. Create a new engine for another scenario. |
 
 Zipline's [tutorial](https://zipline.ml4trading.io/beginner-tutorial) documents
@@ -120,6 +120,87 @@ If you need portfolio analysis after migration, evaluate the optional
 example passes a `BacktestResult` to `ml4t-diagnostic==0.1.4` and computes
 return and drawdown statistics.
 
+## Preserve Zipline read shapes
+
+The upcoming Backtest release includes `compat.zipline.assets.Asset` and
+`compat.zipline.data.BarData` for Pandas read containers inside a native
+`Strategy`. Supply the stable account key and any actual legacy SID explicitly;
+these containers do not resolve symbols or ingest a bundle. Native dated-symbol
+resolution is [documented separately](strategies.md#resolve-dated-instruments-and-enforce-their-lifetimes).
+The original `initialize`/`handle_data` callback runner is still separate work.
+
+The read-container fixtures use the published
+[Zipline Reloaded 3.2.0](https://pypi.org/project/zipline-reloaded/3.2.0/)
+CPython 3.12 Linux wheel, SHA-256
+`1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b`.
+Real daily and minute `run_algorithm` probes cover scalar/sequence selections,
+reversed asset and field order, numeric dtypes and datetime indexes. This is a
+read-container comparison, separate from the retained trading and timing reports.
+
+| Requested assets / fields | `current` | `history` |
+|---|---|---|
+| One / one | Scalar | Series, named by asset |
+| One / several | Series, named by symbol | MultiIndex DataFrame |
+| Several / one | Series, indexed by assets | DataFrame, asset columns |
+| Several / several | DataFrame, asset rows | MultiIndex DataFrame |
+
+Published 3.2.0 returns the MultiIndex for a single asset with multiple fields,
+although its prose describes a simple datetime-indexed frame. It also leaves
+the second index level unnamed. The adapter preserves the actual output:
+`["date", None]` for daily history and `["date_time", None]` for minute history.
+Multi-field history sorts its asset index by supplied legacy SID (otherwise native key); single-field
+history and current reads retain the requested order. History numeric columns
+are Float64; daily indexes are naive session dates and minute indexes are UTC
+instants, both with nanosecond datetime units.
+
+<!-- ml4t-doc-test: zipline-read-shapes -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.specs import FeedSpec
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+from ml4t.backtest.compat.zipline.assets import Asset
+from ml4t.backtest.compat.zipline.data import BarData
+
+asset = Asset("A", symbol="ALPHA", legacy_sid=0)
+dates = [datetime(2025, 1, d, 21, tzinfo=UTC) for d in [6, 7]]
+spec = FeedSpec(time_contract_version=2, calendar="NYSE", data_frequency="1d",
+                timestamp_semantics="bar_close", bar_grid_anchor="session_open",
+                bar_label="right", partial_bar_policy="include")
+prices = pl.DataFrame({"timestamp": dates, "asset": ["A"] * 2,
+                       "close": [100.0, 101.0], "volume": [1000, 2000]})
+services = RuntimeServices()
+
+class ReadPrices(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == dates[-1]:
+            reader = BarData(services)
+            assert reader.current(asset, "price") == 101.0
+            history = reader.history(asset, ["price", "volume"], 2, "1d")
+            assert history.index.names == ["date", None]
+            assert history["price"].to_list() == [100.0, 101.0]
+            assert str(history["volume"].dtype) == "float64"
+
+result = Engine(DataFeed(prices_df=prices, feed_spec=spec), ReadPrices(),
+                BacktestConfig(calendar="NYSE"), runtime=services).run()
+assert result.to_fills_dataframe().is_empty()
+print("Zipline read containers preserve the native causal history.")
+```
+
+History requests require `"1d"` or `"1m"` matching the declared source grid,
+with OHLCV/price fields. The default uses native expected-bar windows; requesting
+before captured source coverage raises and requires warmup bars. Cross-frequency
+aggregation belongs in Data preparation. `history_view="prepared"` selects the
+[Data-prepared view](strategies.md#read-data-prepared-adjusted-history); it does
+not adjust executable prices. Asset, action and futures-account migration still
+requires the separate contracts below.
+
+Reads follow native causal visibility and explicit stale-view policies. In
+particular, a pre-open current read reports missing values rather than exposing
+a future daily close. The native Polars APIs remain available when a strategy
+needs their window and provenance fields. An `Asset` compares by its stable
+native key; use `int(asset)` only when an actual legacy integer SID was supplied.
+
 ## Match ledger and corporate-action assumptions
 
 `Engine` does not automatically turn arbitrary `split_ratio` or `cash_dividend`
@@ -163,9 +244,9 @@ actions, history queries or scheduling rules.
    basis. State each timestamp's timezone and whether it labels a bar open or
    close. Reconcile splits, dividend cash effects, missing bars, and exchange
    holidays before comparing trades.
-3. If the source uses `data.history`, compute each rolling input from bars
-   available at its decision time and pass it through `signals_df`. If it uses
-   `schedule_function`, map its date and time rules to actual feed event times
+3. If the source uses `data.history`, use the native causal read services or the
+   read adapter below; use Engineer for prepared feature panels. If it uses
+   `schedule_function`, map its date and time rules to native session callbacks
    and explicit [schedule metadata](rebalancing.md#schedule-metadata).
 4. Start with one asset and one order. Compare decision and submission times,
    fill times, quantities, prices, cash, and equity. Add target sizing, costs,

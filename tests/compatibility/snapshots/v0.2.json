@@ -666,6 +666,8 @@
     "from ml4t.backtest import run_backtest",
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
+    "from ml4t.backtest.compat.zipline.assets import Asset",
+    "from ml4t.backtest.compat.zipline.data import BarData",
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
     "from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode",
@@ -2634,6 +2636,38 @@
       "module": "ml4t.backtest.analytics.metrics",
       "qualname": "volatility",
       "signature": "(returns: collections.abc.Sequence[float] | numpy.ndarray, annualize: bool = True) -> float"
+    },
+    "ml4t.backtest.compat.zipline.assets:Asset": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "sid": {
+          "kind": "property",
+          "signature": "(self) -> int | str"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.assets",
+      "qualname": "Asset",
+      "signature": "(key: str, symbol: str | None = None, legacy_sid: int | None = None) -> None"
+    },
+    "ml4t.backtest.compat.zipline.data:BarData": {
+      "kind": "class",
+      "members": {
+        "current": {
+          "kind": "method",
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset], fields: str | collections.abc.Sequence[str]) -> Any"
+        },
+        "history": {
+          "kind": "method",
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset], fields: str | collections.abc.Sequence[str], bar_count: int, frequency: str) -> pandas.core.frame.DataFrame | pandas.core.series.Series"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.data",
+      "qualname": "BarData",
+      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str = <WindowUnit.EXPECTED_BAR: 'expected_bar'>) -> None"
     },
     "ml4t.backtest.config:BacktestConfig": {
       "kind": "class",

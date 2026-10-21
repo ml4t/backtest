@@ -57,6 +57,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "account-gatekeeper",
         "installation-import",
         "migration-zipline-target",
+        "zipline-read-shapes",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",
