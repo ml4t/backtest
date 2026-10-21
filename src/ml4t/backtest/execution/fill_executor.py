@@ -340,6 +340,8 @@ class FillExecutor:
             currency=broker._get_contract_currency(order.asset),
         )
         self.journal.fills.append(fill)
+        if self.account.corporate is not None and self.account.corporate.flat_deliveries:
+            self.account.corporate.flat_deliveries.pop(order.asset, None)
 
         # Determine if partial fill
         is_partial = order.order_id in self.orders.partial_quantities
@@ -427,9 +429,10 @@ class FillExecutor:
         if self.journal.fill_snapshots is not None:
             state, holdings = broker._portfolio_snapshot(include_holdings=True)
             if self.journal.corporate_receivable_snapshots is not None:
+                assert self.account.corporate is not None
                 self.journal.corporate_receivable_snapshots[
                     (current_time, len(self.journal.fills) - 1)
-                ] = self.account.corporate_receivable_value
+                ] = self.account.corporate.receivable_value
             assert holdings is not None
             self.journal.fill_snapshots.append(
                 (len(self.journal.fills) - 1, current_time, state, holdings)

@@ -33,7 +33,6 @@ class MarketState:
     asset_bars_seen: dict[str, int] = field(default_factory=dict)
     bar_index: int = 0
     observed_high_low: Callable[[str], tuple[float | None, float | None]] | None = None
-    action_adjusted_assets: set[str] = field(default_factory=set)
 
 
 @dataclass(slots=True)
@@ -71,6 +70,7 @@ class ExecutionJournal:
     recorded_values: dict[str, str] | None = None
     recorded_rows: list[tuple[datetime, int, str, str]] | None = None
     corporate_receivable_snapshots: dict[tuple[datetime, int | None], float] | None = None
+    completed_corporate_entitlements: list[dict[str, Any]] | None = None
     fill_snapshots: (
         list[tuple[int, datetime, tuple[float, float, float, float, int], list[tuple[Any, ...]]]]
         | None

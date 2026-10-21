@@ -74,16 +74,13 @@ class _Positions(Mapping[Asset, PositionView]):
 
     def _flat_distributions(self):
         broker = self.context._require_broker()
-        latest = {}
-        for entitlement in broker.account.corporate_entitlements.values():
-            if entitlement["paid"] and entitlement["destination_asset"] is not None:
-                latest[entitlement["destination_asset"]] = entitlement
+        corporate = broker.account.corporate
+        if corporate is None:
+            return {}
         return {
-            key: entry
-            for key, entry in latest.items()
-            if entry.get("delivered_position_quantity") == 0
-            and key not in broker.positions
-            and not any(fill.asset == key for fill in broker.fills[entry["delivery_fill_count"] :])
+            key: basis
+            for key, (_index, basis) in corporate.flat_deliveries.items()
+            if key not in broker.positions
         }
 
     def __getitem__(self, asset: Asset) -> PositionView:
@@ -91,12 +88,12 @@ class _Positions(Mapping[Asset, PositionView]):
         position = self.context._require_broker().get_position(asset.key)
         flat = self._flat_distributions().get(asset.key) if position is None else None
         if flat is not None:
-            return PositionView(
-                asset,
-                0.0,
-                flat["delivered_position_basis"],
-                self.context._require_broker().get_last_price(asset.key) or 0.0,
-            )
+            broker = self.context._require_broker()
+            mark = broker.get_mark_price(asset.key)
+            if mark is None:
+                mark = broker.get_last_price(asset.key)
+            return PositionView(asset, 0.0, flat, mark if mark is not None else 0.0)
+
         return PositionView(
             asset,
             position.quantity if position is not None else 0,

@@ -545,7 +545,9 @@ class Broker:
         state = self._portfolio_snapshot(include_holdings=include_holdings)
         receivables = self._execution_journal.corporate_receivable_snapshots
         if receivables is not None:
-            receivables[(timestamp, None)] = self.account.corporate_receivable_value
+            corporate = self.account.corporate
+            assert corporate is not None
+            receivables[(timestamp, None)] = corporate.receivable_value
         recorded = self._execution_journal.recorded_values
         if recorded is not None:
             rows = self._execution_journal.recorded_rows
@@ -1003,6 +1005,9 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "completed_entitlements_length": len(
+                self._execution_journal.completed_corporate_entitlements or []
+            ),
             "corporate_receivable_snapshots": dict(
                 self._execution_journal.corporate_receivable_snapshots
             )
@@ -1129,6 +1134,10 @@ class Broker:
             del self._execution_journal.recorded_rows[state["recorded_length"] :]
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
+        if self._execution_journal.completed_corporate_entitlements is not None:
+            del self._execution_journal.completed_corporate_entitlements[
+                state["completed_entitlements_length"] :
+            ]
         self._execution_journal.corporate_receivable_snapshots = state[
             "corporate_receivable_snapshots"
         ]
@@ -1384,6 +1393,11 @@ class Broker:
         use_open: bool = False,
     ) -> float | None:
         """Resolve a finite configured mark, returning None when unavailable."""
+        corporate = self.account.corporate
+        if corporate is not None:
+            adjusted = corporate.marks.get(asset)
+            if adjusted is not None:
+                return adjusted[0 if quantity is not None and quantity > 0 else 1]
         mark_side = None
         if self.mark_price == ExecutionPrice.QUOTE_SIDE and quantity is not None:
             mark_side = OrderSide.SELL if quantity > 0 else OrderSide.BUY
@@ -3093,10 +3107,11 @@ class Broker:
         if self.settlement_delay > 0:
             self.account.release_settled(self._bar_index)
 
-        if self._market_state.action_adjusted_assets:
-            self._market_state.action_adjusted_assets.difference_update(
-                asset for asset, price in prices.items() if isfinite(price)
-            )
+        corporate = self.account.corporate
+        if corporate is not None and corporate.marks:
+            for asset, price in prices.items():
+                if isfinite(price):
+                    corporate.marks.pop(asset, None)
         for asset, price in prices.items():
             if not isfinite(price):
                 continue

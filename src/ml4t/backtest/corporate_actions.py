@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from math import isfinite, trunc, ulp
@@ -13,8 +12,9 @@ import pandas as pd
 import polars as pl
 
 from ._temporal import temporal_rows
+from .accounting.account import CorporateState
 from .calendar import get_schedule
-from .config import ShareType
+from .config import ShareType, ShortCashPolicy
 from .types import AssetClass, OrderStatus, Position
 
 if TYPE_CHECKING:
@@ -107,7 +107,11 @@ class CorporateActionLedger:
         self.broker, self.config = broker, config
         self.policy = config.corporate_action_policy
         self.records: list[dict[str, Any]] = []
-        self.entitlements = broker.account.corporate_entitlements
+        broker.account.corporate = CorporateState()
+        broker._execution_journal.completed_corporate_entitlements = []
+        self.completed: list[dict[str, Any]] = (
+            broker._execution_journal.completed_corporate_entitlements
+        )
         self._cursor = 0
         self._events: list[tuple[datetime, int, _Action, str]] = []
         reference = timestamps[0] if timestamps else None
@@ -229,6 +233,16 @@ class CorporateActionLedger:
                 self._events.append((event.payment, 3, event, "payment"))
         self._events.sort(key=lambda item: (item[0], item[1], item[2].key))
 
+    @property
+    def state(self) -> CorporateState:
+        state = self.broker.account.corporate
+        assert state is not None
+        return state
+
+    @property
+    def entitlements(self) -> dict[tuple[str, str], dict[str, Any]]:
+        return self.state.entitlements
+
     def _clock(self, value: Any, reference: datetime | None) -> datetime:
         if isinstance(value, datetime):
             if reference is not None and (value.tzinfo is None) != (reference.tzinfo is None):
@@ -283,14 +297,6 @@ class CorporateActionLedger:
                 all_asset_stats=True,
                 target_intents=True,
             )
-            market = {
-                slot: (
-                    getattr(broker._market_state, slot)
-                    if slot == "observed_high_low"
-                    else deepcopy(getattr(broker._market_state, slot))
-                )
-                for slot in broker._market_state.__slots__
-            }
             length = len(self.records)
             try:
                 for _, _, event, operation in self._events[self._cursor : end]:
@@ -305,9 +311,6 @@ class CorporateActionLedger:
                 self.refresh()
             except Exception:
                 broker._restore_lifecycle_state(state)
-                for slot in broker._market_state.__slots__:
-                    setattr(broker._market_state, slot, market[slot])
-                self.entitlements = broker.account.corporate_entitlements
                 del self.records[length:]
                 raise
             self._cursor = end
@@ -320,29 +323,35 @@ class CorporateActionLedger:
             raise ValueError("Corporate action would make the cash ledger nonfinite")
         account.cash, account._lock_notional_free_cash = cash, free
 
-    def _rebase_mark(self, asset: str, *, ratio: float = 1.0, cash: float = 0.0) -> None:
+    def _mark(self, asset: str, quantity: float) -> float | None:
+        value = self.broker.get_mark_price(asset, quantity=quantity)
+        return value if value is not None else self.broker.get_last_price(asset)
+
+    def _rebase_mark(
+        self, asset: str, *, ratio: float = 1.0, cash: float = 0.0, short_cash: float | None = None
+    ) -> None:
+        long_mark, short_mark = self._mark(asset, 1.0), self._mark(asset, -1.0)
+        if long_mark is None or short_mark is None:
+            return
+        long_value = long_mark / ratio - cash
+        short_value = short_mark / ratio - (cash if short_cash is None else short_cash)
+        if not all(isfinite(value) and value >= 0 for value in [long_value, short_value]):
+            raise ValueError(
+                "Corporate action requires a finite nonnegative adjusted previous mark"
+            )
         market = self.broker._market_state
-        for field in (
-            "prices",
-            "opens",
-            "highs",
-            "lows",
-            "closes",
-            "vwaps",
-            "bids",
-            "asks",
-            "mids",
-            "last_prices",
-        ):
-            cache = getattr(market, field)
-            if asset in cache:
-                value = cache[asset] / ratio - cash
-                if not isfinite(value) or value <= 0:
-                    raise ValueError("Corporate action requires a positive adjusted previous mark")
-                updated = dict(cache)
-                updated[asset] = value
-                setattr(market, field, updated)
-        market.action_adjusted_assets.add(asset)
+        known = self.state.marks.get(asset)
+        observed = (
+            known[2]
+            if known is not None
+            else (
+                market.last_price_times.get(asset) if market.last_price_times is not None else None
+            )
+        )
+        self.state.marks[asset] = (long_value, short_value, observed)
+        position = self.broker.positions.get(asset)
+        if position is not None:
+            position.current_price = long_value if position.quantity > 0 else short_value
 
     def _split(self, event: _Action, instant: datetime) -> None:
         broker, row = self.broker, event.terms
@@ -432,6 +441,13 @@ class CorporateActionLedger:
                 quantity_after=order.quantity,
             )
         self._rebase_mark(asset, ratio=ratio)
+        flat = self.state.flat_deliveries.get(asset)
+        if flat is not None:
+            index, basis = flat
+            self.state.flat_deliveries[asset] = (
+                index,
+                round(basis / ratio, 2) if legacy else basis / ratio,
+            )
         self._record(
             event,
             instant,
@@ -475,10 +491,21 @@ class CorporateActionLedger:
         if row["action_kind"] in {"cash_dividend", "cash_distribution"}:
             adjustment = row["cash_per_share"]
         else:
-            mark = self.broker.get_last_price(row["destination_asset"])
-            if mark is None:
+            if row["destination_asset"] == row["asset"]:
+                self._rebase_mark(row["asset"], ratio=1 + row["quantity_ratio"])
+                return
+            long_mark = self._mark(row["destination_asset"], 1.0)
+            short_mark = self._mark(row["destination_asset"], -1.0)
+            if long_mark is None or short_mark is None:
+                if not quantity:
+                    return
                 raise ValueError("Distribution requires an observed destination mark")
-            adjustment = row["quantity_ratio"] * mark
+            self._rebase_mark(
+                row["asset"],
+                cash=row["quantity_ratio"] * long_mark,
+                short_cash=row["quantity_ratio"] * short_mark,
+            )
+            return
         self._rebase_mark(row["asset"], cash=adjustment)
 
     def _add_security(
@@ -488,13 +515,16 @@ class CorporateActionLedger:
             return 0.0, 0.0
         broker = self.broker
         existing = broker.positions.get(asset)
-        mark = broker.get_last_price(asset)
+        mark = self._mark(asset, quantity)
         if mark is None:
             raise ValueError("Security distribution requires an observed destination mark")
         total = quantity + (existing.quantity if existing is not None else 0.0)
         reported_basis = existing.commission_adjusted_cost_basis if existing is not None else None
         if not isfinite(total) or not isfinite(basis):
             raise ValueError("Security conversion would create nonfinite position terms")
+        self._short_collateral(
+            asset, existing.quantity if existing is not None else 0.0, total, basis
+        )
         realized = allocated = 0.0
         if existing is not None and existing.quantity * quantity < 0:
             closed = min(abs(existing.quantity), abs(quantity))
@@ -538,6 +568,36 @@ class CorporateActionLedger:
             broker.positions[asset]._commission_adjusted_cost_basis = reported_basis
         return realized, allocated
 
+    def _short_collateral(
+        self, asset: str, old_quantity: float, new_quantity: float, basis: float
+    ) -> None:
+        if (
+            self.config.allow_leverage
+            or self.broker.short_cash_policy is not ShortCashPolicy.LOCK_NOTIONAL
+        ):
+            return
+        account = self.broker.account
+        before = account._lock_notional_short_basis.get(asset, 0.0)
+        if new_quantity >= 0:
+            after = 0.0
+        elif old_quantity < 0:
+            after = (
+                before * min(1.0, abs(new_quantity / old_quantity))
+                + max(0.0, abs(new_quantity) - abs(old_quantity)) * basis
+            )
+        else:
+            after = abs(new_quantity) * basis
+        free = account._lock_notional_free_cash + 2 * (before - after)
+        if not isfinite(free) or not isfinite(after) or after < 0:
+            raise ValueError(
+                "Corporate conversion requires finite nonnegative short collateral basis"
+            )
+        account._lock_notional_free_cash = free
+        if after:
+            account._lock_notional_short_basis[asset] = after
+        else:
+            account._lock_notional_short_basis.pop(asset, None)
+
     def _pay(self, event: _Action, instant: datetime) -> None:
         entitlement = self.entitlements.get(event.key)
         if entitlement is None or entitlement["paid"]:
@@ -560,6 +620,7 @@ class CorporateActionLedger:
                 + entitlement.get("destination_commission", 0.0)
             )
         entitlement["paid"] = True
+        entitlement["receivable_value"] = 0.0
         if destination is not None:
             remaining = self.broker.positions.get(destination)
             entitlement["delivered_position_quantity"] = (
@@ -571,6 +632,15 @@ class CorporateActionLedger:
                 else prior_reported_basis
             )
             entitlement["delivery_fill_count"] = len(self.broker.fills)
+            if remaining is None:
+                self.state.flat_deliveries[destination] = (
+                    len(self.completed),
+                    entitlement["delivered_position_basis"],
+                )
+            else:
+                self.state.flat_deliveries.pop(destination, None)
+        self.completed.append(entitlement)
+        del self.entitlements[event.key]
         self._record(
             event,
             instant,
@@ -586,9 +656,24 @@ class CorporateActionLedger:
         position = broker.positions.get(row["asset"])
         quantity = position.quantity if position is not None else 0.0
         realized = commission = 0.0
+        for order in tuple(broker.pending_orders):
+            if order.asset == row["asset"]:
+                broker._cancel_order_at(
+                    order.order_id, timestamp=instant, reason="corporate_conversion"
+                )
+                self._record(
+                    event,
+                    instant,
+                    "order_cancellation",
+                    order_id=order.order_id,
+                    quantity_before=order.quantity,
+                    quantity_after=0.0,
+                )
+        self.state.converted_assets.add(row["asset"])
+        self.state.marks.pop(row["asset"], None)
+        self.state.flat_deliveries.pop(row["asset"], None)
         if position is not None:
-            if any(o.asset == row["asset"] for o in broker.pending_orders):
-                raise ValueError("Cancel source orders explicitly before a security conversion")
+            self._short_collateral(row["asset"], quantity, 0.0, 0.0)
             units = quantity * row["quantity_ratio"]
             self.entitlements[event.key] = {
                 "source": event.key[0],
@@ -604,7 +689,7 @@ class CorporateActionLedger:
                 "security_quantity": units,
                 "currency": row["currency"],
                 "paid": False,
-                "destination_basis": (position.entry_price - row["cash_component"])
+                "destination_basis": max(0.0, position.entry_price - row["cash_component"])
                 / row["quantity_ratio"]
                 if units
                 else 0.0,
@@ -612,6 +697,8 @@ class CorporateActionLedger:
             }
             if self.policy == "zipline_3_2":
                 realized = -quantity * position.entry_price - position.entry_commission
+            elif units:
+                realized = quantity * max(0.0, row["cash_component"] - position.entry_price)
             if not units:
                 commission = position.entry_commission
                 if self.policy == "declared_terms":
@@ -639,7 +726,9 @@ class CorporateActionLedger:
                     continue
                 recognized = entitlement["cash_amount"]
                 if entitlement["security_quantity"]:
-                    mark = self.broker.get_last_price(entitlement["destination_asset"])
+                    mark = self._mark(
+                        entitlement["destination_asset"], entitlement["security_quantity"]
+                    )
                     if mark is None:
                         raise ValueError(
                             "Security receivable requires an observed destination mark"
@@ -651,4 +740,4 @@ class CorporateActionLedger:
                     )
                 entitlement["receivable_value"] = recognized
                 value += recognized
-        self.broker.account.corporate_receivable_value = value
+        self.state.receivable_value = value

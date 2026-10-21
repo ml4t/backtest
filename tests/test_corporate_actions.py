@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ShortCashPolicy
 from ml4t.backtest.types import ContractSpec
 
 START = datetime(2025, 3, 3, 21, tzinfo=UTC)
@@ -206,3 +207,179 @@ def test_revision_published_after_the_original_effective_instant_cannot_erase_th
     later = action(split_ratio=2.0, revision_id="r2", available_at=TIMES[3], effective_at=TIMES[4])
     with pytest.raises(ValueError, match="Post-effective"):
         run_actions([old, later], [100, 100, 50, 50, 50])
+
+
+def conversion_run(
+    event, *, initial_b=0, b_price=160.0, buy_c=0, rebuy_source=False, policy="declared_terms"
+):
+    submitted = []
+
+    class Hold(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+                if initial_b:
+                    broker.submit_order("B", initial_b)
+            if timestamp == TIMES[3]:
+                if buy_c:
+                    submitted.append(broker.submit_order("C", buy_c))
+                if rebuy_source:
+                    submitted.append(broker.submit_order("A", 1))
+
+    prices = pl.DataFrame(
+        {
+            "timestamp": TIMES * 3,
+            "asset": ["A"] * 5 + ["B"] * 5 + ["C"] * 5,
+            "close": [100.0, 100.0, 80.0, 80.0, 80.0] + [float(b_price)] * 5 + [100.0] * 5,
+        }
+    )
+    config = BacktestConfig(
+        initial_cash=10000,
+        calendar=None,
+        allow_short_selling=True,
+        short_cash_policy=ShortCashPolicy.LOCK_NOTIONAL,
+        commission_rate=0,
+        slippage_rate=0,
+        corporate_action_policy=policy,
+    )
+    engine = Engine(
+        DataFeed(prices_df=prices, corporate_actions=pl.DataFrame([event]), input_manifest=RAW),
+        Hold(),
+        config,
+        holdings_sampling="bar",
+        contract_specs={a: ContractSpec(a) for a in ["A", "B", "C"]},
+    )
+    return engine, engine.run(), submitted
+
+
+def test_security_distribution_that_closes_a_short_releases_the_existing_collateral_for_real_orders():
+    event = action("stock_dividend", destination_asset="B", quantity_ratio=0.2, payment_at=TIMES[3])
+    engine, result, submitted = conversion_run(event, initial_b=-2, b_price=100, buy_c=90)
+    assert submitted[0].status.value == "filled"
+    assert engine.broker.get_position("C").quantity == 90
+    assert engine.broker.cash == 200
+    assert engine.broker.account._lock_notional_short_basis == {}
+    assert result.equity_curve[-1][1] == 10000
+
+
+def test_cash_conversion_cancels_source_orders_and_prevents_reentering_the_converted_identity():
+    event = action("merger", quantity_ratio=0.0, cash_component=120.0)
+    engine, result, submitted = conversion_run(event, rebuy_source=True)
+    assert submitted[0].status.value == "rejected"
+    assert submitted[0].rejection_code == "instrument_converted"
+    assert engine.broker.get_position("A") is None
+    assert len(result.fills) == 1
+    assert result.equity_curve[-1][1] == 10200
+
+
+@pytest.mark.parametrize("policy", ["declared_terms", "zipline_3_2"])
+def test_delayed_cash_and_security_conversion_conserves_cash_and_carries_book_basis(policy):
+    event = action(
+        "merger",
+        destination_asset="B",
+        quantity_ratio=0.5,
+        cash_component=20.0,
+        payment_at=TIMES[4],
+    )
+    engine, result, _ = conversion_run(event, b_price=160, policy=policy)
+    assert engine.broker.get_position("A") is None
+    assert engine.broker.get_position("B").quantity == 5
+    assert engine.broker.get_position("B").entry_price == 160
+    assert engine.broker.cash == 9200
+    assert result.equity_curve[-1][1] == 10000
+    assert len(result.fills) == 1
+
+
+def test_split_on_a_sparse_panel_retains_the_original_price_observation_time():
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+
+    frame = pl.DataFrame(
+        {"timestamp": TIMES[:3], "asset": ["A", "A", "B"], "close": [100.0, 100.0, 1.0]}
+    )
+    result = Engine(
+        DataFeed(
+            prices_df=frame,
+            corporate_actions=pl.DataFrame([action(split_ratio=2.0)]),
+            input_manifest=RAW,
+        ),
+        Buy(),
+        BacktestConfig(initial_cash=10000, calendar=None, commission_rate=0, slippage_rate=0),
+        contract_specs={"A": ContractSpec("A")},
+        holdings_sampling="bar",
+    ).run()
+    held = result.to_holdings_dataframe().filter(
+        (pl.col("timestamp") == TIMES[2]) & (pl.col("asset") == "A")
+    )
+    assert held["mark_source"].to_list() == ["action_adjusted_previous_mark"]
+    assert held["mark_timestamp"].to_list() == [TIMES[1]]
+    assert result.equity_curve[-1][1] == 10000
+    assert len(result.fills) == 1
+
+
+def test_own_share_dividend_rebases_only_the_account_mark_without_creating_a_future_quote():
+    from ml4t.specs import FeedSpec, LifecyclePhase
+
+    from ml4t.backtest import RuntimeServices
+    from ml4t.backtest.execution.schedule import RebalanceSchedule
+
+    runtime = RuntimeServices()
+    seen = []
+
+    def observe(timestamp, data, context, broker):
+        seen.append(
+            (
+                broker.get_account_value(),
+                runtime.market.current(["A"], ["close"], forward_fill=True)["close"][0],
+                broker.get_last_price("A"),
+                broker.account.total_equity,
+            )
+        )
+
+    runtime.scheduler.register(
+        observe,
+        phase=LifecyclePhase.INTRABAR,
+        at="clock",
+        schedule=RebalanceSchedule.explicit_timestamps([TIMES[2] - timedelta(hours=1)]),
+    )
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+
+    frame = pl.DataFrame(
+        {
+            "timestamp": TIMES,
+            "asset": ["A"] * 5,
+            "close": [100.0, 100.0, 100 / 1.2, 100 / 1.2, 100 / 1.2],
+        }
+    )
+    event = action(
+        "stock_dividend",
+        destination_asset="A",
+        quantity_ratio=0.2,
+        effective_at=TIMES[2] - timedelta(hours=2),
+        payment_at=TIMES[4],
+    )
+    result = Engine(
+        DataFeed(
+            prices_df=frame,
+            corporate_actions=pl.DataFrame([event]),
+            input_manifest=RAW,
+            feed_spec=FeedSpec(
+                calendar=None, time_contract_version=2, timestamp_semantics="event_time"
+            ),
+        ),
+        Buy(),
+        BacktestConfig(initial_cash=10000, calendar=None, commission_rate=0, slippage_rate=0),
+        contract_specs={"A": ContractSpec("A")},
+        runtime=runtime,
+    ).run()
+    assert seen[0][0] == pytest.approx(10000, rel=0, abs=1e-9)
+    assert seen[0][1] == 100
+    assert seen[0][2] == 100
+    assert seen[0][3] == pytest.approx(10000, rel=0, abs=1e-9)
+    assert result.equity_curve[-1][1] == pytest.approx(10000, rel=0, abs=1e-9)

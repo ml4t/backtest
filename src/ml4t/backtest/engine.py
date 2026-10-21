@@ -197,6 +197,7 @@ class Engine:
         )
         if self._corporate_actions is not None:
             self.broker._execution_journal.corporate_receivable_snapshots = {}
+            self.broker._market_state.last_price_times = {}
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -950,7 +951,15 @@ class Engine:
         action_entitlements = (
             None
             if self._corporate_actions is None
-            else deepcopy(list(self._corporate_actions.entitlements.values()))
+            else deepcopy(
+                sorted(
+                    [
+                        *self._corporate_actions.completed,
+                        *self._corporate_actions.entitlements.values(),
+                    ],
+                    key=lambda entry: (entry["entitlement_at"], entry["source"], entry["event_id"]),
+                )
+            )
         )
         receipt_snapshots = self.broker._execution_journal.corporate_receivable_snapshots
         action_receivables = (

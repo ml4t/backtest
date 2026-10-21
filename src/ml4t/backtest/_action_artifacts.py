@@ -98,6 +98,7 @@ def validate_action_tables(
         if row["operation"] not in {
             "split",
             "order_adjustment",
+            "order_cancellation",
             "entitlement",
             "payment",
             "merger",

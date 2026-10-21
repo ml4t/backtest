@@ -5763,7 +5763,7 @@
   ],
   "reference_source_revision": "cf649ac06fddce76f6caa2403cd8494ac84f72ad",
   "capture_assumptions": {
-    "native_publication": "Declared synthetic terms are available one day before the first captured close. This is a fixture declaration; Data export retains unknown original publication as null.",
+    "native_publication": "The synthetic terms are explicitly declared available at the first captured close, after the original civil declaration date and before the ex session. This is a caller fixture declaration; the original export retains unknown publication as null.",
     "currency": "The synthetic instruments and cash distributions are explicitly denominated in USD. This declaration is separate from exported unknown currency.",
     "share_basis": "Cash dividend and stock eligibility uses pre-event shares.",
     "prices": "Session labels map to captured original physical closes; no implicit timezone or guessed availability."
@@ -5778,7 +5778,7 @@
       "share_basis"
     ],
     "supplemental_declarations": {
-      "native_publication": "Declared synthetic terms are available one day before the first captured close. This is a fixture declaration; Data export retains unknown original publication as null.",
+      "native_publication": "The synthetic terms are explicitly declared available at the first captured close, after the original civil declaration date and before the ex session. This is a caller fixture declaration; the original export retains unknown publication as null.",
       "currency": "The synthetic instruments and cash distributions are explicitly denominated in USD. This declaration is separate from exported unknown currency.",
       "share_basis": "Cash dividend and stock eligibility uses pre-event shares.",
       "prices": "Session labels map to captured original physical closes; no implicit timezone or guessed availability."

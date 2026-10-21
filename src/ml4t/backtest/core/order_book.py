@@ -145,6 +145,10 @@ class OrderBook:
         if control_request is not None:
             broker._commit_control_order(control_request)
 
+        if self.account.corporate is not None and asset in self.account.corporate.converted_assets:
+            order.reject("Instrument was converted by a corporate action", "instrument_converted")
+            return order
+
         # Immediate fill: same-bar market orders fill during submit_order()
         # instead of being queued for later _process_orders(). Each order
         # validates against real cash (no shadow), matching LEAN's atomic

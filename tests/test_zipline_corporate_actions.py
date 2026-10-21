@@ -207,9 +207,7 @@ def test_unknown_terms_in_the_actual_data_export_are_rejected_before_strategy_st
     feed, assets = prepared_feed(reference, declarations=False)
     if known_terms:
         feed.corporate_actions = feed.corporate_actions.with_columns(
-            pl.lit(pd.Timestamp(reference["closes"][0]) - pd.Timedelta(days=1)).alias(
-                "available_at"
-            )
+            pl.lit(pd.Timestamp(reference["closes"][0])).alias("available_at")
         )
     started = []
 

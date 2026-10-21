@@ -31,10 +31,10 @@ class PortfolioLedger:
 
     def position_mark(self, asset: str, position: Position) -> tuple[float, str, datetime | None]:
         price = self.broker.get_mark_price(asset, quantity=position.quantity)
-        if asset in self.market.action_adjusted_assets:
-            adjusted = price if price is not None else self.broker.get_last_price(asset)
-            if adjusted is not None:
-                return adjusted, "action_adjusted_previous_mark", self.market.time
+        corporate = self.account.corporate
+        adjusted = corporate.marks.get(asset) if corporate is not None else None
+        if adjusted is not None and price is not None:
+            return price, "action_adjusted_previous_mark", adjusted[2]
         if price is not None:
             return price, self.broker.mark_price.value, self.market.time
         price = self.broker.get_last_price(asset)
@@ -76,7 +76,13 @@ class PortfolioLedger:
                     )
                 )
         return (
-            cash + net + self.account.corporate_receivable_value,
+            cash
+            + net
+            + (
+                self.account.corporate.receivable_value
+                if self.account.corporate is not None
+                else 0.0
+            ),
             cash,
             gross,
             net,
@@ -84,7 +90,9 @@ class PortfolioLedger:
         ), holdings
 
     def get_account_value(self) -> float:
-        value = self.account.cash + self.account.corporate_receivable_value
+        value = self.account.cash + (
+            self.account.corporate.receivable_value if self.account.corporate is not None else 0.0
+        )
         for asset, pos in self.account.positions.items():
             price = self.broker.get_mark_price(asset, quantity=pos.quantity)
             if price is None:
