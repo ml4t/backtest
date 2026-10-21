@@ -30,6 +30,7 @@ class AuxiliaryData:
         feed_spec: FeedSpec | Any,
         known_at_cols: Mapping[str, str],
         preparation: Mapping[str, Any] | None = None,
+        eligible_cols: Mapping[str, str] | None = None,
     ) -> None:
         if not isinstance(source_id, str) or not source_id.strip():
             raise ValueError("Auxiliary source_id must identify the original offline source")
@@ -63,12 +64,22 @@ class AuxiliaryData:
             for field, column in known.items()
         ):
             raise ValueError("Every auxiliary payload field needs an explicit known-at column")
-        required = list(dict.fromkeys([time, entity, *known, *known.values()]))
+        eligible = dict(eligible_cols or {})
+        if any(
+            field not in known or not isinstance(column, str) or not column
+            for field, column in eligible.items()
+        ):
+            raise ValueError(
+                "Auxiliary eligibility requires declared payload fields and Boolean columns"
+            )
+        required = list(dict.fromkeys([time, entity, *known, *known.values(), *eligible.values()]))
         if set(required) - set(frame.columns):
             raise ValueError(
                 "Auxiliary input is missing declared key, value or publication columns"
             )
         frame = frame.select(required)
+        if any(frame.schema[column] != pl.Boolean for column in eligible.values()):
+            raise ValueError("Auxiliary eligibility columns must be Boolean")
         for column in [time, *known.values()]:
             dtype = frame.schema[column]
             if not isinstance(dtype, pl.Datetime) or dtype.time_zone is None:
@@ -83,10 +94,12 @@ class AuxiliaryData:
         frame.write_ipc(stream)
         self._frame, self._spec, self._known = frame.clone(), spec, known
         self._source_id = source_id
+        self._eligible = eligible
         self._metadata = {
             "source_id": source_id,
             "feed_spec": spec.to_dict(),
             "known_at_cols": dict(known),
+            "eligible_cols": dict(eligible),
             "content_sha256": sha256(stream.getvalue()).hexdigest(),
             "preparation": deepcopy(dict(preparation or {})),
         }
@@ -106,6 +119,10 @@ class AuxiliaryData:
     @property
     def known_at_cols(self) -> dict[str, str]:
         return dict(self._known)
+
+    @property
+    def eligible_cols(self) -> dict[str, str]:
+        return dict(self._eligible)
 
     @property
     def metadata(self) -> dict[str, Any]:

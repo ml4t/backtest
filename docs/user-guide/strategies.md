@@ -317,6 +317,18 @@ become broker prices, traded volume or trading events. For a Zipline `fetch_csv`
 port, register the captured source with its original URL; parsing and preprocessing
 remain explicit preparation steps.
 
+Auxiliary sources can declare `eligible_cols={"score": "eligible"}` alongside
+`known_at_cols`. The eligibility columns must be Boolean. False or unknown
+eligibility hides the associated payload at its publication cutoff and prevents
+an older value from being carried forward across that exclusion. The source
+producer supplies the mask; Backtest computes no membership or feature values.
+
+For sources needed only by one run, use
+`with services.auxiliary_scope((source,)):` around `Engine(..., runtime=services).run()`.
+The scope must begin before binding the engine. It preserves the caller's input
+registry after completion or errors, permits repeated references to the same
+frozen source object, and rejects a different source using an existing identifier.
+
 ### Resolve dated instruments and enforce their lifetimes
 
 Pass Data's offline `InstrumentRegistry` and the same `FeedSpec` used to construct

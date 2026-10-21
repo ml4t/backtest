@@ -376,3 +376,75 @@ def test_native_market_payload_cannot_replace_its_requested_fill_provenance():
         BacktestConfig(calendar=None),
         runtime=runtime,
     ).run()
+
+
+def test_auxiliary_eligibility_blocks_orders_and_prevents_stale_values_crossing_exclusion():
+    from datetime import UTC, datetime
+
+    clocks = [datetime(2025, 7, 2, 14, minute, tzinfo=UTC) for minute in [0, 1, 2]]
+    source = bt.AuxiliaryData(
+        "screened-panel",
+        pl.DataFrame(
+            {
+                "timestamp": clocks[:2],
+                "asset": ["A", "A"],
+                "score": [10.0, 20.0],
+                "known": clocks[:2],
+                "eligible": [True, False],
+            }
+        ),
+        feed_spec={
+            "timestamp_semantics": "event_time",
+            "calendar": None,
+            "time_contract_version": 2,
+            "entity_col": "asset",
+        },
+        known_at_cols={"score": "known"},
+        eligible_cols={"score": "eligible"},
+    )
+    runtime = RuntimeServices(auxiliary=(source,))
+    seen = []
+
+    class Trade(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            value = runtime.auxiliary("screened-panel").current(
+                ["A"], ["score"], forward_fill=True
+            )["score"][0]
+            seen.append(value)
+            if value is not None:
+                broker.submit_order("A", 1)
+
+    prices = pl.DataFrame({"timestamp": clocks, "asset": ["A"] * 3, "close": [100.0] * 3})
+    result = Engine(
+        DataFeed(prices_df=prices, feed_spec={"timestamp_semantics": "event_time"}),
+        Trade(),
+        BacktestConfig(calendar=None, execution_mode=ExecutionMode.SAME_BAR),
+        runtime=runtime,
+    ).run()
+    assert seen == [10.0, None, None]
+    assert result.to_fills_dataframe()["quantity"].to_list() == [1.0]
+    assert source.metadata["eligible_cols"] == {"score": "eligible"}
+
+
+def test_scoped_auxiliary_sources_restore_caller_inputs_after_success_and_binding_error():
+    runtime = RuntimeServices()
+    source = _source()
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            runtime.auxiliary(SOURCE).current(["A"], ["score"])
+
+    def execute():
+        return Engine(_feed(), Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+
+    with runtime.auxiliary_scope((source, source)):
+        execute()
+    with pytest.raises(ValueError, match="No prepared auxiliary"):
+        execute()
+    with (
+        pytest.raises(ValueError, match="Duplicate auxiliary"),
+        runtime.auxiliary_scope((source, _source())),
+    ):
+        pass
+    with pytest.raises(ValueError, match="No prepared auxiliary"):
+        execute()

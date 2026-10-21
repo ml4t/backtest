@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timedelta
 from math import isfinite
@@ -751,6 +752,30 @@ class RuntimeServices:
             raise ValueError(f"No prepared auxiliary source registered for {source_id!r}")
         return self._auxiliary_views[source_id]
 
+    @contextmanager
+    def auxiliary_scope(self, sources: Sequence[AuxiliaryData]) -> Iterator[RuntimeServices]:
+        """Temporarily include frozen sources while preserving the caller's registry.
+
+        Enter before Engine.run; normal binding/unbinding owns the active views.
+        Repeated references to the same source object share one registry entry.
+        A different source with an existing identifier is a conflict.
+        """
+        if self._engine is not None:
+            raise RuntimeError("Auxiliary input scope requires an inactive runtime")
+        previous = dict(self._auxiliary_sources)
+        try:
+            for source in sources:
+                if not isinstance(source, AuxiliaryData):
+                    raise TypeError("auxiliary scope requires frozen AuxiliaryData sources")
+                existing = self._auxiliary_sources.get(source.source_id)
+                if existing is not None and existing is not source:
+                    raise ValueError("Duplicate auxiliary source identifier in scope")
+                self._auxiliary_sources[source.source_id] = source
+            yield self
+        finally:
+            self._auxiliary_sources.clear()
+            self._auxiliary_sources.update(previous)
+
     def _bind(self, engine: Engine) -> None:
         if self._engine is not None:
             raise RuntimeError("RuntimeServices already belongs to an active run")
@@ -842,6 +867,7 @@ class RuntimeServices:
                     feed_spec=source.feed_spec,
                     owner=market,
                     known_at_cols=source.known_at_cols,
+                    eligible_cols=source.eligible_cols,
                     quote_fields=False,
                 )
                 if view._timestamps:

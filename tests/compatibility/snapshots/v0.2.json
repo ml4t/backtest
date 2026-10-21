@@ -4015,6 +4015,10 @@
     "ml4t.backtest:AuxiliaryData": {
       "kind": "class",
       "members": {
+        "eligible_cols": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, str]"
+        },
         "feed_spec": {
           "kind": "property",
           "signature": "(self) -> ml4t.specs.market_data.FeedSpec"
@@ -4038,7 +4042,7 @@
       },
       "module": "ml4t.backtest.auxiliary",
       "qualname": "AuxiliaryData",
-      "signature": "(source_id: str, frame: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any, known_at_cols: collections.abc.Mapping[str, str], preparation: collections.abc.Mapping[str, Any] | None = None) -> None"
+      "signature": "(source_id: str, frame: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any, known_at_cols: collections.abc.Mapping[str, str], preparation: collections.abc.Mapping[str, Any] | None = None, eligible_cols: collections.abc.Mapping[str, str] | None = None) -> None"
     },
     "ml4t.backtest:BacktestConfig": {
       "kind": "class",
@@ -4860,6 +4864,10 @@
         "auxiliary": {
           "kind": "method",
           "signature": "(self, source_id: 'str') -> 'AuxiliaryDataView'"
+        },
+        "auxiliary_scope": {
+          "kind": "method",
+          "signature": "(self, sources: 'Sequence[AuxiliaryData]') -> 'Iterator[RuntimeServices]'"
         },
         "market": {
           "kind": "property",
