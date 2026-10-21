@@ -15,6 +15,7 @@ try:
 except ImportError:
     __version__ = "0.0.0.dev0"
 
+from .auxiliary import AuxiliaryData
 from .broker import Broker
 from .config import BacktestConfig, CommissionType
 from .datafeed import DataFeed
@@ -82,6 +83,7 @@ __all__ = [
     "Broker",
     "Strategy",
     "RuntimeServices",
+    "AuxiliaryData",
     "Engine",
     "run_backtest",
     "BacktestConfig",

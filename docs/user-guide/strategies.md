@@ -249,6 +249,74 @@ assert result.to_equity_dataframe()["timestamp"].to_list() == dates
 print("History windows retain the gap without creating an executable bar.")
 ```
 
+### Read a frozen auxiliary source
+
+`AuxiliaryData` registers a prepared research table under its original source
+identifier. Prepare downloads, date parsing, dated symbol mapping and preprocessing
+before the run. Reuse Data's preparation APIs when they own those operations.
+Backtest stores a copy of the declared columns and their input-content hash; it
+performs no network request or implicit symbol substitution.
+
+Supply the existing `FeedSpec` with physical observation instants, one stable
+entity column, and an explicit `known_at_cols` entry for each payload field.
+Unknown publication times remain unavailable. Duplicate observation/entity keys
+raise; resolve revisions or economically distinct events upstream instead of
+silently keeping one row. Polars, lazy Polars and named-column/index Pandas inputs
+are supported. Saved CSV or Parquet inputs can use the same route after explicit
+schema/date parsing. Preserve timezone and nanosecond precision during preparation.
+
+<!-- ml4t-doc-test: runtime-auxiliary-source -->
+```python
+from datetime import UTC, datetime, timedelta
+import polars as pl
+from ml4t.specs import FeedSpec
+from ml4t.backtest import AuxiliaryData, BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+
+source_id = "https://example.org/research/captured.csv"
+first = datetime(2025, 1, 6, 21, tzinfo=UTC)
+second = first + timedelta(days=1)
+source = AuxiliaryData(
+    source_id,
+    pl.DataFrame({"observed": [first], "asset": ["TEST"],
+                  "score": [10.0], "published": [second]}),
+    feed_spec=FeedSpec(timestamp_col="observed", entity_col="asset",
+                       timestamp_semantics="event_time", calendar=None),
+    known_at_cols={"score": "published"},
+    preparation={"symbol_mapping": "captured stable IDs", "timezone": "UTC"},
+)
+services = RuntimeServices(auxiliary=[source])
+seen = []
+
+class ReadResearch(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        view = services.auxiliary(source_id)
+        seen.append(view.current(["TEST"], ["score"], forward_fill=True)["score"][0])
+
+prices = pl.DataFrame({"timestamp": [first, second], "asset": ["TEST"] * 2,
+                       "close": [100.0, 101.0]})
+result = Engine(DataFeed(prices_df=prices, feed_spec={"timestamp_semantics": "event_time"}),
+                ReadResearch(), BacktestConfig(calendar=None), runtime=services).run()
+assert seen == [None, 10.0]
+assert result.to_fills_dataframe().is_empty()
+print("Auxiliary publication does not create an executable quote or market event.")
+```
+
+`services.auxiliary(source_id)` requires an exact registered identifier. Its
+`current`, `history` and `last_observed` methods expose only declared payload
+fields; publication and undeclared columns cannot be queried as values.
+`history` supports observation and elapsed windows. Forward filling is explicit
+and can use per-field policies and `max_age`, as with feature reads. A request
+that combines a payload name with the same generated `field_observed_at`
+provenance name raises rather than overwriting either value.
+
+The view's `assets` contains stable keys with at least one published observation
+known so far. Its `metadata` returns a copy of the source identifier, preparation
+declarations, input-content hash, field mappings and `FeedSpec`. Views expire
+when their owning run ends, including empty-source views. Auxiliary values never
+become broker prices, traded volume or trading events. For a Zipline `fetch_csv`
+port, register the captured source with its original URL; parsing and preprocessing
+remain explicit preparation steps.
+
 ### Resolve dated instruments and enforce their lifetimes
 
 Pass Data's offline `InstrumentRegistry` and the same `FeedSpec` used to construct

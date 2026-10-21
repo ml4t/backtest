@@ -625,6 +625,7 @@
     "from ml4t.backtest import AssetClass, BacktestConfig, BacktestResult, ContractSpec, DataFeed, Engine",
     "from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine",
     "from ml4t.backtest import AssetClass, ContractSpec",
+    "from ml4t.backtest import AuxiliaryData, BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy",
     "from ml4t.backtest import BacktestConfig",
     "from ml4t.backtest import BacktestConfig, CommissionType",
     "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine",
@@ -2104,6 +2105,7 @@
     "Broker",
     "Strategy",
     "RuntimeServices",
+    "AuxiliaryData",
     "Engine",
     "run_backtest",
     "BacktestConfig",
@@ -3846,6 +3848,34 @@
       "qualname": "AssetClass",
       "signature": "(*values)"
     },
+    "ml4t.backtest:AuxiliaryData": {
+      "kind": "class",
+      "members": {
+        "feed_spec": {
+          "kind": "property",
+          "signature": "(self) -> ml4t.specs.market_data.FeedSpec"
+        },
+        "frame": {
+          "kind": "property",
+          "signature": "(self) -> polars.dataframe.frame.DataFrame"
+        },
+        "known_at_cols": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, str]"
+        },
+        "metadata": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, Any]"
+        },
+        "source_id": {
+          "kind": "property",
+          "signature": "(self) -> str"
+        }
+      },
+      "module": "ml4t.backtest.auxiliary",
+      "qualname": "AuxiliaryData",
+      "signature": "(source_id: str, frame: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.core.frame.DataFrame, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any, known_at_cols: collections.abc.Mapping[str, str], preparation: collections.abc.Mapping[str, Any] | None = None) -> None"
+    },
     "ml4t.backtest:BacktestConfig": {
       "kind": "class",
       "members": {
@@ -4651,6 +4681,10 @@
           "kind": "property",
           "signature": "(self) -> 'InstrumentView'"
         },
+        "auxiliary": {
+          "kind": "method",
+          "signature": "(self, source_id: 'str') -> 'AuxiliaryDataView'"
+        },
         "market": {
           "kind": "property",
           "signature": "(self) -> 'MarketDataView'"
@@ -4662,7 +4696,7 @@
       },
       "module": "ml4t.backtest.runtime",
       "qualname": "RuntimeServices",
-      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
+      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None, auxiliary: 'Sequence[AuxiliaryData]' = (), instruments: 'InstrumentSource | None' = None, instrument_feed_spec: 'FeedSpec | Any | None' = None, inactive_position_policy: \"Literal['retain_last_mark', 'require_flat']\" = 'retain_last_mark') -> 'None'"
     },
     "ml4t.backtest:StopFillMode": {
       "kind": "class",

@@ -16,6 +16,7 @@ from ml4t.specs import FeedSpec, TimestampSemantics, WindowUnit
 from ._history_clock import expected_times, session_times
 from ._instruments import InstrumentSource, InstrumentView
 from ._temporal import temporal_frame, temporal_row, temporal_rows
+from .auxiliary import AuxiliaryData
 from .execution.callbacks import SessionScheduler
 
 if TYPE_CHECKING:
@@ -196,6 +197,14 @@ class MarketDataView:
             )
         return True
 
+    def _check_active(self) -> None:
+        if (
+            self._runtime._engine is None
+            or self._runtime._market is not self._owner
+            or self._asof is None
+        ):
+            raise RuntimeError("market services require an active run")
+
     def _query(
         self,
         assets: Sequence[str],
@@ -205,12 +214,8 @@ class MarketDataView:
         forward_fill: bool | Mapping[str, bool],
         max_age: timedelta | None = None,
     ) -> pl.DataFrame:
-        if (
-            self._runtime._engine is None
-            or self._runtime._market is not self._owner
-            or self._asof is None
-        ):
-            raise RuntimeError("market services require an active run")
+        self._check_active()
+        assert self._asof is not None
         if isinstance(assets, str) or isinstance(fields, str) or not assets or not fields:
             raise ValueError("assets and fields must be nonempty sequences")
         if len(set(assets)) != len(assets) or len(set(fields)) != len(fields):
@@ -229,6 +234,10 @@ class MarketDataView:
             fill_fields = [field for field in fields if forward_fill.get(field, False)]
         else:
             raise ValueError("forward_fill must be Boolean or a per-field mapping")
+        if {f"{field}_observed_at" for field in fill_fields} & set(fields):
+            raise ValueError(
+                "Forward-fill provenance columns collide with requested payload fields"
+            )
         for field in fields:
             if self._column(field) not in self._columns and field not in self._roles:
                 raise ValueError(f"Unknown market field {field!r}")
@@ -389,12 +398,8 @@ class MarketDataView:
             )
         if view != "raw":
             raise ValueError("history view must be raw or prepared")
-        if (
-            self._runtime._engine is None
-            or self._runtime._market is not self._owner
-            or self._asof is None
-        ):
-            raise RuntimeError("market services require an active run")
+        self._check_active()
+        assert self._asof is not None
         unit = WindowUnit(unit)
         if unit is WindowUnit.ELAPSED:
             if (
@@ -424,6 +429,7 @@ class MarketDataView:
         else:
             assert bar_count is not None
             engine = self._runtime._engine
+            assert engine is not None
             select = expected_times if unit is WindowUnit.EXPECTED_BAR else session_times
             times = select(engine.config, self._asof, bar_count, self._inclusive, self._timestamps)
         return self._query(assets, fields, times, forward_fill=forward_fill, max_age=max_age)
@@ -444,12 +450,8 @@ class MarketDataView:
             )
         if view != "raw":
             raise ValueError("current view must be raw or prepared")
-        if (
-            self._runtime._engine is None
-            or self._runtime._market is not self._owner
-            or self._asof is None
-        ):
-            raise RuntimeError("market services require an active run")
+        self._check_active()
+        assert self._asof is not None
         stale_view = forward_fill is True or (
             isinstance(forward_fill, Mapping)
             and any(value is True for value in forward_fill.values())
@@ -458,12 +460,8 @@ class MarketDataView:
         return self._query(assets, fields, times, forward_fill=forward_fill, max_age=max_age)
 
     def _past_rows(self, asset: str):
-        if (
-            self._runtime._engine is None
-            or self._runtime._market is not self._owner
-            or self._asof is None
-        ):
-            raise RuntimeError("market services require an active run")
+        self._check_active()
+        assert self._asof is not None
         times = self._times.get(asset, [])
         end = bisect_right(times, self._asof)
         if not self._inclusive and end and times[end - 1] == self._asof:
@@ -584,6 +582,74 @@ class FeatureDataView:
         return self._view.last_observed(asset, field)
 
 
+class AuxiliaryDataView(FeatureDataView):
+    """Research-only fields from one frozen source at the active decision cutoff."""
+
+    def __init__(self, view: MarketDataView, source: AuxiliaryData) -> None:
+        super().__init__(view)
+        self._source = source
+
+    def _fields(self, fields: Sequence[str]) -> None:
+        if set(fields) - self._source.known_at_cols.keys():
+            raise ValueError("Auxiliary queries require declared payload fields")
+
+    def current(
+        self,
+        assets: Sequence[str],
+        fields: Sequence[str],
+        *,
+        forward_fill: bool | Mapping[str, bool] = False,
+        max_age: timedelta | None = None,
+    ) -> pl.DataFrame:
+        self._fields(fields)
+        return super().current(assets, fields, forward_fill=forward_fill, max_age=max_age)
+
+    def history(
+        self,
+        assets: Sequence[str],
+        fields: Sequence[str],
+        *,
+        bar_count: int | None = None,
+        unit: WindowUnit | str = WindowUnit.OBSERVATION,
+        duration: timedelta | None = None,
+        forward_fill: bool | Mapping[str, bool] = False,
+        max_age: timedelta | None = None,
+    ) -> pl.DataFrame:
+        self._fields(fields)
+        return super().history(
+            assets,
+            fields,
+            bar_count=bar_count,
+            unit=unit,
+            duration=duration,
+            forward_fill=forward_fill,
+            max_age=max_age,
+        )
+
+    def last_observed(self, asset: str, field: str) -> datetime | None:
+        self._fields([field])
+        return super().last_observed(asset, field)
+
+    @property
+    def assets(self) -> tuple[Any, ...]:
+        """Stable keys with at least one published observation known so far."""
+        self._view._check_active()
+        return tuple(
+            asset
+            for asset in self._view._times
+            if any(
+                self._view._available(field, row)
+                for _, row in self._view._past_rows(asset)
+                for field in self._source.known_at_cols
+            )
+        )
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        self._view._check_active()
+        return self._source.metadata
+
+
 class RuntimeServices:
     """Explicit run-scoped services without changing Strategy attributes or context.
 
@@ -601,6 +667,7 @@ class RuntimeServices:
         signal_known_at_cols: dict[str, str] | None = None,
         context_known_at_cols: dict[str, str] | None = None,
         signal_eligible_cols: dict[str, str] | None = None,
+        auxiliary: Sequence[AuxiliaryData] = (),
         instruments: InstrumentSource | None = None,
         instrument_feed_spec: FeedSpec | Any | None = None,
         inactive_position_policy: Literal["retain_last_mark", "require_flat"] = "retain_last_mark",
@@ -633,6 +700,13 @@ class RuntimeServices:
             raise ValueError(
                 "instruments requires causal lifetimes/resolve methods and instrument_feed_spec"
             )
+        prepared_auxiliary = tuple(auxiliary)
+        if any(not isinstance(source, AuxiliaryData) for source in prepared_auxiliary):
+            raise TypeError("auxiliary must contain frozen AuxiliaryData sources")
+        if len({source.source_id for source in prepared_auxiliary}) != len(prepared_auxiliary):
+            raise ValueError("Duplicate auxiliary source identifiers")
+        self._auxiliary_sources = {source.source_id: source for source in prepared_auxiliary}
+        self._auxiliary_views: dict[str, AuxiliaryDataView] = {}
         self.instruments = instruments
         self.instrument_feed_spec = (
             FeedSpec.from_any(instrument_feed_spec) if instruments is not None else None
@@ -668,6 +742,14 @@ class RuntimeServices:
         if self._signals is None:
             raise ValueError("Signal queries require a signals frame")
         return self._signals
+
+    def auxiliary(self, source_id: str) -> AuxiliaryDataView:
+        """Look up the exact registered offline source; never fetch or substitute data."""
+        if self._engine is None:
+            raise RuntimeError("auxiliary services require an active run")
+        if source_id not in self._auxiliary_views:
+            raise ValueError(f"No prepared auxiliary source registered for {source_id!r}")
+        return self._auxiliary_views[source_id]
 
     def _bind(self, engine: Engine) -> None:
         if self._engine is not None:
@@ -752,6 +834,25 @@ class RuntimeServices:
         self._engine, self._market = engine, market
         self._signals = signals
         try:
+            for source_id, source in self._auxiliary_sources.items():
+                view = MarketDataView(
+                    self,
+                    engine,
+                    prices=source.frame,
+                    feed_spec=source.feed_spec,
+                    owner=market,
+                    known_at_cols=source.known_at_cols,
+                    quote_fields=False,
+                )
+                if view._timestamps:
+                    assert market._asof is not None
+                    try:
+                        _ = view._timestamps[0] <= market._asof
+                    except TypeError as exc:
+                        raise ValueError(
+                            "Auxiliary and simulation clock timezones must be compatible"
+                        ) from exc
+                self._auxiliary_views[source_id] = AuxiliaryDataView(view, source)
             if self.instruments is not None:
                 assert self.instrument_feed_spec is not None
                 self._assets = InstrumentView(
@@ -767,6 +868,7 @@ class RuntimeServices:
                 self._assets = None
             self._engine, self._market = None, None
             self._signals = None
+            self._auxiliary_views.clear()
             raise
 
     def _accepts(self, timestamp: datetime) -> bool:
@@ -854,3 +956,4 @@ class RuntimeServices:
             self._assets = None
         self._engine, self._market = None, None
         self._signals = None
+        self._auxiliary_views.clear()
