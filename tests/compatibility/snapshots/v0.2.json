@@ -680,6 +680,7 @@
     "from ml4t.backtest.compat.zipline.api import get_environment",
     "from ml4t.backtest.compat.zipline.api import order, record, set_commission, set_slippage, symbol",
     "from ml4t.backtest.compat.zipline.assets import Asset",
+    "from ml4t.backtest.compat.zipline.assets import Future",
     "from ml4t.backtest.compat.zipline.data import BarData",
     "from ml4t.backtest.compat.zipline.finance import commission, slippage",
     "from ml4t.backtest.compat.zipline.finance.asset_restrictions import HistoricalRestrictions",
@@ -2728,7 +2729,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "set_commission",
-      "signature": "(model: Any = None, *, us_equities: Any = None) -> None"
+      "signature": "(model: Any = None, *, us_equities: Any = None, us_futures: Any = None) -> None"
     },
     "ml4t.backtest.compat.zipline.api:set_slippage": {
       "kind": "function",
@@ -2757,6 +2758,18 @@
       "module": "ml4t.backtest.compat.zipline.assets",
       "qualname": "Asset",
       "signature": "(key: str, symbol: str | None = None, legacy_sid: int | None = None) -> None"
+    },
+    "ml4t.backtest.compat.zipline.assets:Future": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.assets",
+      "qualname": "Future",
+      "signature": "(key: str, symbol: str | None = None, legacy_sid: int | None = None, *, root_symbol: str, multiplier: float, tick_size: float) -> None"
     },
     "ml4t.backtest.compat.zipline.data:BarData": {
       "kind": "class",
@@ -2913,7 +2926,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.runner",
       "qualname": "run_algorithm",
-      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, csv_sources: 'Sequence[PreparedCSV]' = (), benchmark: 'BenchmarkData | None' = None, history_view: \"Literal['raw', 'prepared']\" = 'raw', history_unit: 'WindowUnit | str | None' = None, history_sources: 'Mapping[str, str] | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
+      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, csv_sources: 'Sequence[PreparedCSV]' = (), benchmark: 'BenchmarkData | None' = None, history_view: \"Literal['raw', 'prepared']\" = 'raw', history_unit: 'WindowUnit | str | None' = None, history_sources: 'Mapping[str, str] | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
     },
     "ml4t.backtest.compat.zipline:to_performance_frame": {
       "kind": "function",
@@ -4428,6 +4441,10 @@
     "ml4t.backtest:Broker": {
       "kind": "class",
       "members": {
+        "allows_price_execution": {
+          "kind": "property",
+          "signature": "(self) -> 'bool'"
+        },
         "buy": {
           "kind": "method",
           "signature": "(self, asset: 'str', shares: 'float | None' = None, contracts: 'int | None' = None, amount: 'float | None' = None, dollars: 'float | None' = None, order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"

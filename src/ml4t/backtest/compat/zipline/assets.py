@@ -1,6 +1,7 @@
 """Immutable migration identifiers, separate from dated symbol lookup."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from math import isfinite
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -50,3 +51,20 @@ class Asset:
         if self.legacy_sid is None:
             raise TypeError("No legacy integer sid was declared for this native asset")
         return self.legacy_sid
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class Future(Asset):
+    """Explicit dated-contract facts; identity remains the native stable key."""
+
+    root_symbol: str = field(kw_only=True)
+    multiplier: float = field(kw_only=True)
+    tick_size: float = field(kw_only=True)
+
+    def __post_init__(self) -> None:
+        Asset.__post_init__(self)
+        if not isinstance(self.root_symbol, str) or not self.root_symbol:
+            raise ValueError("A future requires its declared root_symbol")
+        for value in (self.multiplier, self.tick_size):
+            if isinstance(value, bool) or not isfinite(value) or value <= 0:
+                raise ValueError("Future multiplier and tick_size must be finite and positive")

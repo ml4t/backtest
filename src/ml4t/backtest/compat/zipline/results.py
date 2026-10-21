@@ -8,7 +8,7 @@ import pandas as pd
 
 from ..._temporal import temporal_rows, timestamp_values
 from ...result import BacktestResult
-from .assets import Asset
+from .assets import Asset, Future
 
 
 def to_performance_frame(
@@ -26,7 +26,7 @@ def to_performance_frame(
     if assets is None:
         declared = declaration.get("assets")
         assets = (
-            [Asset(**row) for row in declared]
+            [(Future(**row) if "root_symbol" in row else Asset(**row)) for row in declared]
             if declared is not None
             else [Asset(key) for key in sorted({fill.asset for fill in result.fills})]
         )

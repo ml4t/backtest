@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 from ._scope import current
-from .assets import Asset
+from .assets import Asset, Future
 from .csv import PreparedCSV
 from .events import _DateRule, _TimeRule
 from .events import calendars as calendars
@@ -30,6 +30,10 @@ def sid(sid: int) -> Asset:
     return current().sid(sid)
 
 
+def future_symbol(symbol: str) -> Future:
+    return current().future_symbol(symbol)
+
+
 def order(
     asset: Asset,
     amount: float,
@@ -48,8 +52,8 @@ def get_datetime(tz: str | None = None) -> pd.Timestamp:
     return current().get_datetime(tz)
 
 
-def set_commission(model: Any = None, *, us_equities: Any = None) -> None:
-    current().set_commission(model, us_equities=us_equities)
+def set_commission(model: Any = None, *, us_equities: Any = None, us_futures: Any = None) -> None:
+    current().set_commission(model, us_equities=us_equities, us_futures=us_futures)
 
 
 def set_slippage(model: Any = None, *, us_equities: Any = None) -> None:

@@ -1163,6 +1163,80 @@ explicitly for the quadratic cumulative-participation method, `FixedSlippage`
 for a fixed spread, or `NoSlippage` for zero impact with positive observed
 volume. These adapter choices leave native Backtest defaults unchanged.
 
+### Declare futures contracts and per-order costs
+
+Use `Future` for a dated contract whose root, multiplier and tick size are
+known. `PreparedAssetLookup` also builds these objects from Data's exported
+`zipline_futures` table. `future_symbol("ESH25")` resolves only declared
+contracts; it does not infer a root, select a continuous series or discover a
+bundle. Equity `symbol` lookup remains separate. These frozen bundle facts do
+not establish when historical instrument metadata was published; use the
+native instrument service when causal eligibility is required.
+
+`set_commission(us_futures=PerContract(cost, exchange_fee, min_trade_cost))`
+compiles to native `AssetCommission` and `PerOrderCommission`.
+`PerFutureTrade(cost)` charges its fixed amount once per order. Scalar and
+root-symbol mappings are supported. A partial fill pays only the additional
+cumulative fee due. The contract multiplier affects value sizing and P&L,
+and does not multiply the per-contract fee.
+
+<!-- ml4t-doc-test: declared-future-costs -->
+```python
+from datetime import datetime, timezone
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Future
+from ml4t.backtest.compat.zipline.finance import commission, slippage
+
+contract = Future("contract:8", "ESH25", 8, root_symbol="ES",
+                  multiplier=50., tick_size=.25)
+prices = pl.DataFrame({
+    "timestamp": [datetime(2025, 3, d, 21, tzinfo=timezone.utc) for d in [3, 4, 5, 6]],
+    "asset": [contract.key] * 4, "close": [100.] * 4, "volume": [2.] * 4,
+})
+def initialize(context):
+    context.sent = False
+    context.set_commission(us_futures=commission.PerContract({"ES": 2.}, {"ES": 3.}, 8.))
+    context.set_slippage(slippage.VolumeShareSlippage(volume_limit=.5, price_impact=0))
+def handle_data(context, data):
+    if not context.sent:
+        context.order(context.future_symbol("ESH25"), 3)
+        context.sent = True
+
+performance = run_algorithm(
+    feed=DataFeed(prices_df=prices, feed_spec={"calendar": None,
+        "time_contract_version": 2, "timestamp_semantics": "event_time"}),
+    assets=[contract], initialize=initialize, handle_data=handle_data)
+result = performance.attrs["backtest_result"]
+assert result.to_fills_dataframe()["quantity"].to_list() == [1., 1., 1.]
+assert result.to_fills_dataframe()["commission"].to_list() == [8., 0., 1.]
+assert performance["portfolio_value"].iloc[-1] == 99991.
+assert performance["cash"].iloc[-1] == 84991.
+print("Declared contract units and incremental fees verified.")
+```
+
+`run_algorithm(contract_specs=...)` passes explicit native specifications to
+the Engine. A supplied specification for a `Future` must agree on asset class,
+multiplier and tick size; margin and currency remain explicitly configurable.
+Conflicts fail before initialization. Saved native results preserve the
+declared `Future` facts when projected back to a performance frame.
+
+The adapter's default futures commission uses the frozen published 3.2.0
+cost of 0.85 per contract and its root exchange-fee table. Missing root entries
+in cost mappings use 0.85; missing exchange/trade-fee entries use that frozen
+table. An unknown root requires an explicit fee. These are reference
+reproduction values, not current exchange quotations. Explicit values should
+describe the account being simulated.
+
+The published 3.2.0 comparison uses the same four physical closes and actual
+exported Data contract facts, with one contract per bar to isolate fees. It
+checks mixed equity/futures NAV and fees, scalar/root mappings, fallback
+options and saved-result identity. This does not establish default futures
+slippage, rolling or variation-cash parity. The example explicitly chooses
+volume-share slippage, and its cash follows the native signed-notional method
+described in [ledger assumptions](#match-ledger-and-corporate-action-assumptions).
+
 ### Separate stale reads from executable quotes
 
 The callback runner selects `BarData(read_policy="zipline")`. In this read

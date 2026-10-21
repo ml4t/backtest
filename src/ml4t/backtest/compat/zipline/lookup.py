@@ -14,7 +14,7 @@ import pandas as pd
 import polars as pl
 
 from ..._temporal import temporal_rows
-from .assets import Asset
+from .assets import Asset, Future
 
 
 def _symbol_parts(symbol: str) -> tuple[str, str]:
@@ -52,7 +52,7 @@ class PreparedAssetLookup:
         source_id = getattr(snapshot, "snapshot_id", None)
         if not isinstance(tables, Mapping) or not isinstance(source_id, str) or not source_id:
             raise TypeError("Use a verified Data InputSnapshot with tables and snapshot_id")
-        required = {
+        equity_required = {
             "zipline_equities": {"source_sid", "asset", "symbol", "exchange"},
             "zipline_symbol_lookup": {
                 "sid",
@@ -62,6 +62,22 @@ class PreparedAssetLookup:
                 "end_date",
             },
         }
+        required = equity_required if "zipline_equities" in tables else {}
+        if "zipline_futures" in tables:
+            required = {
+                **required,
+                "zipline_futures": {
+                    "source_sid",
+                    "asset",
+                    "symbol",
+                    "root_symbol",
+                    "multiplier",
+                    "tick_size",
+                    "exchange",
+                },
+            }
+        if not required:
+            raise ValueError("Asset lookup requires exported equities or futures")
         for name, fields in required.items():
             if not isinstance(tables.get(name), pl.DataFrame) or fields - set(tables[name].columns):
                 raise ValueError(f"Symbol lookup requires exported {name} fields {sorted(fields)}")
@@ -73,19 +89,47 @@ class PreparedAssetLookup:
             countries = dict(exchanges.select("exchange", "country_code").iter_rows())
         by_sid = {}
         country_by_sid = {}
-        for row in temporal_rows(tables["zipline_equities"], named=True):
+        for row in temporal_rows(tables.get("zipline_equities", pl.DataFrame()), named=True):
             sid = row["source_sid"]
             if isinstance(sid, bool) or not isinstance(sid, int) or sid in by_sid:
                 raise ValueError("Exported equity source SIDs must be unique integers")
             by_sid[sid] = Asset(row["asset"], row["symbol"], sid)
             country_by_sid[sid] = countries.get(row["exchange"])
-        if not by_sid or len({asset.key for asset in by_sid.values()}) != len(by_sid):
-            raise ValueError("Exported equities require known unique stable asset keys")
         grouped = defaultdict(list)
         facts = []
-        for row in temporal_rows(tables["zipline_symbol_lookup"], named=True):
+        for row in temporal_rows(tables.get("zipline_futures", pl.DataFrame()), named=True):
+            sid = row["source_sid"]
+            if isinstance(sid, bool) or not isinstance(sid, int) or sid in by_sid:
+                raise ValueError("Exported asset source SIDs must be unique integers")
+            asset = Future(
+                row["asset"],
+                row["symbol"],
+                sid,
+                root_symbol=row["root_symbol"],
+                multiplier=row["multiplier"],
+                tick_size=row["tick_size"],
+            )
+            by_sid[sid] = asset
+            facts.append(
+                {
+                    "asset": asset.key,
+                    "sid": sid,
+                    "symbol": asset.symbol,
+                    "root_symbol": asset.root_symbol,
+                    "multiplier": asset.multiplier,
+                    "tick_size": asset.tick_size,
+                }
+            )
+        if not by_sid or len({asset.key for asset in by_sid.values()}) != len(by_sid):
+            raise ValueError("Exported assets require known unique stable asset keys")
+        for row in temporal_rows(tables.get("zipline_symbol_lookup", pl.DataFrame()), named=True):
             sid = row["sid"]
-            if isinstance(sid, bool) or not isinstance(sid, int) or sid not in by_sid:
+            if (
+                isinstance(sid, bool)
+                or not isinstance(sid, int)
+                or sid not in by_sid
+                or isinstance(by_sid[sid], Future)
+            ):
                 raise ValueError("Ownership interval references an unexported source SID")
             company, share = row["company_symbol"], row["share_class_symbol"]
             if not isinstance(company, str) or not company or not isinstance(share, str):

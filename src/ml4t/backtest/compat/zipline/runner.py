@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from math import isfinite
 from typing import Any, Literal
@@ -33,10 +33,11 @@ from ...controls import (
 from ...core.shared import SubmitOrderOptions
 from ...execution.limits import PositiveVolumeLimit, SharedVolumeParticipationLimit
 from ...execution.sizing import quantity_for_value, quantity_to_target, round_quantity
+from ...models import AssetCommission, PercentageCommission, PerOrderCommission
 from ...sessions import SessionConfig
-from ...types import Order, OrderSide, OrderStatus
+from ...types import AssetClass, ContractSpec, Order, OrderSide, OrderStatus
 from ._scope import callback_scope
-from .assets import Asset
+from .assets import Asset, Future
 from .controls import _register_account_controls, _TradingRule
 from .csv import PreparedCSV
 from .data import BarData
@@ -145,6 +146,7 @@ class MigrationContext:
         self._account_controls: list[tuple[str, float, timedelta | None]] = []
         self._restrictions: Restrictions = NoRestrictions()
         self._slippage: Any = slippage.FixedBasisPointsSlippage()
+        self._futures_commission = commission.PerContract(0.85, {})
         self._set_commission(commission.PerShare())
         self.portfolio = _Portfolio(self)
 
@@ -242,7 +244,9 @@ class MigrationContext:
         matches = [
             asset
             for asset in self._by_key.values()
-            if asset.symbol is not None and _symbol_parts(asset.symbol) == parts
+            if not isinstance(asset, Future)
+            and asset.symbol is not None
+            and _symbol_parts(asset.symbol) == parts
         ]
         if len(matches) != 1:
             raise ValueError(f"Symbol {symbol_str!r} has no unique explicit asset mapping")
@@ -268,6 +272,20 @@ class MigrationContext:
         matches = [asset for asset in self._by_key.values() if asset.legacy_sid == sid]
         if len(matches) != 1:
             raise ValueError(f"SID {sid!r} has no explicit asset mapping")
+        return matches[0]
+
+    def future_symbol(self, symbol: str) -> Future:
+        if not isinstance(symbol, str) or not symbol:
+            raise ValueError("future_symbol requires a nonempty contract symbol")
+        matches = [
+            asset
+            for asset in self._by_key.values()
+            if isinstance(asset, Future)
+            and asset.symbol is not None
+            and asset.symbol.upper() == symbol.upper()
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"Future {symbol!r} has no unique explicit contract mapping")
         return matches[0]
 
     def order(
@@ -633,14 +651,47 @@ class MigrationContext:
         else:
             raise TypeError("Use a declared migration commission model")
 
-    def set_commission(self, model: Any = None, *, us_equities: Any = None) -> None:
+    def set_commission(
+        self, model: Any = None, *, us_equities: Any = None, us_futures: Any = None
+    ) -> None:
         self._setup_only()
         if model is not None and us_equities is not None:
             raise ValueError("Declare the equity commission once, positionally or as us_equities")
         model = us_equities if us_equities is not None else model
-        if model is None:
-            return
-        self._set_commission(model)
+        if model is not None:
+            self._set_commission(model)
+        if us_futures is not None:
+            if not isinstance(us_futures, commission.PerContract | commission.PerFutureTrade):
+                raise TypeError("Use PerContract or PerFutureTrade for us_futures commissions")
+            self._futures_commission = us_futures
+
+    def _compile_commission(self) -> AssetCommission | None:
+        futures = [asset for asset in self._by_key.values() if isinstance(asset, Future)]
+        if not futures:
+            return None
+        config = self._config
+        equity = (
+            PercentageCommission(config.commission_rate)
+            if config.commission_type == CommissionType.PERCENTAGE
+            else PerOrderCommission(
+                per_share=config.commission_per_share,
+                per_trade=config.commission_per_trade,
+                minimum=config.commission_minimum,
+            )
+        )
+        models = {
+            asset.key: commission._future_model(self._futures_commission, asset.root_symbol)
+            for asset in futures
+        }
+        config.metadata["migration_future_fees"] = {
+            key: {
+                "per_contract": model.per_share,
+                "exchange_or_trade": model.per_trade,
+                "minimum": model.minimum,
+            }
+            for key, model in models.items()
+        }
+        return AssetCommission(models, default=equity)
 
     def set_slippage(self, model: Any = None, *, us_equities: Any = None) -> None:
         self._setup_only()
@@ -764,6 +815,7 @@ def run_algorithm(
     history_view: Literal["raw", "prepared"] = "raw",
     history_unit: WindowUnit | str | None = None,
     history_sources: Mapping[str, str] | None = None,
+    contract_specs: dict[str, ContractSpec] | None = None,
     start: date | datetime | str | None = None,
     end: date | datetime | str | None = None,
 ) -> pd.DataFrame:
@@ -783,6 +835,20 @@ def run_algorithm(
         assets = asset_lookup.assets
     if assets is None:
         raise ValueError("Declare assets or a PreparedAssetLookup")
+    specs = dict(contract_specs or {})
+    for asset in assets:
+        if isinstance(asset, Future):
+            declared = ContractSpec(
+                asset.key, AssetClass.FUTURE, multiplier=asset.multiplier, tick_size=asset.tick_size
+            )
+            supplied = specs.get(asset.key)
+            if supplied is not None and (
+                supplied.asset_class != declared.asset_class
+                or supplied.multiplier != declared.multiplier
+                or supplied.tick_size != declared.tick_size
+            ):
+                raise ValueError(f"ContractSpec conflicts with declared Future {asset.key!r}")
+            specs.setdefault(asset.key, declared)
     config = BacktestConfig(
         feed_spec=feed.feed_spec,
         initial_cash=capital_base,
@@ -858,10 +924,7 @@ def run_algorithm(
         }
 
     config.metadata["migration_result"] = {
-        "assets": [
-            {"key": asset.key, "symbol": asset.symbol, "legacy_sid": asset.legacy_sid}
-            for asset in assets
-        ],
+        "assets": [asdict(asset) for asset in assets],
         "order_id_prefix": context._order_prefix,
     }
     with _borrow_window(runtime, bounded_start, bounded_end, execution_windows):
@@ -880,6 +943,7 @@ def run_algorithm(
             else "not_declared",
         }
         limits = context._execution_limits()
+        fees = context._compile_commission()
         if context._pipelines:
             config.metadata["migration_pipelines"] = {
                 name: {"definition": state.definition.metadata, "eager": state.eager}
@@ -915,6 +979,8 @@ def run_algorithm(
                 config,
                 runtime=runtime,
                 execution_limits=limits,
+                commission_model=fees,
+                contract_specs=specs,
                 benchmark=context._benchmark,
                 holdings_sampling="bar",
             ).run()

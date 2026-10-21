@@ -116,7 +116,7 @@ class Engine:
             runtime
             if runtime is not None
             else RuntimeServices()
-            if feed.feature_metadata is not None
+            if getattr(feed, "feature_metadata", None) is not None
             else None
         )
         self.holdings_sampling = holdings_sampling

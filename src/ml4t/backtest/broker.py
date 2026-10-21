@@ -1172,11 +1172,16 @@ class Broker:
         )
         return self._scheduled_session_open, inclusive
 
+    @property
+    def allows_price_execution(self) -> bool:
+        """Whether the current callback scope permits fills on observed prices."""
+        return self._scheduled_price_event
+
     def _may_fill_immediately(self) -> bool:
         from ml4t.specs import LifecyclePhase
 
         return (
-            self._scheduled_price_event
+            self.allows_price_execution
             and self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN
         )
 

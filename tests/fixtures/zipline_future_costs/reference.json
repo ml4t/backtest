@@ -1,0 +1,410 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "scope": "Original Engine mixed equity/future fee calculation, flat100 prices, explicit one-unit-per-bar custom slippage isolates cost definitions; NYSE synthetic future declared for this fee-only test, no futures exchange/default-slippage parity claimed",
+  "methods": {
+    "cost_fallback": {
+      "trace": [
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 0,
+              "commission": 0.0
+            },
+            {
+              "sid": 8,
+              "filled": 0,
+              "commission": 0.0
+            }
+          ],
+          "cash": 100000.0,
+          "nav": 100000.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 1,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 1,
+              "commission": 3.85
+            }
+          ],
+          "cash": 99895.15,
+          "nav": 99995.15
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 2,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 2,
+              "commission": 4.7
+            }
+          ],
+          "cash": 99794.29999999999,
+          "nav": 99994.29999999999
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 3,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 3,
+              "commission": 5.55
+            }
+          ],
+          "cash": 99693.44999999998,
+          "nav": 99993.44999999998
+        }
+      ],
+      "nav": [
+        100000.0,
+        99995.15,
+        99994.29999999999,
+        99993.44999999998
+      ],
+      "cash": [
+        100000.0,
+        99895.15,
+        99794.29999999999,
+        99693.44999999998
+      ]
+    },
+    "exchange_fallback": {
+      "trace": [
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 0,
+              "commission": 0.0
+            },
+            {
+              "sid": 8,
+              "filled": 0,
+              "commission": 0.0
+            }
+          ],
+          "cash": 100000.0,
+          "nav": 100000.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 1,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 1,
+              "commission": 3.1799999999999997
+            }
+          ],
+          "cash": 99895.82,
+          "nav": 99995.82
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 2,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 2,
+              "commission": 5.18
+            }
+          ],
+          "cash": 99793.82,
+          "nav": 99993.82
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 3,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 3,
+              "commission": 7.18
+            }
+          ],
+          "cash": 99691.82,
+          "nav": 99991.82
+        }
+      ],
+      "nav": [
+        100000.0,
+        99995.82,
+        99993.82,
+        99991.82
+      ],
+      "cash": [
+        100000.0,
+        99895.82,
+        99793.82,
+        99691.82
+      ]
+    },
+    "default": {
+      "trace": [
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 0,
+              "commission": 0.0
+            },
+            {
+              "sid": 8,
+              "filled": 0,
+              "commission": 0.0
+            }
+          ],
+          "cash": 100000.0,
+          "nav": 100000.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 1,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 1,
+              "commission": 2.03
+            }
+          ],
+          "cash": 99896.97,
+          "nav": 99996.97
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 2,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 2,
+              "commission": 2.88
+            }
+          ],
+          "cash": 99796.12,
+          "nav": 99996.12
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 3,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 3,
+              "commission": 3.7299999999999995
+            }
+          ],
+          "cash": 99695.26999999999,
+          "nav": 99995.26999999999
+        }
+      ],
+      "nav": [
+        100000.0,
+        99996.97,
+        99996.12,
+        99995.26999999999
+      ],
+      "cash": [
+        100000.0,
+        99896.97,
+        99796.12,
+        99695.26999999999
+      ]
+    },
+    "trade_fallback": {
+      "trace": [
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 0,
+              "commission": 0.0
+            },
+            {
+              "sid": 8,
+              "filled": 0,
+              "commission": 0.0
+            }
+          ],
+          "cash": 100000.0,
+          "nav": 100000.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 1,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 1,
+              "commission": 1.18
+            }
+          ],
+          "cash": 99897.82,
+          "nav": 99997.82
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 2,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 2,
+              "commission": 1.18
+            }
+          ],
+          "cash": 99797.82,
+          "nav": 99997.82
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 3,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 3,
+              "commission": 1.18
+            }
+          ],
+          "cash": 99697.82,
+          "nav": 99997.82
+        }
+      ],
+      "nav": [
+        100000.0,
+        99997.82,
+        99997.82,
+        99997.82
+      ],
+      "cash": [
+        100000.0,
+        99897.82,
+        99797.82,
+        99697.82
+      ]
+    }
+  },
+  "closes": [
+    "2025-03-03T21:00:00+00:00",
+    "2025-03-04T21:00:00+00:00",
+    "2025-03-05T21:00:00+00:00",
+    "2025-03-06T21:00:00+00:00"
+  ],
+  "timing_claim": false,
+  "snapshot_id": "125ce52e5b47708d4209995eabaee253522e86f587a9ead97de3d8af0b262ee4",
+  "producer_version": "0.2.2.dev21+gc3b9db80a",
+  "exchange_fees": {
+    "AD": 1.6,
+    "AI": 0.96,
+    "BD": 1.5,
+    "BO": 1.95,
+    "BP": 1.6,
+    "CD": 1.6,
+    "CL": 1.5,
+    "CM": 1.03,
+    "CN": 1.95,
+    "DJ": 1.5,
+    "EC": 1.6,
+    "ED": 1.25,
+    "EE": 1.5,
+    "EI": 1.5,
+    "EL": 1.5,
+    "ER": 0.65,
+    "ES": 1.18,
+    "ET": 1.5,
+    "EU": 1.5,
+    "FC": 2.03,
+    "FF": 0.96,
+    "FI": 0.56,
+    "FS": 1.5,
+    "FV": 0.65,
+    "GC": 1.5,
+    "HG": 1.5,
+    "HO": 1.5,
+    "HU": 1.5,
+    "JE": 0.16,
+    "JY": 1.6,
+    "LB": 2.03,
+    "LC": 2.03,
+    "LH": 2.03,
+    "MB": 1.5,
+    "MD": 1.5,
+    "ME": 1.6,
+    "MG": 1.5,
+    "MI": 1.18,
+    "MS": 1.03,
+    "MW": 1.03,
+    "ND": 1.5,
+    "NG": 1.5,
+    "NK": 2.15,
+    "NQ": 1.18,
+    "NZ": 1.6,
+    "OA": 1.95,
+    "PA": 1.5,
+    "PB": 1.5,
+    "PL": 1.5,
+    "QG": 0.5,
+    "QM": 1.2,
+    "RM": 1.5,
+    "RR": 1.95,
+    "SB": 2.1,
+    "SF": 1.6,
+    "SM": 1.95,
+    "SP": 2.4,
+    "SV": 1.5,
+    "SY": 1.95,
+    "TB": 1.5,
+    "TN": 0.56,
+    "TS": 1.5,
+    "TU": 1.5,
+    "TY": 0.75,
+    "UB": 0.85,
+    "US": 0.8,
+    "VX": 1.5,
+    "WC": 1.95,
+    "XB": 1.5,
+    "XG": 0.75,
+    "YM": 1.5,
+    "YS": 0.75
+  }
+}
