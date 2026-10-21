@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -27,6 +28,15 @@ class _Action:
     terms: dict[str, Any]
     effective: datetime
     payment: datetime | None
+
+
+def action_terms_json(terms: dict[str, Any]) -> str:
+    def date_value(value: Any) -> str:
+        if isinstance(value, date):
+            return value.isoformat()
+        raise TypeError(f"Nonportable action term: {type(value).__name__}")
+
+    return json.dumps(terms, default=date_value, sort_keys=True, allow_nan=False)
 
 
 def _number(row: dict[str, Any], key: str, *, positive: bool = False) -> float:
@@ -188,6 +198,7 @@ class CorporateActionLedger:
                 if payment < effective:
                     raise ValueError("Action payment_date precedes entitlement")
             key = row["source"], row["event_id"]
+            action_terms_json(row)
             versions.setdefault(key, []).append(_Action(key, row, effective, payment))
         for candidates in versions.values():
             candidates.sort(
@@ -241,6 +252,10 @@ class CorporateActionLedger:
                 asset=event.terms["asset"],
                 action_kind=event.terms["action_kind"],
                 operation=operation,
+                available_at=event.terms["available_at"],
+                effective_at=event.effective,
+                payment_at=event.payment,
+                terms_json=action_terms_json(event.terms),
                 **({"cash_delta": 0.0} | values),
             )
         )
@@ -529,20 +544,24 @@ class CorporateActionLedger:
 
     def refresh(self) -> None:
         value = 0.0
+        for entitlement in self.entitlements.values():
+            entitlement["receivable_value"] = 0.0
         if self.policy == "declared_terms":
             for entitlement in self.entitlements.values():
                 if entitlement["paid"]:
                     continue
-                value += entitlement["cash_amount"]
+                recognized = entitlement["cash_amount"]
                 if entitlement["security_quantity"]:
                     mark = self.broker.get_last_price(entitlement["destination_asset"])
                     if mark is None:
                         raise ValueError(
                             "Security receivable requires an observed destination mark"
                         )
-                    value += (
+                    recognized += (
                         entitlement["security_quantity"]
                         * mark
                         * self.broker.get_multiplier(entitlement["destination_asset"])
                     )
+                entitlement["receivable_value"] = recognized
+                value += recognized
         self.broker.account.corporate_receivable_value = value

@@ -195,6 +195,8 @@ class Engine:
             if actions is not None
             else None
         )
+        if self._corporate_actions is not None:
+            self.broker._execution_journal.corporate_receivable_snapshots = {}
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -948,6 +950,19 @@ class Engine:
             if self._corporate_actions is None
             else deepcopy(list(self._corporate_actions.entitlements.values()))
         )
+        receipt_snapshots = self.broker._execution_journal.corporate_receivable_snapshots
+        action_receivables = (
+            None
+            if receipt_snapshots is None
+            else [
+                receipt_snapshots[(row[0], metadata[2])]
+                for row, metadata in zip(
+                    observed_account,
+                    observation_metadata or [("bar", False, None)] * len(observed_account),
+                    strict=True,
+                )
+            ]
+        )
 
         if not self.equity_curve:
             # Return empty result for no-data case
@@ -978,6 +993,7 @@ class Engine:
                 capital_changes=list(self.capital_changes),
                 corporate_actions=action_records,
                 corporate_entitlements=action_entitlements,
+                corporate_receivables=action_receivables,
             )
 
         # Build EquityCurve from raw data
@@ -1098,6 +1114,7 @@ class Engine:
             trades=all_trades,  # Includes both closed and open trades
             corporate_actions=action_records,
             corporate_entitlements=action_entitlements,
+            corporate_receivables=action_receivables,
             equity_curve=list(self.equity_curve),
             fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),

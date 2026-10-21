@@ -123,3 +123,54 @@ def test_raw_action_against_adjusted_prices_is_rejected_before_execution():
                 pass
 
         Engine(feed, Cash(), BacktestConfig(calendar=None))
+
+
+@pytest.mark.parametrize("policy", ["declared_terms", "zipline_3_2"])
+def test_action_artifact_keeps_paid_lineage_and_actual_receivables_without_fabricating_legacy_history(
+    tmp_path, policy
+):
+    from ml4t.backtest.result import BacktestResult
+
+    _, result, _ = run_actions(
+        [action("cash_dividend", cash_per_share=1.0, payment_date=TIMES[4])],
+        [100, 100, 99, 99, 99],
+        policy=policy,
+        sell=True,
+    )
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.to_actions_dataframe().equals(result.to_actions_dataframe())
+    assert restored.to_entitlements_dataframe().equals(result.to_entitlements_dataframe())
+    account = restored.to_portfolio_state_dataframe()
+    assert account["receivables_value"].to_list() == (
+        [0, 0, 10, 10, 0] if policy == "declared_terms" else [0] * 5
+    )
+    assert (
+        account["equity"].to_list()
+        == (account["cash"] + account["net_exposure"] + account["receivables_value"]).to_list()
+    )
+    terms = __import__("json").loads(restored.to_actions_dataframe()["terms_json"][0])
+    assert terms["cash_per_share"] == 1
+    assert terms["available_at"] == (TIMES[0] - timedelta(days=1)).isoformat()
+
+
+@pytest.mark.no_invariant_check
+def test_artifact_rejects_a_payment_journal_omission_from_the_actual_engine_producer(
+    monkeypatch, tmp_path
+):
+    from ml4t.backtest.corporate_actions import CorporateActionLedger
+    from ml4t.backtest.result import ArtifactWriteError
+
+    original = CorporateActionLedger._record
+
+    def lose_payment(self, event, timestamp, operation, **values):
+        if operation != "payment":
+            original(self, event, timestamp, operation, **values)
+
+    monkeypatch.setattr(CorporateActionLedger, "_record", lose_payment)
+    _, result, _ = run_actions(
+        [action("cash_dividend", cash_per_share=1.0, payment_date=TIMES[4])], [100, 100, 99, 99, 99]
+    )
+    with pytest.raises(ArtifactWriteError, match="incomplete"):
+        result.to_parquet(tmp_path)
+    assert not list(tmp_path.iterdir())

@@ -543,6 +543,9 @@ class Broker:
 
     def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
         state = self._portfolio_snapshot(include_holdings=include_holdings)
+        receivables = self._execution_journal.corporate_receivable_snapshots
+        if receivables is not None:
+            receivables[(timestamp, None)] = self.account.corporate_receivable_value
         recorded = self._execution_journal.recorded_values
         if recorded is not None:
             rows = self._execution_journal.recorded_rows
@@ -1000,6 +1003,9 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
+            "corporate_receivable_snapshots": copy.deepcopy(
+                self._execution_journal.corporate_receivable_snapshots
+            ),
             "rebalance_counter": self._rebalance_counter,
             "original_asset_stats_keys": set(self._asset_stats),
             "asset_stats": {},
@@ -1121,6 +1127,9 @@ class Broker:
             del self._execution_journal.recorded_rows[state["recorded_length"] :]
         del self._execution_journal.fills[state["fills_length"] :]
         del self._execution_journal.trades[state["trades_length"] :]
+        self._execution_journal.corporate_receivable_snapshots = state[
+            "corporate_receivable_snapshots"
+        ]
         if self._execution_journal.fill_snapshots is not None:
             del self._execution_journal.fill_snapshots[state["fill_snapshots_length"] :]
 
