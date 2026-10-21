@@ -21,11 +21,14 @@ from ...config import (
     FillOrdering,
     SlippageType,
 )
+from ...controls import OrderConstraints, OrderRequestCount, TradingControl
+from ...core.shared import SubmitOrderOptions
 from ...execution.limits import PositiveVolumeLimit, SharedVolumeParticipationLimit
 from ...execution.sizing import quantity_for_value, quantity_to_target, round_quantity
 from ...types import Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from .assets import Asset
+from .controls import _TradingRule
 from .data import BarData
 from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time_rules
 from .finance import commission, slippage
@@ -108,6 +111,7 @@ class MigrationContext:
         self._running = False
         self._in_before_trading_start = False
         self._schedules: list[_Schedule] = []
+        self._trading_controls: list[TradingControl] = []
         self._slippage: Any = slippage.VolumeShareSlippage()
         self._set_commission(commission.PerShare())
         self.portfolio = _Portfolio(self)
@@ -149,10 +153,13 @@ class MigrationContext:
         kind, limit_price, stop_price = _native_style(style, limit_price, stop_price)
         quantity = round_quantity(amount, rounding="near_integer")
         broker = self._require_broker()
-        if quantity == 0:
-            return None
         submitted = broker.submit_order(
-            asset.key, quantity, order_type=kind, limit_price=limit_price, stop_price=stop_price
+            asset.key,
+            quantity,
+            order_type=kind,
+            limit_price=limit_price,
+            stop_price=stop_price,
+            _options=SubmitOrderOptions(validate_zero_quantity=True),
         )
         return self._external_order_id(submitted.order_id) if submitted is not None else None
 
@@ -237,6 +244,90 @@ class MigrationContext:
     ) -> str | None:
         return self.order_target_value(
             asset, self._require_broker().equity() * target, limit_price, stop_price, style
+        )
+
+    def _control(self, constraint: TradingControl, on_error: str, metadata: dict[str, Any]) -> None:
+        self._setup_only()
+        if on_error not in {"fail", "log"}:
+            raise ValueError("on_error must be fail or log")
+        self._trading_controls.append(_TradingRule(constraint, on_error))
+        self._config.metadata.setdefault("migration_trading_controls", []).append(
+            {**metadata, "on_error": on_error}
+        )
+
+    def set_max_order_count(self, max_count: int, on_error: str = "fail") -> None:
+        self._control(
+            OrderRequestCount(max_count, timezone="UTC"),
+            on_error,
+            {"method": "validated_requests", "max_count": max_count, "timezone": "UTC"},
+        )
+
+    def set_max_order_size(
+        self,
+        asset: Asset | None = None,
+        max_shares: float | None = None,
+        max_notional: float | None = None,
+        on_error: str = "fail",
+    ) -> None:
+        if max_shares is None and max_notional is None:
+            raise ValueError("Supply max_shares or max_notional")
+        if asset is not None:
+            self._validate_asset(asset)
+        key = None if asset is None else asset.key
+        self._control(
+            OrderConstraints(
+                asset=key,
+                max_order_quantity=max_shares,
+                max_order_notional=max_notional,
+                include_pending=False,
+                notional_basis="quoted_units",
+            ),
+            on_error,
+            {
+                "method": "max_order_size",
+                "asset": key,
+                "max_shares": max_shares,
+                "max_notional": max_notional,
+                "notional_basis": "quoted_units",
+            },
+        )
+
+    def set_max_position_size(
+        self,
+        asset: Asset | None = None,
+        max_shares: float | None = None,
+        max_notional: float | None = None,
+        on_error: str = "fail",
+    ) -> None:
+        if max_shares is None and max_notional is None:
+            raise ValueError("Supply max_shares or max_notional")
+        if asset is not None:
+            self._validate_asset(asset)
+        key = None if asset is None else asset.key
+        self._control(
+            OrderConstraints(
+                asset=key,
+                max_position_quantity=max_shares,
+                max_position_notional=max_notional,
+                include_pending=False,
+                notional_basis="quoted_units",
+            ),
+            on_error,
+            {
+                "method": "max_position_size",
+                "asset": key,
+                "max_shares": max_shares,
+                "max_notional": max_notional,
+                "include_pending": False,
+                "notional_basis": "quoted_units",
+            },
+        )
+
+    def set_long_only(self, on_error: str = "fail") -> None:
+        self._control(
+            OrderConstraints(long_only=True, include_pending=False),
+            on_error,
+            {"method": "long_only", "include_pending": False},
         )
 
     def schedule_function(
@@ -432,6 +523,8 @@ class _Callbacks(Strategy):
     def on_start(self, broker: Broker) -> None:
         self.context._broker = broker
         self.context._running = True
+        for control in self.context._trading_controls:
+            broker.register_trading_control(control)
         _register(self.context, self.runtime, self.data, self.before_trading_start)
 
     def on_end(self, broker: Broker) -> None:

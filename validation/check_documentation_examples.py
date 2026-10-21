@@ -61,6 +61,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "zipline-read-shapes",
         "zipline-callback-runner",
         "zipline-scheduled-callbacks",
+        "zipline-trading-constraints",
         "preopen-mixed-rules",
         "readme-quickstart",
         "risk-volatility-stop",

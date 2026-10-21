@@ -6,6 +6,7 @@ import copy
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import date, datetime
 from math import isfinite
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack
@@ -1755,6 +1756,12 @@ class Broker:
             if registered is control:
                 self._capture_lifecycle_mutation()
                 del self._trading_controls[index]
+                if not any(registered is control for registered in self._trading_controls):
+                    prefix = f"requests:{id(control)}"
+                    counts = self._order_state.control_counts
+                    for key in list(counts):
+                        if key[0] == prefix:
+                            del counts[key]
                 return True
         return False
 
@@ -1771,6 +1778,11 @@ class Broker:
             raise TypeError("Account controls must define validate(account)")
         self._capture_lifecycle_mutation()
         self._account_controls.append((boundary, control))
+
+    def _requires_zero_order_validation(self) -> bool:
+        return bool(self._trading_controls) and any(
+            getattr(control, "counts_order_requests", False) for control in self._trading_controls
+        )
 
     def _validate_trading_controls(
         self, asset: str, quantity: float, *, replacing_order_id: str | None = None
@@ -1816,7 +1828,27 @@ class Broker:
             is_update=replacing_order_id is not None,
         )
         for control in self._trading_controls:
-            control.validate(request)
+            if getattr(control, "counts_order_requests", False) and not request.is_update:
+                if timestamp is None:
+                    raise ValueError("Request counts require a simulation timestamp")
+                instant = (
+                    timestamp
+                    if timestamp.tzinfo is not None
+                    else timestamp.replace(
+                        tzinfo=ZoneInfo(clock.timezone if clock is not None else "UTC")
+                    )
+                )
+                day = instant.astimezone(ZoneInfo(getattr(control, "timezone", "UTC"))).date()
+                prefix = f"requests:{id(control)}"
+                key = (prefix, day)
+                prior_count = counts.get(key, 0)
+                control.validate(replace(request, orders_in_day=prior_count))
+                for previous in list(counts):
+                    if previous[0] == prefix and previous != key:
+                        del counts[previous]
+                counts[key] = prior_count + 1
+            else:
+                control.validate(request)
         return request
 
     def _submission_session_date(self, *, validate_active: bool = False) -> date | None:
@@ -1891,7 +1923,9 @@ class Broker:
 
     def _commit_control_order(self, request: OrderControlContext) -> None:
         counts = self._order_state.control_counts
+        requests = {key: count for key, count in counts.items() if key[0].startswith("requests:")}
         counts.clear()
+        counts.update(requests)
         if request.session_date is not None:
             counts[("session", request.session_date)] = request.orders_in_session + 1
         if request.timestamp is not None:

@@ -6,7 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from math import isfinite
-from typing import Literal, Protocol
+from typing import ClassVar, Literal, Protocol
+from zoneinfo import ZoneInfo
 
 
 class TradingControlViolation(ValueError):
@@ -150,6 +151,40 @@ class OrderConstraints:
                 raise ValueError("max_orders_per_day requires a current timestamp")
             if request.orders_in_day >= self.max_orders_per_day:
                 raise TradingControlViolation("Maximum orders in the civil day exceeded")
+
+
+@dataclass(frozen=True)
+class OrderRequestCount:
+    """Limit requests that reach this rule, including zero and later-rejected requests.
+
+    The broker owns counts per validator identity and civil date in ``timezone``.
+    Validation is pure; the broker advances this audit count only after this rule
+    returns. Earlier rule failures do not consume it, while later failures do.
+    Existing OrderConstraints day/session counts continue to count submissions.
+    """
+
+    max_count: int
+    timezone: str = "UTC"
+    counts_order_requests: ClassVar[bool] = True
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.max_count, bool)
+            or not isinstance(self.max_count, int)
+            or self.max_count < 0
+        ):
+            raise ValueError("max_count must be a nonnegative integer")
+        ZoneInfo(self.timezone)
+
+    def validate(self, request: OrderControlContext) -> None:
+        if request.is_update:
+            return
+        if request.timestamp is None:
+            raise ValueError("Request counts require a simulation timestamp")
+        if request.orders_in_day >= self.max_count:
+            raise TradingControlViolation(
+                "Maximum validated order requests in the civil day exceeded"
+            )
 
 
 @dataclass(frozen=True)

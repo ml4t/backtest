@@ -690,6 +690,7 @@
     "from ml4t.backtest.config import SlippageType, SpreadConvention",
     "from ml4t.backtest.config import TrailStopTiming, WaterMarkSource, InitialHwmSource",
     "from ml4t.backtest.controls import AccountConstraints, OrderConstraints, TradingControlViolation",
+    "from ml4t.backtest.controls import TradingControlViolation",
     "from ml4t.backtest.example_data import ExampleRoundTrip, load_example_prices",
     "from ml4t.backtest.example_data import load_example_prices",
     "from ml4t.backtest.execution import LinearImpact",

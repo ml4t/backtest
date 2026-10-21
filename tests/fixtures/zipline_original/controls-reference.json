@@ -1,0 +1,288 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "traces": {
+    "rejected_attempt": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "submitted",
+          "violation"
+        ],
+        "open": 1,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "submitted",
+          "violation"
+        ],
+        "open": 1,
+        "quantity": 1,
+        "cash": 9890.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "submitted",
+          "violation"
+        ],
+        "open": 1,
+        "quantity": 2,
+        "cash": 9770.0,
+        "equity": 10010.0
+      }
+    ],
+    "zero_request": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "none",
+          "violation",
+          "violation"
+        ],
+        "open": 0,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "none",
+          "violation",
+          "violation"
+        ],
+        "open": 0,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "none",
+          "violation",
+          "violation"
+        ],
+        "open": 0,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      }
+    ],
+    "log_and_allow": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 6,
+        "cash": 9340.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 12,
+        "cash": 8620.0,
+        "equity": 10060.0
+      }
+    ],
+    "long_only": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "submitted",
+          "submitted"
+        ],
+        "open": 2,
+        "quantity": 1,
+        "cash": 9890.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "submitted",
+          "submitted"
+        ],
+        "open": 2,
+        "quantity": 1,
+        "cash": 9890.0,
+        "equity": 10010.0
+      }
+    ],
+    "position_size": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "submitted",
+          "submitted",
+          "violation"
+        ],
+        "open": 2,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "violation",
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 8,
+        "cash": 9120.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "violation",
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 2,
+        "cash": 9840.0,
+        "equity": 10080.0
+      }
+    ],
+    "order_notional": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "submitted",
+          "violation"
+        ],
+        "open": 1,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "violation"
+        ],
+        "open": 0,
+        "quantity": 5,
+        "cash": 9450.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "violation"
+        ],
+        "open": 0,
+        "quantity": 5,
+        "cash": 9450.0,
+        "equity": 10050.0
+      }
+    ],
+    "position_notional": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "answers": [
+          "submitted",
+          "submitted",
+          "violation"
+        ],
+        "open": 2,
+        "quantity": 0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "violation",
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 8,
+        "cash": 9120.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "answers": [
+          "violation",
+          "violation",
+          "submitted"
+        ],
+        "open": 1,
+        "quantity": 2,
+        "cash": 9840.0,
+        "equity": 10080.0
+      }
+    ]
+  },
+  "inputs": {
+    "open": [
+      90.0,
+      91.0,
+      92.0
+    ],
+    "high": [
+      101.0,
+      111.0,
+      121.0
+    ],
+    "low": [
+      89.0,
+      90.0,
+      91.0
+    ],
+    "close": [
+      100.0,
+      110.0,
+      120.0
+    ],
+    "volume": [
+      1000,
+      1000,
+      1000
+    ]
+  },
+  "timing_claim": false,
+  "reference_wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b"
+}

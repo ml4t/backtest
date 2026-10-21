@@ -86,12 +86,14 @@ class OrderBook:
             raise ValueError("Order quantity must be a finite real number")
 
         if side is None:
-            if quantity == 0:
-                return None
-            side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
+            side = OrderSide.BUY if quantity >= 0 else OrderSide.SELL
         quantity = abs(quantity)
         if quantity <= self._MIN_ORDER_SIZE:
-            return None
+            validate_zero = options is not None and options.validate_zero_quantity
+            if not validate_zero:
+                validate_zero = broker._requires_zero_order_validation()
+            if not validate_zero:
+                return None
 
         if asset in self.risk.stop_exits_this_bar:
             existing_pos = self.account.positions.get(asset)
@@ -101,6 +103,8 @@ class OrderBook:
         control_request = broker._validate_trading_controls(
             asset, quantity if side is OrderSide.BUY else -quantity
         )
+        if quantity <= self._MIN_ORDER_SIZE:
+            return None
         eligible_from, eligible_on_boundary = broker._preopen_order_eligibility()
         submitted_session = (
             broker._submission_session_date(validate_active=True)

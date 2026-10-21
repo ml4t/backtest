@@ -491,3 +491,80 @@ and half-day rules. Native performance rows remain per observed minute;
 Zipline's minute simulation returns daily performance packets. Use native
 account/return exports with the intended observation frequency when comparing
 analysis.
+
+### Compile trading constraints without changing their meaning
+
+During `initialize`, use `set_max_order_size`, `set_max_position_size`,
+`set_max_order_count` and `set_long_only` through the API or context. Size rules
+accept a mapped `asset` or apply to every asset, with `max_shares`,
+`max_notional`, or both. They compile to native `OrderConstraints` using held
+quantity without pending orders, and quoted price times quantity without a
+contract multiplier, matching the reference control definitions. Native
+`OrderConstraints` retain their default pending-order and economic-notional
+choices. These pre-submission limits do not promise that separately admitted
+pending orders will remain within a combined position limit after execution.
+
+`on_error="fail"` raises the native `TradingControlViolation` before creating
+an order. `on_error="log"` logs the violation and allows submission, as in the
+reference; it does not silently reject the order. Native order parameter,
+execution, account and data-availability checks still apply.
+
+Zipline's order quota counts requests that reach its count rule, including
+zero-sized requests and requests that fail a later rule. The adapter selects
+the explicit native `OrderRequestCount` model with UTC civil dates. Rule order
+therefore matters. A request rejected by an earlier rule does not consume the
+quota. The audit count can advance without an order, fill or cash change.
+Native `OrderConstraints(max_orders_per_day=...)` continues counting submitted
+orders instead. Both definitions remain available; the adapter does not change
+the existing native default.
+
+<!-- ml4t-doc-test: zipline-trading-constraints -->
+```python
+from datetime import UTC, datetime
+
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+from ml4t.backtest.controls import TradingControlViolation
+
+answers = []
+
+
+def initialize(context):
+    context.asset = context.symbol("ALPHA")
+    context.set_max_order_count(2)
+    context.set_max_order_size(max_shares=5)
+
+
+def handle_data(context, data):
+    for quantity in [0, 6, 1]:
+        try:
+            result = context.order(context.asset, quantity)
+            answers.append("none" if result is None else "submitted")
+        except TradingControlViolation:
+            answers.append("violation")
+
+
+feed = DataFeed(
+    prices_df=pl.DataFrame({"timestamp": [datetime(2025, 1, 6, 21, tzinfo=UTC)],
+                            "asset": ["A"], "close": [100.0], "volume": [1000]}),
+    feed_spec={"time_contract_version": 2, "timestamp_semantics": "event_time", "calendar": None},
+)
+performance = run_algorithm(feed=feed, assets=[Asset("A", "ALPHA")],
+                            initialize=initialize, handle_data=handle_data)
+assert answers == ["none", "violation", "violation"]
+assert performance.attrs["backtest_result"].fills == []
+print("request quota consumed without creating an order or changing cash")
+```
+
+<!-- ml4t-doc-output: zipline-trading-constraints -->
+```text
+request quota consumed without creating an order or changing cash
+```
+
+The zero request passes and consumes the first quota entry. The six-share
+request passes the count rule, consumes the second entry, and fails the later
+size rule. The final one-share request then fails the count rule. The retained
+published Zipline 3.2.0 fixture exercises this sequence and the nonzero,
+log-and-allow and long-only variants with divergent open/close prices.

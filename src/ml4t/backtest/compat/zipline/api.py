@@ -126,3 +126,29 @@ def schedule_function(
     calendar: str | None = None,
 ) -> None:
     current().schedule_function(func, date_rule, time_rule, half_days, calendar)
+
+
+def set_max_order_count(max_count: int, on_error: str = "fail") -> None:
+    current().set_max_order_count(max_count, on_error)
+
+
+def set_long_only(on_error: str = "fail") -> None:
+    current().set_long_only(on_error)
+
+
+def set_max_order_size(
+    asset: Asset | None = None,
+    max_shares: float | None = None,
+    max_notional: float | None = None,
+    on_error: str = "fail",
+) -> None:
+    current().set_max_order_size(asset, max_shares, max_notional, on_error)
+
+
+def set_max_position_size(
+    asset: Asset | None = None,
+    max_shares: float | None = None,
+    max_notional: float | None = None,
+    on_error: str = "fail",
+) -> None:
+    current().set_max_position_size(asset, max_shares, max_notional, on_error)

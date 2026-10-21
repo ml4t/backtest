@@ -53,6 +53,7 @@ class SubmitOrderOptions:
     target_intent_id: str | None = None
     child_intent_id: str | None = None
     intent_idempotency_key: str | None = None
+    validate_zero_quantity: bool = False
 
 
 def is_exit_order(order: Order, positions: dict[str, Position]) -> bool:
