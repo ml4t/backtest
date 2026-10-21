@@ -1,5 +1,6 @@
 """Migration impact parameters compiled to native models and execution limits."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 
@@ -23,3 +24,9 @@ class FixedSlippage:
 @dataclass(frozen=True)
 class NoSlippage:
     pass
+
+
+@dataclass(frozen=True)
+class VolatilityVolumeShare:
+    volume_limit: float = 0.05
+    eta: float | Mapping[str, float] | None = None

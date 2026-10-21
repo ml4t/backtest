@@ -341,6 +341,17 @@ class MarketDataView:
             )
         return temporal_frame(records, schema=schema)
 
+    def _observed_high_low(self, asset: str) -> tuple[float | None, float | None]:
+        self._check_active()
+        if self._asof is None or not self._inclusive:
+            return None, None
+        row = self._row(asset, self._asof)
+        if row is None:
+            return None, None
+        high = row.get(self._column("high")) if self._available("high", row) else None
+        low = row.get(self._column("low")) if self._available("low", row) else None
+        return high, low
+
     def _prepared_view(self) -> MarketDataView:
         runtime = self._runtime
         engine, asof = runtime._engine, self._asof
@@ -981,6 +992,7 @@ class RuntimeServices:
                 self._assets.active()
                 engine.broker.register_trading_control(self._assets)
             self.scheduler._bind()
+            engine.broker._set_observed_high_low_reader(market._observed_high_low)
         except BaseException:
             if self._assets is not None:
                 engine.broker.unregister_trading_control(self._assets)
@@ -1075,6 +1087,8 @@ class RuntimeServices:
         return result
 
     def _unbind(self) -> None:
+        if self._engine is not None:
+            self._engine.broker._set_observed_high_low_reader(None)
         self.scheduler._unbind()
         if self._assets is not None:
             assert self._engine is not None

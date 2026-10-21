@@ -3,7 +3,7 @@
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from .result import ExecutionResult
@@ -178,16 +178,27 @@ class SharedVolumeParticipationLimit(VolumeParticipationLimit):
     its existing per-order behavior.
     """
 
+    shared_participation: float | None = field(default=None, kw_only=True)
+
     def __post_init__(self) -> None:
         if not math.isfinite(self.max_participation) or not 0 <= self.max_participation <= 1:
             raise ValueError("max_participation must be finite and between 0 and 1")
         if not math.isfinite(self.min_volume) or self.min_volume < 0:
             raise ValueError("min_volume must be finite and nonnegative")
+        if self.shared_participation is not None and (
+            not math.isfinite(self.shared_participation) or not 0 <= self.shared_participation <= 1
+        ):
+            raise ValueError("shared_participation must be finite and between 0 and 1")
 
     def bar_capacity(self, bar_volume: float | None, price: float) -> float:
         if bar_volume is None or not math.isfinite(bar_volume) or bar_volume < self.min_volume:
             return 0.0
-        return max(0.0, bar_volume * self.max_participation)
+        participation = (
+            self.max_participation
+            if self.shared_participation is None
+            else self.shared_participation
+        )
+        return max(0.0, bar_volume * participation)
 
 
 @dataclass

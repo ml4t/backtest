@@ -490,22 +490,14 @@ class FillExecutor:
             base_price += impact
             self._validate_execution_price(base_price, source="market-impact execution price")
         contextual = callable(getattr(slippage_model, "calculate_with_context", None))
-        current_time = self.market.time
-        assert current_time is not None
         slippage = calculate_slippage(
             slippage_model,
             order.asset,
             quantity,
             base_price,
             available_size,
-            context=SlippageContext(
-                order.asset,
-                quantity,
-                base_price,
-                self.market.volumes.get(order.asset),
-                self.orders.volume_consumed_by_asset.get(order.asset, 0.0),
-                available_size,
-                current_time,
+            context=self._slippage_context(
+                slippage_model, order.asset, quantity, base_price, available_size
             )
             if contextual
             else None,
@@ -513,6 +505,29 @@ class FillExecutor:
         price = base_price + slippage if order.side is OrderSide.BUY else base_price - slippage
         self._validate_execution_price(price, source="execution price")
         return price, slippage
+
+    def _slippage_context(
+        self, model, asset: str, quantity: float, price: float, available_size: float | None
+    ) -> SlippageContext:
+        current_time = self.market.time
+        assert current_time is not None
+        if getattr(model, "requires_observed_ohlc", False):
+            if self.market.observed_high_low is None:
+                raise ValueError("This slippage model requires an active raw observation service")
+            bar_high, bar_low = self.market.observed_high_low(asset)
+        else:
+            bar_high, bar_low = None, None
+        return SlippageContext(
+            asset,
+            quantity,
+            price,
+            self.market.volumes.get(asset),
+            self.orders.volume_consumed_by_asset.get(asset, 0.0),
+            available_size,
+            current_time,
+            bar_high=bar_high,
+            bar_low=bar_low,
+        )
 
     def _validate_final_price(
         self, order: Order, quantity: float, price: float

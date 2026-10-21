@@ -1198,7 +1198,7 @@ prices = pl.DataFrame({
 def initialize(context):
     context.sent = False
     context.set_commission(us_futures=commission.PerContract({"ES": 2.}, {"ES": 3.}, 8.))
-    context.set_slippage(slippage.VolumeShareSlippage(volume_limit=.5, price_impact=0))
+    context.set_slippage(us_futures=slippage.FixedBasisPointsSlippage(0, .5))
 def handle_data(context, data):
     if not context.sent:
         context.order(context.future_symbol("ESH25"), 3)
@@ -1232,10 +1232,95 @@ describe the account being simulated.
 The published 3.2.0 comparison uses the same four physical closes and actual
 exported Data contract facts, with one contract per bar to isolate fees. It
 checks mixed equity/futures NAV and fees, scalar/root mappings, fallback
-options and saved-result identity. This does not establish default futures
-slippage, rolling or variation-cash parity. The example explicitly chooses
-volume-share slippage, and its cash follows the native signed-notional method
+options and saved-result identity. This does not establish rolling or
+variation-cash parity. The example explicitly chooses zero basis-point
+slippage with a per-bar participation cap, and its cash follows the native signed-notional method
 described in [ledger assumptions](#match-ledger-and-corporate-action-assumptions).
+
+### Use futures volatility-volume slippage
+
+The adapter selects `VolatilityVolumeShare(volume_limit=0.05, eta=None)` for
+declared `Future` assets. Configure it with `set_slippage(us_futures=...)`;
+the positional or `us_equities=` model continues to select equity execution
+only. Futures also accept `FixedBasisPointsSlippage`, `FixedSlippage` and
+`NoSlippage`. These options compile to native per-asset models and limits.
+
+Volatility-volume execution uses the observed high/low midpoint, with impact
+`midpoint * eta * annualized_volatility * sqrt(fill_quantity / ADV) / 10000`.
+The statistics use the prior 20 completed daily sessions: mean reported
+volume and sample standard deviation of 19 close returns, multiplied by
+`sqrt(252)`. The fixed 252 is this legacy cost convention, separate from
+the Engine's account-return annualization. A scalar `eta` applies to every
+future; a root-symbol mapping falls back to the frozen published 3.2.0 root
+table and then its unknown-root value. These are reference parameters, not
+current market estimates.
+
+Without sufficient history, or with zero ADV, impact is 7.5 basis points.
+A known zero-volume daily row with a missing close carries the preceding
+close **within that statistics window** for its return calculation, matching
+the reference. Raw quotes remain missing. A missing session or unknown volume
+does not become a zero-volume observation. With `calendar=None`, the window
+counts 20 strictly prior observations instead of calendar sessions.
+
+Minute execution can use an explicitly declared completed daily source via
+`history_sources={"1d": "daily"}` and
+`RuntimeServices(history_sources={"daily": provider})`; the existing
+[independent history source contract](#use-a-separate-prepared-history-grid)
+supplies causal, prepared observations. Without one, a minute feed uses the
+insufficient-history method. The adapter does not resample minute data or
+read a future completed daily close. Newly available source revisions apply
+at their actual fill clock. High and low must be actual published observations;
+the native feed's close fallback is not accepted. Opening-auction targets
+cannot use this completed-bar model.
+
+<!-- ml4t-doc-test: futures-volatility-volume -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Future
+from ml4t.backtest.compat.zipline.finance import commission, slippage
+
+contract = Future("contract:8", "ESH25", 8, root_symbol="ES",
+                  multiplier=50., tick_size=.25)
+prices = pl.DataFrame({
+    "timestamp": [datetime(2025, 3, day, 21, tzinfo=UTC) for day in [3, 4, 5]],
+    "asset": [contract.key] * 3, "close": [105.] * 3,
+    "high": [110.] * 3, "low": [90.] * 3, "volume": [100.] * 3,
+})
+def initialize(context):
+    context.sent = False
+    context.set_commission(us_futures=commission.PerFutureTrade(0))
+    context.set_slippage(us_futures=slippage.VolatilityVolumeShare(.05, eta=.5))
+def handle(context, data):
+    if not context.sent:
+        context.order(contract, 8)
+        context.sent = True
+
+performance = run_algorithm(
+    feed=DataFeed(prices_df=prices, feed_spec={"calendar": "NYSE",
+        "time_contract_version": 2, "timestamp_semantics": "bar_close",
+        "data_frequency": "daily", "bar_label": "right",
+        "bar_grid_anchor": "session_open", "partial_bar_policy": "include"}),
+    assets=[contract], initialize=initialize, handle_data=handle)
+result = performance.attrs["backtest_result"]
+assert [fill.quantity for fill in result.fills] == [5., 3.]
+assert [fill.price for fill in result.fills] == [100.075, 100.075]
+assert performance["portfolio_value"].iloc[-1] == 101970.
+print("Futures midpoint, insufficient-history impact and partial fills verified.")
+```
+
+The limit applies per order, while all orders together remain bounded by
+reported bar volume. Two four-contract orders at volume 110 and a 5% limit
+can each fill four contracts. The retained published 3.2.0 reference can
+overfill raw volume at larger participation settings: two 100-contract
+orders with a 60% limit fill 66 each against volume 110. Backtest instead
+fills 66 and 44, carrying the remainder forward. This volume correction is
+an explicit reference difference. The reference fixtures in
+`tests/fixtures/zipline_volatility` and `zipline_volatility_missing` also cover
+long/short fills, scalar/root/default eta, insufficient and complete history,
+and mixed equity/futures NAV. They do not establish variation-cash settlement.
 
 ### Cancel pending orders at session end
 

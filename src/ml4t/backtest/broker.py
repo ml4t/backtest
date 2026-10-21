@@ -1186,6 +1186,11 @@ class Broker:
         """Whether the current callback scope permits fills on observed prices."""
         return self._scheduled_price_event
 
+    def _set_observed_high_low_reader(
+        self, reader: Callable[[str], tuple[float | None, float | None]] | None
+    ) -> None:
+        self._market_state.observed_high_low = reader
+
     def _may_fill_immediately(self) -> bool:
         from ml4t.specs import LifecyclePhase
 

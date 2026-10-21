@@ -40,7 +40,7 @@ from .config import (
 )
 from .core.shared import SubmitOrderOptions
 from .execution.limits import VolumeParticipationLimit
-from .models import calculate_slippage, quote_commission
+from .models import AssetSlippage, calculate_slippage, quote_commission
 from .sessions import session_date_for_timestamp
 from .types import OrderSide, OrderStatus, OrderType
 
@@ -331,6 +331,14 @@ class PreOpenTargetManager:
             raise UnsupportedPreOpenPolicyError(
                 f"execution policy {self.policy.policy_id!r} disables opening-auction execution"
             )
+        for target in intent.targets:
+            model = self.broker.slippage_model
+            if isinstance(model, AssetSlippage):
+                model = model.for_asset(target.asset)
+            if getattr(model, "requires_observed_ohlc", False):
+                raise UnsupportedPreOpenPolicyError(
+                    f"opening target for {target.asset} cannot use completed-bar high/low slippage"
+                )
         if active_phase is LifecyclePhase.RUN_START:
             raise LateAuctionIntentError(
                 "register opening targets in on_prepare; on_start cannot bind a pre-open decision"

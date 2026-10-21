@@ -56,8 +56,8 @@ def set_commission(model: Any = None, *, us_equities: Any = None, us_futures: An
     current().set_commission(model, us_equities=us_equities, us_futures=us_futures)
 
 
-def set_slippage(model: Any = None, *, us_equities: Any = None) -> None:
-    current().set_slippage(model, us_equities=us_equities)
+def set_slippage(model: Any = None, *, us_equities: Any = None, us_futures: Any = None) -> None:
+    current().set_slippage(model, us_equities=us_equities, us_futures=us_futures)
 
 
 def set_benchmark(asset: Asset | None) -> None:

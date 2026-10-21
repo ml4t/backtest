@@ -63,7 +63,10 @@ def test_original_future_fee_parameters_preserve_partial_order_minimum_exchange_
             else commission.PerFutureTrade(value(3.0))
         )
         set_commission(us_equities=commission.PerShare(0.2, 1.0), us_futures=model)
-        context.set_slippage(slippage.VolumeShareSlippage(volume_limit=0.5, price_impact=0))
+        context.set_slippage(
+            us_equities=slippage.VolumeShareSlippage(volume_limit=0.5, price_impact=0),
+            us_futures=slippage.FixedBasisPointsSlippage(0, 0.5),
+        )
         context.future = future_symbol("esh25")
         assert context.future is future and context.sid(8) is future
         context.sent = False
@@ -100,7 +103,7 @@ def test_future_contract_multiplier_is_used_for_value_orders_instead_of_equity_q
     def initialize(context):
         context.sent = False
         context.set_commission(us_futures=commission.PerFutureTrade(0))
-        context.set_slippage(slippage.NoSlippage())
+        context.set_slippage(us_futures=slippage.NoSlippage())
 
     def handle(context, data):
         if not context.sent:
@@ -189,7 +192,10 @@ def test_actual_exported_future_facts_and_reference_fee_fallbacks_drive_account_
                 "trade_fallback": commission.PerFutureTrade({}),
             }[method]
             context.set_commission(us_futures=model)
-        context.set_slippage(slippage.VolumeShareSlippage(volume_limit=0.5, price_impact=0))
+        context.set_slippage(
+            us_equities=slippage.VolumeShareSlippage(volume_limit=0.5, price_impact=0),
+            us_futures=slippage.FixedBasisPointsSlippage(0, 0.5),
+        )
         contract = context.future_symbol("esh25")
         assert isinstance(contract, Future)
         assert (contract.root_symbol, contract.multiplier, contract.tick_size) == ("ES", 50.0, 0.25)
@@ -260,7 +266,7 @@ def test_none_minimum_keeps_only_contract_and_one_time_exchange_fees():
     def initialize(context):
         context.sent = False
         context.set_commission(us_futures=commission.PerContract(2.0, 3.0, None))
-        context.set_slippage(slippage.VolumeShareSlippage(0.5, 0))
+        context.set_slippage(us_futures=slippage.FixedBasisPointsSlippage(0, 0.5))
 
     def handle(context, data):
         if not context.sent:

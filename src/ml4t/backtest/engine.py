@@ -117,7 +117,10 @@ class Engine:
             runtime
             if runtime is not None
             else RuntimeServices()
-            if getattr(feed, "feature_metadata", None) is not None
+            if (
+                getattr(feed, "feature_metadata", None) is not None
+                or getattr(slippage_model, "requires_observed_ohlc", False)
+            )
             else None
         )
         self.holdings_sampling = holdings_sampling

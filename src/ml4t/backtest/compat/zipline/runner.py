@@ -38,6 +38,7 @@ from ...models import AssetCommission, PercentageCommission, PerOrderCommission
 from ...sessions import SessionConfig
 from ...types import AssetClass, ContractSpec, Order, OrderSide, OrderStatus
 from ._scope import callback_scope
+from ._slippage import compile_slippage
 from .assets import Asset, Future
 from .controls import _register_account_controls, _TradingRule
 from .csv import PreparedCSV
@@ -148,6 +149,7 @@ class MigrationContext:
         self._account_controls: list[tuple[str, float, timedelta | None]] = []
         self._restrictions: Restrictions = NoRestrictions()
         self._slippage: Any = slippage.FixedBasisPointsSlippage()
+        self._futures_slippage: Any = slippage.VolatilityVolumeShare()
         self._futures_commission = commission.PerContract(0.85, {})
         self._cancel_policy: EODCancel | NeverCancel = NeverCancel()
         self._set_commission(commission.PerShare())
@@ -696,14 +698,14 @@ class MigrationContext:
         }
         return AssetCommission(models, default=equity)
 
-    def set_slippage(self, model: Any = None, *, us_equities: Any = None) -> None:
+    def set_slippage(
+        self, model: Any = None, *, us_equities: Any = None, us_futures: Any = None
+    ) -> None:
         self._setup_only()
         if model is not None and us_equities is not None:
             raise ValueError("Declare equity slippage once, positionally or as us_equities")
         model = us_equities if us_equities is not None else model
-        if model is None:
-            return
-        if not isinstance(
+        if model is not None and not isinstance(
             model,
             slippage.VolumeShareSlippage
             | slippage.FixedBasisPointsSlippage
@@ -711,7 +713,18 @@ class MigrationContext:
             | slippage.NoSlippage,
         ):
             raise TypeError("Use a declared migration slippage model")
-        self._slippage = model
+        if model is not None:
+            self._slippage = model
+        if us_futures is not None:
+            if not isinstance(
+                us_futures,
+                slippage.VolatilityVolumeShare
+                | slippage.FixedBasisPointsSlippage
+                | slippage.FixedSlippage
+                | slippage.NoSlippage,
+            ):
+                raise TypeError("Use a declared futures slippage model")
+            self._futures_slippage = us_futures
 
     def set_benchmark(self, asset: Asset | None) -> None:
         self._setup_only()
@@ -959,6 +972,7 @@ def run_algorithm(
             else "not_declared",
         }
         limits = context._execution_limits()
+        impact, limits = compile_slippage(context, runtime, history_view, history_sources, limits)
         fees = context._compile_commission()
         if context._pipelines:
             config.metadata["migration_pipelines"] = {
@@ -996,6 +1010,7 @@ def run_algorithm(
                 runtime=runtime,
                 execution_limits=limits,
                 commission_model=fees,
+                slippage_model=impact,
                 contract_specs=specs,
                 benchmark=context._benchmark,
                 holdings_sampling="bar",

@@ -2739,7 +2739,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "set_slippage",
-      "signature": "(model: Any = None, *, us_equities: Any = None) -> None"
+      "signature": "(model: Any = None, *, us_equities: Any = None, us_futures: Any = None) -> None"
     },
     "ml4t.backtest.compat.zipline.api:symbol": {
       "kind": "function",
@@ -3393,7 +3393,7 @@
       },
       "module": "ml4t.backtest.execution.limits",
       "qualname": "SharedVolumeParticipationLimit",
-      "signature": "(max_participation: float = 0.1, min_volume: float = 0.0) -> None"
+      "signature": "(max_participation: float = 0.1, min_volume: float = 0.0, *, shared_participation: float | None = None) -> None"
     },
     "ml4t.backtest.execution:SquareRootImpact": {
       "kind": "class",
@@ -3457,6 +3457,10 @@
         "for_asset": {
           "kind": "method",
           "signature": "(self, asset: 'str') -> 'SlippageModel'"
+        },
+        "requires_observed_ohlc": {
+          "kind": "property",
+          "signature": "(self) -> 'bool'"
         }
       },
       "module": "ml4t.backtest.models",

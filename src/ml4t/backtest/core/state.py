@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -31,6 +32,7 @@ class MarketState:
     last_price_times: dict[str, datetime] | None = None
     asset_bars_seen: dict[str, int] = field(default_factory=dict)
     bar_index: int = 0
+    observed_high_low: Callable[[str], tuple[float | None, float | None]] | None = None
 
 
 @dataclass(slots=True)

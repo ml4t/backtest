@@ -58,7 +58,10 @@ def test_actual_reference_eod_and_never_preserve_close_callback_partial_fill_and
         context.set_commission(
             us_equities=commission.PerShare(0), us_futures=commission.PerFutureTrade(0)
         )
-        context.set_slippage(slippage.FixedBasisPointsSlippage(0, 0.5))
+        context.set_slippage(
+            us_equities=slippage.FixedBasisPointsSlippage(0, 0.5),
+            us_futures=slippage.FixedBasisPointsSlippage(0, 0.5),
+        )
 
     def handle(context, data):
         now = context.get_datetime()
