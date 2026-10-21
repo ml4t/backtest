@@ -208,3 +208,75 @@ def test_market_view_retained_from_previous_run_cannot_read_during_a_new_run():
     Engine(
         DataFeed(prices_df=single), Retain(), BacktestConfig(calendar=None), runtime=runtime
     ).run()
+
+
+def test_initialization_uses_declared_start_not_the_future_first_trading_bar():
+    dates = [datetime(2025, 1, 3, 21, tzinfo=UTC), datetime(2025, 1, 6, 21, tzinfo=UTC)]
+    start = datetime(2025, 1, 6, tzinfo=UTC)
+    frame = pl.DataFrame(
+        {
+            "timestamp": dates,
+            "asset": ["TEST"] * 2,
+            "close": [100.0, 101.0],
+            "feature": [3.0, 9.0],
+            "known": [datetime(2025, 1, 6, 20, tzinfo=UTC), dates[1]],
+        }
+    )
+    runtime = RuntimeServices(start=start, known_at_cols={"feature": "known"})
+    seen = []
+
+    class Read(Strategy):
+        def on_start(self, broker):
+            seen.append(
+                runtime.market.history(["TEST"], ["feature"], bar_count=1)["feature"].to_list()
+            )
+
+        def on_data(self, timestamp, data, context, broker):
+            seen.append(
+                runtime.market.history(["TEST"], ["feature"], bar_count=2)["feature"].to_list()
+            )
+
+    Engine(DataFeed(prices_df=frame), Read(), BacktestConfig(calendar=None), runtime=runtime).run()
+    assert seen == [[None], [3.0, 9.0]]
+
+
+def test_unpublished_quote_depth_cannot_leak_from_the_history_view_into_executable_data():
+    from ml4t.backtest.config import ExecutionPrice
+    from ml4t.backtest.execution import VolumeParticipationLimit
+
+    dates = [datetime(2025, 1, 2, 15, tzinfo=UTC), datetime(2025, 1, 2, 15, 1, tzinfo=UTC)]
+    frame = pl.DataFrame(
+        {
+            "timestamp": dates,
+            "asset": ["TEST"] * 2,
+            "close": [100.0] * 2,
+            "ask": [100.0] * 2,
+            "ask_size": [1000.0] * 2,
+            "known": [dates[1]] * 2,
+        }
+    )
+    runtime = RuntimeServices(known_at_cols={"ask_size": "known"})
+    seen = []
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            observed = runtime.market.current(["TEST"], ["ask_size"])["ask_size"].to_list()[0]
+            seen.append((data["TEST"].get("ask_size"), observed))
+            if timestamp == dates[0]:
+                broker.submit_order("TEST", 10)
+
+    result = Engine(
+        DataFeed(prices_df=frame, ask_col="ask", ask_size_col="ask_size"),
+        Buy(),
+        BacktestConfig(
+            initial_cash=10000,
+            calendar=None,
+            execution_mode=ExecutionMode.SAME_BAR,
+            execution_price=ExecutionPrice.QUOTE_SIDE,
+        ),
+        runtime=runtime,
+        execution_limits=VolumeParticipationLimit(max_participation=0.1),
+    ).run()
+    assert result.to_fills_dataframe()["timestamp"].to_list() == [dates[1]]
+    assert result.to_fills_dataframe()["quantity"].to_list() == [10.0]
+    assert seen == [(None, None), (1000.0, 1000.0)]

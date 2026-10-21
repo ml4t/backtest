@@ -311,7 +311,7 @@ class RuntimeServices:
                 raise ValueError(
                     "Cash events outside the trading window require explicit preparation"
                 )
-        market._asof = eligible[0]
+        market._asof = self.start if self.start is not None else eligible[0]
         self._engine, self._market = engine, market
         try:
             self.scheduler._bind()
@@ -345,6 +345,8 @@ class RuntimeServices:
                 "bid",
                 "ask",
                 "mid",
+                "bid_size",
+                "ask_size",
             ]:
                 raw = market._column(field)
                 source = (
