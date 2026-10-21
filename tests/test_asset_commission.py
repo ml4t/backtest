@@ -38,7 +38,7 @@ def _prices():
     return pl.DataFrame(
         [
             {
-                "timestamp": datetime(2025, 3, day, tzinfo=UTC),
+                "timestamp": datetime(2025, 3, day, 21, tzinfo=UTC),
                 "asset": asset,
                 "close": 100.0,
                 "volume": 2.0,
@@ -85,6 +85,12 @@ def test_mixed_asset_fees_charge_exchange_once_and_do_not_multiply_per_contract_
         (Path(__file__).parent / "fixtures/zipline_original/future-fee-reference.json").read_text()
     )["methods"][method]
     assert nav == reference["nav"]
+    captured = json.loads(
+        (Path(__file__).parent / "fixtures/zipline_original/future-fee-reference.json").read_text()
+    )
+    assert [point.isoformat() for point in _prices()["timestamp"].unique().sort()] == captured[
+        "closes"
+    ]
     # Signed-notional native account is deliberately separate from variation-cash accounting.
     assert result.to_portfolio_state_dataframe()["cash"][-1] == (
         84690.0 if method == "per_contract" else 84696.0

@@ -563,7 +563,7 @@ from ml4t.backtest.execution import VolumeParticipationLimit
 from ml4t.backtest.models import AssetCommission, PerOrderCommission, PerOrderPerShareCommission
 
 prices = pl.DataFrame([
-    {"timestamp": datetime(2025, 3, day, tzinfo=UTC), "asset": asset,
+    {"timestamp": datetime(2025, 3, day, 21, tzinfo=UTC), "asset": asset,
      "close": 100., "volume": 2.}
     for day in [3, 4, 5, 6] for asset in ["A", "ES"]
 ])
