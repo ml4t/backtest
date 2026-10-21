@@ -199,6 +199,45 @@ assert result.to_equity_dataframe()["timestamp"].to_list() == dates
 print("History windows retain the gap without creating an executable bar.")
 ```
 
+### Read Data-prepared adjusted history
+
+The optional `history_provider` receives `as_of` at the active decision cutoff.
+It returns Data's prepared prices and metadata. Request `view="prepared"` in
+`history` or `current`; the default `view="raw"` reads the untransformed execution
+input. `market.prepared_metadata` returns a defensive copy of the provider's
+cutoff, price basis and preparation declarations.
+
+Backtest rejects retrospective or mismatched cutoffs, unavailable revisions,
+changed timestamp roles/calendars and invented observation keys. Preparation
+does not add executable quotes or apply account corporate actions. Split and
+dividend accounting are separate from a historical read view.
+
+The Data producer was qualified from source
+[`fd646c982ed12fca193f6cf713be1ac8803b17df`](https://github.com/ml4t/data/blob/fd646c982ed12fca193f6cf713be1ac8803b17df/src/ml4t/data/adjustments/history.py),
+development artifact `0.2.2.dev55+gfd646c982`, with Specs 0.2.0. This is not a
+claim that an older published Data package contains this API. With that producer,
+the preparation recipe is:
+
+```python
+from ml4t.data.adjustments import prepare_adjusted_history
+from ml4t.backtest import RuntimeServices
+
+def prepare(*, as_of):
+    return prepare_adjusted_history(
+        raw_source_prices, captured_actions, as_of=as_of, feed_spec=source_spec,
+        basis="split_adjusted", action_coverage="complete",
+    )
+
+services = RuntimeServices(history_provider=prepare)
+```
+
+Here `raw_source_prices` retains source revision IDs, `available_at` instants,
+stable asset keys and physical observation instants. `captured_actions` supplies
+available event terms. `source_spec` declares their mappings and calendar.
+Data selects revisions and adjustment factors; Backtest selects the runtime
+window. A provider may prepare from captured in-memory inputs and must not
+perform undeclared network fetches during simulation.
+
 ## Broker Methods
 
 ### Submitting Orders

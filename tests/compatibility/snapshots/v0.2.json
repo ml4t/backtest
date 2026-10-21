@@ -632,6 +632,7 @@
     "from ml4t.backtest import RebalanceConfig, TargetWeightExecutor",
     "from ml4t.backtest import RebalanceSchedule",
     "from ml4t.backtest import RuleChain, StopLoss, TakeProfit, TrailingStop",
+    "from ml4t.backtest import RuntimeServices",
     "from ml4t.backtest import StopLoss",
     "from ml4t.backtest import StopLoss, TakeProfit, TrailingStop, RuleChain",
     "from ml4t.backtest import StopLoss, TrailingStop, RuleChain",
@@ -4514,7 +4515,7 @@
       },
       "module": "ml4t.backtest.runtime",
       "qualname": "RuntimeServices",
-      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None) -> 'None'"
+      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None) -> 'None'"
     },
     "ml4t.backtest:StopFillMode": {
       "kind": "class",

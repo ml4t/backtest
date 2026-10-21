@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from datetime import datetime, timedelta
 from math import isfinite
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
+import pandas as pd
 import polars as pl
-from ml4t.specs import TimestampSemantics, WindowUnit
+from ml4t.specs import FeedSpec, TimestampSemantics, WindowUnit
 
 from ._history_clock import expected_times, session_times
 from ._temporal import temporal_frame, temporal_row, temporal_rows
@@ -19,21 +21,56 @@ if TYPE_CHECKING:
     from .engine import Engine
 
 
+class PreparedHistory(Protocol):
+    """Read interface for Data's causal prepared-history output."""
+
+    @property
+    def prices(self) -> pl.DataFrame: ...
+
+    @property
+    def metadata(self) -> Mapping[str, Any]: ...
+
+
+class HistoryProvider(Protocol):
+    """Caller-owned offline preparation, with the actual decision cutoff supplied."""
+
+    def __call__(self, *, as_of: datetime) -> PreparedHistory: ...
+
+
 class MarketDataView:
     """Read-only raw observations with explicit causal windows and stale views."""
 
-    def __init__(self, runtime: RuntimeServices, engine: Engine) -> None:
+    def __init__(
+        self,
+        runtime: RuntimeServices,
+        engine: Engine,
+        *,
+        prices: pl.DataFrame | None = None,
+        feed_spec: FeedSpec | None = None,
+        owner: MarketDataView | None = None,
+        known_at_cols: dict[str, str] | None = None,
+    ) -> None:
         self._runtime = runtime
+        self._owner = owner if owner is not None else self
+        self._prepared: tuple[datetime, bool, MarketDataView] | None = None
+        self._preparation_metadata: dict[str, Any] = {}
+        self._known_at_cols = dict(
+            runtime.known_at_cols if known_at_cols is None else known_at_cols
+        )
         feed = engine.feed
-        self._timestamp_col = feed.feed_spec.timestamp_col
-        self._entity_col = feed._entity_col
-        frame = feed.prices
+        spec = feed_spec if feed_spec is not None else feed.feed_spec
+        self._timestamp_col = spec.timestamp_col
+        entity_col = spec.entity_col
+        if not isinstance(entity_col, str):
+            raise ValueError("Runtime history requires one stable entity column")
+        self._entity_col = entity_col
+        frame = prices if prices is not None else feed.prices
         if frame is None:
             raise ValueError("Runtime market services require a prices frame")
         self._frame = frame
         self._columns = set(self._frame.columns)
         self._roles = {
-            name: getattr(feed.feed_spec, f"{name}_col", name)
+            name: getattr(spec, f"{name}_col", name)
             for name in [
                 "open",
                 "high",
@@ -48,12 +85,12 @@ class MarketDataView:
                 "ask_size",
             ]
         }
-        self._roles["price"] = getattr(feed.feed_spec, "price_col", None) or self._roles["close"]
+        self._roles["price"] = spec.price_col or self._roles["close"]
         if self._roles["price"] not in self._columns:
             self._roles["price"] = self._roles["close"]
         self._rows: dict[str, dict[datetime, int]] = {}
         self._times: dict[str, list[datetime]] = {}
-        for field, column in runtime.known_at_cols.items():
+        for field, column in self._known_at_cols.items():
             if self._column(field) not in self._columns:
                 raise ValueError(f"Known-at declaration has no input field {field!r}")
             if column not in self._columns or not isinstance(
@@ -61,14 +98,14 @@ class MarketDataView:
             ):
                 raise ValueError(f"Known-at column {column!r} must contain datetimes")
         index_columns = list(
-            dict.fromkeys([self._timestamp_col, self._entity_col, *runtime.known_at_cols.values()])
+            dict.fromkeys([self._timestamp_col, self._entity_col, *self._known_at_cols.values()])
         )
         for index, row in enumerate(temporal_rows(self._frame.select(index_columns), named=True)):
             asset, timestamp = row[self._entity_col], row[self._timestamp_col]
             rows = self._rows.setdefault(asset, {})
             if timestamp in rows:
                 raise ValueError(f"Duplicate market observation for {asset!r} at {timestamp}")
-            for column in runtime.known_at_cols.values():
+            for column in self._known_at_cols.values():
                 if row[column] is not None:
                     try:
                         _ = row[column] <= timestamp
@@ -93,10 +130,10 @@ class MarketDataView:
     def _available(self, field: str, row: dict[str, Any]) -> bool:
         assert self._asof is not None
         column = self._column(field)
-        declaration = self._runtime.known_at_cols.get(field)
+        declaration = self._known_at_cols.get(field)
         if declaration is None:
             declaration = next(
-                (v for k, v in self._runtime.known_at_cols.items() if self._column(k) == column),
+                (v for k, v in self._known_at_cols.items() if self._column(k) == column),
                 None,
             )
         known = row.get(declaration) if declaration else row[self._timestamp_col]
@@ -114,7 +151,11 @@ class MarketDataView:
         *,
         forward_fill: bool,
     ) -> pl.DataFrame:
-        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
+        if (
+            self._runtime._engine is None
+            or self._runtime._market is not self._owner
+            or self._asof is None
+        ):
             raise RuntimeError("market services require an active run")
         if isinstance(assets, str) or isinstance(fields, str) or not assets or not fields:
             raise ValueError("assets and fields must be nonempty sequences")
@@ -174,6 +215,71 @@ class MarketDataView:
             )
         return temporal_frame(records, schema=schema)
 
+    def _prepared_view(self) -> MarketDataView:
+        runtime = self._runtime
+        engine, asof = runtime._engine, self._asof
+        if engine is None or runtime._market is not self._owner or asof is None:
+            raise RuntimeError("market services require an active run")
+        if runtime.history_provider is None:
+            raise ValueError("view='prepared' requires a causal history_provider")
+        if self._prepared is not None and self._prepared[:2] == (asof, self._inclusive):
+            return self._prepared[2]
+        prepared = runtime.history_provider(as_of=asof)
+        frame, metadata = prepared.prices, prepared.metadata
+        if not isinstance(frame, pl.DataFrame) or not isinstance(metadata, Mapping):
+            raise TypeError("history_provider must return prepared prices and metadata")
+        if metadata.get("perspective") != "causal" or metadata.get("as_of") is None:
+            raise ValueError("Prepared history must declare a causal as_of perspective")
+        if pd.Timestamp(metadata["as_of"]) != asof:
+            raise ValueError("Prepared history as_of must equal the requested decision cutoff")
+        if metadata.get("price_basis") not in {"raw", "split_adjusted", "total_return"}:
+            raise ValueError("Prepared history must declare its price_basis")
+        spec = FeedSpec.from_any(metadata.get("feed_spec"))
+        if spec.timestamp_semantics != engine.config.resolved_timestamp_semantics:
+            raise ValueError("Prepared history cannot reinterpret the observation timestamp role")
+        if spec.resolve_calendar() != engine.config.resolved_calendar:
+            raise ValueError("Prepared history calendar conflicts with the execution feed")
+        source_spec = engine.feed.feed_spec
+        for name in ("bar_label", "bar_grid_anchor", "partial_bar_policy", "session_start_time"):
+            if getattr(spec, name) != getattr(source_spec, name):
+                raise ValueError(f"Prepared history cannot change the declared {name}")
+        if (
+            spec.timestamp_col not in frame
+            or not isinstance(spec.entity_col, str)
+            or spec.entity_col not in frame
+        ):
+            raise ValueError("Prepared history must retain declared observation keys")
+        if "available_at" not in frame or not isinstance(frame.schema["available_at"], pl.Datetime):
+            raise ValueError("Prepared history requires available_at source timestamps")
+        if frame["available_at"].null_count() or frame.filter(pl.col("available_at") > asof).height:
+            raise ValueError("Prepared history contains source revisions unavailable at the cutoff")
+        if "is_imputed" in frame and frame["is_imputed"].fill_null(False).any():
+            raise ValueError("Prepared history cannot promote imputed rows to observations")
+        for row in temporal_rows(frame.select(spec.timestamp_col, spec.entity_col), named=True):
+            instant, asset = row[spec.timestamp_col], row[spec.entity_col]
+            if instant is None or instant > asof or instant not in self._rows.get(asset, {}):
+                raise ValueError(
+                    "Prepared history must retain observed execution keys without future or imputed rows"
+                )
+        known = {
+            name: "available_at"
+            for name in frame.columns
+            if name not in {spec.timestamp_col, spec.entity_col}
+        }
+        known.update(self._known_at_cols)
+        view = MarketDataView(
+            runtime, engine, prices=frame, feed_spec=spec, owner=self._owner, known_at_cols=known
+        )
+        view._asof, view._inclusive = asof, self._inclusive
+        view._preparation_metadata = deepcopy(dict(metadata))
+        self._prepared = (asof, self._inclusive, view)
+        return view
+
+    @property
+    def prepared_metadata(self) -> dict[str, Any]:
+        """Copy the active provider's basis, cutoff and source preparation declarations."""
+        return deepcopy(self._prepared_view()._preparation_metadata)
+
     def history(
         self,
         assets: Sequence[str],
@@ -183,6 +289,7 @@ class MarketDataView:
         unit: WindowUnit | str = WindowUnit.OBSERVATION,
         duration: timedelta | None = None,
         forward_fill: bool = False,
+        view: Literal["raw", "prepared"] = "raw",
     ) -> pl.DataFrame:
         """Select causal raw observations or declared grid points, without resampling.
 
@@ -191,7 +298,22 @@ class MarketDataView:
         Session windows retain each observed instant, without aggregating fields.
         Grid gaps remain null unless the caller explicitly requests a stale read view.
         """
-        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
+        if view == "prepared":
+            return self._prepared_view().history(
+                assets,
+                fields,
+                bar_count=bar_count,
+                unit=unit,
+                duration=duration,
+                forward_fill=forward_fill,
+            )
+        if view != "raw":
+            raise ValueError("history view must be raw or prepared")
+        if (
+            self._runtime._engine is None
+            or self._runtime._market is not self._owner
+            or self._asof is None
+        ):
             raise RuntimeError("market services require an active run")
         unit = WindowUnit(unit)
         if unit is WindowUnit.ELAPSED:
@@ -227,16 +349,33 @@ class MarketDataView:
         return self._query(assets, fields, times, forward_fill=forward_fill)
 
     def current(
-        self, assets: Sequence[str], fields: Sequence[str], *, forward_fill: bool = False
+        self,
+        assets: Sequence[str],
+        fields: Sequence[str],
+        *,
+        forward_fill: bool = False,
+        view: Literal["raw", "prepared"] = "raw",
     ) -> pl.DataFrame:
         """Return values at the active instant, with no implicit stale executable quote."""
-        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
+        if view == "prepared":
+            return self._prepared_view().current(assets, fields, forward_fill=forward_fill)
+        if view != "raw":
+            raise ValueError("current view must be raw or prepared")
+        if (
+            self._runtime._engine is None
+            or self._runtime._market is not self._owner
+            or self._asof is None
+        ):
             raise RuntimeError("market services require an active run")
         times = [self._asof] if self._inclusive else []
         return self._query(assets, fields, times, forward_fill=forward_fill)
 
     def _past_rows(self, asset: str):
-        if self._runtime._engine is None or self._runtime._market is not self or self._asof is None:
+        if (
+            self._runtime._engine is None
+            or self._runtime._market is not self._owner
+            or self._asof is None
+        ):
             raise RuntimeError("market services require an active run")
         times = self._times.get(asset, [])
         end = bisect_right(times, self._asof)
@@ -305,6 +444,7 @@ class RuntimeServices:
         start: datetime | None = None,
         end: datetime | None = None,
         known_at_cols: dict[str, str] | None = None,
+        history_provider: HistoryProvider | None = None,
     ) -> None:
         if start is not None and not isinstance(start, datetime):
             raise TypeError("start must be a datetime")
@@ -314,6 +454,9 @@ class RuntimeServices:
             raise ValueError("start must not exceed end")
         self.start, self.end = start, end
         self.known_at_cols = dict(known_at_cols or {})
+        if history_provider is not None and not callable(history_provider):
+            raise TypeError("history_provider must be callable")
+        self.history_provider = history_provider
         self.scheduler = SessionScheduler(self)
         self._engine: Engine | None = None
         self._market: MarketDataView | None = None
