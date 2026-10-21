@@ -58,13 +58,7 @@ def prepared_feed(reference, *, declarations=True, ex_close=None):
         )
     actions = frames["actions"]
     if declarations:
-        actions = actions.with_columns(
-            pl.lit(pd.Timestamp(reference["closes"][0]) - pd.Timedelta(days=1)).alias(
-                "available_at"
-            ),
-            pl.lit("USD").alias("currency"),
-            pl.lit("pre_event").alias("share_basis"),
-        )
+        actions = pl.read_parquet(ROOT / reference["input"]["name"] / "native_actions.parquet")
     assets = [
         Asset(row["asset"], row["symbol"], row["sid"])
         for row in frames["zipline_equities"].to_dicts()
@@ -144,6 +138,8 @@ def run_reference_case(reference, **options):
                     else None,
                 )
             )
+            if case.get("destination_quantity"):
+                context.orders.append(order(sid(8), case["destination_quantity"]))
         if (
             case.get("close_on_ex")
             and get_datetime().date() == pd.Timestamp(reference["sessions"][2]).date()

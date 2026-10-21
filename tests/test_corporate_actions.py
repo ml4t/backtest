@@ -85,7 +85,7 @@ def test_raw_split_conserves_actual_quantity_cash_basis_and_nav(quantity, ratio)
 @pytest.mark.parametrize("quantity", [10, -10])
 @pytest.mark.parametrize("policy", ["declared_terms", "zipline_3_2"])
 def test_dividend_entitlement_survives_sale_and_only_changes_cash_on_payment(quantity, policy):
-    event = action("cash_dividend", cash_per_share=1.0, payment_date=TIMES[4])
+    event = action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])
     engine, result, observed = run_actions(
         [event], [100, 100, 99, 99, 99], quantity=quantity, policy=policy, sell=True
     )
@@ -132,7 +132,7 @@ def test_action_artifact_keeps_paid_lineage_and_actual_receivables_without_fabri
     from ml4t.backtest.result import BacktestResult
 
     _, result, _ = run_actions(
-        [action("cash_dividend", cash_per_share=1.0, payment_date=TIMES[4])],
+        [action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])],
         [100, 100, 99, 99, 99],
         policy=policy,
         sell=True,
@@ -169,8 +169,40 @@ def test_artifact_rejects_a_payment_journal_omission_from_the_actual_engine_prod
 
     monkeypatch.setattr(CorporateActionLedger, "_record", lose_payment)
     _, result, _ = run_actions(
-        [action("cash_dividend", cash_per_share=1.0, payment_date=TIMES[4])], [100, 100, 99, 99, 99]
+        [action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])], [100, 100, 99, 99, 99]
     )
     with pytest.raises(ArtifactWriteError, match="incomplete"):
         result.to_parquet(tmp_path)
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("quantity", [10, -10])
+def test_declared_fractional_cash_in_lieu_recognizes_the_actual_gain_instead_of_disappearing_basis(
+    quantity,
+):
+    engine, result, _ = run_actions(
+        [action(split_ratio=1 / 3, fractional_policy="cash_in_lieu", cash_in_lieu_price=310.0)],
+        [100, 100, 300, 300, 300],
+        quantity=quantity,
+    )
+    assert engine.broker.get_position("A").quantity == (3 if quantity > 0 else -3)
+    assert result.equity_curve[-1][1] == pytest.approx(
+        10000 + (10 / 3 - 3) * 10 * (1 if quantity > 0 else -1)
+    )
+
+
+def test_cash_only_conversion_records_realized_gain_without_inventing_a_trade_fill():
+    engine, result, _ = run_actions(
+        [action("merger", quantity_ratio=0.0, cash_component=120.0)], [100] * 5
+    )
+    assert engine.broker.get_position("A") is None
+    assert engine.broker.cash == 10200
+    assert len(result.fills) == 1
+    assert result.to_actions_dataframe()["realized_pnl"].sum() == 200
+
+
+def test_revision_published_after_the_original_effective_instant_cannot_erase_the_original_action():
+    old = action(split_ratio=2.0)
+    later = action(split_ratio=2.0, revision_id="r2", available_at=TIMES[3], effective_at=TIMES[4])
+    with pytest.raises(ValueError, match="Post-effective"):
+        run_actions([old, later], [100, 100, 50, 50, 50])

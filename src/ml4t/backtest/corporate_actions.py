@@ -136,11 +136,12 @@ class CorporateActionLedger:
             effective = self._clock(row["effective_at"], reference)
             if kind != "split" and kind != "merger":
                 eligibility = (
-                    row.get("ex_date")
-                    if self.policy == "zipline_3_2"
-                    else row.get("entitlement_date")
+                    row.get("ex_at") if self.policy == "zipline_3_2" else row.get("entitlement_at")
                 )
-                eligibility = eligibility if eligibility is not None else row.get("ex_date")
+                if eligibility is None:
+                    eligibility = row.get("ex_date")
+                if eligibility is None:
+                    eligibility = row.get("entitlement_date")
                 if eligibility is not None:
                     effective = self._clock(eligibility, reference)
             available = row["available_at"]
@@ -189,11 +190,15 @@ class CorporateActionLedger:
             if kind != "split":
                 if row.get("share_basis") not in {"pre_event", "post_event"}:
                     raise ValueError("Action share_basis must be pre_event or post_event")
-                payment_term = row.get("payment_date")
+                payment_term = row.get("payment_at")
+                if payment_term is None:
+                    payment_term = row.get("payment_date")
                 if kind == "merger" and payment_term is None:
                     payment_term = row["effective_at"]
                 if payment_term is None:
-                    raise ValueError("Distribution requires explicit payment_date")
+                    raise ValueError(
+                        "Distribution requires payment_at or a declared payment_date session label"
+                    )
                 payment = self._clock(payment_term, reference)
                 if payment < effective:
                     raise ValueError("Action payment_date precedes entitlement")
@@ -210,6 +215,10 @@ class CorporateActionLedger:
             ):
                 raise ValueError("Action revisions at the same publication instant are ambiguous")
             event = candidates[-1]
+            if event.terms["available_at"] > min(candidate.effective for candidate in candidates):
+                raise ValueError(
+                    "Post-effective action revisions require a forward correction event"
+                )
             kind = event.terms["action_kind"]
             if kind == "split" or kind == "merger":
                 self._events.append((event.effective, 1, event, kind))
@@ -256,7 +265,7 @@ class CorporateActionLedger:
                 effective_at=event.effective,
                 payment_at=event.payment,
                 terms_json=action_terms_json(event.terms),
-                **({"cash_delta": 0.0} | values),
+                **({"cash_delta": 0.0, "realized_pnl": 0.0, "allocated_commission": 0.0} | values),
             )
         )
 
@@ -342,6 +351,7 @@ class CorporateActionLedger:
         position = broker.positions.get(asset)
         old_quantity = position.quantity if position is not None else 0.0
         cash_delta = 0.0
+        realized_pnl = allocated_commission = 0.0
         if position is not None:
             exact = old_quantity * ratio
             if not isfinite(exact) or not isfinite(position.entry_price / ratio):
@@ -358,6 +368,12 @@ class CorporateActionLedger:
                 if legacy
                 else fraction * row.get("cash_in_lieu_price", 0.0)
             )
+            if fraction:
+                allocated_commission = position.entry_commission * abs(fraction / exact)
+                realized_pnl = (
+                    cash_delta - fraction * (position.entry_price / ratio) - allocated_commission
+                )
+                position.entry_commission -= allocated_commission
             position.quantity = whole
             position.entry_price /= ratio
             position._commission_adjusted_cost_basis = basis
@@ -423,6 +439,8 @@ class CorporateActionLedger:
             quantity_before=old_quantity,
             quantity_after=broker.positions[asset].quantity if asset in broker.positions else 0.0,
             cash_delta=cash_delta,
+            realized_pnl=realized_pnl,
+            allocated_commission=allocated_commission,
         )
 
     def _entitle(self, event: _Action, instant: datetime) -> None:
@@ -448,6 +466,8 @@ class CorporateActionLedger:
             "security_quantity": units,
             "currency": row["currency"],
             "paid": False,
+            "destination_basis": 0.0,
+            "destination_commission": 0.0,
         }
         self._record(
             event, instant, "entitlement", quantity_before=quantity, quantity_after=quantity
@@ -461,61 +481,111 @@ class CorporateActionLedger:
             adjustment = row["quantity_ratio"] * mark
         self._rebase_mark(row["asset"], cash=adjustment)
 
-    def _add_security(self, asset: str, quantity: float, basis: float, instant: datetime) -> None:
+    def _add_security(
+        self, asset: str, quantity: float, basis: float, instant: datetime, commission: float = 0.0
+    ) -> tuple[float, float]:
         if not quantity:
-            return
+            return 0.0, 0.0
         broker = self.broker
         existing = broker.positions.get(asset)
-        if existing is not None and existing.quantity * quantity < 0:
-            raise ValueError(
-                "Security distribution against an opposite position requires an explicit conversion trade"
-            )
         mark = broker.get_last_price(asset)
         if mark is None:
             raise ValueError("Security distribution requires an observed destination mark")
+        total = quantity + (existing.quantity if existing is not None else 0.0)
+        reported_basis = existing.commission_adjusted_cost_basis if existing is not None else None
+        if not isfinite(total) or not isfinite(basis):
+            raise ValueError("Security conversion would create nonfinite position terms")
+        realized = allocated = 0.0
+        if existing is not None and existing.quantity * quantity < 0:
+            closed = min(abs(existing.quantity), abs(quantity))
+            allocated_old = existing.entry_commission * closed / abs(existing.quantity)
+            allocated_incoming = commission * closed / abs(quantity)
+            allocated = allocated_old + allocated_incoming
+            realized = (
+                closed * (1 if existing.quantity > 0 else -1) * (basis - existing.entry_price)
+                - allocated
+            )
+            if total == 0:
+                del broker.positions[asset]
+                return realized, allocated
+            if total * existing.quantity > 0:
+                existing.quantity = total
+                existing.entry_commission -= allocated_old
+                return realized, allocated
+            commission -= allocated_incoming
+            existing = None
         if existing is None:
             broker.positions[asset] = Position(
                 asset,
-                quantity,
+                total,
                 basis,
                 instant,
                 current_price=mark,
                 multiplier=broker.get_multiplier(asset),
+                entry_commission=commission,
             )
         else:
-            total = existing.quantity + quantity
+            old_basis = existing.commission_adjusted_cost_basis
             existing.entry_price = (
                 existing.quantity * existing.entry_price + quantity * basis
             ) / total
             existing._commission_adjusted_cost_basis = (
-                existing.quantity * existing.commission_adjusted_cost_basis + quantity * basis
+                existing.quantity * old_basis + quantity * basis
             ) / total
+            existing.entry_commission += commission
             existing.quantity = total
+        if self.policy == "zipline_3_2" and reported_basis is not None:
+            broker.positions[asset]._commission_adjusted_cost_basis = reported_basis
+        return realized, allocated
 
     def _pay(self, event: _Action, instant: datetime) -> None:
         entitlement = self.entitlements.get(event.key)
         if entitlement is None or entitlement["paid"]:
             return
         self._cash(entitlement["cash_amount"])
-        self._add_security(
+        destination = entitlement["destination_asset"]
+        prior = self.broker.positions.get(destination)
+        prior_reported_basis = prior.commission_adjusted_cost_basis if prior is not None else 0.0
+        realized, allocated = self._add_security(
             entitlement["destination_asset"],
             entitlement["security_quantity"],
             entitlement.get("destination_basis", 0.0),
             instant,
+            entitlement.get("destination_commission", 0.0),
         )
+        if event.terms["action_kind"] == "merger" and self.policy == "zipline_3_2":
+            realized += (
+                entitlement["cash_amount"]
+                + entitlement["security_quantity"] * entitlement["destination_basis"]
+                + entitlement.get("destination_commission", 0.0)
+            )
         entitlement["paid"] = True
+        if destination is not None:
+            remaining = self.broker.positions.get(destination)
+            entitlement["delivered_position_quantity"] = (
+                remaining.quantity if remaining is not None else 0.0
+            )
+            entitlement["delivered_position_basis"] = (
+                remaining.commission_adjusted_cost_basis
+                if remaining is not None
+                else prior_reported_basis
+            )
+            entitlement["delivery_fill_count"] = len(self.broker.fills)
         self._record(
             event,
             instant,
             "payment",
             cash_delta=entitlement["cash_amount"],
             quantity_after=entitlement["security_quantity"],
+            realized_pnl=realized,
+            allocated_commission=allocated,
         )
 
     def _merger(self, event: _Action, instant: datetime) -> None:
         row, broker = event.terms, self.broker
         position = broker.positions.get(row["asset"])
         quantity = position.quantity if position is not None else 0.0
+        realized = commission = 0.0
         if position is not None:
             if any(o.asset == row["asset"] for o in broker.pending_orders):
                 raise ValueError("Cancel source orders explicitly before a security conversion")
@@ -538,9 +608,26 @@ class CorporateActionLedger:
                 / row["quantity_ratio"]
                 if units
                 else 0.0,
+                "destination_commission": position.entry_commission if units else 0.0,
             }
+            if self.policy == "zipline_3_2":
+                realized = -quantity * position.entry_price - position.entry_commission
+            if not units:
+                commission = position.entry_commission
+                if self.policy == "declared_terms":
+                    realized = (
+                        quantity * (row["cash_component"] - position.entry_price) - commission
+                    )
             del broker.positions[row["asset"]]
-        self._record(event, instant, "merger", quantity_before=quantity, quantity_after=0.0)
+        self._record(
+            event,
+            instant,
+            "merger",
+            quantity_before=quantity,
+            quantity_after=0.0,
+            realized_pnl=realized,
+            allocated_commission=commission,
+        )
 
     def refresh(self) -> None:
         value = 0.0

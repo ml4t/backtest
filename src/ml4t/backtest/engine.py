@@ -486,6 +486,7 @@ class Engine:
             if self.config.cancel_policy.value == "session_end"
             else None
         )
+        corporate_actions = self._corporate_actions
         for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
@@ -527,7 +528,8 @@ class Engine:
             if expire_orders is not None:
                 expire_orders(timestamp, after_event=False)
 
-            self._advance_account_events(timestamp)
+            if corporate_actions is not None:
+                corporate_actions.advance(timestamp)
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
@@ -614,8 +616,8 @@ class Engine:
                 ask_sizes,
                 signals,
             )
-            if self._corporate_actions is not None:
-                self._corporate_actions.refresh()
+            if corporate_actions is not None:
+                corporate_actions.refresh()
             if session_mode:
                 session_assets.update(assets_data)
                 session_context.update(context)

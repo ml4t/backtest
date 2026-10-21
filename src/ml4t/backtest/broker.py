@@ -1003,9 +1003,11 @@ class Broker:
             "recorded_length": len(self._execution_journal.recorded_rows or []),
             "trades_length": len(self._execution_journal.trades),
             "fill_snapshots_length": len(self._execution_journal.fill_snapshots or []),
-            "corporate_receivable_snapshots": copy.deepcopy(
+            "corporate_receivable_snapshots": dict(
                 self._execution_journal.corporate_receivable_snapshots
-            ),
+            )
+            if self._execution_journal.corporate_receivable_snapshots is not None
+            else None,
             "rebalance_counter": self._rebalance_counter,
             "original_asset_stats_keys": set(self._asset_stats),
             "asset_stats": {},
@@ -3091,10 +3093,13 @@ class Broker:
         if self.settlement_delay > 0:
             self.account.release_settled(self._bar_index)
 
+        if self._market_state.action_adjusted_assets:
+            self._market_state.action_adjusted_assets.difference_update(
+                asset for asset, price in prices.items() if isfinite(price)
+            )
         for asset, price in prices.items():
             if not isfinite(price):
                 continue
-            self._market_state.action_adjusted_assets.discard(asset)
             self._last_prices[asset] = price
             if self._market_state.last_price_times is not None:
                 self._market_state.last_price_times[asset] = timestamp

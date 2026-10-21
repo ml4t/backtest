@@ -29,6 +29,7 @@ _ACTION_SCHEMA = {
     "quantity_after": pl.Float64,
     "cash_delta": pl.Float64,
     "realized_pnl": pl.Float64,
+    "allocated_commission": pl.Float64,
 }
 _ENTITLEMENT_SCHEMA = {
     "source": pl.String,
@@ -46,6 +47,10 @@ _ENTITLEMENT_SCHEMA = {
     "paid": pl.Boolean,
     "destination_basis": pl.Float64,
     "receivable_value": pl.Float64,
+    "destination_commission": pl.Float64,
+    "delivered_position_quantity": pl.Float64,
+    "delivered_position_basis": pl.Float64,
+    "delivery_fill_count": pl.UInt32,
 }
 
 
