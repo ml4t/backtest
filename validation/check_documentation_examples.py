@@ -46,6 +46,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "runtime-causal-session",
         "runtime-history-windows",
         "runtime-feature-availability",
+        "prepared-feature-panel",
         "trading-account-controls",
         "session-end-cancel",
         "order-context-fees",

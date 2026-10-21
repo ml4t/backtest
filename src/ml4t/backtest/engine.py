@@ -107,7 +107,13 @@ class Engine:
         negotiated_version = negotiate_lifecycle_version(lifecycle_version)
         if holdings_sampling not in {"none", "bar", "session", "fill_and_session"}:
             raise ValueError("holdings_sampling must be none, bar, session or fill_and_session")
-        self.runtime = runtime
+        self.runtime = (
+            runtime
+            if runtime is not None
+            else RuntimeServices()
+            if feed.feature_metadata is not None
+            else None
+        )
         self.holdings_sampling = holdings_sampling
         self.holdings: list[tuple[Any, ...]] | None = [] if holdings_sampling != "none" else None
         self._validate_strategy_lifecycle(strategy)

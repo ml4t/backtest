@@ -286,6 +286,83 @@ executable quote methods. A feature named `close` remains a feature. Its history
 supports observation counts and elapsed durations; Engineer owns feature-grid
 preparation and the lookback method that produced each feature.
 
+### Consuming an Engineer feature panel
+
+Development source accepts `DataFeed(feature_spec=...)` with an Engineer
+`FeatureSpec` or its saved `to_dict()` mapping. Supply the prepared panel as
+`signals_df`, or use `signals_path` for Parquet. Backtest projects the declared
+decision instant onto the feed clock and retains the original observation key.
+The manifest's publication and eligibility declarations apply automatically,
+including when no explicit `RuntimeServices` object is supplied. A conflicting
+runtime mapping raises before strategy initialization.
+
+The following consumer example uses saved feature values. Engineer computes
+those values and selects the eligible universe. Backtest performs no feature
+calculation, adjustment or membership inference.
+
+<!-- ml4t-doc-test: prepared-feature-panel -->
+```python
+from datetime import UTC, date, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ExecutionMode
+
+decision = datetime(2025, 7, 9, 17, tzinfo=UTC)
+panel = pl.DataFrame({
+    "timestamp": [date(2025, 7, 9)] * 2,
+    "asset": ["A", "B"], "average": [2.0, 20.0],
+    "decision_time": [decision] * 2,
+    "available_at": [datetime(2025, 7, 9, 16, tzinfo=UTC)] * 2,
+    "eligible": [True, False],
+})
+feature_spec = {
+    "artifact_id": "three-observation-mean", "kind": "features", "version": 1,
+    "schema": {"timestamp_col": "timestamp", "entity_col": "asset",
+               "feature_columns": ["average"], "decision_time_col": "decision_time",
+               "available_at_col": "available_at", "eligible_col": "eligible"},
+    "definition": {
+        "feed_spec": {"time_contract_version": 2, "calendar": None,
+                      "timestamp_semantics": "session_label", "entity_col": "asset"},
+        "window_unit": "observation", "price_basis": "raw", "lookbacks": {"average": 3},
+    },
+}
+prices = pl.DataFrame({"timestamp": [decision] * 2, "asset": ["A", "B"],
+                       "close": [100.0, 100.0]})
+feed = DataFeed(prices_df=prices, signals_df=panel, feature_spec=feature_spec,
+                feed_spec={"time_contract_version": 2, "calendar": None,
+                           "timestamp_semantics": "event_time"})
+
+class Select(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        assert data["A"]["signals"]["average"] == 2.0
+        assert data["B"]["signals"]["average"] is None
+        broker.submit_order("A", 1)
+
+result = Engine(feed, Select(), BacktestConfig(calendar=None,
+                execution_mode=ExecutionMode.SAME_BAR)).run()
+assert result.to_fills_dataframe()["asset"].to_list() == ["A"]
+assert feed.signals["feature_observation_time"].to_list() == panel["timestamp"].to_list()
+print("Prepared features consumed at the declared decision instant.")
+```
+
+Polars lazy panels are collected once before simulation; multi-chunk frames keep
+their rows. Pandas panels may use columns or named index levels for declared
+keys. Primitive nullable values, aware timestamps and integer IDs do not require
+PyArrow conversion. Supply explicit parsing and dtypes when loading CSV before
+passing the resulting frame. The adapter never fetches a dataset during a run.
+
+Only declared features and the retained clock/universe metadata enter signal
+delivery. `feed.feature_metadata` returns a defensive copy of the original spec,
+column projection and excluded-column list. The feature calculation's calendar,
+window unit and price basis remain in that spec; they are not rewritten as the
+simulation's settings. This handoff does not adjust execution prices.
+
+The producer/consumer tests rebuild captured panels through installed Engineer
+`0.1.7.dev58+g093b72d68` from
+[revision 093b72d](https://github.com/ml4t/engineer/blob/093b72d6801cf2b279f1aa682c6d2cabe45d494d/src/ml4t/engineer/features/preparation.py),
+using published Specs 0.2.0. That Engineer artifact is a source-qualified development
+build. This statement does not attribute its preparation API to PyPI Engineer 0.1.7.
+
 Known feature rows at the decision instant can be visible during pre-open, when
 `available_at <= decision_time`; opening quote observations remain excluded until
 their market phase. Explicit feature forward filling retains source timestamps.

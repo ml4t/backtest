@@ -1,0 +1,120 @@
+{
+  "producer": {
+    "repository": "https://github.com/ml4t/engineer",
+    "revision": "093b72d6801cf2b279f1aa682c6d2cabe45d494d",
+    "version": "0.1.7.dev58+g093b72d68",
+    "wheel": "ml4t_engineer-0.1.7.dev58+g093b72d68-py3-none-any.whl",
+    "wheel_sha256": "845ebffe660a04762d8e6e18bb0d129c512e364b03a5920c968bf18bc17cb3db",
+    "published": false
+  },
+  "input_feed_spec": {
+    "timestamp_col": "timestamp",
+    "entity_col": null,
+    "price_col": "close",
+    "open_col": "open",
+    "high_col": "high",
+    "low_col": "low",
+    "close_col": "close",
+    "volume_col": "volume",
+    "vwap_col": null,
+    "bid_col": null,
+    "ask_col": null,
+    "mid_col": null,
+    "bid_size_col": null,
+    "ask_size_col": null,
+    "calendar": null,
+    "timezone": null,
+    "data_frequency": null,
+    "bar_type": null,
+    "timestamp_semantics": "session_label",
+    "session_start_time": null,
+    "time_contract_version": 2,
+    "bar_grid_anchor": null,
+    "bar_label": null,
+    "partial_bar_policy": null
+  },
+  "feature_spec": {
+    "artifact_id": "causal-three-observation-mean",
+    "kind": "features",
+    "version": 1,
+    "storage": {
+      "path": "",
+      "format": "parquet",
+      "partition_by": []
+    },
+    "provenance": {
+      "source_artifacts": [],
+      "content_hash": null,
+      "created_by": null
+    },
+    "schema": {
+      "timestamp_col": "timestamp",
+      "entity_col": "asset",
+      "feature_columns": [
+        "average"
+      ],
+      "available_at_col": "available_at",
+      "decision_time_col": "decision_time",
+      "eligible_col": "eligible",
+      "universe_time_col": "effective_session"
+    },
+    "definition": {
+      "family": "financial",
+      "join_keys": [],
+      "source_artifacts": [],
+      "feed_spec": {
+        "timestamp_col": "timestamp",
+        "entity_col": null,
+        "price_col": "close",
+        "open_col": "open",
+        "high_col": "high",
+        "low_col": "low",
+        "close_col": "close",
+        "volume_col": "volume",
+        "vwap_col": null,
+        "bid_col": null,
+        "ask_col": null,
+        "mid_col": null,
+        "bid_size_col": null,
+        "ask_size_col": null,
+        "calendar": null,
+        "timezone": null,
+        "data_frequency": null,
+        "bar_type": null,
+        "timestamp_semantics": "session_label",
+        "session_start_time": null,
+        "time_contract_version": 2,
+        "bar_grid_anchor": null,
+        "bar_label": null,
+        "partial_bar_policy": null
+      },
+      "window_unit": "observation",
+      "price_basis": "raw",
+      "lookbacks": {
+        "average": 3
+      },
+      "missing_input_policy": "complete"
+    }
+  },
+  "files": {
+    "history.parquet": "c01744dec21383eb7b9d27d248e5e779b51a757fdc03ca3e97084084e17911cc",
+    "decisions.parquet": "b92bd8441e4cc2691584e1d2c81fc1f81f3ce0b72183481a8a2a45cb0cc6441f",
+    "universe.parquet": "2d756d9e61633ba545b12f168233cf8f38535f132babf4fb80189e5c0f43bdcc",
+    "panel.parquet": "3740032e4a0c3d924abf1d3cb396f7a3c397c0a00c8cc8b019331a4967a117db"
+  },
+  "independent_expected": {
+    "averages": [
+      2.0,
+      20.0,
+      3.0,
+      30.0
+    ],
+    "eligible": [
+      true,
+      false,
+      true,
+      false
+    ],
+    "explanation": "Mean of three original observations per asset; B excluded from declared membership."
+  }
+}

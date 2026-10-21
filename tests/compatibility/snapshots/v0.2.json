@@ -4286,6 +4286,10 @@
           "kind": "method",
           "signature": "(self) -> tuple[datetime.datetime, dict[str, dict], dict[str, Any]]"
         },
+        "feature_metadata": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, Any] | None"
+        },
         "n_bars": {
           "kind": "property",
           "signature": "(self) -> int"
@@ -4297,7 +4301,7 @@
       },
       "module": "ml4t.backtest.datafeed",
       "qualname": "DataFeed",
-      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, vwap_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None, session_col: str | None = None, calendar: str | None | ml4t.specs.time.CalendarUnset = <CalendarUnset.UNSET: 'unset'>, capital_flows: polars.dataframe.frame.DataFrame | None = None)"
+      "signature": "(prices_path: str | None = None, signals_path: str | None = None, context_path: str | None = None, prices_df: polars.dataframe.frame.DataFrame | None = None, signals_df: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.core.frame.DataFrame | None = None, context_df: polars.dataframe.frame.DataFrame | None = None, *, feed_spec: ml4t.specs.market_data.FeedSpec | Any | None = None, feature_spec: Any | None = None, contract: ml4t.specs.market_data.FeedSpec | Any | None = None, entity_col: str | None = None, timestamp_col: str | None = None, price_col: str | None = None, open_col: str | None = None, high_col: str | None = None, low_col: str | None = None, close_col: str | None = None, volume_col: str | None = None, vwap_col: str | None = None, bid_col: str | None = None, ask_col: str | None = None, mid_col: str | None = None, bid_size_col: str | None = None, ask_size_col: str | None = None, session_col: str | None = None, calendar: str | None | ml4t.specs.time.CalendarUnset = <CalendarUnset.UNSET: 'unset'>, capital_flows: polars.dataframe.frame.DataFrame | None = None)"
     },
     "ml4t.backtest:Engine": {
       "kind": "class",

@@ -587,6 +587,18 @@ class RuntimeServices:
         market = MarketDataView(self, engine)
         signals = None
         if engine.feed.signals is not None:
+            known_at = dict(self.signal_known_at_cols)
+            eligible = dict(self.signal_eligible_cols)
+            metadata = engine.feed.feature_metadata
+            if metadata is not None:
+                for declared, supplied, name in (
+                    (metadata["projection"]["signal_known_at_cols"], known_at, "publication"),
+                    (metadata["projection"]["signal_eligible_cols"], eligible, "eligibility"),
+                ):
+                    for field, column in declared.items():
+                        if field in supplied and supplied[field] != column:
+                            raise ValueError(f"Runtime {name} mapping conflicts with feature_spec")
+                        supplied[field] = column
             entity = engine.feed._entity_col
             prices = engine.feed.prices
             assert prices is not None
@@ -599,9 +611,9 @@ class RuntimeServices:
                     prices=engine.feed.signals,
                     feed_spec=engine.feed.feed_spec,
                     owner=market,
-                    known_at_cols=self.signal_known_at_cols,
+                    known_at_cols=known_at,
                     quote_fields=False,
-                    eligible_cols=self.signal_eligible_cols,
+                    eligible_cols=eligible,
                 )
             )
         elif self.signal_known_at_cols or self.signal_eligible_cols:
@@ -658,22 +670,23 @@ class RuntimeServices:
     def _advance(self, timestamp: datetime, data: dict[str, dict]) -> dict[str, dict]:
         market = self.market
         market._asof, market._inclusive = timestamp, True
-        if (
-            not self.known_at_cols
-            and not self.signal_known_at_cols
-            and not self.signal_eligible_cols
-        ):
+        signal_view = self._signals._view if self._signals is not None else None
+        signal_fields = (
+            signal_view._known_at_cols.keys() | signal_view._eligible_cols.keys()
+            if signal_view is not None
+            else set()
+        )
+        if not self.known_at_cols and not signal_fields:
             return data
         visible = {asset: dict(values) for asset, values in data.items()}
         for asset, values in visible.items():
-            if self.signal_known_at_cols or self.signal_eligible_cols:
-                view = self.signals._view
+            if signal_fields:
+                assert signal_view is not None
+                view = signal_view
                 signal = view._row(asset, timestamp)
                 if signal is not None:
                     delivered = dict(values.get("signals", {}))
-                    for field in (
-                        self.signal_known_at_cols.keys() | self.signal_eligible_cols.keys()
-                    ):
+                    for field in signal_fields:
                         if not view._available(field, signal):
                             delivered[field] = None
                     values["signals"] = delivered

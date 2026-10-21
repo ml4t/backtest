@@ -5,13 +5,16 @@ timestamp-to-slice indexes, then converts only the current bar to dicts at
 iteration time.
 """
 
+from copy import deepcopy
 from datetime import date, datetime
 from typing import Any
 
+import pandas as pd
 import polars as pl
 from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
+from ._feature_signals import feature_signals
 from ._temporal import temporal_rows, timestamp_values
 
 
@@ -88,10 +91,11 @@ class DataFeed:
         signals_path: str | None = None,
         context_path: str | None = None,
         prices_df: pl.DataFrame | None = None,
-        signals_df: pl.DataFrame | None = None,
+        signals_df: pl.DataFrame | pl.LazyFrame | pd.DataFrame | None = None,
         context_df: pl.DataFrame | None = None,
         *,
         feed_spec: FeedSpec | Any | None = None,
+        feature_spec: Any | None = None,
         contract: FeedSpec | Any | None = None,
         entity_col: str | None = None,
         timestamp_col: str | None = None,
@@ -129,7 +133,7 @@ class DataFeed:
             if prices_df is not None
             else (_read_parquet(prices_path) if prices_path else None)
         )
-        self.signals = (
+        signal_input = (
             signals_df
             if signals_df is not None
             else (_read_parquet(signals_path) if signals_path else None)
@@ -172,6 +176,18 @@ class DataFeed:
             ask_size_col=ask_size_col,
         ).resolve(self.prices.columns, self.ENTITY_COL_CANDIDATES)
         self.contract = self.feed_spec
+        self.signals: pl.DataFrame | None = None
+        self._feature_metadata: dict[str, Any] | None = None
+        if feature_spec is not None:
+            if signal_input is None:
+                raise ValueError("feature_spec requires signals_df or signals_path")
+            self.signals, self._feature_metadata = feature_signals(
+                signal_input, feature_spec, self.feed_spec
+            )
+        elif signal_input is None or isinstance(signal_input, pl.DataFrame):
+            self.signals = signal_input
+        else:
+            raise TypeError("Pandas/lazy signal panels require an explicit feature_spec")
         self._timestamp_col = self.feed_spec.timestamp_col
         resolved_entity_col = self.feed_spec.entity_col
         if not isinstance(resolved_entity_col, str):
@@ -355,6 +371,11 @@ class DataFeed:
             return None
         offset, length = bounds
         return df.slice(offset, length)
+
+    @property
+    def feature_metadata(self) -> dict[str, Any] | None:
+        """Original Engineer declaration and explicit decision-clock projection, defensively copied."""
+        return deepcopy(self._feature_metadata)
 
     def _get_timestamps(self) -> list[datetime]:
         """Get sorted list of all timestamps across all data sources."""
