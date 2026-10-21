@@ -9,6 +9,21 @@ import pandas as pd
 from ...calendar import get_calendar, get_schedule
 from ...sessions import SessionConfig
 
+_FUTURES_CLOSE_OFFSET = -timedelta(hours=1)
+
+
+def _daily_history_close_offset(config):
+    frequency = config.resolved_data_frequency
+    frequency = getattr(frequency, "value", frequency)
+    calendar = config.resolved_calendar
+    if (
+        frequency in {"daily", "d", "1d"}
+        and calendar is not None
+        and get_calendar(calendar).name == "us_futures"
+    ):
+        return _FUTURES_CLOSE_OFFSET
+    return None
+
 
 def _date(value):
     stamp = pd.Timestamp(value)
@@ -54,7 +69,7 @@ def _execution_windows(feed, config, runtime):
             config.resolved_timezone,
         )
         closed = _physical(
-            pd.Timestamp(row["market_close"]) - timedelta(hours=1),
+            pd.Timestamp(row["market_close"]) + _FUTURES_CLOSE_OFFSET,
             points[0].tzinfo is None,
             config.resolved_timezone,
         )

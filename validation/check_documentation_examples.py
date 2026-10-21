@@ -72,6 +72,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "zipline-independent-history-grid",
         "zipline-partial-session",
         "legacy-us-futures-clock",
+        "legacy-daily-futures-history",
         "declared-future-costs",
         "futures-volatility-volume",
         "legacy-session-end-cancel",

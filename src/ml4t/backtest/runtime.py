@@ -404,6 +404,7 @@ class MarketDataView:
         max_age: timedelta | None = None,
         view: Literal["raw", "prepared"] = "raw",
         finite_prices_only: bool = False,
+        session_close_offset: timedelta | None = None,
     ) -> pl.DataFrame:
         """Select causal raw observations or declared grid points, without resampling.
 
@@ -411,6 +412,9 @@ class MarketDataView:
         Elapsed windows instead require ``duration`` and select ``(asof-duration, asof]``.
         Session windows retain each observed instant, without aggregating fields.
         Grid gaps remain null unless the caller explicitly requests a stale read view.
+        An explicit nonpositive ``session_close_offset`` selects earlier daily
+        right-labelled expected endpoints; it never moves an observed quote or
+        changes the calendar, execution clock or default grid.
         """
         if view == "prepared":
             return self._prepared_view().history(
@@ -422,12 +426,15 @@ class MarketDataView:
                 forward_fill=forward_fill,
                 max_age=max_age,
                 finite_prices_only=finite_prices_only,
+                session_close_offset=session_close_offset,
             )
         if view != "raw":
             raise ValueError("history view must be raw or prepared")
         self._check_active()
         assert self._asof is not None
         unit = WindowUnit(unit)
+        if session_close_offset is not None and unit is not WindowUnit.EXPECTED_BAR:
+            raise ValueError("session_close_offset requires expected_bar daily history")
         if unit is WindowUnit.ELAPSED:
             if (
                 bar_count is not None
@@ -457,10 +464,19 @@ class MarketDataView:
             assert bar_count is not None
             engine = self._runtime._engine
             assert engine is not None
-            select = expected_times if unit is WindowUnit.EXPECTED_BAR else session_times
-            times = select(
-                self._history_config, self._asof, bar_count, self._inclusive, self._timestamps
-            )
+            if unit is WindowUnit.EXPECTED_BAR:
+                times = expected_times(
+                    self._history_config,
+                    self._asof,
+                    bar_count,
+                    self._inclusive,
+                    self._timestamps,
+                    session_close_offset=session_close_offset,
+                )
+            else:
+                times = session_times(
+                    self._history_config, self._asof, bar_count, self._inclusive, self._timestamps
+                )
         return self._query(
             assets,
             fields,

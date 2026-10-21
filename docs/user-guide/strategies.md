@@ -158,6 +158,14 @@ continues to return the individual observations without aggregation. See the
 [runnable partial-session example](migrate-from-zipline.md#read-the-current-partial-daily-bar)
 for native reads alongside the original callback projection.
 
+For an explicit earlier daily read endpoint, `history(unit="expected_bar",
+session_close_offset=-timedelta(hours=1), ...)` selects grid points one hour
+before the calendar close. It requires right-labelled daily bars and a
+nonpositive offset that remains after session open. Only observations actually
+available at those instants can be returned; the option does not shift quotes,
+calendar sessions or execution. The default grid is unchanged. See the
+[daily futures example](migrate-from-zipline.md#align-daily-reads-with-the-legacy-futures-close).
+
 Register callbacks before execution or in `on_start`/`on_prepare`. Registrations
 made during a run are removed afterward; registrations made beforehand persist
 when reusing the service for a new Engine. Callbacks use the existing lifecycle

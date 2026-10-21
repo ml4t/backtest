@@ -1709,6 +1709,61 @@ after the last captured market event is rejected. Explicit run bounds exclude
 clock registrations outside those bounds.
 
 
+### Align daily reads with the legacy futures close
+
+Published 3.2.0 daily `us_futures` callbacks also occur at 17:00 New York,
+one hour before that synthetic calendar's full close. The adapter selects
+the same earlier daily history endpoint using native
+`history(unit="expected_bar", session_close_offset=-timedelta(hours=1))`.
+Native history's default calendar grid remains unchanged. The option accepts
+only nonpositive offsets on right-labelled daily expected-bar reads, with
+the selected endpoint after session open.
+
+Supply actual observations available at that earlier endpoint. A full-calendar
+18:00 quote cannot be relabelled or made available at 17:00. Data bundle daily
+session labels alone do not establish physical publication times; declare that
+input policy explicitly. The following controlled example supplies quotes at
+the captured legacy clock.
+
+<!-- ml4t-doc-test: legacy-daily-futures-history -->
+```python
+from datetime import UTC, datetime, timedelta
+import polars as pl
+from ml4t.backtest import DataFeed, RuntimeServices
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Future
+
+asset = Future("ES", "ESH25", 8, root_symbol="ES", multiplier=50., tick_size=.25)
+times = [datetime(2025, 3, day, 22, tzinfo=UTC) for day in [3, 4, 5]]
+values = [100., 101., 102.]
+prices = pl.DataFrame({"timestamp": times, "asset": [asset.key] * 3,
+    "open": values, "high": values, "low": values, "close": values, "volume": [1000.] * 3})
+feed = DataFeed(prices_df=prices, feed_spec={"calendar": "us_futures",
+    "time_contract_version": 2, "data_frequency": "daily", "timestamp_semantics": "event_time",
+    "bar_label": "right", "bar_grid_anchor": "session_open", "partial_bar_policy": "include"})
+runtime = RuntimeServices()
+seen = []
+
+def handle(context, data):
+    legacy = data.history(asset, "close", 1, "1d")
+    native = runtime.market.history([asset.key], ["close"], bar_count=1, unit="expected_bar",
+                                    session_close_offset=-timedelta(hours=1))
+    assert native["timestamp"][0] == context.get_datetime().to_pydatetime()
+    assert native["close"][0] == legacy.iloc[0] == data.current(asset, "price")
+    seen.append(native["close"][0])
+
+performance = run_algorithm(feed=feed, assets=[asset], runtime=runtime, handle_data=handle)
+assert seen == values
+assert performance.attrs["backtest_result"].fills == []
+print("Daily futures history uses actual quotes at the legacy execution close.")
+```
+
+The captured `tests/fixtures/zipline_daily_futures` original-engine workflows
+also check UTC and naive New York input, a DST weekend, pre-event OHLCV reads
+and actual Data-prepared history. A later full-calendar quote remains excluded
+at the earlier cutoff. This clock qualification does not establish settlement
+or variation-cash parity.
+
 ### Read completed bars before trading
 
 At a clock before a market observation, the Zipline read policy projects

@@ -127,9 +127,20 @@ def expected_times(
     count: int,
     inclusive: bool,
     observed: Sequence[datetime],
+    *,
+    session_close_offset: timedelta | None = None,
 ) -> list[datetime]:
     step, right, partial = _grid_parameters(config)
     daily = step is None
+    if session_close_offset is not None and (
+        not isinstance(session_close_offset, timedelta)
+        or session_close_offset > timedelta(0)
+        or not daily
+        or not right
+    ):
+        raise ValueError(
+            "session_close_offset requires a nonpositive timedelta and daily right labels"
+        )
     # Each session contributes at least one eligible bar for daily inputs; sparse or
     # oversized intraday intervals may require additional earlier sessions.
     session_count = min(count + 1, 14)
@@ -137,7 +148,15 @@ def expected_times(
         sessions = _sessions(config, asof, session_count, inclusive)
         times = []
         for row in reversed(sessions):
-            segments = [(row["market_open"], row["market_close"])] if daily else _intervals(row)
+            if daily:
+                opened, closed = row["market_open"], row["market_close"]
+                if session_close_offset is not None:
+                    if session_close_offset <= opened - closed:
+                        raise ValueError("History close must follow the declared session open")
+                    closed += session_close_offset
+                segments = [(opened, closed)]
+            else:
+                segments = _intervals(row)
             for opened, closed in reversed(segments):
                 interval = closed - opened if daily else step
                 assert interval is not None

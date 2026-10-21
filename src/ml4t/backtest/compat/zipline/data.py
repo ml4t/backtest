@@ -12,6 +12,7 @@ from ...runtime import RuntimeServices
 from ...sessions import SessionConfig
 from .assets import Asset
 from .csv import PreparedCSV
+from .window import _daily_history_close_offset
 
 
 class BarData:
@@ -94,7 +95,17 @@ class BarData:
                 else WindowUnit.EXPECTED_BAR
             )
             return market.history(
-                assets, fields, bar_count=1, unit=unit, view=self._history_view, **kwargs
+                assets,
+                fields,
+                bar_count=1,
+                unit=unit,
+                view=self._history_view,
+                session_close_offset=(
+                    _daily_history_close_offset(engine.config)
+                    if unit is WindowUnit.EXPECTED_BAR
+                    else None
+                ),
+                **kwargs,
             )
         return market.current(assets, fields, **kwargs)
 
@@ -371,6 +382,11 @@ class BarData:
                 view="raw" if source is not None else self._history_view,
                 forward_fill=self._stale_fields(names, ffill),
                 finite_prices_only=self._read_policy == "zipline",
+                session_close_offset=(
+                    _daily_history_close_offset(config)
+                    if self._read_policy == "zipline" and unit is WindowUnit.EXPECTED_BAR
+                    else None
+                ),
             )
         rows = list(temporal_rows(frame, named=True))
         times = list(dict.fromkeys(row["timestamp"] for row in rows))
