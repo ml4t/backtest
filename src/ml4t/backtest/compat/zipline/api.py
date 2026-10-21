@@ -1,7 +1,7 @@
 """Callback-scoped migration API; all account mutations use the native broker."""
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
@@ -15,12 +15,12 @@ from .events import time_rules as time_rules
 from .finance.order import OrderView
 
 
-def symbol(symbol_str: str) -> Asset:
-    return current().symbol(symbol_str)
+def symbol(symbol_str: str, country_code: str | None = None) -> Asset:
+    return current().symbol(symbol_str, country_code)
 
 
-def symbols(*symbol_strs: str) -> tuple[Asset, ...]:
-    return current().symbols(*symbol_strs)
+def symbols(*symbol_strs: str, country_code: str | None = None) -> list[Asset]:
+    return current().symbols(*symbol_strs, country_code=country_code)
 
 
 def sid(sid: int) -> Asset:
@@ -165,3 +165,7 @@ def set_min_leverage(min_leverage: float, grace_period: timedelta) -> None:
 
 def get_environment(field: str = "platform") -> Any:
     return current().get_environment(field)
+
+
+def set_symbol_lookup_date(dt: date | datetime | str) -> None:
+    current().set_symbol_lookup_date(dt)

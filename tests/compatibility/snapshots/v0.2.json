@@ -667,6 +667,7 @@
     "from ml4t.backtest import run_backtest",
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
+    "from ml4t.backtest.compat.zipline import PreparedAssetLookup, run_algorithm",
     "from ml4t.backtest.compat.zipline import run_algorithm",
     "from ml4t.backtest.compat.zipline import to_performance_frame",
     "from ml4t.backtest.compat.zipline.api import date_rules, get_datetime, record, schedule_function",
@@ -2720,7 +2721,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.api",
       "qualname": "symbol",
-      "signature": "(symbol_str: str) -> ml4t.backtest.compat.zipline.assets.Asset"
+      "signature": "(symbol_str: str, country_code: str | None = None) -> ml4t.backtest.compat.zipline.assets.Asset"
     },
     "ml4t.backtest.compat.zipline.assets:Asset": {
       "kind": "class",
@@ -2766,11 +2767,31 @@
       "qualname": "module",
       "signature": null
     },
+    "ml4t.backtest.compat.zipline:PreparedAssetLookup": {
+      "kind": "class",
+      "members": {
+        "assets": {
+          "kind": "property",
+          "signature": "(self) -> tuple[ml4t.backtest.compat.zipline.assets.Asset, ...]"
+        },
+        "metadata": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, str]"
+        },
+        "resolve": {
+          "kind": "method",
+          "signature": "(self, symbol: str, on: datetime.date | datetime.datetime | str, *, country_code: str | None = None) -> ml4t.backtest.compat.zipline.assets.Asset"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.lookup",
+      "qualname": "PreparedAssetLookup",
+      "signature": "(snapshot: Any) -> None"
+    },
     "ml4t.backtest.compat.zipline:run_algorithm": {
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.runner",
       "qualname": "run_algorithm",
-      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset]', initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
+      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
     },
     "ml4t.backtest.compat.zipline:to_performance_frame": {
       "kind": "function",

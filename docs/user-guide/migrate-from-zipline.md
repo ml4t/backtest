@@ -769,3 +769,70 @@ print("session window ends at the actual early close")
 ```text
 session window ends at the actual early close
 ```
+
+## Resolve dated symbols from a Data snapshot
+
+`PreparedAssetLookup(snapshot)` consumes the `zipline_equities`,
+`zipline_symbol_lookup` and available exchange-country facts produced by Data's
+bundle exporter. It supplies both immutable `Asset` identifiers and the captured
+symbol-ownership policy. Pass either `asset_lookup=...` or an explicit `assets`
+sequence to `run_algorithm`.
+
+With this lookup, `symbol` defaults to the selected **end session**, as in
+published Zipline 3.2.0. `set_symbol_lookup_date(value)` overrides that date;
+timezone-aware overrides are converted to UTC before removing the timezone.
+This lookup-date contract differs from the midnight-only run-date contract.
+`symbols(...)` returns a list in request order. Case and the first share-class
+separator (`.`, `/`, `-`, `_`) follow the reference spelling rules. Optional
+`country_code` selects declared exchange-country facts; unavailable or ambiguous
+facts raise an error instead of selecting an arbitrary asset.
+
+A lookup selects an identity, never a future market observation. In the qualified
+minute fixture, initializing `symbol("ALPHA")` selects the later owner, while
+`data.current` still returns a missing price until that asset's observations
+arrive. An earlier lookup date selects the old stable ID with its exported
+latest display symbol. These are separate facts.
+
+The exported ownership intervals intentionally extend beyond listing lifetimes.
+Resolving an old alias therefore does not establish that it is active or
+tradable. This object does not install native instrument eligibility or establish
+historical publication times. When that guarantee is required, supply a
+Data-backed `RuntimeServices(instruments=..., instrument_feed_spec=...)` with
+its declared historical availability. See [dated instruments and lifetimes](strategies.md#resolve-dated-instruments-and-enforce-their-lifetimes).
+The raw bundle export explicitly reports unavailable historical publication facts.
+
+The following preparation/read route was qualified using
+[Data source c3b9db80](https://github.com/ml4t/data/commit/c3b9db80a66397420fb27adeccc762559dd41e07),
+Specs 0.2.0 and published Zipline Reloaded 3.2.0. This is a source-candidate Data
+integration, not a claim that every published Data version has the exporter.
+Zipline is needed only in the one-time bundle export environment; reading the
+portable snapshot and running the strategy needs no legacy package.
+
+```python
+from ml4t.data.storage import read_snapshot
+from ml4t.specs import FeedSpec
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import PreparedAssetLookup, run_algorithm
+
+# Read a snapshot previously written by ml4t.data.compat.zipline.export_bundle.
+snapshot = read_snapshot("prepared-bundle")
+clock = snapshot.manifest["content"]["tables"]["minute_bars"]["clock"]
+feed_spec = FeedSpec.from_any(clock["feed_spec"]).with_overrides(
+    calendar=clock["resolved_calendar"]
+)
+feed = DataFeed(prices_df=snapshot.tables["minute_bars"], feed_spec=feed_spec)
+performance = run_algorithm(
+    feed=feed,
+    asset_lookup=PreparedAssetLookup(snapshot),
+    initialize=initialize,
+    handle_data=handle_data,
+    start="2025-07-02",
+    end="2025-07-03",
+)
+```
+
+The complete exported fixture and its original callback trace are retained in
+`tests/fixtures/zipline_symbol_lookup`. The installed Data-reader test exercises
+the recipe above with actual producer output. Static manual asset mappings also
+support case/share-class spelling and list containers, but cannot answer dated
+or country-specific queries without their source facts.

@@ -31,6 +31,7 @@ from ...controls import (
 from ...core.shared import SubmitOrderOptions
 from ...execution.limits import PositiveVolumeLimit, SharedVolumeParticipationLimit
 from ...execution.sizing import quantity_for_value, quantity_to_target, round_quantity
+from ...sessions import SessionConfig
 from ...types import Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from .assets import Asset
@@ -40,6 +41,7 @@ from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time
 from .finance import commission, slippage
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
+from .lookup import PreparedAssetLookup, _lookup_instant, _symbol_parts
 from .results import to_performance_frame
 from .window import _borrow_window, _window
 
@@ -114,6 +116,10 @@ class MigrationContext:
             raise ValueError("Ambiguous legacy SID mapping")
         self._config = config
         self._environment: dict[str, Any] = {}
+        self._asset_lookup: PreparedAssetLookup | None = None
+        self._symbol_lookup_date: pd.Timestamp | None = None
+        self._default_lookup_date: pd.Timestamp | None = None
+        self._lookup_overrides: list[dict[str, str | None]] = []
         self._order_prefix = uuid4().hex
         self._broker: Broker | None = None
         self._initializing = True
@@ -169,14 +175,43 @@ class MigrationContext:
         if not isinstance(asset, Asset) or asset.key not in self._by_key:
             raise ValueError("Asset must belong to the explicit migration mapping")
 
-    def symbol(self, symbol_str: str) -> Asset:
-        matches = [asset for asset in self._by_key.values() if asset.symbol == symbol_str]
+    def symbol(self, symbol_str: str, country_code: str | None = None) -> Asset:
+        if self._asset_lookup is not None:
+            on = (
+                self._symbol_lookup_date
+                if self._symbol_lookup_date is not None
+                else self._default_lookup_date
+            )
+            assert on is not None
+            resolved = self._asset_lookup.resolve(symbol_str, on, country_code=country_code)
+            return self._by_key[resolved.key]
+        if country_code is not None:
+            raise ValueError("Country selection requires a PreparedAssetLookup")
+        parts = _symbol_parts(symbol_str)
+        matches = [
+            asset
+            for asset in self._by_key.values()
+            if asset.symbol is not None and _symbol_parts(asset.symbol) == parts
+        ]
         if len(matches) != 1:
             raise ValueError(f"Symbol {symbol_str!r} has no unique explicit asset mapping")
         return matches[0]
 
-    def symbols(self, *symbol_strs: str) -> tuple[Asset, ...]:
-        return tuple(self.symbol(name) for name in symbol_strs)
+    def symbols(self, *symbol_strs: str, country_code: str | None = None) -> list[Asset]:
+        return [self.symbol(name, country_code) for name in symbol_strs]
+
+    def set_symbol_lookup_date(self, dt: date | datetime | str) -> None:
+        if self._asset_lookup is None:
+            raise ValueError("Dated symbol lookup requires a PreparedAssetLookup")
+        self._symbol_lookup_date = _lookup_instant(dt)
+        self._lookup_overrides.append(
+            {
+                "lookup_date": self._symbol_lookup_date.isoformat(),
+                "simulation_time": self.get_datetime().isoformat()
+                if self._broker is not None
+                else None,
+            }
+        )
 
     def sid(self, sid: int) -> Asset:
         matches = [asset for asset in self._by_key.values() if asset.legacy_sid == sid]
@@ -584,7 +619,8 @@ class _Callbacks(Strategy):
 def run_algorithm(
     *,
     feed: DataFeed,
-    assets: Sequence[Asset],
+    assets: Sequence[Asset] | None = None,
+    asset_lookup: PreparedAssetLookup | None = None,
     initialize: Callable[..., Any] | None = None,
     handle_data: Callable[..., Any] | None = None,
     analyze: Callable[..., Any] | None = None,
@@ -602,6 +638,14 @@ def run_algorithm(
     Optional start/end instead accept timezone-naive midnight session labels and
     select the declared calendar's first tradable minute through its last close.
     """
+    if asset_lookup is not None:
+        if not isinstance(asset_lookup, PreparedAssetLookup):
+            raise TypeError("asset_lookup must be a PreparedAssetLookup")
+        if assets is not None:
+            raise ValueError("Pass assets or asset_lookup, not both")
+        assets = asset_lookup.assets
+    if assets is None:
+        raise ValueError("Declare assets or a PreparedAssetLookup")
     config = BacktestConfig(
         feed_spec=feed.feed_spec,
         initial_cash=capital_base,
@@ -632,6 +676,30 @@ def run_algorithm(
     }
     context = MigrationContext(assets, config)
     context._environment = environment
+    context._asset_lookup = asset_lookup
+    if asset_lookup is not None:
+        resolved = config.merge_feed_spec(feed.feed_spec)
+        session = (
+            SessionConfig(
+                resolved.resolved_calendar,
+                resolved.resolved_timezone,
+                resolved.resolved_session_start_time,
+                resolved.resolved_timestamp_semantics,
+                resolved.resolved_feed_spec.bar_label,
+                resolved.resolved_data_frequency,
+            )
+            .date_for_timestamp(environment["end"])
+            .date()
+            if resolved.resolved_calendar is not None
+            else environment["end"].date()
+        )
+        context._default_lookup_date = pd.Timestamp(session)
+        config.metadata["migration_symbol_lookup"] = {
+            **asset_lookup.metadata,
+            "default_policy": "end_session",
+            "default_date": context._default_lookup_date.isoformat(),
+        }
+
     config.metadata["migration_result"] = {
         "assets": [
             {"key": asset.key, "symbol": asset.symbol, "legacy_sid": asset.legacy_sid}
@@ -653,6 +721,10 @@ def run_algorithm(
             execution_limits=limits,
             holdings_sampling="bar",
         ).run()
+    if asset_lookup is not None and result.config is not None:
+        result.config.metadata["migration_symbol_lookup"]["date_overrides"] = list(
+            context._lookup_overrides
+        )
     performance = to_performance_frame(result)
     if analyze is not None:
         with callback_scope(context):
