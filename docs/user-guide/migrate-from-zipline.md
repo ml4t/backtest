@@ -1141,11 +1141,10 @@ consume the adapter's declared order-request count. The captured published
 3.2.0 fixture in `tests/fixtures/zipline_original/restrictions-reference.json`
 checks those queries, submissions, fills and cash for both policies.
 
-`data.can_trade` currently combines native current-quote eligibility with
+`data.can_trade` combines known-price eligibility, declared lifetimes and
 these restriction predicates. It does not promise an execution fill or check
-buying power. The reference's stale-known-price presentation is a separate
-read-policy difference; supply real quotes for execution. Native lifetime
-eligibility remains with the Data-backed runtime instrument service.
+buying power. Native lifetime eligibility remains with the Data-backed runtime
+instrument service; metadata absent from that service is not inferred.
 
 ### Configure equity basis-point slippage
 
@@ -1162,3 +1161,78 @@ the selected model. Use `VolumeShareSlippage(volume_limit=..., price_impact=...)
 explicitly for the quadratic cumulative-participation method, `FixedSlippage`
 for a fixed spread, or `NoSlippage` for zero impact with positive observed
 volume. These adapter choices leave native Backtest defaults unchanged.
+
+### Separate stale reads from executable quotes
+
+The callback runner selects `BarData(read_policy="zipline")`. In this read
+policy, `current(asset, "price")` and price history may carry the most recent
+known finite price. `close` remains the value of the requested observation;
+it is not forward-filled. `history(..., ffill=False)` disables stale price
+values in that history request. Missing nulls and NaNs follow the same price
+policy.
+
+<!-- ml4t-doc-test: legacy-stale-price-view -->
+```python
+from datetime import UTC, datetime
+import pandas as pd
+import polars as pl
+from ml4t.backtest import DataFeed, RuntimeServices
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+times = [datetime(2025, 7, 1, 20, tzinfo=UTC), datetime(2025, 7, 2, 20, tzinfo=UTC),
+         datetime(2025, 7, 3, 17, tzinfo=UTC)]
+prices = pl.DataFrame({"timestamp": times, "asset": ["A"] * 3,
+                       "close": [100.0, None, 110.0], "volume": [1000, 0, 0]})
+feed = DataFeed(prices_df=prices, feed_spec={
+    "calendar": "NYSE", "time_contract_version": 2, "data_frequency": "1d",
+    "timestamp_semantics": "bar_close", "bar_label": "right",
+    "bar_grid_anchor": "session_open", "partial_bar_policy": "include",
+})
+asset, runtime, seen = Asset("A", "ALPHA", 7), RuntimeServices(), []
+
+def handle_data(context, data):
+    value = data.current(asset, "price")
+    seen.append((value, data.can_trade(asset), data.is_stale(asset)))
+    assert data.current(asset, "last_traded") == pd.Timestamp("2025-07-01")
+    if context.get_datetime().day == 2:
+        assert value == 100.0 and pd.isna(data.current(asset, "close"))
+        assert not runtime.market.can_trade("A")
+        context.order(asset, 1)
+
+performance = run_algorithm(feed=feed, assets=[asset], runtime=runtime,
+                            handle_data=handle_data)
+assert seen == [(100.0, True, False), (100.0, True, True), (110.0, True, True)]
+assert performance.attrs["backtest_result"].fills == []
+print("Stale reads do not create executable prices or volume.")
+```
+
+`is_stale` distinguishes a known earlier trade from an asset that has never
+traded. In the Zipline read policy, a live asset with zero current volume and
+an earlier actual trade is stale, even if an indicative close was observed
+now. `last_traded` requires positive observed volume and a finite published
+price. Its daily output uses the naive session label; minute and calendar-free
+output uses the physical UTC instant with nanosecond precision.
+
+Supply Data-backed `RuntimeServices(instruments=..., instrument_feed_spec=...)`
+to enforce listing lifetimes. The adapter masks OHLC/price outside those
+declared lifetimes and presents volume as zero there. It retains historical
+last-traded dates. Historical lifetime masks apply at each requested history
+point, using facts known at the current cutoff. The actual Data integration in
+`tests/test_zipline_stale_reads.py` checks a July 2 listing that expires before
+July 3, alongside the published 3.2.0 current/history/staleness fixture. The
+fixture declares its metadata known before the run; it does not infer actual
+historical publication times from listing dates.
+
+Direct `BarData(runtime)` preserves the existing native raw-read policy. Native
+`runtime.market.can_trade` continues to require a current executable quote.
+Both modes share the native market service; neither fills missing prices into
+the broker's input. A liquid bar whose price is unpublished cannot execute a
+pending order merely because the read view can display an older known price.
+
+Before trading starts, price reads can return causal warmup prices. They do
+not expose that session's future close. Pass `history_view="prepared"` to the
+callback runner to select the existing causal Data history provider, or
+`history_unit="observation"` to count observations explicitly. This prepared
+view retains the execution grid; separate cross-frequency preparation and
+delivery remain required for a different history grid.

@@ -1,6 +1,7 @@
 """Pandas container projection over causal native market reads."""
 
 from collections.abc import Callable, Sequence
+from math import isfinite
 from typing import Any, Literal
 
 import pandas as pd
@@ -29,12 +30,16 @@ class BarData:
         history_unit: WindowUnit | str | None = None,
         csv_sources: Sequence[PreparedCSV] = (),
         restriction: Callable[[Asset, Any], bool] | None = None,
+        read_policy: Literal["native", "zipline"] = "native",
     ) -> None:
         if history_view not in {"raw", "prepared"}:
             raise ValueError("history_view must be raw or prepared")
+        if read_policy not in {"native", "zipline"}:
+            raise ValueError("read_policy must be native or zipline")
         self._runtime = runtime
         self._csv_sources = tuple(csv_sources)
         self._restriction = restriction
+        self._read_policy = read_policy
         self._history_view = history_view
         self._history_unit = None if history_unit is None else WindowUnit(history_unit)
         if self._history_unit not in {None, WindowUnit.OBSERVATION, WindowUnit.EXPECTED_BAR}:
@@ -66,6 +71,8 @@ class BarData:
         return chosen, names, one_asset, one_field
 
     def _current_value(self, asset, name):
+        if isinstance(asset, Asset) and name == "last_traded":
+            return self._last_traded_value(asset)
         key = asset.key if isinstance(asset, Asset) else asset
         market_field = isinstance(asset, Asset) and name in {
             "price",
@@ -74,6 +81,7 @@ class BarData:
             "low",
             "close",
             "volume",
+            "last_traded",
         }
         candidates = [
             source
@@ -93,9 +101,45 @@ class BarData:
             raise ValueError("Research key/field requires a registered frozen CSV source")
         if not market_field and any(name in source.fields for source in self._csv_sources):
             return float("nan")
-        frame = self._runtime.market.current([key], [name])
+        frame = self._runtime.market.current(
+            [key],
+            [name],
+            forward_fill=self._stale_fields([name]),
+            finite_prices_only=self._read_policy == "zipline",
+        )
         rows = list(temporal_rows(frame, named=True))
-        return self._value(rows[0][name] if rows else None)
+        return self._market_value(asset, name, rows[0].get(name) if rows else None)
+
+    def _stale_fields(self, names, ffill=None):
+        selected = self._read_policy == "zipline" if ffill is None else ffill
+        if not isinstance(selected, bool):
+            raise TypeError("ffill must be Boolean")
+        return {"price": selected} if "price" in names else False
+
+    def _alive(self, asset, timestamp=None):
+        market = self._runtime.market
+        assert market._asof is not None
+        source = self._runtime._assets
+        return source is None or source._active_at(
+            asset.key, timestamp if timestamp is not None else market._asof, market._asof
+        )
+
+    def _market_value(self, asset, field, value, timestamp=None):
+        if self._read_policy == "zipline" and not self._alive(asset, timestamp):
+            return 0 if field == "volume" else float("nan")
+        return self._value(value)
+
+    def _last_traded_value(self, asset):
+        traded = self._runtime.market.last_traded(asset.key)
+        if traded is None:
+            return pd.NaT
+        engine = self._runtime._engine
+        assert engine is not None
+        frequency = getattr(
+            engine.config.resolved_data_frequency, "value", engine.config.resolved_data_frequency
+        )
+        daily = self._read_policy == "zipline" and frequency in {"daily", "1d"}
+        return self._labels([traded], "1d" if daily else "1m")[0]
 
     @property
     def fetcher_assets(self) -> list[Asset]:
@@ -116,10 +160,46 @@ class BarData:
         if any(not isinstance(asset, Asset) for asset in chosen):
             raise TypeError("Tradability queries require declared Assets")
         flags = [
-            market.can_trade(asset.key)
+            (
+                self._known_price_tradable(asset)
+                if self._read_policy == "zipline"
+                else market.can_trade(asset.key)
+            )
             and not (self._restriction is not None and self._restriction(asset, market._asof))
             for asset in chosen
         ]
+        return flags[0] if one else pd.Series(flags, index=chosen, dtype=bool)
+
+    def _known_price_tradable(self, asset):
+        if not self._alive(asset):
+            return False
+        frame = self._runtime.market.current(
+            [asset.key], ["price"], forward_fill=True, finite_prices_only=True
+        )
+        price = frame["price"][0] if not frame.is_empty() else None
+        return price is not None and isfinite(price) and price > 0
+
+    def is_stale(self, assets: Asset | Sequence[Asset]) -> bool | pd.Series:
+        market = self._runtime.market
+        if isinstance(assets, Asset):
+            chosen, one = [assets], True
+        else:
+            chosen, one = list(assets), False
+        if any(not isinstance(asset, Asset) for asset in chosen):
+            raise TypeError("Staleness queries require declared Assets")
+
+        def stale(asset):
+            if self._read_policy == "native":
+                return market.is_stale(asset.key)
+            if not self._alive(asset):
+                return False
+            volume = market.current([asset.key], ["volume"])["volume"][0]
+            return (
+                not (volume is not None and volume > 0)
+                and market.last_traded(asset.key) is not None
+            )
+
+        flags = [bool(stale(asset)) for asset in chosen]
         return flags[0] if one else pd.Series(flags, index=chosen, dtype=bool)
 
     def current(
@@ -130,14 +210,23 @@ class BarData:
         )
         rows = {}
         if not self._csv_sources:
-            frame = self._runtime.market.current([asset.key for asset in chosen], names)
-            rows = {row["asset"]: row for row in temporal_rows(frame, named=True)}
+            raw = [name for name in names if name != "last_traded"]
+            if raw:
+                frame = self._runtime.market.current(
+                    [asset.key for asset in chosen],
+                    raw,
+                    forward_fill=self._stale_fields(raw),
+                    finite_prices_only=self._read_policy == "zipline",
+                )
+                rows = {row["asset"]: row for row in temporal_rows(frame, named=True)}
         result = pd.DataFrame(
             [
                 [
                     self._current_value(asset, name)
                     if self._csv_sources
-                    else self._value(rows.get(asset.key, {}).get(name))
+                    else self._last_traded_value(asset)
+                    if name == "last_traded"
+                    else self._market_value(asset, name, rows.get(asset.key, {}).get(name))
                     for name in names
                 ]
                 for asset in chosen
@@ -145,6 +234,24 @@ class BarData:
             index=pd.Index(chosen),
             columns=pd.Index(names, dtype=object),
         )
+        if "last_traded" in names and all(isinstance(asset, Asset) for asset in chosen):
+            engine = self._runtime._engine
+            assert engine is not None
+            frequency = getattr(
+                engine.config.resolved_data_frequency,
+                "value",
+                engine.config.resolved_data_frequency,
+            )
+            daily = (
+                self._read_policy == "zipline"
+                and frequency in {"daily", "1d"}
+                and engine.config.resolved_calendar is not None
+            )
+            result["last_traded"] = pd.Series(
+                result["last_traded"],
+                index=result.index,
+                dtype="datetime64[ns]" if daily else "datetime64[ns, UTC]",
+            )
         if one_asset and one_field:
             value = result.iloc[0, 0]
             return float("nan") if value is None else value
@@ -181,6 +288,7 @@ class BarData:
         fields: str | Sequence[str],
         bar_count: int,
         frequency: str,
+        ffill: bool | None = None,
     ) -> pd.DataFrame | pd.Series:
         chosen, names, one_asset, one_field = self._selection(assets, fields)
         if set(names) - {"price", "open", "high", "low", "close", "volume"}:
@@ -213,6 +321,8 @@ class BarData:
             bar_count=bar_count,
             unit=unit,
             view=self._history_view,
+            forward_fill=self._stale_fields(names, ffill),
+            finite_prices_only=self._read_policy == "zipline",
         )
         rows = list(temporal_rows(frame, named=True))
         times = list(dict.fromkeys(row["timestamp"] for row in rows))
@@ -226,7 +336,12 @@ class BarData:
         if one_field:
             result = pd.DataFrame(
                 [
-                    [self._value(lookup[(time, asset.key)][names[0]]) for asset in chosen]
+                    [
+                        self._market_value(
+                            asset, names[0], lookup[(time, asset.key)][names[0]], time
+                        )
+                        for asset in chosen
+                    ]
                     for time in times
                 ],
                 index=labels,
@@ -238,7 +353,10 @@ class BarData:
         # leaves its asset level unnamed. Preserve actual output, not its prose.
         result = pd.DataFrame(
             [
-                [self._value(lookup[(time, asset.key)][name]) for name in names]
+                [
+                    self._market_value(asset, name, lookup[(time, asset.key)][name], time)
+                    for name in names
+                ]
                 for time in times
                 for asset in chosen
             ],

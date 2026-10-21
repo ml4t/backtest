@@ -1,0 +1,264 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "trace": [
+    {
+      "timestamp": "2025-07-01T20:00:00+00:00",
+      "can_trade": [
+        true,
+        false
+      ],
+      "is_stale": [
+        false,
+        false
+      ],
+      "current": {
+        "columns": [
+          "price",
+          "close",
+          "volume",
+          "last_traded"
+        ],
+        "dtypes": [
+          "float64",
+          "float64",
+          "int64",
+          "datetime64[ns]"
+        ],
+        "values": [
+          [
+            100.0,
+            100.0,
+            1000.0,
+            "2025-07-01T00:00:00"
+          ],
+          [
+            null,
+            null,
+            0.0,
+            null
+          ]
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-07-02T20:00:00+00:00",
+      "can_trade": [
+        true,
+        true
+      ],
+      "is_stale": [
+        true,
+        false
+      ],
+      "current": {
+        "columns": [
+          "price",
+          "close",
+          "volume",
+          "last_traded"
+        ],
+        "dtypes": [
+          "float64",
+          "float64",
+          "int64",
+          "datetime64[ns]"
+        ],
+        "values": [
+          [
+            100.0,
+            null,
+            0.0,
+            "2025-07-01T00:00:00"
+          ],
+          [
+            50.0,
+            50.0,
+            1000.0,
+            "2025-07-02T00:00:00"
+          ]
+        ]
+      },
+      "history": {
+        "index": [
+          [
+            "2025-07-01T00:00:00",
+            7
+          ],
+          [
+            "2025-07-01T00:00:00",
+            8
+          ],
+          [
+            "2025-07-02T00:00:00",
+            7
+          ],
+          [
+            "2025-07-02T00:00:00",
+            8
+          ]
+        ],
+        "index_names": [
+          "date",
+          null
+        ],
+        "columns": [
+          "price",
+          "close",
+          "volume"
+        ],
+        "values": [
+          [
+            100.0,
+            100.0,
+            1000.0
+          ],
+          [
+            null,
+            null,
+            0.0
+          ],
+          [
+            100.0,
+            null,
+            0.0
+          ],
+          [
+            50.0,
+            50.0,
+            1000.0
+          ]
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-07-03T17:00:00+00:00",
+      "can_trade": [
+        true,
+        false
+      ],
+      "is_stale": [
+        true,
+        false
+      ],
+      "current": {
+        "columns": [
+          "price",
+          "close",
+          "volume",
+          "last_traded"
+        ],
+        "dtypes": [
+          "float64",
+          "float64",
+          "int64",
+          "datetime64[ns]"
+        ],
+        "values": [
+          [
+            110.0,
+            110.0,
+            0.0,
+            "2025-07-01T00:00:00"
+          ],
+          [
+            null,
+            null,
+            0.0,
+            "2025-07-02T00:00:00"
+          ]
+        ]
+      },
+      "history": {
+        "index": [
+          [
+            "2025-07-02T00:00:00",
+            7
+          ],
+          [
+            "2025-07-02T00:00:00",
+            8
+          ],
+          [
+            "2025-07-03T00:00:00",
+            7
+          ],
+          [
+            "2025-07-03T00:00:00",
+            8
+          ]
+        ],
+        "index_names": [
+          "date",
+          null
+        ],
+        "columns": [
+          "price",
+          "close",
+          "volume"
+        ],
+        "values": [
+          [
+            100.0,
+            null,
+            0.0
+          ],
+          [
+            50.0,
+            50.0,
+            1000.0
+          ],
+          [
+            110.0,
+            110.0,
+            0.0
+          ],
+          [
+            null,
+            null,
+            0.0
+          ]
+        ]
+      }
+    }
+  ],
+  "price": {
+    "7": [
+      100.0,
+      null,
+      110.0
+    ],
+    "8": [
+      null,
+      50.0,
+      null
+    ]
+  },
+  "volume": {
+    "7": [
+      1000,
+      0,
+      0
+    ],
+    "8": [
+      0,
+      1000,
+      0
+    ]
+  },
+  "closes": [
+    "2025-07-01T20:00:00+00:00",
+    "2025-07-02T20:00:00+00:00",
+    "2025-07-03T17:00:00+00:00"
+  ],
+  "listing": {
+    "A": [
+      "2025-07-01",
+      "2025-07-03"
+    ],
+    "B": [
+      "2025-07-02",
+      "2025-07-02"
+    ]
+  },
+  "timing_claim": false
+}

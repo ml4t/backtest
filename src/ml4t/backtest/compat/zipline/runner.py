@@ -7,10 +7,11 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from math import isfinite
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import pandas as pd
+from ml4t.specs import WindowUnit
 
 from ... import BacktestConfig, Broker, DataFeed, Engine, RuntimeServices, Strategy
 from ...benchmark import BenchmarkData
@@ -760,6 +761,8 @@ def run_algorithm(
     runtime: RuntimeServices | None = None,
     csv_sources: Sequence[PreparedCSV] = (),
     benchmark: BenchmarkData | None = None,
+    history_view: Literal["raw", "prepared"] = "raw",
+    history_unit: WindowUnit | str | None = None,
     start: date | datetime | str | None = None,
     end: date | datetime | str | None = None,
 ) -> pd.DataFrame:
@@ -858,6 +861,16 @@ def run_algorithm(
             with callback_scope(context):
                 initialize(context)
         context._initializing = False
+        config.metadata["migration_read_policy"] = {
+            "method": "zipline",
+            "price_view": "known_price_stale",
+            "execution_quotes": "raw_observed",
+            "history_view": history_view,
+            "history_unit": getattr(history_unit, "value", history_unit),
+            "lifetimes": "runtime_instrument_source"
+            if runtime.instruments is not None
+            else "not_declared",
+        }
         limits = context._execution_limits()
         if context._pipelines:
             config.metadata["migration_pipelines"] = {
@@ -882,6 +895,9 @@ def run_algorithm(
                         runtime,
                         csv_sources=tuple(context._active_csv.values()),
                         restriction=context._is_restricted,
+                        read_policy="zipline",
+                        history_view=history_view,
+                        history_unit=history_unit,
                     ),
                     handle_data,
                     runtime,

@@ -214,8 +214,23 @@ class MarketDataView:
         *,
         forward_fill: bool | Mapping[str, bool],
         max_age: timedelta | None = None,
+        finite_prices_only: bool = False,
     ) -> pl.DataFrame:
         self._check_active()
+        if not isinstance(finite_prices_only, bool):
+            raise TypeError("finite_prices_only must be Boolean")
+        price_columns = (
+            {
+                self._column(name)
+                for name in ["price", "open", "high", "low", "close", "vwap", "bid", "ask", "mid"]
+            }
+            if finite_prices_only and self._quote_fields
+            else set()
+        )
+
+        def nonfinite_price(row, field):
+            return self._column(field) in price_columns and not isfinite(row[self._column(field)])
+
         assert self._asof is not None
         if isinstance(assets, str) or isinstance(fields, str) or not assets or not fields:
             raise ValueError("assets and fields must be nonempty sequences")
@@ -265,6 +280,8 @@ class MarketDataView:
                         candidate is None
                         or not self._available(field, candidate)
                         or candidate.get(self._column(field)) is None
+                        or finite_prices_only
+                        and nonfinite_price(candidate, field)
                     ):
                         candidate = None
                         if field in fill_fields and not (
@@ -280,6 +297,7 @@ class MarketDataView:
                                 if (
                                     self._available(field, value)
                                     and value.get(self._column(field)) is not None
+                                    and not (finite_prices_only and nonfinite_price(value, field))
                                 ):
                                     candidate, observed = value, past
                                     break
@@ -379,6 +397,7 @@ class MarketDataView:
         forward_fill: bool | Mapping[str, bool] = False,
         max_age: timedelta | None = None,
         view: Literal["raw", "prepared"] = "raw",
+        finite_prices_only: bool = False,
     ) -> pl.DataFrame:
         """Select causal raw observations or declared grid points, without resampling.
 
@@ -396,6 +415,7 @@ class MarketDataView:
                 duration=duration,
                 forward_fill=forward_fill,
                 max_age=max_age,
+                finite_prices_only=finite_prices_only,
             )
         if view != "raw":
             raise ValueError("history view must be raw or prepared")
@@ -433,7 +453,14 @@ class MarketDataView:
             assert engine is not None
             select = expected_times if unit is WindowUnit.EXPECTED_BAR else session_times
             times = select(engine.config, self._asof, bar_count, self._inclusive, self._timestamps)
-        return self._query(assets, fields, times, forward_fill=forward_fill, max_age=max_age)
+        return self._query(
+            assets,
+            fields,
+            times,
+            forward_fill=forward_fill,
+            max_age=max_age,
+            finite_prices_only=finite_prices_only,
+        )
 
     def current(
         self,
@@ -443,11 +470,16 @@ class MarketDataView:
         forward_fill: bool | Mapping[str, bool] = False,
         max_age: timedelta | None = None,
         view: Literal["raw", "prepared"] = "raw",
+        finite_prices_only: bool = False,
     ) -> pl.DataFrame:
         """Return values at the active instant, with no implicit stale executable quote."""
         if view == "prepared":
             return self._prepared_view().current(
-                assets, fields, forward_fill=forward_fill, max_age=max_age
+                assets,
+                fields,
+                forward_fill=forward_fill,
+                max_age=max_age,
+                finite_prices_only=finite_prices_only,
             )
         if view != "raw":
             raise ValueError("current view must be raw or prepared")
@@ -458,7 +490,14 @@ class MarketDataView:
             and any(value is True for value in forward_fill.values())
         )
         times = [self._asof] if self._inclusive or stale_view else []
-        return self._query(assets, fields, times, forward_fill=forward_fill, max_age=max_age)
+        return self._query(
+            assets,
+            fields,
+            times,
+            forward_fill=forward_fill,
+            max_age=max_age,
+            finite_prices_only=finite_prices_only,
+        )
 
     def _past_rows(self, asset: str):
         self._check_active()

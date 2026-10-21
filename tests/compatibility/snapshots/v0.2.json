@@ -647,6 +647,7 @@
     "from ml4t.backtest import BacktestConfig, ExecutionMode",
     "from ml4t.backtest import Broker, BacktestConfig",
     "from ml4t.backtest import DataFeed",
+    "from ml4t.backtest import DataFeed, RuntimeServices",
     "from ml4t.backtest import Engine",
     "from ml4t.backtest import Engine, Strategy, BacktestConfig, DataFeed",
     "from ml4t.backtest import Engine, Strategy, DataFeed, BacktestConfig, run_backtest",
@@ -2765,12 +2766,16 @@
         },
         "history": {
           "kind": "method",
-          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset], fields: str | collections.abc.Sequence[str], bar_count: int, frequency: str) -> pandas.DataFrame | pandas.Series"
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset], fields: str | collections.abc.Sequence[str], bar_count: int, frequency: str, ffill: bool | None = None) -> pandas.DataFrame | pandas.Series"
+        },
+        "is_stale": {
+          "kind": "method",
+          "signature": "(self, assets: ml4t.backtest.compat.zipline.assets.Asset | collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset]) -> bool | pandas.Series"
         }
       },
       "module": "ml4t.backtest.compat.zipline.data",
       "qualname": "BarData",
-      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None, csv_sources: collections.abc.Sequence[ml4t.backtest.compat.zipline.csv.PreparedCSV] = (), restriction: collections.abc.Callable[[ml4t.backtest.compat.zipline.assets.Asset, Any], bool] | None = None) -> None"
+      "signature": "(runtime: ml4t.backtest.runtime.RuntimeServices, *, history_view: Literal['raw', 'prepared'] = 'raw', history_unit: ml4t.specs.time.WindowUnit | str | None = None, csv_sources: collections.abc.Sequence[ml4t.backtest.compat.zipline.csv.PreparedCSV] = (), restriction: collections.abc.Callable[[ml4t.backtest.compat.zipline.assets.Asset, Any], bool] | None = None, read_policy: Literal['native', 'zipline'] = 'native') -> None"
     },
     "ml4t.backtest.compat.zipline.finance.asset_restrictions:HistoricalRestrictions": {
       "kind": "class",
@@ -2899,7 +2904,7 @@
       "kind": "function",
       "module": "ml4t.backtest.compat.zipline.runner",
       "qualname": "run_algorithm",
-      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, csv_sources: 'Sequence[PreparedCSV]' = (), benchmark: 'BenchmarkData | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
+      "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset] | None' = None, asset_lookup: 'PreparedAssetLookup | None' = None, initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None, csv_sources: 'Sequence[PreparedCSV]' = (), benchmark: 'BenchmarkData | None' = None, history_view: \"Literal['raw', 'prepared']\" = 'raw', history_unit: 'WindowUnit | str | None' = None, start: 'date | datetime | str | None' = None, end: 'date | datetime | str | None' = None) -> 'pd.DataFrame'"
     },
     "ml4t.backtest.compat.zipline:to_performance_frame": {
       "kind": "function",

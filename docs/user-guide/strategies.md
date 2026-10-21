@@ -140,6 +140,13 @@ in the view. `last_traded` requires actual positive observed volume;
 `last_observed` works with quotes alone. `can_trade` checks the current quote,
 not buying power or all order controls.
 
+Raw reads retain non-finite input values. In a price read view,
+`finite_prices_only=True` treats non-finite quote prices as missing, including
+when selecting a previous value with `forward_fill`. The option applies to
+price roles and leaves genuine feature NaNs unchanged. It does not alter
+execution data or create volume. The Zipline callback adapter selects this
+price-view policy explicitly.
+
 Register callbacks before execution or in `on_start`/`on_prepare`. Registrations
 made during a run are removed afterward; registrations made beforehand persist
 when reusing the service for a new Engine. Callbacks use the existing lifecycle

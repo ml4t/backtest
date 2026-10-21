@@ -70,7 +70,12 @@ def test_daily_rules_ignore_intraday_time_preserve_month_week_ordinals_and_halfd
 
     def before(context, data):
         trace.append(["before", get_datetime().isoformat()])
-        assert isnan(data.current(context.symbol("ALPHA"), "price"))
+        index = sum(name == "before" for name, _time in trace) - 1
+        price = data.current(context.symbol("ALPHA"), "price")
+        if index == 0:
+            assert isnan(price)
+        else:
+            assert price == 100.0 + index - 1
         for call in [
             context.order,
             context.order_value,
