@@ -105,6 +105,8 @@ def validate_action_tables(
         }:
             raise ValueError("Unknown action application operation")
         terms = json.loads(row["terms_json"])
+        if not isinstance(terms, dict):
+            raise ValueError("Corporate action terms must be a JSON object")
         if any(
             terms.get(name) != row[name]
             for name in ["source", "event_id", "revision_id", "asset", "action_kind"]

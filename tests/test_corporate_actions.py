@@ -250,6 +250,137 @@ def test_action_artifact_keeps_paid_lineage_and_actual_receivables_without_fabri
     assert terms["available_at"] == (TIMES[0] - timedelta(days=1)).isoformat()
 
 
+def test_after_fill_and_session_observations_capture_the_actual_unpaid_receivable(tmp_path):
+    from ml4t.backtest import BacktestResult
+
+    class Trade(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("A", 10)
+            if timestamp == TIMES[2]:
+                broker.submit_order("A", -10)
+
+    feed = DataFeed(
+        prices_df=pl.DataFrame(
+            {"timestamp": TIMES, "asset": ["A"] * 5, "close": [100.0, 100.0, 99.0, 99.0, 99.0]}
+        ),
+        corporate_actions=pl.DataFrame(
+            [action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])]
+        ),
+        input_manifest=RAW,
+        feed_spec={
+            "time_contract_version": 2,
+            "calendar": "NYSE",
+            "timezone": "UTC",
+            "timestamp_semantics": "bar_close",
+            "bar_label": "right",
+            "data_frequency": "1d",
+        },
+    )
+    result = Engine(
+        feed,
+        Trade(),
+        BacktestConfig(initial_cash=10000, commission_rate=0, slippage_rate=0),
+        contract_specs={"A": ContractSpec("A")},
+        holdings_sampling="fill_and_session",
+    ).run()
+    account = result.to_portfolio_state_dataframe()
+    fills = account.filter(pl.col("observation_kind") == "after_fill")
+    assert fills["timestamp"].to_list() == [TIMES[1], TIMES[3]]
+    assert fills["cash"].to_list() == [9000, 9990]
+    assert fills["receivables_value"].to_list() == [0, 10]
+    assert account["equity"].to_list() == [10000] * 7
+    result.to_parquet(tmp_path)
+    assert BacktestResult.from_parquet(tmp_path).to_portfolio_state_dataframe().equals(account)
+
+
+@pytest.mark.no_invariant_check
+@pytest.mark.parametrize("lost_observations", [None, []])
+def test_missing_receivable_observations_from_the_producer_cannot_be_exported_as_complete(
+    monkeypatch, tmp_path, lost_observations
+):
+    from ml4t.backtest import Broker
+    from ml4t.backtest.result import ArtifactError
+
+    original = Broker._corporate_receivable_observations
+    monkeypatch.setattr(
+        Broker, "_corporate_receivable_observations", lambda *_args: lost_observations
+    )
+    event = action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])
+    _, result, _ = run_actions([event], [100, 100, 99, 99, 99])
+    destination = tmp_path / "result"
+    with pytest.raises(ArtifactError, match="receivables"):
+        result.to_parquet(destination)
+    assert not destination.exists()
+    monkeypatch.setattr(Broker, "_corporate_receivable_observations", original)
+    _, valid, _ = run_actions([event], [100, 100, 99, 99, 99])
+    valid.to_parquet(destination)
+
+
+def test_actual_legacy_artifact_does_not_invent_zero_action_history():
+    from pathlib import Path
+
+    from ml4t.backtest import BacktestResult
+
+    result = BacktestResult.from_parquet(
+        Path(__file__).parent / "fixtures/artifacts/v0.1.0b22", recovery=True
+    )
+    with pytest.raises(ValueError, match="captured"):
+        result.to_actions_dataframe()
+    with pytest.raises(ValueError, match="captured"):
+        result.to_entitlements_dataframe()
+
+
+@pytest.mark.parametrize("fault", ["cash_delta", "terms", "nonobject_terms", "nav", "schema"])
+def test_reader_rejects_actual_parquet_writer_faults_before_exposing_action_results(
+    tmp_path, monkeypatch, fault
+):
+    import json
+    from pathlib import Path
+
+    from ml4t.backtest.result import ArtifactManifestError, ArtifactReadError, BacktestResult
+
+    _, result, _ = run_actions(
+        [action("cash_dividend", cash_per_share=1.0, payment_at=TIMES[4])],
+        [100, 100, 99, 99, 99],
+    )
+    writer = pl.DataFrame.write_parquet
+
+    def lose_financial_fact(frame, file, *args, **kwargs):
+        if isinstance(file, (str, Path)):
+            name = Path(file).name
+            if name == "corporate_actions.parquet" and fault == "cash_delta":
+                frame = frame.with_columns(pl.lit(0.0).alias("cash_delta"))
+            elif name == "corporate_actions.parquet" and fault == "terms":
+                frame = frame.with_columns(
+                    pl.col("terms_json").str.replace(
+                        '"cash_per_share": 1.0', '"cash_per_share": 2.0'
+                    )
+                )
+            elif name == "corporate_actions.parquet" and fault == "nonobject_terms":
+                frame = frame.with_columns(pl.lit("[]").alias("terms_json"))
+            elif name == "portfolio_state.parquet" and fault == "nav":
+                frame = frame.with_columns((pl.col("equity") + 1.0).alias("equity"))
+        return writer(frame, file, *args, **kwargs)
+
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", lose_financial_fact)
+    result.to_parquet(tmp_path)
+    if fault == "schema":
+        path = tmp_path / "manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest["schema_version"] = 3
+        path.write_text(json.dumps(manifest))
+    with pytest.raises(
+        (ArtifactReadError, ArtifactManifestError), match="Corporate|corporate|NAV|Payment"
+    ):
+        BacktestResult.from_parquet(tmp_path)
+    monkeypatch.setattr(pl.DataFrame, "write_parquet", writer)
+    result.to_parquet(tmp_path)
+    assert BacktestResult.from_parquet(tmp_path).to_entitlements_dataframe()[
+        "cash_amount"
+    ].to_list() == [10]
+
+
 @pytest.mark.no_invariant_check
 def test_artifact_rejects_a_payment_journal_omission_from_the_actual_engine_producer(
     monkeypatch, tmp_path

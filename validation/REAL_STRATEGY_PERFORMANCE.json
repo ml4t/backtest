@@ -143,6 +143,48 @@
           "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
           "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
         }
+      },
+      {
+        "certified_at": "2026-10-21T23:47:18.591024+00:00",
+        "correctness_evidence_generated_at": "2026-10-21T23:45:20.464268+00:00",
+        "correctness_evidence_sha256": "35670963821288f985d8f55b5ee528f0fc1a9975c89f5a2d4be2fe4a71c73998",
+        "correctness_pairs_passed": 17,
+        "dependencies": {
+          "uv.lock": "d662dbede860b284b3bd3ed8a5d24237d8dfa040a4a45ec48c329d0f58005afd",
+          "validation/environments/backtrader/uv.lock": "b6716d65024b014103198b1feaec0706009ab4b70ad0ee42f185a576090cd6ae",
+          "validation/environments/lean/uv.lock": "929781e6ce00969d94b6e4a89318e34d6989f5c5a905c00b623369f6da8cedda",
+          "validation/environments/vectorbt_oss/uv.lock": "230dc89d48115785e622cc6149a044a995d313239ca4a52da20f644b9e5da63d",
+          "validation/environments/vectorbt_pro/uv.lock": "ab641a3f62ac66793f942bdf98040a8542570ed6c94a75eb3c1607f3fbddfcc5",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "32484892717199eb7da9421f4de7742814c6e670c1f6e50112e168c6cdc40717",
+          "validation/environments/zipline/uv.lock": "494dbe9123d8a286e9fff53ea97536634c6df18728ef106bbb0854d6ec5f0300"
+        },
+        "dependency_graphs": {
+          "uv.lock": "d177390653cd4fd91ef479de041f81fc989cb8c66b4a96817f6225f032d99586",
+          "validation/environments/backtrader/uv.lock": "6c9b64183ed42e58b91d753bd6eeaaa5366374db494ec66bad10bb5fa9ba7154",
+          "validation/environments/lean/uv.lock": "cbac9c8e792e635343f518003f79fe6abdac343ad0ac1f50ff1843fc8bacd982",
+          "validation/environments/vectorbt_oss/uv.lock": "76ae8d3f76644701eabbec66b4b2fb3e00f32380b9cbbeab4600d0898055348c",
+          "validation/environments/vectorbt_pro/uv.lock": "24140b9890f02448799f00f0ead220514b5283232edfc346870bc0b32431718c",
+          "validation/environments/vectorbt_pro_2025_12_31/uv.lock": "8936e2ec99550b05703ab5983bb34bf21004b9a81c659c10758363802c6fd7fe",
+          "validation/environments/zipline/uv.lock": "c5073b844e2b749e74496a13da4291110f705798e20529b2931797ce75d24f81"
+        },
+        "engine_source_sha256": "231e8e58efc4f780e7ae5f8b532ae003830989432b874a4ed0351c24fea8f3f4",
+        "measurement_sha256": "2764a504d315ca55a1bc077073c138de959be647816b651a819d4bde21dfb4e1",
+        "ml4t_commit": "12e79d870988987bfd4f2820aff238c855660d7c",
+        "performance_impact": "none",
+        "reason": "This source adds opt-in raw corporate-action accounting. The measured production workflows supply no action frame, so no action service is constructed, no entitlements or payment journal are allocated, and no action arithmetic runs. The default path adds None guards in event dispatch, account valuation, marks, fill reporting and lifecycle state; the optional mutable state remains None instead of allocating empty per-action containers. Original fills, execution settings, inputs, framework artifacts, runner timed boundaries and dependency selection are unchanged. A bounded same-environment alternating comparison against the exact measured b56e5cf3481e source ran one warmup and ten observations per source on both ETF and CME production workloads (44 child processes). Median paired current/baseline ratios were 0.98874846 and 0.99619696; common fills and marked NAV were identical. These diagnostics support no material default-path impact; they do not replace the accepted publication samples or establish speed claims for action-enabled runs. Fresh correctness with published Specs0.2.0 passes all66synthetic+17production pairs; all17 fresh production output identity sets equal the accepted measured outputs. Correctness agreement is separate from the source and paired-runtime impact evidence. Retain every accepted sample and its original measurement date.",
+        "reviewed_correctness_sha256": "5bdb4780e849a22d891cb9cd148500b65a8a519553555918f7dfa2db04526857",
+        "sources": {
+          "backtrader": "a456cc3bf9ed6708d239f21ed2c2495a3c19a9a8306634fee24619c2c0484459",
+          "benchmark": "64a884292709d4af1a1050f6595e3f657b2483bbcc52be3ee8ec55a6d63aa280",
+          "comparison_input": "a00bf9383c3e5561333ef0fa734745296cf9cda6fe7155ce950713c1ba2da4f9",
+          "lean_crypto": "82f1fbb6054fba25d74a4eabbc9ad4eae808caf89c00f560edefa63304da0dc4",
+          "lean_equity": "f566341d0f4103eda45280684be1b8a91f9da1a46a3a06477cba3b49674d89e8",
+          "lean_fx": "85c18eb1368bfac938fd9909eaa481de867cd864b1f6852281da8af7c2b44951",
+          "ml4t": "c8a5eb818a64a128dce41bc9827adea0a46fdab87a11f418abb19d5df8c7bff9",
+          "vectorbt_oss": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "vectorbt_pro": "c1817727bbf49d1551a072717db324c3e70484eefbdc27aa84af2a093e3e4d52",
+          "zipline": "c23b547767fad7a60f8bd6b0abd1d8f1c1acf99ef0faab3da8fd34621b0ec482"
+        }
       }
     ],
     "dependencies": {

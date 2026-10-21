@@ -170,8 +170,18 @@ def test_real_exported_stock_record_date_and_price_moves_match_closing_ledger_wi
     assert performance["portfolio_value"].to_list() == reference["nav"]
     assert performance["cash"].to_list() == reference["cash"]
     for got, wanted in zip(trace, reference["trace"], strict=True):
-        assert got["positions"] == wanted["positions"]
-        assert got["cash"] == wanted["cash"]
+        wanted = dict(wanted)
+        wanted["orders"] = [{k: v for k, v in row.items() if k != "id"} for row in wanted["orders"]]
+        assert got == wanted
+    fills = [fill for transactions in performance["transactions"] for fill in transactions]
+    assert all(fill["commission"] == 0 for fill in fills)
+    assert all(fill["commission"] is None for fill in reference["fills"])
+    assert [
+        (fill["dt"].isoformat(), int(fill["sid"]), fill["amount"], fill["price"]) for fill in fills
+    ] == [
+        (fill["timestamp"], fill["sid"], fill["quantity"], fill["price"])
+        for fill in reference["fills"]
+    ]
     case = reference["input"]
     if case.get("extra_move"):
         causal_mark = 99.0 if case.get("dividend") else 80.0
