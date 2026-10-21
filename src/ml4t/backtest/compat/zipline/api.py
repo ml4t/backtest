@@ -1,6 +1,7 @@
 """Callback-scoped migration API; all account mutations use the native broker."""
 
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any
 
 import pandas as pd
@@ -152,3 +153,11 @@ def set_max_position_size(
     on_error: str = "fail",
 ) -> None:
     current().set_max_position_size(asset, max_shares, max_notional, on_error)
+
+
+def set_max_leverage(max_leverage: float) -> None:
+    current().set_max_leverage(max_leverage)
+
+
+def set_min_leverage(min_leverage: float, grace_period: timedelta) -> None:
+    current().set_min_leverage(min_leverage, grace_period)

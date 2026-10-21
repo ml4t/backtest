@@ -614,6 +614,7 @@ class Engine:
                 expire_orders(timestamp, after_event=True)
             if self.broker._has_account_controls():
                 self.broker.validate_account_controls(boundary="after_fills")
+                self.broker._validate_session_end_account_controls(timestamp)
 
             # Update water marks at END of bar, AFTER all orders processed
             # This ensures new positions get their HWM updated from entry bar's high

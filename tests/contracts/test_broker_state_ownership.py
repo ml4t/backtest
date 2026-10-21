@@ -14,6 +14,7 @@ SOURCE_ROOT = Path(__file__).parents[2] / "src" / "ml4t" / "backtest"
 BROKER_MUTABLE_COLLECTIONS = {"fills", "orders", "pending_orders", "positions", "trades"}
 FORBIDDEN_BROKER_STATE = {
     "_account_controls",
+    "_account_control_sessions",
     "_asset_stats",
     "_asset_bars_seen",
     "_bar_index",

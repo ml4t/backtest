@@ -4393,7 +4393,7 @@
         },
         "register_account_control": {
           "kind": "method",
-          "signature": "(self, control: 'AccountControl', *, boundary: \"Literal['after_callbacks', 'after_fills']\" = 'after_fills') -> 'None'"
+          "signature": "(self, control: 'AccountControl', *, boundary: \"Literal['after_callbacks', 'after_fills', 'session_end']\" = 'after_fills') -> 'None'"
         },
         "register_position_rule_policy": {
           "kind": "method",
@@ -4449,7 +4449,7 @@
         },
         "validate_account_controls": {
           "kind": "method",
-          "signature": "(self, *, boundary: \"Literal['after_callbacks', 'after_fills'] | None\" = None) -> 'None'"
+          "signature": "(self, *, boundary: \"Literal['after_callbacks', 'after_fills', 'session_end'] | None\" = None) -> 'None'"
         }
       },
       "module": "ml4t.backtest.broker",

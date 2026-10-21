@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from math import isfinite
 from typing import Any
 from uuid import uuid4
@@ -21,14 +22,20 @@ from ...config import (
     FillOrdering,
     SlippageType,
 )
-from ...controls import OrderConstraints, OrderRequestCount, TradingControl
+from ...controls import (
+    AccountConstraints,
+    AccountControlContext,
+    OrderConstraints,
+    OrderRequestCount,
+    TradingControl,
+)
 from ...core.shared import SubmitOrderOptions
 from ...execution.limits import PositiveVolumeLimit, SharedVolumeParticipationLimit
 from ...execution.sizing import quantity_for_value, quantity_to_target, round_quantity
 from ...types import Order, OrderSide, OrderStatus
 from ._scope import callback_scope
 from .assets import Asset
-from .controls import _TradingRule
+from .controls import _register_account_controls, _TradingRule
 from .data import BarData
 from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time_rules
 from .finance import commission, slippage
@@ -112,9 +119,36 @@ class MigrationContext:
         self._in_before_trading_start = False
         self._schedules: list[_Schedule] = []
         self._trading_controls: list[TradingControl] = []
+        self._account_controls: list[tuple[str, float, timedelta | None]] = []
         self._slippage: Any = slippage.VolumeShareSlippage()
         self._set_commission(commission.PerShare())
         self.portfolio = _Portfolio(self)
+
+    @property
+    def account(self) -> AccountControlContext:
+        return self._require_broker().get_account_snapshot()
+
+    def set_max_leverage(self, max_leverage: float) -> None:
+        self._setup_only()
+        AccountConstraints(max_leverage=max_leverage)
+        self._account_controls.append(("maximum", max_leverage, None))
+        self._config.metadata.setdefault("migration_account_controls", []).append(
+            {"max_leverage": max_leverage, "boundary": "session_end"}
+        )
+
+    def set_min_leverage(self, min_leverage: float, grace_period: timedelta) -> None:
+        self._setup_only()
+        if not isinstance(grace_period, timedelta) or not isfinite(grace_period.total_seconds()):
+            raise ValueError("grace_period must be a finite timedelta")
+        self._account_controls.append(("minimum", min_leverage, grace_period))
+        self._config.metadata.setdefault("migration_account_controls", []).append(
+            {
+                "min_leverage": min_leverage,
+                "grace_seconds": grace_period.total_seconds(),
+                "deadline_origin": "start_session_midnight_UTC",
+                "boundary": "session_end",
+            }
+        )
 
     def _require_broker(self) -> Broker:
         if self._broker is None:
@@ -446,7 +480,7 @@ class MigrationContext:
 
     def _setup_only(self) -> None:
         if not self._initializing:
-            raise RuntimeError("Cost settings must be declared during initialize")
+            raise RuntimeError("Settings must be declared during initialize")
 
     def _set_commission(self, model: Any) -> None:
         config = self._config
@@ -525,6 +559,7 @@ class _Callbacks(Strategy):
         self.context._running = True
         for control in self.context._trading_controls:
             broker.register_trading_control(control)
+        _register_account_controls(self.context, self.runtime)
         _register(self.context, self.runtime, self.data, self.before_trading_start)
 
     def on_end(self, broker: Broker) -> None:

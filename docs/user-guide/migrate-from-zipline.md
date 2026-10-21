@@ -568,3 +568,57 @@ request passes the count rule, consumes the second entry, and fails the later
 size rule. The final one-share request then fails the count rule. The retained
 published Zipline 3.2.0 fixture exercises this sequence and the nonzero,
 log-and-allow and long-only variants with divergent open/close prices.
+
+## Account leverage at session close
+
+`set_max_leverage(value)` and `set_min_leverage(value, grace_period)` register native
+`AccountConstraints` at the explicit `session_end` boundary. Declare them during
+`initialize`. Maximum leverage uses gross exposure divided by NAV. Minimum leverage
+starts after UTC midnight of the first accepted session plus the given `timedelta`.
+Both validate after the close callback and fills, including an early close. A
+position that breaches the maximum intraday and returns within the limit by the
+close passes, as in the published Zipline 3.2.0 reference.
+
+`context.account` exposes the native immutable account snapshot: `timestamp`,
+`cash`, `equity`, `gross_exposure`, `net_exposure`, `positions_value` and `leverage`.
+Other legacy account fields are not synthesized. A violation raises native
+`AccountControlViolation`; it does not liquidate a position or undo completed fills.
+
+Session controls require a declared calendar, physical observation timestamps and
+a clock observation at every touched session's actual close. A CSV row with null
+prices can supply that clock point. It cannot supply a new execution price: held
+positions retain their actual prior mark and its timestamp. An incomplete session
+raises an input error rather than silently skipping its control. Calendar-free
+observation runs can use native `after_callbacks` or `after_fills` controls instead.
+
+<!-- ml4t-doc-test: zipline-account-constraints -->
+```python
+from datetime import UTC, datetime
+
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+
+def initialize(context):
+    context.set_max_leverage(1.0)
+
+
+feed = DataFeed(
+    prices_df=pl.DataFrame({"timestamp": [datetime(2025, 7, 3, 17, tzinfo=UTC)],
+                            "asset": ["A"], "close": [100.0], "volume": [1000]}),
+    feed_spec={"calendar": "NYSE", "timestamp_semantics": "bar_close",
+               "bar_label": "right", "data_frequency": "1m",
+               "time_contract_version": 2, "bar_grid_anchor": "session_open",
+               "partial_bar_policy": "include"},
+)
+performance = run_algorithm(feed=feed, assets=[Asset("A", "ALPHA")], initialize=initialize)
+assert performance["portfolio_value"].iloc[-1] == 100000.0
+print("early-close account control passed")
+```
+
+<!-- ml4t-doc-output: zipline-account-constraints -->
+```text
+early-close account control passed
+```

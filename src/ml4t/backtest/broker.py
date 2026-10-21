@@ -194,6 +194,7 @@ class Broker:
         self._order_state = OrderState()
         self._trading_controls: list[TradingControl] = []
         self._account_controls: list[tuple[str, AccountControl]] = []
+        self._account_control_sessions: dict[date, bool] = {}
         self._order_session_config: SessionConfig | None = None
         self._scheduled_session_date: date | None = None
         self._scheduled_session_open: datetime | None = None
@@ -972,6 +973,7 @@ class Broker:
             "control_counts": dict(self._order_state.control_counts),
             "trading_controls": tuple(self._trading_controls),
             "account_controls": tuple(self._account_controls),
+            "account_control_sessions": dict(self._account_control_sessions),
             "orders_this_bar": tuple(self._order_state.current_bar),
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
@@ -1091,6 +1093,7 @@ class Broker:
         self._order_state.control_counts.update(state["control_counts"])
         self._trading_controls[:] = state["trading_controls"]
         self._account_controls[:] = state["account_controls"]
+        self._account_control_sessions = dict(state["account_control_sessions"])
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
@@ -1214,6 +1217,11 @@ class Broker:
         self._completion_validators.setdefault(id(owner), validator)
 
     def _validate_completed_run(self, market_event_count: int) -> None:
+        missing = [
+            session for session, checked in self._account_control_sessions.items() if not checked
+        ]
+        if missing:
+            raise ValueError(f"Session account controls require a close observation for {missing}")
         for validator in tuple(self._completion_validators.values()):
             validator(market_event_count)
 
@@ -1769,11 +1777,31 @@ class Broker:
         self,
         control: AccountControl,
         *,
-        boundary: Literal["after_callbacks", "after_fills"] = "after_fills",
+        boundary: Literal["after_callbacks", "after_fills", "session_end"] = "after_fills",
     ) -> None:
-        """Validate the observed account at an explicit per-event boundary."""
-        if boundary not in {"after_callbacks", "after_fills"}:
-            raise ValueError("Account control boundary must be after_callbacks or after_fills")
+        """Validate the marked account after callbacks, fills or a calendar session close.
+
+        Session controls must be registered before the first market observation.
+        They require physical timestamps, a calendar and each observed session's
+        close clock point. A close row may have null prices; no quote is fabricated.
+        """
+        if boundary not in {"after_callbacks", "after_fills", "session_end"}:
+            raise ValueError("Unknown account control boundary")
+        if boundary == "session_end":
+            clock = self._order_session_config or self._session_config
+            if clock is None or clock.calendar is None:
+                raise ValueError("Session account controls require a declared calendar")
+            if (
+                getattr(clock.timestamp_semantics, "value", clock.timestamp_semantics)
+                == "session_label"
+            ):
+                raise ValueError(
+                    "Session account controls require physical instants, not session labels"
+                )
+            if self._bar_index:
+                raise ValueError(
+                    "Session account controls must be registered before market observations"
+                )
         if not callable(getattr(control, "validate", None)):
             raise TypeError("Account controls must define validate(account)")
         self._capture_lifecycle_mutation()
@@ -1935,7 +1963,7 @@ class Broker:
         return bool(self._account_controls)
 
     def validate_account_controls(
-        self, *, boundary: Literal["after_callbacks", "after_fills"] | None = None
+        self, *, boundary: Literal["after_callbacks", "after_fills", "session_end"] | None = None
     ) -> None:
         """Run registered validators over one native marked account snapshot.
 
@@ -1943,8 +1971,8 @@ class Broker:
         Account validation raises on breach; it does not liquidate or roll back
         completed callbacks. Portfolio risk actions remain with the risk manager.
         """
-        if boundary not in {None, "after_callbacks", "after_fills"}:
-            raise ValueError("Account control boundary must be after_callbacks or after_fills")
+        if boundary not in {None, "after_callbacks", "after_fills", "session_end"}:
+            raise ValueError("Unknown account control boundary")
         controls = [
             rule for phase, rule in self._account_controls if boundary is None or phase == boundary
         ]
@@ -1953,6 +1981,26 @@ class Broker:
         state = self.get_account_snapshot()
         for control in controls:
             control.validate(state)
+
+    def _validate_session_end_account_controls(self, timestamp: datetime) -> None:
+        if not any(phase == "session_end" for phase, _ in self._account_controls):
+            return
+        clock = self._order_session_config or self._session_config
+        assert clock is not None
+        session = clock.date_for_timestamp(timestamp).date()
+        opened, closed = self._order_session_bounds(clock, session)
+        if timestamp.tzinfo is None:
+            zone = ZoneInfo(clock.timezone)
+            opened = opened.astimezone(zone).replace(tzinfo=None)
+            closed = closed.astimezone(zone).replace(tzinfo=None)
+        if not opened <= timestamp <= closed:
+            return
+        if self._account_control_sessions.get(session):
+            return
+        self._account_control_sessions[session] = False
+        if timestamp == closed:
+            self.validate_account_controls(boundary="session_end")
+            self._account_control_sessions[session] = True
 
     def submit_order(
         self,
