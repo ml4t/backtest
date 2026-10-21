@@ -229,12 +229,26 @@ class LateAssetPolicy(str, Enum):
     REQUIRE_HISTORY = "require_history"
 
 
+class ConditionalOrderMode(str, Enum):
+    """Price evidence used for conditional triggers and executions."""
+
+    BAR_OHLC = "bar_ohlc"
+    EXECUTION_PRICE = "execution_price"
+
+
+class CancelPolicy(str, Enum):
+    NEVER = "never"
+    SESSION_END = "session_end"
+
+
 class CommissionType(str, Enum):
     """Commission calculation method."""
 
     NONE = "none"  # No commission
     PERCENTAGE = "percentage"  # % of trade value
     PER_SHARE = "per_share"  # Fixed amount per share/contract
+    PER_ORDER_PER_SHARE = "per_order_per_share"
+    PER_ORDER = "per_order"
     PER_CONTRACT = "per_share"  # Alias for PER_SHARE (futures convention)
     PER_TRADE = "per_trade"  # Fixed amount per trade
     TIERED = "tiered"  # Volume-based tiers
@@ -254,6 +268,7 @@ class SlippageType(str, Enum):
     FIXED = "fixed"  # Fixed dollar amount
     SPREAD = "spread"  # Bid-ask spread approximation in currency units
     VOLUME_BASED = "volume_based"  # Based on trade size vs volume
+    CUMULATIVE_VOLUME_SHARE = "cumulative_volume_share"
 
 
 class DataFrequency(str, Enum):
@@ -539,6 +554,11 @@ class BacktestConfig:
     # === Execution Timing ===
     execution_price: ExecutionPrice = ExecutionPrice.OPEN
     mark_price: ExecutionPrice = ExecutionPrice.PRICE
+    next_bar_execution_price: ExecutionPrice | None = field(default=None, kw_only=True)
+    cancel_policy: CancelPolicy = field(default=CancelPolicy.NEVER, kw_only=True)
+    conditional_order_mode: ConditionalOrderMode = field(
+        default=ConditionalOrderMode.BAR_OHLC, kw_only=True
+    )
     execution_mode: ExecutionMode = ExecutionMode.NEXT_BAR  # Order execution timing
 
     # === Stop Configuration ===
@@ -591,7 +611,13 @@ class BacktestConfig:
             )
 
         # High slippage + high commission
-        total_cost = self.slippage_rate + self.commission_rate
+        flat_slippage = (
+            self.slippage_rate
+            if self.slippage_type
+            not in {SlippageType.VOLUME_BASED, SlippageType.CUMULATIVE_VOLUME_SHARE}
+            else 0.0
+        )
+        total_cost = flat_slippage + self.commission_rate
         if total_cost > 0.01:  # > 1% round-trip
             issues.append(
                 f"Total transaction cost ({total_cost:.2%}) is high. "
@@ -808,6 +834,10 @@ class BacktestConfig:
         return instance
 
     def __post_init__(self) -> None:
+        self.cancel_policy = CancelPolicy(self.cancel_policy)
+        self.conditional_order_mode = ConditionalOrderMode(self.conditional_order_mode)
+        if self.next_bar_execution_price is not None:
+            self.next_bar_execution_price = ExecutionPrice(self.next_bar_execution_price)
         FeedSpec(time_contract_version=self.time_contract_version, calendar=self.calendar)
         if self.time_contract_version == 1 and self.calendar is UNSET_CALENDAR:
             self.calendar = None
@@ -986,6 +1016,13 @@ class BacktestConfig:
                 "execution_price": self.execution_price.value,
                 "mark_price": self.mark_price.value,
                 "execution_mode": self.execution_mode.value,
+                "cancel_policy": self.cancel_policy.value,
+                "conditional_order_mode": self.conditional_order_mode.value,
+                "next_bar_execution_price": (
+                    self.next_bar_execution_price.value
+                    if self.next_bar_execution_price is not None
+                    else None
+                ),
             },
             "stops": {
                 "stop_fill_mode": self.stop_fill_mode.value,
@@ -1102,7 +1139,14 @@ class BacktestConfig:
                     "short_cash_policy",
                     "lock_notional_update_mode",
                 },
-                "execution": {"execution_price", "mark_price", "execution_mode"},
+                "execution": {
+                    "execution_price",
+                    "mark_price",
+                    "execution_mode",
+                    "next_bar_execution_price",
+                    "cancel_policy",
+                    "conditional_order_mode",
+                },
                 "stops": {
                     "stop_fill_mode",
                     "stop_level_basis",
@@ -1243,6 +1287,9 @@ class BacktestConfig:
             execution_mode=ExecutionMode(
                 exec_cfg.get("execution_mode", ExecutionMode.NEXT_BAR.value)
             ),
+            next_bar_execution_price=exec_cfg.get("next_bar_execution_price"),
+            cancel_policy=exec_cfg.get("cancel_policy", "never"),
+            conditional_order_mode=exec_cfg.get("conditional_order_mode", "bar_ohlc"),
             # Stops
             stop_fill_mode=StopFillMode(stops_cfg.get("stop_fill_mode", "stop_price")),
             stop_level_basis=StopLevelBasis(stops_cfg.get("stop_level_basis", "fill_price")),
@@ -1339,7 +1386,7 @@ class BacktestConfig:
         - "default": Sensible defaults for general use
         - "backtrader": Match Backtrader's default behavior
         - "vectorbt": Match VectorBT's default behavior
-        - "zipline": Match Zipline's default behavior
+        - "zipline": Use the declared Zipline comparison profile with costs disabled
         - "lean": Match the frozen LEAN daily US-equity comparison protocol
         - "realistic": Conservative settings for realistic simulation
         - "ibkr_us_stocks_fixed": Interactive Brokers US stocks fixed pricing
@@ -1513,6 +1560,7 @@ class BacktestConfig:
                 "Execution:",
                 f"  Execution mode: {self.execution_mode.value}",
                 f"  Execution price: {self.execution_price.value}",
+                f"  Conditional order mode: {self.conditional_order_mode.value}",
                 f"  Mark price: {self.mark_price.value}",
                 "",
                 "Stops:",
@@ -1532,6 +1580,9 @@ class BacktestConfig:
                     f"{self.slippage_type.value} default_spread={self.slippage_spread:.6f} "
                     f"convention={self.slippage_spread_convention.value}"
                     if self.slippage_type == SlippageType.SPREAD
+                    else f"  Slippage: {self.slippage_type.value} coefficient={self.slippage_rate}"
+                    if self.slippage_type
+                    in {SlippageType.VOLUME_BASED, SlippageType.CUMULATIVE_VOLUME_SHARE}
                     else f"  Slippage: {self.slippage_type.value} @ {self.slippage_rate:.2%}"
                 ),
             ]

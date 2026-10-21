@@ -343,6 +343,7 @@ class TestBacktestResultFillsDataFrame:
             "order_type",
             "limit_price",
             "stop_price",
+            "stop_triggered_at",
             "price_source",
             "reference_price",
             "quote_mid_price",
@@ -677,6 +678,7 @@ class TestBacktestResultParquet:
 
             assert manifest["omitted_components"] == {
                 "holdings": "holdings were not captured",
+                "benchmark": "result has no prepared benchmark",
                 "recorded_variables": "strategy variables were not recorded",
                 "predictions": "result has no predictions",
                 "config": "result has no config",

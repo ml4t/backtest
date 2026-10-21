@@ -1,0 +1,29 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "closes": [
+    "2025-07-02T20:00:00+00:00",
+    "2025-07-03T17:00:00+00:00"
+  ],
+  "callback_statuses": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      2,
+      0,
+      0
+    ]
+  ],
+  "final_statuses": [
+    2,
+    2,
+    0
+  ],
+  "classification": "reference_defect",
+  "reason": "Daily cancellation removes only the first pending order when multiple exist and leaves the final pending order indefinitely; EOD class documentation only promises minute behavior",
+  "native_method": "Cancel every remaining order at the declared session close",
+  "timing_claim": false
+}

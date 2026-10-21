@@ -145,7 +145,7 @@ class ExecutionEngine:
                 continue
             fill_price = fill.check_fill(order, price)
             if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
-                fully_filled = fill.execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                 if fully_filled:
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
@@ -268,7 +268,7 @@ class ExecutionEngine:
         for order, fill_price in accepted_orders:
             if not fill.constrain_locked_short_cover(order, fill_price):
                 continue
-            fully_filled = fill.execute_fill(order, fill_price)
+            fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
             if fully_filled:
                 filled_orders.append(order)
                 self.orders.partial_quantities.pop(order.order_id, None)
@@ -299,7 +299,12 @@ class ExecutionEngine:
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, validation_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            validation_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         multiplier = broker.get_multiplier(order.asset)
         available_shadow_cash = shadow_cash
@@ -356,7 +361,12 @@ class ExecutionEngine:
         )
         new_qty = current_qty + qty_delta
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, fill_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            fill_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
 
@@ -501,7 +511,7 @@ class ExecutionEngine:
                 # Entries fill directly when shadow-validated at submission.
                 fill_price = fill.check_fill(order, price)
                 if fill_price is not None and fill.constrain_locked_short_cover(order, fill_price):
-                    fully_filled = fill.execute_fill(order, fill_price)
+                    fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                     if fully_filled:
                         filled_orders.append(order)
                         self.orders.partial_quantities.pop(order.order_id, None)
@@ -560,7 +570,7 @@ class ExecutionEngine:
                 if not fill.constrain_locked_short_cover(order, fill_price):
                     return
 
-                fully_filled = fill.execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                 if fully_filled:
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
@@ -606,14 +616,16 @@ class ExecutionEngine:
 
             insufficient_cash = "insufficient" in rejection_reason.lower()
             if valid:
-                fully_filled = fill.execute_fill(order, fill_price)
+                fully_filled = fill.execute_fill(order, fill_price, use_open=use_open)
                 if fully_filled:
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
                 else:
                     fill.update_partial_order(order)
             elif not broker.reject_on_insufficient_cash and insufficient_cash:
-                if broker.partial_fills_allowed and fill.try_partial_fill(order, fill_price):
+                if broker.partial_fills_allowed and fill.try_partial_fill(
+                    order, fill_price, use_open=use_open
+                ):
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
                 else:
@@ -624,7 +636,7 @@ class ExecutionEngine:
                 broker.partial_fills_allowed
                 or (order.rebalance_id is not None and broker.share_type.value == "integer")
             ):
-                if fill.try_partial_fill(order, fill_price):
+                if fill.try_partial_fill(order, fill_price, use_open=use_open):
                     filled_orders.append(order)
                     self.orders.partial_quantities.pop(order.order_id, None)
                 else:
@@ -659,6 +671,13 @@ class ExecutionEngine:
         eligible_orders = []
         orders_this_bar_ids = self.orders.current_bar_ids
         for order in self.orders.pending[:]:
+            if order._eligible_from is not None and (
+                self.market.time is None
+                or self.market.time < order._eligible_from
+                or self.market.time == order._eligible_from
+                and not order._eligible_on_boundary
+            ):
+                continue
             if use_open and order.order_type is OrderType.MOC:
                 continue
             if order_types is not None and order.order_type not in order_types:
@@ -690,7 +709,12 @@ class ExecutionEngine:
 
         signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, fill_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            fill_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         # Match the fill debit, which scales notional by the contract multiplier.
         multiplier = broker.get_multiplier(order.asset)
@@ -776,6 +800,8 @@ class ExecutionEngine:
             order.asset,
             quantity,
             float(price),
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
 
         if current < 0 and signed > 0:

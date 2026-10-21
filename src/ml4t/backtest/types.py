@@ -2,8 +2,10 @@
 
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
+from math import inf, isfinite
+from numbers import Real
 from typing import Any
 
 # === Enums ===
@@ -65,6 +67,23 @@ class AssetClass(Enum):
     FOREX = "forex"  # FX pairs (pip value varies)
 
 
+def _validated_multiplier(value: float) -> float:
+    if type(value) is float and 0.0 < value < inf:
+        return value
+    try:
+        valid = (
+            not isinstance(value, bool)
+            and isinstance(value, Real)
+            and isfinite(value)
+            and value > 0
+        )
+    except OverflowError:
+        valid = False
+    if not valid:
+        raise ValueError("Contract multiplier must be finite and positive")
+    return value
+
+
 @dataclass
 class ContractSpec:
     """Contract specification for an asset.
@@ -108,6 +127,9 @@ class ContractSpec:
     margin: float | None = None  # Initial margin per contract (overrides account default)
     margin_pct: tuple[float, float] | None = None  # (initial, maintenance) fractions of notional
     currency: str = "USD"
+
+    def __post_init__(self) -> None:
+        _validated_multiplier(self.multiplier)
 
 
 class ExitReason(str, Enum):
@@ -176,6 +198,24 @@ class Order:
     _risk_exit_reason: str | None = None  # Human-readable reason (legacy, for logging)
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
+    commission_paid: float = field(default=0.0, kw_only=True)
+    cancelled_at: datetime | None = field(default=None, kw_only=True)
+    cancellation_reason: str | None = field(default=None, kw_only=True)
+    _submitted_session_date: date | None = field(default=None, kw_only=True)
+    _eligible_from: datetime | None = field(default=None, kw_only=True)
+    _eligible_on_boundary: bool = field(default=True, kw_only=True)
+    _stop_triggered: bool = field(default=False, kw_only=True)
+    _stop_triggered_at: datetime | None = field(default=None, kw_only=True)
+
+    @property
+    def stop_triggered(self) -> bool:
+        """Whether a stop or stop-limit order has become eligible for execution."""
+        return self._stop_triggered
+
+    @property
+    def stop_triggered_at(self) -> datetime | None:
+        """Actual observed trigger instant, before any later partial fills."""
+        return self._stop_triggered_at
 
     def __post_init__(self) -> None:
         if self.requested_quantity is None:
@@ -256,6 +296,22 @@ class Position:
     multiplier: float = 1.0  # Contract multiplier (for futures)
     entry_commission: float = 0.0  # Commission paid on entry (for Trade PnL)
     entry_slippage: float = 0.0  # Per-unit slippage on entry (for cost decomposition)
+
+    _commission_adjusted_cost_basis: float | None = field(default=None, kw_only=True, repr=False)
+
+    @property
+    def commission_adjusted_cost_basis(self) -> float:
+        """Reported price basis with each fill fee allocated over remaining signed units.
+
+        Reductions retain the prior price basis before their fee adjustment; reversals
+        reset it to the fill price before allocating the entire reversal fee. This is
+        a reporting convention and does not replace gross entry price or P&L costs.
+        """
+        return (
+            self.entry_price
+            if self._commission_adjusted_cost_basis is None
+            else self._commission_adjusted_cost_basis
+        )
 
     def __post_init__(self):
         # Initialize water marks to entry price
@@ -418,6 +474,7 @@ class Fill:
     intent_idempotency_key: str | None = None
     multiplier: float | None = None
     currency: str | None = None
+    stop_triggered_at: datetime | None = field(default=None, kw_only=True)
 
 
 @dataclass

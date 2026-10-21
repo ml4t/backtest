@@ -1,0 +1,57 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "transport": "Frozen CSV bytes injected only at fetch_data; actual published parser/symbol resolver/DataPortal/Engine unchanged",
+  "original_source_id": "https://example.org/original-research.csv",
+  "csv": "date,ticker,raw\n2025-07-01,A,5\n2025-07-03,A,15\n2025-07-02,UNKNOWN,99\ninvalid,A,500\n",
+  "events": [
+    {
+      "phase": "transport",
+      "url": "https://example.org/original-research.csv"
+    },
+    {
+      "phase": "pre",
+      "columns": [
+        "date",
+        "ticker",
+        "raw"
+      ]
+    },
+    {
+      "phase": "post",
+      "columns": [
+        "raw",
+        "score",
+        "sid"
+      ],
+      "index_timezone": "UTC",
+      "sids": [
+        7,
+        7
+      ]
+    }
+  ],
+  "trace": [
+    {
+      "timestamp": "2025-07-01T20:00:00+00:00",
+      "signal": 11.0,
+      "fetcher_sids": [
+        7
+      ]
+    },
+    {
+      "timestamp": "2025-07-02T20:00:00+00:00",
+      "signal": 11.0,
+      "fetcher_sids": [
+        7
+      ]
+    },
+    {
+      "timestamp": "2025-07-03T17:00:00+00:00",
+      "signal": 31.0,
+      "fetcher_sids": [
+        7
+      ]
+    }
+  ],
+  "timing_claim": false
+}

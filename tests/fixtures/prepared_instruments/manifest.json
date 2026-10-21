@@ -1,0 +1,553 @@
+{
+  "producer": {
+    "repository": "https://github.com/ml4t/data",
+    "revision": "fd646c982ed12fca193f6cf713be1ac8803b17df",
+    "version": "0.2.2.dev55+gfd646c982",
+    "wheel": "ml4t_data-0.2.2.dev55+gfd646c982-py3-none-any.whl",
+    "wheel_sha256": "d1c207ff8690847955321c7fde56c0c813fbbaed3b0591c5bfaf41a8c8d153a6",
+    "published": false
+  },
+  "groups": {
+    "equity": {
+      "feed_spec": {
+        "timestamp_col": "valid_from",
+        "entity_col": "asset",
+        "price_col": "close",
+        "open_col": "open",
+        "high_col": "high",
+        "low_col": "low",
+        "close_col": "close",
+        "volume_col": "volume",
+        "vwap_col": null,
+        "bid_col": null,
+        "ask_col": null,
+        "mid_col": null,
+        "bid_size_col": null,
+        "ask_size_col": null,
+        "calendar": "NYSE",
+        "timezone": "America/New_York",
+        "data_frequency": null,
+        "bar_type": null,
+        "timestamp_semantics": "session_label",
+        "session_start_time": null,
+        "time_contract_version": 2,
+        "bar_grid_anchor": null,
+        "bar_label": null,
+        "partial_bar_policy": null
+      },
+      "times": [
+        "2025-01-06T21:00:00+00:00",
+        "2025-01-08T21:00:00+00:00",
+        "2025-01-10T21:00:00+00:00",
+        "2025-01-13T21:00:00+00:00"
+      ],
+      "identities": "equity-identities.parquet",
+      "snapshots": [
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "equity-0-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "equity-0-1.parquet",
+          "sha256": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "equity-0-2.parquet",
+          "sha256": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "equity-0-3.parquet",
+          "sha256": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc"
+        },
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "equity-1-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "equity-1-1.parquet",
+          "sha256": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "equity-1-2.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "equity-1-3.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "equity-2-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "equity-2-1.parquet",
+          "sha256": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "equity-2-2.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "equity-2-3.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "equity-3-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "equity-3-1.parquet",
+          "sha256": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "equity-3-2.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "equity-3-3.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        }
+      ],
+      "resolutions": [
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "asset": "OLD"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "error": "Missing or ambiguous identity"
+        },
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "asset": "NEW"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "asset": "OLD"
+        },
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "asset": "NEW"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "error": "Missing or ambiguous identity"
+        },
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "asset": "NEW"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "error": "Missing or ambiguous identity"
+        }
+      ]
+    },
+    "future_revision": {
+      "feed_spec": {
+        "timestamp_col": "valid_from",
+        "entity_col": "asset",
+        "price_col": "close",
+        "open_col": "open",
+        "high_col": "high",
+        "low_col": "low",
+        "close_col": "close",
+        "volume_col": "volume",
+        "vwap_col": null,
+        "bid_col": null,
+        "ask_col": null,
+        "mid_col": null,
+        "bid_size_col": null,
+        "ask_size_col": null,
+        "calendar": "NYSE",
+        "timezone": "America/New_York",
+        "data_frequency": null,
+        "bar_type": null,
+        "timestamp_semantics": "session_label",
+        "session_start_time": null,
+        "time_contract_version": 2,
+        "bar_grid_anchor": null,
+        "bar_label": null,
+        "partial_bar_policy": null
+      },
+      "times": [
+        "2025-01-06T21:00:00+00:00",
+        "2025-01-08T21:00:00+00:00",
+        "2025-01-10T21:00:00+00:00",
+        "2025-01-13T21:00:00+00:00"
+      ],
+      "identities": "future_revision-identities.parquet",
+      "snapshots": [
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "future_revision-0-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "future_revision-0-1.parquet",
+          "sha256": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "future_revision-0-2.parquet",
+          "sha256": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "file": "future_revision-0-3.parquet",
+          "sha256": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc"
+        },
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "future_revision-1-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "future_revision-1-1.parquet",
+          "sha256": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "future_revision-1-2.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "file": "future_revision-1-3.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "future_revision-2-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "future_revision-2-1.parquet",
+          "sha256": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "future_revision-2-2.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "file": "future_revision-2-3.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "future_revision-3-0.parquet",
+          "sha256": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680"
+        },
+        {
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "future_revision-3-1.parquet",
+          "sha256": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303"
+        },
+        {
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "future_revision-3-2.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        },
+        {
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "file": "future_revision-3-3.parquet",
+          "sha256": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113"
+        }
+      ],
+      "resolutions": [
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "asset": "OLD"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-06T21:00:00+00:00",
+          "as_of": "2025-01-06T21:00:00+00:00",
+          "error": "Missing or ambiguous identity"
+        },
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "asset": "NEW"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-08T21:00:00+00:00",
+          "as_of": "2025-01-08T21:00:00+00:00",
+          "asset": "OLD"
+        },
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "asset": "NEW"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-10T21:00:00+00:00",
+          "as_of": "2025-01-10T21:00:00+00:00",
+          "error": "Missing or ambiguous identity"
+        },
+        {
+          "symbol": "ALPHA",
+          "exchange": null,
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "asset": "NEW"
+        },
+        {
+          "symbol": "BETA",
+          "exchange": null,
+          "on": "2025-01-13T21:00:00+00:00",
+          "as_of": "2025-01-13T21:00:00+00:00",
+          "error": "Missing or ambiguous identity"
+        }
+      ]
+    },
+    "cme": {
+      "feed_spec": {
+        "timestamp_col": "valid_from",
+        "entity_col": "asset",
+        "price_col": "close",
+        "open_col": "open",
+        "high_col": "high",
+        "low_col": "low",
+        "close_col": "close",
+        "volume_col": "volume",
+        "vwap_col": null,
+        "bid_col": null,
+        "ask_col": null,
+        "mid_col": null,
+        "bid_size_col": null,
+        "ask_size_col": null,
+        "calendar": "CME_Equity",
+        "timezone": "America/Chicago",
+        "data_frequency": null,
+        "bar_type": null,
+        "timestamp_semantics": "session_label",
+        "session_start_time": null,
+        "time_contract_version": 2,
+        "bar_grid_anchor": null,
+        "bar_label": null,
+        "partial_bar_policy": null
+      },
+      "times": [
+        "2025-07-06T23:30:00+00:00",
+        "2025-07-07T00:30:00+00:00",
+        "2025-07-07T23:30:00+00:00"
+      ],
+      "identities": "cme-identities.parquet",
+      "snapshots": [
+        {
+          "on": "2025-07-06T23:30:00+00:00",
+          "as_of": "2025-07-06T23:30:00+00:00",
+          "file": "cme-0-0.parquet",
+          "sha256": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6"
+        },
+        {
+          "on": "2025-07-07T00:30:00+00:00",
+          "as_of": "2025-07-06T23:30:00+00:00",
+          "file": "cme-0-1.parquet",
+          "sha256": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6"
+        },
+        {
+          "on": "2025-07-07T23:30:00+00:00",
+          "as_of": "2025-07-06T23:30:00+00:00",
+          "file": "cme-0-2.parquet",
+          "sha256": "b0976b8fad893c08a2138d48afc22bc8bd45d1b3f135c61e255da9b59022ad38"
+        },
+        {
+          "on": "2025-07-06T23:30:00+00:00",
+          "as_of": "2025-07-07T00:30:00+00:00",
+          "file": "cme-1-0.parquet",
+          "sha256": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6"
+        },
+        {
+          "on": "2025-07-07T00:30:00+00:00",
+          "as_of": "2025-07-07T00:30:00+00:00",
+          "file": "cme-1-1.parquet",
+          "sha256": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6"
+        },
+        {
+          "on": "2025-07-07T23:30:00+00:00",
+          "as_of": "2025-07-07T00:30:00+00:00",
+          "file": "cme-1-2.parquet",
+          "sha256": "b0976b8fad893c08a2138d48afc22bc8bd45d1b3f135c61e255da9b59022ad38"
+        },
+        {
+          "on": "2025-07-06T23:30:00+00:00",
+          "as_of": "2025-07-07T23:30:00+00:00",
+          "file": "cme-2-0.parquet",
+          "sha256": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6"
+        },
+        {
+          "on": "2025-07-07T00:30:00+00:00",
+          "as_of": "2025-07-07T23:30:00+00:00",
+          "file": "cme-2-1.parquet",
+          "sha256": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6"
+        },
+        {
+          "on": "2025-07-07T23:30:00+00:00",
+          "as_of": "2025-07-07T23:30:00+00:00",
+          "file": "cme-2-2.parquet",
+          "sha256": "b0976b8fad893c08a2138d48afc22bc8bd45d1b3f135c61e255da9b59022ad38"
+        }
+      ],
+      "resolutions": [
+        {
+          "symbol": "ES",
+          "exchange": null,
+          "on": "2025-07-06T23:30:00+00:00",
+          "as_of": "2025-07-06T23:30:00+00:00",
+          "asset": "CME1"
+        },
+        {
+          "symbol": "ES",
+          "exchange": null,
+          "on": "2025-07-07T00:30:00+00:00",
+          "as_of": "2025-07-07T00:30:00+00:00",
+          "asset": "CME1"
+        },
+        {
+          "symbol": "ES",
+          "exchange": null,
+          "on": "2025-07-07T23:30:00+00:00",
+          "as_of": "2025-07-07T23:30:00+00:00",
+          "error": "Missing or ambiguous identity"
+        }
+      ]
+    }
+  },
+  "files": {
+    "equity-identities.parquet": "99de58205e021df4615a589731d420417eaf49d28d98506e8aad3fae70729df9",
+    "equity-0-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "equity-0-1.parquet": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc",
+    "equity-0-2.parquet": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc",
+    "equity-0-3.parquet": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc",
+    "equity-1-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "equity-1-1.parquet": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303",
+    "equity-1-2.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "equity-1-3.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "equity-2-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "equity-2-1.parquet": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303",
+    "equity-2-2.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "equity-2-3.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "equity-3-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "equity-3-1.parquet": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303",
+    "equity-3-2.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "equity-3-3.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "future_revision-identities.parquet": "a6f251f77b8101f34e6d473bcb981d0ad512bc4125a252d6120ed303d983af38",
+    "future_revision-0-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "future_revision-0-1.parquet": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc",
+    "future_revision-0-2.parquet": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc",
+    "future_revision-0-3.parquet": "f8198e3c63e9d4d531e0a77d4d85c46f0d9eb5719a18d7503cb9b9adcc2fb0fc",
+    "future_revision-1-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "future_revision-1-1.parquet": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303",
+    "future_revision-1-2.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "future_revision-1-3.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "future_revision-2-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "future_revision-2-1.parquet": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303",
+    "future_revision-2-2.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "future_revision-2-3.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "future_revision-3-0.parquet": "7da4b64c7e204400a99cd154dc801b307ab649470d77055385e2e28080d2f680",
+    "future_revision-3-1.parquet": "6685f98d5afe77eddb8d3036d69c26ec8ac37f03ab88cc22822969a087d85303",
+    "future_revision-3-2.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "future_revision-3-3.parquet": "5354bdf365e1876d88747b1f79dbf97e03ed9113396835ced42b61b72da83113",
+    "cme-identities.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-0-0.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-0-1.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-0-2.parquet": "b0976b8fad893c08a2138d48afc22bc8bd45d1b3f135c61e255da9b59022ad38",
+    "cme-1-0.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-1-1.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-1-2.parquet": "b0976b8fad893c08a2138d48afc22bc8bd45d1b3f135c61e255da9b59022ad38",
+    "cme-2-0.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-2-1.parquet": "6650dd22c458796df4b8b1ed6f0b4758e68d895c2a3fb36bb10c0adccc25c1a6",
+    "cme-2-2.parquet": "b0976b8fad893c08a2138d48afc22bc8bd45d1b3f135c61e255da9b59022ad38"
+  }
+}

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
+from numbers import Real
 from typing import TYPE_CHECKING
 
-from ..config import MissingPricePolicy
+from ..config import CancelPolicy, MissingPricePolicy
 from ..models import estimate_commission
 from ..types import ExecutionMode, Order, OrderSide, OrderStatus, OrderType, Position
 from .shared import SubmitOrderOptions, is_exit_order, quantity_zero_tolerance
@@ -46,6 +47,24 @@ class OrderBook:
         self._submission_shadow_cash: float = 0.0
         self._submission_shadow_positions: dict[str, tuple[float, float]] = {}
 
+    @staticmethod
+    def _validate_prices(
+        order_type: OrderType, limit_price: float | None, stop_price: float | None
+    ) -> None:
+        for name, value, required in (
+            ("limit_price", limit_price, order_type in {OrderType.LIMIT, OrderType.STOP_LIMIT}),
+            ("stop_price", stop_price, order_type in {OrderType.STOP, OrderType.STOP_LIMIT}),
+        ):
+            if value is None and not required:
+                continue
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, Real)
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise ValueError(f"{name} must be a finite positive price for {order_type.value}")
+
     def submit_order(
         self,
         asset: str,
@@ -58,19 +77,40 @@ class OrderBook:
         options: SubmitOrderOptions | None = None,
     ) -> Order | None:
         broker = self.broker
+        self._validate_prices(order_type, limit_price, stop_price)
+        if (
+            isinstance(quantity, bool)
+            or not isinstance(quantity, Real)
+            or not math.isfinite(quantity)
+        ):
+            raise ValueError("Order quantity must be a finite real number")
 
         if side is None:
-            if quantity == 0:
-                return None
-            side = OrderSide.BUY if quantity > 0 else OrderSide.SELL
+            side = OrderSide.BUY if quantity >= 0 else OrderSide.SELL
         quantity = abs(quantity)
         if quantity <= self._MIN_ORDER_SIZE:
-            return None
+            validate_zero = options is not None and options.validate_zero_quantity
+            if not validate_zero:
+                validate_zero = broker._requires_zero_order_validation()
+            if not validate_zero:
+                return None
 
         if asset in self.risk.stop_exits_this_bar:
             existing_pos = self.account.positions.get(asset)
             if existing_pos is None:
                 return None
+
+        control_request = broker._validate_trading_controls(
+            asset, quantity if side is OrderSide.BUY else -quantity
+        )
+        if quantity <= self._MIN_ORDER_SIZE:
+            return None
+        eligible_from, eligible_on_boundary = broker._preopen_order_eligibility()
+        submitted_session = (
+            broker._submission_session_date(validate_active=True)
+            if broker.cancel_policy is CancelPolicy.SESSION_END
+            else None
+        )
 
         self.orders.counter += 1
         order = Order(
@@ -94,11 +134,16 @@ class OrderBook:
             intent_idempotency_key=(
                 options.intent_idempotency_key if options is not None else None
             ),
+            _submitted_session_date=submitted_session,
+            _eligible_from=eligible_from,
+            _eligible_on_boundary=eligible_on_boundary,
         )
 
         order._signal_price = self.market.prices.get(asset)
 
         self.orders.orders.append(order)
+        if control_request is not None:
+            broker._commit_control_order(control_request)
 
         # Immediate fill: same-bar market orders fill during submit_order()
         # instead of being queued for later _process_orders(). Each order
@@ -147,6 +192,7 @@ class OrderBook:
         broker = self.broker
         return (
             broker.immediate_fill
+            and broker._may_fill_immediately()
             and broker.execution_mode is ExecutionMode.SAME_BAR
             and order.order_type is OrderType.MARKET
             and order.child_intent_id is None
@@ -254,15 +300,42 @@ class OrderBook:
 
         for order in self.orders.pending:
             if order.order_id == order_id:
+                quantity = kwargs.get("quantity", self.fill_engine.get_effective_quantity(order))
+                if (
+                    isinstance(quantity, bool)
+                    or not isinstance(quantity, Real)
+                    or not math.isfinite(quantity)
+                    or quantity <= 0
+                ):
+                    raise ValueError("Updated remaining quantity must be finite and positive")
+                self.broker._validate_trading_controls(
+                    order.asset,
+                    quantity if order.side is OrderSide.BUY else -quantity,
+                    replacing_order_id=order_id,
+                )
+                self._validate_prices(
+                    order.order_type,
+                    kwargs.get("limit_price", order.limit_price),
+                    kwargs.get("stop_price", order.stop_price),
+                )
+                if "stop_price" in kwargs and kwargs["stop_price"] != order.stop_price:
+                    order._stop_triggered = False
+                    order._stop_triggered_at = None
                 for key, value in kwargs.items():
                     setattr(order, key, value)
+                if "quantity" in kwargs and order_id in self.orders.partial_quantities:
+                    self.orders.partial_quantities[order_id] = quantity
                 return True
         return False
 
-    def cancel_order(self, order_id: str) -> bool:
+    def cancel_order(
+        self, order_id: str, *, timestamp: datetime | None = None, reason: str = "user"
+    ) -> bool:
         for order in self.orders.pending:
             if order.order_id == order_id:
                 order.status = OrderStatus.CANCELLED
+                order.cancelled_at = timestamp if timestamp is not None else self.market.time
+                order.cancellation_reason = reason
                 self.orders.pending.remove(order)
                 self.orders.partial_quantities.pop(order_id, None)
                 return True
@@ -393,7 +466,12 @@ class OrderBook:
         if opened != 0.0:
             shadow_cash -= opened * signal_price
         shadow_cash -= estimate_commission(
-            broker.commission_model, order.asset, order.quantity, signal_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            signal_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
 
         # Keep shadow effects even for rejected orders to mirror Backtrader's
@@ -468,7 +546,12 @@ class OrderBook:
             # LEAN semantics: shorts consume buying power rather than crediting cash.
             shadow_cash -= abs(opened) * signal_price * multiplier
         shadow_cash -= estimate_commission(
-            broker.commission_model, order.asset, order.quantity, signal_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            signal_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
 
         if shadow_cash < 0.0:
@@ -504,7 +587,12 @@ class OrderBook:
         )
 
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, signal_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            signal_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         shadow_positions = self._build_shadow_policy_positions()
         available_cash = self._submission_shadow_cash

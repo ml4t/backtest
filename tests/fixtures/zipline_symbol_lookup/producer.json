@@ -1,0 +1,18 @@
+{
+  "source": "c3b9db80a66397420fb27adeccc762559dd41e07",
+  "version": "0.2.2.dev21+gc3b9db80a",
+  "source_modules_verified": 168,
+  "wheel": "ml4t_data-0.2.2.dev21+gc3b9db80a-py3-none-any.whl",
+  "wheel_sha256": "713b032ddd07b5512837e093249fed2e56aad8fabad26a6352e38164674dfe88",
+  "published": false,
+  "snapshot_id": "eb20b414e26757630ebc16db56aba8cf6e99fdce562b01cd2eedfb1cc665a637",
+  "repository": "https://github.com/ml4t/data",
+  "source_kind": "source_candidate",
+  "reference": {
+    "package": "zipline-reloaded==3.2.0",
+    "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+    "pandas": "2.3.3",
+    "exchange_calendars": "4.13.2"
+  },
+  "snapshot_archive_sha256": "95ed19fd33e7b8dba801dbc515aa8bcf91ca87b03a128861599bd0bcedf0a0b7"
+}

@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import copy
+import logging
 from collections import deque
-from collections.abc import Callable, Mapping
-from datetime import datetime
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import replace
+from datetime import date, datetime
 from math import isfinite
-from typing import TYPE_CHECKING, Any, TypedDict, Unpack
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack
 from zoneinfo import ZoneInfo
 
 from .capital import CapitalChange, CapitalEvent
 from .config import (
+    CancelPolicy,
+    ConditionalOrderMode,
     EntryOrderPriority,
     ExecutionPrice,
     FillOrdering,
@@ -25,6 +31,7 @@ from .config import (
     TrailStopTiming,
     WaterMarkSource,
 )
+from .controls import AccountControl, AccountControlContext, OrderControlContext, TradingControl
 from .core import (
     ExecutionEngine,
     ExecutionJournal,
@@ -54,6 +61,7 @@ from .types import (
     StopFillMode,
     StopLevelBasis,
     Trade,
+    _validated_multiplier,
 )
 
 if TYPE_CHECKING:
@@ -130,6 +138,10 @@ class Broker:
         late_asset_min_bars: int = 1,
         settlement_delay: int = 0,
         settlement_reduces_buying_power: bool = True,
+        next_bar_execution_price: ExecutionPrice | None = None,
+        cancel_policy: CancelPolicy = CancelPolicy.NEVER,
+        *,
+        conditional_order_mode: ConditionalOrderMode = ConditionalOrderMode.BAR_OHLC,
     ):
         # Runtime imports for accounting classes.
         # These are imported here rather than at module level because:
@@ -144,11 +156,17 @@ class Broker:
 
         self.initial_cash = initial_cash
         # Note: self.cash is now a property delegating to self.account.cash (Bug #5 fix)
-        self.commission_model = commission_model or NoCommission()
-        self.slippage_model = slippage_model or NoSlippage()
+        self.commission_model = commission_model if commission_model is not None else NoCommission()
+        self.slippage_model = slippage_model if slippage_model is not None else NoSlippage()
         self.stop_slippage_rate = stop_slippage_rate
         self.execution_mode = execution_mode
         self.execution_price = execution_price
+        self.conditional_order_mode = ConditionalOrderMode(conditional_order_mode)
+        self.next_bar_execution_price = (
+            ExecutionPrice(next_bar_execution_price)
+            if next_bar_execution_price is not None
+            else None
+        )
         self.mark_price = mark_price
         self.stop_fill_mode = stop_fill_mode
         self.stop_level_basis = stop_level_basis
@@ -176,6 +194,17 @@ class Broker:
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
         self._market_state = MarketState()
         self._order_state = OrderState()
+        self._trading_controls: list[TradingControl] = []
+        self._account_controls: list[tuple[str, AccountControl]] = []
+        self._account_control_sessions: dict[date, bool] = {}
+        self._order_session_config: SessionConfig | None = None
+        self._scheduled_session_date: date | None = None
+        self._scheduled_session_open: datetime | None = None
+        self._scheduled_price_event = True
+        self.cancel_policy = CancelPolicy(cancel_policy)
+        self._session_expiry_cache: dict[tuple[str, date], tuple[datetime, datetime]] = {}
+        self._session_order_bounds: Mapping[date, tuple[datetime, datetime]] = MappingProxyType({})
+        self._warn_on_session_cancel = False
         self._risk_state = RiskState()
         self._execution_journal = ExecutionJournal()
 
@@ -242,7 +271,11 @@ class Broker:
         self.market_impact_model = market_impact_model  # MarketImpactModel instance
 
         # Contract specifications (for futures and other derivatives)
-        self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
+        self._contract_specs: dict[str, ContractSpec] = (
+            copy.deepcopy(contract_specs) if contract_specs else {}
+        )
+        for spec in self._contract_specs.values():
+            _validated_multiplier(spec.multiplier)
 
         # Fill execution (extracted from _execute_fill)
         self._fill_executor = FillExecutor(
@@ -306,17 +339,21 @@ class Broker:
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
+        commission_model: CommissionModel | None = None,
+        slippage_model: SlippageModel | None = None,
     ) -> Broker:
         """Create Broker from BacktestConfig.
 
-        This is the recommended way to create a Broker. All settings come from
-        the BacktestConfig, ensuring consistency with Engine and other components.
+        Config supplies the execution and account settings. Explicit native fee,
+        impact and execution-limit models override their configured counterparts.
 
         Args:
             config: BacktestConfig with all behavioral settings
             execution_limits: Optional execution limits (not in config)
             market_impact_model: Optional market impact model (not in config)
             contract_specs: Optional contract specifications (not in config)
+            commission_model: Explicit fee model overriding configured fee rates
+            slippage_model: Explicit slippage model overriding configured rates
 
         Returns:
             Configured Broker instance
@@ -328,11 +365,14 @@ class Broker:
         from .config import CommissionType, SlippageType
         from .models import (
             CombinedCommission,
+            CumulativeVolumeShareSlippage,
             FixedSlippage,
             NoCommission,
             NoSlippage,
             PercentageCommission,
             PercentageSlippage,
+            PerOrderCommission,
+            PerOrderPerShareCommission,
             PerShareCommission,
             SpreadSlippage,
             TieredCommission,
@@ -360,6 +400,9 @@ class Broker:
                 effective_slippage_type = SlippageType.PERCENTAGE
 
         # Build commission model from config
+        explicit_commission = commission_model
+        if explicit_commission is not None and not isinstance(explicit_commission, CommissionModel):
+            raise TypeError("commission_model must implement the native CommissionModel protocol")
         commission_model = None
         if effective_commission_type == CommissionType.PERCENTAGE:
             commission_model = PercentageCommission(rate=config.commission_rate)
@@ -367,6 +410,17 @@ class Broker:
             commission_model = PerShareCommission(
                 per_share=config.commission_per_share,
                 minimum=config.commission_minimum,
+            )
+        elif effective_commission_type == CommissionType.PER_ORDER:
+            commission_model = PerOrderCommission(
+                per_share=config.commission_per_share,
+                rate=config.commission_rate,
+                per_trade=config.commission_per_trade,
+                minimum=config.commission_minimum,
+            )
+        elif effective_commission_type == CommissionType.PER_ORDER_PER_SHARE:
+            commission_model = PerOrderPerShareCommission(
+                per_share=config.commission_per_share, minimum=config.commission_minimum
             )
         elif effective_commission_type == CommissionType.PER_TRADE:
             commission_model = CombinedCommission(fixed=config.commission_per_trade)
@@ -377,6 +431,9 @@ class Broker:
         elif effective_commission_type == CommissionType.NONE:
             commission_model = NoCommission()
 
+        explicit_slippage = slippage_model
+        if explicit_slippage is not None and not isinstance(explicit_slippage, SlippageModel):
+            raise TypeError("slippage_model must implement the native SlippageModel protocol")
         # Build slippage model from config
         slippage_model = None
         if effective_slippage_type == SlippageType.PERCENTAGE:
@@ -391,16 +448,23 @@ class Broker:
             )
         elif effective_slippage_type == SlippageType.VOLUME_BASED:
             slippage_model = VolumeShareSlippage(impact_factor=config.slippage_rate)
+        elif effective_slippage_type == SlippageType.CUMULATIVE_VOLUME_SHARE:
+            slippage_model = CumulativeVolumeShareSlippage(price_impact=config.slippage_rate)
         elif effective_slippage_type == SlippageType.NONE:
             slippage_model = NoSlippage()
 
-        return cls(
+        broker = cls(
             initial_cash=config.initial_cash,
-            commission_model=commission_model,
-            slippage_model=slippage_model,
+            commission_model=explicit_commission
+            if explicit_commission is not None
+            else commission_model,
+            slippage_model=explicit_slippage if explicit_slippage is not None else slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
             execution_mode=config.execution_mode,
             execution_price=config.execution_price,
+            next_bar_execution_price=config.next_bar_execution_price,
+            cancel_policy=config.cancel_policy,
+            conditional_order_mode=config.conditional_order_mode,
             mark_price=config.mark_price,
             stop_fill_mode=config.stop_fill_mode,
             stop_level_basis=config.stop_level_basis,
@@ -439,6 +503,18 @@ class Broker:
             settlement_delay=config.settlement_delay,
             settlement_reduces_buying_power=config.settlement_reduces_buying_power,
         )
+        if config.resolved_calendar is not None:
+            from .sessions import SessionConfig
+
+            broker._order_session_config = SessionConfig(
+                calendar=config.resolved_calendar,
+                timezone=config.resolved_timezone,
+                session_start_time=config.resolved_session_start_time,
+                data_frequency=config.resolved_data_frequency,
+                timestamp_semantics=config.resolved_timestamp_semantics,
+                bar_label=config.resolved_feed_spec.bar_label,
+            )
+        return broker
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
     @property
@@ -910,6 +986,11 @@ class Broker:
             "order_counter": self._order_state.counter,
             "partial_quantities": copy.deepcopy(self._order_state.partial_quantities),
             "filled_this_bar": set(self._order_state.filled_this_bar),
+            "volume_consumed_by_asset": dict(self._order_state.volume_consumed_by_asset),
+            "control_counts": dict(self._order_state.control_counts),
+            "trading_controls": tuple(self._trading_controls),
+            "account_controls": tuple(self._account_controls),
+            "account_control_sessions": dict(self._account_control_sessions),
             "orders_this_bar": tuple(self._order_state.current_bar),
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
@@ -1023,6 +1104,13 @@ class Broker:
         self._order_state.partial_quantities.update(state["partial_quantities"])
         self._order_state.filled_this_bar.clear()
         self._order_state.filled_this_bar.update(state["filled_this_bar"])
+        self._order_state.volume_consumed_by_asset.clear()
+        self._order_state.volume_consumed_by_asset.update(state["volume_consumed_by_asset"])
+        self._order_state.control_counts.clear()
+        self._order_state.control_counts.update(state["control_counts"])
+        self._trading_controls[:] = state["trading_controls"]
+        self._account_controls[:] = state["account_controls"]
+        self._account_control_sessions = dict(state["account_control_sessions"])
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
@@ -1051,6 +1139,65 @@ class Broker:
         target_intent_state = state["target_intent_state"]
         if target_intent_state is not None and self._preopen_target_manager is not None:
             self._preopen_target_manager.restore_transaction_state(target_intent_state)
+
+    @contextmanager
+    def _scheduled_callback_clock(
+        self,
+        timestamp: datetime,
+        *,
+        session_date: date | None = None,
+        session_open: datetime | None = None,
+        has_price_event: bool = True,
+    ) -> Iterator[None]:
+        previous = self._market_state.time
+        previous_session = self._scheduled_session_date
+        previous_open = self._scheduled_session_open
+        previous_price_event = self._scheduled_price_event
+        self._scheduled_price_event = has_price_event
+        self._market_state.time = timestamp
+        self._scheduled_session_date = session_date
+        self._scheduled_session_open = session_open
+        try:
+            self._expire_session_orders(timestamp, after_event=False)
+            yield
+        finally:
+            self._market_state.time = previous
+            self._scheduled_session_date = previous_session
+            self._scheduled_session_open = previous_open
+            self._scheduled_price_event = previous_price_event
+
+    def _preopen_order_eligibility(self) -> tuple[datetime | None, bool]:
+        if self._scheduled_session_open is None:
+            return None, True
+        from ml4t.specs import LifecyclePhase
+
+        from .sessions import _is_right_labeled_bar
+
+        if self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN:
+            return None, True
+        clock = self._order_session_config or self._session_config
+        inclusive = clock is None or not _is_right_labeled_bar(
+            clock.timestamp_semantics, clock.bar_label
+        )
+        return self._scheduled_session_open, inclusive
+
+    @property
+    def allows_price_execution(self) -> bool:
+        """Whether the current callback scope permits fills on observed prices."""
+        return self._scheduled_price_event
+
+    def _set_observed_high_low_reader(
+        self, reader: Callable[[str], tuple[float | None, float | None]] | None
+    ) -> None:
+        self._market_state.observed_high_low = reader
+
+    def _may_fill_immediately(self) -> bool:
+        from ml4t.specs import LifecyclePhase
+
+        return (
+            self.allows_price_execution
+            and self._active_lifecycle_phase is not LifecyclePhase.PRE_OPEN
+        )
 
     def _begin_lifecycle_dispatch(
         self,
@@ -1104,17 +1251,27 @@ class Broker:
         self._completion_validators.setdefault(id(owner), validator)
 
     def _validate_completed_run(self, market_event_count: int) -> None:
+        missing = [
+            session for session, checked in self._account_control_sessions.items() if not checked
+        ]
+        if missing:
+            raise ValueError(f"Session account controls require a close observation for {missing}")
         for validator in tuple(self._completion_validators.values()):
             validator(market_event_count)
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
-        """Return the configured contract specification, or None when absent."""
-        return self._contract_specs.get(asset)
+        """Return a detached contract specification, or None when absent."""
+        spec = self._contract_specs.get(asset)
+        return copy.deepcopy(spec) if spec is not None else None
+
+    def _get_contract_currency(self, asset: str) -> str | None:
+        spec = self._contract_specs.get(asset)
+        return spec.currency if spec is not None else None
 
     def get_multiplier(self, asset: str) -> float:
         """Get contract multiplier for an asset (1.0 for equities)."""
         spec = self._contract_specs.get(asset)
-        return spec.multiplier if spec else 1.0
+        return _validated_multiplier(spec.multiplier) if spec is not None else 1.0
 
     def _next_rebalance_id(self) -> str:
         self._capture_lifecycle_mutation()
@@ -1479,6 +1636,15 @@ class Broker:
         """Return cash plus positions marked from the configured price source."""
         return self._portfolio_ledger.get_account_value()
 
+    def get_account_snapshot(self) -> AccountControlContext:
+        """Return one immutable, currently marked native account observation."""
+        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
+            include_holdings=False
+        )
+        return AccountControlContext(
+            self._market_state.time, equity, cash, gross, net, positions_value=net
+        )
+
     def get_account_value(self) -> float:
         """Return marked account equity using the compatibility method name."""
         return self.equity()
@@ -1623,6 +1789,308 @@ class Broker:
         )
         return self._risk_engine.evaluate_position_rules()
 
+    def register_trading_control(self, control: TradingControl) -> None:
+        """Add an ordered, side-effect-free pre-submission validator."""
+        if not callable(getattr(control, "validate", None)):
+            raise TypeError("Trading controls must define validate(request)")
+        self._capture_lifecycle_mutation()
+        self._trading_controls.append(control)
+
+    def unregister_trading_control(self, control: TradingControl) -> bool:
+        """Remove the exact registered validator, preserving every other rule."""
+        for index, registered in enumerate(self._trading_controls):
+            if registered is control:
+                self._capture_lifecycle_mutation()
+                del self._trading_controls[index]
+                if not any(registered is control for registered in self._trading_controls):
+                    prefix = f"requests:{id(control)}"
+                    counts = self._order_state.control_counts
+                    for key in list(counts):
+                        if key[0] == prefix:
+                            del counts[key]
+                return True
+        return False
+
+    def register_account_control(
+        self,
+        control: AccountControl,
+        *,
+        boundary: Literal["after_callbacks", "after_fills", "session_end"] = "after_fills",
+    ) -> None:
+        """Validate the marked account after callbacks, fills or a calendar session close.
+
+        Session controls must be registered before the first market observation.
+        They require physical timestamps, a calendar and each observed session's
+        close clock point. A close row may have null prices; no quote is fabricated.
+        """
+        if boundary not in {"after_callbacks", "after_fills", "session_end"}:
+            raise ValueError("Unknown account control boundary")
+        if boundary == "session_end":
+            clock = self._order_session_config or self._session_config
+            if clock is None or clock.calendar is None:
+                raise ValueError("Session account controls require a declared calendar")
+            if (
+                getattr(clock.timestamp_semantics, "value", clock.timestamp_semantics)
+                == "session_label"
+            ):
+                raise ValueError(
+                    "Session account controls require physical instants, not session labels"
+                )
+            if self._bar_index:
+                raise ValueError(
+                    "Session account controls must be registered before market observations"
+                )
+        if not callable(getattr(control, "validate", None)):
+            raise TypeError("Account controls must define validate(account)")
+        self._capture_lifecycle_mutation()
+        self._account_controls.append((boundary, control))
+
+    def _requires_zero_order_validation(self) -> bool:
+        return bool(self._trading_controls) and any(
+            getattr(control, "counts_order_requests", False) for control in self._trading_controls
+        )
+
+    def _validate_trading_controls(
+        self, asset: str, quantity: float, *, replacing_order_id: str | None = None
+    ) -> OrderControlContext | None:
+        if not self._trading_controls:
+            return None
+        from ml4t.specs import LifecyclePhase
+
+        timestamp = self._market_state.time
+        clock = self._order_session_config or self._session_config
+        session = (
+            clock.date_for_timestamp(timestamp).date()
+            if clock is not None and timestamp is not None
+            else None
+        )
+        if self._scheduled_session_date is not None:
+            session = self._scheduled_session_date
+        counts = self._order_state.control_counts
+        position = self.positions.get(asset)
+        pending_buy = pending_sell = 0.0
+        for order in self.pending_orders:
+            if order.asset != asset or order.order_id == replacing_order_id:
+                continue
+            remaining = self._fill_engine.get_effective_quantity(order)
+            if order.side is OrderSide.BUY:
+                pending_buy += remaining
+            else:
+                pending_sell += remaining
+        request = OrderControlContext(
+            timestamp,
+            asset,
+            quantity,
+            position.quantity if position else 0.0,
+            pending_buy,
+            pending_sell,
+            None
+            if self._active_lifecycle_phase is LifecyclePhase.PRE_OPEN
+            else self._current_prices.get(asset),
+            self.get_multiplier(asset),
+            session,
+            counts.get(("session", session), 0) if session is not None else 0,
+            counts.get(("day", timestamp.date()), 0) if timestamp is not None else 0,
+            is_update=replacing_order_id is not None,
+        )
+        for control in self._trading_controls:
+            if getattr(control, "counts_order_requests", False) and not request.is_update:
+                if timestamp is None:
+                    raise ValueError("Request counts require a simulation timestamp")
+                instant = (
+                    timestamp
+                    if timestamp.tzinfo is not None
+                    else timestamp.replace(
+                        tzinfo=ZoneInfo(clock.timezone if clock is not None else "UTC")
+                    )
+                )
+                day = instant.astimezone(ZoneInfo(getattr(control, "timezone", "UTC"))).date()
+                prefix = f"requests:{id(control)}"
+                key = (prefix, day)
+                prior_count = counts.get(key, 0)
+                control.validate(replace(request, orders_in_day=prior_count))
+                for previous in list(counts):
+                    if previous[0] == prefix and previous != key:
+                        del counts[previous]
+                counts[key] = prior_count + 1
+            else:
+                control.validate(request)
+        return request
+
+    def _submission_session_date(self, *, validate_active: bool = False) -> date | None:
+        timestamp = self._market_state.time
+        clock = self._order_session_config or self._session_config
+        session = self._scheduled_session_date or (
+            clock.date_for_timestamp(timestamp).date()
+            if clock is not None and timestamp is not None
+            else None
+        )
+        if validate_active and clock is not None and session is not None and timestamp is not None:
+            from ml4t.specs import LifecyclePhase
+
+            from .sessions import _is_right_labeled_bar
+
+            opened, closed = self._order_session_bounds(clock, session)
+            instant = (
+                timestamp
+                if timestamp.tzinfo is not None
+                else timestamp.replace(tzinfo=ZoneInfo(clock.timezone))
+            )
+            pre = self._active_lifecycle_phase is LifecyclePhase.PRE_OPEN
+            right = not pre and _is_right_labeled_bar(clock.timestamp_semantics, clock.bar_label)
+            active = opened < instant <= closed if right else opened <= instant < closed
+            if not active and not (
+                pre and self._scheduled_session_date is not None and instant < opened
+            ):
+                raise ValueError(
+                    "session_end orders require an active declared session or its scheduled pre-open"
+                )
+        return session
+
+    def configure_session_cancellation(
+        self,
+        *,
+        bounds: Mapping[date, tuple[datetime, datetime]] | None = None,
+        warn_on_cancel: bool = False,
+    ) -> None:
+        """Set explicit physical order-session bounds before the first market event.
+
+        Bounds must lie within their declared calendar session. Native defaults
+        continue to expire at the full calendar close. This only configures the
+        existing session-end cancellation policy; it does not enable that policy.
+        """
+        if self._market_state.time is not None or self.orders:
+            raise RuntimeError("Configure session cancellation before the first market event")
+        clock = self._order_session_config or self._session_config
+        if clock is None or clock.calendar is None:
+            raise ValueError("Session cancellation bounds require a declared calendar")
+        if not isinstance(warn_on_cancel, bool):
+            raise TypeError("warn_on_cancel must be boolean")
+        selected = {}
+        for session, pair in (bounds or {}).items():
+            if not isinstance(session, date) or isinstance(session, datetime):
+                raise ValueError("Order-session bounds require civil session dates")
+            if len(pair) != 2 or any(
+                not isinstance(value, datetime) or value.tzinfo is None for value in pair
+            ):
+                raise ValueError("Order-session bounds require aware physical open/close instants")
+            opened, closed = pair
+            from .calendar import get_schedule
+
+            schedule = get_schedule(clock.calendar, session, session)
+            if schedule.height != 1:
+                raise ValueError(f"Cannot assign order-session bounds to non-session {session}")
+            native_open, native_close = schedule["market_open"][0], schedule["market_close"][0]
+            if not native_open <= opened < closed <= native_close:
+                raise ValueError("Order-session bounds must lie within their declared session")
+            selected[session] = (opened, closed)
+        self._session_order_bounds = MappingProxyType(selected)
+        self._warn_on_session_cancel = warn_on_cancel
+
+    def _order_session_bounds(
+        self, clock: SessionConfig, session: date
+    ) -> tuple[datetime, datetime]:
+        from .calendar import get_schedule
+
+        if clock.calendar is None:
+            raise ValueError("session_end cancellation requires a declared calendar")
+        if session in self._session_order_bounds:
+            return self._session_order_bounds[session]
+        key = (clock.calendar, session)
+        bounds = self._session_expiry_cache.get(key)
+        if bounds is None:
+            schedule = get_schedule(clock.calendar, session, session)
+            if schedule.height != 1:
+                raise ValueError(f"Cannot assign an order to non-session {session}")
+            bounds = (schedule["market_open"][0], schedule["market_close"][0])
+            self._session_expiry_cache[key] = bounds
+        return bounds
+
+    def _expire_session_orders(self, timestamp: datetime, *, after_event: bool) -> None:
+        if self.cancel_policy is CancelPolicy.NEVER or not self.pending_orders:
+            return
+        clock = self._order_session_config or self._session_config
+        if clock is None or clock.calendar is None:
+            raise ValueError("session_end cancellation requires a declared calendar")
+        current = self._submission_session_date()
+        if self._scheduled_session_date is None:
+            current = clock.date_for_timestamp(timestamp).date()
+        for order in list(self.pending_orders):
+            if order._submitted_session_date is None:
+                order._submitted_session_date = current
+            session = order._submitted_session_date
+            assert session is not None
+            _, closed = self._order_session_bounds(clock, session)
+            if timestamp.tzinfo is None:
+                closed = closed.astimezone(ZoneInfo(clock.timezone)).replace(tzinfo=None)
+            if timestamp > closed or timestamp == closed and (after_event or current != session):
+                self._capture_lifecycle_mutation(order_id=order.order_id)
+                remaining = self._order_state.partial_quantities.get(order.order_id, order.quantity)
+                self._order_book.cancel_order(
+                    order.order_id, timestamp=closed, reason="session_end"
+                )
+                if self._warn_on_session_cancel:
+                    logging.getLogger(__name__).warning(
+                        "Order %s for %s cancelled at session end: %s filled, %s remaining",
+                        order.order_id,
+                        order.asset,
+                        order.filled_quantity,
+                        remaining,
+                    )
+
+    def _commit_control_order(self, request: OrderControlContext) -> None:
+        counts = self._order_state.control_counts
+        requests = {key: count for key, count in counts.items() if key[0].startswith("requests:")}
+        counts.clear()
+        counts.update(requests)
+        if request.session_date is not None:
+            counts[("session", request.session_date)] = request.orders_in_session + 1
+        if request.timestamp is not None:
+            counts[("day", request.timestamp.date())] = request.orders_in_day + 1
+
+    def _has_account_controls(self) -> bool:
+        return bool(self._account_controls)
+
+    def validate_account_controls(
+        self, *, boundary: Literal["after_callbacks", "after_fills", "session_end"] | None = None
+    ) -> None:
+        """Run registered validators over one native marked account snapshot.
+
+        Calling without a boundary validates every registered rule immediately.
+        Account validation raises on breach; it does not liquidate or roll back
+        completed callbacks. Portfolio risk actions remain with the risk manager.
+        """
+        if boundary not in {None, "after_callbacks", "after_fills", "session_end"}:
+            raise ValueError("Unknown account control boundary")
+        controls = [
+            rule for phase, rule in self._account_controls if boundary is None or phase == boundary
+        ]
+        if not controls:
+            return
+        state = self.get_account_snapshot()
+        for control in controls:
+            control.validate(state)
+
+    def _validate_session_end_account_controls(self, timestamp: datetime) -> None:
+        if not any(phase == "session_end" for phase, _ in self._account_controls):
+            return
+        clock = self._order_session_config or self._session_config
+        assert clock is not None
+        session = clock.date_for_timestamp(timestamp).date()
+        opened, closed = self._order_session_bounds(clock, session)
+        if timestamp.tzinfo is None:
+            zone = ZoneInfo(clock.timezone)
+            opened = opened.astimezone(zone).replace(tzinfo=None)
+            closed = closed.astimezone(zone).replace(tzinfo=None)
+        if not opened <= timestamp <= closed:
+            return
+        if self._account_control_sessions.get(session):
+            return
+        self._account_control_sessions[session] = False
+        if timestamp == closed:
+            self.validate_account_controls(boundary="session_end")
+            self._account_control_sessions[session] = True
+
     def submit_order(
         self,
         asset: str,
@@ -1668,6 +2136,8 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
+        if asset in self._contract_specs:
+            self.get_multiplier(asset)
         self._capture_lifecycle_mutation(asset=asset)
         return self._order_book.submit_order(
             asset=asset,
@@ -1803,6 +2273,9 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
+        order = self.get_order(order_id)
+        if order is not None:
+            self.get_multiplier(order.asset)
         self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.update_order(order_id, **kwargs)
 
@@ -1814,6 +2287,19 @@ class Broker:
         """
         self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.cancel_order(order_id)
+
+    def _cancel_order_at(self, order_id: str, *, timestamp: datetime, reason: str) -> bool:
+        self._capture_lifecycle_mutation(order_id=order_id)
+        return self._order_book.cancel_order(order_id, timestamp=timestamp, reason=reason)
+
+    def get_orders(
+        self, asset: str | None = None, *, pending_only: bool = False
+    ) -> tuple[Order, ...]:
+        """Return detached order snapshots in submission order."""
+        source = self._order_state.pending if pending_only else self._order_state.orders
+        return tuple(
+            copy.deepcopy(order) for order in source if asset is None or order.asset == asset
+        )
 
     def close_position(
         self,
@@ -2493,6 +2979,14 @@ class Broker:
         """Return an order from the complete order history, or None when unknown."""
         return self._order_book.get_order(order_id)
 
+    def get_fills(self, order_id: str | None = None) -> list[Fill]:
+        """Return detached observed fills, optionally selecting one native order."""
+        return [
+            copy.deepcopy(fill)
+            for fill in self._execution_journal.fills
+            if order_id is None or fill.order_id == order_id
+        ]
+
     def get_pending_orders(self, asset: str | None = None) -> list[Order]:
         """Return a copy of pending orders, optionally filtered by asset."""
         return self._order_book.get_pending_orders(asset=asset)
@@ -2599,6 +3093,7 @@ class Broker:
 
         # Clear per-bar tracking at start of new bar
         self._filled_this_bar.clear()
+        self._order_state.volume_consumed_by_asset.clear()
         self._stop_exits_this_bar.clear()  # VBT Pro: allow re-entry on next bar
         self._positions_created_this_bar.clear()  # VBT Pro: update HWM from next bar
 

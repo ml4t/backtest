@@ -25,10 +25,23 @@ from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import polars as pl
+from ml4t.specs import BarLabel
 from ml4t.specs.market_data import TimestampSemantics
+
+from ._temporal import temporal_frame
 
 if TYPE_CHECKING:
     pass
+
+
+def _is_right_labeled_bar(timestamp_semantics, bar_label) -> bool:
+    semantics = TimestampSemantics(timestamp_semantics) if timestamp_semantics is not None else None
+    label = BarLabel(bar_label) if bar_label is not None else None
+    if semantics is TimestampSemantics.SESSION_LABEL:
+        return False
+    if semantics is TimestampSemantics.BAR_CLOSE and label is BarLabel.LEFT:
+        raise ValueError("bar_close timestamp_semantics requires bar_label='right'")
+    return semantics is TimestampSemantics.BAR_CLOSE or label is BarLabel.RIGHT
 
 
 @dataclass(frozen=True)
@@ -50,11 +63,36 @@ class SessionConfig:
     calendar: str
     timezone: str = "UTC"
     session_start_time: str | None = None  # Format: "HH:MM"
+    timestamp_semantics: TimestampSemantics | str | None = None
+    bar_label: BarLabel | str | None = None
+    data_frequency: Any | None = None
 
     def __post_init__(self) -> None:
         if self.session_start_time is None:
             return
         _validate_session_start_time(self.calendar, self.session_start_time)
+
+    def date_for_timestamp(self, timestamp: datetime) -> datetime:
+        """Assign the observed instant to its session, respecting closing endpoints."""
+        if _is_right_labeled_bar(self.timestamp_semantics, self.bar_label):
+            label = session_date_for_timestamp(
+                timestamp,
+                calendar=self.calendar,
+                timezone=self.timezone,
+                session_start_time=self.session_start_time,
+                data_frequency=self.data_frequency,
+                timestamp_semantics=self.timestamp_semantics,
+                bar_label=self.bar_label,
+            )
+            return datetime.combine(label, time.min)
+        return assign_session_date(
+            _timestamp_in_session_timezone(
+                timestamp, ZoneInfo(self.timezone), self.get_session_timezone()
+            ),
+            self.get_session_timezone(),
+            self.get_session_start_hour(),
+            self.get_session_start_minute(),
+        )
 
     def get_session_start_hour(self) -> int:
         """Get session start hour (0-23)."""
@@ -124,6 +162,7 @@ def session_date_for_timestamp(
     session_start_time: str | None,
     data_frequency: Any | None,
     timestamp_semantics: TimestampSemantics | str | None,
+    bar_label: BarLabel | str | None = None,
 ) -> date:
     """Return the exchange session date for one feed timestamp."""
     from .calendar import get_calendar, get_calendar_sessions_by_open_date
@@ -140,7 +179,7 @@ def session_date_for_timestamp(
     if (
         semantics is TimestampSemantics.SESSION_LABEL
         or (semantics is None and frequency is DataFrequency.DAILY)
-        or (semantics is None and frequency is None)
+        or (semantics is None and frequency is None and bar_label is None)
     ):
         return timestamp.date()
 
@@ -158,16 +197,28 @@ def session_date_for_timestamp(
     if calendar is not None and session_start_time is None:
         event_time_utc = event_time.astimezone(ZoneInfo("UTC"))
         event_date = event_time.date()
-        label_years = (
-            (event_date.year, event_date.year + 1)
-            if event_date.month == 12 and event_date.day == 31
-            else (event_date.year,)
-        )
-        sessions = (
+        right = _is_right_labeled_bar(semantics, bar_label)
+        label_years = [event_date.year]
+        if event_date.month == 12 and event_date.day == 31:
+            label_years.append(event_date.year + 1)
+        if right and event_date.month == 1 and event_date.day == 1:
+            label_years.insert(0, event_date.year - 1)
+        open_dates = (event_date - timedelta(days=1), event_date) if right else (event_date,)
+        candidates = [
             session
             for year in label_years
-            for session in get_calendar_sessions_by_open_date(calendar, year).get(event_date, ())
-            if session.market_open <= event_time_utc
+            for sessions_by_date in [get_calendar_sessions_by_open_date(calendar, year)]
+            for open_date in open_dates
+            for session in sessions_by_date.get(open_date, ())
+        ]
+        sessions = (
+            session
+            for session in candidates
+            if (
+                session.market_open < event_time_utc <= session.market_close
+                if right
+                else session.market_open <= event_time_utc
+            )
         )
         latest = max(sessions, key=lambda session: session.market_open, default=None)
         return latest.session_date if latest is not None else event_date
@@ -243,24 +294,9 @@ def compute_session_pnl(
     timestamps = [ts for ts, _ in equity_curve]
     values = [v for _, v in equity_curve]
 
-    # Assign session dates
-    session_dates = []
-    tz = session_config.get_session_timezone()
-    data_tz = ZoneInfo(session_config.timezone)
-    session_start_hour = session_config.get_session_start_hour()
-    session_start_minute = session_config.get_session_start_minute()
+    session_dates = [session_config.date_for_timestamp(ts) for ts in timestamps]
 
-    for ts in timestamps:
-        session_timestamp = _timestamp_in_session_timezone(ts, data_tz, tz)
-        session_date = assign_session_date(
-            session_timestamp,
-            tz,
-            session_start_hour,
-            session_start_minute,
-        )
-        session_dates.append(session_date)
-
-    df = pl.DataFrame(
+    df = temporal_frame(
         {
             "timestamp": timestamps,
             "equity": values,
@@ -432,7 +468,7 @@ def align_to_sessions(
 
 def _empty_session_pnl_df() -> pl.DataFrame:
     """Return empty DataFrame with session P&L schema."""
-    return pl.DataFrame(
+    return temporal_frame(
         schema={
             "session_date": pl.Datetime,
             "session_start": pl.Datetime,

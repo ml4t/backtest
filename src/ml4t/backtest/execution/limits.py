@@ -1,7 +1,10 @@
 """Volume participation limits for realistic execution."""
 
+import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from .result import ExecutionResult
 
@@ -31,6 +34,31 @@ class ExecutionLimits(ABC):
             ExecutionResult with fillable and remaining quantities
         """
         pass
+
+
+class AssetExecutionLimits(ExecutionLimits):
+    """Select an existing native limit for each explicit stable asset key."""
+
+    def __init__(self, models: Mapping[str, ExecutionLimits], *, default: ExecutionLimits) -> None:
+        if not isinstance(default, ExecutionLimits) or any(
+            not isinstance(key, str) or not key or not isinstance(model, ExecutionLimits)
+            for key, model in models.items()
+        ):
+            raise TypeError("Asset limits require stable string keys and native ExecutionLimits")
+        if isinstance(default, AssetExecutionLimits) or any(
+            isinstance(model, AssetExecutionLimits) for model in models.values()
+        ):
+            raise TypeError("Declare one asset limit routing table, without nested routes")
+        self.models = MappingProxyType(dict(models))
+        self.default = default
+
+    def for_asset(self, asset: str) -> ExecutionLimits:
+        return self.models.get(asset, self.default)
+
+    def calculate(
+        self, order_quantity: float, bar_volume: float | None, price: float
+    ) -> ExecutionResult:
+        raise TypeError("Asset execution limits require an explicit asset selection")
 
 
 @dataclass
@@ -139,6 +167,38 @@ class VolumeParticipationLimit(ExecutionLimits):
             adjusted_price=price,
             participation_rate=participation_rate,
         )
+
+
+@dataclass
+class SharedVolumeParticipationLimit(VolumeParticipationLimit):
+    """Share one observed traded-volume budget across all orders for an asset/bar.
+
+    Missing/nonfinite volume has no executable capacity. Quote-side sizes do not
+    substitute for observed traded volume. Ordinary VolumeParticipationLimit retains
+    its existing per-order behavior.
+    """
+
+    shared_participation: float | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.max_participation) or not 0 <= self.max_participation <= 1:
+            raise ValueError("max_participation must be finite and between 0 and 1")
+        if not math.isfinite(self.min_volume) or self.min_volume < 0:
+            raise ValueError("min_volume must be finite and nonnegative")
+        if self.shared_participation is not None and (
+            not math.isfinite(self.shared_participation) or not 0 <= self.shared_participation <= 1
+        ):
+            raise ValueError("shared_participation must be finite and between 0 and 1")
+
+    def bar_capacity(self, bar_volume: float | None, price: float) -> float:
+        if bar_volume is None or not math.isfinite(bar_volume) or bar_volume < self.min_volume:
+            return 0.0
+        participation = (
+            self.max_participation
+            if self.shared_participation is None
+            else self.shared_participation
+        )
+        return max(0.0, bar_volume * participation)
 
 
 @dataclass

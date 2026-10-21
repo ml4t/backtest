@@ -342,7 +342,12 @@ def measurement_digest(report: dict[str, Any]) -> str:
             **{key: value for key, value in report.items() if key != "provenance"},
             "provenance": {
                 key: report["provenance"].get(key)
-                for key in ("ml4t_engine_source_sha256", "sources", "dependencies")
+                for key in (
+                    "ml4t_engine_source_sha256",
+                    "sources",
+                    "dependencies",
+                    "measurement_cohorts",
+                )
                 if key in report["provenance"]
             },
         }
@@ -478,6 +483,100 @@ def certify_source(
         raise ValueError("Reviewed performance evidence is invalid: " + "; ".join(failures))
     report["provenance"] = candidate["provenance"]
     return entry
+
+
+def measurement_cohort_failures(report: dict[str, Any]) -> list[str]:
+    """Validate separately dated measurements without changing the timing protocol."""
+    provenance = report.get("provenance")
+    if not isinstance(provenance, dict) or "measurement_cohorts" not in provenance:
+        return []
+    cohorts = provenance["measurement_cohorts"]
+    if not isinstance(cohorts, dict) or set(cohorts) != {"framework", "backtest"}:
+        return ["Timing measurement cohorts must declare framework and backtest"]
+    reference, backtest = cohorts["framework"], cohorts["backtest"]
+    if not isinstance(reference, dict) or not isinstance(backtest, dict):
+        return ["Timing measurement cohorts must be objects"]
+    failures = []
+
+    def instant(value: Any, name: str) -> datetime | None:
+        try:
+            result = datetime.fromisoformat(value)
+            if result.tzinfo is None or result.utcoffset() is None:
+                raise ValueError("Missing timezone")
+            return result
+        except (TypeError, ValueError):
+            failures.append(f"Timing measurement cohort lacks a valid {name} instant")
+            return None
+
+    reference_date = instant(reference.get("generated_at"), "reference")
+    start = instant(backtest.get("started_at"), "Backtest start")
+    end = instant(backtest.get("completed_at"), "Backtest end")
+    generated = instant(report.get("generated_at"), "report generation")
+    if all(value is not None for value in (reference_date, start, end, generated)):
+        assert reference_date is not None and start is not None and end is not None
+        assert generated is not None
+        if not reference_date <= start < end <= generated:
+            failures.append("Timing measurement cohort chronology differs")
+    reference_digest = reference.get("measurement_sha256")
+    if not _is_sha256(reference_digest):
+        failures.append("Timing measurement cohort lacks its original measurement identity")
+    head = backtest.get("source_head")
+    if (
+        not isinstance(head, str)
+        or len(head) != 40
+        or any(character not in "0123456789abcdef" for character in head)
+    ):
+        failures.append("Timing measurement cohort lacks its Backtest source revision")
+    dependencies = backtest.get("dependencies")
+    if not isinstance(dependencies, dict) or any(
+        not isinstance(dependencies.get(name), str) or not dependencies[name].strip()
+        for name in ("numpy", "pandas", "polars", "ml4t-specs")
+    ):
+        failures.append("Timing measurement cohort lacks actual Backtest dependency versions")
+    environment = report.get("environment")
+    original_environment = reference.get("environment")
+    if not isinstance(environment, dict) or original_environment != environment:
+        failures.append(
+            "Timing measurement cohort reference environment or framework targets differ"
+        )
+    old_provenance = reference.get("provenance")
+    old_sources = old_provenance.get("sources") if isinstance(old_provenance, dict) else None
+    expected_sources = {
+        name: _sha256(path)
+        for name, path in TIMING_SOURCE_PATHS.items()
+        if name not in {"benchmark", "ml4t"}
+    }
+    if not isinstance(old_sources, dict) or any(
+        old_sources.get(name) != value for name, value in expected_sources.items()
+    ):
+        failures.append("Timing measurement cohort reference adapter or input source differs")
+    if not isinstance(reference.get("reason"), str) or not reference["reason"].strip():
+        failures.append("Timing measurement cohort lacks its reference reuse rationale")
+    records = report.get("records")
+    if not isinstance(records, list):
+        return failures + ["Timing measurement cohort records must be a list"]
+    for row in records:
+        lineage = row.get("measurement_lineage") if isinstance(row, dict) else None
+        if not isinstance(lineage, dict):
+            failures.append("Timing measurement cohort lacks per-pair lineage")
+            continue
+        if (
+            lineage.get("framework_generated_at") != reference.get("generated_at")
+            or lineage.get("framework_original_measurement_sha256") != reference_digest
+            or lineage.get("framework_samples_reused_unchanged") is not True
+            or lineage.get("backtest_source_head") != head
+        ):
+            failures.append(
+                "Timing measurement cohort per-pair reference or source identity differs"
+            )
+        pair_start = instant(lineage.get("backtest_started_at"), "pair start")
+        pair_end = instant(lineage.get("backtest_completed_at"), "pair end")
+        if all(value is not None for value in (start, end, pair_start, pair_end)):
+            assert start is not None and end is not None
+            assert pair_start is not None and pair_end is not None
+            if not start <= pair_start < pair_end <= end:
+                failures.append("Timing measurement cohort pair lies outside its declared interval")
+    return failures
 
 
 def report_failures(report: dict[str, Any], correctness: dict[str, Any]) -> list[str]:
@@ -644,6 +743,7 @@ def report_failures(report: dict[str, Any], correctness: dict[str, Any]) -> list
             expected_ratio = medians["framework_engine"] / medians["ml4t_engine"]
             if record.get("framework_to_ml4t_median_ratio") != expected_ratio:
                 failures.append(f"{identity} timing ratio differs from raw samples")
+    failures.extend(measurement_cohort_failures(report))
     return failures
 
 

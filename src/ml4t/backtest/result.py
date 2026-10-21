@@ -26,6 +26,8 @@ import math
 from collections.abc import ItemsView, Iterable, KeysView
 from dataclasses import dataclass, field
 from datetime import datetime
+from hashlib import sha256
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -33,11 +35,14 @@ import polars as pl
 from ml4t.specs import UNSET_CALENDAR, CalendarUnset
 from ml4t.specs.market_data import FeedSpec
 
+from ._temporal import temporal_frame, temporal_rows, timestamp_dtype
+
 try:
     from ._version import __version__
 except ImportError:  # pragma: no cover - fallback for local editable edge cases
     __version__ = "0.0.0.dev0"
 from .analytics.annualization import should_session_align
+from .benchmark import _validate_benchmark_frame, _validate_benchmark_metadata
 from .capital import CapitalChange, flow_adjusted_returns
 from .funding import FundingPayment
 from .types import Fill, Order, OrderSide, OrderStatus, OrderType, Trade
@@ -49,6 +54,7 @@ if TYPE_CHECKING:
 
 _ARTIFACT_TYPE = "ml4t-backtest-result"
 _ARTIFACT_SCHEMA_VERSION = 3
+_BENCHMARK_ARTIFACT_SCHEMA_VERSION = 4
 _MANIFEST_FILE = "manifest.json"
 _INCOMPLETE_MARKER = ".artifact-incomplete"
 _NONFINITE_FLOAT_KEY = "__ml4t_nonfinite_float__"
@@ -63,6 +69,7 @@ _COMPONENT_FILES = {
     "holdings": "holdings.parquet",
     "capital_flows": "capital_flows.parquet",
     "recorded_variables": "recorded_variables.parquet",
+    "benchmark": "benchmark.parquet",
     "daily_pnl": "daily_pnl.parquet",
     "metrics": "metrics.json",
     "config": "config.yaml",
@@ -182,8 +189,8 @@ def _validate_complete_holdings(
     holdings: pl.DataFrame,
     error_type: type[ArtifactError] = ArtifactReadError,
 ) -> None:
-    counts = dict(holdings.group_by("observation_id").len().iter_rows())
-    for row in account.iter_rows(named=True):
+    counts = dict(temporal_rows(holdings.group_by("observation_id").len()))
+    for row in temporal_rows(account, named=True):
         actual = counts.pop(row["observation_id"], 0)
         if row["holdings_complete"]:
             if actual != row["open_positions"]:
@@ -192,6 +199,15 @@ def _validate_complete_holdings(
             raise error_type("Uncaptured account observations cannot declare complete holdings")
     if counts:
         raise error_type("Holdings do not refer to recorded account observations")
+
+
+def _benchmark_digest(frame: pl.DataFrame) -> str:
+    rows = zip(
+        frame["timestamp"].cast(pl.Int64).to_list(),
+        [value.hex() for value in frame["benchmark_return"].to_list()],
+        strict=True,
+    )
+    return sha256(json.dumps(list(rows), separators=(",", ":")).encode()).hexdigest()
 
 
 @dataclass
@@ -242,6 +258,8 @@ class BacktestResult:
     observation_metadata: list[tuple[str, bool, int | None]] = field(default_factory=list)
     recorded_variables: list[tuple[datetime, int, str, str]] | None = None
     account_method: str | None = None
+    benchmark: pl.DataFrame | None = None
+    benchmark_metadata: dict[str, Any] | None = None
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)
@@ -249,6 +267,29 @@ class BacktestResult:
     _fills_df: pl.DataFrame | None = field(default=None, repr=False)
     _portfolio_state_df: pl.DataFrame | None = field(default=None, repr=False)
     _rejected_orders_df: pl.DataFrame | None = field(default=None, repr=False)
+
+    def to_benchmark_dataframe(self) -> pl.DataFrame:
+        """Return prepared period returns with their source and financial definition."""
+        if self.benchmark is None:
+            raise ValueError("Result has no prepared benchmark")
+        _validate_benchmark_metadata(self.benchmark_metadata)
+        frame = _validate_benchmark_frame(self.benchmark)
+        timezone = self.config.resolved_timezone if self.config is not None else "UTC"
+        import pandas as pd
+
+        expected = {
+            (
+                pd.Timestamp(point).tz_localize(timezone)
+                if pd.Timestamp(point).tz is None
+                else pd.Timestamp(point)
+            )
+            .tz_convert("UTC")
+            .value
+            for point, _ in self.equity_curve
+        }
+        if set(frame["timestamp"].cast(pl.Int64).to_list()) != expected:
+            raise ValueError("Benchmark periods do not match observed equity periods")
+        return frame
 
     def _feed_spec(self) -> FeedSpec | None:
         if self.config is None:
@@ -268,12 +309,7 @@ class BacktestResult:
 
     def _timestamp_dtype(self, timestamps: Iterable[datetime | None]) -> pl.DataType:
         """Use the recorded zone, or the equity timeline for an empty export."""
-        for timestamp in timestamps:
-            if timestamp is not None:
-                return pl.Series([timestamp]).dtype
-        for timestamp, _ in self.equity_curve:
-            return pl.Series([timestamp]).dtype
-        return pl.Datetime()
+        return timestamp_dtype(chain(timestamps, (timestamp for timestamp, _ in self.equity_curve)))
 
     def to_trades_dataframe(self) -> pl.DataFrame:
         """Convert trades to Polars DataFrame.
@@ -304,7 +340,7 @@ class BacktestResult:
         schema["entry_time"] = self._timestamp_dtype(t.entry_time for t in self.trades)
         schema["exit_time"] = self._timestamp_dtype(t.exit_time for t in self.trades)
         if not self.trades:
-            return pl.DataFrame(schema=schema)
+            return temporal_frame(schema=schema)
 
         records = []
         for t in self.trades:
@@ -346,7 +382,7 @@ class BacktestResult:
                 }
             )
 
-        self._trades_df = pl.DataFrame(records, schema=schema)
+        self._trades_df = temporal_frame(records, schema=schema)
         return self._trades_df
 
     def to_fills_dataframe(self) -> pl.DataFrame:
@@ -361,8 +397,9 @@ class BacktestResult:
 
         schema = self._fills_schema()
         schema["timestamp"] = self._timestamp_dtype(fill.timestamp for fill in self.fills)
+        schema["stop_triggered_at"] = schema["timestamp"]
         if not self.fills:
-            return pl.DataFrame(schema=schema)
+            return temporal_frame(schema=schema)
 
         records = []
         for sequence, fill in enumerate(self.fills):
@@ -386,6 +423,7 @@ class BacktestResult:
                     "order_type": fill.order_type,
                     "limit_price": fill.limit_price,
                     "stop_price": fill.stop_price,
+                    "stop_triggered_at": fill.stop_triggered_at,
                     "price_source": fill.price_source,
                     "reference_price": fill.reference_price,
                     "quote_mid_price": fill.quote_mid_price,
@@ -400,7 +438,7 @@ class BacktestResult:
                 }
             )
 
-        self._fills_df = pl.DataFrame(records, schema=schema)
+        self._fills_df = temporal_frame(records, schema=schema)
         return self._fills_df
 
     def to_funding_dataframe(self) -> pl.DataFrame:
@@ -415,7 +453,7 @@ class BacktestResult:
             "amount_per_unit": pl.Float64(),
             "cash_delta": pl.Float64(),
         }
-        return pl.DataFrame(
+        return temporal_frame(
             [
                 {
                     "timestamp": payment.timestamp,
@@ -441,7 +479,7 @@ class BacktestResult:
             order.created_at for order in self.rejected_orders
         )
         if not self.rejected_orders:
-            return pl.DataFrame(schema=schema)
+            return temporal_frame(schema=schema)
 
         records = [
             {
@@ -464,7 +502,7 @@ class BacktestResult:
             }
             for order in self.rejected_orders
         ]
-        self._rejected_orders_df = pl.DataFrame(
+        self._rejected_orders_df = temporal_frame(
             records,
             schema=schema,
         )
@@ -473,7 +511,7 @@ class BacktestResult:
     def to_predictions_dataframe(self) -> pl.DataFrame:
         """Return the raw prediction DataFrame used as backtest input."""
         if self.predictions is None:
-            return pl.DataFrame()
+            return temporal_frame()
         return self.predictions
 
     def to_equity_dataframe(self) -> pl.DataFrame:
@@ -490,20 +528,20 @@ class BacktestResult:
             return self._equity_df
 
         if not self.equity_curve:
-            return pl.DataFrame(schema=self._equity_schema())
+            return temporal_frame(schema=self._equity_schema())
 
         timestamps = [ts for ts, _ in self.equity_curve]
         values = [float(v) for _, v in self.equity_curve]
 
         # Build base DataFrame and sort by timestamp
-        df = pl.DataFrame({"timestamp": timestamps, "equity": values}).sort("timestamp")
+        df = temporal_frame({"timestamp": timestamps, "equity": values}).sort("timestamp")
         initial = self.initial_capital if self.initial_capital is not None else df["equity"][0]
         previous = pl.col("equity").shift(1).fill_null(initial)
         if self.capital_changes:
             if self.initial_capital is None:
                 raise ArtifactError("Capital-flow returns require recorded initial_capital")
             returns = flow_adjusted_returns(
-                list(df.iter_rows()), self.initial_capital, self.capital_changes
+                list(temporal_rows(df)), self.initial_capital, self.capital_changes
             )
             df = df.with_columns(pl.Series("return", returns))
             df = df.with_columns(
@@ -554,7 +592,7 @@ class BacktestResult:
         schema = self._portfolio_state_schema()
         schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.portfolio_state)
         frame = (
-            pl.DataFrame(self.portfolio_state, schema=schema, orient="row")
+            temporal_frame(self.portfolio_state, schema=schema, orient="row")
             .sort("timestamp", maintain_order=True)
             .with_row_index("observation_id")
         )
@@ -586,7 +624,7 @@ class BacktestResult:
         schema = self._holdings_schema()
         schema["timestamp"] = self._timestamp_dtype(row[0] for row in self.holdings)
         schema["mark_timestamp"] = self._timestamp_dtype(row[-1] for row in self.holdings)
-        return pl.DataFrame(self.holdings, schema=schema, orient="row")
+        return temporal_frame(self.holdings, schema=schema, orient="row")
 
     def to_capital_flows_dataframe(self) -> pl.DataFrame:
         """Return ordered external capital applications, with marked pre/post-flow NAV."""
@@ -599,7 +637,7 @@ class BacktestResult:
             "nav_before": pl.Float64(),
             "nav_after": pl.Float64(),
         }
-        return pl.DataFrame(
+        return temporal_frame(
             [
                 (
                     change.timestamp,
@@ -626,12 +664,12 @@ class BacktestResult:
             "name": pl.String,
             "value_json": pl.String,
         }
-        return pl.DataFrame(self.recorded_variables, schema=schema, orient="row")
+        return temporal_frame(self.recorded_variables, schema=schema, orient="row")
 
     def to_recorded_records(self) -> list[dict[str, Any]]:
         """Return decoded strategy values grouped by their actual bar observation."""
         records: dict[int, dict[str, Any]] = {}
-        for row in self.to_recorded_dataframe().iter_rows(named=True):
+        for row in temporal_rows(self.to_recorded_dataframe(), named=True):
             record = records.setdefault(
                 row["bar_index"],
                 {"timestamp": row["timestamp"], "bar_index": row["bar_index"], "values": {}},
@@ -662,6 +700,9 @@ class BacktestResult:
             calendar=calendar,
             timezone=self.config.resolved_timezone if self.config else "UTC",
             session_start_time=self.config.resolved_session_start_time if self.config else None,
+            timestamp_semantics=self.config.resolved_timestamp_semantics if self.config else None,
+            bar_label=self.config.resolved_feed_spec.bar_label if self.config else None,
+            data_frequency=self.config.resolved_data_frequency if self.config else None,
         )
         daily = compute_session_pnl(
             self.equity_curve,
@@ -674,20 +715,13 @@ class BacktestResult:
     def _adjust_flow_pnl(self, daily: pl.DataFrame, session_config=None) -> pl.DataFrame:
         if not self.capital_changes or daily.is_empty():
             return daily
-        from zoneinfo import ZoneInfo
-
-        from .sessions import _timestamp_in_session_timezone, assign_session_date
 
         def key(timestamp):
-            if session_config is None:
-                return timestamp.date()
-            tz = session_config.get_session_timezone()
-            return assign_session_date(
-                _timestamp_in_session_timezone(timestamp, ZoneInfo(session_config.timezone), tz),
-                tz,
-                session_config.get_session_start_hour(),
-                session_config.get_session_start_minute(),
-            ).date()
+            return (
+                timestamp.date()
+                if session_config is None
+                else session_config.date_for_timestamp(timestamp).date()
+            )
 
         factors: dict[Any, float] = {}
         external: dict[Any, float] = {}
@@ -721,7 +755,7 @@ class BacktestResult:
                 pnl, return_pct, cumulative_return, num_bars
         """
         if not self.equity_curve:
-            return pl.DataFrame(
+            return temporal_frame(
                 schema={
                     "date": pl.Date,
                     "open_equity": pl.Float64,
@@ -1017,6 +1051,8 @@ class BacktestResult:
             unavailable["recorded_variables"] = "strategy variables were not recorded"
         if self.predictions is None:
             unavailable["predictions"] = "result has no predictions"
+        if self.benchmark is None:
+            unavailable["benchmark"] = "result has no prepared benchmark"
         if self.config is None:
             unavailable["config"] = "result has no config"
             unavailable["spec"] = "result has no config for a runtime spec"
@@ -1027,6 +1063,13 @@ class BacktestResult:
             raise ArtifactWriteError(f"Requested artifact components are unavailable: {details}")
 
         selected = [name for name in requested if name not in unavailable]
+        benchmark_frame = None
+        if self.benchmark is not None:
+            try:
+                benchmark_frame = self.to_benchmark_dataframe()
+                json.dumps(self.benchmark_metadata, allow_nan=False)
+            except Exception as exc:
+                raise ArtifactWriteError(f"Invalid prepared benchmark: {exc}") from exc
 
         text_payloads: dict[str, str] = {}
         if "metrics" in selected:
@@ -1202,6 +1245,15 @@ class BacktestResult:
             )
             written["recorded_variables"] = recorded_path
 
+        if "benchmark" in selected:
+            benchmark_path = path / _COMPONENT_FILES["benchmark"]
+            assert benchmark_frame is not None
+            write_component(
+                "benchmark",
+                lambda: benchmark_frame.write_parquet(benchmark_path, compression=compression),
+            )
+            written["benchmark"] = benchmark_path
+
         if "daily_pnl" in selected:
             daily_path = path / "daily_pnl.parquet"
             write_component(
@@ -1227,7 +1279,17 @@ class BacktestResult:
 
         manifest = {
             "artifact_type": _ARTIFACT_TYPE,
-            "schema_version": _ARTIFACT_SCHEMA_VERSION,
+            "schema_version": _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+            if self.benchmark is not None
+            else _ARTIFACT_SCHEMA_VERSION,
+            **(
+                {
+                    "benchmark_metadata": self.benchmark_metadata,
+                    "benchmark_content_sha256": _benchmark_digest(benchmark_frame),
+                }
+                if benchmark_frame is not None
+                else {}
+            ),
             "library_version": __version__,
             "account_method": self.account_method,
             "initial_capital": self.initial_capital,
@@ -1241,6 +1303,7 @@ class BacktestResult:
                 | ({"capital_flows"} if self.capital_changes else set())
                 | ({"holdings"} if self.holdings_sampling != "none" else set())
                 | ({"recorded_variables"} if self.recorded_variables is not None else set())
+                | ({"benchmark"} if self.benchmark is not None else set())
             ),
             "components": {
                 name: _COMPONENT_FILES[name] for name in _COMPONENT_FILES if name in written
@@ -1362,10 +1425,14 @@ class BacktestResult:
 
         if manifest is not None:
             schema_version = manifest.get("schema_version")
-            if schema_version not in (2, _ARTIFACT_SCHEMA_VERSION):
+            if schema_version not in (
+                2,
+                _ARTIFACT_SCHEMA_VERSION,
+                _BENCHMARK_ARTIFACT_SCHEMA_VERSION,
+            ):
                 raise UnsupportedArtifactVersionError(
                     f"Unsupported result artifact schema version {schema_version!r}; "
-                    f"supported version is {_ARTIFACT_SCHEMA_VERSION}"
+                    f"supported versions are 2, {_ARTIFACT_SCHEMA_VERSION} and {_BENCHMARK_ARTIFACT_SCHEMA_VERSION}"
                 )
             component_data = manifest.get("components")
             if not isinstance(component_data, dict) or not all(
@@ -1434,7 +1501,17 @@ class BacktestResult:
                 )
             )
 
-        missing_required_components = sorted(_REQUIRED_RESULT_COMPONENTS - components.keys())
+        benchmark_metadata = manifest.get("benchmark_metadata") if manifest else None
+        benchmark_declared = benchmark_metadata is not None or (
+            manifest is not None
+            and manifest.get("schema_version") == _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+        )
+        if benchmark_declared and benchmark_metadata is None and not recovery:
+            raise ArtifactManifestError("Benchmark artifact has no provenance declaration")
+        required_components = _REQUIRED_RESULT_COMPONENTS | (
+            {"benchmark"} if benchmark_declared else set()
+        )
+        missing_required_components = sorted(required_components - components.keys())
         missing_files = sorted(
             name for name, filename in components.items() if not (path / filename).is_file()
         )
@@ -1447,7 +1524,7 @@ class BacktestResult:
             missing_components = sorted(
                 (
                     _COMPONENT_FILES.keys()
-                    - {"funding", "holdings", "capital_flows", "recorded_variables"}
+                    - {"funding", "holdings", "capital_flows", "recorded_variables", "benchmark"}
                 )
                 - components.keys()
             )
@@ -1459,6 +1536,12 @@ class BacktestResult:
                 )
                 for name in missing_components
             )
+            if benchmark_declared and "benchmark" not in components:
+                diagnostics.append(
+                    ArtifactDiagnostic(
+                        "component_missing", "benchmark", "Declared benchmark.parquet is absent."
+                    )
+                )
             for name in missing_files:
                 diagnostics.append(
                     ArtifactDiagnostic(
@@ -1497,7 +1580,7 @@ class BacktestResult:
 
         def read_trades(component_path: Path) -> list[Trade]:
             result: list[Trade] = []
-            for row in pl.read_parquet(component_path).iter_rows(named=True):
+            for row in temporal_rows(pl.read_parquet(component_path), named=True):
                 symbol = row.get("symbol") or row.get("asset", "")
                 fees = row.get("fees")
                 if fees is None:
@@ -1546,7 +1629,12 @@ class BacktestResult:
                 ):
                     raise ValueError("fill_sequence must uniquely order every fill from zero")
                 frame = frame.sort("fill_sequence")
-            for row in frame.iter_rows(named=True):
+            for row in temporal_rows(frame, named=True):
+                triggered_at = row.get("stop_triggered_at")
+                if triggered_at is not None and (
+                    not isinstance(triggered_at, datetime) or triggered_at > row["timestamp"]
+                ):
+                    raise ValueError("Stop trigger instant must not follow its fill")
                 result.append(
                     Fill(
                         order_id=row["order_id"],
@@ -1563,6 +1651,7 @@ class BacktestResult:
                         order_type=row.get("order_type", ""),
                         limit_price=row.get("limit_price"),
                         stop_price=row.get("stop_price"),
+                        stop_triggered_at=row.get("stop_triggered_at"),
                         price_source=row.get("price_source", ""),
                         reference_price=row.get("reference_price"),
                         quote_mid_price=row.get("quote_mid_price"),
@@ -1590,12 +1679,12 @@ class BacktestResult:
                     amount_per_unit=row["amount_per_unit"],
                     cash_delta=row["cash_delta"],
                 )
-                for row in pl.read_parquet(component_path).iter_rows(named=True)
+                for row in temporal_rows(pl.read_parquet(component_path), named=True)
             ]
 
         def read_rejected_orders(component_path: Path) -> list[Order]:
             result: list[Order] = []
-            for row in pl.read_parquet(component_path).iter_rows(named=True):
+            for row in temporal_rows(pl.read_parquet(component_path), named=True):
                 result.append(
                     Order(
                         order_id=row["order_id"],
@@ -1621,7 +1710,7 @@ class BacktestResult:
         def read_equity(component_path: Path) -> list[tuple[datetime, float]]:
             return [
                 (row["timestamp"], row["equity"])
-                for row in pl.read_parquet(component_path).iter_rows(named=True)
+                for row in temporal_rows(pl.read_parquet(component_path), named=True)
             ]
 
         observation_metadata: list[tuple[str, bool, int | None]] = []
@@ -1635,7 +1724,7 @@ class BacktestResult:
                 if not metadata_columns <= set(frame.columns):
                     raise ValueError("Account observation metadata is incomplete")
                 metadata = []
-                for row in frame.iter_rows(named=True):
+                for row in temporal_rows(frame, named=True):
                     kind, complete, sequence = (
                         row["observation_kind"],
                         row["holdings_complete"],
@@ -1667,7 +1756,7 @@ class BacktestResult:
                     row["net_exposure"],
                     row["open_positions"],
                 )
-                for row in frame.iter_rows(named=True)
+                for row in temporal_rows(frame, named=True)
             ]
 
         def read_metrics(component_path: Path) -> dict[str, Any]:
@@ -1718,14 +1807,35 @@ class BacktestResult:
                     range(len(flows_frame))
                 ):
                     raise ValueError("flow_sequence must uniquely order every capital change")
-                for row in (
-                    flows_frame.sort("flow_sequence").drop("flow_sequence").iter_rows(named=True)
+                for row in temporal_rows(
+                    flows_frame.sort("flow_sequence").drop("flow_sequence"), named=True
                 ):
                     capital_changes.append(CapitalChange(**row))
             except Exception as exc:
                 raise ArtifactReadError("Invalid capital_flows.parquet") from exc
         rejected_orders = read_component("rejected_orders", read_rejected_orders, [])
         equity_curve = read_component("equity", read_equity, [])
+
+        def read_benchmark(component_path):
+            frame = _validate_benchmark_frame(pl.read_parquet(component_path))
+            if (
+                manifest is None
+                or manifest.get("schema_version") != _BENCHMARK_ARTIFACT_SCHEMA_VERSION
+            ):
+                raise ValueError("Prepared benchmark requires artifact schema version 4")
+            if _benchmark_digest(frame) != manifest.get("benchmark_content_sha256"):
+                raise ValueError("Prepared benchmark content does not match its retained digest")
+            probe = cls(
+                trades=[],
+                fills=[],
+                metrics={},
+                equity_curve=equity_curve,
+                config=config,
+                benchmark=frame,
+                benchmark_metadata=benchmark_metadata,
+            )
+            return probe.to_benchmark_dataframe()
+
         portfolio_state = read_component("portfolio_state", read_portfolio_state, [])
         holdings_frame = read_component("holdings", pl.read_parquet, None)
         holdings = None
@@ -1758,7 +1868,7 @@ class BacktestResult:
                 pl.struct("observation_id", "asset").is_duplicated().any()
             ).item():
                 raise ArtifactReadError("holdings observation/asset keys must be unique")
-            for row in holdings_frame.iter_rows(named=True):
+            for row in temporal_rows(holdings_frame, named=True):
                 observation = row["observation_id"]
                 if (
                     not isinstance(observation, int)
@@ -1786,7 +1896,7 @@ class BacktestResult:
                     raise ArtifactReadError(
                         "holdings quantities and values must be finite with a positive multiplier"
                     )
-            holdings = list(holdings_frame.select(list(cls._holdings_schema())).iter_rows())
+            holdings = list(temporal_rows(holdings_frame.select(list(cls._holdings_schema()))))
         recorded_frame = read_component("recorded_variables", pl.read_parquet, None)
         recorded_variables = None
         recorded_sampling = manifest.get("recorded_sampling") if manifest else None
@@ -1800,7 +1910,7 @@ class BacktestResult:
                 raise ArtifactReadError("Recorded variables are missing required fields")
             if recorded_frame.select(pl.struct("bar_index", "name").is_duplicated().any()).item():
                 raise ArtifactReadError("Recorded variable keys must be unique")
-            for row in recorded_frame.iter_rows(named=True):
+            for row in temporal_rows(recorded_frame, named=True):
                 index = row["bar_index"]
                 if (
                     not isinstance(index, int)
@@ -1818,7 +1928,7 @@ class BacktestResult:
                     raise ArtifactReadError(
                         "Recorded values must contain valid tagged JSON"
                     ) from exc
-            recorded_variables = list(recorded_frame.select(required).iter_rows())
+            recorded_variables = list(temporal_rows(recorded_frame.select(required)))
         elif recorded_sampling == "bar_end":
             if not recovery:
                 raise ArtifactReadError("Declared strategy variables are missing")
@@ -1888,6 +1998,8 @@ class BacktestResult:
         if config is None:
             config = spec_config
 
+        benchmark = read_component("benchmark", read_benchmark, None)
+
         if daily_pnl is not None:
             if not component_read_ok["equity"]:
                 diagnostics.append(
@@ -1937,6 +2049,8 @@ class BacktestResult:
             observation_metadata=observation_metadata,
             recorded_variables=recorded_variables,
             account_method=account_method,
+            benchmark=benchmark,
+            benchmark_metadata=benchmark_metadata if benchmark is not None else None,
         )
         if result.holdings is not None:
             if result.holdings_sampling in {"session", "fill_and_session"} and len(
@@ -2015,6 +2129,7 @@ class BacktestResult:
             "order_type": pl.String(),
             "limit_price": pl.Float64(),
             "stop_price": pl.Float64(),
+            "stop_triggered_at": pl.Datetime(),
             "price_source": pl.String(),
             "reference_price": pl.Float64(),
             "quote_mid_price": pl.Float64(),

@@ -1,0 +1,123 @@
+{
+  "producer": {
+    "repository": "https://github.com/ml4t/data",
+    "revision": "c3b9db80a66397420fb27adeccc762559dd41e07",
+    "version": "0.2.2.dev21+gc3b9db80a",
+    "published": false,
+    "wheel_sha256": "713b032ddd07b5512837e093249fed2e56aad8fabad26a6352e38164674dfe88"
+  },
+  "feed_spec": {
+    "timestamp_col": "valid_from",
+    "entity_col": "asset",
+    "price_col": "close",
+    "open_col": "open",
+    "high_col": "high",
+    "low_col": "low",
+    "close_col": "close",
+    "volume_col": "volume",
+    "vwap_col": null,
+    "bid_col": null,
+    "ask_col": null,
+    "mid_col": null,
+    "bid_size_col": null,
+    "ask_size_col": null,
+    "calendar": "NYSE",
+    "timezone": "America/New_York",
+    "data_frequency": null,
+    "bar_type": null,
+    "timestamp_semantics": "session_label",
+    "session_start_time": null,
+    "time_contract_version": 2,
+    "bar_grid_anchor": null,
+    "bar_label": null,
+    "partial_bar_policy": null
+  },
+  "snapshots": [
+    {
+      "on": "2025-07-01T20:00:00+00:00",
+      "as_of": "2025-07-01T20:00:00+00:00",
+      "file": "0-0.parquet",
+      "sha256": "6abfeff6326041612dd07c17521fc87985dbe971e89352c2310e77609c0daf70",
+      "assets": [
+        "A"
+      ]
+    },
+    {
+      "on": "2025-07-01T20:00:00+00:00",
+      "as_of": "2025-07-02T20:00:00+00:00",
+      "file": "0-1.parquet",
+      "sha256": "6abfeff6326041612dd07c17521fc87985dbe971e89352c2310e77609c0daf70",
+      "assets": [
+        "A"
+      ]
+    },
+    {
+      "on": "2025-07-01T20:00:00+00:00",
+      "as_of": "2025-07-03T17:00:00+00:00",
+      "file": "0-2.parquet",
+      "sha256": "6abfeff6326041612dd07c17521fc87985dbe971e89352c2310e77609c0daf70",
+      "assets": [
+        "A"
+      ]
+    },
+    {
+      "on": "2025-07-02T20:00:00+00:00",
+      "as_of": "2025-07-01T20:00:00+00:00",
+      "file": "1-0.parquet",
+      "sha256": "5773a98f78741ddf19ecb61b9dd7c242fd95aeb98444358ea3793aca9bf3848e",
+      "assets": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "on": "2025-07-02T20:00:00+00:00",
+      "as_of": "2025-07-02T20:00:00+00:00",
+      "file": "1-1.parquet",
+      "sha256": "5773a98f78741ddf19ecb61b9dd7c242fd95aeb98444358ea3793aca9bf3848e",
+      "assets": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "on": "2025-07-02T20:00:00+00:00",
+      "as_of": "2025-07-03T17:00:00+00:00",
+      "file": "1-2.parquet",
+      "sha256": "5773a98f78741ddf19ecb61b9dd7c242fd95aeb98444358ea3793aca9bf3848e",
+      "assets": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "on": "2025-07-03T17:00:00+00:00",
+      "as_of": "2025-07-01T20:00:00+00:00",
+      "file": "2-0.parquet",
+      "sha256": "6abfeff6326041612dd07c17521fc87985dbe971e89352c2310e77609c0daf70",
+      "assets": [
+        "A"
+      ]
+    },
+    {
+      "on": "2025-07-03T17:00:00+00:00",
+      "as_of": "2025-07-02T20:00:00+00:00",
+      "file": "2-1.parquet",
+      "sha256": "6abfeff6326041612dd07c17521fc87985dbe971e89352c2310e77609c0daf70",
+      "assets": [
+        "A"
+      ]
+    },
+    {
+      "on": "2025-07-03T17:00:00+00:00",
+      "as_of": "2025-07-03T17:00:00+00:00",
+      "file": "2-2.parquet",
+      "sha256": "6abfeff6326041612dd07c17521fc87985dbe971e89352c2310e77609c0daf70",
+      "assets": [
+        "A"
+      ]
+    }
+  ],
+  "availability": "Explicitly declared fixture metadata known before run, as in reference AssetFinder configuration; not inferred actual historical publication",
+  "interval": "Data [valid_from,valid_to) vs reference inclusive end_date; B valid only July2"
+}

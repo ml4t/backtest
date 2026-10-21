@@ -107,6 +107,46 @@ def test_selective_export_marks_omitted_capture_unavailable_in_recovery(
     assert recovered.to_returns_series().to_list() == pytest.approx([-0.001, 0, 0])
 
 
+def test_account_export_rejects_an_observation_aggregation_that_drops_only_metadata(
+    tmp_path, monkeypatch
+):
+    original = Engine._result_observations
+
+    def incomplete_aggregation(engine):
+        account, holdings, metadata = original(engine)
+        return account, holdings, metadata[:-1]
+
+    class Hold(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            pass
+
+    def run():
+        return Engine(
+            DataFeed(
+                prices_df=pl.DataFrame(
+                    {
+                        "timestamp": [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [6, 7]],
+                        "asset": ["A", "A"],
+                        "close": [100.0, 100.0],
+                    }
+                )
+            ),
+            Hold(),
+            BacktestConfig(initial_cash=10000, calendar=None),
+            holdings_sampling="bar",
+        ).run()
+
+    monkeypatch.setattr(Engine, "_result_observations", incomplete_aggregation)
+    with pytest.raises(ArtifactError, match="metadata must match the recorded timeline"):
+        run().to_parquet(tmp_path)
+    monkeypatch.setattr(Engine, "_result_observations", original)
+    result = run()
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    assert restored.to_portfolio_state_dataframe()["equity"].to_list() == [10000, 10000]
+    assert restored.to_portfolio_state_dataframe()["holdings_complete"].to_list() == [True, True]
+
+
 @pytest.mark.parametrize(
     "field,value,reason",
     [

@@ -1,0 +1,550 @@
+{
+  "reference": "zipline-reloaded==3.2.0",
+  "timing_claim": false,
+  "source": "actual run_algorithm/BarData",
+  "values": {
+    "current_scalar_scalar": {
+      "kind": "scalar",
+      "value": 102.0
+    },
+    "history_scalar_scalar": {
+      "kind": "Series",
+      "name": "A",
+      "index": [
+        "2025-01-06T00:00:00",
+        "2025-01-07T00:00:00",
+        "2025-01-08T00:00:00"
+      ],
+      "index_names": [
+        null
+      ],
+      "dtype": "float64",
+      "index_dtypes": [
+        "datetime64[ns]"
+      ],
+      "values": [
+        100.0,
+        101.0,
+        102.0
+      ]
+    },
+    "current_scalar_fields": {
+      "kind": "Series",
+      "name": "ALPHA",
+      "index": [
+        "price",
+        "volume"
+      ],
+      "index_names": [
+        null
+      ],
+      "dtype": "float64",
+      "index_dtypes": [
+        "object"
+      ],
+      "values": [
+        102.0,
+        3000.0
+      ]
+    },
+    "history_scalar_fields": {
+      "kind": "DataFrame",
+      "index": [
+        [
+          "2025-01-06T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-07T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-08T00:00:00",
+          "A"
+        ]
+      ],
+      "index_names": [
+        "date",
+        null
+      ],
+      "columns": [
+        "price",
+        "volume"
+      ],
+      "column_names": [
+        "fields"
+      ],
+      "dtypes": [
+        "float64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "datetime64[ns]",
+        "object"
+      ],
+      "values": [
+        [
+          100.0,
+          1000.0
+        ],
+        [
+          101.0,
+          2000.0
+        ],
+        [
+          102.0,
+          3000.0
+        ]
+      ]
+    },
+    "current_assets_scalar": {
+      "kind": "Series",
+      "name": "price",
+      "index": [
+        "A",
+        "B"
+      ],
+      "index_names": [
+        null
+      ],
+      "dtype": "float64",
+      "index_dtypes": [
+        "object"
+      ],
+      "values": [
+        102.0,
+        51.0
+      ]
+    },
+    "history_assets_scalar": {
+      "kind": "DataFrame",
+      "index": [
+        "2025-01-06T00:00:00",
+        "2025-01-07T00:00:00",
+        "2025-01-08T00:00:00"
+      ],
+      "index_names": [
+        null
+      ],
+      "columns": [
+        "A",
+        "B"
+      ],
+      "column_names": [
+        null
+      ],
+      "dtypes": [
+        "float64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "datetime64[ns]"
+      ],
+      "values": [
+        [
+          100.0,
+          50.0
+        ],
+        [
+          101.0,
+          49.0
+        ],
+        [
+          102.0,
+          51.0
+        ]
+      ]
+    },
+    "current_assets_fields": {
+      "kind": "DataFrame",
+      "index": [
+        "A",
+        "B"
+      ],
+      "index_names": [
+        null
+      ],
+      "columns": [
+        "price",
+        "volume"
+      ],
+      "column_names": [
+        null
+      ],
+      "dtypes": [
+        "float64",
+        "int64"
+      ],
+      "index_dtypes": [
+        "object"
+      ],
+      "values": [
+        [
+          102.0,
+          3000.0
+        ],
+        [
+          51.0,
+          3000.0
+        ]
+      ]
+    },
+    "history_assets_fields": {
+      "kind": "DataFrame",
+      "index": [
+        [
+          "2025-01-06T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-06T00:00:00",
+          "B"
+        ],
+        [
+          "2025-01-07T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-07T00:00:00",
+          "B"
+        ],
+        [
+          "2025-01-08T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-08T00:00:00",
+          "B"
+        ]
+      ],
+      "index_names": [
+        "date",
+        null
+      ],
+      "columns": [
+        "price",
+        "volume"
+      ],
+      "column_names": [
+        "fields"
+      ],
+      "dtypes": [
+        "float64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "datetime64[ns]",
+        "object"
+      ],
+      "values": [
+        [
+          100.0,
+          1000.0
+        ],
+        [
+          50.0,
+          1000.0
+        ],
+        [
+          101.0,
+          2000.0
+        ],
+        [
+          49.0,
+          2000.0
+        ],
+        [
+          102.0,
+          3000.0
+        ],
+        [
+          51.0,
+          3000.0
+        ]
+      ]
+    },
+    "current_reverse_scalar_fields": {
+      "kind": "Series",
+      "name": "ALPHA",
+      "index": [
+        "volume",
+        "price"
+      ],
+      "index_names": [
+        null
+      ],
+      "dtype": "float64",
+      "index_dtypes": [
+        "object"
+      ],
+      "values": [
+        3000.0,
+        102.0
+      ]
+    },
+    "history_reverse_scalar_fields": {
+      "kind": "DataFrame",
+      "index": [
+        [
+          "2025-01-06T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-07T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-08T00:00:00",
+          "A"
+        ]
+      ],
+      "index_names": [
+        "date",
+        null
+      ],
+      "columns": [
+        "volume",
+        "price"
+      ],
+      "column_names": [
+        "fields"
+      ],
+      "dtypes": [
+        "float64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "datetime64[ns]",
+        "object"
+      ],
+      "values": [
+        [
+          1000.0,
+          100.0
+        ],
+        [
+          2000.0,
+          101.0
+        ],
+        [
+          3000.0,
+          102.0
+        ]
+      ]
+    },
+    "current_reverse_assets_scalar": {
+      "kind": "Series",
+      "name": "price",
+      "index": [
+        "B",
+        "A"
+      ],
+      "index_names": [
+        null
+      ],
+      "dtype": "float64",
+      "index_dtypes": [
+        "object"
+      ],
+      "values": [
+        51.0,
+        102.0
+      ]
+    },
+    "history_reverse_assets_scalar": {
+      "kind": "DataFrame",
+      "index": [
+        "2025-01-06T00:00:00",
+        "2025-01-07T00:00:00",
+        "2025-01-08T00:00:00"
+      ],
+      "index_names": [
+        null
+      ],
+      "columns": [
+        "B",
+        "A"
+      ],
+      "column_names": [
+        null
+      ],
+      "dtypes": [
+        "float64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "datetime64[ns]"
+      ],
+      "values": [
+        [
+          50.0,
+          100.0
+        ],
+        [
+          49.0,
+          101.0
+        ],
+        [
+          51.0,
+          102.0
+        ]
+      ]
+    },
+    "current_reverse_assets_fields": {
+      "kind": "DataFrame",
+      "index": [
+        "B",
+        "A"
+      ],
+      "index_names": [
+        null
+      ],
+      "columns": [
+        "volume",
+        "price"
+      ],
+      "column_names": [
+        null
+      ],
+      "dtypes": [
+        "int64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "object"
+      ],
+      "values": [
+        [
+          3000.0,
+          51.0
+        ],
+        [
+          3000.0,
+          102.0
+        ]
+      ]
+    },
+    "history_reverse_assets_fields": {
+      "kind": "DataFrame",
+      "index": [
+        [
+          "2025-01-06T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-06T00:00:00",
+          "B"
+        ],
+        [
+          "2025-01-07T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-07T00:00:00",
+          "B"
+        ],
+        [
+          "2025-01-08T00:00:00",
+          "A"
+        ],
+        [
+          "2025-01-08T00:00:00",
+          "B"
+        ]
+      ],
+      "index_names": [
+        "date",
+        null
+      ],
+      "columns": [
+        "volume",
+        "price"
+      ],
+      "column_names": [
+        "fields"
+      ],
+      "dtypes": [
+        "float64",
+        "float64"
+      ],
+      "index_dtypes": [
+        "datetime64[ns]",
+        "object"
+      ],
+      "values": [
+        [
+          1000.0,
+          100.0
+        ],
+        [
+          1000.0,
+          50.0
+        ],
+        [
+          2000.0,
+          101.0
+        ],
+        [
+          2000.0,
+          49.0
+        ],
+        [
+          3000.0,
+          102.0
+        ],
+        [
+          3000.0,
+          51.0
+        ]
+      ]
+    }
+  },
+  "artifact": {
+    "version": "3.2.0",
+    "wheel": "zipline_reloaded-3.2.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+    "sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+    "published": true
+  },
+  "inputs": {
+    "dates": [
+      "2025-01-06",
+      "2025-01-07",
+      "2025-01-08"
+    ],
+    "native_legacy_map": {
+      "A": 0,
+      "B": 1
+    },
+    "symbols": {
+      "A": "ALPHA",
+      "B": "BETA"
+    },
+    "closes": {
+      "A": [
+        100.0,
+        101.0,
+        102.0
+      ],
+      "B": [
+        50.0,
+        49.0,
+        51.0
+      ]
+    },
+    "open_offset": -2.0,
+    "high_offset": 1.0,
+    "low_offset": -3.0,
+    "volume": [
+      1000,
+      2000,
+      3000
+    ]
+  },
+  "observed_difference_from_reference_prose": "Published3.2 multi-field history returns a MultiIndex even for one asset; second index level remains None. Adapter matches actual implementation.",
+  "dtype_qualification": "Actual published3.2 captured numeric column and datetime index dtypes.",
+  "reference_environment": {
+    "pandas": "2.3.3",
+    "numpy": "2.5.4",
+    "exchange-calendars": "4.13.2"
+  }
+}

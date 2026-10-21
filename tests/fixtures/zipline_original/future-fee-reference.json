@@ -1,0 +1,174 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "scope": "Original Engine mixed equity/future fee calculation, flat100 prices, explicit one-unit-per-bar custom slippage isolates cost definitions; NYSE synthetic future declared for this fee-only test, no futures exchange/default-slippage parity claimed",
+  "methods": {
+    "per_contract": {
+      "trace": [
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 0,
+              "commission": 0.0
+            },
+            {
+              "sid": 8,
+              "filled": 0,
+              "commission": 0.0
+            }
+          ],
+          "cash": 100000.0,
+          "nav": 100000.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 1,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 1,
+              "commission": 8.0
+            }
+          ],
+          "cash": 99891.0,
+          "nav": 99991.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 2,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 2,
+              "commission": 8.0
+            }
+          ],
+          "cash": 99791.0,
+          "nav": 99991.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 3,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 3,
+              "commission": 9.0
+            }
+          ],
+          "cash": 99690.0,
+          "nav": 99990.0
+        }
+      ],
+      "nav": [
+        100000.0,
+        99991.0,
+        99991.0,
+        99990.0
+      ],
+      "cash": [
+        100000.0,
+        99891.0,
+        99791.0,
+        99690.0
+      ]
+    },
+    "per_future_trade": {
+      "trace": [
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 0,
+              "commission": 0.0
+            },
+            {
+              "sid": 8,
+              "filled": 0,
+              "commission": 0.0
+            }
+          ],
+          "cash": 100000.0,
+          "nav": 100000.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 1,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 1,
+              "commission": 3.0
+            }
+          ],
+          "cash": 99896.0,
+          "nav": 99996.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 2,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 2,
+              "commission": 3.0
+            }
+          ],
+          "cash": 99796.0,
+          "nav": 99996.0
+        },
+        {
+          "orders": [
+            {
+              "sid": 7,
+              "filled": 3,
+              "commission": 1.0
+            },
+            {
+              "sid": 8,
+              "filled": 3,
+              "commission": 3.0
+            }
+          ],
+          "cash": 99696.0,
+          "nav": 99996.0
+        }
+      ],
+      "nav": [
+        100000.0,
+        99996.0,
+        99996.0,
+        99996.0
+      ],
+      "cash": [
+        100000.0,
+        99896.0,
+        99796.0,
+        99696.0
+      ]
+    }
+  },
+  "closes": [
+    "2025-03-03T21:00:00+00:00",
+    "2025-03-04T21:00:00+00:00",
+    "2025-03-05T21:00:00+00:00",
+    "2025-03-06T21:00:00+00:00"
+  ],
+  "timing_claim": false
+}

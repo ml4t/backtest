@@ -7,6 +7,86 @@ ml4t-backtest has two levels of risk management: **position rules** (per-positio
 
 Rule snippets below assume a strategy or broker with current positions and prices. The linked risk tutorial runs the full event sequence and inspects reduction fills.
 
+## Validate submissions and accounts
+
+These validators are development-source features, outside the preserved 0.1.13
+release candidate. They use the existing Broker, order book and account ledger.
+They raise on a violation; they do not request a portfolio liquidation.
+
+Register `OrderConstraints` through `broker.register_trading_control(...)`.
+Validation runs before an order consumes an identifier, count or cash, and also
+applies to updates of a pending order. A failed strategy callback restores order
+counts with its other broker mutations.
+
+<!-- ml4t-doc-test: trading-account-controls -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ExecutionMode
+from ml4t.backtest.controls import AccountConstraints, OrderConstraints, TradingControlViolation
+
+dates = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [2, 3]]
+prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 2,
+                       "close": [100.0, 100.0]})
+
+class Controlled(Strategy):
+    def on_start(self, broker):
+        broker.register_trading_control(OrderConstraints(
+            max_order_quantity=5, max_position_quantity=5,
+            max_orders_per_session=1, long_only=True,
+        ))
+        broker.register_account_control(AccountConstraints(max_leverage=1))
+
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == dates[0]:
+            try:
+                broker.submit_order("TEST", 6)
+            except TradingControlViolation:
+                pass
+            assert broker.orders == []
+            assert broker.submit_order("TEST", 3).order_id == "ORD-1"
+
+result = Engine(DataFeed(prices_df=prices,
+                        feed_spec={"timestamp_semantics": "bar_close"}),
+                Controlled(), BacktestConfig(initial_cash=10000,
+                                              execution_mode=ExecutionMode.NEXT_BAR)).run()
+assert result.to_fills_dataframe()["quantity"].to_list() == [3.0]
+print("Submission and observed-account controls verified.")
+```
+
+Position controls include same-direction unfilled quantities by default. Opposing
+pending orders do not reduce that worst-case exposure, and an unfilled buy cannot
+authorize a short sale. Choose `include_pending=False` for the legacy rule that
+tests only held quantity plus the new order. Notional limits include the actual
+instrument multiplier; `notional_basis="quoted_units"` explicitly selects the
+legacy price-times-quantity convention.
+
+`max_orders_per_session` requires a calendar and follows its exchange session,
+including the upcoming session for a scheduled pre-open callback.
+`max_orders_per_day` counts the delivered timestamp's civil date. Failed validation
+does not consume counts; a submitted order counts even if later execution rejects
+it. Updating or cancelling an order does not create another submission.
+`blocked_assets` and the optional pure `restriction(request)` callable restrict
+stable asset IDs at the order's actual timestamp. Custom trading validators expose
+`validate(request)` and inspect the immutable `OrderControlContext`.
+
+Account rules inspect one native marked account snapshot per price event. The
+default `boundary="after_fills"` includes all that event's fills. Choose
+`boundary="after_callbacks"` to validate after strategy/scheduled callbacks,
+before deferred same-bar or market-on-close fills. Immediate fills made inside a
+callback are already part of that snapshot. `min_leverage` requires a datetime
+`deadline` and applies strictly after it. Custom account validators expose
+`validate(account)` over immutable account values. A breach aborts the run without
+undoing completed callbacks; use portfolio limits below for halt or liquidation.
+`broker.validate_account_controls()` can also validate all registered rules
+immediately.
+
+For a partially filled order, `broker.update_order(order_id, quantity=...)`
+changes the positive, finite remaining quantity. Earlier fills remain recorded.
+The update cannot bypass trading controls or leave the old executable remainder
+in the partial-fill book.
+
 ## Position Rules
 
 ### StopLoss

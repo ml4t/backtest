@@ -9,23 +9,39 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ..config import InitialHwmSource, LockNotionalUpdateMode, ShareType
-from ..core.shared import add_with_zero_cancellation, quantity_zero_tolerance
+from ..core.shared import CASH_TOLERANCE, add_with_zero_cancellation, quantity_zero_tolerance
 from ..core.state import ExecutionJournal, MarketState, OrderState, RiskState
-from ..models import calculate_commission, calculate_slippage
+from ..models import (
+    AssetSlippage,
+    CumulativeVolumeShareSlippage,
+    FixedSlippage,
+    NoSlippage,
+    PercentageSlippage,
+    SlippageContext,
+    SlippageModel,
+    SpreadSlippage,
+    VolumeShareSlippage,
+    calculate_commission,
+    calculate_slippage,
+)
 from ..types import (
     ExitReason,
     Fill,
     Order,
     OrderSide,
     OrderStatus,
+    OrderType,
     Position,
     Trade,
 )
+from .impact import LinearImpact, NoImpact, PowerLawImpact, SquareRootImpact
+from .limits import AssetExecutionLimits
 
 if TYPE_CHECKING:
     from ..accounting import AccountState
@@ -127,7 +143,7 @@ class FillExecutor:
         self.record_pnl = record_pnl
         self.fill_engine: FillEngine | None = None
 
-    def execute(self, order: Order, base_price: float) -> bool:
+    def execute(self, order: Order, base_price: float, *, price_source: str | None = None) -> bool:
         """Execute a fill and update positions.
 
         This is the main entry point, replacing Broker._execute_fill().
@@ -144,12 +160,23 @@ class FillExecutor:
                 negative, or directionally favorable value outside its contract.
         """
         broker = self.broker
+        if not broker.allows_price_execution:
+            return False
         current_time = self.market.time
         assert current_time is not None, "Cannot execute fill without current time"
 
         self._validate_execution_price(base_price, source="base execution price")
 
         available_size = broker.get_available_size(order.asset, order.side)
+        slippage_model = broker.slippage_model
+        if isinstance(slippage_model, AssetSlippage):
+            slippage_model = slippage_model.for_asset(order.asset)
+        contextual_slippage = callable(getattr(slippage_model, "calculate_with_context", None))
+        traded_volume = self.market.volumes.get(order.asset)
+        if getattr(slippage_model, "requires_traded_volume", False) and (
+            traded_volume is None or not math.isfinite(traded_volume) or traded_volume <= 0
+        ):
+            return False
 
         # Get effective quantity (considering partial fills from previous bars)
         if self.fill_engine is None:
@@ -159,21 +186,46 @@ class FillExecutor:
 
         # Apply execution limits (volume participation)
         remaining_quantity = 0.0
-        if broker.execution_limits is not None:
+        shared_budget = None
+        limits = broker.execution_limits
+        if isinstance(limits, AssetExecutionLimits):
+            limits = limits.for_asset(order.asset)
+        if limits is not None:
+            shared_budget = getattr(limits, "bar_capacity", None)
             if order.order_id in self.orders.filled_this_bar:
                 return False
 
-            exec_result = broker.execution_limits.calculate(
+            exec_result = limits.calculate(
                 effective_quantity,
-                available_size,
+                self.market.volumes.get(order.asset)
+                if shared_budget is not None
+                else available_size,
                 base_price,
             )
             fill_quantity = exec_result.fillable_quantity
+            if (
+                not math.isfinite(fill_quantity)
+                or fill_quantity < 0
+                or fill_quantity > effective_quantity
+            ):
+                raise ValueError(
+                    "Invalid execution quantity from "
+                    f"{type(limits).__name__}: got {fill_quantity!r}, "
+                    f"requested {effective_quantity!r}"
+                )
+            if shared_budget is not None:
+                capacity = shared_budget(self.market.volumes.get(order.asset), base_price)
+                if not math.isfinite(capacity) or capacity < 0:
+                    raise ValueError("Shared volume capacity must be finite and nonnegative")
+                consumed = self.orders.volume_consumed_by_asset.get(order.asset, 0.0)
+                fill_quantity = min(fill_quantity, max(0.0, capacity - consumed))
+                if available_size is not None:
+                    fill_quantity = min(fill_quantity, max(0.0, available_size))
 
             if not math.isfinite(fill_quantity) or fill_quantity < 0:
                 raise ValueError(
                     "Invalid execution quantity from "
-                    f"{type(broker.execution_limits).__name__}: got {fill_quantity!r}"
+                    f"{type(limits).__name__}: got {fill_quantity!r}"
                 )
             if broker.share_type == ShareType.INTEGER:
                 fill_quantity = float(int(fill_quantity))
@@ -184,33 +236,52 @@ class FillExecutor:
             if broker.share_type == ShareType.INTEGER:
                 remaining_quantity = float(int(remaining_quantity))
 
-        # Apply market impact
-        if broker.market_impact_model is not None:
-            is_buy = order.side == OrderSide.BUY
-            impact = broker.market_impact_model.calculate(
-                fill_quantity,
-                base_price,
-                available_size,
-                is_buy,
-            )
-            self._validate_market_impact(impact, is_buy=is_buy)
-            base_price = base_price + impact
-            self._validate_execution_price(base_price, source="market-impact execution price")
-
-        # Calculate slippage
-        slippage = calculate_slippage(
-            broker.slippage_model,
-            order.asset,
-            fill_quantity,
-            base_price,
-            available_size,
+        fill_price, slippage = self._price_for_quantity(
+            order, fill_quantity, base_price, available_size, quote=True
         )
-        fill_price = base_price + slippage if order.side == OrderSide.BUY else base_price - slippage
-        self._validate_execution_price(fill_price, source="execution price")
+        if not self._within_limit(order, fill_price):
+            return False
+
+        if not broker.skip_cash_validation and fill_price != base_price:
+            valid, reason, code = self._validate_final_price(order, fill_quantity, fill_price)
+            if not valid:
+                if broker.partial_fills_allowed and code != "account_restriction":
+                    fill_quantity = self._affordable_cost_quantity(
+                        order, fill_quantity, base_price, available_size
+                    )
+                else:
+                    fill_quantity = 0.0
+                if fill_quantity <= 0:
+                    if broker.reject_on_insufficient_cash:
+                        order.reject(reason, code or "order_validation_failed")
+                    else:
+                        order.status = OrderStatus.CANCELLED
+                    return False
+                fill_price, slippage = self._price_for_quantity(
+                    order, fill_quantity, base_price, available_size, quote=True
+                )
+                if not self._within_limit(order, fill_price):
+                    return False
+                order.quantity = fill_quantity
+                remaining_quantity = 0.0
+                self.orders.partial_quantities.pop(order.order_id, None)
+
+        if self._has_mutable_price_model(slippage_model):
+            actual_price, actual_slippage = self._price_for_quantity(
+                order, fill_quantity, base_price, available_size, quote=False
+            )
+            if actual_price != fill_price or actual_slippage != slippage:
+                raise ValueError("Execution price model must produce its quoted deterministic cost")
 
         # Calculate commission
+        multiplier = broker.get_multiplier(order.asset)
         commission = calculate_commission(
-            broker.commission_model, order.asset, fill_quantity, fill_price
+            broker.commission_model,
+            order.asset,
+            fill_quantity,
+            fill_price,
+            order=order,
+            multiplier=multiplier,
         )
         quote_context = broker.get_quote_context(order.asset, order.side)
 
@@ -233,9 +304,10 @@ class FillExecutor:
                 self.orders.partial_quantities.pop(order.order_id, None)
 
         # Create fill record
-        price_source = "open" if order.child_intent_id is not None else broker.execution_price.value
-        multiplier = broker.get_multiplier(order.asset)
-        contract_spec = broker.get_contract_spec(order.asset)
+        if price_source is None:
+            price_source = (
+                "open" if order.child_intent_id is not None else broker.execution_price.value
+            )
         fill = Fill(
             order_id=order.order_id,
             rebalance_id=order.rebalance_id,
@@ -249,6 +321,7 @@ class FillExecutor:
             order_type=order.order_type.value,
             limit_price=order.limit_price,
             stop_price=order.stop_price,
+            stop_triggered_at=order.stop_triggered_at,
             price_source=price_source,
             reference_price=quote_context["reference_price"],
             quote_mid_price=quote_context["quote_mid_price"],
@@ -264,7 +337,7 @@ class FillExecutor:
             child_intent_id=order.child_intent_id,
             intent_idempotency_key=order.intent_idempotency_key,
             multiplier=multiplier,
-            currency=contract_spec.currency if contract_spec is not None else None,
+            currency=broker._get_contract_currency(order.asset),
         )
         self.journal.fills.append(fill)
 
@@ -299,10 +372,25 @@ class FillExecutor:
 
         old_position = self.account.positions.get(order.asset)
         old_quantity = old_position.quantity if old_position is not None else 0.0
+        old_basis = (
+            old_position._commission_adjusted_cost_basis if old_position is not None else None
+        )
+        old_entry = old_position.entry_price if old_position is not None else 0.0
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
         fill.commission = actual_commission
+        order.commission_paid += actual_commission
+        position = self.account.positions.get(order.asset)
+        if position is not None and (actual_commission != 0.0 or old_basis is not None):
+            basis = old_entry if old_basis is None else old_basis
+            if old_quantity == 0.0 or old_quantity * position.quantity < 0.0:
+                basis = fill_price
+            elif old_quantity * signed_qty > 0.0:
+                basis = (basis * old_quantity + fill_price * signed_qty) / position.quantity
+            position._commission_adjusted_cost_basis = basis + (
+                actual_commission / (position.quantity * multiplier)
+            )
 
         self._update_lock_notional_free_cash(
             ctx,
@@ -313,6 +401,10 @@ class FillExecutor:
         # Update cash (include multiplier for futures/derivatives)
         cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
+        if shared_budget is not None or contextual_slippage:
+            self.orders.volume_consumed_by_asset[order.asset] = (
+                self.orders.volume_consumed_by_asset.get(order.asset, 0.0) + fill_quantity
+            )
 
         # Sync position to AccountState using execution price for this fill.
         # In next-bar/open execution this avoids close-price mark-to-market
@@ -340,6 +432,155 @@ class FillExecutor:
             )
 
         return not is_partial
+
+    @staticmethod
+    def _within_limit(order: Order, price: float) -> bool:
+        if order.order_type not in {OrderType.LIMIT, OrderType.STOP_LIMIT}:
+            return True
+        assert order.limit_price is not None
+        return (
+            price <= order.limit_price
+            if order.side is OrderSide.BUY
+            else price >= order.limit_price
+        )
+
+    def _has_mutable_price_model(self, slippage_model: SlippageModel) -> bool:
+        return type(slippage_model) not in (
+            NoSlippage,
+            FixedSlippage,
+            PercentageSlippage,
+            SpreadSlippage,
+            VolumeShareSlippage,
+            CumulativeVolumeShareSlippage,
+        ) or type(self.broker.market_impact_model) not in (
+            type(None),
+            NoImpact,
+            LinearImpact,
+            SquareRootImpact,
+            PowerLawImpact,
+        )
+
+    def _price_for_quantity(
+        self,
+        order: Order,
+        quantity: float,
+        base_price: float,
+        available_size: float | None,
+        *,
+        quote: bool,
+    ) -> tuple[float, float]:
+        broker = self.broker
+        impact_model = broker.market_impact_model
+        slippage_model = broker.slippage_model
+        if isinstance(slippage_model, AssetSlippage):
+            slippage_model = slippage_model.for_asset(order.asset)
+        original_slippage = slippage_model
+        if quote and self._has_mutable_price_model(slippage_model):
+            impact_model = deepcopy(impact_model)
+            slippage_model = deepcopy(slippage_model)
+            if slippage_model is original_slippage or (
+                impact_model is not None and impact_model is broker.market_impact_model
+            ):
+                raise TypeError("Execution price models must support independent deepcopy quotes")
+        if impact_model is not None:
+            is_buy = order.side is OrderSide.BUY
+            impact = impact_model.calculate(quantity, base_price, available_size, is_buy)
+            self._validate_market_impact(impact, is_buy=is_buy)
+            base_price += impact
+            self._validate_execution_price(base_price, source="market-impact execution price")
+        contextual = callable(getattr(slippage_model, "calculate_with_context", None))
+        slippage = calculate_slippage(
+            slippage_model,
+            order.asset,
+            quantity,
+            base_price,
+            available_size,
+            context=self._slippage_context(
+                slippage_model, order.asset, quantity, base_price, available_size
+            )
+            if contextual
+            else None,
+        )
+        price = base_price + slippage if order.side is OrderSide.BUY else base_price - slippage
+        self._validate_execution_price(price, source="execution price")
+        return price, slippage
+
+    def _slippage_context(
+        self, model, asset: str, quantity: float, price: float, available_size: float | None
+    ) -> SlippageContext:
+        current_time = self.market.time
+        assert current_time is not None
+        if getattr(model, "requires_observed_ohlc", False):
+            if self.market.observed_high_low is None:
+                raise ValueError("This slippage model requires an active raw observation service")
+            bar_high, bar_low = self.market.observed_high_low(asset)
+        else:
+            bar_high, bar_low = None, None
+        return SlippageContext(
+            asset,
+            quantity,
+            price,
+            self.market.volumes.get(asset),
+            self.orders.volume_consumed_by_asset.get(asset, 0.0),
+            available_size,
+            current_time,
+            bar_high=bar_high,
+            bar_low=bar_low,
+        )
+
+    def _validate_final_price(
+        self, order: Order, quantity: float, price: float
+    ) -> tuple[bool, str, str | None]:
+        candidate = replace(order, quantity=quantity)
+        valid, reason, code = self.broker.gatekeeper.validate_order_with_code(candidate, price)
+        if valid and (
+            order.side is OrderSide.BUY
+            and self.account.get_position_quantity(order.asset) < 0
+            and self.broker.short_cash_policy.value == "lock_notional"
+            and not self.account.policy.allow_leverage
+        ):
+            assert self.fill_engine is not None
+            valid = self.fill_engine.get_max_affordable_quantity(candidate, price) >= quantity
+            if not valid:
+                return False, "Insufficient cash to cover short at final price", "insufficient_cash"
+        return valid, reason, code
+
+    def _affordable_cost_quantity(
+        self, order: Order, upper: float, base_price: float, available_size: float | None
+    ) -> float:
+        def affordable(quantity: float) -> bool:
+            price, _ = self._price_for_quantity(
+                order, quantity, base_price, available_size, quote=True
+            )
+            return self._validate_final_price(order, quantity, price)[0]
+
+        low = 0.0
+        if self.broker.share_type is ShareType.INTEGER:
+            high_int = int(upper)
+            low_int = 0
+            while low_int < high_int:
+                mid = (low_int + high_int + 1) // 2
+                if affordable(float(mid)):
+                    low_int = mid
+                else:
+                    high_int = mid - 1
+            return float(low_int)
+        high = upper
+        for _ in range(64):
+            mid = (low + high) / 2
+            if affordable(mid):
+                low = mid
+            else:
+                high = mid
+        # Gatekeeper allows a numerical cash tolerance. Retain a spendable buffer
+        # so binary-search rounding cannot turn a cash account negative.
+        price, _ = self._price_for_quantity(order, low, base_price, available_size, quote=True)
+        tolerance = (
+            0.0 if self.broker.short_cash_policy.value == "lock_notional" else CASH_TOLERANCE
+        )
+        return max(
+            0.0, low - (tolerance + 1e-8) / (price * self.broker.get_multiplier(order.asset))
+        )
 
     def _update_lock_notional_free_cash(
         self,

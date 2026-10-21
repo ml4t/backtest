@@ -97,6 +97,20 @@ def _comparison_checks(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def measurement_caption(performance: dict[str, Any]) -> str:
+    """Keep the measurement dates independent of later report generation."""
+    cohorts = performance["provenance"].get("measurement_cohorts")
+    if cohorts is None:
+        return f"Measured {performance['generated_at'][:10]}"
+    start = cohorts["backtest"]["started_at"][:10]
+    end = cohorts["backtest"]["completed_at"][:10]
+    backtest_date = start if start == end else f"{start} to {end}"
+    return (
+        f"Backtest measured {backtest_date}; reference measurements dated "
+        f"{cohorts['framework']['generated_at'][:10]} were retained unchanged"
+    )
+
+
 def render_claims(
     correctness: dict[str, Any],
     large_scale: dict[str, Any],
@@ -280,7 +294,7 @@ def render_claims(
             "|---|---|---:|---:|---:|",
             *performance_rows,
             "",
-            f"Measured {real_performance['generated_at'][:10]} on "
+            f"{measurement_caption(real_performance)}. Host: "
             f"`{environment['platform']}` with {environment['cpu_count']} logical CPUs. Each "
             "side used one isolated warm-up process and ten isolated measured processes. The "
             f"timer includes only the engine call; it excludes {excluded}. These measurements "

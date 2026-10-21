@@ -1,8 +1,19 @@
 """Pluggable commission and slippage models."""
 
+from __future__ import annotations
+
 import math
+from collections.abc import Callable, Mapping
 from copy import deepcopy
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+from datetime import datetime
+from types import MappingProxyType
+from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
+
+from .config import ExecutionPrice
+
+if TYPE_CHECKING:
+    from .types import Order
 
 # === Protocols ===
 
@@ -29,13 +40,175 @@ class SlippageModel(Protocol):
     ) -> float: ...
 
 
+@dataclass(frozen=True)
+class CommissionContext:
+    """A quote's actual fill increment and the order's previously committed fees."""
+
+    order_id: str | None
+    asset: str
+    signed_quantity: float
+    price: float
+    multiplier: float
+    filled_quantity: float
+    commission_paid: float
+    filled_notional: float
+
+
+@dataclass(frozen=True)
+class SlippageContext:
+    """Actual fill size, observed traded volume and already committed asset/bar volume."""
+
+    asset: str
+    quantity: float
+    price: float
+    traded_volume: float | None
+    volume_consumed: float
+    quoted_size: float | None
+    timestamp: datetime
+    bar_high: float | None = None
+    bar_low: float | None = None
+
+
+@dataclass(frozen=True)
+class VolatilityVolumeSlippage:
+    """Square-root impact from explicit completed-history ADV and annualized volatility.
+
+    The read-only statistics callback receives the asset and actual fill clock.
+    None or zero ADV selects the explicit 7.5bp insufficient-history convention.
+    Choose the high/low midpoint execution basis for the legacy futures method.
+    """
+
+    eta: float
+    statistics: Callable[[str, datetime], tuple[float, float] | None] | None = None
+    requires_traded_volume: ClassVar[bool] = True
+    requires_observed_ohlc: ClassVar[bool] = True
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.eta) or self.eta < 0:
+            raise ValueError("eta must be finite and nonnegative")
+        if self.statistics is not None and not callable(self.statistics):
+            raise TypeError("statistics must be a read-only callable or None")
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        raise TypeError("VolatilityVolumeSlippage requires an observed SlippageContext")
+
+    def __deepcopy__(self, memo):
+        return type(self)(self.eta, self.statistics)
+
+    def calculate_with_context(self, context: SlippageContext) -> float:
+        if any(
+            value is None or not math.isfinite(value) or value <= 0
+            for value in (context.bar_high, context.bar_low)
+        ):
+            raise ValueError("Volatility-volume impact requires observed positive high and low")
+        assert context.bar_high is not None and context.bar_low is not None
+        if context.bar_high < context.bar_low:
+            raise ValueError("Observed high cannot be below low")
+        values = (
+            self.statistics(context.asset, context.timestamp)
+            if self.statistics is not None
+            else None
+        )
+        if values is None:
+            return context.price * 7.5 / 10000.0
+        mean_volume, annualized_volatility = values
+        if (
+            not math.isfinite(mean_volume)
+            or mean_volume < 0
+            or not math.isfinite(annualized_volatility)
+            or annualized_volatility < 0
+        ):
+            raise ValueError("Impact statistics must be finite and nonnegative")
+        if mean_volume == 0:
+            return context.price * 7.5 / 10000.0
+        from .execution.impact import SquareRootImpact
+
+        return SquareRootImpact(
+            coefficient=self.eta / 10000.0, volatility=annualized_volatility
+        ).calculate(context.quantity, context.price, mean_volume, True)
+
+
+class AssetSlippage:
+    """Route stable keys to native models and explicit execution-price bases."""
+
+    def __init__(
+        self,
+        models: Mapping[str, SlippageModel],
+        *,
+        default: SlippageModel,
+        price_sources: Mapping[str, ExecutionPrice | str] | None = None,
+    ) -> None:
+        if not isinstance(default, SlippageModel) or any(
+            not isinstance(key, str) or not key or not isinstance(model, SlippageModel)
+            for key, model in models.items()
+        ):
+            raise TypeError("Asset slippage requires stable string keys and native SlippageModels")
+        if isinstance(default, AssetSlippage) or any(
+            isinstance(model, AssetSlippage) for model in models.values()
+        ):
+            raise TypeError("Declare one asset slippage routing table, without nested routes")
+        if any(not isinstance(key, str) or not key for key in (price_sources or {})):
+            raise ValueError("Execution-price sources require stable string asset keys")
+        self.models = MappingProxyType(dict(models))
+        self.default = default
+        self.price_sources = MappingProxyType(
+            {key: ExecutionPrice(value) for key, value in (price_sources or {}).items()}
+        )
+
+    def for_asset(self, asset: str) -> SlippageModel:
+        return self.models.get(asset, self.default)
+
+    @property
+    def requires_observed_ohlc(self) -> bool:
+        return any(
+            getattr(model, "requires_observed_ohlc", False)
+            for model in [self.default, *self.models.values()]
+        )
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        return self.for_asset(asset).calculate(asset, quantity, price, volume)
+
+    def calculate_with_context(self, context: SlippageContext) -> float:
+        return calculate_slippage(
+            self.for_asset(context.asset),
+            context.asset,
+            context.quantity,
+            context.price,
+            context.traded_volume,
+            context=context,
+        )
+
+
 def calculate_commission(
     model: CommissionModel,
     asset: str,
     quantity: float,
     price: float,
+    *,
+    order: Order | None = None,
+    multiplier: float = 1.0,
 ) -> float:
-    value = model.calculate(asset, quantity, price)
+    quote = getattr(model, "quote", None)
+    value = (
+        quote(
+            CommissionContext(
+                order.order_id if order is not None else None,
+                asset,
+                -abs(quantity)
+                if order is not None and order.side.value == "sell"
+                else abs(quantity),
+                price,
+                multiplier,
+                order.filled_quantity if order is not None else 0.0,
+                order.commission_paid if order is not None else 0.0,
+                abs((order.filled_price or 0.0) * order.filled_quantity * multiplier)
+                if order is not None
+                else 0.0,
+            )
+        )
+        if quote is not None
+        else model.calculate(asset, quantity, price)
+    )
     return _validate_nonnegative_model_output("commission", model, value)
 
 
@@ -44,15 +217,64 @@ def estimate_commission(
     asset: str,
     quantity: float,
     price: float,
+    *,
+    order: Order | None = None,
+    multiplier: float = 1.0,
 ) -> float:
     """Estimate a fee without advancing a stateful model's execution state."""
+    if type(model) is AssetCommission:
+        return estimate_commission(
+            model.models.get(asset, model.default),
+            asset,
+            quantity,
+            price,
+            order=order,
+            multiplier=multiplier,
+        )
     try:
         estimate_model = deepcopy(model)
     except Exception as exc:
         raise TypeError("commission model must support deepcopy for pre-trade estimates") from exc
     if estimate_model is model:
         raise TypeError("commission model deepcopy must return an independent instance")
-    return calculate_commission(estimate_model, asset, quantity, price)
+    return calculate_commission(
+        estimate_model, asset, quantity, price, order=order, multiplier=multiplier
+    )
+
+
+def quote_commission(
+    model: CommissionModel,
+    asset: str,
+    quantity: float,
+    price: float,
+    *,
+    order: Order | None = None,
+    multiplier: float = 1.0,
+) -> float:
+    """Quote without consuming mutable models; retain native stateless validation cost."""
+    if type(model) is AssetCommission:
+        return quote_commission(
+            model.models.get(asset, model.default),
+            asset,
+            quantity,
+            price,
+            order=order,
+            multiplier=multiplier,
+        )
+    if type(model) in (
+        NoCommission,
+        PercentageCommission,
+        PerShareCommission,
+        PerOrderCommission,
+        PerOrderPerShareCommission,
+        TieredCommission,
+        CombinedCommission,
+        FuturesCommission,
+    ):
+        return calculate_commission(
+            model, asset, quantity, price, order=order, multiplier=multiplier
+        )
+    return estimate_commission(model, asset, quantity, price, order=order, multiplier=multiplier)
 
 
 def calculate_slippage(
@@ -61,8 +283,15 @@ def calculate_slippage(
     quantity: float,
     price: float,
     volume: float | None,
+    *,
+    context: SlippageContext | None = None,
 ) -> float:
-    value = model.calculate(asset, quantity, price, volume)
+    contextual = getattr(model, "calculate_with_context", None) if context is not None else None
+    value = (
+        contextual(context)
+        if callable(contextual)
+        else model.calculate(asset, quantity, price, volume)
+    )
     return _validate_nonnegative_model_output("slippage", model, value)
 
 
@@ -112,6 +341,72 @@ class PerShareCommission:
 
     def calculate(self, asset: str, quantity: float, price: float) -> float:
         return max(abs(quantity) * self.per_share, self.minimum)
+
+
+class PerOrderCommission:
+    """Compose unit, notional and one-time fees with a cumulative order minimum."""
+
+    def __init__(
+        self,
+        per_share: float = 0.0,
+        rate: float = 0.0,
+        per_trade: float = 0.0,
+        minimum: float = 0.0,
+    ):
+        if any(
+            not math.isfinite(value) or value < 0 for value in (per_share, rate, per_trade, minimum)
+        ):
+            raise ValueError("Commission rates and minimum must be finite and nonnegative")
+        self.per_share, self.rate = per_share, rate
+        self.per_trade, self.minimum = per_trade, minimum
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        raise TypeError("Per-order commission requires a CommissionContext quote")
+
+    def quote(self, context: CommissionContext) -> float:
+        quantity = context.filled_quantity + abs(context.signed_quantity)
+        notional = context.filled_notional + abs(
+            context.signed_quantity * context.price * context.multiplier
+        )
+        total = quantity * self.per_share + notional * self.rate + self.per_trade
+        return max(0.0, max(total, self.minimum) - context.commission_paid)
+
+
+class PerOrderPerShareCommission(PerOrderCommission):
+    """Cumulative per-order minimum; each fill pays only the remaining amount due."""
+
+    def __init__(self, per_share: float = 0.0, minimum: float = 0.0):
+        super().__init__(per_share=per_share, minimum=minimum)
+
+
+class AssetCommission:
+    """Route explicit stable asset keys to existing native fee models.
+
+    Quote context, including committed fills and fees, is passed unchanged.
+    Missing mappings use the caller's required default model; symbols and asset
+    classes are never guessed from an identifier or contract multiplier.
+    """
+
+    def __init__(self, models: Mapping[str, CommissionModel], *, default: CommissionModel) -> None:
+        if not isinstance(default, CommissionModel) or any(
+            not isinstance(key, str) or not key or not isinstance(model, CommissionModel)
+            for key, model in models.items()
+        ):
+            raise TypeError("Asset fees require stable string keys and native CommissionModels")
+        self.models = dict(models)
+        self.default = default
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        return self.models.get(asset, self.default).calculate(asset, quantity, price)
+
+    def quote(self, context: CommissionContext) -> float:
+        model = self.models.get(context.asset, self.default)
+        quote = getattr(model, "quote", None)
+        return (
+            quote(context)
+            if quote is not None
+            else model.calculate(context.asset, context.signed_quantity, context.price)
+        )
 
 
 class TieredCommission:
@@ -286,6 +581,31 @@ class VolumeShareSlippage:
         impact = volume_fraction * self.impact_factor
         # Return per-unit price adjustment (not total dollars)
         return price * impact
+
+
+class CumulativeVolumeShareSlippage:
+    """Quadratic adverse impact using committed total absolute asset/bar participation.
+
+    This is distinct from the existing per-fill linear VolumeShareSlippage. A
+    participation cap belongs to ExecutionLimits, not this price-impact model.
+    """
+
+    requires_traded_volume = True
+
+    def __init__(self, price_impact: float = 0.1):
+        if not math.isfinite(price_impact) or price_impact < 0:
+            raise ValueError("price_impact must be finite and nonnegative")
+        self.price_impact = price_impact
+
+    def calculate(self, asset: str, quantity: float, price: float, volume: float | None) -> float:
+        raise TypeError("CumulativeVolumeShareSlippage requires SlippageContext")
+
+    def calculate_with_context(self, context: SlippageContext) -> float:
+        volume = context.traded_volume
+        if volume is None or not math.isfinite(volume) or volume <= 0:
+            raise ValueError("Cumulative volume impact requires positive observed traded volume")
+        participation = (context.volume_consumed + abs(context.quantity)) / volume
+        return context.price * self.price_impact * participation**2
 
 
 class FuturesSlippage:

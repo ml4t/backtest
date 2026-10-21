@@ -63,7 +63,7 @@
       "version": "3.1.1"
     }
   },
-  "generated_at": "2026-10-20T23:44:08.310261+00:00",
+  "generated_at": "2026-10-21T21:18:36.996605+00:00",
   "input_policy": {
     "float_quantum": "0.00000001",
     "rounding": "ROUND_HALF_EVEN",
@@ -704,7 +704,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 2.843364725005813,
+      "duration_seconds": 0.08962017396697775,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -1361,11 +1361,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d34babef0534a871f927ab6553a49d7b7e35a03283516b1741835d49381d2e0d"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "2f5818c2e97b42dbe4f5463411c72f08476090473ce3816efe7570fe9903e7b7",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.843364725005813,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -1374,7 +1387,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -2034,7 +2047,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 2.917321491986513,
+      "duration_seconds": 0.01016806298866868,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -2691,11 +2704,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "7db3751b770b7369c40f6b31fc757e7949b07dd5b56430e7226dc8db7d444e38"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "2f5818c2e97b42dbe4f5463411c72f08476090473ce3816efe7570fe9903e7b7",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.917321491986513,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -2704,7 +2730,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -2861,7 +2887,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 2.6639339959947392,
+      "duration_seconds": 0.0037516760057769716,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3009,11 +3035,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
           "scenario": "ad7292cedc685fa6c10032a0574f3e5da89b81dbb0f3a312cc2f5d83f5b454a1"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "5808747e0f08697b16ff9eabb735862c7499f1276db965617133c561afadc5b7",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.6639339959947392,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -3022,7 +3061,7 @@
         },
         "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -3179,7 +3218,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 2.7076404240215197,
+      "duration_seconds": 0.003958682005759329,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -3327,11 +3366,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
           "scenario": "2dea68c3a9472e95c15e7238928919fe01b4e63bfd3a14a5a9666ea89b86cc41"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "7dd8d74a91ffec338af817a7bd57ecdb818a9cbe09f4b48f8aa733ddf94ac2cf",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.7076404240215197,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -3340,7 +3392,7 @@
         },
         "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -4010,7 +4062,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 3.0360193719970994,
+      "duration_seconds": 0.009695525979623199,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -4671,11 +4723,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "93f5ba4a70377e12f472819a04fbceabb1a44df86108f5feed401a8499bd7b88"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "e9eeb5f76586ad333dbcea1924ca0f22bc1ac3880cc522a7d6ad0ee24f061bc4",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.0360193719970994,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -4684,7 +4749,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -5354,7 +5419,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 2.8195687139523216,
+      "duration_seconds": 0.010265327990055084,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -6015,11 +6080,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "523af2137e8233ef65d03ffb841e91525f65f7c3057b3111e86aedbf0a973fb7"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "abac4574c538456e533a52ffb91ec788c453d63bdbee10f2f914e45e1b1bc625",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.8195687139523216,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -6028,7 +6106,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -6688,7 +6766,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 2.912042445037514,
+      "duration_seconds": 0.01101921801455319,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -7345,11 +7423,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "0eee68a74bb2c999c23582d129c81e91ad51b48af637e051507f8a40979c2871"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "c0134e6d81fc29a3d1c8eef3c448bfbe19e013085143b7af109e3a047f9041bd",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.912042445037514,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -7358,7 +7449,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -8018,7 +8109,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 2.8280265089706518,
+      "duration_seconds": 0.010470324952621013,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -8675,11 +8766,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d2d36326d5a7ec88f577088205574b8a9f6dab9661ed6813d190c138c4c8208f"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "50e6285849b39b839d2aa6a31ac14ac3b40cd7838f95ea2cc35db6d3963f42a3",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.8280265089706518,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -8688,7 +8792,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -8892,7 +8996,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 2.9573397819767706,
+      "duration_seconds": 0.009031262015923858,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9093,11 +9197,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
           "scenario": "80d8dea99e845ad7f708cc42fb94f66feababcf8b6814e3096300af1f4b709c2"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "11ba872866f56490b37e6e6a7cc72f8862d7eeaac360eec42f1b3c5da4f3cc1e",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.9573397819767706,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -9106,7 +9223,7 @@
         },
         "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -9367,7 +9484,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 3.4624355050036684,
+      "duration_seconds": 0.008731961017474532,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -9625,11 +9742,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "27979784dbb2f9dd6cf72c0d89ea956d49003ed83a57ed254cb6a2cbd234b6a5",
           "scenario": "ca329113ef7eae6ef6cb075659587a244d4808ab35df74a891dcea2db9151f0e"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "91abad0afd4efa5d7355f260e7bbeeebf8e6bdf8521394cc82a7f0af267f5ec2",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.4624355050036684,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -9638,7 +9768,7 @@
         },
         "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -10298,7 +10428,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 3.5117616200004704,
+      "duration_seconds": 0.012994546967092901,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -10955,11 +11085,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "88c5993243d7dfa17cc8ed4d7979639e4846f1a3d5a9f1b62007e934bd9f73b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "2176e4bef37299efd7123025ba564acad067c9521dbac84274cc65b97183648e",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.5117616200004704,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -10968,7 +11111,7 @@
         },
         "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -11172,7 +11315,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 6.289291555003729,
+      "duration_seconds": 0.008681219012942165,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11373,11 +11516,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "15f4500f48791f0c67d7c57f2554d0689a35a6dd71e07a8117de510acf106770",
           "scenario": "51166032bf2c4582113ae77995f8db134af72ee7ccdca2dfa4b989fc48295e33"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "603b8d5d96a1393f7b625d280e1cfd3aa8c117099cdbb063280c5711aa2e6fea",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 6.289291555003729,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -11386,7 +11542,7 @@
         },
         "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -11533,7 +11689,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 3.0287161140004173,
+      "duration_seconds": 0.004597606952302158,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11677,11 +11833,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
           "scenario": "b39049d150f6fc2c71a16c642dc255e53e92c4840e949226036d175bccc4e1b0"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "28d50d5888760386ee1c54406041c9d1033f148afa145c52565a9bbb226899a1",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.0287161140004173,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -11690,7 +11859,7 @@
         },
         "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -11837,7 +12006,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 2.7510447049862705,
+      "duration_seconds": 0.004962526028975844,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -11981,11 +12150,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
           "scenario": "875c440f742f71bb0793ff5c4c6a1a0080b961930e6d2a24493cfa3e4c1d80b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "eb589e03cd0fbf9390d78250208bd156a312f945d250ea1d95650297e6f85a41",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.7510447049862705,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -11994,7 +12176,7 @@
         },
         "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -12141,7 +12323,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 2.7063021499780007,
+      "duration_seconds": 0.004702137957792729,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -12285,11 +12467,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
           "scenario": "fccddcd3455a97b6ce7c416cc2b41672c9d79511da75211739c16c90e940c969"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "9e0b12517dafed146afd959fabeffd01a9c2ab0c1c09fecdb0f09e6628eb528b",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.7063021499780007,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -12298,7 +12493,7 @@
         },
         "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -12901,7 +13096,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 2.958171665959526,
+      "duration_seconds": 0.06617337500210851,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -13501,11 +13696,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "647d9a4a1a219599288faf756e995322ffee249ad29d3fbb88d3b1859249421a",
           "scenario": "0198df8bd89459f57967743d1f22954c5d08e535d28d96d9ab83461ca73d02b9"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "2ced5893e59dc6b837eb9a8023afafb63556bf5ddc72981db13d36708513a715",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.958171665959526,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -13514,7 +13722,7 @@
         },
         "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -47804,7 +48012,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 3.244002507010009,
+      "duration_seconds": 0.19817764702020213,
       "framework": "vectorbt_pro",
       "framework_result": {
         "capabilities": {
@@ -82091,11 +82299,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d0e0852cea9e321d72793f0f7fd7479d70d67ea3b367cbab817e4e3067af4e32"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "f973b4b8a596c1256882b3785087bb453d90092f4d0471f3b5c74f284fc51209",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.244002507010009,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "2026.6.27",
@@ -82104,7 +82325,7 @@
         },
         "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -82764,7 +82985,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 4.466971259971615,
+      "duration_seconds": 0.010531392006669194,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -83421,11 +83642,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d34babef0534a871f927ab6553a49d7b7e35a03283516b1741835d49381d2e0d"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "6433aabba709e3ddaae58c4da9602edd0597dd03e4540c670b53096b38409f79",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.466971259971615,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -83434,7 +83668,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -84094,7 +84328,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 4.347742443962488,
+      "duration_seconds": 0.01178873103344813,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -84751,11 +84985,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "7db3751b770b7369c40f6b31fc757e7949b07dd5b56430e7226dc8db7d444e38"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "6433aabba709e3ddaae58c4da9602edd0597dd03e4540c670b53096b38409f79",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.347742443962488,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -84764,7 +85011,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -84921,7 +85168,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 4.18407858198043,
+      "duration_seconds": 0.004907615017145872,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85069,11 +85316,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
           "scenario": "ad7292cedc685fa6c10032a0574f3e5da89b81dbb0f3a312cc2f5d83f5b454a1"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "6d3c7ad90492c370a9a1b04c109444cbe4b3d02cd0e5dd8b5a2aeac087da801c",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.18407858198043,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -85082,7 +85342,7 @@
         },
         "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -85239,7 +85499,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 4.157374550995883,
+      "duration_seconds": 0.004599164007231593,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -85387,11 +85647,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "3b0720d05e9e5869aa6f01432d17918e2db8c0d80810310e6c39c8bf82d1aee0",
           "scenario": "2dea68c3a9472e95c15e7238928919fe01b4e63bfd3a14a5a9666ea89b86cc41"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "eecca712dae2499f1e7829187955ad3ea141c7930031e5a786916370c6d3b651",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.157374550995883,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -85400,7 +85673,7 @@
         },
         "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -86070,7 +86343,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 4.770457033009734,
+      "duration_seconds": 0.012669074989389628,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -86731,11 +87004,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "93f5ba4a70377e12f472819a04fbceabb1a44df86108f5feed401a8499bd7b88"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "89c0057ecaf41ed5b69c1ae1252a34afb22f1b0ede2e16399957b8ce1469cbf7",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.770457033009734,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -86744,7 +87030,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -87418,7 +87704,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 3.996223677007947,
+      "duration_seconds": 0.012650677002966404,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -88075,11 +88361,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "0eee68a74bb2c999c23582d129c81e91ad51b48af637e051507f8a40979c2871"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "901d833adc7140b73020c9b3c0b86eae467269616e614ae27efb7b3ff6c00791",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.996223677007947,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -88088,7 +88387,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -88748,7 +89047,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 4.66941015800694,
+      "duration_seconds": 0.012150301015935838,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89405,11 +89704,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d2d36326d5a7ec88f577088205574b8a9f6dab9661ed6813d190c138c4c8208f"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "0c9efe42628fdca78f47ea7cc604af15740cdcdc093e5bb73e0db3aa73b4a542",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.66941015800694,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -89418,7 +89730,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -89622,7 +89934,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 4.70585797005333,
+      "duration_seconds": 0.010196094983257353,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -89823,11 +90135,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
           "scenario": "80d8dea99e845ad7f708cc42fb94f66feababcf8b6814e3096300af1f4b709c2"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "98cdd2ba7f7000ff0001079e9ed69773af513fdff4f2a0231f2ea6e9ea39a11b",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.70585797005333,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -89836,7 +90161,7 @@
         },
         "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -90097,7 +90422,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 4.220745711994823,
+      "duration_seconds": 0.010462345962878317,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -90355,11 +90680,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "27979784dbb2f9dd6cf72c0d89ea956d49003ed83a57ed254cb6a2cbd234b6a5",
           "scenario": "ca329113ef7eae6ef6cb075659587a244d4808ab35df74a891dcea2db9151f0e"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "e5b0f6cec078b9390329a6f1bd97a76736b5491e95c9fdf246fa97d22912a5ae",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.220745711994823,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -90368,7 +90706,7 @@
         },
         "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -91028,7 +91366,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 3.9131186620215885,
+      "duration_seconds": 0.013938658055849373,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -91685,11 +92023,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "88c5993243d7dfa17cc8ed4d7979639e4846f1a3d5a9f1b62007e934bd9f73b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "15d176bbc585359f2be9c324923e8d799a1db77082c4789f34157a1ced1c7601",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.9131186620215885,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -91698,7 +92049,7 @@
         },
         "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -91902,7 +92253,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 4.321617954003159,
+      "duration_seconds": 0.011099896975792944,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92103,11 +92454,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "85ef0c7c62fc2cf1f841196fce585253cbfa5fe4d3beb0e6c204003994d7f28f",
           "scenario": "51166032bf2c4582113ae77995f8db134af72ee7ccdca2dfa4b989fc48295e33"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "da2cbe9de5fa6e37c258188699e723490801ef3e7d2c9a681ebc950bf97a9b1e",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.321617954003159,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -92116,7 +92480,7 @@
         },
         "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -92263,7 +92627,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 4.1145756800542586,
+      "duration_seconds": 0.0062197609804570675,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92407,11 +92771,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
           "scenario": "b39049d150f6fc2c71a16c642dc255e53e92c4840e949226036d175bccc4e1b0"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "a19433da93f822eff28188bb26958cb4e8c8818dff7da2a08197f013ddcd70b5",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.1145756800542586,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -92420,7 +92797,7 @@
         },
         "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -92567,7 +92944,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 4.053582602005918,
+      "duration_seconds": 0.00601175898918882,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -92711,11 +93088,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
           "scenario": "875c440f742f71bb0793ff5c4c6a1a0080b961930e6d2a24493cfa3e4c1d80b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "4f3dbd02c9622f91ddd7ede167cf11b8a4af2bf70332ad14292301cc90ad7d14",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.053582602005918,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -92724,7 +93114,7 @@
         },
         "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -92871,7 +93261,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 4.115586545027327,
+      "duration_seconds": 0.004916516016237438,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -93015,11 +93405,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
           "scenario": "fccddcd3455a97b6ce7c416cc2b41672c9d79511da75211739c16c90e940c969"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "7517439adc1feb4afd08e9874173c163ab7942f901cb50c279a0abb8e49ebedb",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.115586545027327,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -93028,7 +93431,7 @@
         },
         "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -93631,7 +94034,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 4.071927381970454,
+      "duration_seconds": 0.07001745101297274,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -94231,11 +94634,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "b5511731b0b2768bf962b3ac1d81c21a82f96d04896692f85bef5e5030ce2b1c",
           "scenario": "0198df8bd89459f57967743d1f22954c5d08e535d28d96d9ab83461ca73d02b9"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "1d31e3aa125f56629c7132a1f0ccaea822c541faf86a7d5446c3cc07ac42daeb",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.071927381970454,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -94244,7 +94660,7 @@
         },
         "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -128534,7 +128950,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 4.6611218429752626,
+      "duration_seconds": 0.1982594389701262,
       "framework": "vectorbt_oss",
       "framework_result": {
         "capabilities": {
@@ -162821,11 +163237,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d0e0852cea9e321d72793f0f7fd7479d70d67ea3b367cbab817e4e3067af4e32"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "38befff1191450c274bf66a8fa1eeb7c450a723bf7d0c02d157eb2b2821f3bde",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 4.6611218429752626,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.1.0",
@@ -162834,7 +163263,7 @@
         },
         "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -163514,7 +163943,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 0.29388371598906815,
+      "duration_seconds": 0.014625462994445115,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -164193,11 +164622,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d34babef0534a871f927ab6553a49d7b7e35a03283516b1741835d49381d2e0d"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "f33359a2404d554dde24c4084e8e29f96d7d9ea77568e03fb71a1983817f8ddd",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.29388371598906815,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -164206,7 +164648,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -164886,7 +165328,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 0.28819882398238406,
+      "duration_seconds": 0.011173086997587234,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165565,11 +166007,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "7db3751b770b7369c40f6b31fc757e7949b07dd5b56430e7226dc8db7d444e38"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "f33359a2404d554dde24c4084e8e29f96d7d9ea77568e03fb71a1983817f8ddd",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.28819882398238406,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -165578,7 +166033,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -165736,7 +166191,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 0.34272589796455577,
+      "duration_seconds": 0.004497093032114208,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -165885,11 +166340,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "ad7292cedc685fa6c10032a0574f3e5da89b81dbb0f3a312cc2f5d83f5b454a1"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "c8c9ac09ca0692092fd21833172dd595c2c8e3abfae002609f28451c5f56b3d6",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.34272589796455577,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -165898,7 +166366,7 @@
         },
         "input_digest": "02743db0d03a02ec414e579929e5e4729b5f99124ab2a41bb234adf93626f62a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -166056,7 +166524,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 0.35172796802362427,
+      "duration_seconds": 0.005394526990130544,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -166205,11 +166673,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "2dea68c3a9472e95c15e7238928919fe01b4e63bfd3a14a5a9666ea89b86cc41"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "659f60630ca1b0f6acff8341a623ef5ea580b6a6786bb2194c8e8421f2db9533",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.35172796802362427,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -166218,7 +166699,7 @@
         },
         "input_digest": "c013a16b8902a5599e53c27dae34849fcf327b4e89ec69d00c951903578f948a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -166908,7 +167389,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 0.2814632199588232,
+      "duration_seconds": 0.01165497797774151,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -167589,11 +168070,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "93f5ba4a70377e12f472819a04fbceabb1a44df86108f5feed401a8499bd7b88"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "dac577a56b8da5ce37f1e4ef0620edaabc27e77c753fdf1dd78dd66e4042dd29",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.2814632199588232,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -167602,7 +168096,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -168292,7 +168786,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 0.2849019920104183,
+      "duration_seconds": 0.011484872025903314,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -168973,11 +169467,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "523af2137e8233ef65d03ffb841e91525f65f7c3057b3111e86aedbf0a973fb7"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "0beaa109c2c0d711afdad6d0b3f602d28b10d63f20f3303af9e5d34cec892294",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.2849019920104183,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -168986,7 +169493,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -169666,7 +170173,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 0.27970587101299316,
+      "duration_seconds": 0.01187856198521331,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -170345,11 +170852,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "0eee68a74bb2c999c23582d129c81e91ad51b48af637e051507f8a40979c2871"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "fab97038248d6ede162c5af8082f82362632aed5f899b8f22660cb757e32dea9",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.27970587101299316,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -170358,7 +170878,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -171038,7 +171558,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 0.27565989398863167,
+      "duration_seconds": 0.011700175004079938,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -171717,11 +172237,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d2d36326d5a7ec88f577088205574b8a9f6dab9661ed6813d190c138c4c8208f"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "9fc6bd64235cc9d1c13d4cd6f5915d55a511e62f20aaa46fa9192cb0a70e4406",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.27565989398863167,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -171730,7 +172263,7 @@
         },
         "input_digest": "465e20dbdd050a15410d58b7391e304491566407369632fbda07da88e4cc1cee",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -171936,7 +172469,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 0.3075221630278975,
+      "duration_seconds": 0.01077821000944823,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172139,11 +172672,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "80d8dea99e845ad7f708cc42fb94f66feababcf8b6814e3096300af1f4b709c2"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "a3a9dd6bbe9b6567e459d5bf69df72d82ef6169193f4659d7b977b245fe28f19",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.3075221630278975,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -172152,7 +172698,7 @@
         },
         "input_digest": "0857d4181ff37765143cd13fb7b67ead75a163a9ece87f9d258bb436175f2568",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -172416,7 +172962,7 @@
         "scenario_id": "10"
       },
       "detail": null,
-      "duration_seconds": 0.3131255969638005,
+      "duration_seconds": 0.012846478959545493,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -172677,11 +173223,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "ca329113ef7eae6ef6cb075659587a244d4808ab35df74a891dcea2db9151f0e"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "bc2d6f260f07008f244176a313427e656cd5e07dd403441c5e59a95f65259b77",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.3131255969638005,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -172690,7 +173249,7 @@
         },
         "input_digest": "23496f457ab5fcdf8c02626db8af05c791278cc307dff08599f673c376e9116c",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -173360,7 +173919,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 0.3341918339719996,
+      "duration_seconds": 0.01565261703217402,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174027,11 +174586,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "88c5993243d7dfa17cc8ed4d7979639e4846f1a3d5a9f1b62007e934bd9f73b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "ef14c906e66de5100d95143a61f61e41404fb3f0e8c406f60c5364469084db14",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.3341918339719996,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -174040,7 +174612,7 @@
         },
         "input_digest": "24a69cd2961c5f77332e19aa92432884a792bd64d1e045dac33f1922902e3ba3",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -174246,7 +174818,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 0.27755306102335453,
+      "duration_seconds": 0.009805987996514887,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174449,11 +175021,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "573f73f81275679129b0b0cda5fdf37aa7c8dadf009a5f5aca55fb7be9f9985e",
           "scenario": "51166032bf2c4582113ae77995f8db134af72ee7ccdca2dfa4b989fc48295e33"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "a264bdcddaf7ddc07c06d439a3add2a3124c7b510fe3000e97febd7f42fb7d69",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.27755306102335453,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -174462,7 +175047,7 @@
         },
         "input_digest": "06b9362c086c33e65085233ecbe78d43de5c0f00950eb8b19d6df6e89ba76d3b",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -174610,7 +175195,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 0.2862107259570621,
+      "duration_seconds": 0.005735265032853931,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -174755,11 +175340,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "b39049d150f6fc2c71a16c642dc255e53e92c4840e949226036d175bccc4e1b0"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "9d4f5c55e0fb61a77563c5a49b9b6dfbb92945f0ad2e60477b4fa2807d466d0e",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.2862107259570621,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -174768,7 +175366,7 @@
         },
         "input_digest": "8948480a577fa0d6a769f0af879559553b872df5c12ebbdc621237db201f1d99",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -174916,7 +175514,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 0.2735937559627928,
+      "duration_seconds": 0.006374404998496175,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175061,11 +175659,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "875c440f742f71bb0793ff5c4c6a1a0080b961930e6d2a24493cfa3e4c1d80b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "420b21aabaf70f17b3deae7330720a96fbf9f615a3620416dc60a1a8c13eaf10",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.2735937559627928,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -175074,7 +175685,7 @@
         },
         "input_digest": "ea9583aa3a0de9f4e92d22968932fd83ac3e7d6e8d8a3e4f689e59868390c7d2",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -175222,7 +175833,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 0.28835834696656093,
+      "duration_seconds": 0.005402395036071539,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -175367,11 +175978,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "fccddcd3455a97b6ce7c416cc2b41672c9d79511da75211739c16c90e940c969"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "e111091c6a422d431078b5a1abf92d94cf04a1b65491fde2cf66e8183346962e",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.28835834696656093,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -175380,7 +176004,7 @@
         },
         "input_digest": "a11960a1bd3f521902fe84af312597b4c7928f97c2dd5b0b37b898d5a00ce3e6",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -175992,7 +176616,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 0.44882973801577464,
+      "duration_seconds": 0.07342222396982834,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -176601,11 +177225,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "6a425065c946d387fafc9cb9978bb86d7754e617273669247cf1149fbd23cc03",
           "scenario": "0198df8bd89459f57967743d1f22954c5d08e535d28d96d9ab83461ca73d02b9"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "c9662af0236e2a062feae04782f4081baa9e37a607f39c5c2df246457d7e9966",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.44882973801577464,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -176614,7 +177251,7 @@
         },
         "input_digest": "ffd7241a6fbac9130b1d3b499285d0df2610825316987918d110592cbf847c7d",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -212104,7 +212741,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 0.6910627880133688,
+      "duration_seconds": 0.20845820900285617,
       "framework": "backtrader",
       "framework_result": {
         "capabilities": {
@@ -247593,11 +248230,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d0e0852cea9e321d72793f0f7fd7479d70d67ea3b367cbab817e4e3067af4e32"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "399f6ee306898268bd7106d76aa5a16c18d9ee7e2351baae7e5f72829dba600b",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 0.6910627880133688,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "1.9.78.123",
@@ -247606,7 +248256,7 @@
         },
         "input_digest": "4fb3be3cba6d7c832eeb1fd8c72523b5260ea67fa5ecf3bceeb8e21256e0f998",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -247981,7 +248631,7 @@
         "scenario_id": "01"
       },
       "detail": null,
-      "duration_seconds": 2.7562286690226756,
+      "duration_seconds": 0.13344809698173776,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -248357,11 +249007,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d34babef0534a871f927ab6553a49d7b7e35a03283516b1741835d49381d2e0d"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "badad89d01738bb6c7f43836d0f80675dbd621f1ead8aa2b293b5a7f1566d80a",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.7562286690226756,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -248370,7 +249033,7 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -248745,7 +249408,7 @@
         "scenario_id": "02"
       },
       "detail": null,
-      "duration_seconds": 2.6132107520243153,
+      "duration_seconds": 0.008937940001487732,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249121,11 +249784,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "7db3751b770b7369c40f6b31fc757e7949b07dd5b56430e7226dc8db7d444e38"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "badad89d01738bb6c7f43836d0f80675dbd621f1ead8aa2b293b5a7f1566d80a",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.6132107520243153,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -249134,7 +249810,7 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -249291,7 +249967,7 @@
         "scenario_id": "03"
       },
       "detail": null,
-      "duration_seconds": 2.450278503005393,
+      "duration_seconds": 0.005898670991882682,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249443,11 +250119,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "16de00f1f72fcdd0199f55a77aaf5fe9c2e99450ae25a5350bd854eebf3896f5",
           "scenario": "ad7292cedc685fa6c10032a0574f3e5da89b81dbb0f3a312cc2f5d83f5b454a1"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "064668d75c5f54270041ffe971767bd262842f9d15efb79e2d7b85d93ccc6d62",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.450278503005393,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -249456,7 +250145,7 @@
         },
         "input_digest": "2ade3aa0a65bc5315f2297bc8bbc19b45dfdb8db50e52d56fc85ecb4a82facdd",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -249613,7 +250302,7 @@
         "scenario_id": "04"
       },
       "detail": null,
-      "duration_seconds": 2.6091814389801584,
+      "duration_seconds": 0.0043976089800708,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -249765,11 +250454,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "16de00f1f72fcdd0199f55a77aaf5fe9c2e99450ae25a5350bd854eebf3896f5",
           "scenario": "2dea68c3a9472e95c15e7238928919fe01b4e63bfd3a14a5a9666ea89b86cc41"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "ad674c21204cca103b1e6d66d6d4b169bda3d0a063b7e3a809ae7c0d4f3e1318",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.6091814389801584,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -249778,7 +250480,7 @@
         },
         "input_digest": "f576ca0b7380cdcf6eb6c99d5b8467e796d9811d6fb1cd66191df1688a948b62",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -250163,7 +250865,7 @@
         "scenario_id": "05"
       },
       "detail": null,
-      "duration_seconds": 3.0865474740276113,
+      "duration_seconds": 0.00922431901562959,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -250543,11 +251245,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "93f5ba4a70377e12f472819a04fbceabb1a44df86108f5feed401a8499bd7b88"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "dc2c2fe943dce75b070b5e6e2f65536e79235e4652045e001edef5ad9bfbac81",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.0865474740276113,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -250556,7 +251271,7 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -250941,7 +251656,7 @@
         "scenario_id": "06"
       },
       "detail": null,
-      "duration_seconds": 2.754249197023455,
+      "duration_seconds": 0.009337804978713393,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -251321,11 +252036,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "523af2137e8233ef65d03ffb841e91525f65f7c3057b3111e86aedbf0a973fb7"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "3d80471e2df41fe563272f9630d899bcb667d6e724347a38bd0c1af2ca276482",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.754249197023455,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -251334,7 +252062,7 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -251709,7 +252437,7 @@
         "scenario_id": "07"
       },
       "detail": null,
-      "duration_seconds": 2.694102247012779,
+      "duration_seconds": 0.008960634004324675,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252085,11 +252813,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "0eee68a74bb2c999c23582d129c81e91ad51b48af637e051507f8a40979c2871"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "6add1b70c9b08bebc4bb1116d1cbee78e217a431c0343216ad899faf467508a5",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.694102247012779,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -252098,7 +252839,7 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -252473,7 +253214,7 @@
         "scenario_id": "08"
       },
       "detail": null,
-      "duration_seconds": 2.6051290840259753,
+      "duration_seconds": 0.00895707804011181,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -252849,11 +253590,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d2d36326d5a7ec88f577088205574b8a9f6dab9661ed6813d190c138c4c8208f"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "87d45ddf4557cde9f31e5a170d4730d0d8089c7889543adea40d5a7130b8abcc",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.6051290840259753,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -252862,7 +253616,7 @@
         },
         "input_digest": "1e10efa2535c6df89cf6723633fd6f36e07a7f3449632f4aebaa518c1afade05",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -253066,7 +253820,7 @@
         "scenario_id": "09"
       },
       "detail": null,
-      "duration_seconds": 2.422048917040229,
+      "duration_seconds": 0.008050036965869367,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -253271,11 +254025,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
           "scenario": "80d8dea99e845ad7f708cc42fb94f66feababcf8b6814e3096300af1f4b709c2"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "290da14a36710a3719ec6833418cf51c8d19066b89e9731c6ec34a0dc64bd857",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.422048917040229,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -253284,7 +254051,7 @@
         },
         "input_digest": "52803556b6f294e3ad1223585e297f6dab81add8ca8cf22db7ed227dc14fe627",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -253673,7 +254440,7 @@
         "scenario_id": "11"
       },
       "detail": null,
-      "duration_seconds": 2.7501681330031715,
+      "duration_seconds": 0.011376149021089077,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254049,11 +254816,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "8901a4a7a750c26fb43ceb5d89b4c6ccf9279503da8659b8398cce30d90c8d9c",
           "scenario": "88c5993243d7dfa17cc8ed4d7979639e4846f1a3d5a9f1b62007e934bd9f73b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "78573f48c5b08fd20b72ba1d0595e6247a10faa2af65752792ec372274aebb73",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.7501681330031715,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -254062,7 +254842,7 @@
         },
         "input_digest": "8a8791a9d96df21d21b4fa14ebf111ea1417ec8424fd87ac9b4b79515ca6c952",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -254266,7 +255046,7 @@
         "scenario_id": "12"
       },
       "detail": null,
-      "duration_seconds": 2.582824372977484,
+      "duration_seconds": 0.008594569051638246,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254471,11 +255251,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "1d86423ea9c4ce2c32fc3b60b01566b4a0fe7f5629ee4cf2bf6899fd4d728f69",
           "scenario": "51166032bf2c4582113ae77995f8db134af72ee7ccdca2dfa4b989fc48295e33"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "c5d810b889bb3d9882d9c06430fdb74056cc07814f7885527ae4eab8905a862a",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.582824372977484,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -254484,7 +255277,7 @@
         },
         "input_digest": "ad5a0b9abf3e7e3ae35e06811443d816a29ac95b66e0bc7ce6b49a175f1e5fce",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -254631,7 +255424,7 @@
         "scenario_id": "13"
       },
       "detail": null,
-      "duration_seconds": 2.456977926020045,
+      "duration_seconds": 0.005263995961286128,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -254779,11 +255572,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
           "scenario": "b39049d150f6fc2c71a16c642dc255e53e92c4840e949226036d175bccc4e1b0"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "64617304f97513fc047956964571746c09832cbd2c11d73cdc6dc1aaf6f050e2",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.456977926020045,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -254792,7 +255598,7 @@
         },
         "input_digest": "bc94952cbe0b0c493e4a5599ddcd00a92412a9c8c838ea8e5c02d84d217baf0c",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -254939,7 +255745,7 @@
         "scenario_id": "14"
       },
       "detail": null,
-      "duration_seconds": 2.4415812700171955,
+      "duration_seconds": 0.00558005494531244,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255087,11 +255893,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
           "scenario": "875c440f742f71bb0793ff5c4c6a1a0080b961930e6d2a24493cfa3e4c1d80b5"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "da8662f57dd17ae534ab5cf7eb2a80f9a75fdf55cc7c34e498bef86aaadace7c",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.4415812700171955,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -255100,7 +255919,7 @@
         },
         "input_digest": "a0bd681ff924f45192415219403b02e639df271a2aa5987bb9b1e263b2d8c88a",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -255247,7 +256066,7 @@
         "scenario_id": "15"
       },
       "detail": null,
-      "duration_seconds": 2.3367363910074346,
+      "duration_seconds": 0.01776079199044034,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -255395,11 +256214,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
           "scenario": "fccddcd3455a97b6ce7c416cc2b41672c9d79511da75211739c16c90e940c969"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "224b3fcc39961447cd243abdc8c59faaa3bb5b410f4429d76046b20377a0fdfa",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 2.3367363910074346,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -255408,7 +256240,7 @@
         },
         "input_digest": "ce9cac417809758597595322703b30800145707fa0db44bd7f2cd0775790c114",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -255783,7 +256615,7 @@
         "scenario_id": "16"
       },
       "detail": null,
-      "duration_seconds": 3.097910398966633,
+      "duration_seconds": 0.05281390802701935,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -256159,11 +256991,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "94534fbfeca18ae041b780a18fbfe6884c21c0ce8c84d15d1d8e2096ba59cce7",
           "scenario": "0198df8bd89459f57967743d1f22954c5d08e535d28d96d9ab83461ca73d02b9"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "668c95bf5333bfef2e4fc3d2b1a3b63b18b8a45f86593b8189d10f57979308d4",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.097910398966633,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -256172,7 +257017,7 @@
         },
         "input_digest": "88cfc732983d3fa783e181fd4c97f8d95f7833e20dd03de0c201aaa85e83ca8b",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {
@@ -275471,7 +276316,7 @@
         "scenario_id": "17"
       },
       "detail": null,
-      "duration_seconds": 3.423406033020001,
+      "duration_seconds": 0.12826891796430573,
       "framework": "zipline",
       "framework_result": {
         "capabilities": {
@@ -294771,11 +295616,24 @@
           "canonical_records": "fa1d9846bdc895cf62e6435097a8953d131ac16f6ae910d41ba81a5090c43707",
           "capabilities": "dd0f50965982db8aae711f850740fc1d26c5f09d8b7c3d24221b347a7e14c8aa",
           "comparator": "de6683dd96cab7fc9ce005f4651b7de359b8ddfcd6402b543960133ca35b0f5e",
-          "engine": "ad027d4fe31424b1dabbdc61f45393c1fd1760b09987f9463c195796281ce06c",
+          "engine": "d1aff90984b7b303d9e6bf644d4d17e4dd6cb21d905f17905cd9db8db4204837",
           "manifest": "38e64faa733ac8412b0a1cabec5357be229852f19b432f2f215a7bf20f3a2780",
           "ml4t_runner": "6e9753811241863f59fc6607f315237aa1caec673372ef3b3a85fc959cf426e0",
           "profile": "4d2cacb23e64dacdbb2eda228691671d3a5d327dbbdd899de310551b244bae54",
           "scenario": "d0e0852cea9e321d72793f0f7fd7479d70d67ea3b367cbab817e4e3067af4e32"
+        },
+        "framework_reference": {
+          "execution": "reused_immutable_framework_result_not_rerun",
+          "framework_result_sha256": "0e47782feb45979eeac4cd995b6ad542fe55f2ea9f263262661d26d97b0dbb3f",
+          "generated_at": "2026-10-20T23:44:08.310261+00:00",
+          "original_comparison_duration_seconds": 3.423406033020001,
+          "original_python": {
+            "implementation": "cpython",
+            "version": "3.12.11"
+          },
+          "report_git_revision": "da223f904cfa03744152311e3c617c15fdc1ddcd",
+          "report_path": "validation/CORRECTNESS_RESULTS.json",
+          "report_sha256": "b9dfd6ed66130ed5cb2e6dc9685d64ee79085fedc55190cf8a6e1c3e647239c2"
         },
         "framework_target": {
           "actual_version": "3.1.1",
@@ -294784,7 +295642,7 @@
         },
         "input_digest": "6fdd33a401576a2adde590f2f8d5986f5893e4663336033ba6c0f8f221d5d526",
         "ml4t": {
-          "commit": "64f4ace862474aca38651aa45c84dcc1a3ab88da",
+          "commit": "875da3923de62feefa1fcfa4df6331c8810f8ede",
           "dirty": false
         },
         "python": {

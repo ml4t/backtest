@@ -1,0 +1,161 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "calendar": "NYSE",
+  "asset_sids": [
+    7,
+    8
+  ],
+  "cases": {
+    "fail": {
+      "trace": [
+        {
+          "timestamp": "2025-07-01T20:00:00+00:00",
+          "restricted": [
+            false,
+            true
+          ],
+          "can_trade": [
+            true,
+            false
+          ],
+          "submitted": [
+            7
+          ],
+          "rejected": [
+            8
+          ]
+        },
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "restricted": [
+            true,
+            true
+          ],
+          "can_trade": [
+            false,
+            false
+          ],
+          "submitted": [],
+          "rejected": [
+            7,
+            8
+          ]
+        },
+        {
+          "timestamp": "2025-07-03T17:00:00+00:00",
+          "restricted": [
+            false,
+            true
+          ],
+          "can_trade": [
+            true,
+            false
+          ],
+          "submitted": [
+            7
+          ],
+          "rejected": [
+            8
+          ]
+        }
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "sid": 7,
+          "amount": 1,
+          "price": 101.0505
+        }
+      ],
+      "cash": [
+        1000.0,
+        898.9485,
+        898.9485
+      ]
+    },
+    "log": {
+      "trace": [
+        {
+          "timestamp": "2025-07-01T20:00:00+00:00",
+          "restricted": [
+            false,
+            true
+          ],
+          "can_trade": [
+            true,
+            false
+          ],
+          "submitted": [
+            7,
+            8
+          ],
+          "rejected": []
+        },
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "restricted": [
+            true,
+            true
+          ],
+          "can_trade": [
+            false,
+            false
+          ],
+          "submitted": [
+            7,
+            8
+          ],
+          "rejected": []
+        },
+        {
+          "timestamp": "2025-07-03T17:00:00+00:00",
+          "restricted": [
+            false,
+            true
+          ],
+          "can_trade": [
+            true,
+            false
+          ],
+          "submitted": [
+            7,
+            8
+          ],
+          "rejected": []
+        }
+      ],
+      "fills": [
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "sid": 7,
+          "amount": 1,
+          "price": 101.0505
+        },
+        {
+          "timestamp": "2025-07-02T20:00:00+00:00",
+          "sid": 8,
+          "amount": 1,
+          "price": 101.0505
+        },
+        {
+          "timestamp": "2025-07-03T17:00:00+00:00",
+          "sid": 7,
+          "amount": 1,
+          "price": 102.051
+        },
+        {
+          "timestamp": "2025-07-03T17:00:00+00:00",
+          "sid": 8,
+          "amount": 1,
+          "price": 102.051
+        }
+      ],
+      "cash": [
+        1000.0,
+        797.8969999999999,
+        593.7929999999999
+      ]
+    }
+  },
+  "timing_claim": false
+}

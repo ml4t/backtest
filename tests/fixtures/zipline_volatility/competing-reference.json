@@ -1,0 +1,56 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "snapshot_id": "0a5091b0c702d1dbbb09e4a6c3bcf4cca365e7c93e0bec2224fc26e7b4cd8edf",
+  "cases": {
+    "per_order": {
+      "volume_limit": 0.05,
+      "order_quantity": 4,
+      "first_bar_volume": 110,
+      "first_bar_filled": 8,
+      "fills": [
+        {
+          "timestamp": "2025-02-05T21:00:00+00:00",
+          "amount": 4,
+          "price": 102.0765
+        },
+        {
+          "timestamp": "2025-02-05T21:00:00+00:00",
+          "amount": 4,
+          "price": 102.0765
+        }
+      ],
+      "classification": "per_order_participation"
+    },
+    "overfill": {
+      "volume_limit": 0.6,
+      "order_quantity": 100,
+      "first_bar_volume": 110,
+      "first_bar_filled": 132,
+      "fills": [
+        {
+          "timestamp": "2025-02-05T21:00:00+00:00",
+          "amount": 66,
+          "price": 102.0765
+        },
+        {
+          "timestamp": "2025-02-05T21:00:00+00:00",
+          "amount": 66,
+          "price": 102.0765
+        },
+        {
+          "timestamp": "2025-02-06T21:00:00+00:00",
+          "amount": 34,
+          "price": 99.07425
+        },
+        {
+          "timestamp": "2025-02-06T21:00:00+00:00",
+          "amount": 34,
+          "price": 99.07425
+        }
+      ],
+      "classification": "reference_overfill_defect"
+    }
+  },
+  "timing_claim": false
+}

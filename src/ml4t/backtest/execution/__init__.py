@@ -15,9 +15,11 @@ from .impact import (
     SquareRootImpact,
 )
 from .limits import (
+    AssetExecutionLimits,
     ExecutionLimits,
     NoLimits,
     PositiveVolumeLimit,
+    SharedVolumeParticipationLimit,
     VolumeParticipationLimit,
 )
 from .rebalancer import (
@@ -39,9 +41,11 @@ __all__ = [
     "FillContext",
     # Limits
     "ExecutionLimits",
+    "AssetExecutionLimits",
     "NoLimits",
     "PositiveVolumeLimit",
     "VolumeParticipationLimit",
+    "SharedVolumeParticipationLimit",
     # Impact
     "MarketImpactModel",
     "NoImpact",

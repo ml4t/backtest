@@ -147,6 +147,17 @@ Account type is determined by the flag combination:
 | `execution_mode` | ExecutionMode | NEXT_BAR | When orders fill (SAME_BAR or NEXT_BAR) |
 | `execution_price` | ExecutionPrice | OPEN | Price used for market fills |
 | `mark_price` | ExecutionPrice | PRICE | Price used for open-position marking |
+| `next_bar_execution_price` | ExecutionPrice or None | None | Explicit deferred execution source; None preserves the native next-open rule |
+| `conditional_order_mode` | ConditionalOrderMode | BAR_OHLC | Extrema/level-based conditional orders, or EXECUTION_PRICE for triggers and fills on the selected observation |
+
+To execute an ordinary market order at the next observed bar's close, select
+`execution_mode=ExecutionMode.NEXT_BAR` and
+`next_bar_execution_price=ExecutionPrice.CLOSE`. The order remains deferred;
+changing this source does not move it to its decision bar. The default `None`
+retains existing next-open behavior, including existing quote/VWAP handling.
+Market-on-close orders retain their own close rule, and canonical opening-auction
+child intents continue to use the opening price. The option is persisted under
+`execution.next_bar_execution_price` in the resolved JSON/YAML configuration.
 
 Available `ExecutionPrice` values:
 
@@ -182,18 +193,18 @@ mark source.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `commission_type` | CommissionType | NONE | Model: NONE, PERCENTAGE, PER_SHARE, PER_TRADE, TIERED |
+| `commission_type` | CommissionType | NONE | Model: NONE, PERCENTAGE, PER_SHARE, PER_TRADE, TIERED, PER_ORDER_PER_SHARE, PER_ORDER |
 | `commission_rate` | float | 0.0 | Rate for percentage model |
 | `commission_per_share` | float | 0.0 | Dollar amount per share |
-| `commission_per_trade` | float | 0.0 | Dollar amount per trade |
-| `commission_minimum` | float | 0.0 | Minimum commission per trade |
+| `commission_per_trade` | float | 0.0 | Flat fee per fill for PER_TRADE; once per order for PER_ORDER |
+| `commission_minimum` | float | 0.0 | Per-fill minimum for PER_SHARE; cumulative order minimum for PER_ORDER_PER_SHARE/PER_ORDER |
 
 ### Slippage
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `slippage_type` | SlippageType | NONE | Model: NONE, PERCENTAGE, FIXED, SPREAD, VOLUME_BASED |
-| `slippage_rate` | float | 0.0 | Rate for percentage model |
+| `slippage_type` | SlippageType | NONE | Model: NONE, PERCENTAGE, FIXED, SPREAD, VOLUME_BASED, CUMULATIVE_VOLUME_SHARE |
+| `slippage_rate` | float | 0.0 | Percentage rate, or coefficient for the selected volume-impact model |
 | `slippage_fixed` | float | 0.0 | Fixed dollar amount per share |
 | `slippage_spread` | float | 0.0 | Spread in currency units for bar-only spread approximation |
 | `slippage_spread_by_asset` | dict[str, float] | `{}` | Optional per-asset spread overrides |

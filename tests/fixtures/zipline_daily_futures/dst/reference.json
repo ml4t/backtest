@@ -1,0 +1,48 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "trace": [
+    {
+      "kind": "before",
+      "timestamp": "2025-03-07T13:45:00+00:00"
+    },
+    {
+      "kind": "handle",
+      "timestamp": "2025-03-07T22:00:00+00:00",
+      "price": 100.0,
+      "history": [
+        [
+          100.0,
+          1000.0
+        ]
+      ],
+      "history_labels": [
+        "2025-03-07T00:00:00"
+      ]
+    },
+    {
+      "kind": "before",
+      "timestamp": "2025-03-10T12:45:00+00:00"
+    },
+    {
+      "kind": "handle",
+      "timestamp": "2025-03-10T21:00:00+00:00",
+      "price": 101.0,
+      "history": [
+        [
+          101.0,
+          1000.0
+        ]
+      ],
+      "history_labels": [
+        "2025-03-10T00:00:00"
+      ]
+    }
+  ],
+  "snapshot_id": "de4ea3ec37edfecd564c9945db0852a166c63a8aa4648268d0033ffb4d29a9b2",
+  "session_closes": [
+    "2025-03-07T23:00:00+00:00",
+    "2025-03-10T22:00:00+00:00"
+  ],
+  "scope": "Actual original daily futures callback, current/history and pre-event clocks; no timing or settlement claim"
+}

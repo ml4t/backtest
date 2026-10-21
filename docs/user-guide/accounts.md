@@ -190,7 +190,71 @@ config = BacktestConfig(
 broker = Broker.from_config(config)
 ```
 
+## Read a marked account snapshot
+
+`broker.get_account_snapshot()` returns an immutable observation of the current
+native ledger: `timestamp`, `equity`, `cash`, `positions_value`, `gross_exposure`,
+`net_exposure` and `leverage`. `timestamp` is the broker's query/callback clock,
+including pre-open clocks; it does not assert that every position has a new
+quote. Read holdings exports for individual mark timestamps and sources.
+
+Position value is supplied directly by the marked ledger. It is not recovered
+by subtracting cash from rounded NAV. The current signed-notional account method
+has the same position value and net exposure; the futures cash limitation above
+still applies. Calling this getter does not add a bar or result observation.
+Request a new snapshot after an event or fill when updated values are needed.
+
+<!-- ml4t-doc-test: native-account-snapshot -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import CommissionType, ExecutionMode
+
+seen = []
+class ReadAccount(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        broker.submit_order("A", 2)
+        state = broker.get_account_snapshot()
+        assert abs(state.cash - 99798.8) < 1e-8
+        assert abs(state.equity - 99998.8) < 1e-8
+        assert state.positions_value == 200.0
+        assert state.gross_exposure == state.net_exposure == 200.0
+        seen.append(state.timestamp)
+
+clock = datetime(2025, 1, 6, 21, tzinfo=UTC)
+result = Engine(
+    DataFeed(prices_df=pl.DataFrame({"timestamp": [clock], "asset": ["A"], "close": [100.0]})),
+    ReadAccount(),
+    BacktestConfig(calendar=None, initial_cash=100000, execution_mode=ExecutionMode.SAME_BAR,
+                    immediate_fill=True, commission_type=CommissionType.PER_ORDER,
+                    commission_per_share=0.1, commission_per_trade=1.0),
+).run()
+assert seen == [clock]
+assert result.to_fills_dataframe()["commission"].to_list() == [1.2]
+print("The snapshot includes the actual fill fee and marked position value.")
+```
+
+Contract multipliers must be finite positive real numbers; Boolean and unknown
+values are invalid. `Engine` captures copies of supplied `ContractSpec` objects,
+and `broker.get_contract_spec(asset)` returns a detached copy. Editing preparation
+objects or a returned descriptor does not change a bound run's execution units.
+Prepare explicit dated instruments or conversion events for unit changes.
+
 ## Transaction Costs
+
+In development source, fill-time affordability uses the actual price after market
+impact and slippage, including the commission at that price. With leverage
+disabled, a ten-share buy at $100 with 1% slippage requires $1,010. A $1,000
+account rejects it when `partial_fills_allowed=False`, or fills nine integer
+shares when partial fills are enabled. Quantity-dependent impact is recomputed
+for the affordable quantity. Cash sizing retains the originally requested
+quantity in the order's `requested_quantity` field.
+
+Custom price models must support independent `deepcopy` for non-consuming quotes
+and produce deterministic costs. Only actual executions advance their model
+state. Explicit `skip_cash_validation=True` retains unconstrained behavior;
+leveraged accounts continue to use their configured margin policy.
 
 Account policy often interacts with trading costs, especially when leverage or high
 turnover magnifies drag:
@@ -299,3 +363,25 @@ Chapter 17, Section 17.4, [Conformal position sizing](https://github.com/stefan-
 - [Risk Management](risk-management.md) -- position rules and portfolio limits that interact with buying power
 - [Rebalancing](rebalancing.md) -- portfolio-weight execution under explicit account constraints
 - [Results & Analysis](results.md) -- inspect turnover, fills, and portfolio-state effects of account policy
+
+Engine captures its input configuration when constructed, including nested mappings.
+Prepare settings before constructing the Engine. Editing the original configuration
+does not reconfigure a bound run, and the returned result keeps a detached copy of
+the settings used for that run.
+
+### Gross entry and commission-adjusted reporting basis
+
+`broker.get_position(asset).entry_price` is the gross weighted entry price used
+for native P&L. `commission_adjusted_cost_basis` is a separate reporting price:
+it includes each transaction fee divided by the remaining signed quantity and
+contract multiplier. A partial reduction retains the prior basis before adding
+its fee; a reversal resets the basis to the fill price before adding the whole
+reversal fee. This follows the position-reporting convention tested against
+Zipline Reloaded 3.2.0. Cash and trade P&L continue to account for actual fees
+once, using their existing entry/exit allocation.
+
+For example, buying 10 shares at 100 with a fee of 1 reports a basis of 100.1.
+Buying another 10 at 110 with a fee of 1 reports 105.1. Selling 5 at 120 with a
+fee of 0.5 reports 105.13333333333334 on the remaining 15 shares, while their
+gross entry price stays 105. The property is a live position view; it does not
+add a field to saved holdings artifacts.

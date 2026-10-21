@@ -6,6 +6,23 @@ The [multi-asset rebalancing tutorial](../tutorials/multiasset-rebalancing.md) r
 
 Schema snippets using `[...]` stand for user-supplied columns; they are not standalone datasets. Run the [bundled data examples](../tutorials/data.md) for complete panels and checked output.
 
+## Timestamp roles and precision
+
+Declare actual event instants, completed-bar endpoints or session labels through
+`FeedSpec.timestamp_semantics`. These roles are distinct. With session enforcement,
+ordinary event instants use `[open, close)`; `bar_close` or right-labeled bars use
+`(open, close]`, including the closing endpoint before an intraday break. A midnight
+closing bar in a continuous calendar belongs to the session that just ended.
+The original instant is retained.
+
+Nanosecond Polars inputs retain separate event identities through callbacks,
+history, fills, account/holding exports and strict saved-result loading. Such
+callbacks can receive pandas `Timestamp`, a datetime-compatible type that retains
+nanoseconds. Converting it to Python's microsecond-only `datetime` yourself loses
+that precision. Timezone declarations and session labels still need to describe
+the source accurately; precision preservation does not infer a venue or timestamp
+meaning from the clock value.
+
 ## Required Columns
 
 With the default `FeedSpec`, the prices DataFrame must include:

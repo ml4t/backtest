@@ -468,7 +468,9 @@ each end-of-bar snapshot.
 | `NONE` | No commission | `commission_rate=0` |
 | `PERCENTAGE` | % of trade value | `commission_rate=0.001` (0.1%) |
 | `PER_SHARE` | Fixed $ per share | `commission_per_share=0.005` |
-| `PER_TRADE` | Fixed $ per trade | `commission_per_trade=5.0` |
+| `PER_TRADE` | Fixed fee per fill | `commission_per_trade=5.0` |
+| `PER_ORDER_PER_SHARE` | Cumulative per-order minimum on unit fees | `commission_per_share=0.005, commission_minimum=1.0` |
+| `PER_ORDER` | Composed cumulative unit/notional/one-time fees | Explicit unit, rate, flat and minimum parameters |
 | `TIERED` | Volume-based tiers | Custom model |
 
 ```python
@@ -482,7 +484,180 @@ config = BacktestConfig(
 )
 ```
 
+### Cumulative order fees and shared volume
+
+These additional methods are development-source features. They are not part of the
+preserved 0.1.13 release candidate.
+
+`PER_SHARE` and `PER_TRADE` retain their native per-fill behavior. Select
+`PER_ORDER_PER_SHARE` when one order's partial fills should share a minimum fee.
+`PER_ORDER` additionally combines `commission_per_share`, `commission_rate`,
+`commission_per_trade` and `commission_minimum`. Its notional component uses actual
+fill prices and the declared contract multiplier; the flat component applies once.
+Quotes use previously committed order quantities/notionals/fees and do not consume
+a fill. Fees are committed only for actual executions.
+
+`SharedVolumeParticipationLimit` shares one traded-volume budget across all orders
+for the same asset and bar, in both directions. Missing/nonfinite traded volume
+has no capacity; quote-side depth does not substitute for traded volume. Explicit
+quote depth can further restrict a fill. `VolumeParticipationLimit` retains its
+existing per-order convention. Neither option models a complete exchange order book.
+
+The following run matches the qualified Zipline 3.2.0 daily fixture for a ten-share
+order filled as five shares on each of two bars. It pays the one-dollar order
+minimum once. The native per-fill alternative would pay two dollars.
+
+<!-- ml4t-doc-test: order-context-fees -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import CommissionType, ExecutionMode, ExecutionPrice
+from ml4t.backtest.execution import SharedVolumeParticipationLimit
+
+dates = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [6, 7, 8]]
+prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 3,
+                       "close": [104.0, 105.0, 106.0], "volume": [10.0] * 3})
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == dates[0]:
+            broker.submit_order("TEST", 10)
+config = BacktestConfig(initial_cash=10000, calendar=None,
+    execution_mode=ExecutionMode.NEXT_BAR,
+    next_bar_execution_price=ExecutionPrice.CLOSE,
+    commission_type=CommissionType.PER_ORDER_PER_SHARE,
+    commission_per_share=0.01, commission_minimum=1.0)
+result = Engine(DataFeed(prices_df=prices), Buy(), config,
+    execution_limits=SharedVolumeParticipationLimit(max_participation=0.5)).run()
+fills = result.to_fills_dataframe()
+assert fills["quantity"].to_list() == [5.0, 5.0]
+assert fills["timestamp"].to_list() == dates[1:]
+assert fills["price"].to_list() == [105.0, 106.0]
+assert fills["commission"].to_list() == [1.0, 0.0]
+assert result.to_equity_dataframe()["equity"].to_list() == [10000.0, 9999.0, 10004.0]
+print("Partial order fees and shared volume verified.")
+```
+
+### Route explicit fees by asset
+
+`Engine`, `Engine.from_config`, `run_backtest` and `Broker.from_config` accept
+`commission_model=` to override configured fee rates. `AssetCommission` routes
+stable asset keys to native models, with an explicit default for other keys.
+It passes the order's committed quantity and paid fees to models that implement
+`quote(CommissionContext)`; other models receive the existing `calculate`
+interface. Estimates use copies, so they cannot advance an actual model's
+in-memory fill state.
+
+Use `PerOrderCommission(per_share=..., per_trade=..., minimum=...)` for a
+per-contract charge, a one-time exchange charge and an order minimum. The unit
+charge counts contracts. Only the optional `rate` term uses multiplied
+notional. `PerOrderCommission(per_trade=...)` also expresses a fixed futures
+trade fee. There is no additional per-contract fee formula.
+
+<!-- ml4t-doc-test: native-asset-commission -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
+from ml4t.backtest.execution import VolumeParticipationLimit
+from ml4t.backtest.models import AssetCommission, PerOrderCommission, PerOrderPerShareCommission
+
+prices = pl.DataFrame([
+    {"timestamp": datetime(2025, 3, day, 21, tzinfo=UTC), "asset": asset,
+     "close": 100., "volume": 2.}
+    for day in [3, 4, 5, 6] for asset in ["A", "ES"]
+])
+fees = AssetCommission({"ES": PerOrderCommission(per_share=2., per_trade=3., minimum=8.)},
+                        default=PerOrderPerShareCommission(per_share=.2, minimum=1.))
+
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp.day == 3:
+            broker.submit_order("A", 3)
+            broker.submit_order("ES", 3)
+
+result = Engine(DataFeed(prices_df=prices), Buy(),
+                BacktestConfig(calendar=None, initial_cash=100000), commission_model=fees,
+                execution_limits=VolumeParticipationLimit(.5),
+                contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.)}).run()
+fills = result.to_fills_dataframe()
+assert fills.filter(pl.col("asset") == "ES")["commission"].to_list() == [8., 0., 1.]
+assert fills.filter(pl.col("asset") == "A")["commission"].to_list() == [1., 0., 0.]
+assert result.to_equity_dataframe()["equity"][-1] == 99990.
+print("Per-asset fees retain committed partial fills and contract units.")
+```
+
+The futures minimum is paid on the first fill; cumulative charges reach 9 on
+the third fill. A multiplier of 50 does not multiply those unit fees. The
+published Zipline Reloaded 3.2.0 mixed-asset fixture checks this sequence and
+the fixed futures trade fee against its actual engine, with an explicit
+one-unit-per-bar caller slippage model. It does not establish default futures
+slippage or settlement behavior. Native signed-notional cash remains unchanged;
+the example's final cash is 84690, whereas Zipline's variation-cash account
+reports 99690 with the same NAV. An explicit variation-cash account method
+remains separate work.
+
+A supplied Python model is not reconstructed from `BacktestConfig` serialization.
+Retain its parameters with the run inputs and supply it again when rerunning a
+simulation. Saved result artifacts retain the executed fees and account path.
+
 ### Slippage Models
+
+`Engine`, `Engine.from_config`, `run_backtest` and `Broker.from_config` accept
+an explicit `slippage_model=`. `AssetSlippage` selects native models by stable
+key, with a required default. Its optional `price_sources` mapping sets the
+execution basis for ordinary market and conditional orders. Explicit MOC close
+orders and typed opening child intents retain their declared close/open basis.
+Marks continue to use the separate marking policy.
+
+`AssetExecutionLimits` selects existing participation limits by stable key.
+Shared capacity remains owned by the native order state for each asset/bar;
+separate orders cannot reuse it. Quote estimates copy only the selected model
+and do not advance its actual fill state.
+
+<!-- ml4t-doc-test: native-asset-execution -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
+from ml4t.backtest.config import ExecutionMode, ExecutionPrice
+from ml4t.backtest.execution import AssetExecutionLimits, SharedVolumeParticipationLimit
+from ml4t.backtest.models import AssetSlippage, FixedSlippage, PercentageSlippage
+
+prices = pl.DataFrame([
+    {"timestamp": datetime(2025, 3, day, 21, tzinfo=UTC), "asset": asset,
+     "close": 100., "high": 120., "low": 100., "volume": 4.}
+    for day in [3, 4, 5, 6] for asset in ["A", "ES"]
+])
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp.day == 3:
+            broker.submit_order("A", 3)
+            broker.submit_order("ES", 3)
+
+result = Engine(DataFeed(prices_df=prices), Buy(), BacktestConfig(
+    calendar=None, execution_mode=ExecutionMode.NEXT_BAR,
+    next_bar_execution_price=ExecutionPrice.CLOSE),
+    slippage_model=AssetSlippage({"ES": FixedSlippage(.5)},
+        default=PercentageSlippage(.01), price_sources={"ES": ExecutionPrice.MID}),
+    execution_limits=AssetExecutionLimits({"ES": SharedVolumeParticipationLimit(.25)},
+        default=SharedVolumeParticipationLimit(.5)),
+    contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.)}).run()
+fills = result.to_fills_dataframe()
+assert fills.filter(pl.col("asset") == "A")["price"].to_list() == [101., 101.]
+assert fills.filter(pl.col("asset") == "ES")["price"].to_list() == [110.5] * 3
+assert result.to_portfolio_state_dataframe()["cash"][-1] == 83122.
+assert result.to_equity_dataframe()["equity"][-1] == 98422.
+print("Distinct asset execution bases, costs and volume caps verified.")
+```
+
+The futures fills use the observed high/low midpoint 110 plus a 0.5 adverse
+cost; the equity uses close 100 plus 1%. These deliberately different sources
+are recorded on the fills. The future is marked at 100 with multiplier 50,
+so its marked loss includes the 10.5-point difference. This example selects
+native signed-notional accounting and does not claim a variation-cash result.
+Retain supplied model parameters alongside the inputs when rerunning; Python
+model objects are not reconstructed by `BacktestConfig` serialization.
 
 | Type | Calculation | Config |
 |------|------------|--------|
@@ -490,6 +665,7 @@ config = BacktestConfig(
 | `PERCENTAGE` | % of price | `slippage_rate=0.001` (0.1%) |
 | `FIXED` | Fixed $ per share | `slippage_fixed=0.01` |
 | `VOLUME_BASED` | Linear size-to-volume impact | `slippage_rate=0.1` (impact coefficient) |
+| `CUMULATIVE_VOLUME_SHARE` | Quadratic committed asset/bar participation | `slippage_rate=0.1` (impact coefficient) |
 
 Slippage models remain separate from quote-side execution:
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from ..config import ExecutionPrice, LockNotionalUpdateMode, ShareType
-from ..models import estimate_commission
-from ..types import OrderSide, OrderType
+from ..config import ConditionalOrderMode, ExecutionPrice, LockNotionalUpdateMode, ShareType
+from ..models import AssetSlippage, estimate_commission
+from ..types import ExecutionMode, OrderSide, OrderType
 from .shared import CASH_TOLERANCE, add_with_zero_cancellation
 from .state import MarketState, OrderState
 
@@ -113,6 +113,8 @@ class FillEngine:
                 order.asset,
                 order.quantity,
                 fill_price,
+                order=order,
+                multiplier=broker.get_multiplier(order.asset),
             )
             != 0.0
         ):
@@ -176,7 +178,7 @@ class FillEngine:
 
         return max(0.0, free_cash / unit_cost)
 
-    def try_partial_fill(self, order, fill_price: float) -> bool:
+    def try_partial_fill(self, order, fill_price: float, *, use_open: bool = False) -> bool:
         max_shares = self.get_max_affordable_quantity(order, fill_price)
 
         if self.broker.share_type == ShareType.INTEGER:
@@ -186,7 +188,7 @@ class FillEngine:
             return False
 
         order.quantity = max_shares
-        return bool(self.execute_fill(order, fill_price))
+        return bool(self.execute_fill(order, fill_price, use_open=use_open))
 
     def constrain_locked_short_cover(self, order, fill_price: float) -> bool:
         """Apply locked-cash affordability before any short-cover fill path."""
@@ -217,27 +219,40 @@ class FillEngine:
         self.orders.partial_quantities.pop(order.order_id, None)
         return True
 
-    def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
+    def get_fill_price_source(self, order, use_open: bool) -> ExecutionPrice:
         broker = self.broker
         if order.child_intent_id is not None and use_open:
-            return broker.get_price_for_source(
-                ExecutionPrice.OPEN,
-                order.asset,
-                side=order.side,
-                use_open=True,
-            )
+            return ExecutionPrice.OPEN
         if order.order_type is OrderType.MOC:
-            return broker.get_price_for_source(
-                ExecutionPrice.CLOSE,
-                order.asset,
-                side=order.side,
-                use_open=False,
-            )
-        return broker.get_price_for_source(
-            broker.execution_price,
+            return ExecutionPrice.CLOSE
+        if isinstance(broker.slippage_model, AssetSlippage):
+            source = broker.slippage_model.price_sources.get(order.asset)
+            if source is not None:
+                return source
+        if use_open and broker.next_bar_execution_price is not None:
+            return broker.next_bar_execution_price
+        source = broker.execution_price
+        if (
+            use_open
+            and broker.execution_mode is ExecutionMode.NEXT_BAR
+            and source
+            not in {
+                ExecutionPrice.BID,
+                ExecutionPrice.ASK,
+                ExecutionPrice.QUOTE_MID,
+                ExecutionPrice.QUOTE_SIDE,
+                ExecutionPrice.VWAP,
+            }
+        ):
+            return ExecutionPrice.OPEN
+        return source
+
+    def get_fill_price_for_order(self, order, use_open: bool) -> float | None:
+        return self.broker.get_price_for_source(
+            self.get_fill_price_source(order, use_open),
             order.asset,
             side=order.side,
-            use_open=use_open,
+            use_open=False,
         )
 
     def get_effective_quantity(self, order) -> float:
@@ -274,8 +289,19 @@ class FillEngine:
                 fill_price = fill_price * (1 + broker.stop_slippage_rate)
         return fill_price
 
-    def check_limit_fill(self, order, high: float, low: float) -> float | None:
+    def check_limit_fill(
+        self, order, high: float, low: float, price: float | None = None
+    ) -> float | None:
         if order.limit_price is None:
+            return None
+        if self.broker.conditional_order_mode is ConditionalOrderMode.EXECUTION_PRICE:
+            if price is not None and (
+                order.side is OrderSide.BUY
+                and price <= order.limit_price
+                or order.side is OrderSide.SELL
+                and price >= order.limit_price
+            ):
+                return price
             return None
         if (
             order.side == OrderSide.BUY
@@ -286,8 +312,23 @@ class FillEngine:
             return order.limit_price
         return None
 
-    def check_stop_fill(self, order, high: float, low: float, bar_open: float) -> float | None:
+    def check_stop_fill(
+        self, order, high: float, low: float, bar_open: float, price: float | None = None
+    ) -> float | None:
         if order.stop_price is None:
+            return None
+        if order._stop_triggered:
+            return price if price is not None else bar_open
+        if self.broker.conditional_order_mode is ConditionalOrderMode.EXECUTION_PRICE:
+            if price is not None and (
+                order.side is OrderSide.BUY
+                and price >= order.stop_price
+                or order.side is OrderSide.SELL
+                and price <= order.stop_price
+            ):
+                order._stop_triggered = True
+                order._stop_triggered_at = self.market.time
+                return price
             return None
 
         triggered = False
@@ -302,8 +343,37 @@ class FillEngine:
         if not triggered:
             return None
 
+        order._stop_triggered = True
+        order._stop_triggered_at = self.market.time
         gap_price = self.check_gap_through(order.side, order.stop_price, bar_open)
         return gap_price if gap_price is not None else order.stop_price
+
+    def check_stop_limit_fill(
+        self, order, high: float, low: float, bar_open: float, price: float
+    ) -> float | None:
+        if order.limit_price is None or order.stop_price is None:
+            return None
+        if not order._stop_triggered:
+            if self.check_stop_fill(order, high, low, bar_open, price) is None:
+                return None
+            if self.broker.conditional_order_mode is ConditionalOrderMode.BAR_OHLC:
+                gap = self.check_gap_through(order.side, order.stop_price, bar_open)
+                better_limit = (
+                    order.side is OrderSide.BUY
+                    and order.limit_price < order.stop_price
+                    or order.side is OrderSide.SELL
+                    and order.limit_price > order.stop_price
+                )
+                close = self.market.closes.get(order.asset)
+                reached_after = close is not None and (
+                    order.side is OrderSide.BUY
+                    and close <= order.limit_price
+                    or order.side is OrderSide.SELL
+                    and close >= order.limit_price
+                )
+                if gap is None and better_limit and not reached_after:
+                    return None
+        return self.check_limit_fill(order, high, low, price)
 
     def update_and_check_trailing_stop(
         self, order, high: float, low: float, bar_open: float
@@ -336,12 +406,16 @@ class FillEngine:
         if order.order_type in {OrderType.MARKET, OrderType.MOC}:
             return self.check_market_fill(order, price)
         if order.order_type == OrderType.LIMIT:
-            return self.check_limit_fill(order, high, low)
+            return self.check_limit_fill(order, high, low, price)
         if order.order_type == OrderType.STOP:
-            return self.check_stop_fill(order, high, low, bar_open)
+            return self.check_stop_fill(order, high, low, bar_open, price)
+        if order.order_type == OrderType.STOP_LIMIT:
+            return self.check_stop_limit_fill(order, high, low, bar_open, price)
         if order.order_type == OrderType.TRAILING_STOP:
             return self.update_and_check_trailing_stop(order, high, low, bar_open)
         return None
 
-    def execute_fill(self, order, base_price: float) -> bool:
-        return self.executor.execute(order, base_price)
+    def execute_fill(self, order, base_price: float, *, use_open: bool = False) -> bool:
+        return self.executor.execute(
+            order, base_price, price_source=self.get_fill_price_source(order, use_open).value
+        )

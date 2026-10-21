@@ -287,7 +287,7 @@ def _check_fill_order_type_bounds(result: BacktestResult) -> None:
         limit_price = getattr(f, "limit_price", None)
         stop_price = getattr(f, "stop_price", None)
 
-        if order_type == "limit" and limit_price is not None:
+        if order_type in {"limit", "stop_limit"} and limit_price is not None:
             if f.side == OrderSide.BUY:
                 assert f.price <= limit_price + tol, (
                     f"Fill order-type bound violated for fill {i} ({f.asset}): "
@@ -299,6 +299,11 @@ def _check_fill_order_type_bounds(result: BacktestResult) -> None:
                     f"limit SELL filled at {f.price:.6f} < limit_price {limit_price:.6f}"
                 )
         elif order_type == "stop" and stop_price is not None:
+            triggered_at = getattr(f, "stop_triggered_at", None)
+            if triggered_at is not None:
+                assert triggered_at <= f.timestamp, "Stop trigger cannot occur after execution"
+                if triggered_at < f.timestamp:
+                    continue  # A previously triggered stop's remainder is a market order.
             if f.side == OrderSide.BUY:
                 assert f.price >= stop_price - tol, (
                     f"Fill order-type bound violated for fill {i} ({f.asset}): "

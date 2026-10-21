@@ -124,9 +124,9 @@ class _ConstantImpact:
 
 
 class _InvalidSellPriceImpact:
-    def __init__(self) -> None:
-        self.broker = None
-        self.broker_snapshot: dict[str, Any] | None = None
+    def __init__(self, observe) -> None:
+        self.observe = observe
+        self.calls = 0
 
     def calculate(
         self,
@@ -135,8 +135,9 @@ class _InvalidSellPriceImpact:
         volume: float | None,
         is_buy: bool,
     ) -> float:
+        self.calls += 1
         if not is_buy:
-            self.broker_snapshot = _financial_snapshot(self.broker)
+            self.observe()
         return 0.0 if is_buy else -200.0
 
 
@@ -270,20 +271,25 @@ def test_invalid_custom_impact_is_fail_atomic(value: float) -> None:
 
 def test_invalid_execution_price_is_fail_atomic() -> None:
     strategy = _RoundTripStrategy()
-    impact = _InvalidSellPriceImpact()
+    snapshots = []
+
+    def observe():
+        snapshots.append(_financial_snapshot(engine.broker))
+
+    impact = _InvalidSellPriceImpact(observe)
     engine = Engine(
         DataFeed(prices_df=_prices()),
         strategy,
         BacktestConfig(execution_mode=ExecutionMode.NEXT_BAR),
         market_impact_model=impact,
     )
-    impact.broker = engine.broker
-
     with pytest.raises(ValueError, match=r"execution price.*-100\.0"):
         engine.run()
 
-    assert impact.broker_snapshot is not None
-    assert _financial_snapshot(engine.broker) == impact.broker_snapshot
+    # Invalid quote evaluation leaves both the live model and broker untouched.
+    assert impact.calls == 1  # Only the successful buy advanced the live model.
+    assert len(snapshots) == 1
+    assert _financial_snapshot(engine.broker) == snapshots[0]
 
 
 def test_invalid_flip_commission_is_fail_atomic() -> None:
@@ -303,7 +309,7 @@ def test_invalid_flip_commission_is_fail_atomic() -> None:
     assert _financial_snapshot(engine.broker) == invalid_commission.broker_snapshot
 
 
-@pytest.mark.parametrize("value", [-0.5, math.nan, math.inf])
+@pytest.mark.parametrize("value", [-0.5, math.nan, math.inf, 11.0])
 def test_invalid_execution_limit_quantity_is_fail_atomic(value: float) -> None:
     strategy = _BuyOnceStrategy()
     limits = _InvalidExecutionLimits(value)

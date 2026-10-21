@@ -1,0 +1,148 @@
+{
+  "reference_distribution": "zipline-reloaded==3.2.0",
+  "timing_claim": false,
+  "traces": {
+    "1": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "quantity": 0,
+        "cost_basis": 0.0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "quantity": 10,
+        "cost_basis": 100.1,
+        "cash": 8999.0,
+        "equity": 9999.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "quantity": 20,
+        "cost_basis": 105.1,
+        "cash": 7898.0,
+        "equity": 10098.0
+      },
+      {
+        "timestamp": "2025-01-10T21:00:00+00:00",
+        "quantity": 15,
+        "cost_basis": 105.13333333333334,
+        "cash": 8497.5,
+        "equity": 10297.5
+      },
+      {
+        "timestamp": "2025-01-13T21:00:00+00:00",
+        "quantity": -15,
+        "cost_basis": 129.8,
+        "cash": 12394.5,
+        "equity": 10444.5
+      }
+    ],
+    "-1": [
+      {
+        "timestamp": "2025-01-06T21:00:00+00:00",
+        "quantity": 0,
+        "cost_basis": 0.0,
+        "cash": 10000.0,
+        "equity": 10000.0
+      },
+      {
+        "timestamp": "2025-01-07T21:00:00+00:00",
+        "quantity": -10,
+        "cost_basis": 99.9,
+        "cash": 10999.0,
+        "equity": 9999.0
+      },
+      {
+        "timestamp": "2025-01-08T21:00:00+00:00",
+        "quantity": -20,
+        "cost_basis": 104.9,
+        "cash": 12098.0,
+        "equity": 9898.0
+      },
+      {
+        "timestamp": "2025-01-10T21:00:00+00:00",
+        "quantity": -15,
+        "cost_basis": 104.86666666666666,
+        "cash": 11497.5,
+        "equity": 9697.5
+      },
+      {
+        "timestamp": "2025-01-13T21:00:00+00:00",
+        "quantity": 15,
+        "cost_basis": 130.2,
+        "cash": 7594.5,
+        "equity": 9544.5
+      }
+    ]
+  },
+  "input_dates": [
+    "2025-01-06T00:00:00",
+    "2025-01-07T00:00:00",
+    "2025-01-08T00:00:00",
+    "2025-01-10T00:00:00",
+    "2025-01-13T00:00:00"
+  ],
+  "input_ohlcv": {
+    "open": [
+      90.0,
+      100.0,
+      110.0,
+      120.0,
+      130.0
+    ],
+    "high": [
+      91.0,
+      101.0,
+      111.0,
+      121.0,
+      131.0
+    ],
+    "low": [
+      89.0,
+      99.0,
+      109.0,
+      119.0,
+      129.0
+    ],
+    "close": [
+      90.0,
+      100.0,
+      110.0,
+      120.0,
+      130.0
+    ],
+    "volume": [
+      1000,
+      1000,
+      1000,
+      1000,
+      1000
+    ]
+  },
+  "reference_wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
+  "input": {
+    "asset": "A",
+    "initial_cash": 10000,
+    "close": [
+      90.0,
+      100.0,
+      110.0,
+      120.0,
+      130.0
+    ],
+    "volume": 1000,
+    "signed_orders": [
+      10,
+      10,
+      -5,
+      -30
+    ],
+    "commission_per_share": 0.1,
+    "minimum_commission": 0.0,
+    "execution": "next_bar_close",
+    "volume_limit": 1.0,
+    "price_impact": 0.0
+  }
+}
