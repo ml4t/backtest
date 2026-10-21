@@ -49,9 +49,15 @@ class MarketDataView:
         feed_spec: FeedSpec | None = None,
         owner: MarketDataView | None = None,
         known_at_cols: dict[str, str] | None = None,
+        quote_fields: bool = True,
+        eligible_cols: dict[str, str] | None = None,
     ) -> None:
         self._runtime = runtime
         self._owner = owner if owner is not None else self
+        self._clock_asof: datetime | None = None
+        self._clock_inclusive = False
+        self._quote_fields = quote_fields
+        self._eligible_cols = dict(eligible_cols or {})
         self._prepared: tuple[datetime, bool, MarketDataView] | None = None
         self._preparation_metadata: dict[str, Any] = {}
         self._known_at_cols = dict(
@@ -69,27 +75,41 @@ class MarketDataView:
             raise ValueError("Runtime market services require a prices frame")
         self._frame = frame
         self._columns = set(self._frame.columns)
-        self._roles = {
-            name: getattr(spec, f"{name}_col", name)
-            for name in [
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "vwap",
-                "bid",
-                "ask",
-                "mid",
-                "bid_size",
-                "ask_size",
-            ]
-        }
-        self._roles["price"] = spec.price_col or self._roles["close"]
-        if self._roles["price"] not in self._columns:
-            self._roles["price"] = self._roles["close"]
+        self._roles = (
+            {
+                name: getattr(spec, f"{name}_col", name)
+                for name in [
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "vwap",
+                    "bid",
+                    "ask",
+                    "mid",
+                    "bid_size",
+                    "ask_size",
+                ]
+            }
+            if quote_fields
+            else {}
+        )
+        if quote_fields:
+            self._roles["price"] = spec.price_col or self._roles["close"]
+            if self._roles["price"] not in self._columns:
+                self._roles["price"] = self._roles["close"]
         self._rows: dict[str, dict[datetime, int]] = {}
         self._times: dict[str, list[datetime]] = {}
+        for field, column in self._eligible_cols.items():
+            if (
+                self._column(field) not in self._columns
+                or column not in self._columns
+                or self._frame.schema[column] != pl.Boolean
+            ):
+                raise ValueError(
+                    "Feature eligibility requires existing fields and boolean eligibility columns"
+                )
         for field, column in self._known_at_cols.items():
             if self._column(field) not in self._columns:
                 raise ValueError(f"Known-at declaration has no input field {field!r}")
@@ -120,6 +140,22 @@ class MarketDataView:
         self._asof: datetime | None = None
         self._inclusive = False
 
+    @property
+    def _asof(self) -> datetime | None:
+        return self._owner._clock_asof
+
+    @_asof.setter
+    def _asof(self, value: datetime | None) -> None:
+        self._clock_asof = value
+
+    @property
+    def _inclusive(self) -> bool:
+        return self._owner._clock_inclusive if self._quote_fields else True
+
+    @_inclusive.setter
+    def _inclusive(self, value: bool) -> None:
+        self._clock_inclusive = value
+
     def _row(self, asset: str, timestamp: datetime) -> dict[str, Any] | None:
         index = self._rows.get(asset, {}).get(timestamp)
         return temporal_row(self._frame, index) if index is not None else None
@@ -127,7 +163,7 @@ class MarketDataView:
     def _column(self, field: str) -> str:
         return self._roles.get(field, field)
 
-    def _available(self, field: str, row: dict[str, Any]) -> bool:
+    def _published(self, field: str, row: dict[str, Any]) -> bool:
         assert self._asof is not None
         column = self._column(field)
         declaration = self._known_at_cols.get(field)
@@ -142,6 +178,14 @@ class MarketDataView:
         if row[self._timestamp_col] == self._asof and not self._inclusive:
             return False
         return known <= self._asof
+
+    def _ineligible(self, field: str, row: dict[str, Any]) -> bool:
+        column = self._eligible_cols.get(field)
+        return column is not None and self._published(field, row) and row.get(column) is not True
+
+    def _available(self, field: str, row: dict[str, Any]) -> bool:
+        column = self._eligible_cols.get(field)
+        return self._published(field, row) and (column is None or row.get(column) is True)
 
     def _query(
         self,
@@ -166,11 +210,16 @@ class MarketDataView:
         for field in fields:
             if self._column(field) not in self._columns and field not in self._roles:
                 raise ValueError(f"Unknown market field {field!r}")
-            if forward_fill and self._column(field) in {
-                self._column("volume"),
-                self._column("bid_size"),
-                self._column("ask_size"),
-            }:
+            if (
+                forward_fill
+                and self._quote_fields
+                and self._column(field)
+                in {
+                    self._column("volume"),
+                    self._column("bid_size"),
+                    self._column("ask_size"),
+                }
+            ):
                 raise ValueError(f"Forward filling {field!r} would invent tradable volume")
         records = []
         for timestamp in times:
@@ -186,11 +235,13 @@ class MarketDataView:
                         or candidate.get(self._column(field)) is None
                     ):
                         candidate = None
-                        if forward_fill:
+                        if forward_fill and not (row is not None and self._ineligible(field, row)):
                             asset_times = self._times.get(asset, [])
                             for index in range(bisect_right(asset_times, timestamp) - 1, -1, -1):
                                 past = asset_times[index]
                                 value = self._row(asset, past)
+                                if value is not None and self._ineligible(field, value):
+                                    break
                                 assert value is not None
                                 if (
                                     self._available(field, value)
@@ -431,6 +482,44 @@ class MarketDataView:
         return True
 
 
+class FeatureDataView:
+    """Causal prepared fields sharing the runtime cutoff, without executable quote roles."""
+
+    def __init__(self, view: MarketDataView) -> None:
+        self._view = view
+
+    def current(
+        self, assets: Sequence[str], fields: Sequence[str], *, forward_fill: bool = False
+    ) -> pl.DataFrame:
+        return self._view.current(assets, fields, forward_fill=forward_fill)
+
+    def history(
+        self,
+        assets: Sequence[str],
+        fields: Sequence[str],
+        *,
+        bar_count: int | None = None,
+        unit: WindowUnit | str = WindowUnit.OBSERVATION,
+        duration: timedelta | None = None,
+        forward_fill: bool = False,
+    ) -> pl.DataFrame:
+        if WindowUnit(unit) not in {WindowUnit.OBSERVATION, WindowUnit.ELAPSED}:
+            raise ValueError(
+                "Feature history requires observation or elapsed units; prepare feature grids in Engineer"
+            )
+        return self._view.history(
+            assets,
+            fields,
+            bar_count=bar_count,
+            unit=unit,
+            duration=duration,
+            forward_fill=forward_fill,
+        )
+
+    def last_observed(self, asset: str, field: str) -> datetime | None:
+        return self._view.last_observed(asset, field)
+
+
 class RuntimeServices:
     """Explicit run-scoped services without changing Strategy attributes or context.
 
@@ -445,6 +534,9 @@ class RuntimeServices:
         end: datetime | None = None,
         known_at_cols: dict[str, str] | None = None,
         history_provider: HistoryProvider | None = None,
+        signal_known_at_cols: dict[str, str] | None = None,
+        context_known_at_cols: dict[str, str] | None = None,
+        signal_eligible_cols: dict[str, str] | None = None,
     ) -> None:
         if start is not None and not isinstance(start, datetime):
             raise TypeError("start must be a datetime")
@@ -454,12 +546,16 @@ class RuntimeServices:
             raise ValueError("start must not exceed end")
         self.start, self.end = start, end
         self.known_at_cols = dict(known_at_cols or {})
+        self.signal_known_at_cols = dict(signal_known_at_cols or {})
+        self.context_known_at_cols = dict(context_known_at_cols or {})
+        self.signal_eligible_cols = dict(signal_eligible_cols or {})
         if history_provider is not None and not callable(history_provider):
             raise TypeError("history_provider must be callable")
         self.history_provider = history_provider
         self.scheduler = SessionScheduler(self)
         self._engine: Engine | None = None
         self._market: MarketDataView | None = None
+        self._signals: FeatureDataView | None = None
 
     @property
     def market(self) -> MarketDataView:
@@ -467,6 +563,15 @@ class RuntimeServices:
         if self._market is None:
             raise RuntimeError("market services require an active run")
         return self._market
+
+    @property
+    def signals(self) -> FeatureDataView:
+        """Prepared per-asset fields with independent publication times and no quote aliases."""
+        if self._engine is None:
+            raise RuntimeError("signal services require an active run")
+        if self._signals is None:
+            raise ValueError("Signal queries require a signals frame")
+        return self._signals
 
     def _bind(self, engine: Engine) -> None:
         if self._engine is not None:
@@ -480,6 +585,53 @@ class RuntimeServices:
                 "prepare session labels as actual instants before binding physical runtime cutoffs"
             )
         market = MarketDataView(self, engine)
+        signals = None
+        if engine.feed.signals is not None:
+            entity = engine.feed._entity_col
+            prices = engine.feed.prices
+            assert prices is not None
+            if engine.feed.signals.schema[entity] != prices.schema[entity]:
+                raise ValueError("Signal and price stable asset key dtypes must match")
+            signals = FeatureDataView(
+                MarketDataView(
+                    self,
+                    engine,
+                    prices=engine.feed.signals,
+                    feed_spec=engine.feed.feed_spec,
+                    owner=market,
+                    known_at_cols=self.signal_known_at_cols,
+                    quote_fields=False,
+                    eligible_cols=self.signal_eligible_cols,
+                )
+            )
+        elif self.signal_known_at_cols or self.signal_eligible_cols:
+            raise ValueError("Signal known-at declarations require a signals frame")
+        if self.context_known_at_cols:
+            frame = engine.feed.context
+            if frame is None:
+                raise ValueError("Context known-at declarations require a context frame")
+            time = engine.feed.feed_spec.timestamp_col
+            if frame[time].is_duplicated().any():
+                raise ValueError("Context publication requires unique timestamps")
+            for field, column in self.context_known_at_cols.items():
+                if (
+                    field not in frame
+                    or column not in frame
+                    or not isinstance(frame.schema[column], pl.Datetime)
+                ):
+                    raise ValueError(
+                        "Context known-at fields require existing fields and datetime publication columns"
+                    )
+                for row in temporal_rows(
+                    frame.select(list(dict.fromkeys([time, column]))), named=True
+                ):
+                    if row[column] is not None:
+                        try:
+                            _ = row[column] <= row[time]
+                        except TypeError as exc:
+                            raise ValueError(
+                                "Context publication and event timezones must be compatible"
+                            ) from exc
         eligible = [t for t in engine.feed.timestamps if self._accepts(t)]
         if not eligible:
             raise ValueError("RuntimeServices window contains no feed events")
@@ -490,10 +642,12 @@ class RuntimeServices:
                 )
         market._asof = self.start if self.start is not None else eligible[0]
         self._engine, self._market = engine, market
+        self._signals = signals
         try:
             self.scheduler._bind()
         except BaseException:
             self._engine, self._market = None, None
+            self._signals = None
             raise
 
     def _accepts(self, timestamp: datetime) -> bool:
@@ -504,10 +658,25 @@ class RuntimeServices:
     def _advance(self, timestamp: datetime, data: dict[str, dict]) -> dict[str, dict]:
         market = self.market
         market._asof, market._inclusive = timestamp, True
-        if not self.known_at_cols:
+        if (
+            not self.known_at_cols
+            and not self.signal_known_at_cols
+            and not self.signal_eligible_cols
+        ):
             return data
         visible = {asset: dict(values) for asset, values in data.items()}
         for asset, values in visible.items():
+            if self.signal_known_at_cols or self.signal_eligible_cols:
+                view = self.signals._view
+                signal = view._row(asset, timestamp)
+                if signal is not None:
+                    delivered = dict(values.get("signals", {}))
+                    for field in (
+                        self.signal_known_at_cols.keys() | self.signal_eligible_cols.keys()
+                    ):
+                        if not view._available(field, signal):
+                            delivered[field] = None
+                    values["signals"] = delivered
             row = market._row(asset, timestamp)
             if row is None:
                 continue
@@ -537,6 +706,24 @@ class RuntimeServices:
                     values[field] = None
         return visible
 
+    def _mask_context(self, timestamp: datetime, context: dict[str, Any]) -> dict[str, Any]:
+        if not self.context_known_at_cols:
+            return context
+        engine = self._engine
+        assert engine is not None
+        frame = engine.feed._slice_for_timestamp(
+            engine.feed.context, engine.feed._context_ranges_by_ts, timestamp
+        )
+        if frame is None or not frame.height:
+            return context
+        row = temporal_row(frame, 0)
+        result = dict(context)
+        for field, column in self.context_known_at_cols.items():
+            if row[column] is None or row[column] > timestamp:
+                result[field] = None
+        return result
+
     def _unbind(self) -> None:
         self.scheduler._unbind()
         self._engine, self._market = None, None
+        self._signals = None

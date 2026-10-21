@@ -4591,11 +4591,15 @@
         "market": {
           "kind": "property",
           "signature": "(self) -> 'MarketDataView'"
+        },
+        "signals": {
+          "kind": "property",
+          "signature": "(self) -> 'FeatureDataView'"
         }
       },
       "module": "ml4t.backtest.runtime",
       "qualname": "RuntimeServices",
-      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None) -> 'None'"
+      "signature": "(*, start: 'datetime | None' = None, end: 'datetime | None' = None, known_at_cols: 'dict[str, str] | None' = None, history_provider: 'HistoryProvider | None' = None, signal_known_at_cols: 'dict[str, str] | None' = None, context_known_at_cols: 'dict[str, str] | None' = None, signal_eligible_cols: 'dict[str, str] | None' = None) -> 'None'"
     },
     "ml4t.backtest:StopFillMode": {
       "kind": "class",

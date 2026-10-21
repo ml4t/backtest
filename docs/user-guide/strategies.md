@@ -238,6 +238,76 @@ Data selects revisions and adjustment factors; Backtest selects the runtime
 window. A provider may prepare from captured in-memory inputs and must not
 perform undeclared network fetches during simulation.
 
+### Enforce prepared feature and context availability
+
+Declare per-field `signal_known_at_cols` and `context_known_at_cols` on the runtime.
+Unavailable values become `None` in the actual strategy payload. For prepared
+panels, `signal_eligible_cols` additionally requires a true Boolean eligibility
+value for each named feature. These mappings do not change prices or compute
+features. Declare every field whose publication differs from its observation
+clock, including eligibility or universe metadata when reading it directly.
+
+<!-- ml4t-doc-test: runtime-feature-availability -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy
+
+dates = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [2, 3, 6]]
+prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 3,
+                       "close": [100.0] * 3})
+signals = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 3,
+                        "alpha": [10.0, -1.0, 100.0],
+                        "available_at": [dates[1], dates[1], dates[2]],
+                        "eligible": [True, True, False]})
+runtime = RuntimeServices(signal_known_at_cols={"alpha": "available_at"},
+                           signal_eligible_cols={"alpha": "eligible"})
+seen = []
+
+class ReadFeatures(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        value = data["TEST"]["signals"]["alpha"]
+        seen.append(value)
+        assert runtime.signals.current(["TEST"], ["alpha"])["alpha"].to_list() == [value]
+        if value is not None and value > 0:
+            broker.submit_order("TEST", 1)
+
+result = Engine(DataFeed(prices_df=prices, signals_df=signals,
+                        feed_spec={"timestamp_semantics": "bar_close"}),
+                ReadFeatures(), BacktestConfig(calendar=None), runtime=runtime).run()
+assert seen == [None, -1.0, None]
+assert result.to_fills_dataframe().is_empty()
+print("Publication and eligibility boundaries verified in strategy delivery.")
+```
+
+`runtime.signals` reads prepared per-asset fields on the same simulation cutoff as
+the market service. It exposes `current`, `history` and `last_observed`, with no
+executable quote methods. A feature named `close` remains a feature. Its history
+supports observation counts and elapsed durations; Engineer owns feature-grid
+preparation and the lookback method that produced each feature.
+
+Known feature rows at the decision instant can be visible during pre-open, when
+`available_at <= decision_time`; opening quote observations remain excluded until
+their market phase. Explicit feature forward filling retains source timestamps.
+It stops at a known ineligible row, while unavailable future rows cannot erase
+valid earlier history. Forward filling changes the read view, not the strategy's
+raw signal payload or executable prices.
+
+Engineer-prepared panels retain observation time, decision time, availability and
+eligibility separately. For a default single-asset-key panel, an explicit input
+projection can preserve the observation key while selecting the decision clock:
+
+```python
+signals = panel.rename({"timestamp": "feature_observed_at", "decision_time": "timestamp"})
+```
+
+Use the actual artifact's `FeatureSchema` mappings for custom columns. Signal and
+price asset key dtypes must agree. Duplicate signal keys, duplicate context clocks
+with publication declarations, and missing or mistyped declared publication
+columns fail before strategy initialization. Prepared Pipeline and auxiliary
+source adapters are additional migration work; this example does not execute a
+legacy Pipeline object.
+
 ## Broker Methods
 
 ### Submitting Orders

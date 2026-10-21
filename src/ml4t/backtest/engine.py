@@ -452,6 +452,7 @@ class Engine:
                     continue
                 self.runtime.scheduler._before_event(timestamp, has_price_event=bool(assets_data))
                 assets_data = self.runtime._advance(timestamp, assets_data)
+                context = self.runtime._mask_context(timestamp, context)
 
             if expire_orders is not None:
                 expire_orders(timestamp, after_event=False)
