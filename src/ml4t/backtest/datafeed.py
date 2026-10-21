@@ -114,7 +114,15 @@ class DataFeed:
         session_col: str | None = None,
         calendar: str | None | CalendarUnset = UNSET_CALENDAR,
         capital_flows: pl.DataFrame | None = None,
+        corporate_actions: pl.DataFrame | None = None,
+        input_manifest: dict[str, Any] | None = None,
     ):
+        if corporate_actions is not None and not isinstance(corporate_actions, pl.DataFrame):
+            raise TypeError("corporate_actions must be a Polars DataFrame")
+        self.corporate_actions = (
+            corporate_actions.clone() if corporate_actions is not None else None
+        )
+        self.input_manifest = deepcopy(input_manifest)
         if capital_flows is not None and not isinstance(capital_flows, pl.DataFrame):
             raise TypeError("capital_flows must be a Polars DataFrame")
         self.capital_flows = capital_flows.clone() if capital_flows is not None else None

@@ -102,7 +102,19 @@ def _check_equity_terminal(
         assert result.metrics["total_external_flow"] == external, (
             "external capital does not reconcile"
         )
-    expected = initial_cash + realized_pnl + open_pnl + funding + external
+    distributions = sum(
+        row["cash_delta"]
+        for row in result.corporate_actions or ()
+        if row["operation"] == "payment"
+        and row["action_kind"] in {"cash_dividend", "cash_distribution"}
+    )
+    if result.config is not None and result.config.corporate_action_policy == "declared_terms":
+        distributions += sum(
+            row["cash_amount"]
+            for row in result.corporate_entitlements or ()
+            if not row["paid"] and row["action_kind"] in {"cash_dividend", "cash_distribution"}
+        )
+    expected = initial_cash + realized_pnl + open_pnl + funding + external + distributions
     diff = abs(expected - final_value)
 
     reported_trades = [*realized_trades, *open_trades]

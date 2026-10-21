@@ -41,6 +41,8 @@ class AccountState:
         self._lock_notional_short_basis: dict[str, float] = {}
         self.positions: dict[str, Position] = {}
         self.policy = policy
+        self.corporate_entitlements: dict[tuple[str, str], dict] = {}
+        self.corporate_receivable_value = 0.0
 
         # Settlement tracking: holds are (settle_bar, amount) pairs
         self._settlement_holds: deque[tuple[int, float]] = deque()
@@ -56,7 +58,11 @@ class AccountState:
         Returns:
             Total account equity
         """
-        return self.cash + sum(p.market_value for p in self.positions.values())
+        return (
+            self.cash
+            + sum(p.market_value for p in self.positions.values())
+            + self.corporate_receivable_value
+        )
 
     @property
     def buying_power(self) -> float:

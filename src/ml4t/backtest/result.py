@@ -260,6 +260,20 @@ class BacktestResult:
     account_method: str | None = None
     benchmark: pl.DataFrame | None = None
     benchmark_metadata: dict[str, Any] | None = None
+    corporate_actions: list[dict[str, Any]] | None = None
+    corporate_entitlements: list[dict[str, Any]] | None = None
+
+    def to_actions_dataframe(self) -> pl.DataFrame:
+        """Return actual account/order action applications, including cash movements."""
+        if self.corporate_actions is None:
+            raise ValueError("Result has no captured corporate-action ledger")
+        return temporal_frame(self.corporate_actions, infer_schema_length=None)
+
+    def to_entitlements_dataframe(self) -> pl.DataFrame:
+        """Return earned obligations independently of later trading, including paid status."""
+        if self.corporate_entitlements is None:
+            raise ValueError("Result has no captured corporate entitlements")
+        return temporal_frame(self.corporate_entitlements, infer_schema_length=None)
 
     # Cached DataFrames (computed on demand)
     _trades_df: pl.DataFrame | None = field(default=None, repr=False)

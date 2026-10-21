@@ -71,10 +71,16 @@ class PortfolioLedger:
                         mark_time,
                     )
                 )
-        return (cash + net, cash, gross, net, len(self.account.positions)), holdings
+        return (
+            cash + net + self.account.corporate_receivable_value,
+            cash,
+            gross,
+            net,
+            len(self.account.positions),
+        ), holdings
 
     def get_account_value(self) -> float:
-        value = self.account.cash
+        value = self.account.cash + self.account.corporate_receivable_value
         for asset, pos in self.account.positions.items():
             price = self.broker.get_mark_price(asset, quantity=pos.quantity)
             if price is None:

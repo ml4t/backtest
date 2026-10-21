@@ -27,6 +27,7 @@ from .benchmark import BenchmarkData
 from .broker import Broker
 from .capital import CapitalChange, index_capital_events
 from .config import DataFrequency, ExecutionPrice
+from .corporate_actions import CorporateActionLedger
 from .datafeed import DataFeed
 from .funding import FundingPayment, index_funding_events
 from .lifecycle import LifecycleDispatcher
@@ -186,6 +187,14 @@ class Engine:
             getattr(feed, "capital_flows", None), list(feed.timestamps)
         )
         self.capital_changes: list[CapitalChange] = []
+        actions = getattr(feed, "corporate_actions", None)
+        self._corporate_actions = (
+            CorporateActionLedger(
+                actions, feed.input_manifest, self.config, self.broker, list(feed.timestamps)
+            )
+            if actions is not None
+            else None
+        )
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
         ):
@@ -516,6 +525,8 @@ class Engine:
             if expire_orders is not None:
                 expire_orders(timestamp, after_event=False)
 
+            self._advance_account_events(timestamp)
+
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
             highs = getattr(assets_data, "_highs", None)
@@ -601,6 +612,8 @@ class Engine:
                 ask_sizes,
                 signals,
             )
+            if self._corporate_actions is not None:
+                self._corporate_actions.refresh()
             if session_mode:
                 session_assets.update(assets_data)
                 session_context.update(context)
@@ -749,6 +762,10 @@ class Engine:
             RuntimeError: If a run was already started on this Engine instance.
         """
         return self.run().to_dict()
+
+    def _advance_account_events(self, timestamp: datetime) -> None:
+        if self._corporate_actions is not None:
+            self._corporate_actions.advance(timestamp)
 
     def _record_portfolio_state(self, timestamp: datetime) -> None:
         """Capture per-bar NAV and explicitly sampled observed positions."""
@@ -923,6 +940,15 @@ class Engine:
 
         observed_account, observed_holdings, observation_metadata = self._result_observations()
 
+        action_records = (
+            None if self._corporate_actions is None else deepcopy(self._corporate_actions.records)
+        )
+        action_entitlements = (
+            None
+            if self._corporate_actions is None
+            else deepcopy(list(self._corporate_actions.entitlements.values()))
+        )
+
         if not self.equity_curve:
             # Return empty result for no-data case
             return BacktestResult(
@@ -950,6 +976,8 @@ class Engine:
                 recorded_variables=self.broker._recorded_variables(),
                 holdings_sampling=self.holdings_sampling,
                 capital_changes=list(self.capital_changes),
+                corporate_actions=action_records,
+                corporate_entitlements=action_entitlements,
             )
 
         # Build EquityCurve from raw data
@@ -1068,6 +1096,8 @@ class Engine:
 
         return BacktestResult(
             trades=all_trades,  # Includes both closed and open trades
+            corporate_actions=action_records,
+            corporate_entitlements=action_entitlements,
             equity_curve=list(self.equity_curve),
             fills=list(self.broker.fills),
             rejected_orders=self.broker.get_rejected_orders(),
