@@ -1,0 +1,208 @@
+{
+  "package": "zipline-reloaded==3.2.0",
+  "input": {
+    "0": {
+      "close": [
+        5.0,
+        10.0,
+        20.0,
+        30.0,
+        40.0
+      ],
+      "volume": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    "1": {
+      "close": [
+        10.0,
+        20.0,
+        40.0,
+        60.0,
+        80.0
+      ],
+      "volume": [
+        1000,
+        1000,
+        0,
+        1000,
+        1000
+      ]
+    }
+  },
+  "input_sessions": [
+    "2025-06-27T00:00:00",
+    "2025-06-30T00:00:00",
+    "2025-07-01T00:00:00",
+    "2025-07-02T00:00:00",
+    "2025-07-03T00:00:00"
+  ],
+  "input_close_instants": [
+    "2025-06-27T20:00:00+00:00",
+    "2025-06-30T20:00:00+00:00",
+    "2025-07-01T20:00:00+00:00",
+    "2025-07-02T20:00:00+00:00",
+    "2025-07-03T17:00:00+00:00"
+  ],
+  "asset_lifetimes": {
+    "start": "2025-06-27T00:00:00",
+    "end": "2025-07-03T00:00:00",
+    "method": "explicit finite input lifetimes"
+  },
+  "before": [
+    {
+      "timestamp": "2025-07-02T12:45:00+00:00",
+      "alpha": {
+        "index": [
+          0
+        ],
+        "index_name": null,
+        "columns": [
+          "mean",
+          "latest"
+        ],
+        "dtypes": [
+          "float64",
+          "float64"
+        ],
+        "values": [
+          [
+            15.0,
+            20.0
+          ]
+        ]
+      },
+      "lazy": {
+        "index": [
+          0
+        ],
+        "index_name": null,
+        "columns": [
+          "mean",
+          "latest"
+        ],
+        "dtypes": [
+          "float64",
+          "float64"
+        ],
+        "values": [
+          [
+            15.0,
+            20.0
+          ]
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-07-03T12:45:00+00:00",
+      "alpha": {
+        "index": [
+          0,
+          1
+        ],
+        "index_name": null,
+        "columns": [
+          "mean",
+          "latest"
+        ],
+        "dtypes": [
+          "float64",
+          "float64"
+        ],
+        "values": [
+          [
+            25.0,
+            30.0
+          ],
+          [
+            50.0,
+            60.0
+          ]
+        ]
+      },
+      "lazy": {
+        "index": [
+          0,
+          1
+        ],
+        "index_name": null,
+        "columns": [
+          "mean",
+          "latest"
+        ],
+        "dtypes": [
+          "float64",
+          "float64"
+        ],
+        "values": [
+          [
+            25.0,
+            30.0
+          ],
+          [
+            50.0,
+            60.0
+          ]
+        ]
+      }
+    }
+  ],
+  "market": [
+    {
+      "timestamp": "2025-07-02T20:00:00+00:00",
+      "alpha": {
+        "index": [
+          0
+        ],
+        "index_name": null,
+        "columns": [
+          "mean",
+          "latest"
+        ],
+        "dtypes": [
+          "float64",
+          "float64"
+        ],
+        "values": [
+          [
+            15.0,
+            20.0
+          ]
+        ]
+      }
+    },
+    {
+      "timestamp": "2025-07-03T17:00:00+00:00",
+      "alpha": {
+        "index": [
+          0,
+          1
+        ],
+        "index_name": null,
+        "columns": [
+          "mean",
+          "latest"
+        ],
+        "dtypes": [
+          "float64",
+          "float64"
+        ],
+        "values": [
+          [
+            25.0,
+            30.0
+          ],
+          [
+            50.0,
+            60.0
+          ]
+        ]
+      }
+    }
+  ],
+  "timing_claim": false
+}

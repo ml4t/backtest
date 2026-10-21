@@ -22,6 +22,57 @@ class Cash(Strategy):
         pass
 
 
+@pytest.mark.parametrize("include_start_session", [False, True])
+def test_explicit_start_session_pre_open_can_precede_trading_bound_without_warmup_callbacks(
+    include_start_session,
+):
+    first = datetime(2025, 7, 2, 13, 31, tzinfo=UTC)
+    closes = [datetime(2025, 7, day, 20 if day < 3 else 17, tzinfo=UTC) for day in [1, 2, 3]]
+    runtime, trace = RuntimeServices(start=first), []
+
+    def before(timestamp, _data, _context, _broker):
+        trace.append(
+            (timestamp, runtime.market.history(["A"], ["close"], bar_count=1)["close"].to_list())
+        )
+
+    runtime.scheduler.register(
+        before,
+        phase=LifecyclePhase.PRE_OPEN,
+        at="session_open",
+        minutes_before=45,
+        include_start_session=include_start_session,
+    )
+    result = Engine(
+        _instant_feed(
+            prices_df=pl.DataFrame(
+                {"timestamp": closes, "asset": ["A"] * 3, "close": [10.0, 20.0, 30.0]}
+            ),
+            feed_spec={
+                "time_contract_version": 2,
+                "calendar": "NYSE",
+                "timestamp_semantics": "bar_close",
+                "bar_label": "right",
+                "data_frequency": "1d",
+            },
+        ),
+        Cash(),
+        BacktestConfig(calendar="NYSE"),
+        runtime=runtime,
+    ).run()
+    expected = [(datetime(2025, 7, 3, 12, 45, tzinfo=UTC), [20.0])]
+    if include_start_session:
+        expected.insert(0, (datetime(2025, 7, 2, 12, 45, tzinfo=UTC), [10.0]))
+    assert trace == expected
+    assert result.to_equity_dataframe()["timestamp"].to_list() == closes[1:]
+    assert runtime.start == first
+
+
+def test_start_session_extension_cannot_be_used_to_run_an_early_market_callback():
+    runtime = RuntimeServices()
+    with pytest.raises(ValueError, match="option for pre_open"):
+        runtime.scheduler.register(lambda *_: None, include_start_session=True)
+
+
 @pytest.mark.parametrize("future_close", [104.0, 204.0])
 def test_daily_pre_session_sees_only_prior_prices_and_close_callbacks_follow_handle_data(
     future_close,

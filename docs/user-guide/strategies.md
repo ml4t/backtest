@@ -125,6 +125,13 @@ assert result.to_equity_dataframe()["timestamp"].to_list() == [dates[-1]]
 print("Runtime callbacks and causal warmup verified.")
 ```
 
+By default, scheduled clocks also obey `RuntimeServices.start`. For a run that
+starts at the first tradable minute, register a pre-open callback with
+`include_start_session=True` to include that session's earlier preparation clock.
+This option applies only to `PRE_OPEN`; market observations before `start`
+remain warmup rows. The Zipline callback adapter selects it for
+`before_trading_start`.
+
 History's default `unit="observation"` counts observed price instants, retaining
 missing asset rows. `known_at_cols={"field": "publication_timestamp_column"}` masks fields until
 available. `forward_fill=True` is an explicit read view with source timestamps;

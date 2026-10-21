@@ -217,6 +217,7 @@ def _register(context, runtime, data, before_trading_start):
             phase=LifecyclePhase.PRE_OPEN,
             at="session_open",
             minutes_before=45,
+            include_start_session=True,
         )
     for plan in context._schedules:
         if plan.calendar is not None and get_calendar(plan.calendar).name != source_calendar.name:

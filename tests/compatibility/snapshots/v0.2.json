@@ -668,6 +668,7 @@
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
     "from ml4t.backtest.compat.zipline import PreparedAssetLookup, run_algorithm",
+    "from ml4t.backtest.compat.zipline import PreparedPipeline, run_algorithm",
     "from ml4t.backtest.compat.zipline import run_algorithm",
     "from ml4t.backtest.compat.zipline import to_performance_frame",
     "from ml4t.backtest.compat.zipline.api import date_rules, get_datetime, record, schedule_function",
@@ -2786,6 +2787,22 @@
       "module": "ml4t.backtest.compat.zipline.lookup",
       "qualname": "PreparedAssetLookup",
       "signature": "(snapshot: Any) -> None"
+    },
+    "ml4t.backtest.compat.zipline:PreparedPipeline": {
+      "kind": "class",
+      "members": {
+        "metadata": {
+          "kind": "property",
+          "signature": "(self) -> dict[str, Any]"
+        },
+        "source": {
+          "kind": "property",
+          "signature": "(self) -> ml4t.backtest.auxiliary.AuxiliaryData"
+        }
+      },
+      "module": "ml4t.backtest.compat.zipline.pipeline",
+      "qualname": "PreparedPipeline",
+      "signature": "(panel: polars.dataframe.frame.DataFrame | polars.lazyframe.frame.LazyFrame | pandas.DataFrame, *, feature_spec: Any, decisions: polars.dataframe.frame.DataFrame | pandas.DataFrame | None = None, columns: collections.abc.Mapping[str, str] | None = None, source_id: str | None = None) -> None"
     },
     "ml4t.backtest.compat.zipline:run_algorithm": {
       "kind": "function",

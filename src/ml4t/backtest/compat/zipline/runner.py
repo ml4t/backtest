@@ -42,6 +42,7 @@ from .finance import commission, slippage
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
 from .lookup import PreparedAssetLookup, _lookup_instant, _symbol_parts
+from .pipeline import PreparedPipeline, _PipelineState
 from .results import to_performance_frame
 from .window import _borrow_window, _window
 
@@ -126,6 +127,7 @@ class MigrationContext:
         self._running = False
         self._in_before_trading_start = False
         self._schedules: list[_Schedule] = []
+        self._pipelines: dict[str, _PipelineState] = {}
         self._trading_controls: list[TradingControl] = []
         self._account_controls: list[tuple[str, float, timedelta | None]] = []
         self._slippage: Any = slippage.VolumeShareSlippage()
@@ -135,6 +137,30 @@ class MigrationContext:
     @property
     def account(self) -> AccountControlContext:
         return self._require_broker().get_account_snapshot()
+
+    def attach_pipeline(
+        self, pipeline: PreparedPipeline, name: str, chunks: Any = None, eager: bool = True
+    ) -> PreparedPipeline:
+        self._setup_only()
+        if not isinstance(pipeline, PreparedPipeline):
+            raise TypeError("Prepare feature calculations in Engineer and pass PreparedPipeline")
+        if not isinstance(name, str) or not name or name in self._pipelines:
+            raise ValueError("Pipeline names must be nonempty and unique")
+        if chunks is not None:
+            raise ValueError(
+                "chunks controls factor calculation; prepare batches upstream and attach the prepared panel without chunks"
+            )
+        if not isinstance(eager, bool):
+            raise TypeError("eager must be Boolean")
+        self._pipelines[name] = _PipelineState(pipeline, eager)
+        return pipeline
+
+    def pipeline_output(self, name: str) -> pd.DataFrame:
+        if self._initializing:
+            raise RuntimeError("pipeline_output is unavailable during initialize")
+        if name not in self._pipelines:
+            raise ValueError(f"No pipeline named {name!r}")
+        return self._pipelines[name].output()
 
     def set_max_leverage(self, max_leverage: float) -> None:
         self._setup_only()
@@ -605,7 +631,18 @@ class _Callbacks(Strategy):
         for control in self.context._trading_controls:
             broker.register_trading_control(control)
         _register_account_controls(self.context, self.runtime)
-        _register(self.context, self.runtime, self.data, self.before_trading_start)
+        _register(
+            self.context,
+            self.runtime,
+            self.data,
+            self._before if self.context._pipelines else self.before_trading_start,
+        )
+
+    def _before(self, context, data) -> None:
+        for state in context._pipelines.values():
+            state.capture(context, self.runtime)
+        if self.before_trading_start is not None:
+            self.before_trading_start(context, data)
 
     def on_end(self, broker: Broker) -> None:
         self.context._running = False
@@ -715,14 +752,22 @@ def run_algorithm(
                 initialize(context)
         context._initializing = False
         limits = context._execution_limits()
-        result = Engine(
-            feed,
-            _Callbacks(context, BarData(runtime), handle_data, runtime, before_trading_start),
-            config,
-            runtime=runtime,
-            execution_limits=limits,
-            holdings_sampling="bar",
-        ).run()
+        if context._pipelines:
+            config.metadata["migration_pipelines"] = {
+                name: {"definition": state.definition.metadata, "eager": state.eager}
+                for name, state in context._pipelines.items()
+            }
+        with runtime.auxiliary_scope(
+            tuple(state.definition.source for state in context._pipelines.values())
+        ):
+            result = Engine(
+                feed,
+                _Callbacks(context, BarData(runtime), handle_data, runtime, before_trading_start),
+                config,
+                runtime=runtime,
+                execution_limits=limits,
+                holdings_sampling="bar",
+            ).run()
     if asset_lookup is not None and result.config is not None:
         result.config.metadata["migration_symbol_lookup"]["date_overrides"] = list(
             context._lookup_overrides

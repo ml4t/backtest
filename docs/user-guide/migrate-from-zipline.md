@@ -354,7 +354,8 @@ input and its declared costs, not a performance measurement or a claim that
 all Zipline workflows are supported.
 
 This initial adapter does not yet implement
-the original Pipeline construction API, `fetch_csv`, benchmark
+the original Pipeline construction API. Use the [prepared panel route](#deliver-prepared-pipeline-results)
+for factor delivery. `fetch_csv`, benchmark
 return inputs, raw corporate actions or futures variation-cash settlement.
 Native scheduler and prepared feature/history routes remain available as
 shown above. `set_benchmark(None)` explicitly disables a benchmark; omission
@@ -837,3 +838,106 @@ The complete exported fixture and its original callback trace are retained in
 the recipe above with actual producer output. Static manual asset mappings also
 support case/share-class spelling and list containers, but cannot answer dated
 or country-specific queries without their source facts.
+
+### Deliver prepared Pipeline results
+
+Keep factor calculations and universe preparation in Engineer. Backtest's
+`PreparedPipeline` consumes that panel and its `FeatureSpec`, then exposes
+`attach_pipeline` and `pipeline_output` on the callback API and context. It
+uses the native auxiliary-data service and pre-open scheduler.
+
+In the original workflow, `SimpleMovingAverage(close, window_length=2)` on
+July 2 uses June 30 and July 1 closes. A screen based on latest volume also
+uses July 1. Prepare those values upstream with an explicit July 2 decision
+instant. The adapter does not calculate factors from execution prices.
+
+The following example starts from a prepared panel. Its two closes, 10 and
+20, give mean 15. The panel is published at July 1 close and delivered at
+July 2's NYSE premarket clock, 12:45 UTC.
+
+<!-- ml4t-doc-test: prepared-pipeline-delivery -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import DataFeed
+from ml4t.backtest.compat.zipline import PreparedPipeline, run_algorithm
+from ml4t.backtest.compat.zipline.assets import Asset
+
+decision = datetime(2025, 7, 2, 12, 45, tzinfo=UTC)
+panel = pl.DataFrame({
+    "timestamp": [datetime(2025, 7, 1).date()], "asset": ["A"],
+    "decision_time": [decision],
+    "available_at": [datetime(2025, 7, 1, 20, tzinfo=UTC)],
+    "eligible": [True], "mean": [15.0], "latest": [20.0],
+})
+feature_spec = {
+    "artifact_id": "two-price-mean", "kind": "features", "version": 1,
+    "schema": {"timestamp_col": "timestamp", "entity_col": "asset",
+               "feature_columns": ["mean", "latest"],
+               "decision_time_col": "decision_time", "available_at_col": "available_at",
+               "eligible_col": "eligible"},
+    "definition": {"feed_spec": {"timestamp_col": "timestamp", "entity_col": "asset",
+                                 "timestamp_semantics": "session_label", "calendar": "NYSE"},
+                   "price_basis": "raw"},
+}
+pipeline = PreparedPipeline(panel, feature_spec=feature_spec)
+prices = pl.DataFrame({
+    "timestamp": [datetime(2025, 7, 1, 20, tzinfo=UTC),
+                  datetime(2025, 7, 2, 20, tzinfo=UTC)],
+    "asset": ["A", "A"], "close": [20.0, 30.0], "volume": [1000, 1000],
+})
+feed = DataFeed(prices_df=prices, feed_spec={
+    "calendar": "NYSE", "time_contract_version": 2, "data_frequency": "1d",
+    "timestamp_semantics": "bar_close", "bar_label": "right",
+})
+asset, seen = Asset("A", "ALPHA", 0), []
+
+def initialize(context):
+    context.attach_pipeline(pipeline, "alpha", eager=False)
+
+def before_trading_start(context, data):
+    frame = context.pipeline_output("alpha")
+    assert frame.loc[asset, "mean"] == 15.0
+    assert frame.loc[asset, "latest"] == 20.0
+    seen.append(context.get_datetime())
+
+performance = run_algorithm(
+    feed=feed, assets=[asset], initialize=initialize,
+    before_trading_start=before_trading_start, start="2025-07-02", end="2025-07-02",
+)
+assert seen == [decision]
+assert performance.portfolio_value.tolist() == [100000.0]
+print("Prepared Pipeline delivery verified.")
+```
+
+For actual preparation, use Engineer's `prepare_feature_panel` with its
+declared lookbacks, observation cutoff, decision/publication instants and dated
+universe. Pass the resulting panel and `FeatureSpec` to the constructor above.
+The integration test in `tests/test_zipline_pipeline.py` regenerates
+`tests/fixtures/prepared_pipeline` through the public Engineer API. That route
+was qualified with [Engineer source 093b72d6](https://github.com/ml4t/engineer/commit/093b72d6801cf2b279f1aa682c6d2cabe45d494d)
+and Specs 0.2.0. The Backtest consumer needs neither Engineer nor Zipline
+installed.
+
+`columns={"output_name": "feature_name"}` selects and renames declared fields
+in insertion order. Each session uses the panel rows at its exact premarket
+decision instant, with publication and eligibility checked by the native
+runtime. Later publication cannot enter that session's cached output.
+`eager=False` delays Pandas conversion until the first read; both modes capture
+values at the same premarket instant. Returned frames are independent copies.
+Rows use the declared `Asset` index, sorted by legacy SID when supplied.
+
+A decision with no eligible rows returns an empty frame with the declared
+columns and dtypes. Supply the optional `decisions` table to declare sessions
+whose panel contains no rows at all. An undeclared decision raises an error
+instead of reusing the previous session's factors. A genuine missing factor
+stays missing.
+
+The original Pipeline expression DSL and `chunks` calculation scheduling move
+to upstream preparation. This adapter requires a prepared panel; it rejects a
+legacy Pipeline object or non-`None` `chunks`. Translate the calculation and
+batch preparation before attaching it. The pinned published 3.2.0 comparison
+uses explicit finite asset lifetimes, two output columns, a volume screen,
+eager/lazy attachments and July 3's early close. Its premarket and market
+frames match the prepared route, including column order and dtypes. This
+comparison does not qualify arbitrary custom Pipeline terms.

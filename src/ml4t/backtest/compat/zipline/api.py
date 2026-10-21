@@ -13,6 +13,7 @@ from .events import calendars as calendars
 from .events import date_rules as date_rules
 from .events import time_rules as time_rules
 from .finance.order import OrderView
+from .pipeline import PreparedPipeline
 
 
 def symbol(symbol_str: str, country_code: str | None = None) -> Asset:
@@ -169,3 +170,13 @@ def get_environment(field: str = "platform") -> Any:
 
 def set_symbol_lookup_date(dt: date | datetime | str) -> None:
     current().set_symbol_lookup_date(dt)
+
+
+def attach_pipeline(
+    pipeline: PreparedPipeline, name: str, chunks: Any = None, eager: bool = True
+) -> PreparedPipeline:
+    return current().attach_pipeline(pipeline, name, chunks, eager)
+
+
+def pipeline_output(name: str) -> pd.DataFrame:
+    return current().pipeline_output(name)

@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from ml4t.specs import LifecyclePhase, TimestampSemantics
 
 from ..calendar import get_schedule
-from ..sessions import _is_right_labeled_bar, session_date_for_timestamp
+from ..sessions import SessionConfig, _is_right_labeled_bar, session_date_for_timestamp
 from .schedule import (
     RebalanceCadence,
     RebalanceSchedule,
@@ -30,6 +30,7 @@ class _Registration:
     at: str
     offset: timedelta
     schedule: RebalanceSchedule
+    include_start_session: bool
 
 
 class SessionScheduler:
@@ -62,6 +63,7 @@ class SessionScheduler:
         minutes_before: int = 0,
         minutes_after: int = 0,
         schedule: RebalanceSchedule | None = None,
+        include_start_session: bool = False,
     ) -> None:
         """Register before execution or during on_start/on_prepare, in stable order."""
         if self._prepared:
@@ -89,12 +91,23 @@ class SessionScheduler:
             raise ValueError("Bar callbacks do not accept elapsed offsets")
         if phase is LifecyclePhase.PRE_OPEN and (at != "session_open" or offset > timedelta(0)):
             raise ValueError("pre_open callbacks require session_open with a nonpositive offset")
+        if not isinstance(include_start_session, bool) or (
+            include_start_session and phase is not LifecyclePhase.PRE_OPEN
+        ):
+            raise ValueError("include_start_session is a Boolean option for pre_open callbacks")
         if phase is LifecyclePhase.OPENING_AUCTION and (at != "session_open" or offset):
             raise ValueError("opening_auction callbacks require the actual session_open")
         if schedule is not None and not isinstance(schedule, RebalanceSchedule):
             raise TypeError("schedule must be a RebalanceSchedule")
         self._registrations.append(
-            _Registration(callback, phase, at, offset, schedule or RebalanceSchedule.every_bar())
+            _Registration(
+                callback,
+                phase,
+                at,
+                offset,
+                schedule or RebalanceSchedule.every_bar(),
+                include_start_session,
+            )
         )
         if self._runtime._engine is not None:
             self._validate()
@@ -147,6 +160,15 @@ class SessionScheduler:
         if calendar is None:
             raise ValueError("Session cadence requires a declared calendar")
         timezone = ZoneInfo(engine.config.resolved_timezone)
+        clock = SessionConfig(
+            calendar,
+            engine.config.resolved_timezone,
+            engine.config.resolved_session_start_time,
+            engine.config.resolved_timestamp_semantics,
+            engine.config.resolved_feed_spec.bar_label,
+            engine.config.resolved_data_frequency,
+        )
+        first_session = clock.date_for_timestamp(first).date()
 
         def feed_time(timestamp):
             return (
@@ -170,7 +192,13 @@ class SessionScheduler:
                     continue
                 anchor = opened if registration.at == "session_open" else closed
                 timestamp = anchor + registration.offset
-                if not self._runtime._accepts(timestamp):
+                start_session_pre = (
+                    registration.include_start_session
+                    and row["session_date"] == first_session
+                    and self._runtime.start is not None
+                    and timestamp < self._runtime.start
+                )
+                if not self._runtime._accepts(timestamp) and not start_session_pre:
                     continue
                 if not is_rebalance_timestamp(
                     closed,
