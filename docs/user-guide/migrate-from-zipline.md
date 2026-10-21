@@ -674,3 +674,34 @@ print("saved native account projected without rerunning the strategy")
 ```text
 saved native account projected without rerunning the strategy
 ```
+
+## Move the strategy itself to the native API
+
+The source distribution includes `examples/zipline_native_strategies.py`, with
+`DualMovingAverage` and `OnlineMovingAverageReversion`. Both subclass the existing
+`Strategy`, receive `RuntimeServices`, read native long-form current/history
+views and submit orders through `Broker`. They use no callback facade or Zipline
+installation. Construct the runtime once and pass the same instance to the
+strategy and `Engine(..., runtime=runtime)`.
+
+`reference_execution()` returns the explicit configuration and shared-volume
+limit used for these examples. It selects next-bar **close** fills, FIFO,
+per-order per-share fees with a one-dollar minimum, and cumulative volume-share
+impact. Pass both the configuration and `execution_limits` to `Engine`; using
+its default execution assumptions changes the experiment. This helper describes
+the qualified example settings, not all Zipline strategies or financial models.
+
+The OLMAR journey uses seven equity assets, a five-session window, epsilon 1.05
+and 13 complete daily sessions. The dual moving-average journey uses 350 daily
+sessions, waits for its full 300-session window and exercises both crossovers.
+The same frozen OHLCV inputs run through published Zipline 3.2.0, the imported
+callbacks above and these native ports. Checks compare intermediate weights,
+cash, NAV, position quantities and cost basis where applicable, recorded moving
+averages, and every signed fill and execution price. The native ports retain
+Apache-2.0 attribution in the example and `examples/LICENSE.zipline`.
+
+These examples use complete daily equity grids. They do not demonstrate
+corporate actions, futures accounting, cross-frequency preparation or missing-bar
+imputation. For causal feature preparation use Engineer, for adjustment inputs
+use Data, and keep their declared availability and basis when constructing the
+feed. The strategy owns decisions; the native broker owns fills and accounts.
