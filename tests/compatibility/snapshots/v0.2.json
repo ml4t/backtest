@@ -659,6 +659,7 @@
     "from ml4t.backtest.config import SlippageType",
     "from ml4t.backtest.config import SlippageType, SpreadConvention",
     "from ml4t.backtest.config import TrailStopTiming, WaterMarkSource, InitialHwmSource",
+    "from ml4t.backtest.controls import AccountConstraints, OrderConstraints, TradingControlViolation",
     "from ml4t.backtest.example_data import ExampleRoundTrip, load_example_prices",
     "from ml4t.backtest.example_data import load_example_prices",
     "from ml4t.backtest.execution import LinearImpact",
@@ -2836,6 +2837,45 @@
       "qualname": "WaterMarkSource",
       "signature": "(*values)"
     },
+    "ml4t.backtest.controls:AccountConstraints": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "validate": {
+          "kind": "method",
+          "signature": "(self, account: 'AccountControlContext') -> 'None'"
+        }
+      },
+      "module": "ml4t.backtest.controls",
+      "qualname": "AccountConstraints",
+      "signature": "(max_leverage: 'float | None' = None, min_leverage: 'float | None' = None, deadline: 'datetime | None' = None) -> None"
+    },
+    "ml4t.backtest.controls:OrderConstraints": {
+      "kind": "class",
+      "members": {
+        "__repr__": {
+          "kind": "method",
+          "signature": "(self)"
+        },
+        "validate": {
+          "kind": "method",
+          "signature": "(self, request: 'OrderControlContext') -> 'None'"
+        }
+      },
+      "module": "ml4t.backtest.controls",
+      "qualname": "OrderConstraints",
+      "signature": "(asset: 'str | None' = None, max_order_quantity: 'float | None' = None, max_order_notional: 'float | None' = None, max_position_quantity: 'float | None' = None, max_position_notional: 'float | None' = None, max_orders_per_session: 'int | None' = None, max_orders_per_day: 'int | None' = None, long_only: 'bool' = False, include_pending: 'bool' = True, notional_basis: \"Literal['economic', 'quoted_units']\" = 'economic', blocked_assets: 'frozenset[str]' = <factory>, restriction: 'Callable[[OrderControlContext], bool] | None' = None) -> None"
+    },
+    "ml4t.backtest.controls:TradingControlViolation": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.controls",
+      "qualname": "TradingControlViolation",
+      "signature": null
+    },
     "ml4t.backtest.example_data:ExampleRoundTrip": {
       "kind": "class",
       "members": {
@@ -4114,6 +4154,10 @@
           "kind": "method",
           "signature": "(self, asset: 'str', fraction: 'float', order_type: 'OrderType' = <OrderType.MARKET: 'market'>, limit_price: 'float | None' = None) -> 'Order | None'"
         },
+        "register_account_control": {
+          "kind": "method",
+          "signature": "(self, control: 'AccountControl', *, boundary: \"Literal['after_callbacks', 'after_fills']\" = 'after_fills') -> 'None'"
+        },
         "register_position_rule_policy": {
           "kind": "method",
           "signature": "(self, policy_id: 'str', rules: 'PositionRule') -> 'None'"
@@ -4121,6 +4165,10 @@
         "register_target_intent": {
           "kind": "method",
           "signature": "(self, intent: 'CanonicalTargetIntent', *, position_rules: 'PositionRule | Mapping[str, PositionRule] | None' = None) -> 'CanonicalTargetIntent'"
+        },
+        "register_trading_control": {
+          "kind": "method",
+          "signature": "(self, control: 'TradingControl') -> 'None'"
         },
         "restore_target_intent_state": {
           "kind": "method",
@@ -4157,6 +4205,10 @@
         "update_position_context": {
           "kind": "method",
           "signature": "(self, asset: 'str', context: 'dict') -> 'None'"
+        },
+        "validate_account_controls": {
+          "kind": "method",
+          "signature": "(self, *, boundary: \"Literal['after_callbacks', 'after_fills'] | None\" = None) -> 'None'"
         }
       },
       "module": "ml4t.backtest.broker",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
+from numbers import Real
 from typing import TYPE_CHECKING
 
 from ..config import MissingPricePolicy
@@ -72,6 +73,10 @@ class OrderBook:
             if existing_pos is None:
                 return None
 
+        control_request = broker._validate_trading_controls(
+            asset, quantity if side is OrderSide.BUY else -quantity
+        )
+
         self.orders.counter += 1
         order = Order(
             asset=asset,
@@ -99,6 +104,8 @@ class OrderBook:
         order._signal_price = self.market.prices.get(asset)
 
         self.orders.orders.append(order)
+        if control_request is not None:
+            broker._commit_control_order(control_request)
 
         # Immediate fill: same-bar market orders fill during submit_order()
         # instead of being queued for later _process_orders(). Each order
@@ -255,8 +262,23 @@ class OrderBook:
 
         for order in self.orders.pending:
             if order.order_id == order_id:
+                quantity = kwargs.get("quantity", self.fill_engine.get_effective_quantity(order))
+                if (
+                    isinstance(quantity, bool)
+                    or not isinstance(quantity, Real)
+                    or not math.isfinite(quantity)
+                    or quantity <= 0
+                ):
+                    raise ValueError("Updated remaining quantity must be finite and positive")
+                self.broker._validate_trading_controls(
+                    order.asset,
+                    quantity if order.side is OrderSide.BUY else -quantity,
+                    replacing_order_id=order_id,
+                )
                 for key, value in kwargs.items():
                     setattr(order, key, value)
+                if "quantity" in kwargs and order_id in self.orders.partial_quantities:
+                    self.orders.partial_quantities[order_id] = quantity
                 return True
         return False
 

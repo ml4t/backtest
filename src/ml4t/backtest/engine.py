@@ -563,6 +563,8 @@ class Engine:
                     session_context = {}
                 if self.runtime is not None:
                     self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=False)
+                if self.broker._account_controls:
+                    self.broker.validate_account_controls(boundary="after_callbacks")
                 # MOC orders are the one next-bar exception: they execute on the
                 # current session close after strategy logic runs.
                 self.broker._process_orders(
@@ -577,9 +579,13 @@ class Engine:
                 self._dispatch_market_event(timestamp, assets_data, context)
                 if self.runtime is not None:
                     self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=False)
+                if self.broker._account_controls:
+                    self.broker.validate_account_controls(boundary="after_callbacks")
                 self.broker._process_orders()
 
             self.preopen_target_manager.reconcile(timestamp)
+            if self.broker._account_controls:
+                self.broker.validate_account_controls(boundary="after_fills")
 
             # Update water marks at END of bar, AFTER all orders processed
             # This ensures new positions get their HWM updated from entry bar's high

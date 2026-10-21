@@ -44,6 +44,7 @@ _REQUIRED_EXAMPLES = frozenset(
     {
         "runtime-causal-session",
         "runtime-history-windows",
+        "trading-account-controls",
         "order-context-fees",
         "account-engine-direct",
         "account-gatekeeper",

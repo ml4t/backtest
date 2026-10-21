@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from ..types import Fill, Order, Trade
@@ -45,6 +45,7 @@ class OrderState:
     partial_quantities: dict[str, float] = field(default_factory=dict)
     filled_this_bar: set[str] = field(default_factory=set)
     volume_consumed_by_asset: dict[str, float] = field(default_factory=dict)
+    control_counts: dict[tuple[str, date], int] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -6,9 +6,9 @@ import copy
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
 from math import isfinite
-from typing import TYPE_CHECKING, Any, TypedDict, Unpack
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack
 from zoneinfo import ZoneInfo
 
 from .capital import CapitalChange, CapitalEvent
@@ -26,6 +26,7 @@ from .config import (
     TrailStopTiming,
     WaterMarkSource,
 )
+from .controls import AccountControl, AccountControlContext, OrderControlContext, TradingControl
 from .core import (
     ExecutionEngine,
     ExecutionJournal,
@@ -183,6 +184,10 @@ class Broker:
         self.settlement_reduces_buying_power = settlement_reduces_buying_power
         self._market_state = MarketState()
         self._order_state = OrderState()
+        self._trading_controls: list[TradingControl] = []
+        self._account_controls: list[tuple[str, AccountControl]] = []
+        self._order_session_config: SessionConfig | None = None
+        self._scheduled_session_date: date | None = None
         self._risk_state = RiskState()
         self._execution_journal = ExecutionJournal()
 
@@ -414,7 +419,7 @@ class Broker:
         elif effective_slippage_type == SlippageType.NONE:
             slippage_model = NoSlippage()
 
-        return cls(
+        broker = cls(
             initial_cash=config.initial_cash,
             commission_model=commission_model,
             slippage_model=slippage_model,
@@ -460,6 +465,18 @@ class Broker:
             settlement_delay=config.settlement_delay,
             settlement_reduces_buying_power=config.settlement_reduces_buying_power,
         )
+        if config.resolved_calendar is not None:
+            from .sessions import SessionConfig
+
+            broker._order_session_config = SessionConfig(
+                calendar=config.resolved_calendar,
+                timezone=config.resolved_timezone,
+                session_start_time=config.resolved_session_start_time,
+                data_frequency=config.resolved_data_frequency,
+                timestamp_semantics=config.resolved_timestamp_semantics,
+                bar_label=config.resolved_feed_spec.bar_label,
+            )
+        return broker
 
     # Phase 4.1: Make cash a property delegating to account to prevent state drift
     @property
@@ -932,6 +949,9 @@ class Broker:
             "partial_quantities": copy.deepcopy(self._order_state.partial_quantities),
             "filled_this_bar": set(self._order_state.filled_this_bar),
             "volume_consumed_by_asset": dict(self._order_state.volume_consumed_by_asset),
+            "control_counts": dict(self._order_state.control_counts),
+            "trading_controls": tuple(self._trading_controls),
+            "account_controls": tuple(self._account_controls),
             "orders_this_bar": tuple(self._order_state.current_bar),
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
@@ -1047,6 +1067,10 @@ class Broker:
         self._order_state.filled_this_bar.update(state["filled_this_bar"])
         self._order_state.volume_consumed_by_asset.clear()
         self._order_state.volume_consumed_by_asset.update(state["volume_consumed_by_asset"])
+        self._order_state.control_counts.clear()
+        self._order_state.control_counts.update(state["control_counts"])
+        self._trading_controls[:] = state["trading_controls"]
+        self._account_controls[:] = state["account_controls"]
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
@@ -1077,13 +1101,18 @@ class Broker:
             self._preopen_target_manager.restore_transaction_state(target_intent_state)
 
     @contextmanager
-    def _scheduled_callback_clock(self, timestamp: datetime) -> Iterator[None]:
+    def _scheduled_callback_clock(
+        self, timestamp: datetime, *, session_date: date | None = None
+    ) -> Iterator[None]:
         previous = self._market_state.time
+        previous_session = self._scheduled_session_date
         self._market_state.time = timestamp
+        self._scheduled_session_date = session_date
         try:
             yield
         finally:
             self._market_state.time = previous
+            self._scheduled_session_date = previous_session
 
     def _may_fill_immediately(self) -> bool:
         from ml4t.specs import LifecyclePhase
@@ -1660,6 +1689,105 @@ class Broker:
             all_asset_stats=True,
         )
         return self._risk_engine.evaluate_position_rules()
+
+    def register_trading_control(self, control: TradingControl) -> None:
+        """Add an ordered, side-effect-free pre-submission validator."""
+        if not callable(getattr(control, "validate", None)):
+            raise TypeError("Trading controls must define validate(request)")
+        self._capture_lifecycle_mutation()
+        self._trading_controls.append(control)
+
+    def register_account_control(
+        self,
+        control: AccountControl,
+        *,
+        boundary: Literal["after_callbacks", "after_fills"] = "after_fills",
+    ) -> None:
+        """Validate the observed account at an explicit per-event boundary."""
+        if boundary not in {"after_callbacks", "after_fills"}:
+            raise ValueError("Account control boundary must be after_callbacks or after_fills")
+        if not callable(getattr(control, "validate", None)):
+            raise TypeError("Account controls must define validate(account)")
+        self._capture_lifecycle_mutation()
+        self._account_controls.append((boundary, control))
+
+    def _validate_trading_controls(
+        self, asset: str, quantity: float, *, replacing_order_id: str | None = None
+    ) -> OrderControlContext | None:
+        if not self._trading_controls:
+            return None
+        from ml4t.specs import LifecyclePhase
+
+        timestamp = self._market_state.time
+        clock = self._order_session_config or self._session_config
+        session = (
+            clock.date_for_timestamp(timestamp).date()
+            if clock is not None and timestamp is not None
+            else None
+        )
+        if self._scheduled_session_date is not None:
+            session = self._scheduled_session_date
+        counts = self._order_state.control_counts
+        position = self.positions.get(asset)
+        pending_buy = pending_sell = 0.0
+        for order in self.pending_orders:
+            if order.asset != asset or order.order_id == replacing_order_id:
+                continue
+            remaining = self._fill_engine.get_effective_quantity(order)
+            if order.side is OrderSide.BUY:
+                pending_buy += remaining
+            else:
+                pending_sell += remaining
+        request = OrderControlContext(
+            timestamp,
+            asset,
+            quantity,
+            position.quantity if position else 0.0,
+            pending_buy,
+            pending_sell,
+            None
+            if self._active_lifecycle_phase is LifecyclePhase.PRE_OPEN
+            else self._current_prices.get(asset),
+            self.get_multiplier(asset),
+            session,
+            counts.get(("session", session), 0) if session is not None else 0,
+            counts.get(("day", timestamp.date()), 0) if timestamp is not None else 0,
+            is_update=replacing_order_id is not None,
+        )
+        for control in self._trading_controls:
+            control.validate(request)
+        return request
+
+    def _commit_control_order(self, request: OrderControlContext) -> None:
+        counts = self._order_state.control_counts
+        counts.clear()
+        if request.session_date is not None:
+            counts[("session", request.session_date)] = request.orders_in_session + 1
+        if request.timestamp is not None:
+            counts[("day", request.timestamp.date())] = request.orders_in_day + 1
+
+    def validate_account_controls(
+        self, *, boundary: Literal["after_callbacks", "after_fills"] | None = None
+    ) -> None:
+        """Run registered validators over one native marked account snapshot.
+
+        Calling without a boundary validates every registered rule immediately.
+        Account validation raises on breach; it does not liquidate or roll back
+        completed callbacks. Portfolio risk actions remain with the risk manager.
+        """
+        if boundary not in {None, "after_callbacks", "after_fills"}:
+            raise ValueError("Account control boundary must be after_callbacks or after_fills")
+        controls = [
+            rule for phase, rule in self._account_controls if boundary is None or phase == boundary
+        ]
+        if not controls:
+            return
+        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
+            include_holdings=False
+        )
+        state = AccountControlContext(self._market_state.time, equity, cash, gross, net)
+        for control in controls:
+            control.validate(state)
 
     def submit_order(
         self,
