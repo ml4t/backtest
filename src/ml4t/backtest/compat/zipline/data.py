@@ -15,8 +15,8 @@ from .assets import Asset
 class BarData:
     """Project current/history without a separate price store or execution path.
 
-    Daily output labels are native calendar session dates. Minute output preserves
-    physical UTC instants. Requested history frequency must match the prepared
+    With a calendar, daily labels are native session dates. Calendar-free reads
+    and minute output preserve physical UTC instants. Requested history frequency must match the prepared
     source grid; this boundary never resamples raw data or computes adjustments.
     """
 

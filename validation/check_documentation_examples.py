@@ -54,6 +54,7 @@ _REQUIRED_EXAMPLES = frozenset(
         "conditional-stop-limit",
         "order-context-fees",
         "account-engine-direct",
+        "native-account-snapshot",
         "account-gatekeeper",
         "installation-import",
         "migration-zipline-target",

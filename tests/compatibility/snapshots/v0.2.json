@@ -671,6 +671,7 @@
     "from ml4t.backtest.config import BacktestConfig",
     "from ml4t.backtest.config import CommissionType",
     "from ml4t.backtest.config import CommissionType, DataFrequency, ExecutionMode",
+    "from ml4t.backtest.config import CommissionType, ExecutionMode",
     "from ml4t.backtest.config import CommissionType, ExecutionMode, ExecutionPrice",
     "from ml4t.backtest.config import CommissionType, SlippageType",
     "from ml4t.backtest.config import ConditionalOrderMode, ExecutionMode, ExecutionPrice",
@@ -4148,6 +4149,10 @@
         "from_config": {
           "kind": "method",
           "signature": "(cls, config: 'BacktestConfig', execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None) -> 'Broker'"
+        },
+        "get_account_snapshot": {
+          "kind": "method",
+          "signature": "(self) -> 'AccountControlContext'"
         },
         "get_account_value": {
           "kind": "method",

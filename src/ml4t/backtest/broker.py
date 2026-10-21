@@ -58,6 +58,7 @@ from .types import (
     StopFillMode,
     StopLevelBasis,
     Trade,
+    _validated_multiplier,
 )
 
 if TYPE_CHECKING:
@@ -263,7 +264,11 @@ class Broker:
         self.market_impact_model = market_impact_model  # MarketImpactModel instance
 
         # Contract specifications (for futures and other derivatives)
-        self._contract_specs: dict[str, ContractSpec] = contract_specs or {}
+        self._contract_specs: dict[str, ContractSpec] = (
+            copy.deepcopy(contract_specs) if contract_specs else {}
+        )
+        for spec in self._contract_specs.values():
+            _validated_multiplier(spec.multiplier)
 
         # Fill execution (extracted from _execute_fill)
         self._fill_executor = FillExecutor(
@@ -1212,13 +1217,14 @@ class Broker:
             validator(market_event_count)
 
     def get_contract_spec(self, asset: str) -> ContractSpec | None:
-        """Return the configured contract specification, or None when absent."""
-        return self._contract_specs.get(asset)
+        """Return a detached contract specification, or None when absent."""
+        spec = self._contract_specs.get(asset)
+        return copy.deepcopy(spec) if spec is not None else None
 
     def get_multiplier(self, asset: str) -> float:
         """Get contract multiplier for an asset (1.0 for equities)."""
         spec = self._contract_specs.get(asset)
-        return spec.multiplier if spec else 1.0
+        return _validated_multiplier(spec.multiplier) if spec else 1.0
 
     def _next_rebalance_id(self) -> str:
         self._capture_lifecycle_mutation()
@@ -1583,6 +1589,15 @@ class Broker:
         """Return cash plus positions marked from the configured price source."""
         return self._portfolio_ledger.get_account_value()
 
+    def get_account_snapshot(self) -> AccountControlContext:
+        """Return one immutable, currently marked native account observation."""
+        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
+            include_holdings=False
+        )
+        return AccountControlContext(
+            self._market_state.time, equity, cash, gross, net, positions_value=net
+        )
+
     def get_account_value(self) -> float:
         """Return marked account equity using the compatibility method name."""
         return self.equity()
@@ -1901,10 +1916,7 @@ class Broker:
         ]
         if not controls:
             return
-        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
-            include_holdings=False
-        )
-        state = AccountControlContext(self._market_state.time, equity, cash, gross, net)
+        state = self.get_account_snapshot()
         for control in controls:
             control.validate(state)
 
@@ -1953,6 +1965,8 @@ class Broker:
             order = broker.submit_order("AAPL", -100, order_type=OrderType.STOP,
                                         stop_price=145.0)
         """
+        if asset in self._contract_specs:
+            self.get_multiplier(asset)
         self._capture_lifecycle_mutation(asset=asset)
         return self._order_book.submit_order(
             asset=asset,
@@ -2088,6 +2102,9 @@ class Broker:
         Raises:
             ValueError: If attempting to update non-updatable fields
         """
+        order = self.get_order(order_id)
+        if order is not None:
+            self.get_multiplier(order.asset)
         self._capture_lifecycle_mutation(order_id=order_id)
         return self._order_book.update_order(order_id, **kwargs)
 

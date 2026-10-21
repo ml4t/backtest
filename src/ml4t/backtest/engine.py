@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import warnings
+from copy import deepcopy
 from datetime import date, datetime
 from math import ceil
 from typing import TYPE_CHECKING, Any
@@ -122,7 +123,7 @@ class Engine:
 
         self.feed = feed
         self.strategy = strategy
-        self.config = config.merge_feed_spec(getattr(feed, "feed_spec", None))
+        self.config = deepcopy(config).merge_feed_spec(getattr(feed, "feed_spec", None))
         if (
             holdings_sampling in {"session", "fill_and_session"}
             and self.config.resolved_calendar is None
@@ -887,7 +888,7 @@ class Engine:
                     "num_funding_events": 0,
                     **contract_evidence,
                 },
-                config=self.config,
+                config=deepcopy(self.config),
                 initial_capital=self.config.initial_cash,
                 returns_include_commissions=True,
                 account_method="signed_notional",
@@ -1021,7 +1022,7 @@ class Engine:
             predictions=self.feed.signals,
             portfolio_state=observed_account,
             metrics=metrics,
-            config=self.config,
+            config=deepcopy(self.config),
             initial_capital=self.config.initial_cash,
             returns_include_commissions=True,
             account_method="signed_notional",

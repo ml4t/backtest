@@ -4,6 +4,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
+from math import isfinite
+from numbers import Real
 from typing import Any
 
 # === Enums ===
@@ -65,6 +67,21 @@ class AssetClass(Enum):
     FOREX = "forex"  # FX pairs (pip value varies)
 
 
+def _validated_multiplier(value: float) -> float:
+    try:
+        valid = (
+            not isinstance(value, bool)
+            and isinstance(value, Real)
+            and isfinite(value)
+            and value > 0
+        )
+    except OverflowError:
+        valid = False
+    if not valid:
+        raise ValueError("Contract multiplier must be finite and positive")
+    return value
+
+
 @dataclass
 class ContractSpec:
     """Contract specification for an asset.
@@ -108,6 +125,9 @@ class ContractSpec:
     margin: float | None = None  # Initial margin per contract (overrides account default)
     margin_pct: tuple[float, float] | None = None  # (initial, maintenance) fractions of notional
     currency: str = "USD"
+
+    def __post_init__(self) -> None:
+        _validated_multiplier(self.multiplier)
 
 
 class ExitReason(str, Enum):

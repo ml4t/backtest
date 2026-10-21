@@ -190,6 +190,57 @@ config = BacktestConfig(
 broker = Broker.from_config(config)
 ```
 
+## Read a marked account snapshot
+
+`broker.get_account_snapshot()` returns an immutable observation of the current
+native ledger: `timestamp`, `equity`, `cash`, `positions_value`, `gross_exposure`,
+`net_exposure` and `leverage`. `timestamp` is the broker's query/callback clock,
+including pre-open clocks; it does not assert that every position has a new
+quote. Read holdings exports for individual mark timestamps and sources.
+
+Position value is supplied directly by the marked ledger. It is not recovered
+by subtracting cash from rounded NAV. The current signed-notional account method
+has the same position value and net exposure; the futures cash limitation above
+still applies. Calling this getter does not add a bar or result observation.
+Request a new snapshot after an event or fill when updated values are needed.
+
+<!-- ml4t-doc-test: native-account-snapshot -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import CommissionType, ExecutionMode
+
+seen = []
+class ReadAccount(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        broker.submit_order("A", 2)
+        state = broker.get_account_snapshot()
+        assert abs(state.cash - 99798.8) < 1e-8
+        assert abs(state.equity - 99998.8) < 1e-8
+        assert state.positions_value == 200.0
+        assert state.gross_exposure == state.net_exposure == 200.0
+        seen.append(state.timestamp)
+
+clock = datetime(2025, 1, 6, 21, tzinfo=UTC)
+result = Engine(
+    DataFeed(prices_df=pl.DataFrame({"timestamp": [clock], "asset": ["A"], "close": [100.0]})),
+    ReadAccount(),
+    BacktestConfig(calendar=None, initial_cash=100000, execution_mode=ExecutionMode.SAME_BAR,
+                    immediate_fill=True, commission_type=CommissionType.PER_ORDER,
+                    commission_per_share=0.1, commission_per_trade=1.0),
+).run()
+assert seen == [clock]
+assert result.to_fills_dataframe()["commission"].to_list() == [1.2]
+print("The snapshot includes the actual fill fee and marked position value.")
+```
+
+Contract multipliers must be finite positive real numbers; Boolean and unknown
+values are invalid. `Engine` captures copies of supplied `ContractSpec` objects,
+and `broker.get_contract_spec(asset)` returns a detached copy. Editing preparation
+objects or a returned descriptor does not change a bound run's execution units.
+Prepare explicit dated instruments or conversion events for unit changes.
+
 ## Transaction Costs
 
 In development source, fill-time affordability uses the actual price after market
@@ -312,3 +363,8 @@ Chapter 17, Section 17.4, [Conformal position sizing](https://github.com/stefan-
 - [Risk Management](risk-management.md) -- position rules and portfolio limits that interact with buying power
 - [Rebalancing](rebalancing.md) -- portfolio-weight execution under explicit account constraints
 - [Results & Analysis](results.md) -- inspect turnover, fills, and portfolio-state effects of account policy
+
+Engine captures its input configuration when constructed, including nested mappings.
+Prepare settings before constructing the Engine. Editing the original configuration
+does not reconfigure a bound run, and the returned result keeps a detached copy of
+the settings used for that run.

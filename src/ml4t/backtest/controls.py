@@ -159,6 +159,7 @@ class AccountControlContext:
     cash: float
     gross_exposure: float
     net_exposure: float
+    positions_value: float | None = field(default=None, kw_only=True)
 
     @property
     def leverage(self) -> float:
