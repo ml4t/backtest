@@ -1,8 +1,14 @@
 """Pluggable commission and slippage models."""
 
+from __future__ import annotations
+
 import math
 from copy import deepcopy
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from .types import Order
 
 # === Protocols ===
 
@@ -29,13 +35,50 @@ class SlippageModel(Protocol):
     ) -> float: ...
 
 
+@dataclass(frozen=True)
+class CommissionContext:
+    """A quote's actual fill increment and the order's previously committed fees."""
+
+    order_id: str | None
+    asset: str
+    signed_quantity: float
+    price: float
+    multiplier: float
+    filled_quantity: float
+    commission_paid: float
+    filled_notional: float
+
+
 def calculate_commission(
     model: CommissionModel,
     asset: str,
     quantity: float,
     price: float,
+    *,
+    order: Order | None = None,
+    multiplier: float = 1.0,
 ) -> float:
-    value = model.calculate(asset, quantity, price)
+    quote = getattr(model, "quote", None)
+    value = (
+        quote(
+            CommissionContext(
+                order.order_id if order is not None else None,
+                asset,
+                -abs(quantity)
+                if order is not None and order.side.value == "sell"
+                else abs(quantity),
+                price,
+                multiplier,
+                order.filled_quantity if order is not None else 0.0,
+                order.commission_paid if order is not None else 0.0,
+                abs((order.filled_price or 0.0) * order.filled_quantity * multiplier)
+                if order is not None
+                else 0.0,
+            )
+        )
+        if quote is not None
+        else model.calculate(asset, quantity, price)
+    )
     return _validate_nonnegative_model_output("commission", model, value)
 
 
@@ -44,6 +87,9 @@ def estimate_commission(
     asset: str,
     quantity: float,
     price: float,
+    *,
+    order: Order | None = None,
+    multiplier: float = 1.0,
 ) -> float:
     """Estimate a fee without advancing a stateful model's execution state."""
     try:
@@ -52,7 +98,35 @@ def estimate_commission(
         raise TypeError("commission model must support deepcopy for pre-trade estimates") from exc
     if estimate_model is model:
         raise TypeError("commission model deepcopy must return an independent instance")
-    return calculate_commission(estimate_model, asset, quantity, price)
+    return calculate_commission(
+        estimate_model, asset, quantity, price, order=order, multiplier=multiplier
+    )
+
+
+def quote_commission(
+    model: CommissionModel,
+    asset: str,
+    quantity: float,
+    price: float,
+    *,
+    order: Order | None = None,
+    multiplier: float = 1.0,
+) -> float:
+    """Quote without consuming mutable models; retain native stateless validation cost."""
+    if type(model) in (
+        NoCommission,
+        PercentageCommission,
+        PerShareCommission,
+        PerOrderCommission,
+        PerOrderPerShareCommission,
+        TieredCommission,
+        CombinedCommission,
+        FuturesCommission,
+    ):
+        return calculate_commission(
+            model, asset, quantity, price, order=order, multiplier=multiplier
+        )
+    return estimate_commission(model, asset, quantity, price, order=order, multiplier=multiplier)
 
 
 def calculate_slippage(
@@ -112,6 +186,42 @@ class PerShareCommission:
 
     def calculate(self, asset: str, quantity: float, price: float) -> float:
         return max(abs(quantity) * self.per_share, self.minimum)
+
+
+class PerOrderCommission:
+    """Compose unit, notional and one-time fees with a cumulative order minimum."""
+
+    def __init__(
+        self,
+        per_share: float = 0.0,
+        rate: float = 0.0,
+        per_trade: float = 0.0,
+        minimum: float = 0.0,
+    ):
+        if any(
+            not math.isfinite(value) or value < 0 for value in (per_share, rate, per_trade, minimum)
+        ):
+            raise ValueError("Commission rates and minimum must be finite and nonnegative")
+        self.per_share, self.rate = per_share, rate
+        self.per_trade, self.minimum = per_trade, minimum
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        raise TypeError("Per-order commission requires a CommissionContext quote")
+
+    def quote(self, context: CommissionContext) -> float:
+        quantity = context.filled_quantity + abs(context.signed_quantity)
+        notional = context.filled_notional + abs(
+            context.signed_quantity * context.price * context.multiplier
+        )
+        total = quantity * self.per_share + notional * self.rate + self.per_trade
+        return max(0.0, max(total, self.minimum) - context.commission_paid)
+
+
+class PerOrderPerShareCommission(PerOrderCommission):
+    """Cumulative per-order minimum; each fill pays only the remaining amount due."""
+
+    def __init__(self, per_share: float = 0.0, minimum: float = 0.0):
+        super().__init__(per_share=per_share, minimum=minimum)
 
 
 class TieredCommission:

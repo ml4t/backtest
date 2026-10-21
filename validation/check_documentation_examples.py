@@ -43,6 +43,7 @@ _API_AUDIT_PATHS = (
 _REQUIRED_EXAMPLES = frozenset(
     {
         "runtime-causal-session",
+        "order-context-fees",
         "account-engine-direct",
         "account-gatekeeper",
         "installation-import",

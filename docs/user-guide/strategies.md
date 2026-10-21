@@ -67,6 +67,9 @@ Signals come from the optional signals DataFrame passed to DataFeed. Access them
 
 ## Use causal history and session callbacks
 
+These additional runtime services are development-source features, outside the
+preserved 0.1.13 release candidate.
+
 Pass a `RuntimeServices` instance to the existing `Engine`. The strategy's `context`
 remains the input feed context. Rows before `start` supply history but cannot trade
 or create account observations. The service becomes unavailable after the run.

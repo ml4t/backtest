@@ -176,6 +176,7 @@ class Order:
     _risk_exit_reason: str | None = None  # Human-readable reason (legacy, for logging)
     _exit_reason: ExitReason | None = None  # Typed exit reason (preferred)
     _risk_fill_price: float | None = None  # Stop/target price for risk exits
+    commission_paid: float = field(default=0.0, kw_only=True)
 
     def __post_init__(self) -> None:
         if self.requested_quantity is None:

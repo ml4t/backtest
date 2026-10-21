@@ -394,7 +394,12 @@ class OrderBook:
         if opened != 0.0:
             shadow_cash -= opened * signal_price
         shadow_cash -= estimate_commission(
-            broker.commission_model, order.asset, order.quantity, signal_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            signal_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
 
         # Keep shadow effects even for rejected orders to mirror Backtrader's
@@ -469,7 +474,12 @@ class OrderBook:
             # LEAN semantics: shorts consume buying power rather than crediting cash.
             shadow_cash -= abs(opened) * signal_price * multiplier
         shadow_cash -= estimate_commission(
-            broker.commission_model, order.asset, order.quantity, signal_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            signal_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
 
         if shadow_cash < 0.0:
@@ -505,7 +515,12 @@ class OrderBook:
         )
 
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, signal_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            signal_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         shadow_positions = self._build_shadow_policy_positions()
         available_cash = self._submission_shadow_cash

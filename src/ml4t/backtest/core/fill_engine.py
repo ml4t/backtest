@@ -113,6 +113,8 @@ class FillEngine:
                 order.asset,
                 order.quantity,
                 fill_price,
+                order=order,
+                multiplier=broker.get_multiplier(order.asset),
             )
             != 0.0
         ):

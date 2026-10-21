@@ -340,6 +340,8 @@ class Broker:
             NoSlippage,
             PercentageCommission,
             PercentageSlippage,
+            PerOrderCommission,
+            PerOrderPerShareCommission,
             PerShareCommission,
             SpreadSlippage,
             TieredCommission,
@@ -374,6 +376,17 @@ class Broker:
             commission_model = PerShareCommission(
                 per_share=config.commission_per_share,
                 minimum=config.commission_minimum,
+            )
+        elif effective_commission_type == CommissionType.PER_ORDER:
+            commission_model = PerOrderCommission(
+                per_share=config.commission_per_share,
+                rate=config.commission_rate,
+                per_trade=config.commission_per_trade,
+                minimum=config.commission_minimum,
+            )
+        elif effective_commission_type == CommissionType.PER_ORDER_PER_SHARE:
+            commission_model = PerOrderPerShareCommission(
+                per_share=config.commission_per_share, minimum=config.commission_minimum
             )
         elif effective_commission_type == CommissionType.PER_TRADE:
             commission_model = CombinedCommission(fixed=config.commission_per_trade)
@@ -918,6 +931,7 @@ class Broker:
             "order_counter": self._order_state.counter,
             "partial_quantities": copy.deepcopy(self._order_state.partial_quantities),
             "filled_this_bar": set(self._order_state.filled_this_bar),
+            "volume_consumed_by_asset": dict(self._order_state.volume_consumed_by_asset),
             "orders_this_bar": tuple(self._order_state.current_bar),
             "orders_this_bar_ids": set(self._order_state.current_bar_ids),
             "fills_length": len(self._execution_journal.fills),
@@ -1031,6 +1045,8 @@ class Broker:
         self._order_state.partial_quantities.update(state["partial_quantities"])
         self._order_state.filled_this_bar.clear()
         self._order_state.filled_this_bar.update(state["filled_this_bar"])
+        self._order_state.volume_consumed_by_asset.clear()
+        self._order_state.volume_consumed_by_asset.update(state["volume_consumed_by_asset"])
         self._order_state.current_bar[:] = state["orders_this_bar"]
         self._order_state.current_bar_ids.clear()
         self._order_state.current_bar_ids.update(state["orders_this_bar_ids"])
@@ -2621,6 +2637,7 @@ class Broker:
 
         # Clear per-bar tracking at start of new bar
         self._filled_this_bar.clear()
+        self._order_state.volume_consumed_by_asset.clear()
         self._stop_exits_this_bar.clear()  # VBT Pro: allow re-entry on next bar
         self._positions_created_this_bar.clear()  # VBT Pro: update HWM from next bar
 

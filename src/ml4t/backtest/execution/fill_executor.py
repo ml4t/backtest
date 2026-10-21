@@ -159,16 +159,28 @@ class FillExecutor:
 
         # Apply execution limits (volume participation)
         remaining_quantity = 0.0
+        shared_budget = None
         if broker.execution_limits is not None:
+            shared_budget = getattr(broker.execution_limits, "bar_capacity", None)
             if order.order_id in self.orders.filled_this_bar:
                 return False
 
             exec_result = broker.execution_limits.calculate(
                 effective_quantity,
-                available_size,
+                self.market.volumes.get(order.asset)
+                if shared_budget is not None
+                else available_size,
                 base_price,
             )
             fill_quantity = exec_result.fillable_quantity
+            if shared_budget is not None:
+                capacity = shared_budget(self.market.volumes.get(order.asset), base_price)
+                if not math.isfinite(capacity) or capacity < 0:
+                    raise ValueError("Shared volume capacity must be finite and nonnegative")
+                consumed = self.orders.volume_consumed_by_asset.get(order.asset, 0.0)
+                fill_quantity = min(fill_quantity, max(0.0, capacity - consumed))
+                if available_size is not None:
+                    fill_quantity = min(fill_quantity, max(0.0, available_size))
 
             if not math.isfinite(fill_quantity) or fill_quantity < 0:
                 raise ValueError(
@@ -210,7 +222,12 @@ class FillExecutor:
 
         # Calculate commission
         commission = calculate_commission(
-            broker.commission_model, order.asset, fill_quantity, fill_price
+            broker.commission_model,
+            order.asset,
+            fill_quantity,
+            fill_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         quote_context = broker.get_quote_context(order.asset, order.side)
 
@@ -303,6 +320,7 @@ class FillExecutor:
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
         fill.commission = actual_commission
+        order.commission_paid += actual_commission
 
         self._update_lock_notional_free_cash(
             ctx,
@@ -313,6 +331,10 @@ class FillExecutor:
         # Update cash (include multiplier for futures/derivatives)
         cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
+        if shared_budget is not None:
+            self.orders.volume_consumed_by_asset[order.asset] = (
+                self.orders.volume_consumed_by_asset.get(order.asset, 0.0) + fill_quantity
+            )
 
         # Sync position to AccountState using execution price for this fill.
         # In next-bar/open execution this avoids close-price mark-to-market

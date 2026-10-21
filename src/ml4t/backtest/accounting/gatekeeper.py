@@ -7,7 +7,7 @@ ensuring they meet account policy constraints and preventing invalid trades.
 from collections.abc import Callable
 
 from ..core.shared import quantity_zero_tolerance
-from ..models import CommissionModel, calculate_commission
+from ..models import CommissionModel, quote_commission
 from ..types import Order, OrderSide
 from .account import AccountState
 
@@ -143,8 +143,13 @@ class Gatekeeper:
         # Check for position reversal (long→short or short→long)
         # Delegate to policy's handle_reversal() method
         if self._is_reversal(current_qty, order_qty_delta):
-            commission = calculate_commission(
-                self.commission_model, order.asset, order.quantity, price
+            commission = quote_commission(
+                self.commission_model,
+                order.asset,
+                order.quantity,
+                price,
+                order=order,
+                multiplier=self.multiplier_resolver(order.asset),
             )
             reversal_cash = self.account.cash
             if getattr(
@@ -169,7 +174,14 @@ class Gatekeeper:
 
         # This is an opening order (new position or adding to existing)
         # Calculate commission to include in cost
-        commission = calculate_commission(self.commission_model, order.asset, order.quantity, price)
+        commission = quote_commission(
+            self.commission_model,
+            order.asset,
+            order.quantity,
+            price,
+            order=order,
+            multiplier=self.multiplier_resolver(order.asset),
+        )
 
         # Use buffered cash (reserves cash_buffer_pct for safety margin)
         available = self._available_cash()

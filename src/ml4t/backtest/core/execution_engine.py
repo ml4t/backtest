@@ -299,7 +299,12 @@ class ExecutionEngine:
             and ((current_qty > 0 and new_qty < 0) or (current_qty < 0 and new_qty > 0))
         )
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, validation_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            validation_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         multiplier = broker.get_multiplier(order.asset)
         available_shadow_cash = shadow_cash
@@ -356,7 +361,12 @@ class ExecutionEngine:
         )
         new_qty = current_qty + qty_delta
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, fill_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            fill_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         shadow_cash += -qty_delta * fill_price * broker.get_multiplier(order.asset) - commission
 
@@ -690,7 +700,12 @@ class ExecutionEngine:
 
         signed_qty = order.quantity if order.side is OrderSide.BUY else -order.quantity
         commission = estimate_commission(
-            broker.commission_model, order.asset, order.quantity, fill_price
+            broker.commission_model,
+            order.asset,
+            order.quantity,
+            fill_price,
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
         # Match the fill debit, which scales notional by the contract multiplier.
         multiplier = broker.get_multiplier(order.asset)
@@ -776,6 +791,8 @@ class ExecutionEngine:
             order.asset,
             quantity,
             float(price),
+            order=order,
+            multiplier=broker.get_multiplier(order.asset),
         )
 
         if current < 0 and signed > 0:

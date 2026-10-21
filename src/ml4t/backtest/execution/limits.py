@@ -1,5 +1,6 @@
 """Volume participation limits for realistic execution."""
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -139,6 +140,27 @@ class VolumeParticipationLimit(ExecutionLimits):
             adjusted_price=price,
             participation_rate=participation_rate,
         )
+
+
+@dataclass
+class SharedVolumeParticipationLimit(VolumeParticipationLimit):
+    """Share one observed traded-volume budget across all orders for an asset/bar.
+
+    Missing/nonfinite volume has no executable capacity. Quote-side sizes do not
+    substitute for observed traded volume. Ordinary VolumeParticipationLimit retains
+    its existing per-order behavior.
+    """
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.max_participation) or not 0 <= self.max_participation <= 1:
+            raise ValueError("max_participation must be finite and between 0 and 1")
+        if not math.isfinite(self.min_volume) or self.min_volume < 0:
+            raise ValueError("min_volume must be finite and nonnegative")
+
+    def bar_capacity(self, bar_volume: float | None, price: float) -> float:
+        if bar_volume is None or not math.isfinite(bar_volume) or bar_volume < self.min_volume:
+            return 0.0
+        return max(0.0, bar_volume * self.max_participation)
 
 
 @dataclass

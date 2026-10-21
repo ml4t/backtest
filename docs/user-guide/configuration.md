@@ -192,11 +192,11 @@ mark source.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `commission_type` | CommissionType | NONE | Model: NONE, PERCENTAGE, PER_SHARE, PER_TRADE, TIERED |
+| `commission_type` | CommissionType | NONE | Model: NONE, PERCENTAGE, PER_SHARE, PER_TRADE, TIERED, PER_ORDER_PER_SHARE, PER_ORDER |
 | `commission_rate` | float | 0.0 | Rate for percentage model |
 | `commission_per_share` | float | 0.0 | Dollar amount per share |
-| `commission_per_trade` | float | 0.0 | Dollar amount per trade |
-| `commission_minimum` | float | 0.0 | Minimum commission per trade |
+| `commission_per_trade` | float | 0.0 | Flat fee per fill for PER_TRADE; once per order for PER_ORDER |
+| `commission_minimum` | float | 0.0 | Per-fill minimum for PER_SHARE; cumulative order minimum for PER_ORDER_PER_SHARE/PER_ORDER |
 
 ### Slippage
 

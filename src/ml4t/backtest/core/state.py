@@ -44,6 +44,7 @@ class OrderState:
     current_bar_ids: set[str] = field(default_factory=set)
     partial_quantities: dict[str, float] = field(default_factory=dict)
     filled_this_bar: set[str] = field(default_factory=set)
+    volume_consumed_by_asset: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

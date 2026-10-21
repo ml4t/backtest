@@ -468,7 +468,9 @@ each end-of-bar snapshot.
 | `NONE` | No commission | `commission_rate=0` |
 | `PERCENTAGE` | % of trade value | `commission_rate=0.001` (0.1%) |
 | `PER_SHARE` | Fixed $ per share | `commission_per_share=0.005` |
-| `PER_TRADE` | Fixed $ per trade | `commission_per_trade=5.0` |
+| `PER_TRADE` | Fixed fee per fill | `commission_per_trade=5.0` |
+| `PER_ORDER_PER_SHARE` | Cumulative per-order minimum on unit fees | `commission_per_share=0.005, commission_minimum=1.0` |
+| `PER_ORDER` | Composed cumulative unit/notional/one-time fees | Explicit unit, rate, flat and minimum parameters |
 | `TIERED` | Volume-based tiers | Custom model |
 
 ```python
@@ -480,6 +482,60 @@ config = BacktestConfig(
     commission_per_share=0.005,
     commission_minimum=1.0,
 )
+```
+
+### Cumulative order fees and shared volume
+
+These additional methods are development-source features. They are not part of the
+preserved 0.1.13 release candidate.
+
+`PER_SHARE` and `PER_TRADE` retain their native per-fill behavior. Select
+`PER_ORDER_PER_SHARE` when one order's partial fills should share a minimum fee.
+`PER_ORDER` additionally combines `commission_per_share`, `commission_rate`,
+`commission_per_trade` and `commission_minimum`. Its notional component uses actual
+fill prices and the declared contract multiplier; the flat component applies once.
+Quotes use previously committed order quantities/notionals/fees and do not consume
+a fill. Fees are committed only for actual executions.
+
+`SharedVolumeParticipationLimit` shares one traded-volume budget across all orders
+for the same asset and bar, in both directions. Missing/nonfinite traded volume
+has no capacity; quote-side depth does not substitute for traded volume. Explicit
+quote depth can further restrict a fill. `VolumeParticipationLimit` retains its
+existing per-order convention. Neither option models a complete exchange order book.
+
+The following run matches the qualified Zipline 3.2.0 daily fixture for a ten-share
+order filled as five shares on each of two bars. It pays the one-dollar order
+minimum once. The native per-fill alternative would pay two dollars.
+
+<!-- ml4t-doc-test: order-context-fees -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
+from ml4t.backtest.config import CommissionType, ExecutionMode, ExecutionPrice
+from ml4t.backtest.execution import SharedVolumeParticipationLimit
+
+dates = [datetime(2025, 1, day, 21, tzinfo=UTC) for day in [6, 7, 8]]
+prices = pl.DataFrame({"timestamp": dates, "asset": ["TEST"] * 3,
+                       "close": [104.0, 105.0, 106.0], "volume": [10.0] * 3})
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp == dates[0]:
+            broker.submit_order("TEST", 10)
+config = BacktestConfig(initial_cash=10000, calendar=None,
+    execution_mode=ExecutionMode.NEXT_BAR,
+    next_bar_execution_price=ExecutionPrice.CLOSE,
+    commission_type=CommissionType.PER_ORDER_PER_SHARE,
+    commission_per_share=0.01, commission_minimum=1.0)
+result = Engine(DataFeed(prices_df=prices), Buy(), config,
+    execution_limits=SharedVolumeParticipationLimit(max_participation=0.5)).run()
+fills = result.to_fills_dataframe()
+assert fills["quantity"].to_list() == [5.0, 5.0]
+assert fills["timestamp"].to_list() == dates[1:]
+assert fills["price"].to_list() == [105.0, 106.0]
+assert fills["commission"].to_list() == [1.0, 0.0]
+assert result.to_equity_dataframe()["equity"].to_list() == [10000.0, 9999.0, 10004.0]
+print("Partial order fees and shared volume verified.")
 ```
 
 ### Slippage Models
