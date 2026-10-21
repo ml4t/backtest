@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
@@ -243,6 +244,36 @@ class PerOrderPerShareCommission(PerOrderCommission):
 
     def __init__(self, per_share: float = 0.0, minimum: float = 0.0):
         super().__init__(per_share=per_share, minimum=minimum)
+
+
+class AssetCommission:
+    """Route explicit stable asset keys to existing native fee models.
+
+    Quote context, including committed fills and fees, is passed unchanged.
+    Missing mappings use the caller's required default model; symbols and asset
+    classes are never guessed from an identifier or contract multiplier.
+    """
+
+    def __init__(self, models: Mapping[str, CommissionModel], *, default: CommissionModel) -> None:
+        if not isinstance(default, CommissionModel) or any(
+            not isinstance(key, str) or not key or not isinstance(model, CommissionModel)
+            for key, model in models.items()
+        ):
+            raise TypeError("Asset fees require stable string keys and native CommissionModels")
+        self.models = dict(models)
+        self.default = default
+
+    def calculate(self, asset: str, quantity: float, price: float) -> float:
+        return self.models.get(asset, self.default).calculate(asset, quantity, price)
+
+    def quote(self, context: CommissionContext) -> float:
+        model = self.models.get(context.asset, self.default)
+        quote = getattr(model, "quote", None)
+        return (
+            quote(context)
+            if quote is not None
+            else model.calculate(context.asset, context.signed_quantity, context.price)
+        )
 
 
 class TieredCommission:

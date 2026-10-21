@@ -624,6 +624,7 @@
   "documented_imports": [
     "from ml4t.backtest import AssetClass, BacktestConfig, BacktestResult, ContractSpec, DataFeed, Engine",
     "from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine",
+    "from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy",
     "from ml4t.backtest import AssetClass, ContractSpec",
     "from ml4t.backtest import AuxiliaryData, BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy",
     "from ml4t.backtest import BacktestConfig",
@@ -712,6 +713,7 @@
     "from ml4t.backtest.execution import SquareRootImpact",
     "from ml4t.backtest.execution import VolumeParticipationLimit",
     "from ml4t.backtest.execution.rebalancer import TargetWeightExecutor, RebalanceConfig",
+    "from ml4t.backtest.models import AssetCommission, PerOrderCommission, PerOrderPerShareCommission",
     "from ml4t.backtest.models import NoCommission",
     "from ml4t.backtest.models import TieredCommission, CombinedCommission",
     "from ml4t.backtest.prediction_market_fees import KalshiCommission",
@@ -3373,6 +3375,22 @@
       "qualname": "VolumeParticipationLimit",
       "signature": "(max_participation: float = 0.1, min_volume: float = 0.0) -> None"
     },
+    "ml4t.backtest.models:AssetCommission": {
+      "kind": "class",
+      "members": {
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', quantity: 'float', price: 'float') -> 'float'"
+        },
+        "quote": {
+          "kind": "method",
+          "signature": "(self, context: 'CommissionContext') -> 'float'"
+        }
+      },
+      "module": "ml4t.backtest.models",
+      "qualname": "AssetCommission",
+      "signature": "(models: 'Mapping[str, CommissionModel]', *, default: 'CommissionModel') -> 'None'"
+    },
     "ml4t.backtest.models:CombinedCommission": {
       "kind": "class",
       "members": {
@@ -3396,6 +3414,29 @@
       "module": "ml4t.backtest.models",
       "qualname": "NoCommission",
       "signature": "()"
+    },
+    "ml4t.backtest.models:PerOrderCommission": {
+      "kind": "class",
+      "members": {
+        "calculate": {
+          "kind": "method",
+          "signature": "(self, asset: 'str', quantity: 'float', price: 'float') -> 'float'"
+        },
+        "quote": {
+          "kind": "method",
+          "signature": "(self, context: 'CommissionContext') -> 'float'"
+        }
+      },
+      "module": "ml4t.backtest.models",
+      "qualname": "PerOrderCommission",
+      "signature": "(per_share: 'float' = 0.0, rate: 'float' = 0.0, per_trade: 'float' = 0.0, minimum: 'float' = 0.0)"
+    },
+    "ml4t.backtest.models:PerOrderPerShareCommission": {
+      "kind": "class",
+      "members": {},
+      "module": "ml4t.backtest.models",
+      "qualname": "PerOrderPerShareCommission",
+      "signature": "(per_share: 'float' = 0.0, minimum: 'float' = 0.0)"
     },
     "ml4t.backtest.models:TieredCommission": {
       "kind": "class",
@@ -4426,7 +4467,7 @@
         },
         "from_config": {
           "kind": "method",
-          "signature": "(cls, config: 'BacktestConfig', execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None) -> 'Broker'"
+          "signature": "(cls, config: 'BacktestConfig', execution_limits: 'ExecutionLimits | None' = None, market_impact_model: 'MarketImpactModel | None' = None, contract_specs: 'dict[str, ContractSpec] | None' = None, commission_model: 'CommissionModel | None' = None) -> 'Broker'"
         },
         "get_account_snapshot": {
           "kind": "method",
@@ -4702,7 +4743,7 @@
       "members": {
         "from_config": {
           "kind": "method",
-          "signature": "(cls, feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig', *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', benchmark: 'BenchmarkData | None' = None) -> 'Engine'"
+          "signature": "(cls, feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig', *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, commission_model: 'CommissionModel | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', benchmark: 'BenchmarkData | None' = None) -> 'Engine'"
         },
         "run": {
           "kind": "method",
@@ -4715,7 +4756,7 @@
       },
       "module": "ml4t.backtest.engine",
       "qualname": "Engine",
-      "signature": "(feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig | None' = None, *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', runtime: 'RuntimeServices | None' = None, benchmark: 'BenchmarkData | None' = None)"
+      "signature": "(feed: 'DataFeed', strategy: 'Strategy', config: 'BacktestConfig | None' = None, *, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, commission_model: 'CommissionModel | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', runtime: 'RuntimeServices | None' = None, benchmark: 'BenchmarkData | None' = None)"
     },
     "ml4t.backtest:ExecutionMode": {
       "kind": "class",
@@ -5272,7 +5313,7 @@
       "kind": "function",
       "module": "ml4t.backtest.engine",
       "qualname": "run_backtest",
-      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, capital_flows: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', benchmark: 'BenchmarkData | None' = None) -> 'BacktestResult'"
+      "signature": "(prices: 'pl.DataFrame | str', strategy: 'Strategy', signals: 'pl.DataFrame | str | None' = None, context: 'pl.DataFrame | str | None' = None, config: 'BacktestConfig | str | None' = None, *, feed_spec: 'Any | None' = None, contract: 'Any | None' = None, contract_specs: 'dict[str, Any] | None' = None, market_impact_model: 'Any | None' = None, commission_model: 'CommissionModel | None' = None, execution_limits: 'Any | None' = None, funding_df: 'pl.DataFrame | None' = None, capital_flows: 'pl.DataFrame | None' = None, lifecycle_version: 'LifecycleVersion | str' = <LifecycleVersion.V1: '1'>, execution_policy: 'ExecutionPolicy | None' = None, target_intent_state: 'dict[str, Any] | None' = None, holdings_sampling: 'str' = 'none', benchmark: 'BenchmarkData | None' = None) -> 'BacktestResult'"
     }
   }
 }

@@ -334,17 +334,19 @@ class Broker:
         execution_limits: ExecutionLimits | None = None,
         market_impact_model: MarketImpactModel | None = None,
         contract_specs: dict[str, ContractSpec] | None = None,
+        commission_model: CommissionModel | None = None,
     ) -> Broker:
         """Create Broker from BacktestConfig.
 
-        This is the recommended way to create a Broker. All settings come from
-        the BacktestConfig, ensuring consistency with Engine and other components.
+        Config supplies the execution and account settings. Explicit native fee,
+        impact and execution-limit models override their configured counterparts.
 
         Args:
             config: BacktestConfig with all behavioral settings
             execution_limits: Optional execution limits (not in config)
             market_impact_model: Optional market impact model (not in config)
             contract_specs: Optional contract specifications (not in config)
+            commission_model: Explicit fee model overriding configured fee rates
 
         Returns:
             Configured Broker instance
@@ -391,6 +393,9 @@ class Broker:
                 effective_slippage_type = SlippageType.PERCENTAGE
 
         # Build commission model from config
+        explicit_commission = commission_model
+        if explicit_commission is not None and not isinstance(explicit_commission, CommissionModel):
+            raise TypeError("commission_model must implement the native CommissionModel protocol")
         commission_model = None
         if effective_commission_type == CommissionType.PERCENTAGE:
             commission_model = PercentageCommission(rate=config.commission_rate)
@@ -440,7 +445,9 @@ class Broker:
 
         broker = cls(
             initial_cash=config.initial_cash,
-            commission_model=commission_model,
+            commission_model=explicit_commission
+            if explicit_commission is not None
+            else commission_model,
             slippage_model=slippage_model,
             stop_slippage_rate=config.stop_slippage_rate,
             execution_mode=config.execution_mode,

@@ -538,6 +538,69 @@ assert result.to_equity_dataframe()["equity"].to_list() == [10000.0, 9999.0, 100
 print("Partial order fees and shared volume verified.")
 ```
 
+### Route explicit fees by asset
+
+`Engine`, `Engine.from_config`, `run_backtest` and `Broker.from_config` accept
+`commission_model=` to override configured fee rates. `AssetCommission` routes
+stable asset keys to native models, with an explicit default for other keys.
+It passes the order's committed quantity and paid fees to models that implement
+`quote(CommissionContext)`; other models receive the existing `calculate`
+interface. Estimates use copies, so they cannot advance an actual model's
+in-memory fill state.
+
+Use `PerOrderCommission(per_share=..., per_trade=..., minimum=...)` for a
+per-contract charge, a one-time exchange charge and an order minimum. The unit
+charge counts contracts. Only the optional `rate` term uses multiplied
+notional. `PerOrderCommission(per_trade=...)` also expresses a fixed futures
+trade fee. There is no additional per-contract fee formula.
+
+<!-- ml4t-doc-test: native-asset-commission -->
+```python
+from datetime import UTC, datetime
+import polars as pl
+from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
+from ml4t.backtest.execution import VolumeParticipationLimit
+from ml4t.backtest.models import AssetCommission, PerOrderCommission, PerOrderPerShareCommission
+
+prices = pl.DataFrame([
+    {"timestamp": datetime(2025, 3, day, tzinfo=UTC), "asset": asset,
+     "close": 100., "volume": 2.}
+    for day in [3, 4, 5, 6] for asset in ["A", "ES"]
+])
+fees = AssetCommission({"ES": PerOrderCommission(per_share=2., per_trade=3., minimum=8.)},
+                        default=PerOrderPerShareCommission(per_share=.2, minimum=1.))
+
+class Buy(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        if timestamp.day == 3:
+            broker.submit_order("A", 3)
+            broker.submit_order("ES", 3)
+
+result = Engine(DataFeed(prices_df=prices), Buy(),
+                BacktestConfig(calendar=None, initial_cash=100000), commission_model=fees,
+                execution_limits=VolumeParticipationLimit(.5),
+                contract_specs={"ES": ContractSpec("ES", AssetClass.FUTURE, multiplier=50.)}).run()
+fills = result.to_fills_dataframe()
+assert fills.filter(pl.col("asset") == "ES")["commission"].to_list() == [8., 0., 1.]
+assert fills.filter(pl.col("asset") == "A")["commission"].to_list() == [1., 0., 0.]
+assert result.to_equity_dataframe()["equity"][-1] == 99990.
+print("Per-asset fees retain committed partial fills and contract units.")
+```
+
+The futures minimum is paid on the first fill; cumulative charges reach 9 on
+the third fill. A multiplier of 50 does not multiply those unit fees. The
+published Zipline Reloaded 3.2.0 mixed-asset fixture checks this sequence and
+the fixed futures trade fee against its actual engine, with an explicit
+one-unit-per-bar caller slippage model. It does not establish default futures
+slippage or settlement behavior. Native signed-notional cash remains unchanged;
+the example's final cash is 84690, whereas Zipline's variation-cash account
+reports 99690 with the same NAV. An explicit variation-cash account method
+remains separate work.
+
+A supplied Python model is not reconstructed from `BacktestConfig` serialization.
+Retain its parameters with the run inputs and supply it again when rerunning a
+simulation. Saved result artifacts retain the executed fees and account path.
+
 ### Slippage Models
 
 | Type | Calculation | Config |
