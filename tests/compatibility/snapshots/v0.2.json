@@ -627,6 +627,7 @@
     "from ml4t.backtest import AssetClass, ContractSpec",
     "from ml4t.backtest import AuxiliaryData, BacktestConfig, DataFeed, Engine, RuntimeServices, Strategy",
     "from ml4t.backtest import BacktestConfig",
+    "from ml4t.backtest import BacktestConfig, BacktestResult, DataFeed, Engine, Strategy",
     "from ml4t.backtest import BacktestConfig, CommissionType",
     "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine",
     "from ml4t.backtest import BacktestConfig, CommissionType, DataFeed, Engine, ExecutionMode, Strategy",
@@ -667,6 +668,7 @@
     "from ml4t.backtest.accounting import AccountState, Gatekeeper, UnifiedAccountPolicy",
     "from ml4t.backtest.analytics.bridge import to_trade_records",
     "from ml4t.backtest.compat.zipline import run_algorithm",
+    "from ml4t.backtest.compat.zipline import to_performance_frame",
     "from ml4t.backtest.compat.zipline.api import date_rules, get_datetime, record, schedule_function",
     "from ml4t.backtest.compat.zipline.api import order, record, set_commission, set_slippage, symbol",
     "from ml4t.backtest.compat.zipline.assets import Asset",
@@ -2762,6 +2764,12 @@
       "module": "ml4t.backtest.compat.zipline.runner",
       "qualname": "run_algorithm",
       "signature": "(*, feed: 'DataFeed', assets: 'Sequence[Asset]', initialize: 'Callable[..., Any] | None' = None, handle_data: 'Callable[..., Any] | None' = None, analyze: 'Callable[..., Any] | None' = None, before_trading_start: 'Callable[..., Any] | None' = None, capital_base: 'float' = 100000.0, runtime: 'RuntimeServices | None' = None) -> 'pd.DataFrame'"
+    },
+    "ml4t.backtest.compat.zipline:to_performance_frame": {
+      "kind": "function",
+      "module": "ml4t.backtest.compat.zipline.results",
+      "qualname": "to_performance_frame",
+      "signature": "(result: ml4t.backtest.result.BacktestResult, *, assets: collections.abc.Sequence[ml4t.backtest.compat.zipline.assets.Asset] | None = None) -> pandas.DataFrame"
     },
     "ml4t.backtest.config:BacktestConfig": {
       "kind": "class",

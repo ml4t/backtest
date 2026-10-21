@@ -13,7 +13,6 @@ from uuid import uuid4
 import pandas as pd
 
 from ... import BacktestConfig, Broker, DataFeed, Engine, RuntimeServices, Strategy
-from ..._temporal import temporal_rows
 from ...config import (
     CommissionType,
     ConditionalOrderMode,
@@ -41,6 +40,7 @@ from .events import _DateRule, _register, _Schedule, _TimeRule, date_rules, time
 from .finance import commission, slippage
 from .finance.execution import _native_style
 from .finance.order import ORDER_STATUS, OrderView
+from .results import to_performance_frame
 
 
 @dataclass(frozen=True)
@@ -571,56 +571,6 @@ class _Callbacks(Strategy):
                 self.handle_data(self.context, self.data)
 
 
-def _performance(
-    result, assets: Mapping[str, Asset], order_id: Callable[[str], str]
-) -> pd.DataFrame:
-    frame = result.to_portfolio_state_dataframe()
-    rows = list(temporal_rows(frame, named=True))
-    index = pd.DatetimeIndex([row["timestamp"] for row in rows])
-    if index.tz is None:
-        index = index.tz_localize(result.config.resolved_timezone)
-    performance = pd.DataFrame(
-        {
-            "portfolio_value": [row["equity"] for row in rows],
-            "cash": [row["cash"] for row in rows],
-            "returns": result.to_returns_series().to_list(),
-        },
-        index=index.tz_convert("UTC").as_unit("ns"),
-    )
-    transactions: dict[pd.Timestamp, list[dict[str, Any]]] = {}
-    for fill in result.fills:
-        timestamp = pd.Timestamp(fill.timestamp)
-        if timestamp.tz is None:
-            timestamp = timestamp.tz_localize(result.config.resolved_timezone)
-        timestamp = timestamp.tz_convert("UTC")
-        transactions.setdefault(timestamp, []).append(
-            {
-                "sid": assets[fill.asset],
-                "amount": fill.quantity * (1 if fill.side.value == "buy" else -1),
-                "dt": timestamp,
-                "price": fill.price,
-                "order_id": order_id(fill.order_id),
-                "native_order_id": fill.order_id,
-                "commission": fill.commission,
-            }
-        )
-    performance["transactions"] = [
-        transactions.get(timestamp, []) for timestamp in performance.index
-    ]
-    if result.recorded_variables is not None:
-        records = result.to_recorded_records()
-        by_observation = {row["bar_index"]: row["values"] for row in records}
-        names = set().union(*(row["values"] for row in records)) if records else set()
-        for name in sorted(names):
-            if name in performance.columns:
-                raise ValueError(f"Recorded name {name!r} conflicts with a native account field")
-            performance[name] = [
-                by_observation.get(row["observation_id"], {}).get(name) for row in rows
-            ]
-    performance.attrs["backtest_result"] = result
-    return performance
-
-
 def run_algorithm(
     *,
     feed: DataFeed,
@@ -658,6 +608,13 @@ def run_algorithm(
         },
     )
     context = MigrationContext(assets, config)
+    config.metadata["migration_result"] = {
+        "assets": [
+            {"key": asset.key, "symbol": asset.symbol, "legacy_sid": asset.legacy_sid}
+            for asset in assets
+        ],
+        "order_id_prefix": context._order_prefix,
+    }
     if initialize is not None:
         with callback_scope(context):
             initialize(context)
@@ -672,7 +629,7 @@ def run_algorithm(
         execution_limits=limits,
         holdings_sampling="bar",
     ).run()
-    performance = _performance(result, context._by_key, context._external_order_id)
+    performance = to_performance_frame(result)
     if analyze is not None:
         with callback_scope(context):
             analyze(context, performance)

@@ -622,3 +622,55 @@ print("early-close account control passed")
 ```text
 early-close account control passed
 ```
+
+## Reopen a native result as a performance frame
+
+`to_performance_frame(result)` is the same projection used by `run_algorithm`
+and its `analyze` callback. It reads an in-memory or reloaded `BacktestResult`;
+it does not rerun a strategy. Columns contain observed `portfolio_value`, `cash`,
+returns including the first period, actual `transactions` and captured recorded
+variables. Rows keep the native observation frequency. Minute account rows are
+not converted into Zipline's daily performance packets, and uncaptured positions
+or statistics are not reconstructed.
+
+New migration runs retain their explicit asset mapping and scoped order-ID prefix
+in artifact configuration, so a reload preserves callback-visible identities.
+For ordinary native results, the converter uses native stable keys with unknown
+symbols and native order IDs. Supply `assets=[Asset(...)]` to declare display
+symbols or legacy SIDs; no ticker is inferred from a key. Older migration artifacts
+without this declaration need that explicit mapping to recover display metadata.
+The `native_order_id` transaction field always preserves the underlying broker ID.
+
+<!-- ml4t-doc-test: zipline-saved-performance -->
+```python
+from datetime import UTC, datetime
+from tempfile import TemporaryDirectory
+
+import polars as pl
+from ml4t.backtest import BacktestConfig, BacktestResult, DataFeed, Engine, Strategy
+from ml4t.backtest.compat.zipline import to_performance_frame
+
+
+class HoldCash(Strategy):
+    def on_data(self, timestamp, data, context, broker):
+        pass
+
+
+feed = DataFeed(
+    prices_df=pl.DataFrame({"timestamp": [datetime(2025, 7, 3, 17, tzinfo=UTC)],
+                            "asset": ["A"], "close": [100.0]}),
+    feed_spec={"calendar": None, "timestamp_semantics": "event_time"},
+)
+native = Engine(feed, HoldCash(), BacktestConfig(calendar=None, initial_cash=1000)).run()
+with TemporaryDirectory() as directory:
+    native.to_parquet(directory)
+    restored = BacktestResult.from_parquet(directory)
+    reopened = to_performance_frame(restored)
+assert reopened["portfolio_value"].iloc[-1] == 1000.0
+print("saved native account projected without rerunning the strategy")
+```
+
+<!-- ml4t-doc-output: zipline-saved-performance -->
+```text
+saved native account projected without rerunning the strategy
+```
