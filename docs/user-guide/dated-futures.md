@@ -179,7 +179,7 @@ a closing transaction for 17 on July 10. The native explicit raw-quote close
 matches its complete fills, cash and NAV on those captured inputs.
 
 Reproduce the old workflow with
-[`capture_zipline_dated_reference.py`](https://github.com/ml4t/backtest/blob/codex/dated-futures-rolls/validation/capture_zipline_dated_reference.py)
+[`capture_zipline_dated_reference.py`](https://github.com/ml4t/backtest/blob/c18834e4da7fc288cd022a00b9aca71764b551fa/validation/capture_zipline_dated_reference.py)
 in a separate environment containing Zipline 3.2.0. Give the script a new output
 directory. Compare the new workflow with
 [`test_zipline_dated_reference.py`](https://github.com/ml4t/backtest/blob/0ab0e577f1d7dc0031249dd51fc8ae45e12355ce/tests/test_zipline_dated_reference.py).

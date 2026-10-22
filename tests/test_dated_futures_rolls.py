@@ -366,3 +366,115 @@ def test_fractional_contract_roll_roundtrips_real_partial_fill_arithmetic(tmp_pa
         .to_rolls_dataframe()
         .equals(result.to_rolls_dataframe())
     )
+
+
+def test_roll_artifact_preserves_mixed_equity_dividend_benchmark_and_variation_ledgers(tmp_path):
+    from ml4t.specs import FeedSpec
+
+    from ml4t.backtest.benchmark import BenchmarkData
+
+    class Mixed(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            if timestamp == TIMES[0]:
+                broker.submit_order("OLD", 1)
+                broker.submit_order("EQUITY", 10)
+            if timestamp == TIMES[2]:
+                broker.roll_position("OLD", "NEW", roll_id="mixed")
+
+    spec = FeedSpec(timestamp_semantics="event_time")
+    actions = pl.DataFrame(
+        [
+            {
+                "source": "capture",
+                "event_id": "dividend",
+                "revision_id": "r1",
+                "asset": "EQUITY",
+                "action_kind": "cash_dividend",
+                "available_at": TIMES[0],
+                "effective_at": TIMES[2],
+                "payment_at": TIMES[4],
+                "currency": "USD",
+                "share_basis": "pre_event",
+                "cash_per_share": 1.0,
+            }
+        ]
+    )
+    result = Engine(
+        DataFeed(
+            prices_df=pl.DataFrame(
+                {
+                    "timestamp": [t for t in TIMES for _ in range(3)],
+                    "asset": ["OLD", "NEW", "EQUITY"] * 6,
+                    "close": [
+                        4000.0,
+                        4010.0,
+                        100.0,
+                        4000.0,
+                        4010.0,
+                        100.0,
+                        4010.0,
+                        4020.0,
+                        100.0,
+                        4020.0,
+                        4030.0,
+                        100.0,
+                        4030.0,
+                        4040.0,
+                        100.0,
+                        4040.0,
+                        4050.0,
+                        100.0,
+                    ],
+                }
+            ),
+            corporate_actions=actions,
+            input_manifest={"price_basis": "raw"},
+            feed_spec=spec,
+        ),
+        Mixed(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=100000,
+            allow_leverage=True,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+        ),
+        contract_specs={
+            "EQUITY": ContractSpec("EQUITY"),
+            **{
+                asset: ContractSpec(
+                    asset,
+                    asset_class=AssetClass.FUTURE,
+                    multiplier=50,
+                    margin=15000,
+                    accounting_method="futures_variation",
+                    settlement_policy="on_mark",
+                )
+                for asset in ["OLD", "NEW"]
+            },
+        },
+        holdings_sampling="bar",
+        benchmark=BenchmarkData(
+            pl.DataFrame({"timestamp": TIMES, "return": [0.0] * 6}),
+            source_id="declared-index",
+            return_method="close_to_close",
+            reinvestment="none",
+            feed_spec=spec,
+        ),
+    ).run()
+    assert result.to_portfolio_state_dataframe()["cash"][-1] == 101002
+    assert result.to_equity_dataframe()["equity"][-1] == 102002
+    result.to_parquet(tmp_path)
+    restored = BacktestResult.from_parquet(tmp_path)
+    for name in [
+        "rolls",
+        "actions",
+        "entitlements",
+        "benchmark",
+        "futures_settlements",
+        "portfolio_state",
+        "holdings",
+    ]:
+        method = f"to_{name}_dataframe"
+        assert getattr(restored, method)().equals(getattr(result, method)())
