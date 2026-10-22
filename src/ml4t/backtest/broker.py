@@ -589,7 +589,10 @@ class Broker:
         ]
 
     def _portfolio_snapshot(self, *, include_holdings: bool):
-        return self._portfolio_ledger.snapshot(include_holdings=include_holdings)
+        state, holdings, _accounting = self._portfolio_ledger.snapshot(
+            include_holdings=include_holdings
+        )
+        return state, holdings
 
     def _observe_portfolio(self, timestamp: datetime, observation: int, *, include_holdings: bool):
         state = self._portfolio_snapshot(include_holdings=include_holdings)
@@ -1713,9 +1716,11 @@ class Broker:
 
     def get_account_snapshot(self) -> AccountControlContext:
         """Return one immutable, currently marked native account observation."""
-        (equity, cash, gross, net, _), _holdings = self._portfolio_ledger.snapshot(
+        (equity, cash, gross, net, _), _holdings, accounting = self._portfolio_ledger.snapshot(
             include_holdings=False
         )
+        if accounting is not None:
+            return accounting
         return AccountControlContext(
             self._market_state.time, equity, cash, gross, net, positions_value=net
         )

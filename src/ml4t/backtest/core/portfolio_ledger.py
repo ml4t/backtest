@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from ..controls import AccountControlContext
 from .state import MarketState, OrderState
 
 if TYPE_CHECKING:
@@ -47,10 +48,21 @@ class PortfolioLedger:
 
     def snapshot(
         self, *, include_holdings: bool
-    ) -> tuple[tuple[float, float, float, float, int], list[tuple[Any, ...]] | None]:
+    ) -> tuple[
+        tuple[float, float, float, float, int],
+        list[tuple[Any, ...]] | None,
+        AccountControlContext | None,
+    ]:
         cash = self.account.cash
         gross = net = 0.0
-        liquidation = 0.0
+        variation = self.account.futures_methods is not None
+        liquidation = unsettled = initial_margin = maintenance_margin = 0.0
+        if variation:
+            from ..accounting.policy import UnifiedAccountPolicy
+
+            policy = self.account.policy
+            if not isinstance(policy, UnifiedAccountPolicy):
+                raise TypeError("Futures variation requires a declared margin policy")
         holdings = [] if include_holdings else None
         for asset, position in self.account.positions.items():
             if include_holdings:
@@ -67,7 +79,23 @@ class PortfolioLedger:
                 if position.variation_basis is None
                 else position.quantity * (price - position.variation_basis) * position.multiplier
             )
-            liquidation += liquidation_value
+            if variation:
+                liquidation += liquidation_value
+                if position.variation_basis is not None:
+                    unsettled += liquidation_value
+                initial_margin += policy.get_margin_requirement(
+                    asset,
+                    position.quantity,
+                    price,
+                    multiplier=position.multiplier,
+                )
+                maintenance_margin += policy.get_margin_requirement(
+                    asset,
+                    position.quantity,
+                    price,
+                    for_initial=False,
+                    multiplier=position.multiplier,
+                )
             if holdings is not None:
                 holdings.append(
                     (
@@ -82,19 +110,40 @@ class PortfolioLedger:
                         mark_time,
                     )
                 )
+        equity = cash + (liquidation if variation else net)
+        equity += (
+            self.account.corporate.receivable_value if self.account.corporate is not None else 0.0
+        )
+        details = None
+        if variation:
+            holds = (
+                self.account.unsettled_cash if self.broker.settlement_reduces_buying_power else 0.0
+            )
+            buffer = max(cash - holds, 0.0) * self.broker.cash_buffer_pct
+            details = AccountControlContext(
+                self.market.time,
+                equity,
+                cash,
+                gross,
+                net,
+                positions_value=liquidation,
+                initial_margin_required=initial_margin,
+                maintenance_margin_required=maintenance_margin,
+                available_funds=equity - initial_margin - holds - buffer,
+                futures_unsettled_pnl=unsettled,
+                margin_breach=equity < maintenance_margin,
+            )
         return (
-            cash
-            + liquidation
-            + (
-                self.account.corporate.receivable_value
-                if self.account.corporate is not None
-                else 0.0
+            (
+                equity,
+                cash,
+                gross,
+                net,
+                len(self.account.positions),
             ),
-            cash,
-            gross,
-            net,
-            len(self.account.positions),
-        ), holdings
+            holdings,
+            details,
+        )
 
     def get_account_value(self) -> float:
         value = self.account.cash + (

@@ -140,6 +140,8 @@ class FuturesLedger:
             self._cursor = end
 
     def on_mark(self, timestamp: datetime, phase: str) -> None:
+        planned = []
+        cash = self.account.cash
         for asset, mode in (self.account.futures_methods or {}).items():
             position = self.account.positions.get(asset)
             if position is None:
@@ -149,18 +151,27 @@ class FuturesLedger:
                 continue
             if not isfinite(mark):
                 raise ValueError("Futures account mark must be finite")
-            position.current_price = mark
+            event = None
             if mode == "on_mark" and mark != position.variation_basis:
-                self._settle(
-                    {
-                        "timestamp": timestamp,
-                        "available_at": timestamp,
-                        "asset": asset,
-                        "settlement_price": mark,
-                        "currency": self.broker._get_contract_currency(asset),
-                        "source": "ml4t.backtest/on_mark",
-                        "event_id": f"{asset}:{timestamp.isoformat()}:{phase}",
-                        "revision_id": "generated",
-                    },
-                    phase=phase,
-                )
+                basis = position.variation_basis
+                if basis is None or not isfinite(basis):
+                    raise ValueError("Futures variation basis must be captured and finite")
+                delta = position.quantity * (mark - basis) * position.multiplier
+                cash += delta
+                if not isfinite(delta) or not isfinite(cash):
+                    raise ValueError("Settlement would make the cash ledger nonfinite")
+                event = {
+                    "timestamp": timestamp,
+                    "available_at": timestamp,
+                    "asset": asset,
+                    "settlement_price": mark,
+                    "currency": self.broker._get_contract_currency(asset),
+                    "source": "ml4t.backtest/on_mark",
+                    "event_id": f"{asset}:{timestamp.isoformat()}:{phase}",
+                    "revision_id": "generated",
+                }
+            planned.append((position, mark, event))
+        for position, mark, event in planned:
+            position.current_price = mark
+            if event is not None:
+                self._settle(event, phase=phase)
