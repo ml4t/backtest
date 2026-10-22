@@ -64,6 +64,12 @@ def test_actual_offline_snapshot_feature_engine_artifact_and_diagnostic_workflow
 
 def test_diagnostic_futures_exposure_does_not_become_principal_cash_or_nav_value():
     integration = pytest.importorskip("ml4t.diagnostic.integration")
+    evaluation = pytest.importorskip("ml4t.diagnostic.evaluation")
+    if not callable(getattr(evaluation.PortfolioAnalysis, "compute_holdings_analysis", None)):
+        pytest.skip(
+            "This optional Diagnostic version predates holdings analysis; "
+            "the pinned successor integration cohort must execute this workflow"
+        )
     from ml4t.backtest import AssetClass, BacktestConfig, ContractSpec, DataFeed, Engine, Strategy
     from ml4t.backtest.config import CommissionType
 

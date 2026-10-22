@@ -45,6 +45,16 @@ jobs:
           tests/test_offline_migration.py tests/test_zipline_dated_reference.py
           tests/test_zipline_continuous_futures.py tests/test_data_dated_rolls.py
           -o addopts='' --import-mode=importlib -W error -q
+          --junitxml="${{ runner.temp }}/successor-integration.xml"
+      - name: Require every pinned integration workflow to execute
+        env:
+          ML4T_SUCCESSOR_REPORT: ${{ runner.temp }}/successor-integration.xml
+        run: >-
+          "$RUNNER_TEMP/consumer/bin/python" -I -c
+          "import os, xml.etree.ElementTree as ET;
+          root = ET.parse(os.environ['ML4T_SUCCESSOR_REPORT']).getroot();
+          assert root.findall('.//testcase') and not root.findall('.//testcase/skipped'),
+          'The pinned integration cohort must execute every selected workflow without skips'"
       - name: Run the documented offline CLI
         run: >-
           "$RUNNER_TEMP/consumer/bin/python" -I examples/offline_migration.py
@@ -53,7 +63,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: installed-successor-${{ matrix.python }}-${{ github.sha }}
-          path: ${{ runner.temp }}/offline-workflow
+          path: |
+            ${{ runner.temp }}/offline-workflow
+            ${{ runner.temp }}/successor-integration.xml
           if-no-files-found: error
       - name: Run the documented continuous-futures CLI
         run: >-
