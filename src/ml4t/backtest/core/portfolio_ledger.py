@@ -50,6 +50,7 @@ class PortfolioLedger:
     ) -> tuple[tuple[float, float, float, float, int], list[tuple[Any, ...]] | None]:
         cash = self.account.cash
         gross = net = 0.0
+        liquidation = 0.0
         holdings = [] if include_holdings else None
         for asset, position in self.account.positions.items():
             if include_holdings:
@@ -61,6 +62,12 @@ class PortfolioLedger:
             value = position.quantity * price * position.multiplier
             gross += abs(value)
             net += value
+            liquidation_value = (
+                value
+                if position.variation_basis is None
+                else position.quantity * (price - position.variation_basis) * position.multiplier
+            )
+            liquidation += liquidation_value
             if holdings is not None:
                 holdings.append(
                     (
@@ -70,14 +77,14 @@ class PortfolioLedger:
                         position.multiplier,
                         self.broker._get_contract_currency(asset),
                         value,
-                        value,
+                        liquidation_value,
                         source,
                         mark_time,
                     )
                 )
         return (
             cash
-            + net
+            + liquidation
             + (
                 self.account.corporate.receivable_value
                 if self.account.corporate is not None
@@ -98,7 +105,11 @@ class PortfolioLedger:
             if price is None:
                 price, _, _ = self.position_mark(asset, pos)
             multiplier = self.broker.get_multiplier(asset)
-            value += pos.quantity * price * multiplier
+            value += (
+                pos.quantity
+                * (price if pos.variation_basis is None else price - pos.variation_basis)
+                * multiplier
+            )
         return value
 
     def get_rejected_orders(self, asset: str | None = None):

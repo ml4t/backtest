@@ -101,6 +101,7 @@ class Engine:
         slippage_model: SlippageModel | None = None,
         execution_limits: Any | None = None,
         funding_df: pl.DataFrame | None = None,
+        settlement_events: pl.DataFrame | None = None,
         lifecycle_version: LifecycleVersion | str = LifecycleVersion.V1,
         execution_policy: ExecutionPolicy | None = None,
         target_intent_state: dict[str, Any] | None = None,
@@ -193,6 +194,9 @@ class Engine:
             )
             if actions is not None
             else None
+        )
+        self._futures_ledger = self.broker._create_futures_ledger(
+            settlement_events, list(feed.timestamps)
         )
         if self.broker.execution_price is ExecutionPrice.VWAP and not getattr(
             self.feed.feed_spec, "vwap_col", None
@@ -484,6 +488,7 @@ class Engine:
             else None
         )
         corporate_actions = self._corporate_actions
+        futures_ledger = self._futures_ledger
         for feed_bar_index, (timestamp, assets_data, context) in enumerate(self.feed):
             # Calendar session enforcement
             calendar_id = self.config.resolved_calendar if self.config else None
@@ -521,6 +526,8 @@ class Engine:
                 self.runtime.scheduler._before_event(timestamp, has_price_event=bool(assets_data))
                 if corporate_actions is not None:
                     corporate_actions.advance(timestamp)
+                if futures_ledger is not None:
+                    futures_ledger.advance(timestamp)
                 assets_data = self.runtime._advance(timestamp, assets_data)
                 context = self.runtime._mask_context(timestamp, context)
 
@@ -529,6 +536,8 @@ class Engine:
 
             if corporate_actions is not None and self.runtime is None:
                 corporate_actions.advance(timestamp)
+            if futures_ledger is not None and self.runtime is None:
+                futures_ledger.advance(timestamp)
 
             prices = getattr(assets_data, "_prices", None)
             opens = getattr(assets_data, "_opens", None)
@@ -644,6 +653,8 @@ class Engine:
             if self.execution_mode == ExecutionMode.NEXT_BAR:
                 # Process same-cycle risk exits before ordinary strategy decisions.
                 self.broker._process_orders(use_open=True)
+                if futures_ledger is not None:
+                    futures_ledger.on_mark(timestamp, "before_callbacks")
                 if self.runtime is not None:
                     self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=True)
                 # Strategy generates new orders
@@ -668,6 +679,8 @@ class Engine:
             else:
                 # Same-bar mode: process before and after strategy
                 self.broker._process_orders()
+                if futures_ledger is not None:
+                    futures_ledger.on_mark(timestamp, "before_callbacks")
                 if self.runtime is not None:
                     self.runtime.scheduler._on_event(timestamp, assets_data, context, opening=True)
                 self._dispatch_market_event(timestamp, assets_data, context)
@@ -687,6 +700,8 @@ class Engine:
             # Update water marks at END of bar, AFTER all orders processed
             # This ensures new positions get their HWM updated from entry bar's high
             # VBT Pro behavior: HWM updated at bar end, used in NEXT bar's trail evaluation
+            if futures_ledger is not None:
+                futures_ledger.on_mark(timestamp, "after_fills")
             self.broker._update_water_marks()
 
             self._record_portfolio_state(timestamp)
@@ -769,6 +784,8 @@ class Engine:
     def _advance_account_events(self, timestamp: datetime) -> None:
         if self._corporate_actions is not None:
             self._corporate_actions.advance(timestamp)
+        if self._futures_ledger is not None:
+            self._futures_ledger.advance(timestamp)
 
     def _record_portfolio_state(self, timestamp: datetime) -> None:
         """Capture per-bar NAV and explicitly sampled observed positions."""

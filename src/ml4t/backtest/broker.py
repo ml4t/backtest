@@ -222,6 +222,13 @@ class Broker:
                     effective_margin_pct_schedule[symbol] = spec.margin_pct
 
         # Create AccountState with UnifiedAccountPolicy
+        futures_methods = {
+            asset: spec.settlement_policy
+            for asset, spec in (contract_specs or {}).items()
+            if spec.accounting_method == "futures_variation"
+        }
+        if futures_methods and not allow_leverage:
+            raise ValueError("futures_variation requires a margin-enabled account")
         policy: AccountPolicy = UnifiedAccountPolicy(
             allow_short_selling=allow_short_selling,
             allow_leverage=allow_leverage,
@@ -231,9 +238,11 @@ class Broker:
             fixed_margin_schedule=effective_margin_schedule or None,
             margin_pct_schedule=effective_margin_pct_schedule or None,
             short_cash_policy=short_cash_policy.value,
+            variation_assets=frozenset(futures_methods),
         )
 
         self.account = AccountState(initial_cash=initial_cash, policy=policy)
+        self.account.futures_methods = futures_methods or None
         # Derive account_type string from flags for backward compat
         if allow_leverage:
             self.account_type = "margin"
@@ -555,6 +564,18 @@ class Broker:
         self._execution_journal.corporate_receivable_snapshots = {}
         self._market_state.last_price_times = {}
         return ledger
+
+    def _create_futures_ledger(self, events, timestamps):
+        from .futures import FuturesLedger
+
+        if self.account.futures_methods is None:
+            if events is not None:
+                raise ValueError("settlement_events require declared futures_variation instruments")
+            return None
+        self._execution_journal.futures_settlements = []
+        return FuturesLedger(
+            self, events, timestamps, account=self.account, journal=self._execution_journal
+        )
 
     def _corporate_receivable_observations(self, account, metadata):
         snapshots = self._execution_journal.corporate_receivable_snapshots

@@ -378,6 +378,7 @@ class FillExecutor:
             old_position._commission_adjusted_cost_basis if old_position is not None else None
         )
         old_entry = old_position.entry_price if old_position is not None else 0.0
+        variation_basis = old_position.variation_basis if old_position is not None else None
 
         # Update position and get actual commission (may change for flips)
         actual_commission = self._update_position(ctx)
@@ -401,7 +402,29 @@ class FillExecutor:
         )
 
         # Update cash (include multiplier for futures/derivatives)
-        cash_change = -signed_qty * fill_price * multiplier - actual_commission
+        if self.account.futures_methods is not None and order.asset in self.account.futures_methods:
+            cash_change = -actual_commission
+            if old_quantity * signed_qty < 0:
+                assert variation_basis is not None
+                closed = min(abs(old_quantity), abs(signed_qty))
+                cash_change += (
+                    closed
+                    * (1 if old_quantity > 0 else -1)
+                    * (fill_price - variation_basis)
+                    * multiplier
+                )
+            if position is not None:
+                if old_quantity == 0 or old_quantity * position.quantity < 0:
+                    position.variation_basis = fill_price
+                elif old_quantity * signed_qty > 0:
+                    assert variation_basis is not None
+                    position.variation_basis = (
+                        old_quantity * variation_basis + signed_qty * fill_price
+                    ) / position.quantity
+                else:
+                    position.variation_basis = variation_basis
+        else:
+            cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change
         if shared_budget is not None or contextual_slippage:
             self.orders.volume_consumed_by_asset[order.asset] = (

@@ -71,6 +71,7 @@ class ExecutionJournal:
     recorded_rows: list[tuple[datetime, int, str, str]] | None = None
     corporate_receivable_snapshots: dict[tuple[datetime, int | None], float] | None = None
     completed_corporate_entitlements: list[dict[str, Any]] | None = None
+    futures_settlements: list[dict[str, Any]] | None = None
     fill_snapshots: (
         list[tuple[int, datetime, tuple[float, float, float, float, int], list[tuple[Any, ...]]]]
         | None
