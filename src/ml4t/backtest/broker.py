@@ -591,10 +591,16 @@ class Broker:
             )
         ]
 
-    def _portfolio_snapshot(self, *, include_holdings: bool):
-        state, holdings, _accounting = self._portfolio_ledger.snapshot(
+    def _portfolio_snapshot(
+        self, *, include_holdings: bool, observation_key: tuple[datetime, int] | None = None
+    ):
+        state, holdings, accounting = self._portfolio_ledger.snapshot(
             include_holdings=include_holdings
         )
+        if observation_key is not None and accounting is not None:
+            snapshots = self._execution_journal.accounting_snapshots
+            assert snapshots is not None
+            snapshots[observation_key] = accounting
         return state, holdings
 
     def _accounting_observations(self, account, metadata):

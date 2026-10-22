@@ -23,9 +23,8 @@ encumbers funds; it is neither a fee nor a deduction from cash.
 from datetime import UTC, datetime, timedelta
 from tempfile import TemporaryDirectory
 import polars as pl
-from ml4t.backtest import (
-    AssetClass, BacktestConfig, BacktestResult, ContractSpec, Strategy, run_backtest,
-)
+from ml4t.backtest import AssetClass, BacktestConfig, BacktestResult
+from ml4t.backtest import ContractSpec, Strategy, run_backtest
 from ml4t.backtest.config import CommissionType
 
 times = [datetime(2025, 3, 3, 21, tzinfo=UTC) + timedelta(days=i) for i in range(4)]
@@ -177,7 +176,7 @@ Existing schema 2 through 5 artifacts remain readable with their original method
 Corporate receivables and prepared benchmarks can coexist in the same artifact.
 
 The captured reference tests in
-[`test_zipline_futures_variation.py`](https://github.com/ml4t/backtest/blob/main/tests/test_zipline_futures_variation.py)
+[`test_zipline_futures_variation.py`](https://github.com/ml4t/backtest/blob/fcde877fd686d599d4c4283d3122ddc9a77976d2/tests/test_zipline_futures_variation.py)
 compare eight original Zipline Reloaded 3.2.0 runs: long, short, close and
 scale-in/partial-close/reversal, each with zero and fixed per-future fees. Cash,
 NAV, position basis, marks and fills match exactly for those declared inputs.
