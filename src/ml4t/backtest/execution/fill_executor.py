@@ -391,8 +391,10 @@ class FillExecutor:
                 basis = fill_price
             elif old_quantity * signed_qty > 0.0:
                 basis = (basis * old_quantity + fill_price * signed_qty) / position.quantity
-            position._commission_adjusted_cost_basis = basis + (
-                actual_commission / (position.quantity * multiplier)
+            position._commission_adjusted_cost_basis = (
+                (basis * position.quantity + actual_commission / multiplier) / position.quantity
+                if actual_commission
+                else basis
             )
 
         self._update_lock_notional_free_cash(
@@ -404,17 +406,21 @@ class FillExecutor:
         # Update cash (include multiplier for futures/derivatives)
         if self.account.futures_methods is not None and order.asset in self.account.futures_methods:
             cash_change = -actual_commission
-            if old_quantity * signed_qty < 0:
+            payout_quantity = 0.0
+            payout = 0.0
+            mode = self.account.futures_methods[order.asset]
+            if mode == "on_mark" and old_quantity:
+                assert variation_basis is not None
+                payout_quantity = old_quantity
+                payout = old_quantity * (fill_price - variation_basis) * multiplier
+            elif old_quantity * signed_qty < 0:
                 assert variation_basis is not None
                 closed = min(abs(old_quantity), abs(signed_qty))
-                cash_change += (
-                    closed
-                    * (1 if old_quantity > 0 else -1)
-                    * (fill_price - variation_basis)
-                    * multiplier
-                )
+                payout_quantity = closed * (1 if old_quantity > 0 else -1)
+                payout = payout_quantity * (fill_price - variation_basis) * multiplier
+            cash_change += payout
             if position is not None:
-                if old_quantity == 0 or old_quantity * position.quantity < 0:
+                if mode == "on_mark" or old_quantity == 0 or old_quantity * position.quantity < 0:
                     position.variation_basis = fill_price
                 elif old_quantity * signed_qty > 0:
                     assert variation_basis is not None
@@ -423,6 +429,27 @@ class FillExecutor:
                     ) / position.quantity
                 else:
                     position.variation_basis = variation_basis
+            if payout_quantity:
+                settlements = self.journal.futures_settlements
+                assert settlements is not None
+                settlements.append(
+                    {
+                        "timestamp": current_time,
+                        "available_at": current_time,
+                        "asset": order.asset,
+                        "source": "ml4t.backtest/fill",
+                        "event_id": f"{order.order_id}:{len(self.journal.fills) - 1}",
+                        "revision_id": "generated",
+                        "phase": "fill_mark" if mode == "on_mark" else "close",
+                        "quantity": payout_quantity,
+                        "basis_before": variation_basis,
+                        "settlement_price": fill_price,
+                        "multiplier": multiplier,
+                        "currency": broker._get_contract_currency(order.asset),
+                        "cash_delta": payout,
+                        "fill_sequence": len(self.journal.fills) - 1,
+                    }
+                )
         else:
             cash_change = -signed_qty * fill_price * multiplier - actual_commission
         broker.cash += cash_change

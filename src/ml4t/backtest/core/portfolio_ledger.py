@@ -111,9 +111,10 @@ class PortfolioLedger:
                     )
                 )
         equity = cash + (liquidation if variation else net)
-        equity += (
+        receivables = (
             self.account.corporate.receivable_value if self.account.corporate is not None else 0.0
         )
+        equity += receivables
         details = None
         if variation:
             holds = (
@@ -129,7 +130,7 @@ class PortfolioLedger:
                 positions_value=liquidation,
                 initial_margin_required=initial_margin,
                 maintenance_margin_required=maintenance_margin,
-                available_funds=equity - initial_margin - holds - buffer,
+                available_funds=equity - receivables - initial_margin - holds - buffer,
                 futures_unsettled_pnl=unsettled,
                 margin_breach=equity < maintenance_margin,
             )
