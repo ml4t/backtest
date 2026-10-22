@@ -1,25 +1,35 @@
 """Actual published Zipline continuous selection and explicit expiry cleanup traces."""
 
+import importlib
 import json
 import sys
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any, cast
 
 import pandas as pd
-from zipline import run_algorithm
-from zipline.api import (
-    continuous_future,
-    get_datetime,
-    order,
-    set_benchmark,
-    set_commission,
-    set_slippage,
-    sid,
-)
-from zipline.data.bundles import bundles, ingest, register, unregister
-from zipline.finance.commission import NoCommission
-from zipline.finance.slippage import NoSlippage
-from zipline.utils.calendar_utils import get_calendar
+
+zipline: Any = importlib.import_module("zipline")
+api: Any = importlib.import_module("zipline.api")
+bundle_module: Any = importlib.import_module("zipline.data.bundles")
+commission: Any = importlib.import_module("zipline.finance.commission")
+slippage: Any = importlib.import_module("zipline.finance.slippage")
+calendars: Any = importlib.import_module("zipline.utils.calendar_utils")
+run_algorithm = cast(Any, zipline).run_algorithm
+continuous_future = api.continuous_future
+get_datetime = api.get_datetime
+order = api.order
+set_benchmark = api.set_benchmark
+set_commission = api.set_commission
+set_slippage = api.set_slippage
+sid = api.sid
+bundles = bundle_module.bundles
+ingest = bundle_module.ingest
+register = bundle_module.register
+unregister = bundle_module.unregister
+NoCommission = commission.NoCommission
+NoSlippage = slippage.NoSlippage
+get_calendar = calendars.get_calendar
 
 assert version("zipline-reloaded") == "3.2.0"
 root = Path(sys.argv[1])
@@ -46,7 +56,7 @@ def prepare(_env, assets, _minute, daily, adjustments, _calendar, _start, _end, 
                 "multiplier": [50.0] * 2,
                 "tick_size": [0.25] * 2,
             },
-            index=[17, 23],
+            index=pd.Index([17, 23]),
         ),
         root_symbols=pd.DataFrame({"root_symbol": ["TEST"], "exchange": ["CME"]}),
         exchanges=pd.DataFrame(
@@ -68,7 +78,7 @@ def prepare(_env, assets, _minute, daily, adjustments, _calendar, _start, _end, 
 
 register(name, prepare, calendar_name="us_futures", start_session=days[0], end_session=days[-1])
 ingest(name)
-report = {
+report: dict[str, Any] = {
     "package": "zipline-reloaded==3.2.0",
     "source_revision": "cf649ac06fddce76f6caa2403cd8494ac84f72ad",
     "wheel_sha256": "1d7a3c4f547c02e9a3c3cc1f8ea2394641124c1fdb35ef27cdf30fa488d3899b",
