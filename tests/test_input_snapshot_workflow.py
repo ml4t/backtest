@@ -196,3 +196,108 @@ def test_snapshot_feature_artifact_drives_actual_engineer_decision_clock_and_eli
         BacktestResult.from_parquet(tmp_path / "results").input_provenance
         == result.input_provenance
     )
+
+
+def test_real_snapshot_consumes_all_declared_tables_without_losing_actions_or_cash_flows(tmp_path):
+    storage = pytest.importorskip("ml4t.data.storage")
+    from ml4t.backtest import ContractSpec
+
+    SnapshotTable, export_snapshot = storage.SnapshotTable, storage.export_snapshot
+    times = [datetime(2025, 1, 6, 21, tzinfo=UTC) + timedelta(days=i) for i in range(3)]
+    prices = pl.DataFrame({"timestamp": times, "asset": ["A"] * 3, "close": [100.0, 50.0, 52.0]})
+    signals = pl.DataFrame({"timestamp": times, "asset": ["A"] * 3, "score": [10.0, 20.0, 30.0]})
+    context = pl.DataFrame({"timestamp": times, "risk": [1.0, 2.0, 3.0]})
+    flows = pl.DataFrame(
+        {"timestamp": [times[1]], "event_id": ["fund"], "kind": ["delta"], "value": [1000.0]}
+    )
+    actions = pl.DataFrame(
+        [
+            {
+                "event_id": "split",
+                "action_kind": "split",
+                "asset": "A",
+                "available_at": times[0],
+                "effective_at": times[1],
+                "currency": "USD",
+                "source": "capture",
+                "revision_id": "r1",
+                "share_basis": "pre_event",
+                "split_ratio": 2.0,
+                "split_ratio_convention": "new_per_old",
+            }
+        ]
+    )
+    frames = {
+        "prices": prices,
+        "signals": signals,
+        "context": context,
+        "corporate_actions": actions,
+        "capital_flows": flows,
+    }
+    metadata = {
+        "source_revision": "all-roles-r1",
+        "identity_namespace": "capture",
+        "units": {"close": "USD/share"},
+        "as_of": times[-1].isoformat(),
+        "price_basis": "raw",
+        "share_basis": "source",
+        "revisions": {"capture": "r1"},
+    }
+    spec = FeedSpec(
+        time_contract_version=2, calendar=None, timestamp_semantics="event_time", entity_col="asset"
+    )
+    snapshot = export_snapshot(
+        tmp_path / "inputs",
+        {
+            name: SnapshotTable(
+                frame,
+                role=name,
+                metadata=metadata,
+                feed_spec=spec if name in {"prices", "signals"} else None,
+            )
+            for name, frame in frames.items()
+        },
+        effective_config={},
+        artifacts={},
+        calendar=None,
+    )
+    feed = DataFeed.from_snapshot(
+        tmp_path / "inputs",
+        signals_table="signals",
+        context_table="context",
+        corporate_actions_table="corporate_actions",
+        capital_flows_table="capital_flows",
+    )
+    observed = []
+
+    class Buy(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            observed.append((data["A"]["signals"]["score"], context["risk"]))
+            if timestamp == times[0]:
+                broker.submit_order("A", 10)
+
+    result = Engine(
+        feed,
+        Buy(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=10000,
+            commission_rate=0,
+            slippage_rate=0,
+            execution_mode=ExecutionMode.SAME_BAR,
+        ),
+        contract_specs={"A": ContractSpec("A", currency="USD")},
+        holdings_sampling="bar",
+    ).run()
+    assert observed == [(10, 1), (20, 2), (30, 3)]
+    assert result.to_portfolio_state_dataframe()["cash"].to_list() == [9000, 10000, 10000]
+    assert result.to_equity_dataframe()["equity"].to_list() == [10000, 11000, 11040]
+    assert result.to_actions_dataframe().filter(pl.col("operation") == "split")[
+        "quantity_after"
+    ].to_list() == [20]
+    assert result.input_provenance["snapshot_id"] == snapshot.snapshot_id
+    assert result.input_provenance["consumed_tables"] == {name: name for name in frames}
+    result.to_parquet(tmp_path / "result")
+    assert (
+        BacktestResult.from_parquet(tmp_path / "result").input_provenance == result.input_provenance
+    )
