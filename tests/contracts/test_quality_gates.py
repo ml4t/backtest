@@ -5,9 +5,11 @@ from __future__ import annotations
 import importlib.util
 import math
 import tomllib
+from datetime import datetime
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 import yaml
 
 from tests.helpers.invariants import _accounting_tolerance
@@ -79,7 +81,8 @@ def test_warning_policy_fails_new_warnings_and_has_no_global_suppression() -> No
     assert filters[0] == "error"
     assert "ignore::DeprecationWarning" not in filters
     assert "ignore::PendingDeprecationWarning" not in filters
-    assert len(filters) <= 6
+    with pytest.raises(DeprecationWarning, match="utcnow"):
+        _ = datetime.utcnow()
 
 
 def test_accounting_tolerance_is_an_exact_ulp_bound() -> None:
