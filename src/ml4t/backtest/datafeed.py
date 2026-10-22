@@ -423,6 +423,10 @@ class DataFeed:
             calendar=clock["resolved_calendar"],
         )
         frames = {role: snapshot.tables[name] for role, name in selected.items()}
+        if feature_spec is None and signals_table is not None:
+            artifact = snapshot.manifest["content"]["tables"][signals_table].get("artifact")
+            if isinstance(artifact, dict) and artifact.get("kind") == "features":
+                feature_spec = artifact
         feed = cls(
             prices_df=frames["prices"],
             signals_df=frames.get("signals"),
@@ -447,6 +451,10 @@ class DataFeed:
             "normalized_table_format": "arrow-ipc-rechunked-v1",
             "polars_version": pl.__version__,
         }
+        features = feed.feature_metadata
+        if features is not None:
+            provenance["feature_spec"] = features["spec"]
+            provenance["feature_projection"] = features["projection"]
         validate_input_provenance(provenance)
         feed._input_provenance = provenance
         return feed

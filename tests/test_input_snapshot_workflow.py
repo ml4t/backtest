@@ -107,3 +107,92 @@ def test_in_memory_price_change_after_snapshot_read_is_rejected_before_start_cal
     with pytest.raises(ValueError, match="[Ss]napshot.*changed|[Cc]hanged.*snapshot"):
         Engine(feed, Noop(), BacktestConfig(calendar=None)).run()
     assert not started
+
+
+def test_snapshot_feature_artifact_drives_actual_engineer_decision_clock_and_eligibility(tmp_path):
+    from pathlib import Path
+
+    storage = pytest.importorskip("ml4t.data.storage")
+    preparation = pytest.importorskip("ml4t.engineer.features.preparation")
+    artifacts = pytest.importorskip("ml4t.engineer.artifacts")
+    rolling = pytest.importorskip("ml4t.engineer.features.rolling")
+    root = Path(__file__).parent / "fixtures/prepared_features"
+    source = json.loads((root / "manifest.json").read_text())
+    panel = preparation.prepare_feature_panel(
+        pl.read_parquet(root / "history.parquet"),
+        features={"average": rolling.finite_mean("close", period=3)},
+        lookbacks={"average": 3},
+        input_columns=["close"],
+        decisions=pl.read_parquet(root / "decisions.parquet"),
+        universe=pl.read_parquet(root / "universe.parquet"),
+        price_basis="raw",
+        feed_spec=FeedSpec.from_any(source["input_feed_spec"]),
+    )
+    feature_spec = artifacts.FeatureSpec.from_mapping(source["feature_spec"])
+    prices = panel.select(
+        pl.col("decision_time").alias("timestamp"), "asset", pl.lit(100.0).alias("close")
+    )
+    metadata = {
+        "source_revision": "declared-fixture-r1",
+        "identity_namespace": "fixture",
+        "units": {"close": "USD/share", "average": "USD/share"},
+        "as_of": None,
+        "price_basis": "raw",
+        "share_basis": "source",
+        "revisions": {"fixture": "r1"},
+    }
+    storage.export_snapshot(
+        tmp_path / "inputs",
+        {
+            "prices": storage.SnapshotTable(
+                prices,
+                role="prices",
+                metadata=metadata,
+                feed_spec=FeedSpec(
+                    time_contract_version=2, calendar=None, timestamp_semantics="event_time"
+                ),
+            ),
+            "features": storage.SnapshotTable(
+                panel, role="features", metadata=metadata, artifact=feature_spec
+            ),
+        },
+        effective_config={"seed": 7},
+        artifacts={},
+        calendar=None,
+    )
+    feed = DataFeed.from_snapshot(tmp_path / "inputs", signals_table="features")
+    seen = []
+
+    class Read(Strategy):
+        def on_data(self, timestamp, data, context, broker):
+            seen.append([data[asset]["signals"]["average"] for asset in ["A", "B"]])
+            if data["A"]["signals"]["average"] is not None and broker.get_position("A") is None:
+                broker.submit_order("A", 1)
+
+    result = Engine(
+        feed,
+        Read(),
+        BacktestConfig(
+            calendar=None,
+            initial_cash=10000,
+            execution_mode=ExecutionMode.SAME_BAR,
+            commission_type=CommissionType.PER_TRADE,
+            commission_per_trade=2,
+            slippage_rate=0,
+        ),
+        holdings_sampling="bar",
+    ).run()
+    assert seen == [[2.0, None], [3.0, None]]
+    assert result.to_fills_dataframe()["asset"].to_list() == ["A"]
+    assert result.to_portfolio_state_dataframe()["cash"].to_list() == [9898, 9898]
+    assert result.input_provenance["feature_spec"]["schema"] == feature_spec.to_dict()["schema"]
+    assert (
+        result.input_provenance["feature_spec"]["definition"]
+        == feature_spec.to_dict()["definition"]
+    )
+    assert result.input_provenance["feature_spec"]["storage"]["path"] == "tables/features"
+    result.to_parquet(tmp_path / "results")
+    assert (
+        BacktestResult.from_parquet(tmp_path / "results").input_provenance
+        == result.input_provenance
+    )
