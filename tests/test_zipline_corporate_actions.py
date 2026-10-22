@@ -29,7 +29,7 @@ REFERENCE = json.loads((ROOT / "reference.json").read_text())
 BOUNDARIES = json.loads((ROOT / "boundary-reference.json").read_text())
 
 
-def prepared_feed(reference, *, declarations=True, ex_close=None):
+def prepared_feed(reference, *, declarations=True, ex_close=None, prepared_actions=None):
     snapshot = ROOT / reference["input"]["name"] / "snapshot"
     frames = {
         name: pl.read_parquet(snapshot / f"tables/{name}/data.parquet")
@@ -60,6 +60,8 @@ def prepared_feed(reference, *, declarations=True, ex_close=None):
     actions = frames["actions"]
     if declarations:
         actions = pl.read_parquet(ROOT / reference["input"]["name"] / "native_actions.parquet")
+    if prepared_actions is not None:
+        actions = prepared_actions
     assets = [
         Asset(row["asset"], row["symbol"], row["sid"])
         for row in frames["zipline_equities"].to_dicts()
@@ -160,6 +162,37 @@ def run_reference_case(reference, **options):
         contract_specs={a.key: ContractSpec(a.key, currency="USD") for a in assets},
     )
     return performance, trace, premarket
+
+
+@pytest.mark.parametrize(
+    "reference", REFERENCE["cases"] + BOUNDARIES["cases"], ids=lambda c: c["input"]["name"]
+)
+def test_installed_data_preparation_flows_directly_into_the_action_enabled_engine(reference):
+    adjustments = pytest.importorskip("ml4t.data.adjustments")
+    storage = pytest.importorskip("ml4t.data.storage")
+    snapshot = storage.read_snapshot(ROOT / reference["input"]["name"] / "snapshot")
+    declared = snapshot.tables["actions"].with_columns(
+        pl.lit(pd.Timestamp(reference["closes"][0])).alias("available_at"),
+        pl.lit("USD").alias("currency"),
+        pl.lit("pre_event").alias("share_basis"),
+    )
+    actual = adjustments.prepare_action_inputs(
+        declared,
+        feed_spec=FeedSpec(
+            time_contract_version=2,
+            timestamp_col="effective_at",
+            entity_col="asset",
+            calendar="NYSE",
+            timestamp_semantics="session_label",
+        ),
+        required_terms=["available_at", "currency", "share_basis"],
+    )
+    retained = pl.read_parquet(ROOT / reference["input"]["name"] / "native_actions.parquet")
+    assert actual.equals(retained)
+    assert actual["missing_terms"].to_list() == [[]]
+    performance, _, _ = run_reference_case(reference, prepared_actions=actual)
+    assert performance["cash"].to_list() == reference["cash"]
+    assert performance["portfolio_value"].to_list() == reference["nav"]
 
 
 @pytest.mark.parametrize("reference", BOUNDARIES["cases"], ids=lambda c: c["input"]["name"])

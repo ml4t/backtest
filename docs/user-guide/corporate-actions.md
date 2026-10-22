@@ -117,7 +117,8 @@ Actions run before strategy callbacks and subsequent order execution at that clo
 
 An exact repeated revision applies once. Conflicting terms under the same revision
 fail. A later publication may replace earlier terms only before the earliest
-effective instant; equal publication clocks for different revisions are ambiguous.
+effective instant. Different revisions competing for the latest publication clock
+are ambiguous.
 Retroactive corrections require a separately declared forward event.
 
 ## Input basis and audit outputs
@@ -164,6 +165,9 @@ closing cash, NAV and positions for long/short splits, reverse splits, partial o
 cash payments after sale, own/cross-stock payments and destination position changes.
 The original reports transaction commission as `None` under `NoCommission`; native
 fills report explicit zero, while original and native order commission are both zero.
+After a security payment covers a destination position, the callback facade can
+retain the original's zero-quantity position entry and reported basis. Native
+holdings remain flat; the facade projects that presentation from the payment journal.
 
 Original daily premarket valuation can already read that day's close. Changing only
 the ex-day close by $7 changes its premarket mark by $7. Backtest retains the causal
