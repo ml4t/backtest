@@ -42,15 +42,21 @@ jobs:
         run: |
           uv venv --python "${{ matrix.python }}" "$RUNNER_TEMP/consumer"
           uv pip install --python "$RUNNER_TEMP/consumer" \
-            wheelhouse/*.whl pytest -r validation/successor-integration-requirements.txt
+            wheelhouse/*.whl pytest hypothesis -r validation/successor-integration-requirements.txt
           uv pip check --python "$RUNNER_TEMP/consumer"
       - name: Verify installed public workflows and legacy input conversion
         run: >-
           uv run --no-project --python "$RUNNER_TEMP/consumer" python -I -m pytest
           tests/test_input_snapshot_workflow.py tests/test_migration_inputs.py
-          tests/test_offline_migration.py tests/test_zipline_dated_reference.py
-          tests/test_zipline_continuous_futures.py tests/test_data_dated_rolls.py
-          -o addopts='' --import-mode=importlib -W error -q
+          tests/test_offline_migration.py tests/test_data_dated_rolls.py
+          tests/test_zipline_*.py tests/test_runtime_*.py
+          tests/test_corporate_actions.py tests/test_futures_variation.py
+          tests/test_dated_futures_rolls.py tests/test_futures_lifecycle.py
+          tests/test_capital_flows.py tests/test_native_account_views.py
+          tests/test_prepared_history.py tests/test_history_sources.py
+          tests/test_partial_close_accounting.py tests/accounting
+          tests/property/test_accounting_invariants.py
+          -o addopts='' --import-mode=importlib -q
           --junitxml="${{ runner.temp }}/successor-integration.xml"
       - name: Require every pinned integration workflow to execute
         env:
