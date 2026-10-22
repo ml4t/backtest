@@ -196,6 +196,8 @@ filterwarnings = [
     "ignore::FutureWarning:zipline",  # Zipline compatibility warnings
     # pandas 3.1 / exchange_calendars 4.13.2: equivalent aliases in calendar construction.
     "ignore:(Series.values returning an ndarray that drops timezone|DatetimeIndex.weekday is deprecated and will be removed in a future version. Use DatetimeIndex.day_of_week instead.):DeprecationWarning:(pandas\\.core\\.series|exchange_calendars\\.exchange_calendar_xhkg|exchange_calendars\\.utils\\.pandas_utils)$",
+    # PMC 5.5 NYSE uses this equivalent alias; keep caller-origin deprecations fatal.
+    'ignore:Series[.]dt[.]weekday is deprecated and will be removed in a future version[.] Use Series[.]dt[.]day_of_week instead[.]$:DeprecationWarning:pandas_market_calendars[.]calendars[.]nyse$',
 ]
 
 [tool.ruff]

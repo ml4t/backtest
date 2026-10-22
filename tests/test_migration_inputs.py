@@ -100,6 +100,13 @@ def test_ambiguous_csv_keys_are_rejected_instead_of_silently_overwriting_an_even
         Engine(DataFeed(**args), Noop(), BacktestConfig(calendar=None)).run()
 
 
+def test_direct_pandas_weekday_deprecation_remains_an_error_outside_calendar_dependency():
+    pandas = pytest.importorskip("pandas", minversion="3.1")
+    dates = pandas.Series(pandas.to_datetime(["2025-01-06"]))
+    with pytest.raises(pandas.errors.Pandas4Warning, match="Series.dt.weekday is deprecated"):
+        _ = dates.dt.weekday
+
+
 def test_unsorted_cross_sections_keep_original_asset_order_at_equal_event_instants():
     times = pd.to_datetime([EPOCHS[2], EPOCHS[2], EPOCHS[0], EPOCHS[0]], utc=True)
     prices = pd.DataFrame(

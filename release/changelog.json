@@ -2,6 +2,32 @@
   "legacy_start": "0.1.0b17",
   "releases": [
     {
+      "version": "0.2.0",
+      "date": "Unreleased",
+      "sections": {
+        "Added": [
+          "Run causal current/history, scheduled callbacks, prepared Pipeline and frozen CSV inputs through native runtime services and the optional Zipline callback facade. Original OLMAR, moving-average and momentum journeys retain declared timing and execution methods.",
+          "Apply raw splits, cash and stock distributions, mergers and capital flows to native positions, pending orders and account histories. Retain action, cash-flow and dated-roll ledgers in versioned result artifacts.",
+          "Offer explicit futures variation-cash accounting, declared settlement policies, dated-contract roll legs and lifecycle controls. Continuous-future research reads use prepared Data inputs; orders execute dated contracts at raw quotes.",
+          "Consume immutable Data snapshots and captured Engineer feature declarations, retaining exact input provenance through native results. Add runnable offline preparation-to-Diagnostic and continuous-futures migration workflows."
+        ],
+        "Fixed": [
+          "Compute first-period investment returns from configured initial capital, retain observed account/holdings/fill histories, and distinguish external capital, futures exposure, liquidation value and NAV.",
+          "Reject duplicate or ambiguous event keys, changed verified inputs, and undeclared continuous-future queries before simulation callbacks or orders.",
+          "Qualify actual producer workflows on current Pandas, allowing only the exact deprecated weekday alias from upstream PMC NYSE schedule construction while keeping other warnings fatal."
+        ],
+        "Compatibility": [
+          "Calendar selection now distinguishes omission, a named calendar and explicit None: inherit declared feed metadata then NYSE only when omitted; None disables schedules. Unversioned saved configurations retain their legacy interpretation. Calendar-free numerical annualization defaults to 252 observations per year and accepts an explicit periods_per_year.",
+          "Require ml4t-specs>=0.2.0. Preserve historical result readers and the v0.1 compatibility snapshot while recording the expanded v0.2 public surface. Native cash accounting remains the default; variation accounting and legacy execution conventions are opt-in.",
+          "The complete optional Data/Engineer/Diagnostic migration cohort is qualified on Python 3.12 through 3.14 against documented immutable source builds. Backtest core Python 3.15 qualification is separate; these source identities are not claims about older published consumer wheels."
+        ],
+        "Validation": [
+          "Expand installed successor qualification to actual causal history, Pipeline, identity, lifecycle, controls and account producer paths across Linux, macOS and Windows. Require every selected workflow to execute without skips. The Arrow-present cohort uses PyArrow 26 or later with Pandas 3.1 to avoid deprecated timezone-dropping index access in older Arrow conversion.",
+          "Retain accepted performance measurements within their explicitly reviewed scope and unchanged output identities; no new speed claim or reference timing measurement is introduced."
+        ]
+      }
+    },
+    {
       "version": "0.1.13",
       "date": "2026-10-15",
       "sections": {
